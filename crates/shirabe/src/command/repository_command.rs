@@ -12,8 +12,8 @@ use crate::json::JsonFile;
 use indexmap::IndexMap;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    InvalidArgumentException, PHP_URL_HOST, PhpMixed, RuntimeException, impl_php_class, parse_url,
-    php_regex, strtolower,
+    InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class, parse_url, php_regex,
+    strtolower,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -64,9 +64,9 @@ impl RepositoryCommand {
                     .get("url")
                     .and_then(|v| v.as_string())
                     .map(|url| {
-                        parse_url(url, PHP_URL_HOST)
-                            .as_string()
-                            .unwrap_or("")
+                        parse_url(url)
+                            .and_then(|parsed| parsed.host)
+                            .unwrap_or_default()
                             .ends_with("packagist.org")
                     })
                     .unwrap_or(false);

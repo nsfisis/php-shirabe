@@ -39,12 +39,8 @@ impl Filesystem {
 
         let mut do_copy = true;
         // PHP: !$overwriteNewerFiles && !parse_url($originFile, PHP_URL_HOST) && is_file($targetFile)
-        let origin_host = shirabe_php_shim::parse_url(origin_file, shirabe_php_shim::PHP_URL_HOST);
-        if matches!(
-            origin_host,
-            shirabe_php_shim::PhpMixed::Null | shirabe_php_shim::PhpMixed::Bool(false)
-        ) && shirabe_php_shim::is_file(target_file)
-        {
+        let origin_host = shirabe_php_shim::parse_url(origin_file).and_then(|url| url.host);
+        if origin_host.is_none() && shirabe_php_shim::is_file(target_file) {
             do_copy = shirabe_php_shim::filemtime(origin_file).unwrap_or(0)
                 > shirabe_php_shim::filemtime(target_file).unwrap_or(0);
         }

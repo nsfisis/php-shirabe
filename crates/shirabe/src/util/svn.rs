@@ -9,8 +9,8 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    LogicException, PHP_URL_HOST, PhpMixed, RuntimeException, empty, implode, parse_url,
-    parse_url_all, php_regex, stripos, strpos, trim,
+    LogicException, PhpMixed, RuntimeException, implode, parse_url, php_regex, stripos, strpos,
+    trim,
 };
 use std::sync::Mutex;
 
@@ -344,8 +344,8 @@ impl Svn {
 
         let auth_config = self.config.borrow_mut().get("http-basic");
 
-        let host = parse_url(&self.url, PHP_URL_HOST);
-        let host_str = host.as_string().unwrap_or("");
+        let host = parse_url(&self.url).and_then(|parsed| parsed.host);
+        let host_str = host.as_deref().unwrap_or("");
         let auth_for_host = auth_config
             .as_array()
             .and_then(|m| m.get(host_str))
@@ -376,28 +376,21 @@ impl Svn {
 
     /// Create the auth params from the url
     fn create_auth_from_url(&mut self) -> bool {
-        let uri = parse_url_all(&self.url);
-        let uri_arr = match uri.as_array() {
-            Some(a) => a.clone(),
-            None => {
-                self.has_auth = Some(false);
-                return false;
-            }
-        };
-        let user_val = uri_arr.get("user").cloned().unwrap_or(PhpMixed::Null);
-        if empty(&user_val) {
+        let Some(uri) = parse_url(&self.url) else {
             self.has_auth = Some(false);
             return false;
-        }
+        };
+        let Some(user) = uri.user.filter(|user| !user.is_empty() && user != "0") else {
+            self.has_auth = Some(false);
+            return false;
+        };
 
-        let pass_val = uri_arr.get("pass").cloned().unwrap_or(PhpMixed::Null);
         self.credentials = Some(SvnCredentials {
-            username: user_val.as_string().unwrap_or("").to_string(),
-            password: if !empty(&pass_val) {
-                pass_val.as_string().unwrap_or("").to_string()
-            } else {
-                String::new()
-            },
+            username: user,
+            password: uri
+                .pass
+                .filter(|pass| !pass.is_empty() && pass != "0")
+                .unwrap_or_default(),
         });
 
         self.has_auth = Some(true);

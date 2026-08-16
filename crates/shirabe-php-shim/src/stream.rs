@@ -84,9 +84,9 @@ pub fn stream_isatty(stream: PhpResource) -> bool {
 /// `STREAM_IS_URL`; this classifies by the scheme itself, so a registered custom wrapper claiming to
 /// be local (or vice versa) comes out differently than in PHP.
 pub fn stream_is_local(path: &str) -> bool {
-    match crate::parse_url(path, crate::PHP_URL_SCHEME) {
-        PhpMixed::String(scheme) => scheme.eq_ignore_ascii_case("file"),
-        _ => true,
+    match crate::parse_url(path).and_then(|url| url.scheme) {
+        Some(scheme) => scheme.eq_ignore_ascii_case("file"),
+        None => true,
     }
 }
 

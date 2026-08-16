@@ -6,8 +6,8 @@ use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::util::{GetResult, RemoteFilesystem};
 use shirabe_php_shim::{
-    PHP_URL_HOST, PhpMixed, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS, file_get_contents,
-    parse_url, strpos, unlink,
+    PhpMixed, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS, file_get_contents, parse_url,
+    strpos, unlink,
 };
 
 // Mirrors RemoteFilesystemTest::getConfigMock: get('github-domains') and
@@ -356,8 +356,8 @@ fn test_bit_bucket_public_download() {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
         let mut rfs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false, None);
-        let hostname = parse_url(url, PHP_URL_HOST);
-        let hostname = hostname.as_string().unwrap_or("");
+        let hostname = parse_url(url).and_then(|parsed| parsed.host);
+        let hostname = hostname.as_deref().unwrap_or("");
 
         let (result, _headers) = rfs
             .get_contents(hostname, url, false, IndexMap::new())

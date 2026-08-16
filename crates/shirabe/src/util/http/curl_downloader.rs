@@ -628,22 +628,31 @@ impl CurlDownloader {
         if let Some(location_header) = response.inner.get_header("location")
             && !location_header.is_empty()
         {
-            if !parse_url(&location_header, shirabe_php_shim::PHP_URL_SCHEME).is_null() {
+            let location_parsed = parse_url(&location_header);
+            if location_parsed
+                .as_ref()
+                .and_then(|parsed| parsed.scheme.as_deref())
+                .is_some_and(|scheme| !scheme.is_empty() && scheme != "0")
+            {
                 // Absolute URL; e.g. https://example.com/composer
                 target_url = location_header;
-            } else if !parse_url(&location_header, shirabe_php_shim::PHP_URL_HOST).is_null() {
+            } else if location_parsed
+                .as_ref()
+                .and_then(|parsed| parsed.host.as_deref())
+                .is_some_and(|host| !host.is_empty() && host != "0")
+            {
                 // Scheme relative; e.g. //example.com/foo
                 target_url = format!(
                     "{}:{}",
-                    parse_url(url, shirabe_php_shim::PHP_URL_SCHEME)
-                        .as_string()
-                        .unwrap_or(""),
+                    parse_url(url)
+                        .and_then(|parsed| parsed.scheme)
+                        .unwrap_or_default(),
                     location_header
                 );
             } else if location_header.starts_with('/') {
                 // Absolute path; e.g. /foo
-                let url_host = parse_url(url, shirabe_php_shim::PHP_URL_HOST);
-                let url_host_str = url_host.as_string().unwrap_or("");
+                let url_host = parse_url(url).and_then(|parsed| parsed.host);
+                let url_host_str = url_host.as_deref().unwrap_or("");
                 target_url = Preg::replace(
                     format!(
                         r"{{^(.+(?://|@){}(?::\d+)?)(?:[/\?].*)?$}}",

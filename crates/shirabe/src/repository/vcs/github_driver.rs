@@ -17,9 +17,9 @@ use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_key_exists, array_map,
+    InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_map,
     array_search_mixed, base64_decode, basename, empty, explode, extension_loaded, in_array_loose,
-    parse_url_all, php_regex, strpos, strtolower, substr, trim, urlencode,
+    parse_url, php_regex, strpos, strtolower, substr, trim, urlencode,
 };
 
 #[derive(Debug)]
@@ -666,19 +666,12 @@ impl GitHubDriver {
                     );
                 }
                 "custom" => {
-                    let bits = parse_url_all(&item_url);
-                    if matches!(bits, PhpMixed::Bool(false)) {
+                    let Some(bits) = parse_url(&item_url) else {
                         keys_to_remove.push(key_idx);
                         continue;
-                    }
-
-                    let bits_map = match bits {
-                        PhpMixed::Array(m) => m,
-                        _ => IndexMap::new(),
                     };
-                    if !array_key_exists("scheme", &bits_map)
-                        && !array_key_exists("host", &bits_map)
-                    {
+
+                    if bits.scheme.is_none() && bits.host.is_none() {
                         if Preg::is_match(php_regex!(r"{^[a-z0-9-]++\.[a-z]{2,3}$}"), &item_url) {
                             result[key_idx].insert(
                                 "url".to_string(),

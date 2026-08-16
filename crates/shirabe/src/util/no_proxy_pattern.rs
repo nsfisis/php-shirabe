@@ -3,9 +3,8 @@
 use indexmap::IndexMap;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    PHP_URL_HOST, PHP_URL_PORT, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
-    empty, explode, filter_var_int_with_range, filter_var_ip, inet_pton, ltrim, parse_url,
-    php_regex, stripos, strlen, strpbrk, strpos, substr, substr_count,
+    RuntimeException, array_key_exists, explode, filter_var_int_with_range, filter_var_ip,
+    inet_pton, ltrim, parse_url, php_regex, stripos, strlen, strpbrk, strpos, substr, substr_count,
 };
 
 /// Tests URLs against NO_PROXY patterns
@@ -70,23 +69,26 @@ impl NoProxyPattern {
 
     /// Returns false is the url cannot be parsed, otherwise a data object
     fn get_url_data(&self, url: &str) -> anyhow::Result<Option<UrlData>> {
-        let host = parse_url(url, PHP_URL_HOST);
-        if empty(&host) {
+        let parsed = parse_url(url);
+        let Some(host_str) = parsed
+            .as_ref()
+            .and_then(|parsed| parsed.host.clone())
+            .filter(|host| !host.is_empty() && host != "0")
+        else {
             return Ok(None);
-        }
-        let host_str = host.as_string().unwrap_or("").to_string();
+        };
 
-        let mut port_mixed = parse_url(url, PHP_URL_PORT);
+        let mut port = parsed.as_ref().and_then(|parsed| parsed.port);
 
-        if empty(&port_mixed) {
-            match parse_url(url, PHP_URL_SCHEME).as_string() {
-                Some("http") => port_mixed = PhpMixed::Int(80),
-                Some("https") => port_mixed = PhpMixed::Int(443),
+        if port.is_none_or(|port| port == 0) {
+            match parsed.as_ref().and_then(|parsed| parsed.scheme.as_deref()) {
+                Some("http") => port = Some(80),
+                Some("https") => port = Some(443),
                 _ => {}
             }
         }
 
-        let port_int = port_mixed.as_int().unwrap_or(0);
+        let port_int = port.unwrap_or(0);
         let host_name = format!(
             "{}{}",
             host_str,

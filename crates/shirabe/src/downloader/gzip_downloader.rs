@@ -14,8 +14,8 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PATHINFO_FILENAME, PHP_URL_PATH, PhpMixed, RuntimeException, extension_loaded, fclose, fopen,
-    fwrite, gzclose, gzopen, gzread, impl_php_class, implode, parse_url, pathinfo, strtr,
+    PATHINFO_FILENAME, PhpMixed, RuntimeException, extension_loaded, fclose, fopen, fwrite,
+    gzclose, gzopen, gzread, impl_php_class, implode, parse_url, pathinfo, strtr,
 };
 
 #[derive(Debug)]
@@ -82,12 +82,13 @@ impl ArchiveDownloader for GzipDownloader {
         path: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let filename = pathinfo(
-            parse_url(
-                &strtr(&package.get_dist_url().unwrap_or_default(), "\\", "/"),
-                PHP_URL_PATH,
-            )
-            .as_string()
-            .unwrap_or(""),
+            &parse_url(&strtr(
+                &package.get_dist_url().unwrap_or_default(),
+                "\\",
+                "/",
+            ))
+            .and_then(|url| url.path)
+            .unwrap_or_default(),
             PATHINFO_FILENAME,
         );
         let target_filepath = std::path::Path::new(path)

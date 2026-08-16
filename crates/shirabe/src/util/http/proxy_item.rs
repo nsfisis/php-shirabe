@@ -3,7 +3,7 @@
 use crate::util::http::RequestProxy;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, base64_encode, parse_url_all, rawurldecode, strpbrk,
+    PhpMixed, RuntimeException, base64_encode, parse_url, rawurldecode, strpbrk,
 };
 
 #[derive(Debug)]
@@ -23,44 +23,34 @@ impl ProxyItem {
             return Err(RuntimeException::new(syntax_error));
         }
 
-        let proxy_parsed = parse_url_all(&proxy_url);
-        let proxy = match proxy_parsed.as_array() {
-            None => {
-                return Err(RuntimeException::new(syntax_error));
-            }
-            Some(a) => a.clone(),
+        let Some(proxy) = parse_url(&proxy_url) else {
+            return Err(RuntimeException::new(syntax_error));
         };
 
-        if !proxy.contains_key("host") {
+        let Some(host) = proxy.host else {
             return Err(RuntimeException::new(format!(
                 "unable to find proxy host in {}",
                 env_name
             )));
-        }
+        };
 
-        let scheme = if proxy.contains_key("scheme") {
-            format!(
-                "{}://",
-                proxy["scheme"].as_string().unwrap_or("").to_lowercase()
-            )
-        } else {
-            "http://".to_string()
+        let scheme = match &proxy.scheme {
+            Some(scheme) => format!("{}://", scheme.to_lowercase()),
+            None => "http://".to_string(),
         };
         let mut safe = String::new();
 
         let mut curl_auth: Option<String> = None;
         let mut options_auth: Option<String> = None;
 
-        if proxy.contains_key("user") {
+        if let Some(user_raw) = &proxy.user {
             safe = "***".to_string();
-            let user_raw = proxy["user"].as_string().unwrap_or("");
             let auth_raw = rawurldecode(user_raw);
 
-            let mut user = user_raw.to_string();
+            let mut user = user_raw.clone();
             let mut auth = auth_raw;
 
-            if proxy.contains_key("pass") {
-                let pass_raw = proxy["pass"].as_string().unwrap_or("");
+            if let Some(pass_raw) = &proxy.pass {
                 safe += ":***";
                 user += &format!(":{}", pass_raw);
                 auth += &format!(":{}", rawurldecode(pass_raw));
@@ -77,11 +67,10 @@ impl ProxyItem {
             }
         }
 
-        let host = proxy["host"].as_string().unwrap_or("").to_string();
         let port: Option<i64>;
 
-        if proxy.contains_key("port") {
-            port = proxy["port"].as_int();
+        if let Some(proxy_port) = proxy.port {
+            port = Some(proxy_port);
         } else if scheme == "http://" {
             port = Some(80);
         } else if scheme == "https://" {

@@ -42,7 +42,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
     RuntimeException, UnexpectedValueException, extension_loaded, hash, http_build_query_mixed,
-    json_decode, parse_url_all, php_regex, realpath, strtolower, strtr, urlencode, var_export,
+    json_decode, parse_url, php_regex, realpath, strtolower, strtr, urlencode, var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
@@ -207,13 +207,12 @@ impl ComposerRepository {
             .and_then(|v| v.as_string())
             .unwrap_or("")
             .to_string();
-        let url_bits = parse_url_all(&strtr(&current_url, "\\", "/"));
-        let url_bits_arr = url_bits.as_array();
-        let scheme_present = url_bits_arr
-            .and_then(|a| a.get("scheme"))
-            .and_then(|v| v.as_string())
-            .is_some_and(|s| !s.is_empty());
-        if url_bits_arr.is_none() || !scheme_present {
+        let url_bits = parse_url(&strtr(&current_url, "\\", "/"));
+        let scheme_present = url_bits
+            .as_ref()
+            .and_then(|url_bits| url_bits.scheme.as_deref())
+            .is_some_and(|scheme| !scheme.is_empty());
+        if url_bits.is_none() || !scheme_present {
             return Err(UnexpectedValueException::new(format!(
                 "Invalid url given for Composer repository: {}",
                 current_url
@@ -2100,13 +2099,11 @@ impl ComposerRepository {
     }
 
     pub fn get_packages_json_url(&self) -> String {
-        let json_url_parts = parse_url_all(&strtr(&self.url, "\\", "/"));
+        let json_url_parts = parse_url(&strtr(&self.url, "\\", "/"));
 
         let has_json = json_url_parts
-            .as_array()
-            .and_then(|a| a.get("path"))
-            .and_then(|v| v.as_string())
-            .is_some_and(|p| p.contains(".json"));
+            .and_then(|json_url_parts| json_url_parts.path)
+            .is_some_and(|path| path.contains(".json"));
         if has_json {
             return self.url.clone();
         }

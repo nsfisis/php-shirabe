@@ -11,7 +11,7 @@ use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values,
     filter_var_email, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar, is_string,
-    json_encode, parse_url_all, php_regex, php_to_string, str_replace, strcasecmp, strtolower,
+    json_encode, parse_url, php_regex, php_to_string, str_replace, strcasecmp, strtolower,
     strtotime, substr, trigger_error, trim, var_export,
 };
 use shirabe_semver::Intervals;
@@ -299,24 +299,16 @@ impl ValidatingArrayLoader {
             return true;
         }
 
-        let bits = parse_url_all(value);
-        let bits_map = match bits {
-            PhpMixed::Array(m) => m,
-            _ => return false,
+        let Some(bits) = parse_url(value) else {
+            return false;
         };
-        let scheme = bits_map
-            .get("scheme")
-            .and_then(|v| v.as_string())
-            .unwrap_or("");
-        let host = bits_map
-            .get("host")
-            .and_then(|v| v.as_string())
-            .unwrap_or("");
+        let scheme = bits.scheme.unwrap_or_default();
+        let host = bits.host.unwrap_or_default();
         if scheme.is_empty() || host.is_empty() {
             return false;
         }
 
-        if !schemes.contains(&scheme) {
+        if !schemes.contains(&scheme.as_str()) {
             return false;
         }
 

@@ -11,9 +11,8 @@ use crate::util::GitLab;
 use indexmap::IndexMap;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, RuntimeException, base64_encode, explode,
-    in_array_loose, in_array_strict, is_array, is_string, json_decode, parse_url, php_regex,
-    str_replace, strpos, strtolower, substr, trim,
+    PhpMixed, RuntimeException, base64_encode, explode, in_array_loose, in_array_strict, is_array,
+    is_string, json_decode, parse_url, php_regex, str_replace, strpos, strtolower, substr, trim,
 };
 
 #[derive(Debug)]
@@ -257,11 +256,11 @@ impl AuthHelper {
                 }
             }
 
-            let scheme = parse_url(url, PHP_URL_SCHEME);
+            let scheme = parse_url(url).and_then(|parsed| parsed.scheme);
             if !git_lab_util.authorize_oauth(origin)
                 && (!self.io.is_interactive()
                     || !git_lab_util.authorize_oauth_interactively(
-                        scheme.as_string().unwrap_or(""),
+                        scheme.as_deref().unwrap_or(""),
                         origin,
                         Some(&message),
                     )?)
@@ -632,16 +631,21 @@ impl AuthHelper {
     ///
     /// @return bool Whether the given URL is a public BitBucket download which requires no authentication.
     pub fn is_public_bit_bucket_download(&self, url_to_bit_bucket_file: &str) -> bool {
-        let domain = parse_url(url_to_bit_bucket_file, PHP_URL_HOST);
-        let domain_str = domain.as_string().unwrap_or("");
+        let parsed = parse_url(url_to_bit_bucket_file);
+        let domain_str = parsed
+            .as_ref()
+            .and_then(|parsed| parsed.host.as_deref())
+            .unwrap_or("");
         if strpos(domain_str, "bitbucket.org").is_none() {
             // Bitbucket downloads are hosted on amazonaws.
             // We do not need to authenticate there at all
             return true;
         }
 
-        let path = parse_url(url_to_bit_bucket_file, PHP_URL_PATH);
-        let path_str = path.as_string().unwrap_or("");
+        let path_str = parsed
+            .as_ref()
+            .and_then(|parsed| parsed.path.as_deref())
+            .unwrap_or("");
 
         // Path for a public download follows this pattern /{user}/{repo}/downloads/{whatever}
         // {@link https://blog.bitbucket.org/2009/04/12/new-feature-downloads/}

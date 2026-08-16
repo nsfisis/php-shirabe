@@ -16,12 +16,11 @@ use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PHP_URL_HOST, PHP_URL_PATH, PHP_URL_SCHEME, PhpMixed, RuntimeException, STREAM_NOTIFY_FAILURE,
-    STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS, array_replace_recursive, base64_encode,
-    explode, extension_loaded, file_get_contents, file_get_contents5, file_put_contents,
-    filter_var_boolean, gethostbyname, http_clear_last_response_headers,
-    http_get_last_response_headers, ini_get, json_decode, parse_url, php_regex, preg_quote, strpos,
-    strtolower, strtr, substr, trim, zlib_decode,
+    PhpMixed, RuntimeException, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS,
+    STREAM_NOTIFY_PROGRESS, array_replace_recursive, base64_encode, explode, extension_loaded,
+    file_get_contents, file_get_contents5, file_put_contents, filter_var_boolean, gethostbyname,
+    http_clear_last_response_headers, http_get_last_response_headers, ini_get, json_decode,
+    parse_url, php_regex, preg_quote, strpos, strtolower, strtr, substr, trim, zlib_decode,
 };
 
 /// Result of `RemoteFilesystem::get` — string content, `true` (for copy), or `false`.
@@ -180,10 +179,9 @@ impl RemoteFilesystem {
         file_name: Option<String>,
         progress: bool,
     ) -> anyhow::Result<GetResult> {
-        self.scheme = parse_url(&strtr(file_url, "\\", "/"), PHP_URL_SCHEME)
-            .as_string()
-            .unwrap_or("")
-            .to_string();
+        self.scheme = parse_url(&strtr(file_url, "\\", "/"))
+            .and_then(|parsed| parsed.scheme)
+            .unwrap_or_default();
         self.bytes_max = 0;
         self.origin_url = origin_url.to_string();
         self.file_url = file_url.to_string();
@@ -471,9 +469,9 @@ impl RemoteFilesystem {
             && substr(&self.file_url, -4, None) == ".zip"
             && (location_header.is_none()
                 || substr(
-                    parse_url(location_header.as_deref().unwrap_or(""), PHP_URL_PATH)
-                        .as_string()
-                        .unwrap_or(""),
+                    &parse_url(location_header.as_deref().unwrap_or(""))
+                        .and_then(|parsed| parsed.path)
+                        .unwrap_or_default(),
                     -4,
                     None,
                 ) != ".zip")
@@ -929,23 +927,23 @@ impl RemoteFilesystem {
     ) -> anyhow::Result<Option<String>> {
         let mut target_url: Option<String> = None;
         if let Some(location_header) = Response::find_header_value(response_headers, "location") {
-            if !parse_url(&location_header, PHP_URL_SCHEME)
-                .as_string()
-                .unwrap_or("")
-                .is_empty()
+            let location_parsed = parse_url(&location_header);
+            if location_parsed
+                .as_ref()
+                .and_then(|parsed| parsed.scheme.as_deref())
+                .is_some_and(|scheme| !scheme.is_empty() && scheme != "0")
             {
                 target_url = Some(location_header);
-            } else if parse_url(&location_header, PHP_URL_HOST)
-                .as_string()
-                .map(|s| !s.is_empty())
-                .unwrap_or(false)
+            } else if location_parsed
+                .as_ref()
+                .and_then(|parsed| parsed.host.as_deref())
+                .is_some_and(|host| !host.is_empty() && host != "0")
             {
                 target_url = Some(format!("{}:{}", self.scheme, location_header));
             } else if location_header.starts_with('/') {
-                let url_host = parse_url(&self.file_url, PHP_URL_HOST)
-                    .as_string()
-                    .unwrap_or("")
-                    .to_string();
+                let url_host = parse_url(&self.file_url)
+                    .and_then(|parsed| parsed.host)
+                    .unwrap_or_default();
 
                 target_url = Some(Preg::replace(
                     format!(
@@ -980,10 +978,9 @@ impl RemoteFilesystem {
 
             additional_options.insert("redirects".to_string(), PhpMixed::Int(self.redirects));
 
-            let host = parse_url(&target_url, PHP_URL_HOST)
-                .as_string()
-                .unwrap_or("")
-                .to_string();
+            let host = parse_url(&target_url)
+                .and_then(|parsed| parsed.host)
+                .unwrap_or_default();
             let res = self.get(
                 &host,
                 &target_url,

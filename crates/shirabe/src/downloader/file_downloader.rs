@@ -27,10 +27,10 @@ use crate::util::sync_executor;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PHP_URL_PATH, PhpMixed,
-    RuntimeException, UnexpectedValueException, array_search, file_exists, filesize, get_class,
-    hash, hash_file, impl_php_class, is_dir, is_executable, parse_url, pathinfo, realpath, rtrim,
-    spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
+    InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed, RuntimeException,
+    UnexpectedValueException, array_search, file_exists, filesize, get_class, hash, hash_file,
+    impl_php_class, is_dir, is_executable, parse_url, pathinfo, realpath, rtrim, spl_object_hash,
+    strlen, strpos, strtr, trim, umask, usleep,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -259,12 +259,13 @@ impl FileDownloader {
 
     fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> String {
         pathinfo(
-            parse_url(
-                &strtr(&package.get_dist_url().unwrap_or_default(), "\\", "/"),
-                PHP_URL_PATH,
-            )
-            .as_string()
-            .unwrap_or(""),
+            &parse_url(&strtr(
+                &package.get_dist_url().unwrap_or_default(),
+                "\\",
+                "/",
+            ))
+            .and_then(|url| url.path)
+            .unwrap_or_default(),
             component,
         )
     }

@@ -4,17 +4,14 @@ use crate::config::Config;
 use crate::util::GitHub;
 use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
-use shirabe_php_shim::{
-    PHP_URL_HOST, PHP_URL_PORT, PhpMixed, in_array_strict, parse_url, php_regex,
-};
+use shirabe_php_shim::{PhpMixed, in_array_strict, parse_url, php_regex};
 
 pub struct Url;
 
 impl Url {
     pub fn update_dist_reference(config: &Config, mut url: String, r#ref: &str) -> String {
-        let host = parse_url(&url, PHP_URL_HOST)
-            .as_string()
-            .map(|s| s.to_string())
+        let host = parse_url(&url)
+            .and_then(|parsed| parsed.host)
             .unwrap_or_default();
 
         if host == "api.github.com" || host == "github.com" || host == "www.github.com" {
@@ -121,11 +118,15 @@ impl Url {
             return url.to_string();
         }
 
-        let mut origin = parse_url(url, PHP_URL_HOST)
-            .as_string()
-            .map(|s| s.to_string())
+        let parsed = parse_url(url);
+        let mut origin = parsed
+            .as_ref()
+            .and_then(|parsed| parsed.host.clone())
             .unwrap_or_default();
-        if let Some(port) = parse_url(url, PHP_URL_PORT).as_int() {
+        if let Some(port) = parsed
+            .and_then(|parsed| parsed.port)
+            .filter(|port| *port != 0)
+        {
             origin = format!("{}:{}", origin, port);
         }
 

@@ -10,8 +10,8 @@ use crate::io::io_interface;
 use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PHP_URL_HOST, PHP_URL_SCHEME, PhpMixed, RuntimeException, array_key_exists,
-    array_merge, array_search_mixed, array_unique, empty, filter_var_url, implode, in_array_loose,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, array_key_exists, array_merge,
+    array_search_mixed, array_unique, empty, filter_var_url, implode, in_array_loose,
     in_array_strict, intval, is_array, is_string, parse_url, php_regex, php_to_string, rtrim,
     strtolower, strtoupper, strtr, substr, trigger_error,
 };
@@ -1035,12 +1035,9 @@ impl Config {
         }
 
         // Extract scheme and throw exception on known insecure protocols
-        let scheme = parse_url(url, PHP_URL_SCHEME)
-            .as_string()
-            .map(|s| s.to_string());
-        let hostname = parse_url(url, PHP_URL_HOST)
-            .as_string()
-            .map(|s| s.to_string());
+        let parsed = parse_url(url);
+        let scheme = parsed.as_ref().and_then(|parsed| parsed.scheme.clone());
+        let hostname = parsed.and_then(|parsed| parsed.host);
         if matches!(scheme.as_deref(), Some("http" | "git" | "ftp" | "svn")) {
             if self.get_with_flags("secure-http", 0)?.as_bool() == Some(true) {
                 if scheme.as_deref() == Some("svn") {
