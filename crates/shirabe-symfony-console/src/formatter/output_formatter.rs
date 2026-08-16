@@ -109,7 +109,7 @@ impl OutputFormatter {
             return Ok(Some(style.borrow().clone_box()));
         }
 
-        let mut matches: Vec<Vec<String>> = vec![];
+        let mut matches: Vec<Vec<Option<String>>> = vec![];
         if preg_match_all_set_order(php_regex!("/([^=]+)=([^;]+)(;|$)/"), string, &mut matches) == 0
         {
             return Ok(None);
@@ -117,7 +117,14 @@ impl OutputFormatter {
 
         let mut style = OutputFormatterStyle::new(None, None, vec![]);
         for r#match in &matches {
-            let mut r#match: Vec<String> = r#match.clone();
+            let mut r#match: Vec<String> = r#match
+                .iter()
+                .map(|group| {
+                    group
+                        .clone()
+                        .expect("every group participates whenever the pattern matches")
+                })
+                .collect();
             shirabe_php_shim::array_shift(&mut r#match);
             r#match[0] = shirabe_php_shim::strtolower(&r#match[0]);
 
@@ -135,7 +142,11 @@ impl OutputFormatter {
                 );
                 let options = shirabe_php_shim::array_shift(&mut options).unwrap_or_default();
                 for option in &options {
-                    style.set_option(option);
+                    style.set_option(
+                        option
+                            .as_deref()
+                            .expect("group 0 participates whenever the pattern matches"),
+                    );
                 }
             } else {
                 return Ok(None);

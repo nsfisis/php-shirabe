@@ -167,19 +167,15 @@ pub fn preg_match2(
 }
 
 // PREG_PATTERN_ORDER: the outer vec is indexed by capture group, the inner by
-// match occurrence. Non-participating groups are reported as "".
-pub fn preg_match_all(pattern: impl PregPattern, subject: &str) -> Vec<Vec<String>> {
+// match occurrence. A non-participating group is reported as None.
+pub fn preg_match_all(pattern: impl PregPattern, subject: &str) -> Vec<Vec<Option<String>>> {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
     let group_count = re.captures_len();
-    let mut groups: Vec<Vec<String>> = vec![Vec::new(); group_count];
+    let mut groups: Vec<Vec<Option<String>>> = vec![Vec::new(); group_count];
     for caps in re.captures_iter(subject) {
         for (g, group) in groups.iter_mut().enumerate() {
-            group.push(
-                caps.get(g)
-                    .map(|m| m.as_str().to_string())
-                    .unwrap_or_default(),
-            );
+            group.push(caps.get(g).map(|m| m.as_str().to_string()));
         }
     }
     groups
@@ -218,17 +214,22 @@ pub fn preg_match_all2(
 }
 
 // PREG_SET_ORDER: the outer vec is indexed by match occurrence, the inner by
-// capture group (a classic `$matches` row).
+// capture group (a `$matches` row). A non-participating group is reported as
+// None.
 pub fn preg_match_all_set_order(
     pattern: impl PregPattern,
     subject: &str,
-    matches: &mut Vec<Vec<String>>,
+    matches: &mut Vec<Vec<Option<String>>>,
 ) -> usize {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
-    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut rows: Vec<Vec<Option<String>>> = Vec::new();
     for caps in re.captures_iter(subject) {
-        rows.push(php_match_row(&caps));
+        rows.push(
+            (0..caps.len())
+                .map(|g| caps.get(g).map(|m| m.as_str().to_string()))
+                .collect(),
+        );
     }
     let count = rows.len();
     *matches = rows;
@@ -299,8 +300,9 @@ fn preg_split_impl(pattern: impl PregPattern, subject: &str, delim_capture: bool
         let m = caps.get(0).unwrap();
         result.push(subject[last..m.start()].to_string());
         if delim_capture {
-            // Mirror preg_match: trailing unmatched groups are dropped, interior
-            // unmatched groups are emitted as "".
+            // `preg_split` accepts no PREG_UNMATCHED_AS_NULL, so the split list
+            // holds strings only: trailing unmatched groups are dropped,
+            // interior ones are emitted as "".
             if let Some(last_g) = (1..caps.len()).rev().find(|&g| caps.get(g).is_some()) {
                 for g in 1..=last_g {
                     result.push(caps.get(g).map(|x| x.as_str()).unwrap_or("").to_string());
@@ -639,22 +641,6 @@ fn php_replacement_group(bytes: &[u8]) -> (usize, usize) {
         consumed += 1;
     }
     (group, consumed)
-}
-
-// Classic preg_match `$matches` row: index 0 is the full match, trailing
-// unmatched groups are truncated and interior unmatched groups become "".
-fn php_match_row(caps: &regex::Captures) -> Vec<String> {
-    let last = (0..caps.len())
-        .rev()
-        .find(|&g| caps.get(g).is_some())
-        .unwrap_or(0);
-    (0..=last)
-        .map(|g| {
-            caps.get(g)
-                .map(|m| m.as_str().to_string())
-                .unwrap_or_default()
-        })
-        .collect()
 }
 
 // Builds a single match's `$matches` map with both named and numbered keys

@@ -34,7 +34,17 @@ impl CompletionInput {
             input_str,
         );
 
-        Self::from_tokens(tokens[0].clone(), current_index)
+        Self::from_tokens(
+            tokens[0]
+                .iter()
+                .map(|token| {
+                    token
+                        .clone()
+                        .expect("group 0 participates whenever the pattern matches")
+                })
+                .collect(),
+            current_index,
+        )
     }
 
     /// Create an input based on an COMP_WORDS token list.
