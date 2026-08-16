@@ -13,9 +13,8 @@
 
 pub use shirabe_php_shim::{CaptureKey, PregMatches, PregMatchesAll, PregMatchesAllWithOffsets};
 use shirabe_php_shim::{
-    PregPattern, preg_grep, preg_match_all_offset_capture_unmatched_as_null, preg_match_all2,
-    preg_match_map, preg_match2, preg_match2_unmatched_as_null, preg_replace_callback,
-    preg_replace2,
+    PregPattern, preg_grep, preg_match_all_offset_capture, preg_match_all2, preg_match_map,
+    preg_match2, preg_replace_callback, preg_replace2,
 };
 
 preg_match_map! {
@@ -48,7 +47,7 @@ impl Preg {
         offset: usize,
     ) -> bool {
         let mut internal = PregMatches::new();
-        let result = preg_match2_unmatched_as_null(pattern, subject, &mut internal, offset);
+        let result = preg_match2(pattern, subject, &mut internal, offset);
 
         if let Some(out) = matches {
             *out = drop_null_matches(internal);
@@ -76,8 +75,7 @@ impl Preg {
         matches: Option<&mut PregMatchesAllWithOffsets>,
     ) -> usize {
         let mut internal = PregMatchesAllWithOffsets::new();
-        let result =
-            preg_match_all_offset_capture_unmatched_as_null(pattern, subject, &mut internal);
+        let result = preg_match_all_offset_capture(pattern, subject, &mut internal);
 
         if let Some(out) = matches {
             *out = internal;
@@ -153,7 +151,7 @@ impl Preg {
         matches: &mut PregNamedGroups,
     ) -> bool {
         let mut internal = PregMatches::new();
-        let result = preg_match2_unmatched_as_null(pattern, subject, &mut internal, 0);
+        let result = preg_match2(pattern, subject, &mut internal, 0);
 
         matches.clear();
         for (key, value) in internal {
@@ -165,38 +163,26 @@ impl Preg {
         result
     }
 
+    /// `is_match3` with the groups positioned by number rather than keyed, for callers that only
+    /// read numbered groups. Index 0 is the full match; an unmatched group is `None`.
     pub fn is_match_with_indexed_captures(
         pattern: impl PregPattern,
         subject: &str,
-    ) -> Option<Vec<String>> {
-        // Classic preg_match semantics (no PREG_UNMATCHED_AS_NULL): trailing
-        // unmatched groups are truncated, interior unmatched groups become "".
+    ) -> Option<Vec<Option<String>>> {
         let mut internal = PregMatches::new();
-        let result = preg_match2(pattern, subject, &mut internal, 0);
-
-        if !result {
+        if !preg_match2(pattern, subject, &mut internal, 0) {
             return None;
         }
 
-        let max_index = internal
-            .keys()
-            .filter_map(|key| match key {
-                CaptureKey::ByIndex(index) => Some(*index),
-                CaptureKey::ByName(_) => None,
-            })
-            .max()
-            .unwrap_or(0);
-
-        let mut captures = Vec::with_capacity(max_index + 1);
-        for index in 0..=max_index {
-            let value = internal
-                .get(&CaptureKey::ByIndex(index))
-                .and_then(|value| value.clone())
-                .unwrap_or_default();
-            captures.push(value);
-        }
-
-        Some(captures)
+        Some(
+            internal
+                .into_iter()
+                .filter_map(|(key, value)| match key {
+                    CaptureKey::ByIndex(_) => Some(value),
+                    CaptureKey::ByName(_) => None,
+                })
+                .collect(),
+        )
     }
 
     pub fn is_match_all(

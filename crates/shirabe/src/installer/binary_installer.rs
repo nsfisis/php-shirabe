@@ -328,10 +328,10 @@ impl BinaryInstaller {
             &bin_contents,
         ) {
             // carry over the existing shebang if present, otherwise add our own
-            let proxy_code = if m.get(1).is_none() {
+            let proxy_code = if m[1].is_none() {
                 "#!/usr/bin/env php".to_string()
             } else {
-                trim(m.get(1).map(|s| s.as_str()).unwrap_or(""), None)
+                trim(m[1].as_deref().unwrap_or(""), None)
             };
             let bin_path_exported = self
                 .filesystem
@@ -377,7 +377,7 @@ impl BinaryInstaller {
                 $data = str_replace('__FILE__', var_export($this->realpath, true), $data);"
                     .to_string();
             }
-            if trim(m.first().map(|s| s.as_str()).unwrap_or(""), None) != "<?php" {
+            if trim(m[0].as_deref().unwrap_or(""), None) != "<?php" {
                 stream_hint =
                     " using a stream wrapper to prevent the shebang from being output on PHP<8\n *"
                         .to_string();

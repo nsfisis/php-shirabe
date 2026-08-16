@@ -67,7 +67,7 @@ impl FundCommand {
                     php_regex!(r"{^https://github.com/([^/]+)$}"),
                     &url,
                 )
-                && let Some(sponsor) = matches.into_iter().nth(1)
+                && let Some(sponsor) = matches.into_iter().nth(1).flatten()
             {
                 url = format!("https://github.com/sponsors/{}", sponsor);
             }

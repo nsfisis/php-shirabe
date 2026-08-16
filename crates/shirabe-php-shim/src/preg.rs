@@ -36,10 +36,6 @@ macro_rules! preg_match_map {
                 self.0.insert(key, value)
             }
 
-            pub fn keys(&self) -> ::indexmap::map::Keys<'_, $key, $value> {
-                self.0.keys()
-            }
-
             pub fn iter(&self) -> ::indexmap::map::Iter<'_, $key, $value> {
                 self.0.iter()
             }
@@ -84,7 +80,7 @@ macro_rules! preg_match_map {
 
 preg_match_map! {
     /// A single match's `$matches`, keyed by both the named and the numbered form of each capture
-    /// group. A `None` value is a group the caller's flags reported as unmatched.
+    /// group. A `None` value is a group that did not participate in the match.
     pub struct PregMatches(CaptureKey => Option<String>);
 }
 
@@ -149,26 +145,6 @@ pub fn preg_match2(
     matches: &mut PregMatches,
     offset: usize,
 ) -> bool {
-    preg_match2_impl(pattern, subject, matches, offset, false)
-}
-
-// PREG_UNMATCHED_AS_NULL counterpart of preg_match2().
-pub fn preg_match2_unmatched_as_null(
-    pattern: impl PregPattern,
-    subject: &str,
-    matches: &mut PregMatches,
-    offset: usize,
-) -> bool {
-    preg_match2_impl(pattern, subject, matches, offset, true)
-}
-
-fn preg_match2_impl(
-    pattern: impl PregPattern,
-    subject: &str,
-    matches: &mut PregMatches,
-    offset: usize,
-    unmatched_as_null: bool,
-) -> bool {
     let __resolved = pattern.resolve();
     let (re, anchored) = __resolved.parts();
     // An anchored (`A`) pattern must match starting exactly at `offset`; the `regex` crate cannot
@@ -184,11 +160,7 @@ fn preg_match2_impl(
     matches.clear();
     if let Some(caps) = &caps {
         let names: Vec<Option<&str>> = re.capture_names().collect();
-        *matches = if unmatched_as_null {
-            single_match_map_unmatched_as_null(caps, &names)
-        } else {
-            single_match_map(caps, &names)
-        };
+        *matches = single_match_map(caps, &names);
     }
 
     caps.is_some()
@@ -263,30 +235,11 @@ pub fn preg_match_all_set_order(
     count
 }
 
-// A non-participating group is reported at offset -1, holding "".
+// A non-participating group is reported as None, at offset -1.
 pub fn preg_match_all_offset_capture(
     pattern: impl PregPattern,
     subject: &str,
     matches: &mut PregMatchesAllWithOffsets,
-) -> usize {
-    preg_match_all_offset_capture_impl(pattern, subject, matches, false)
-}
-
-// PREG_UNMATCHED_AS_NULL counterpart of preg_match_all_offset_capture(): a
-// non-participating group holds null instead of "".
-pub fn preg_match_all_offset_capture_unmatched_as_null(
-    pattern: impl PregPattern,
-    subject: &str,
-    matches: &mut PregMatchesAllWithOffsets,
-) -> usize {
-    preg_match_all_offset_capture_impl(pattern, subject, matches, true)
-}
-
-fn preg_match_all_offset_capture_impl(
-    pattern: impl PregPattern,
-    subject: &str,
-    matches: &mut PregMatchesAllWithOffsets,
-    unmatched_as_null: bool,
 ) -> usize {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
@@ -300,8 +253,7 @@ fn preg_match_all_offset_capture_impl(
         for (g, column) in groups.iter_mut().enumerate() {
             let entry = match caps.get(g) {
                 Some(m) => (Some(m.as_str().to_string()), m.start() as i64),
-                None if unmatched_as_null => (None, -1),
-                None => (Some(String::new()), -1),
+                None => (None, -1),
             };
             column.push(entry);
         }
@@ -706,36 +658,9 @@ fn php_match_row(caps: &regex::Captures) -> Vec<String> {
 }
 
 // Builds a single match's `$matches` map with both named and numbered keys
-// (the named key precedes its number). Trailing unmatched groups are dropped
-// and interior ones become "".
+// (the named key precedes its number). Every group is present; a
+// non-participating one is None.
 fn single_match_map(caps: &regex::Captures, names: &[Option<&str>]) -> PregMatches {
-    let mut out = PregMatches::new();
-    let group_count = caps.len();
-    let last_participating = (0..group_count).rev().find(|&i| caps.get(i).is_some());
-
-    for i in 0..group_count {
-        let m = caps.get(i);
-        if m.is_none()
-            && let Some(last) = last_participating
-            && i > last
-        {
-            break;
-        }
-        let value = Some(m.map(|m| m.as_str().to_string()).unwrap_or_default());
-        if let Some(Some(name)) = names.get(i) {
-            out.insert(CaptureKey::ByName((*name).to_string()), value.clone());
-        }
-        out.insert(CaptureKey::ByIndex(i), value);
-    }
-    out
-}
-
-// PREG_UNMATCHED_AS_NULL counterpart of single_match_map(): every group is
-// present and non-participating ones are None.
-fn single_match_map_unmatched_as_null(
-    caps: &regex::Captures,
-    names: &[Option<&str>],
-) -> PregMatches {
     let mut out = PregMatches::new();
 
     for i in 0..caps.len() {

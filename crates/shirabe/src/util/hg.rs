@@ -158,7 +158,7 @@ impl Hg {
                         &output,
                     )
                 {
-                    return matches.into_iter().nth(1);
+                    return matches.into_iter().nth(1).flatten();
                 }
                 None
             })

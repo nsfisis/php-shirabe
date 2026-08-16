@@ -466,10 +466,8 @@ impl Command for UpdateCommand {
                 let Some(matches) = matches else {
                     continue;
                 };
-                let constraint = parser.parse_constraints(&format!(
-                    "~{}",
-                    matches.get(1).cloned().unwrap_or_default()
-                ))?;
+                let constraint = parser
+                    .parse_constraints(&format!("~{}", matches[1].clone().unwrap_or_default()))?;
                 if let Some(existing) = temporary_constraints.get(&package.get_name()) {
                     temporary_constraints.insert(
                         package.get_name(),

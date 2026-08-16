@@ -704,9 +704,9 @@ impl VersionGuesser {
             );
 
             if let Some(matches) = Preg::is_match_with_indexed_captures(&url_pattern, &output) {
-                let m1 = matches.get(1).cloned().unwrap_or_default();
-                let m2 = matches.get(2).cloned();
-                let m3 = matches.get(3).cloned();
+                let m1 = matches[1].clone().unwrap_or_default();
+                let m2 = matches[2].clone();
+                let m3 = matches[3].clone();
                 if let Some(m2) = m2.as_ref()
                     && let Some(m3) = m3.as_ref()
                     && (branches_path == *m2 || tags_path == *m2)

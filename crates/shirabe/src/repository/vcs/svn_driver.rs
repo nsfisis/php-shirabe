@@ -260,10 +260,10 @@ impl SvnDriver {
         let (path, rev) = if let Some(m) =
             Preg::is_match_with_indexed_captures(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
         {
-            if m.get(2).is_some() {
+            if m[2].is_some() {
                 (
-                    m.get(1).cloned().unwrap_or_default(),
-                    m.get(2).cloned().unwrap_or_default(),
+                    m[1].clone().unwrap_or_default(),
+                    m[2].clone().unwrap_or_default(),
                 )
             } else {
                 (identifier.clone(), String::new())
@@ -300,10 +300,10 @@ impl SvnDriver {
         let (path, rev) = if let Some(m) =
             Preg::is_match_with_indexed_captures(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
         {
-            if m.get(2).is_some() {
+            if m[2].is_some() {
                 (
-                    m.get(1).cloned().unwrap_or_default(),
-                    m.get(2).cloned().unwrap_or_default(),
+                    m[1].clone().unwrap_or_default(),
+                    m[2].clone().unwrap_or_default(),
                 )
             } else {
                 (identifier.clone(), String::new())
