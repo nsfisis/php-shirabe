@@ -109,7 +109,7 @@ impl GitDownloader {
             .cloned()
             .unwrap_or_default();
 
-        let mut branches_match: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
+        let mut branches_match: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
         if !Preg::is_match_all3(
             format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
             &refs,
@@ -121,7 +121,10 @@ impl GitDownloader {
         let candidate_branches: Vec<String> = branches_match
             .get(&CaptureKey::ByIndex(1))
             .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .into_iter()
+            .map(|branch| branch.expect("group 1 participates whenever the pattern matches"))
+            .collect();
 
         // use the first match as branch name for now
         let mut branch = candidate_branches[0].clone();
@@ -134,7 +137,7 @@ impl GitDownloader {
 
             // try to find matching branch names in remote repos
             for candidate in &candidate_branches {
-                let mut m: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
+                let mut m: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
                 if Preg::is_match_all3(
                     format!(
                         "{{^[a-f0-9]+ refs/remotes/((?:[^/]+)/{})$}}mi",
@@ -143,11 +146,13 @@ impl GitDownloader {
                     &refs,
                     Some(&mut m),
                 ) {
-                    let matches: Vec<String> =
+                    let matches: Vec<Option<String>> =
                         m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     for match_ in matches {
                         branch = candidate.clone();
-                        remote_branches.push(match_);
+                        remote_branches.push(
+                            match_.expect("group 1 participates whenever the pattern matches"),
+                        );
                     }
                     break;
                 }

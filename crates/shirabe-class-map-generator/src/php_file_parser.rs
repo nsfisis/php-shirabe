@@ -99,13 +99,12 @@ impl PhpFileParser {
             let ns = matches
                 .get(&CaptureKey::ByName("ns".to_owned()))
                 .and_then(|v| v.get(i))
-                .map(|s| s.as_str())
-                .unwrap_or("");
-            if !ns.is_empty() {
+                .and_then(|s| s.as_deref());
+            if ns.is_some_and(|ns| !ns.is_empty()) {
                 let nsname = matches
                     .get(&CaptureKey::ByName("nsname".to_owned()))
                     .and_then(|v| v.get(i))
-                    .map(|s| s.as_str())
+                    .and_then(|s| s.as_deref())
                     .unwrap_or("");
                 namespace = str_replace_array(
                     &[
@@ -121,8 +120,8 @@ impl PhpFileParser {
                 let name = matches
                     .get(&CaptureKey::ByName("name".to_owned()))
                     .and_then(|v| v.get(i))
-                    .map(|s| s.as_str())
-                    .unwrap_or("");
+                    .and_then(|s| s.as_deref())
+                    .expect("the `name` group participates whenever `ns` does not");
                 // skip anon classes extending/implementing
                 if name == "extends" {
                     continue;
@@ -142,9 +141,10 @@ impl PhpFileParser {
                 } else if matches
                     .get(&CaptureKey::ByName("type".to_owned()))
                     .and_then(|v| v.get(i))
-                    .map(|s| s.to_lowercase())
-                    .as_deref()
-                    == Some("enum")
+                    .and_then(|s| s.as_deref())
+                    .unwrap_or("")
+                    .to_lowercase()
+                    == "enum"
                 {
                     // something like:
                     //   enum Foo: int { HERP = '123'; }

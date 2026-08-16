@@ -78,7 +78,7 @@ impl VersionBumper {
             major = major
         );
 
-        let mut matches: IndexMap<CaptureKey, Vec<(String, usize)>> = IndexMap::new();
+        let mut matches: IndexMap<CaptureKey, Vec<(Option<String>, i64)>> = IndexMap::new();
         if Preg::is_match_all_with_offsets3(&pattern, &pretty_constraint, Some(&mut matches)) {
             let mut modified = pretty_constraint.clone();
             let constraint_matches = matches
@@ -86,8 +86,11 @@ impl VersionBumper {
                 .cloned()
                 .unwrap_or_default();
             for match_ in constraint_matches.iter().rev() {
-                let match_str = &match_.0;
-                let match_offset = match_.1 as i64;
+                let match_str = match_
+                    .0
+                    .as_deref()
+                    .expect("the `constraint` group participates whenever the pattern matches");
+                let match_offset = match_.1;
                 let suffix = if match_str.matches('.').count() == 2
                     && version_without_suffix.matches('.').count() == 1
                 {

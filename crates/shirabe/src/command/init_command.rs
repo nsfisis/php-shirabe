@@ -175,17 +175,20 @@ impl InitCommand {
         ) == 0
         {
             *self.git_config.borrow_mut() = Some(IndexMap::new());
-            let mut m: IndexMap<CaptureKey, Vec<String>> = IndexMap::new();
+            let mut m: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
             if Preg::is_match_all3(php_regex!(r"{^([^=]+)=(.*)$}m"), &output, Some(&mut m)) {
-                let keys: Vec<String> = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                let values: Vec<String> =
+                let keys: Vec<Option<String>> =
+                    m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let values: Vec<Option<String>> =
                     m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 for (key, value) in keys.iter().zip(values.iter()) {
-                    self.git_config
-                        .borrow_mut()
-                        .as_mut()
-                        .unwrap()
-                        .insert(key.clone(), value.clone());
+                    self.git_config.borrow_mut().as_mut().unwrap().insert(
+                        key.clone()
+                            .expect("group 1 participates whenever the pattern matches"),
+                        value
+                            .clone()
+                            .expect("group 2 participates whenever the pattern matches"),
+                    );
                 }
             }
 

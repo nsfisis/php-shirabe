@@ -63,7 +63,7 @@ impl Preg {
     pub fn match_all3(
         pattern: impl PregPattern,
         subject: &str,
-        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<Option<String>>>>,
     ) -> usize {
         Self::match_all5(pattern, subject, matches)
     }
@@ -71,13 +71,13 @@ impl Preg {
     fn match_all5(
         pattern: impl PregPattern,
         subject: &str,
-        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<Option<String>>>>,
     ) -> usize {
         let mut internal: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
         let result = preg_match_all2(pattern, subject, &mut internal);
 
         if let Some(out) = matches {
-            *out = null_to_empty_match_all(internal);
+            *out = internal;
         }
 
         result
@@ -86,13 +86,13 @@ impl Preg {
     fn match_all_with_offsets5(
         pattern: impl PregPattern,
         subject: &str,
-        matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<(Option<String>, i64)>>>,
     ) -> usize {
         let mut internal: IndexMap<CaptureKey, Vec<(Option<String>, i64)>> = IndexMap::new();
         let result = preg_match_all_offset_capture2(pattern, subject, &mut internal);
 
         if let Some(out) = matches {
-            *out = null_to_empty_offset_match_all(internal);
+            *out = internal;
         }
 
         result
@@ -243,7 +243,7 @@ impl Preg {
     pub fn is_match_all3(
         pattern: impl PregPattern,
         subject: &str,
-        matches: Option<&mut IndexMap<CaptureKey, Vec<String>>>,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<Option<String>>>>,
     ) -> bool {
         Self::match_all5(pattern, subject, matches) > 0
     }
@@ -251,7 +251,7 @@ impl Preg {
     pub fn is_match_all_with_offsets3(
         pattern: impl PregPattern,
         subject: &str,
-        matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
+        matches: Option<&mut IndexMap<CaptureKey, Vec<(Option<String>, i64)>>>,
     ) -> bool {
         Self::match_all_with_offsets5(pattern, subject, matches) > 0
     }
@@ -289,41 +289,5 @@ fn drop_null_matches_ref(
     matches
         .iter()
         .filter_map(|(key, value)| value.clone().map(|value| (key.clone(), value)))
-        .collect()
-}
-
-// In the `Vec<String>`-valued maps a per-iteration `null` cannot be stored, so
-// unmatched groups collapse to "" (the classic non-PREG_UNMATCHED_AS_NULL form).
-fn null_to_empty_match_all(
-    matches: IndexMap<CaptureKey, Vec<Option<String>>>,
-) -> IndexMap<CaptureKey, Vec<String>> {
-    matches
-        .into_iter()
-        .map(|(key, values)| {
-            (
-                key,
-                values
-                    .into_iter()
-                    .map(|value| value.unwrap_or_default())
-                    .collect(),
-            )
-        })
-        .collect()
-}
-
-fn null_to_empty_offset_match_all(
-    matches: IndexMap<CaptureKey, Vec<(Option<String>, i64)>>,
-) -> IndexMap<CaptureKey, Vec<(String, usize)>> {
-    matches
-        .into_iter()
-        .map(|(key, values)| {
-            (
-                key,
-                values
-                    .into_iter()
-                    .map(|(value, offset)| (value.unwrap_or_default(), offset.max(0) as usize))
-                    .collect(),
-            )
-        })
         .collect()
 }
