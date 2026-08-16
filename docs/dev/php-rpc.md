@@ -165,6 +165,10 @@ Notable internal helpers:
 - `__shirabe_settle_promise` — the inverse: drains a promise a plugin returned to Rust. React
   settles synchronously, so an already-settled promise yields its value here (a rejection is
   re-thrown as the Throw reply); one that is still pending is an explicit error.
+- `__shirabe_sync_env` — replays the environment writes the Rust side made after the worker was
+  spawned into the storage each one names (`putenv()`, `$_ENV`, `$_SERVER`); see
+  [docs/dev/env-vars-porting.md](./env-vars-porting.md). The outermost `rpc_call` of a session
+  issues it whenever the journal has moved on.
 - `__shirabe_get_property` — for testing only: reads a public property of a P-table entity.
 - `__shirabe_oracle_roundtrip` — codec oracle support for tests.
 - `__shirabe_console_application_boot` — builds the worker-side `Composer\Console\Application`

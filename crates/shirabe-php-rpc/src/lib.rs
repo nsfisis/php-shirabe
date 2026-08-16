@@ -1,6 +1,7 @@
 //! Rust-to-PHP RPC over a Unix domain socket. See `docs/dev/php-rpc.md`.
 
 pub mod composer_runtime;
+mod env;
 pub mod frame;
 pub mod session;
 pub mod value;
@@ -780,7 +781,10 @@ fn rpc_call(
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
     // Held for the whole logical call session; nested calls from the same thread (issued by a
     // dispatcher handler) re-enter immediately, other threads are serialized.
-    let _session = session::SessionGuard::enter();
+    let session = session::SessionGuard::enter();
+    if session.is_outermost() {
+        env::flush()?;
+    }
     let my_id = NEXT_CORR_ID.fetch_add(2, Ordering::Relaxed);
     send_frame(&request(my_id))?;
     loop {

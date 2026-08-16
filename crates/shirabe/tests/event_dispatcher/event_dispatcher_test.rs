@@ -740,12 +740,8 @@ fn test_dispatcher_can_execute_cli_and_php_in_same_event_script_stack() {
     assert_eq!(expected, io.borrow().get_output());
 }
 
-// TODO(php-runtime): `@putenv` writes the environment of the Shirabe process, while the listener
-// reads `getenv()` inside the PHP worker — a long-lived child that keeps the environment it
-// inherited when it was spawned. Nothing propagates the write across the boundary.
 #[test]
 #[serial]
-#[ignore = "`@putenv ABC=123` does not reach the PHP worker the listener runs in"]
 fn test_dispatcher_can_put_env() {
     let _tear_down = TearDown;
     if !php_runtime_available() {
@@ -786,12 +782,8 @@ fn test_dispatcher_can_put_env() {
     assert_eq!(expected, io.borrow().get_output());
 }
 
-// TODO(php-runtime): the bin dir is appended to the PATH of the Shirabe process, while the
-// listeners read `getenv('PATH')` inside the PHP worker — a long-lived child that keeps the
-// environment it inherited when it was spawned. Nothing propagates the append across the boundary.
 #[test]
 #[serial]
-#[ignore = "the bin dir the dispatcher appends to PATH does not reach the PHP worker the listeners run in"]
 fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
     let _tear_down = TearDown;
     if !php_runtime_available() {

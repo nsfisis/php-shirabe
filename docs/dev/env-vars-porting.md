@@ -33,12 +33,17 @@ each call site.
 | `$_ENV` | `PHP_ENV` |
 | `$_SERVER` | `PHP_SERVER` |
 
+## Reaching the PHP runtime
+
+The PHP worker is a separate, long-lived process (`docs/dev/php-rpc.md`): it holds the environment
+it was handed at spawn, so a later write on the Rust side would be invisible to the PHP code
+running in it. Every write to one of the three storages is therefore recorded in an ordered journal
+(`env_mutations_since`), and `shirabe-php-rpc` replays the entries the worker has not seen yet —
+through `__shirabe_sync_env`, which writes each entry to the storage it names — before the next call
+crosses the boundary. Replaying the writes rather than pushing a whole snapshot is what keeps the
+worker's own `$_SERVER` entries (`argv`, `SCRIPT_NAME`, ...) intact.
+
 ## TODOs
 
-The current implementation only models the Rust side. Two things remain unimplemented:
-
-* Propagating `$_ENV`/`$_SERVER` into the real PHP runtime. When Shirabe hands control to PHP
-  (for the plugin API), the PHP side needs to see the same `$_ENV`/`$_SERVER` snapshot Shirabe
-  holds. This is marked `TODO(php-runtime)` in `env.rs` and is not yet wired up.
-* Reflecting PHP-side mutations of `$_ENV`/`$_SERVER` back into Shirabe. How to handle the case
-  where PHP code rewrites `$_ENV` or `$_SERVER` is still TBD.
+Reflecting PHP-side mutations of `$_ENV`/`$_SERVER` back into Shirabe is unimplemented. How to
+handle the case where PHP code rewrites `$_ENV` or `$_SERVER` is still TBD.

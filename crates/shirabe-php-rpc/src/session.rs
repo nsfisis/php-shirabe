@@ -16,18 +16,19 @@ struct SessionLock {
 }
 
 impl SessionLock {
-    fn acquire(&self) {
+    /// Returns whether this acquisition opened the session rather than re-entering one.
+    fn acquire(&self) -> bool {
         let mut owner = self.owner.lock().unwrap();
         let me = std::thread::current().id();
         loop {
             match *owner {
                 None => {
                     *owner = Some((me, 1));
-                    return;
+                    return true;
                 }
                 Some((tid, depth)) if tid == me => {
                     *owner = Some((me, depth + 1));
-                    return;
+                    return false;
                 }
                 Some(_) => {
                     owner = self.cvar.wait(owner).unwrap();
@@ -60,12 +61,20 @@ static SESSION: LazyLock<SessionLock> = LazyLock::new(|| SessionLock {
 
 /// RAII guard; acquired once at the outermost `rpc_call`, re-entered (depth += 1, no blocking)
 /// by nested calls from the same thread.
-pub struct SessionGuard;
+pub struct SessionGuard {
+    outermost: bool,
+}
 
 impl SessionGuard {
     pub fn enter() -> Self {
-        SESSION.acquire();
-        SessionGuard
+        let outermost = SESSION.acquire();
+        SessionGuard { outermost }
+    }
+
+    /// Whether this guard opened the session. Work that must happen once per logical call
+    /// session, before anything else crosses the boundary, keys off this.
+    pub fn is_outermost(&self) -> bool {
+        self.outermost
     }
 }
 
@@ -81,8 +90,10 @@ mod tests {
 
     #[test]
     fn same_thread_reenters_without_blocking() {
-        let _outer = SessionGuard::enter();
-        let _inner = SessionGuard::enter();
+        let outer = SessionGuard::enter();
+        let inner = SessionGuard::enter();
+        assert!(outer.is_outermost());
+        assert!(!inner.is_outermost());
     }
 
     #[test]

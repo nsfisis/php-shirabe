@@ -851,6 +851,40 @@ ShirabeRpcRuntime::$dispatch = [
         }
         return $value;
     },
+    // Replays environment writes the Rust side made after this process was spawned, which only
+    // inherited the environment as it stood then. The three storages PHP exposes are distinct
+    // (docs/dev/env-vars-porting.md), so each write names the one it targets; a null value is an
+    // unset.
+    '__shirabe_sync_env' => static function ($args) {
+        foreach ($args[0] as [$storage, $key, $value]) {
+            switch ($storage) {
+                case 'process':
+                    if ($value === null) {
+                        putenv($key);
+                    } else {
+                        putenv("{$key}={$value}");
+                    }
+                    break;
+                case '_ENV':
+                    if ($value === null) {
+                        unset($_ENV[$key]);
+                    } else {
+                        $_ENV[$key] = $value;
+                    }
+                    break;
+                case '_SERVER':
+                    if ($value === null) {
+                        unset($_SERVER[$key]);
+                    } else {
+                        $_SERVER[$key] = $value;
+                    }
+                    break;
+                default:
+                    throw new RuntimeException("__shirabe_sync_env got an unknown storage `{$storage}`");
+            }
+        }
+        return true;
+    },
     // For testing only: reads a public property of a P-table entity (PHPUnit asserts like
     // `$plugins[0]->version` have no method to call).
     '__shirabe_get_property' => static function ($args) {
