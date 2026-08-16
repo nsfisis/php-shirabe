@@ -1896,17 +1896,21 @@ class ComposerStaticInit{}
                     {
                         // remove target-dir from file paths of the root package
                         if is_root {
-                            let target_dir = str_replace(
-                                "\\<dirsep\\>",
-                                "[\\\\/]",
-                                &preg_quote(
-                                    &str_replace_multi(
-                                        &package.get_target_dir().unwrap_or_default(),
-                                        &[("/", "<dirsep>"), ("\\", "<dirsep>")],
-                                    ),
-                                    None,
-                                ),
-                            );
+                            // Regex pattern compatibility:
+                            // PHP swaps every path separator for a `<dirsep>` marker, runs
+                            // `preg_quote` over the whole target dir and rewrites the quoted
+                            // `\<dirsep\>` into `[\\/]`. `preg_quote` emits `<` and `>`
+                            // unescaped here, because the `regex` crate reads `\<`/`\>` as word
+                            // boundaries, so the marker is not recoverable from the quoted
+                            // string. Quote each separator-delimited segment on its own and join
+                            // the segments with the same character class.
+                            let target_dir = package
+                                .get_target_dir()
+                                .unwrap_or_default()
+                                .split(['/', '\\'])
+                                .map(|segment| preg_quote(segment, None))
+                                .collect::<Vec<String>>()
+                                .join("[\\\\/]");
                             path_str = ltrim(
                                 &Preg::replace(
                                     format!("{{^{}}}", target_dir),
@@ -2521,13 +2525,4 @@ fn find_top_level_arrow(entry: &str) -> Option<usize> {
         i += 1;
     }
     None
-}
-
-// Helper used by parse_autoloads_type for chained string substitutions.
-fn str_replace_multi(input: &str, pairs: &[(&str, &str)]) -> String {
-    let mut s = input.to_string();
-    for (from, to) in pairs {
-        s = str_replace(from, to, &s);
-    }
-    s
 }

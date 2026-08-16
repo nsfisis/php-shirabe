@@ -589,7 +589,6 @@ fn test_root_package_autoloading_alternative_vendor_dir() {
 
 #[test]
 #[serial]
-#[ignore = "autoload_real.php/autoload_static.php fixtures track a newer Composer template (single blank lines + $filesToLoad/$requireFile block) than the current AutoloadGenerator port emits; needs production template alignment"]
 fn test_root_package_autoloading_with_target_dir() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
