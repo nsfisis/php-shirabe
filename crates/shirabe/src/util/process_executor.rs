@@ -224,7 +224,7 @@ impl ProcessExecutor {
                         &command_str,
                         &Self::escape(&Self::get_executable(&m1)),
                         0,
-                        strlen(&m1) as usize,
+                        Some(strlen(&m1)),
                     );
                 }
             }

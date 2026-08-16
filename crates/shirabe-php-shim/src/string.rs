@@ -22,13 +22,31 @@ pub fn substr_count(haystack: &str, needle: &str) -> i64 {
     haystack.matches(needle).count() as i64
 }
 
-// Byte-based, matching PHP's substr_replace.
-// TODO(php-semantics): PHP accepts negative $start/$length (counting from the end); this signature takes
-// usize and therefore cannot express those cases.
-pub fn substr_replace(string: &str, replace: &str, start: usize, length: usize) -> String {
+// Byte-based, matching PHP's substr_replace. `length` of `None` is PHP's omitted `$length`,
+// which replaces up to the end of the string.
+// TODO(bytes): slicing at arbitrary byte offsets can split a multi-byte sequence, and the
+// `String` return type forces the resulting invalid bytes through `from_utf8_lossy`.
+pub fn substr_replace(string: &str, replace: &str, start: i64, length: Option<i64>) -> String {
     let bytes = string.as_bytes();
-    let start = start.min(bytes.len());
-    let end = start.saturating_add(length).min(bytes.len());
+    let str_len = bytes.len() as i64;
+
+    // A negative start counts from the end of the string, clamped to both ends of the string.
+    let start = if start < 0 {
+        (str_len + start).max(0)
+    } else {
+        start.min(str_len)
+    };
+
+    // A negative length means "stop that many bytes before the end of the string"; the result is
+    // clamped to an empty range rather than becoming negative.
+    let mut length = length.unwrap_or(str_len);
+    if length < 0 {
+        length = (str_len - start + length).max(0);
+    }
+    length = length.min(str_len - start);
+
+    let start = start as usize;
+    let end = start + length as usize;
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len() + replace.len());
     out.extend_from_slice(&bytes[..start]);
     out.extend_from_slice(replace.as_bytes());
@@ -1082,5 +1100,72 @@ pub fn uniqid(prefix: &str, more_entropy: bool) -> String {
         format!("{}.{:.8}", base, fastrand::f64() * 10.0)
     } else {
         base
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::substr_replace;
+
+    #[test]
+    fn substr_replace_matches_php() {
+        // Expected values are the output of PHP 8.5.9's substr_replace().
+        assert_eq!(substr_replace("Hello World", "XX", 0, None), "XX");
+        assert_eq!(substr_replace("Hello World", "XX", 6, None), "Hello XX");
+        assert_eq!(substr_replace("Hello World", "XX", 6, Some(5)), "Hello XX");
+        assert_eq!(
+            substr_replace("Hello World", "XX", 6, Some(100)),
+            "Hello XX"
+        );
+        assert_eq!(
+            substr_replace("Hello World", "XX", 20, Some(3)),
+            "Hello WorldXX"
+        );
+        assert_eq!(
+            substr_replace("Hello World", "XX", 11, Some(3)),
+            "Hello WorldXX"
+        );
+        assert_eq!(substr_replace("Hello World", "XX", -5, None), "Hello XX");
+        assert_eq!(
+            substr_replace("Hello World", "XX", -5, Some(2)),
+            "Hello XXrld"
+        );
+        assert_eq!(
+            substr_replace("Hello World", "XX", -100, Some(3)),
+            "XXlo World"
+        );
+        assert_eq!(substr_replace("Hello World", "XX", -100, None), "XX");
+        assert_eq!(substr_replace("Hello World", "XX", 0, Some(-5)), "XXWorld");
+        assert_eq!(
+            substr_replace("Hello World", "XX", 0, Some(-100)),
+            "XXHello World"
+        );
+        assert_eq!(substr_replace("Hello World", "XX", 3, Some(-3)), "HelXXrld");
+        assert_eq!(
+            substr_replace("Hello World", "XX", -5, Some(-2)),
+            "Hello XXld"
+        );
+        assert_eq!(
+            substr_replace("Hello World", "XX", -5, Some(-100)),
+            "Hello XXWorld"
+        );
+        assert_eq!(
+            substr_replace("Hello World", "XX", 6, Some(0)),
+            "Hello XXWorld"
+        );
+        assert_eq!(
+            substr_replace("Hello World", "XX", 0, Some(0)),
+            "XXHello World"
+        );
+        assert_eq!(substr_replace("", "XX", 0, None), "XX");
+        assert_eq!(substr_replace("", "XX", 5, Some(3)), "XX");
+        assert_eq!(substr_replace("", "XX", -5, Some(-3)), "XX");
+        assert_eq!(substr_replace("Hello World", "", 0, Some(5)), " World");
+        assert_eq!(substr_replace("Hello World", "", -5, None), "Hello ");
+        assert_eq!(substr_replace("abc", "X", 1, Some(-1)), "aXc");
+        assert_eq!(substr_replace("abc", "X", 2, Some(-2)), "abXc");
+        assert_eq!(substr_replace("abc", "X", -1, Some(-1)), "abXc");
+        assert_eq!(substr_replace("abc", "X", 3, Some(0)), "abcX");
+        assert_eq!(substr_replace("abc", "X", 3, None), "abcX");
     }
 }

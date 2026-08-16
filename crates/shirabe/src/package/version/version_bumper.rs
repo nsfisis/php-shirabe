@@ -112,10 +112,12 @@ impl VersionBumper {
                     } else {
                         format!("{}{}", new_pretty_constraint, suffix)
                     };
-                let offset = match_offset as usize;
-                let length = Platform::strlen(match_str) as usize;
-                modified =
-                    shirabe_php_shim::substr_replace(&modified, &replacement, offset, length);
+                modified = shirabe_php_shim::substr_replace(
+                    &modified,
+                    &replacement,
+                    match_offset,
+                    Some(Platform::strlen(match_str)),
+                );
             }
 
             let new_constraint = parser.parse_constraints(&modified)?;
