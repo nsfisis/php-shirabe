@@ -83,23 +83,13 @@ impl Preg {
         result
     }
 
-    pub fn match_all_with_offsets5(
+    fn match_all_with_offsets5(
         pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
-        flags: i64,
-        offset: usize,
     ) -> usize {
-        Self::check_set_order(flags);
-
         let mut internal: IndexMap<CaptureKey, Vec<(Option<String>, i64)>> = IndexMap::new();
-        let result = preg_match_all_offset_capture2(
-            pattern,
-            subject,
-            &mut internal,
-            flags | PREG_UNMATCHED_AS_NULL | PREG_OFFSET_CAPTURE,
-            offset,
-        );
+        let result = preg_match_all_offset_capture2(pattern, subject, &mut internal);
 
         if let Some(out) = matches {
             *out = null_to_empty_offset_match_all(internal);
@@ -263,7 +253,7 @@ impl Preg {
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<(String, usize)>>>,
     ) -> bool {
-        Self::match_all_with_offsets5(pattern, subject, matches, 0, 0) > 0
+        Self::match_all_with_offsets5(pattern, subject, matches) > 0
     }
 
     fn check_offset_capture(flags: i64, use_function_name: &str) {

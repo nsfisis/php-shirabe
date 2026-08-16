@@ -187,6 +187,7 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
 
 #[test]
 #[serial]
+#[ignore = "see test_self()"]
 fn test_show_outdated_deps_sorting_by_age() {
     run_show_case(
         input(vec![

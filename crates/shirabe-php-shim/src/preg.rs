@@ -200,24 +200,20 @@ pub fn preg_match_all_offset_capture2(
     pattern: impl PregPattern,
     subject: &str,
     matches: &mut indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>>,
-    flags: i64,
-    offset: usize,
 ) -> usize {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
-    let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let group_count = re.captures_len();
     let names: Vec<Option<&str>> = re.capture_names().collect();
 
     let mut groups: Vec<Vec<(Option<String>, i64)>> = vec![Vec::new(); group_count];
     let mut count = 0;
-    for caps in re.captures_iter(&subject[offset..]) {
+    for caps in re.captures_iter(subject) {
         count += 1;
         for (g, column) in groups.iter_mut().enumerate() {
             let entry = match caps.get(g) {
-                Some(m) => (Some(m.as_str().to_string()), (m.start() + offset) as i64),
-                None if unmatched_as_null => (None, -1),
-                None => (Some(String::new()), -1),
+                Some(m) => (Some(m.as_str().to_string()), m.start() as i64),
+                None => (None, -1),
             };
             column.push(entry);
         }
