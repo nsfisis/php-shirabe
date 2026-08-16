@@ -46,7 +46,7 @@ pub const MAX_LINE_LENGTH: i64 = 120;
 #[derive(Debug)]
 pub enum DefinitionListItem {
     String(String),
-    Array(indexmap::IndexMap<String, PhpMixed>),
+    Array(indexmap::IndexMap<String, String>),
     TableSeparator(TableSeparator),
 }
 
@@ -86,34 +86,21 @@ impl SymfonyStyle {
     /// Formats a message as a block of text.
     pub fn block(
         &mut self,
-        messages: PhpMixed,
+        messages: &[String],
         r#type: Option<&str>,
         style: Option<&str>,
         prefix: &str,
         padding: bool,
         escape: bool,
     ) {
-        let messages: Vec<PhpMixed> = if shirabe_php_shim::is_array(&messages) {
-            match messages {
-                PhpMixed::Array(entries) => entries.into_values().collect(),
-                PhpMixed::List(items) => items,
-                _ => unreachable!("value is an array past the is_array guard"),
-            }
-        } else {
-            vec![messages]
-        };
-
         self.auto_prepend_block();
         let block = self.create_block(messages, r#type, style, prefix, padding, escape);
-        self.writeln(
-            PhpMixed::List(block.into_iter().map(PhpMixed::String).collect()),
-            OUTPUT_NORMAL,
-        );
+        self.writeln(&block, OUTPUT_NORMAL);
         self.new_line(1);
     }
 
     /// Formats a command comment.
-    pub fn comment(&mut self, message: PhpMixed) {
+    pub fn comment(&mut self, message: &[String]) {
         self.block(
             message,
             None,
@@ -125,7 +112,7 @@ impl SymfonyStyle {
     }
 
     /// Formats an info message.
-    pub fn info(&mut self, message: PhpMixed) {
+    pub fn info(&mut self, message: &[String]) {
         self.block(message, Some("INFO"), Some("fg=green"), " ", true, true);
     }
 
@@ -171,18 +158,11 @@ impl SymfonyStyle {
                 }
                 DefinitionListItem::Array(value) => {
                     // $headers[] = key($value); $row[] = current($value);
-                    let first_key = value
-                        .keys()
-                        .next()
-                        .map(|k| PhpMixed::String(k.clone()))
-                        .unwrap_or(PhpMixed::Null);
-                    let first_value = value
-                        .values()
-                        .next()
-                        .cloned()
-                        .unwrap_or(PhpMixed::Bool(false));
-                    headers.push(Cell::from(first_key));
-                    row.push(Cell::from(first_value));
+                    let first_key = value.keys().next().cloned();
+                    // `current()` on an empty array is false, which renders as an empty cell.
+                    let first_value = value.values().next().cloned().unwrap_or_default();
+                    headers.push(first_key.map_or(Cell::Null, Cell::Value));
+                    row.push(Cell::Value(first_value));
                 }
             }
         }
@@ -325,7 +305,7 @@ impl SymfonyStyle {
 
     fn create_block(
         &mut self,
-        messages: Vec<PhpMixed>,
+        messages: &[String],
         r#type: Option<&str>,
         style: Option<&str>,
         prefix: &str,
@@ -350,9 +330,9 @@ impl SymfonyStyle {
 
         let messages_count = messages.len() as i64;
         // wrap and add newlines for each element
-        for (key, message) in messages.into_iter().enumerate() {
+        for (key, message) in messages.iter().enumerate() {
             let key = key as i64;
-            let mut message = Self::php_string(&message);
+            let mut message = message.clone();
             if escape {
                 message = OutputFormatter::escape(&message).unwrap();
             }
@@ -445,10 +425,6 @@ impl SymfonyStyle {
         .ok()
     }
 
-    fn php_string(value: &PhpMixed) -> String {
-        shirabe_php_shim::strval(value)
-    }
-
     /// Bridges the `StyleInterface` validator (which yields `anyhow::Error`) to the
     /// `Question::set_validator` validator (which yields `InvalidArgumentException`) by
     /// converting any error into an `InvalidArgumentException` carrying its message.
@@ -465,41 +441,19 @@ impl SymfonyStyle {
     }
 
     /// {@inheritdoc}
-    pub fn writeln(&mut self, messages: PhpMixed, r#type: i64) {
-        let messages: Vec<PhpMixed> = if !shirabe_php_shim::is_iterable(&messages) {
-            vec![messages]
-        } else {
-            match messages {
-                PhpMixed::Array(entries) => entries.into_values().collect(),
-                PhpMixed::List(items) => items,
-                _ => unreachable!("value is iterable past the is_iterable guard"),
-            }
-        };
-
+    pub fn writeln(&mut self, messages: &[String], r#type: i64) {
         for message in messages {
-            let message = Self::php_string(&message);
-            self.inner.writeln(std::slice::from_ref(&message), r#type);
-            self.write_buffer(&message, true, r#type);
+            self.inner.writeln(std::slice::from_ref(message), r#type);
+            self.write_buffer(message, true, r#type);
         }
     }
 
     /// {@inheritdoc}
-    pub fn write(&mut self, messages: PhpMixed, newline: bool, r#type: i64) {
-        let messages: Vec<PhpMixed> = if !shirabe_php_shim::is_iterable(&messages) {
-            vec![messages]
-        } else {
-            match messages {
-                PhpMixed::Array(entries) => entries.into_values().collect(),
-                PhpMixed::List(items) => items,
-                _ => unreachable!("value is iterable past the is_iterable guard"),
-            }
-        };
-
+    pub fn write(&mut self, messages: &[String], newline: bool, r#type: i64) {
         for message in messages {
-            let message = Self::php_string(&message);
             self.inner
-                .write(std::slice::from_ref(&message), newline, r#type);
-            self.write_buffer(&message, newline, r#type);
+                .write(std::slice::from_ref(message), newline, r#type);
+            self.write_buffer(message, newline, r#type);
         }
     }
 }
@@ -508,88 +462,70 @@ impl StyleInterface for SymfonyStyle {
     /// {@inheritdoc}
     fn title(&mut self, message: &str) {
         self.auto_prepend_block();
-        self.writeln(
-            PhpMixed::List(vec![
-                PhpMixed::String(format!(
-                    "<comment>{}</>",
-                    OutputFormatter::escape_trailing_backslash(message),
-                )),
-                PhpMixed::String(format!(
-                    "<comment>{}</>",
-                    shirabe_php_shim::str_repeat(
-                        "=",
-                        Helper::width(&Helper::remove_decoration(
-                            &mut *self.get_formatter().borrow_mut(),
-                            message,
-                        )) as usize,
-                    ),
-                )),
-            ]),
-            OUTPUT_NORMAL,
-        );
+        let lines = [
+            format!(
+                "<comment>{}</>",
+                OutputFormatter::escape_trailing_backslash(message),
+            ),
+            format!(
+                "<comment>{}</>",
+                shirabe_php_shim::str_repeat(
+                    "=",
+                    Helper::width(&Helper::remove_decoration(
+                        &mut *self.get_formatter().borrow_mut(),
+                        message,
+                    )) as usize,
+                ),
+            ),
+        ];
+        self.writeln(&lines, OUTPUT_NORMAL);
         self.new_line(1);
     }
 
     /// {@inheritdoc}
     fn section(&mut self, message: &str) {
         self.auto_prepend_block();
-        self.writeln(
-            PhpMixed::List(vec![
-                PhpMixed::String(format!(
-                    "<comment>{}</>",
-                    OutputFormatter::escape_trailing_backslash(message),
-                )),
-                PhpMixed::String(format!(
-                    "<comment>{}</>",
-                    shirabe_php_shim::str_repeat(
-                        "-",
-                        Helper::width(&Helper::remove_decoration(
-                            &mut *self.get_formatter().borrow_mut(),
-                            message,
-                        )) as usize,
-                    ),
-                )),
-            ]),
-            OUTPUT_NORMAL,
-        );
+        let lines = [
+            format!(
+                "<comment>{}</>",
+                OutputFormatter::escape_trailing_backslash(message),
+            ),
+            format!(
+                "<comment>{}</>",
+                shirabe_php_shim::str_repeat(
+                    "-",
+                    Helper::width(&Helper::remove_decoration(
+                        &mut *self.get_formatter().borrow_mut(),
+                        message,
+                    )) as usize,
+                ),
+            ),
+        ];
+        self.writeln(&lines, OUTPUT_NORMAL);
         self.new_line(1);
     }
 
     /// {@inheritdoc}
-    fn listing(&mut self, elements: Vec<PhpMixed>) {
+    fn listing(&mut self, elements: &[String]) {
         self.auto_prepend_text();
-        let elements: Vec<PhpMixed> = shirabe_php_shim::array_map(
-            |element: &PhpMixed| PhpMixed::String(format!(" * {}", element.clone())),
-            &elements,
-        );
+        let elements: Vec<String> =
+            shirabe_php_shim::array_map(|element: &String| format!(" * {}", element), elements);
 
-        self.writeln(
-            PhpMixed::List(elements.into_iter().collect()),
-            OUTPUT_NORMAL,
-        );
+        self.writeln(&elements, OUTPUT_NORMAL);
         self.new_line(1);
     }
 
     /// {@inheritdoc}
-    fn text(&mut self, message: PhpMixed) {
+    fn text(&mut self, message: &[String]) {
         self.auto_prepend_text();
 
-        let messages: Vec<PhpMixed> = if shirabe_php_shim::is_array(&message) {
-            match message {
-                PhpMixed::Array(entries) => entries.into_values().collect(),
-                PhpMixed::List(items) => items,
-                _ => unreachable!("value is an array past the is_array guard"),
-            }
-        } else {
-            vec![message]
-        };
-        for message in messages {
-            self.writeln(PhpMixed::String(format!(" {}", message)), OUTPUT_NORMAL);
+        for message in message {
+            self.writeln(&[format!(" {}", message)], OUTPUT_NORMAL);
         }
     }
 
     /// {@inheritdoc}
-    fn success(&mut self, message: PhpMixed) {
+    fn success(&mut self, message: &[String]) {
         self.block(
             message,
             Some("OK"),
@@ -601,7 +537,7 @@ impl StyleInterface for SymfonyStyle {
     }
 
     /// {@inheritdoc}
-    fn error(&mut self, message: PhpMixed) {
+    fn error(&mut self, message: &[String]) {
         self.block(
             message,
             Some("ERROR"),
@@ -613,7 +549,7 @@ impl StyleInterface for SymfonyStyle {
     }
 
     /// {@inheritdoc}
-    fn warning(&mut self, message: PhpMixed) {
+    fn warning(&mut self, message: &[String]) {
         self.block(
             message,
             Some("WARNING"),
@@ -625,12 +561,12 @@ impl StyleInterface for SymfonyStyle {
     }
 
     /// {@inheritdoc}
-    fn note(&mut self, message: PhpMixed) {
+    fn note(&mut self, message: &[String]) {
         self.block(message, Some("NOTE"), Some("fg=yellow"), " ! ", false, true);
     }
 
     /// {@inheritdoc}
-    fn caution(&mut self, message: PhpMixed) {
+    fn caution(&mut self, message: &[String]) {
         self.block(
             message,
             Some("CAUTION"),
@@ -642,10 +578,10 @@ impl StyleInterface for SymfonyStyle {
     }
 
     /// {@inheritdoc}
-    fn table(&mut self, headers: Vec<PhpMixed>, rows: Vec<PhpMixed>) {
+    fn table(&mut self, headers: Vec<Cell>, rows: Vec<Row>) {
         self.create_table()
-            .set_headers(headers.into_iter().map(Cell::from).collect())
-            .set_rows(rows.into_iter().map(Row::from).collect())
+            .set_headers(headers)
+            .set_rows(rows)
             .render();
 
         self.new_line(1);
@@ -696,26 +632,20 @@ impl StyleInterface for SymfonyStyle {
     fn choice(
         &mut self,
         question: &str,
-        choices: Vec<PhpMixed>,
+        choices: Vec<String>,
         default: Option<PhpMixed>,
     ) -> PhpMixed {
-        let default = if let Some(default) = default {
-            let values = shirabe_php_shim::array_flip(&PhpMixed::List(choices.to_vec()));
+        let default = default.map(|default| {
+            let values = shirabe_php_shim::array_flip_strings(&choices);
             // $default = $values[$default] ?? $default;
-            let resolved = match &values {
-                PhpMixed::Array(map) => map.get(&default.to_string()).cloned(),
-                _ => None,
-            };
-            Some(resolved.unwrap_or(default))
-        } else {
-            None
-        };
+            values.get(&default.to_string()).cloned().unwrap_or(default)
+        });
 
         // PHP: return $this->askQuestion(new ChoiceQuestion($question, $choices, $default));
         let choices_map: indexmap::IndexMap<String, PhpMixed> = choices
             .into_iter()
             .enumerate()
-            .map(|(i, c)| (i.to_string(), c))
+            .map(|(i, c)| (i.to_string(), PhpMixed::String(c)))
             .collect();
         let choice_question = ChoiceQuestion::new(question.to_string(), choices_map, default)
             .expect("choice() always provides at least one choice");

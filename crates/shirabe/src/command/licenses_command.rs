@@ -16,6 +16,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException, impl_php_class};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
+use shirabe_symfony_console::helper::Row;
 use shirabe_symfony_console::helper::Table;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -291,22 +292,16 @@ impl Command for LicensesCommand {
                 let mut entries: Vec<(String, i64)> = used_licenses.into_iter().collect();
                 entries.sort_by(|a, b| b.1.cmp(&a.1));
 
-                let rows: Vec<PhpMixed> = entries
+                let rows: Vec<Row> = entries
                     .iter()
                     .map(|(license, count)| {
-                        PhpMixed::List(vec![
-                            PhpMixed::String(license.clone()),
-                            PhpMixed::String(count.to_string()),
-                        ])
+                        Row::Cells(vec![license.clone().into(), count.to_string().into()])
                     })
                     .collect();
 
                 let mut symfony_io = SymfonyStyle::new(input, output);
                 symfony_io.table(
-                    vec![
-                        PhpMixed::String("License".to_string()),
-                        PhpMixed::String("Number of dependencies".to_string()),
-                    ],
+                    vec!["License".into(), "Number of dependencies".into()],
                     rows,
                 );
             }

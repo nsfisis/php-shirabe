@@ -1,5 +1,7 @@
 //! ref: composer/vendor/symfony/console/Style/StyleInterface.php
 
+use crate::helper::Cell;
+use crate::helper::Row;
 use shirabe_php_shim::PhpMixed;
 
 /// Output style helpers.
@@ -11,28 +13,28 @@ pub trait StyleInterface {
     fn section(&mut self, message: &str);
 
     /// Formats a list.
-    fn listing(&mut self, elements: Vec<PhpMixed>);
+    fn listing(&mut self, elements: &[String]);
 
     /// Formats informational text.
-    fn text(&mut self, message: PhpMixed);
+    fn text(&mut self, message: &[String]);
 
     /// Formats a success result bar.
-    fn success(&mut self, message: PhpMixed);
+    fn success(&mut self, message: &[String]);
 
     /// Formats an error result bar.
-    fn error(&mut self, message: PhpMixed);
+    fn error(&mut self, message: &[String]);
 
     /// Formats an warning result bar.
-    fn warning(&mut self, message: PhpMixed);
+    fn warning(&mut self, message: &[String]);
 
     /// Formats a note admonition.
-    fn note(&mut self, message: PhpMixed);
+    fn note(&mut self, message: &[String]);
 
     /// Formats a caution admonition.
-    fn caution(&mut self, message: PhpMixed);
+    fn caution(&mut self, message: &[String]);
 
     /// Formats a table.
-    fn table(&mut self, headers: Vec<PhpMixed>, rows: Vec<PhpMixed>);
+    fn table(&mut self, headers: Vec<Cell>, rows: Vec<Row>);
 
     /// Asks a question.
     fn ask(
@@ -56,7 +58,7 @@ pub trait StyleInterface {
     fn choice(
         &mut self,
         question: &str,
-        choices: Vec<PhpMixed>,
+        choices: Vec<String>,
         default: Option<PhpMixed>,
     ) -> PhpMixed;
 
