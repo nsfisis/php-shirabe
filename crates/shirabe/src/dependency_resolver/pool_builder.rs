@@ -786,7 +786,7 @@ impl PoolBuilder {
     fn is_update_allowed(&self, package: PackageInterfaceHandle) -> bool {
         for pattern in &self.update_allow_list {
             let pattern_regexp = base_package::package_name_to_regexp(pattern);
-            if Preg::is_match3(&pattern_regexp, &package.get_name(), None) {
+            if Preg::is_match3(&pattern_regexp, &package.get_name()).is_some() {
                 return true;
             }
         }
@@ -813,13 +813,13 @@ impl PoolBuilder {
                 .borrow_mut()
                 .get_packages()?
             {
-                if Preg::is_match3(&pattern_regexp, &package.get_name(), None) {
+                if Preg::is_match3(&pattern_regexp, &package.get_name()).is_some() {
                     continue 'outer;
                 }
             }
             // update pattern matches a root require? => all good, probably a new package
             for (package_name, _constraint) in request.get_requires() {
-                if Preg::is_match3(&pattern_regexp, package_name, None) {
+                if Preg::is_match3(&pattern_regexp, package_name).is_some() {
                     if PlatformRepository::is_platform_package(package_name) {
                         matched_platform_package = true;
                         continue;

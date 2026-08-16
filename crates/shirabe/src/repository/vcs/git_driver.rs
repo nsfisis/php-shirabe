@@ -14,7 +14,7 @@ use crate::util::Url;
 use chrono::TimeZone;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, realpath,
@@ -198,14 +198,12 @@ impl GitDriver {
             let branches = self.inner.process.borrow().split_lines(&output);
             if !branches.contains(&"* master".to_string()) {
                 for branch in &branches {
-                    if !branch.is_empty() {
-                        let mut caps = PregMatchedGroups::new();
-                        if Preg::match3(php_regex!(r"{^\* +(\S+)}"), branch, Some(&mut caps))
-                            && let Some(name) = caps.get(&CaptureKey::ByIndex(1))
-                        {
-                            self.root_identifier = Some(name.clone());
-                            break;
-                        }
+                    if !branch.is_empty()
+                        && let Some(caps) = Preg::match3(php_regex!(r"{^\* +(\S+)}"), branch)
+                        && let Some(name) = caps.get(&CaptureKey::ByIndex(1))
+                    {
+                        self.root_identifier = Some(name.clone());
+                        break;
                     }
                 }
             }
@@ -310,21 +308,20 @@ impl GitDriver {
                 Some(&self.repo_dir),
             );
             for tag in self.inner.process.borrow().split_lines(&output) {
-                if !tag.is_empty() {
-                    let mut caps = PregMatchedGroups::new();
-                    if Preg::match3(
+                if !tag.is_empty()
+                    && let Some(caps) = Preg::match3(
                         php_regex!(r"{^([a-f0-9]{40}) refs/tags/(\S+?)(\^\{\})?$}"),
                         &tag,
-                        Some(&mut caps),
-                    ) && let (Some(hash), Some(name)) = (
+                    )
+                    && let (Some(hash), Some(name)) = (
                         caps.get(&CaptureKey::ByIndex(1)),
                         caps.get(&CaptureKey::ByIndex(2)),
-                    ) {
-                        self.tags
-                            .as_mut()
-                            .unwrap()
-                            .insert(name.clone(), hash.clone());
-                    }
+                    )
+                {
+                    self.tags
+                        .as_mut()
+                        .unwrap()
+                        .insert(name.clone(), hash.clone());
                 }
             }
         }
@@ -349,19 +346,19 @@ impl GitDriver {
                 Some(&self.repo_dir),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
-                if !branch.is_empty() && !Preg::is_match(php_regex!(r"{^ *[^/]+/HEAD }"), &branch) {
-                    let mut caps = PregMatchedGroups::new();
-                    if Preg::match3(
+                if !branch.is_empty()
+                    && !Preg::is_match(php_regex!(r"{^ *[^/]+/HEAD }"), &branch)
+                    && let Some(caps) = Preg::match3(
                         php_regex!(r"{^(?:\* )? *(\S+) *([a-f0-9]+)(?: .*)?$}"),
                         &branch,
-                        Some(&mut caps),
-                    ) && let (Some(name), Some(hash)) = (
+                    )
+                    && let (Some(name), Some(hash)) = (
                         caps.get(&CaptureKey::ByIndex(1)),
                         caps.get(&CaptureKey::ByIndex(2)),
-                    ) && !name.starts_with('-')
-                    {
-                        branches.insert(name.clone(), hash.clone());
-                    }
+                    )
+                    && !name.starts_with('-')
+                {
+                    branches.insert(name.clone(), hash.clone());
                 }
             }
 

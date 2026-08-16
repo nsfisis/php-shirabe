@@ -226,11 +226,9 @@ impl Git {
                 &mut output,
                 cwd,
             )?;
-            let mut m = PregMatchedGroups::new();
-            if Preg::is_match3(
+            if let Some(m) = Preg::is_match3(
                 php_regex!(r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im"),
                 &output,
-                Some(&mut m),
             ) {
                 let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
                 if !self.io.has_authentication(&m3) {
@@ -248,14 +246,12 @@ impl Git {
         let protocols = self.config.borrow_mut().get("github-protocols");
         // public github, autoswitch protocols
         // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
-        let mut m = PregMatchedGroups::new();
-        if Preg::is_match3(
+        if let Some(m) = Preg::is_match3(
             format!(
                 "{{^(?:https?|git)://{}/(.*)}}",
                 Self::get_github_domains_regex(&self.config.borrow())
             ),
             url,
-            Some(&mut m),
         ) {
             let mut messages: Vec<String> = vec![];
             let protocols_list: Vec<String> = match &protocols {
@@ -344,23 +340,23 @@ impl Git {
             let mut error_msg = self.process.borrow().get_error_output().to_string();
             // private github repository without ssh key access, try https with auth
             // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
-            let mut m = PregMatchedGroups::new();
             let github_matched = Preg::is_match3(
                 format!(
                     "{{^git@{}:(.+?)\\.git$}}i",
                     Self::get_github_domains_regex(&self.config.borrow())
                 ),
                 url,
-                Some(&mut m),
-            ) || Preg::is_match3(
-                format!(
-                    "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
-                    Self::get_github_domains_regex(&self.config.borrow())
-                ),
-                url,
-                Some(&mut m),
-            );
-            if github_matched {
+            )
+            .or_else(|| {
+                Preg::is_match3(
+                    format!(
+                        "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
+                        Self::get_github_domains_regex(&self.config.borrow())
+                    ),
+                    url,
+                )
+            });
+            if let Some(m) = github_matched {
                 let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 if !self.io.has_authentication(&m1) {
@@ -410,15 +406,12 @@ impl Git {
                     credentials = vec![rawurlencode(&username), rawurlencode(&password)];
                     error_msg = self.process.borrow().get_error_output().to_string();
                 }
-            } else if Preg::is_match3(
+            } else if let Some(m) = Preg::is_match3(
                 php_regex!(r"{^(https?)://(bitbucket\.org)/(.*?)(?:\.git)?$}i"),
                 url,
-                Some(&mut m),
-            ) || Preg::is_match3(
-                php_regex!(r"{^(git)@(bitbucket\.org):(.+?\.git)$}i"),
-                url,
-                Some(&mut m),
-            ) {
+            )
+            .or_else(|| Preg::is_match3(php_regex!(r"{^(git)@(bitbucket\.org):(.+?\.git)$}i"), url))
+            {
                 // bitbucket either through oauth or app password, with fallback to ssh.
                 let mut bitbucket_util = Bitbucket::new(
                     self.io.clone(),
@@ -556,21 +549,22 @@ impl Git {
                 }
 
                 error_msg = self.process.borrow().get_error_output().to_string();
-            } else if Preg::is_match3(
+            } else if let Some(m) = Preg::is_match3(
                 format!(
                     "{{^(git)@{}:(.+?\\.git)$}}i",
                     Self::get_gitlab_domains_regex(&self.config.borrow())
                 ),
                 url,
-                Some(&mut m),
-            ) || Preg::is_match3(
-                format!(
-                    "{{^(https?)://{}/(.*)}}i",
-                    Self::get_gitlab_domains_regex(&self.config.borrow())
-                ),
-                url,
-                Some(&mut m),
-            ) {
+            )
+            .or_else(|| {
+                Preg::is_match3(
+                    format!(
+                        "{{^(https?)://{}/(.*)}}i",
+                        Self::get_gitlab_domains_regex(&self.config.borrow())
+                    ),
+                    url,
+                )
+            }) {
                 let mut m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
@@ -1090,14 +1084,7 @@ impl Git {
     }
 
     fn get_authentication_failure(&self, url: &str) -> Option<PregMatchedGroups> {
-        let mut m = PregMatchedGroups::new();
-        if !Preg::is_match3(
-            php_regex!(r"{^(https?://)([^/]+)(.*)$}i"),
-            url,
-            Some(&mut m),
-        ) {
-            return None;
-        }
+        let m = Preg::is_match3(php_regex!(r"{^(https?://)([^/]+)(.*)$}i"), url)?;
 
         let auth_failures = [
             "fatal: Authentication failed",
@@ -1179,12 +1166,9 @@ impl Git {
                 .borrow()
                 .split_lines(output_mixed.as_string().unwrap_or(""));
             for line in lines {
-                let mut matches = PregMatchedGroups::new();
-                if Preg::is_match3(
-                    php_regex!(r"{^\s*HEAD branch:\s(.+)\s*$}m"),
-                    &line,
-                    Some(&mut matches),
-                ) {
+                if let Some(matches) =
+                    Preg::is_match3(php_regex!(r"{^\s*HEAD branch:\s(.+)\s*$}m"), &line)
+                {
                     return Ok(Some(
                         matches
                             .get(&CaptureKey::ByIndex(1))
@@ -1307,15 +1291,11 @@ impl Git {
                 &mut output,
                 Option::<&str>::None,
             );
-            if exit_code == 0 {
-                let mut matches = PregMatchedGroups::new();
-                if Preg::is_match3(
-                    php_regex!(r"/^git version (\d+(?:\.\d+)+)/m"),
-                    &output,
-                    Some(&mut matches),
-                ) {
-                    *version = Some(matches.get(&CaptureKey::ByIndex(1)).cloned());
-                }
+            if exit_code == 0
+                && let Some(matches) =
+                    Preg::is_match3(php_regex!(r"/^git version (\d+(?:\.\d+)+)/m"), &output)
+            {
+                *version = Some(matches.get(&CaptureKey::ByIndex(1)).cloned());
             }
         }
         version.clone().unwrap_or(None)

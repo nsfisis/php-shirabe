@@ -37,7 +37,7 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException, array_pop,
@@ -526,34 +526,26 @@ impl CreateProjectCommand {
             if package_version.is_none() {
                 stability = Some("stable".to_string());
             } else {
-                let ok = {
-                    let mut matched = PregMatchedGroups::new();
-                    let ok = Preg::is_match3(
-                        format!(
-                            "{{^[^,\\s]*?@({})$}}i",
-                            implode(
-                                "|",
-                                &STABILITIES
-                                    .keys()
-                                    .map(|k| k.to_string())
-                                    .collect::<Vec<_>>()
-                            )
-                        ),
-                        package_version.as_deref().unwrap_or(""),
-                        Some(&mut matched),
+                let matched = Preg::is_match3(
+                    format!(
+                        "{{^[^,\\s]*?@({})$}}i",
+                        implode(
+                            "|",
+                            &STABILITIES
+                                .keys()
+                                .map(|k| k.to_string())
+                                .collect::<Vec<_>>()
+                        )
+                    ),
+                    package_version.as_deref().unwrap_or(""),
+                );
+                if let Some(matched) = matched {
+                    stability = Some(
+                        matched
+                            .get(&CaptureKey::ByIndex(1))
+                            .cloned()
+                            .unwrap_or_default(),
                     );
-                    if ok {
-                        stability = Some(
-                            matched
-                                .get(&CaptureKey::ByIndex(1))
-                                .cloned()
-                                .unwrap_or_default(),
-                        );
-                    }
-                    ok
-                };
-                if ok {
-                    // stability already set above
                 } else {
                     stability = Some(VersionParser::parse_stability(
                         package_version.as_deref().unwrap_or(""),

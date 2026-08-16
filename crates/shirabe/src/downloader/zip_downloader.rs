@@ -8,7 +8,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::IniHelper;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException, ZipArchive,
@@ -113,20 +113,15 @@ impl ZipDownloader {
                 .execute(&[command_spec[1].as_str()], &mut output, None::<&str>)
                 .unwrap_or(1)
                 == 0
+                && let Some(m) =
+                    Preg::is_match3(php_regex!(r"{^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)}"), &output)
             {
-                let mut m = PregMatchedGroups::new();
-                if Preg::is_match3(
-                    php_regex!(r"{^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)}"),
-                    &output,
-                    Some(&mut m),
-                ) {
-                    let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                    if version_compare(&m1, "21.01", CmpOp::Lt) {
-                        self.inner.io.borrow().write_error(&format!(
-                            "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",
-                            executable, m1, executable,
-                        ));
-                    }
+                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                if version_compare(&m1, "21.01", CmpOp::Lt) {
+                    self.inner.io.borrow().write_error(&format!(
+                        "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",
+                        executable, m1, executable,
+                    ));
                 }
             }
         }

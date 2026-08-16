@@ -19,7 +19,7 @@ use crate::repository::RepositorySet;
 use crate::repository::{RepositoryInterface, SearchResult};
 use crate::util::Filesystem;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
@@ -330,11 +330,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                 }
                             }
 
-                            let mut m = PregMatchedGroups::new();
-                            if Preg::is_match3(
+                            if let Some(m) = Preg::is_match3(
                                 php_regex!(r"{^\s*(?P<name>[\S/]+)(?:\s+(?P<version>\S+))?\s*$}"),
                                 &selection,
-                                Some(&mut m),
                             ) {
                                 if let Some(v) =
                                     m.get(&CaptureKey::ByName("version".to_string())).cloned()

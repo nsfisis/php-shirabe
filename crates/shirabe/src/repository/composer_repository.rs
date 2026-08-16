@@ -37,7 +37,7 @@ use futures::StreamExt;
 use futures::stream::FuturesOrdered;
 use indexmap::IndexMap;
 use shirabe_metadata_minifier::MetadataMinifier;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
@@ -245,11 +245,9 @@ impl ComposerRepository {
             .to_string();
 
         // force url for packagist.org to repo.packagist.org
-        let mut match_packagist = PregMatchedGroups::new();
-        if Preg::is_match3(
+        if let Some(match_packagist) = Preg::is_match3(
             php_regex!(r"{^(?P<proto>https?)://packagist\.org/?$}i"),
             &url,
-            Some(&mut match_packagist),
         ) {
             let proto = match_packagist
                 .get(&CaptureKey::ByName("proto".to_string()))
@@ -781,11 +779,9 @@ impl ComposerRepository {
 
         if self.has_providers()? || self.lazy_providers_url.is_some() {
             // optimize search for "^foo/bar" where at least "^foo/" is present by loading this directly from the listUrl if present
-            let mut match_groups = PregMatchedGroups::new();
-            if Preg::is_match3(
+            if let Some(match_groups) = Preg::is_match3(
                 php_regex!(r"{^\^(?P<query>(?P<vendor>[a-z0-9_.-]+)/[a-z0-9_.-]*)\*?$}i"),
                 &query,
-                Some(&mut match_groups),
             ) && let Some(list_url) = self.list_url.as_ref()
             {
                 let q = match_groups
@@ -2430,12 +2426,7 @@ impl ComposerRepository {
         }
 
         if url.starts_with('/') {
-            let mut matches = PregMatchedGroups::new();
-            if Preg::is_match3(
-                php_regex!(r"{^[^:]++://[^/]*+}"),
-                &self.url,
-                Some(&mut matches),
-            ) {
+            if let Some(matches) = Preg::is_match3(php_regex!(r"{^[^:]++://[^/]*+}"), &self.url) {
                 return Ok(format!(
                     "{}{}",
                     matches

@@ -16,7 +16,7 @@ use crate::util::http::CurlDownloader;
 use crate::util::http::Response;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, extension_loaded,
@@ -240,12 +240,8 @@ impl HttpDownloader {
         let origin = Url::get_origin(&self.config.borrow(), url);
 
         // capture username/password from URL if there is one
-        let mut m = PregMatchedGroups::new();
-        if Preg::is_match3(
-            php_regex!(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i"),
-            url,
-            Some(&mut m),
-        ) {
+        if let Some(m) = Preg::is_match3(php_regex!(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i"), url)
+        {
             self.io.borrow_mut().set_authentication(
                 origin.clone(),
                 rawurldecode(

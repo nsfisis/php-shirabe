@@ -12,7 +12,7 @@ use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, function_exists,
     implode, is_string, json_encode, php_regex, preg_quote, str_replace, strlen, strnatcasecmp,
@@ -228,49 +228,43 @@ impl VersionGuesser {
 
             // find current branch and collect all branch names
             for branch in self.process.borrow().split_lines(&output) {
-                if !branch.is_empty() {
-                    let mut m = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                if !branch.is_empty()
+                    && let Some(m) = Preg::is_match3(
                         php_regex!(
                             r"{^(?:\* ) *(\(no branch\)|\(detached from \S+\)|\(HEAD detached at \S+\)|\S+) *([a-f0-9]+) .*$}"
                         ),
                         &branch,
-                        Some(&mut m),
-                    ) {
-                        let g1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                        let g2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
-                        if g1 == "(no branch)"
-                            || strpos(&g1, "(detached ") == Some(0)
-                            || strpos(&g1, "(HEAD detached at") == Some(0)
-                        {
-                            version = Some(format!("dev-{}", g2));
-                            pretty_version = version.clone();
-                            is_feature_branch = true;
-                            is_detached = true;
-                        } else {
-                            version = Some(self.version_parser.normalize_branch(&g1)?);
-                            pretty_version = Some(format!("dev-{}", g1));
-                            is_feature_branch = self.is_feature_branch(package_config, Some(&g1));
-                        }
-
-                        commit = Some(g2);
+                    )
+                {
+                    let g1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                    let g2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                    if g1 == "(no branch)"
+                        || strpos(&g1, "(detached ") == Some(0)
+                        || strpos(&g1, "(HEAD detached at") == Some(0)
+                    {
+                        version = Some(format!("dev-{}", g2));
+                        pretty_version = version.clone();
+                        is_feature_branch = true;
+                        is_detached = true;
+                    } else {
+                        version = Some(self.version_parser.normalize_branch(&g1)?);
+                        pretty_version = Some(format!("dev-{}", g1));
+                        is_feature_branch = self.is_feature_branch(package_config, Some(&g1));
                     }
+
+                    commit = Some(g2);
                 }
 
-                if !branch.is_empty() && {
-                    let mut tmp = PregMatchedGroups::new();
-                    !Preg::is_match3(php_regex!(r"{^ *.+/HEAD }"), &branch, Some(&mut tmp))
-                } {
-                    let mut m = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                if !branch.is_empty()
+                    && Preg::is_match3(php_regex!(r"{^ *.+/HEAD }"), &branch).is_none()
+                    && let Some(m) = Preg::is_match3(
                         php_regex!(
                             r"{^(?:\* )? *((?:remotes/(?:origin|upstream)/)?[^\s/]+) *([a-f0-9]+) .*$}"
                         ),
                         &branch,
-                        Some(&mut m),
-                    ) {
-                        branches.push(m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default());
-                    }
+                    )
+                {
+                    branches.push(m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default());
                 }
             }
 
@@ -756,12 +750,7 @@ impl VersionGuesser {
                 .into());
             }
         };
-        let mut m = PregMatchedGroups::new();
-        if Preg::is_match3(
-            php_regex!(r"{^(\d+(?:\.\d+)*)-dev$}i"),
-            &version,
-            Some(&mut m),
-        ) {
+        if let Some(m) = Preg::is_match3(php_regex!(r"{^(\d+(?:\.\d+)*)-dev$}i"), &version) {
             return Ok(format!(
                 "{}.x-dev",
                 m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default()

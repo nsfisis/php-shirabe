@@ -32,58 +32,31 @@ preg_match_map! {
 pub struct Preg;
 
 impl Preg {
-    pub fn match3(
-        pattern: impl PregPattern,
-        subject: &str,
-        matches: Option<&mut PregMatchedGroups>,
-    ) -> bool {
-        Self::match4(pattern, subject, matches, 0)
+    pub fn match3(pattern: impl PregPattern, subject: &str) -> Option<PregMatchedGroups> {
+        Self::match4(pattern, subject, 0)
     }
 
     pub fn match4(
         pattern: impl PregPattern,
         subject: &str,
-        matches: Option<&mut PregMatchedGroups>,
         offset: usize,
-    ) -> bool {
-        let internal = preg_match2(pattern, subject, offset);
-
-        if let Some(out) = matches {
-            *out = match &internal {
-                Some(internal) => drop_null_matches(internal),
-                None => PregMatchedGroups::new(),
-            };
-        }
-
-        internal.is_some()
+    ) -> Option<PregMatchedGroups> {
+        preg_match2(pattern, subject, offset).map(|internal| drop_null_matches(&internal))
     }
 
     pub fn match_all(pattern: impl PregPattern, subject: &str) -> usize {
-        occurrence_count(&preg_match_all2(pattern, subject))
+        Self::match_all2(pattern, subject).occurrence_count()
     }
 
-    pub fn match_all2(
-        pattern: impl PregPattern,
-        subject: &str,
-        matches: &mut PregMatchesAll,
-    ) -> usize {
-        *matches = preg_match_all2(pattern, subject);
-        occurrence_count(matches)
+    pub fn match_all2(pattern: impl PregPattern, subject: &str) -> PregMatchesAll {
+        preg_match_all2(pattern, subject)
     }
 
     fn match_all_with_offsets5(
         pattern: impl PregPattern,
         subject: &str,
-        matches: Option<&mut PregMatchesAllWithOffsets>,
-    ) -> usize {
-        let internal = preg_match_all_offset_capture(pattern, subject);
-        let count = internal[&CaptureKey::ByIndex(0)].len();
-
-        if let Some(out) = matches {
-            *out = internal;
-        }
-
-        count
+    ) -> PregMatchesAllWithOffsets {
+        preg_match_all_offset_capture(pattern, subject)
     }
 
     pub fn replace(pattern: impl PregPattern, replacement: &str, subject: &str) -> String {
@@ -127,44 +100,31 @@ impl Preg {
     }
 
     pub fn is_match(pattern: impl PregPattern, subject: &str) -> bool {
-        Self::match4(pattern, subject, None, 0)
+        Self::match4(pattern, subject, 0).is_some()
     }
 
-    pub fn is_match3(
-        pattern: impl PregPattern,
-        subject: &str,
-        matches: Option<&mut PregMatchedGroups>,
-    ) -> bool {
-        Self::match4(pattern, subject, matches, 0)
+    pub fn is_match3(pattern: impl PregPattern, subject: &str) -> Option<PregMatchedGroups> {
+        Self::match4(pattern, subject, 0)
     }
 
     pub fn is_match4(
         pattern: impl PregPattern,
         subject: &str,
-        matches: Option<&mut PregMatchedGroups>,
         offset: usize,
-    ) -> bool {
-        Self::match4(pattern, subject, matches, offset)
+    ) -> Option<PregMatchedGroups> {
+        Self::match4(pattern, subject, offset)
     }
 
-    pub fn is_match_named(
-        pattern: impl PregPattern,
-        subject: &str,
-        matches: &mut PregNamedGroups,
-    ) -> bool {
-        let internal = preg_match2(pattern, subject, 0);
-        let result = internal.is_some();
-
-        matches.clear();
-        if let Some(internal) = internal {
-            for (key, value) in internal {
-                if let (CaptureKey::ByName(name), Some(value)) = (key, value) {
-                    matches.insert(name, value);
-                }
-            }
-        }
-
-        result
+    pub fn is_match_named(pattern: impl PregPattern, subject: &str) -> Option<PregNamedGroups> {
+        Some(
+            preg_match2(pattern, subject, 0)?
+                .into_iter()
+                .filter_map(|(key, value)| match (key, value) {
+                    (CaptureKey::ByName(name), Some(value)) => Some((name, value)),
+                    _ => None,
+                })
+                .collect(),
+        )
     }
 
     /// `is_match3` with the groups positioned by number rather than keyed, for callers that only
@@ -184,20 +144,15 @@ impl Preg {
         )
     }
 
-    pub fn is_match_all(
-        pattern: impl PregPattern,
-        subject: &str,
-        matches: &mut PregMatchesAll,
-    ) -> bool {
-        Self::match_all2(pattern, subject, matches) > 0
+    pub fn is_match_all(pattern: impl PregPattern, subject: &str) -> PregMatchesAll {
+        Self::match_all2(pattern, subject)
     }
 
     pub fn is_match_all_with_offsets3(
         pattern: impl PregPattern,
         subject: &str,
-        matches: Option<&mut PregMatchesAllWithOffsets>,
-    ) -> bool {
-        Self::match_all_with_offsets5(pattern, subject, matches) > 0
+    ) -> PregMatchesAllWithOffsets {
+        Self::match_all_with_offsets5(pattern, subject)
     }
 }
 
@@ -208,10 +163,4 @@ fn drop_null_matches(matches: &PregMatches) -> PregMatchedGroups {
         .iter()
         .filter_map(|(key, value)| value.clone().map(|value| (key.clone(), value)))
         .collect()
-}
-
-// PHP's `preg_match_all` returns the number of occurrences; every column of a
-// PREG_PATTERN_ORDER map holds one entry per occurrence.
-fn occurrence_count(matches: &PregMatchesAll) -> usize {
-    matches[&CaptureKey::ByIndex(0)].len()
 }

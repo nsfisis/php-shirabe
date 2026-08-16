@@ -6,7 +6,7 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
 use chrono::Utc;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     ErrorException, bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space,
     file_exists, file_get_contents, file_put_contents, filemtime, function_exists, hash_file,
@@ -186,13 +186,11 @@ impl Cache {
                         true,
                         crate::io::DEBUG,
                     );
-                    let mut m = PregMatchedGroups::new();
-                    if Preg::match3(
+                    if let Some(m) = Preg::match3(
                         php_regex!(
                             r"{^file_put_contents\(\): Only ([0-9]+) of ([0-9]+) bytes written}"
                         ),
                         e.get_message(),
-                        Some(&mut m),
                     ) {
                         // Remove partial file.
                         unlink(&temp_file_name);

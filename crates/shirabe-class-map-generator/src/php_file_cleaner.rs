@@ -97,15 +97,13 @@ impl PhpFileCleaner {
                 }
 
                 if char == '<' && self.peek('<') {
-                    let mut r#match = PregMatchedGroups::new();
                     // Regex pattern compatibility:
                     // PHP matches `<<<`, an optional quote, the identifier, then requires the
                     // closing quote to be the exact same character via `\1`. The `regex` crate has
                     // no backreferences, so the three quote states (none, `'`, `"`) are expanded
                     // into separate alternatives, each capturing the identifier in its own group.
-                    if self.r#match(
+                    if let Some(r#match) = self.r#match(
                         r#"{<<<[ \t]*(?:"([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)"|'([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)'|([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*))(?:\r\n|\n|\r)}A"#,
-                        Some(&mut r#match),
                     ) {
                         self.index += r#match.get(&CaptureKey::ByIndex(0)).map(|s| s.len()).unwrap_or(0);
                         let delimiter = [1, 2, 3]
@@ -144,13 +142,9 @@ impl PhpFileCleaner {
                         let end = self.index + entry.length;
                         if end <= self.len && self.contents[self.index..end] == entry.name {
                             let offset = if self.index > 0 { self.index - 1 } else { 0 };
-                            let mut r#match = PregMatchedGroups::new();
-                            if Preg::is_match4(
-                                &entry.pattern,
-                                &self.contents,
-                                Some(&mut r#match),
-                                offset,
-                            ) {
+                            if let Some(r#match) =
+                                Preg::is_match4(&entry.pattern, &self.contents, offset)
+                            {
                                 return clean
                                     + r#match
                                         .get(&CaptureKey::ByIndex(0))
@@ -164,8 +158,7 @@ impl PhpFileCleaner {
                 self.index += 1;
                 let rest_pattern = REST_PATTERN.lock().unwrap().clone();
                 if let Some(rest_pattern) = rest_pattern {
-                    let mut r#match = PregMatchedGroups::new();
-                    if self.r#match(&rest_pattern, Some(&mut r#match)) {
+                    if let Some(r#match) = self.r#match(&rest_pattern) {
                         let m0 = r#match
                             .get(&CaptureKey::ByIndex(0))
                             .cloned()
@@ -292,7 +285,7 @@ impl PhpFileCleaner {
         self.index + 1 < self.len && self.contents.as_bytes()[self.index + 1] as char == char
     }
 
-    fn r#match(&self, regex: &str, r#match: Option<&mut PregMatchedGroups>) -> bool {
-        Preg::is_match4(regex, &self.contents, r#match, self.index)
+    fn r#match(&self, regex: &str) -> Option<PregMatchedGroups> {
+        Preg::is_match4(regex, &self.contents, self.index)
     }
 }

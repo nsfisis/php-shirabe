@@ -246,7 +246,7 @@ impl Filesystem {
             return Ok(Some(true));
         }
 
-        if Preg::is_match3(php_regex!("{^(?:[a-z]:)?[/\\\\]+$}i"), directory, None) {
+        if Preg::is_match3(php_regex!("{^(?:[a-z]:)?[/\\\\]+$}i"), directory).is_some() {
             return Err(RuntimeException::new(format!("Aborting an attempted deletion of {}, this was probably not intended, if it is a real use case please report it.", directory))
             .into());
         }
@@ -578,7 +578,7 @@ impl Filesystem {
         let mut common_path = to.clone();
         while strpos(&format!("{}/", from), &format!("{}/", common_path)) != Some(0)
             && "/" != common_path
-            && !Preg::is_match3(php_regex!("{^[A-Z]:/?$}i"), &common_path, None)
+            && Preg::is_match3(php_regex!("{^[A-Z]:/?$}i"), &common_path).is_none()
         {
             common_path = strtr(&dirname(&common_path), "\\", "/");
         }
@@ -635,7 +635,7 @@ impl Filesystem {
         let mut common_path = to.clone();
         while strpos(&format!("{}/", from), &format!("{}/", common_path)) != Some(0)
             && "/" != common_path
-            && !Preg::is_match3(php_regex!("{^[A-Z]:/?$}i"), &common_path, None)
+            && Preg::is_match3(php_regex!("{^[A-Z]:/?$}i"), &common_path).is_none()
             && "." != common_path
         {
             common_path = strtr(&dirname(&common_path), "\\", "/");
@@ -735,11 +735,9 @@ impl Filesystem {
         }
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
-        let mut prefix_match = shirabe_pcre::PregMatchedGroups::new();
-        if Preg::is_match3(
+        if let Some(prefix_match) = Preg::is_match3(
             php_regex!("{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
             &path,
-            Some(&mut prefix_match),
         ) {
             prefix = prefix_match
                 .get(&shirabe_pcre::CaptureKey::ByIndex(1))
@@ -785,7 +783,7 @@ impl Filesystem {
     /// And other possible unforeseen disasters, see https://github.com/composer/composer/pull/9422
     pub fn trim_trailing_slash(path: &str) -> String {
         let mut path = path.to_string();
-        if !Preg::is_match3(php_regex!("{^[/\\\\]+$}"), &path, None) {
+        if Preg::is_match3(php_regex!("{^[/\\\\]+$}"), &path).is_none() {
             path = rtrim(&path, Some("/\\"));
         }
 
@@ -802,15 +800,15 @@ impl Filesystem {
                     "{^(file://(?!//)|/(?!/)|/?[a-z]:[\\\\/]|\\.\\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i"
                 ),
                 path,
-                None,
-            );
+            )
+            .is_some();
         }
 
         Preg::is_match3(
             php_regex!("{^(file://|/|/?[a-z]:[\\\\/]|\\.\\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i"),
             path,
-            None,
         )
+        .is_some()
     }
 
     pub fn get_platform_path(path: &str) -> String {

@@ -11,7 +11,7 @@ use crate::util::Hg as HgUtils;
 use crate::util::Url;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_writable, php_regex};
 
@@ -232,14 +232,13 @@ impl HgDriver {
                 Some(&self.repo_dir),
             );
             for tag in self.inner.process.borrow().split_lines(&output) {
-                if !tag.is_empty() {
-                    let mut m = PregMatchedGroups::new();
-                    if Preg::match3(php_regex!(r"(^([^\s]+)\s+\d+:(.*)$)"), &tag, Some(&mut m)) {
-                        tags.insert(
-                            m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
-                            m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
-                        );
-                    }
+                if !tag.is_empty()
+                    && let Some(m) = Preg::match3(php_regex!(r"(^([^\s]+)\s+\d+:(.*)$)"), &tag)
+                {
+                    tags.insert(
+                        m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                        m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                    );
                 }
             }
             tags.shift_remove("tip");
@@ -262,20 +261,16 @@ impl HgDriver {
                 Some(&self.repo_dir),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
-                if !branch.is_empty() {
-                    let mut m = PregMatchedGroups::new();
-                    if Preg::match3(
-                        php_regex!(r"(^([^\s]+)\s+\d+:([a-f0-9]+))"),
-                        &branch,
-                        Some(&mut m),
-                    ) {
-                        let name = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                        if !name.starts_with('-') {
-                            branches.insert(
-                                name,
-                                m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
-                            );
-                        }
+                if !branch.is_empty()
+                    && let Some(m) =
+                        Preg::match3(php_regex!(r"(^([^\s]+)\s+\d+:([a-f0-9]+))"), &branch)
+                {
+                    let name = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                    if !name.starts_with('-') {
+                        branches.insert(
+                            name,
+                            m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                        );
                     }
                 }
             }
@@ -287,20 +282,16 @@ impl HgDriver {
                 Some(&self.repo_dir),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
-                if !branch.is_empty() {
-                    let mut m = PregMatchedGroups::new();
-                    if Preg::match3(
-                        php_regex!(r"(^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$)"),
-                        &branch,
-                        Some(&mut m),
-                    ) {
-                        let name = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                        if !name.starts_with('-') {
-                            bookmarks.insert(
-                                name,
-                                m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
-                            );
-                        }
+                if !branch.is_empty()
+                    && let Some(m) =
+                        Preg::match3(php_regex!(r"(^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$)"), &branch)
+                {
+                    let name = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                    if !name.starts_with('-') {
+                        bookmarks.insert(
+                            name,
+                            m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                        );
                     }
                 }
             }

@@ -642,9 +642,9 @@ fn is_regex(str: &str) -> bool {
     // PHP 8.2+ available modifiers.
     let available_modifiers = "imsxuADUn";
 
-    let mut matches = PregMatchedGroups::new();
+    let matches = PregMatchedGroups::new();
     let pattern = format!("/^(.{{3,}}?)[{available_modifiers}]*$/");
-    if Preg::is_match3(&pattern, str, Some(&mut matches)) {
+    if let Some(matches) = Preg::is_match3(&pattern, str) {
         let group = matches
             .get(&CaptureKey::ByIndex(1))
             .cloned()
@@ -688,10 +688,9 @@ fn comparator_test(operator: &str, test: i64, target: i64) -> bool {
 /// `DateComparator::__construct`, returning `(operator, target unix timestamp)`.
 fn parse_date_comparator(test: &str) -> (String, i64) {
     let pattern = "#^\\s*(==|!=|[<>]=?|after|since|before|until)?\\s*(.+?)\\s*$#i";
-    let mut matches = PregMatchedGroups::new();
-    if !Preg::is_match3(pattern, test, Some(&mut matches)) {
+    let Some(matches) = Preg::is_match3(pattern, test) else {
         panic!("Don't understand \"{test}\" as a date test.");
-    }
+    };
 
     let date = matches
         .get(&CaptureKey::ByIndex(2))

@@ -15,7 +15,7 @@ use crate::repository::RepositoryManager;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, UnexpectedValueException, php_regex, preg_split, strtolower,
 };
@@ -252,11 +252,9 @@ impl RootPackageLoader {
         mut aliases: Vec<IndexMap<String, String>>,
     ) -> Vec<IndexMap<String, String>> {
         for (req_name, req_version) in requires {
-            let mut m = PregMatchedGroups::new();
-            if Preg::is_match3(
+            if let Some(m) = Preg::is_match3(
                 php_regex!(r"{(?:^|\| *|, *)([^,\s#|]+)(?:#[^ ]+)? +as +([^,\s|]+)(?:$| *\|| *,)}"),
                 req_version,
-                Some(&mut m),
             ) {
                 let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
@@ -318,8 +316,7 @@ impl RootPackageLoader {
 
             let mut matched = false;
             for constraint in &constraints {
-                let mut m = PregMatchedGroups::new();
-                if Preg::is_match3(&pattern, constraint, Some(&mut m)) {
+                if let Some(m) = Preg::is_match3(&pattern, constraint) {
                     let name = strtolower(req_name);
                     let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     let normalized_m1 = VersionParser::normalize_stability(&m1).unwrap_or_default();
@@ -365,12 +362,8 @@ impl RootPackageLoader {
     ) -> IndexMap<String, String> {
         for (req_name, req_version) in requires {
             let req_version = Preg::replace(php_regex!(r"{^([^,\s@]+) as .+$}"), "$1", req_version);
-            let mut m = PregMatchedGroups::new();
-            if Preg::is_match3(
-                php_regex!(r"{^[^,\s@]+?#([a-f0-9]+)$}"),
-                &req_version,
-                Some(&mut m),
-            ) && VersionParser::parse_stability(&req_version) == "dev"
+            if let Some(m) = Preg::is_match3(php_regex!(r"{^[^,\s@]+?#([a-f0-9]+)$}"), &req_version)
+                && VersionParser::parse_stability(&req_version) == "dev"
             {
                 let name = strtolower(req_name);
                 references.insert(

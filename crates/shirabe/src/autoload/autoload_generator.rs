@@ -559,12 +559,9 @@ return array(
             {
                 let content =
                     file_get_contents(format!("{}/autoload.php", vendor_path)).unwrap_or_default();
-                let mut matches = PregMatchedGroups::new();
-                if Preg::match3(
-                    php_regex!("{ComposerAutoloaderInit([^:\\s]+)::}"),
-                    &content,
-                    Some(&mut matches),
-                ) {
+                if let Some(matches) =
+                    Preg::match3(php_regex!("{ComposerAutoloaderInit([^:\\s]+)::}"), &content)
+                {
                     suffix = matches.get(&CaptureKey::ByIndex(1)).cloned();
                 }
             }
@@ -1155,12 +1152,8 @@ return array(
             let package = &item.0;
             let links = array_merge_map(package.get_replaces(), package.get_provides());
             for (_k, link) in &links {
-                let mut matches = PregMatchedGroups::new();
-                if Preg::match3(
-                    php_regex!("{^ext-(.+)$}iD"),
-                    link.get_target(),
-                    Some(&mut matches),
-                ) && let Some(ext) = matches.get(&CaptureKey::ByIndex(1)).cloned()
+                if let Some(matches) = Preg::match3(php_regex!("{^ext-(.+)$}iD"), link.get_target())
+                    && let Some(ext) = matches.get(&CaptureKey::ByIndex(1)).cloned()
                 {
                     extension_providers
                         .entry(ext)
@@ -1201,13 +1194,9 @@ return array(
                     required_php_64bit = true;
                 }
 
-                let mut matches = PregMatchedGroups::new();
                 if check_platform.as_bool() == Some(true)
-                    && Preg::match3(
-                        php_regex!("{^ext-(.+)$}iD"),
-                        link.get_target(),
-                        Some(&mut matches),
-                    )
+                    && let Some(matches) =
+                        Preg::match3(php_regex!("{^ext-(.+)$}iD"), link.get_target())
                 {
                     let ext_key = matches
                         .get(&CaptureKey::ByIndex(1))

@@ -24,7 +24,7 @@ use crate::repository::RootPackageRepository;
 use crate::util::Git as GitUtil;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
@@ -843,21 +843,17 @@ impl Locker {
                         ]),
                         &mut output,
                         path.as_deref(),
-                    )? {
-                        let mut m = PregMatchedGroups::new();
-                        if Preg::is_match3(
-                            php_regex!(r"{^\s*(\d+)\s*}"),
-                            output.as_string().unwrap_or(""),
-                            Some(&mut m),
-                        ) {
-                            let ts = m
-                                .get(&CaptureKey::ByIndex(1))
-                                .cloned()
-                                .unwrap_or_default()
-                                .parse::<i64>()
-                                .unwrap_or(0);
-                            datetime = chrono::DateTime::from_timestamp(ts, 0);
-                        }
+                    )? && let Some(m) = Preg::is_match3(
+                        php_regex!(r"{^\s*(\d+)\s*}"),
+                        output.as_string().unwrap_or(""),
+                    ) {
+                        let ts = m
+                            .get(&CaptureKey::ByIndex(1))
+                            .cloned()
+                            .unwrap_or_default()
+                            .parse::<i64>()
+                            .unwrap_or(0);
+                        datetime = chrono::DateTime::from_timestamp(ts, 0);
                     }
                 }
                 _ => {}

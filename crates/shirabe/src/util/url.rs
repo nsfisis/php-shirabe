@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::util::GitHub;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{PhpMixed, in_array_strict, parse_url, php_regex};
 
 pub struct Url;
@@ -14,13 +14,11 @@ impl Url {
             .unwrap_or_default();
 
         if host == "api.github.com" || host == "github.com" || host == "www.github.com" {
-            let mut m = PregMatchedGroups::new();
-            if Preg::match3(
+            if let Some(m) = Preg::match3(
                 php_regex!(
                     r"{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/(zip|tar)ball/(.+)$}i"
                 ),
                 &url,
-                Some(&mut m),
             ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
@@ -29,12 +27,11 @@ impl Url {
                     m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default(),
                     r#ref
                 );
-            } else if Preg::match3(
+            } else if let Some(m) = Preg::match3(
                 php_regex!(
                     r"{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/archive/.+\.(zip|tar)(?:\.gz)?$}i"
                 ),
                 &url,
-                Some(&mut m),
             ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
@@ -43,12 +40,11 @@ impl Url {
                     m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default(),
                     r#ref
                 );
-            } else if Preg::match3(
+            } else if let Some(m) = Preg::match3(
                 php_regex!(
                     r"{^https?://api\.github\.com/repos/([^/]+)/([^/]+)/(zip|tar)ball(?:/.+)?$}i"
                 ),
                 &url,
-                Some(&mut m),
             ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
@@ -59,13 +55,11 @@ impl Url {
                 );
             }
         } else if host == "bitbucket.org" || host == "www.bitbucket.org" {
-            let mut m = PregMatchedGroups::new();
-            if Preg::match3(
+            if let Some(m) = Preg::match3(
                 php_regex!(
                     r"{^https?://(?:www\.)?bitbucket\.org/([^/]+)/([^/]+)/get/(.+)\.(zip|tar\.gz|tar\.bz2)$}i"
                 ),
                 &url,
-                Some(&mut m),
             ) {
                 url = format!(
                     "https://bitbucket.org/{}/{}/get/{}.{}",
@@ -76,13 +70,11 @@ impl Url {
                 );
             }
         } else if host == "gitlab.com" || host == "www.gitlab.com" {
-            let mut m = PregMatchedGroups::new();
-            if Preg::match3(
+            if let Some(m) = Preg::match3(
                 php_regex!(
                     r"{^https?://(?:www\.)?gitlab\.com/api/v[34]/projects/([^/]+)/repository/archive\.(zip|tar\.gz|tar\.bz2|tar)\?sha=.+$}i"
                 ),
                 &url,
-                Some(&mut m),
             ) {
                 url = format!(
                     "https://gitlab.com/api/v4/projects/{}/repository/archive.{}?sha={}",

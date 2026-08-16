@@ -17,7 +17,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups, PregMatchesAll};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class, implode,
     in_array_strict, is_dir, php_regex, preg_quote, preg_split, realpath, rtrim, strlen, strpos,
@@ -95,26 +95,20 @@ impl GitDownloader {
         }
 
         let mut refs = trim(&output, None);
-        let mut head_match = PregMatchedGroups::new();
-        if !Preg::is_match3(
-            php_regex!(r"{^([a-f0-9]+) HEAD$}mi"),
-            &refs,
-            Some(&mut head_match),
-        ) {
+        let Some(head_match) = Preg::is_match3(php_regex!(r"{^([a-f0-9]+) HEAD$}mi"), &refs) else {
             // could not match the HEAD for some reason
             return Ok(None);
-        }
+        };
         let head_ref = head_match
             .get(&CaptureKey::ByIndex(1))
             .cloned()
             .unwrap_or_default();
 
-        let mut branches_match = PregMatchesAll::new();
-        if !Preg::is_match_all(
+        let branches_match = Preg::is_match_all(
             format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
             &refs,
-            &mut branches_match,
-        ) {
+        );
+        if branches_match.occurrence_count() == 0 {
             // not on a branch, we are either on a not-modified tag or some sort of detached head, so skip this
             return Ok(None);
         }
@@ -137,15 +131,14 @@ impl GitDownloader {
 
             // try to find matching branch names in remote repos
             for candidate in &candidate_branches {
-                let mut m = PregMatchesAll::new();
-                if Preg::is_match_all(
+                let m = Preg::is_match_all(
                     format!(
                         "{{^[a-f0-9]+ refs/remotes/((?:[^/]+)/{})$}}mi",
                         preg_quote(candidate, None)
                     ),
                     &refs,
-                    &mut m,
-                ) {
+                );
+                if m.occurrence_count() > 0 {
                     let matches: Vec<Option<String>> =
                         m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     for match_ in matches {
@@ -510,14 +503,12 @@ impl GitDownloader {
 
     fn set_push_url(&self, path: &str, url: &str) {
         // set push url for github projects
-        let mut match_ = PregMatchedGroups::new();
-        if Preg::is_match3(
+        if let Some(match_) = Preg::is_match3(
             format!(
                 "{{^(?:https?|git)://{}/([^/]+)/([^/]+?)(?:\\.git)?$}}",
                 GitUtil::get_github_domains_regex(&self.inner.config.borrow())
             ),
             url,
-            Some(&mut match_),
         ) {
             let protocols = self.inner.config.borrow_mut().get("github-protocols");
             let m1 = match_
@@ -1114,31 +1105,23 @@ impl VcsDownloader for GitDownloader {
             &mut output,
             Some(&path),
         ) == 0
+            && let Some(origin_match) =
+                Preg::is_match3(php_regex!(r"{^origin\s+(?P<url>\S+)}m"), &output)
+            && let Some(composer_match) =
+                Preg::is_match3(php_regex!(r"{^composer\s+(?P<url>\S+)}m"), &output)
         {
-            let mut origin_match = PregMatchedGroups::new();
-            let mut composer_match = PregMatchedGroups::new();
-            if Preg::is_match3(
-                php_regex!(r"{^origin\s+(?P<url>\S+)}m"),
-                &output,
-                Some(&mut origin_match),
-            ) && Preg::is_match3(
-                php_regex!(r"{^composer\s+(?P<url>\S+)}m"),
-                &output,
-                Some(&mut composer_match),
-            ) {
-                let origin_url = origin_match
-                    .get(&CaptureKey::ByName("url".to_string()))
-                    .cloned()
-                    .unwrap_or_default();
-                let composer_url = composer_match
-                    .get(&CaptureKey::ByName("url".to_string()))
-                    .cloned()
-                    .unwrap_or_default();
-                if origin_url == composer_url
-                    && Some(composer_url.as_str()) != target.get_source_url().as_deref()
-                {
-                    update_origin_url = true;
-                }
+            let origin_url = origin_match
+                .get(&CaptureKey::ByName("url".to_string()))
+                .cloned()
+                .unwrap_or_default();
+            let composer_url = composer_match
+                .get(&CaptureKey::ByName("url".to_string()))
+                .cloned()
+                .unwrap_or_default();
+            if origin_url == composer_url
+                && Some(composer_url.as_str()) != target.get_source_url().as_deref()
+            {
+                update_origin_url = true;
             }
         }
         if update_origin_url && target.get_source_url().is_some() {

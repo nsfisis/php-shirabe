@@ -33,7 +33,7 @@ use crate::util::ProcessExecutor;
 use crate::util::http::ProxyManager;
 use crate::util::http::RequestProxy;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpClass as _, PhpMixed,
@@ -862,11 +862,9 @@ impl DiagnoseCommand {
             warnings.insert("zlib".to_string(), PhpMixed::Bool(true));
         }
 
-        let mut phpinfo_match = PregMatchedGroups::new();
-        if Preg::is_match3(
+        if let Some(phpinfo_match) = Preg::is_match3(
             php_regex!("{Configure Command(?: *</td><td class=\"v\">| *=> *)(.*?)(?:</td>|$)}m"),
             &diagnostics.phpinfo_general,
-            Some(&mut phpinfo_match),
         ) {
             let configure = phpinfo_match
                 .get(&CaptureKey::ByIndex(1))

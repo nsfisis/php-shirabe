@@ -36,7 +36,7 @@ use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
 use crate::util::PackageInfo;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
     array_search, date_format_to_strftime, date_local, extension_loaded, impl_php_class,
@@ -1372,12 +1372,10 @@ impl ShowCommand {
         }
 
         if target_version.is_none() {
-            let mut groups = PregMatchedGroups::new();
             if major_only
-                && Preg::is_match3(
+                && let Some(groups) = Preg::is_match3(
                     php_regex!(r"{^(?P<zero_major>(?:0\.)+)?(?P<first_meaningful>\d+)\.}"),
                     &package.get_version(),
-                    Some(&mut groups),
                 )
             {
                 let zero_major = groups

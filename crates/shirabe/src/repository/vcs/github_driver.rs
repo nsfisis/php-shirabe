@@ -14,7 +14,7 @@ use crate::util::GitHub;
 use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_map,
@@ -70,20 +70,18 @@ impl GitHubDriver {
     }
 
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        let mut match_ = PregMatchedGroups::new();
-        if !Preg::is_match3(
+        let Some(match_) = Preg::is_match3(
             php_regex!(
                 r"#^(?:(?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$#"
             ),
             &self.inner.url,
-            Some(&mut match_),
-        ) {
+        ) else {
             return Err(InvalidArgumentException::new(format!(
                 "The GitHub repository URL {} is invalid.",
                 self.inner.url.clone(),
             ))
             .into());
-        }
+        };
 
         self.owner = match_
             .get(&CaptureKey::ByIndex(3))
@@ -495,16 +493,14 @@ impl GitHubDriver {
         let mut key: Option<String> = None;
         for line in preg_split(php_regex!(r"{\r?\n}"), &funding) {
             let line = trim(&line, None);
-            let mut m = PregMatchedGroups::new();
-            if Preg::is_match3(php_regex!(r"{^(\w+)\s*:\s*(.+)$}"), &line, Some(&mut m)) {
+            if let Some(m) = Preg::is_match3(php_regex!(r"{^(\w+)\s*:\s*(.+)$}"), &line) {
                 let g1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let g2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 if g2 == "[" {
                     key = Some(g1);
                     continue;
                 }
-                let mut m2 = PregMatchedGroups::new();
-                if Preg::is_match3(php_regex!(r"{^\[(.*?)\](?:\s*#.*)?$}"), &g2, Some(&mut m2)) {
+                if let Some(m2) = Preg::is_match3(php_regex!(r"{^\[(.*?)\](?:\s*#.*)?$}"), &g2) {
                     let inner = m2.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     for item in array_map(
                         |s: &String| trim(s, None),
@@ -518,11 +514,9 @@ impl GitHubDriver {
                         );
                         result.push(entry);
                     }
-                } else if Preg::is_match3(
-                    php_regex!(r"{^([^#].*?)(?:\s+#.*)?$}"),
-                    &g2,
-                    Some(&mut m2),
-                ) {
+                } else if let Some(m2) =
+                    Preg::is_match3(php_regex!(r"{^([^#].*?)(?:\s+#.*)?$}"), &g2)
+                {
                     let mut entry = IndexMap::new();
                     entry.insert("type".to_string(), PhpMixed::String(g1.clone()));
                     entry.insert(
@@ -535,17 +529,12 @@ impl GitHubDriver {
                     result.push(entry);
                 }
                 key = None;
-            } else if Preg::is_match3(php_regex!(r"{^(\w+)\s*:\s*#\s*$}"), &line, Some(&mut m)) {
+            } else if let Some(m) = Preg::is_match3(php_regex!(r"{^(\w+)\s*:\s*#\s*$}"), &line) {
                 key = Some(m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default());
-            } else if key.is_some() && {
-                let mut tmp = PregMatchedGroups::new();
-                Preg::is_match3(php_regex!(r"{^-\s*(.+)(?:\s+#.*)?$}"), &line, Some(&mut m))
-                    || Preg::is_match3(php_regex!(r"{^(.+),(?:\s*#.*)?$}"), &line, Some(&mut tmp))
-                        && {
-                            m = tmp;
-                            true
-                        }
-            } {
+            } else if key.is_some()
+                && let Some(m) = Preg::is_match3(php_regex!(r"{^-\s*(.+)(?:\s+#.*)?$}"), &line)
+                    .or_else(|| Preg::is_match3(php_regex!(r"{^(.+),(?:\s*#.*)?$}"), &line))
+            {
                 let mut entry = IndexMap::new();
                 entry.insert(
                     "type".to_string(),
@@ -936,16 +925,14 @@ impl GitHubDriver {
         url: &str,
         _deep: bool,
     ) -> anyhow::Result<bool> {
-        let mut matches = PregMatchedGroups::new();
-        if !Preg::is_match3(
+        let Some(matches) = Preg::is_match3(
             php_regex!(
                 r"#^((?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$#"
             ),
             url,
-            Some(&mut matches),
-        ) {
+        ) else {
             return Ok(false);
-        }
+        };
 
         let origin_url = matches
             .get(&CaptureKey::ByIndex(2))
@@ -1284,8 +1271,7 @@ impl GitHubDriver {
 
         let links = explode(",", &header);
         for link in &links {
-            let mut m = PregMatchedGroups::new();
-            if Preg::is_match3(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link, Some(&mut m)) {
+            if let Some(m) = Preg::is_match3(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
                 return Some(m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default());
             }
         }

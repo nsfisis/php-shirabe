@@ -37,10 +37,7 @@ impl ForgejoUrl {
 
     pub fn try_from(repo_url: Option<&str>) -> Option<Self> {
         let repo_url = repo_url?;
-        let mut matches = shirabe_pcre::PregMatchedGroups::new();
-        if !Preg::match3(Self::URL_REGEX, repo_url, Some(&mut matches)) {
-            return None;
-        }
+        let matches = Preg::match3(Self::URL_REGEX, repo_url)?;
         use shirabe_pcre::CaptureKey;
         let m: Vec<String> = (0..5)
             .map(|i| {

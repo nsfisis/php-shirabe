@@ -18,7 +18,7 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
     escapeshellcmd, exec, explode, file_exists, impl_php_class, implode, in_array_loose,
@@ -701,11 +701,9 @@ impl Command for ConfigCommand {
             let mut source = config.borrow_mut().get_source_of_value(&setting_key);
 
             let mut value: PhpMixed;
-            let mut matches = PregMatchedGroups::new();
-            if Preg::is_match3(
+            if let Some(matches) = Preg::is_match3(
                 php_regex!("/^repos?(?:itories)?(?:\\.(.+))?/"),
                 &setting_key,
-                Some(&mut matches),
             ) {
                 if matches.get(&CaptureKey::ByIndex(1)).is_none() {
                     value = data
@@ -929,12 +927,9 @@ impl Command for ConfigCommand {
             return Ok(0);
         }
         // handle preferred-install per-package config
-        let mut matches = PregMatchedGroups::new();
-        if Preg::is_match3(
-            php_regex!("/^preferred-install\\.(.+)/"),
-            &setting_key,
-            Some(&mut matches),
-        ) {
+        if let Some(matches) =
+            Preg::is_match3(php_regex!("/^preferred-install\\.(.+)/"), &setting_key)
+        {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -967,11 +962,9 @@ impl Command for ConfigCommand {
         }
 
         // handle allow-plugins config setting elements true or false to add/remove
-        let mut matches = PregMatchedGroups::new();
-        if Preg::is_match3(
+        if let Some(matches) = Preg::is_match3(
             php_regex!("{^allow-plugins\\.([a-zA-Z0-9/*-]+)}"),
             &setting_key,
-            Some(&mut matches),
         ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
@@ -1037,12 +1030,9 @@ impl Command for ConfigCommand {
         }
 
         // handle repositories
-        let mut matches = PregMatchedGroups::new();
-        if Preg::is_match3(
-            php_regex!("/^repos?(?:itories)?\\.(.+)/"),
-            &setting_key,
-            Some(&mut matches),
-        ) {
+        if let Some(matches) =
+            Preg::is_match3(php_regex!("/^repos?(?:itories)?\\.(.+)/"), &setting_key)
+        {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -1106,16 +1096,11 @@ impl Command for ConfigCommand {
             }
 
             return Err(RuntimeException::new("You must pass the type and a url. Example: shirabe config repositories.foo vcs https://bar.com".to_string())
-            .into());
+        .into());
         }
 
         // handle extra
-        let mut matches = PregMatchedGroups::new();
-        if Preg::is_match3(
-            php_regex!("/^extra\\.(.+)/"),
-            &setting_key,
-            Some(&mut matches),
-        ) {
+        if let Some(matches) = Preg::is_match3(php_regex!("/^extra\\.(.+)/"), &setting_key) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -1187,12 +1172,7 @@ impl Command for ConfigCommand {
         }
 
         // handle suggest
-        let mut matches = PregMatchedGroups::new();
-        if Preg::is_match3(
-            php_regex!("/^suggest\\.(.+)/"),
-            &setting_key,
-            Some(&mut matches),
-        ) {
+        if let Some(matches) = Preg::is_match3(php_regex!("/^suggest\\.(.+)/"), &setting_key) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -1226,12 +1206,7 @@ impl Command for ConfigCommand {
         }
 
         // handle platform
-        let mut matches = PregMatchedGroups::new();
-        if Preg::is_match3(
-            php_regex!("/^platform\\.(.+)/"),
-            &setting_key,
-            Some(&mut matches),
-        ) {
+        if let Some(matches) = Preg::is_match3(php_regex!("/^platform\\.(.+)/"), &setting_key) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -1348,13 +1323,11 @@ impl Command for ConfigCommand {
         }
 
         // handle auth
-        let mut matches = PregMatchedGroups::new();
-        if Preg::is_match3(
+        if let Some(matches) = Preg::is_match3(
             php_regex!(
                 "/^(bitbucket-oauth|github-oauth|gitlab-oauth|gitlab-token|http-basic|custom-headers|bearer|forgejo-token)\\.(.+)/"
             ),
             &setting_key,
-            Some(&mut matches),
         ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.auth_config_source
@@ -1474,12 +1447,7 @@ impl Command for ConfigCommand {
                     }
 
                     // Check if the header is in correct "Name: Value" format
-                    let mut header_parts = PregMatchedGroups::new();
-                    if !Preg::is_match3(
-                        php_regex!("/^[^:]+:\\s*.+$/"),
-                        header,
-                        Some(&mut header_parts),
-                    ) {
+                    if Preg::is_match3(php_regex!("/^[^:]+:\\s*.+$/"), header).is_none() {
                         return Err(RuntimeException::new(format!(
                             "Header \"{}\" is not in \"Header-Name: Header-Value\" format",
                             header
@@ -1527,12 +1495,7 @@ impl Command for ConfigCommand {
         }
 
         // handle script
-        let mut matches = PregMatchedGroups::new();
-        if Preg::is_match3(
-            php_regex!("/^scripts\\.(.+)/"),
-            &setting_key,
-            Some(&mut matches),
-        ) {
+        if let Some(matches) = Preg::is_match3(php_regex!("/^scripts\\.(.+)/"), &setting_key) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -1770,11 +1733,13 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "cache-files-maxsize".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(Preg::is_match3(
-                    php_regex!("/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i"),
-                    val.as_string().unwrap_or(""),
-                    None,
-                ))
+                PhpMixed::Bool(
+                    Preg::is_match3(
+                        php_regex!("/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i"),
+                        val.as_string().unwrap_or(""),
+                    )
+                    .is_some(),
+                )
             }),
             Box::new(|val| val.clone()),
         ),

@@ -216,17 +216,16 @@ impl ProcessExecutor {
         let mut process: Process;
         if is_string(&command) {
             let mut command_str = command.as_string().unwrap_or("").to_string();
-            if Platform::is_windows() {
-                let mut m = PregMatchedGroups::new();
-                if Preg::is_match3(php_regex!(r"{^([^:/\\]++) }"), &command_str, Some(&mut m)) {
-                    let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                    command_str = substr_replace(
-                        &command_str,
-                        &Self::escape(&Self::get_executable(&m1)),
-                        0,
-                        Some(strlen(&m1)),
-                    );
-                }
+            if Platform::is_windows()
+                && let Some(m) = Preg::is_match3(php_regex!(r"{^([^:/\\]++) }"), &command_str)
+            {
+                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                command_str = substr_replace(
+                    &command_str,
+                    &Self::escape(&Self::get_executable(&m1)),
+                    0,
+                    Some(strlen(&m1)),
+                );
             }
 
             process = Process::from_shell_commandline(

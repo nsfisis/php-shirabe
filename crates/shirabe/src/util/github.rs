@@ -8,7 +8,7 @@ use crate::io::io_interface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, date_local, in_array_loose, php_regex, stripos, strtolower};
 
@@ -325,12 +325,7 @@ impl GitHub {
             if stripos(header, "x-github-sso: required").is_none() {
                 continue;
             }
-            let mut caps = PregMatchedGroups::new();
-            if Preg::match3(
-                php_regex!(r"{\burl=(?P<url>[^\s;]+)}"),
-                header,
-                Some(&mut caps),
-            ) {
+            if let Some(caps) = Preg::match3(php_regex!(r"{\burl=(?P<url>[^\s;]+)}"), header) {
                 return caps.get(&CaptureKey::ByName("url".to_string())).cloned();
             }
         }

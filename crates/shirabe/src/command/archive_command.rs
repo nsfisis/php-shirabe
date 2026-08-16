@@ -26,7 +26,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::r#loop::Loop;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{LogicException, get_debug_type, impl_php_class, php_regex};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -228,25 +228,21 @@ impl ArchiveCommand {
             min_stability = "stable".to_string();
         }
 
-        if let Some(version_str) = &version {
-            let mut matches = PregMatchedGroups::new();
-            if Preg::match3(
-                php_regex!(r"{@(stable|RC|beta|alpha|dev)$}i"),
-                version_str,
-                Some(&mut matches),
-            ) {
-                let m1 = matches
-                    .get(&CaptureKey::ByIndex(1))
-                    .cloned()
-                    .unwrap_or_default();
-                let m0 = matches
-                    .get(&CaptureKey::ByIndex(0))
-                    .cloned()
-                    .unwrap_or_default();
-                min_stability = VersionParser::normalize_stability(&m1)?;
-                let full_match_len = m0.len();
-                version = Some(version_str[..version_str.len() - full_match_len].to_string());
-            }
+        if let Some(version_str) = &version
+            && let Some(matches) =
+                Preg::match3(php_regex!(r"{@(stable|RC|beta|alpha|dev)$}i"), version_str)
+        {
+            let m1 = matches
+                .get(&CaptureKey::ByIndex(1))
+                .cloned()
+                .unwrap_or_default();
+            let m0 = matches
+                .get(&CaptureKey::ByIndex(0))
+                .cloned()
+                .unwrap_or_default();
+            min_stability = VersionParser::normalize_stability(&m1)?;
+            let full_match_len = m0.len();
+            version = Some(version_str[..version_str.len() - full_match_len].to_string());
         }
 
         let mut repo_set = RepositorySet::new(

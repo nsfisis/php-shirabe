@@ -5,7 +5,7 @@ use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::util::Platform;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchesAllWithOffsets};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::php_regex;
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
@@ -77,8 +77,8 @@ impl VersionBumper {
             major = major
         );
 
-        let mut matches = PregMatchesAllWithOffsets::new();
-        if Preg::is_match_all_with_offsets3(&pattern, &pretty_constraint, Some(&mut matches)) {
+        let matches = Preg::is_match_all_with_offsets3(&pattern, &pretty_constraint);
+        if matches.occurrence_count() > 0 {
             let mut modified = pretty_constraint.clone();
             let constraint_matches = matches
                 .get(&CaptureKey::ByName("constraint".to_string()))

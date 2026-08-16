@@ -13,7 +13,7 @@ use crate::util::Svn as SvnUtil;
 use crate::util::Url;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, php_regex, stripos, strrpos, strtr, substr, trim,
@@ -317,18 +317,14 @@ impl SvnDriver {
             &format!("{}{}{}", self.base_url, path, rev),
         )?;
         for line in self.inner.process.borrow().split_lines(&output) {
-            if !line.is_empty() {
-                let mut m = PregMatchedGroups::new();
-                if Preg::is_match3(
-                    php_regex!(r"{^Last Changed Date: ([^(]+)}"),
-                    &line,
-                    Some(&mut m),
-                ) {
-                    let date_str = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                    return Ok(shirabe_php_shim::date_create::<Utc>(date_str.trim())
-                        .ok()
-                        .map(|d| d.fixed_offset()));
-                }
+            if !line.is_empty()
+                && let Some(m) =
+                    Preg::is_match3(php_regex!(r"{^Last Changed Date: ([^(]+)}"), &line)
+            {
+                let date_str = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                return Ok(shirabe_php_shim::date_create::<Utc>(date_str.trim())
+                    .ok()
+                    .map(|d| d.fixed_offset()));
             }
         }
 
@@ -349,28 +345,23 @@ impl SvnDriver {
                     let mut last_rev: i64 = 0;
                     for line in self.inner.process.borrow().split_lines(&output) {
                         let line = trim(&line, None);
-                        if !line.is_empty() {
-                            let mut m = PregMatchedGroups::new();
-                            if Preg::is_match3(
-                                php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"),
-                                &line,
-                                Some(&mut m),
-                            ) {
-                                let rev: i64 = m
-                                    .get(&CaptureKey::ByIndex(1))
-                                    .and_then(|s| s.parse().ok())
-                                    .unwrap_or(0);
-                                let path =
-                                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
-                                if path == "./" {
-                                    last_rev = rev;
-                                } else {
-                                    let identifier = self.build_identifier(
-                                        &format!("/{}/{}", self.tags_path, path),
-                                        std::cmp::max(last_rev, rev),
-                                    );
-                                    tags.insert(path.trim_end_matches('/').to_string(), identifier);
-                                }
+                        if !line.is_empty()
+                            && let Some(m) =
+                                Preg::is_match3(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
+                        {
+                            let rev: i64 = m
+                                .get(&CaptureKey::ByIndex(1))
+                                .and_then(|s| s.parse().ok())
+                                .unwrap_or(0);
+                            let path = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                            if path == "./" {
+                                last_rev = rev;
+                            } else {
+                                let identifier = self.build_identifier(
+                                    &format!("/{}/{}", self.tags_path, path),
+                                    std::cmp::max(last_rev, rev),
+                                );
+                                tags.insert(path.trim_end_matches('/').to_string(), identifier);
                             }
                         }
                     }
@@ -400,27 +391,23 @@ impl SvnDriver {
             if !output.is_empty() {
                 for line in self.inner.process.borrow().split_lines(&output) {
                     let line = trim(&line, None);
-                    if !line.is_empty() {
-                        let mut m = PregMatchedGroups::new();
-                        if Preg::is_match3(
-                            php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"),
-                            &line,
-                            Some(&mut m),
-                        ) {
-                            let rev: i64 = m
-                                .get(&CaptureKey::ByIndex(1))
-                                .and_then(|s| s.parse().ok())
-                                .unwrap_or(0);
-                            let path = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
-                            if path == "./" {
-                                let identifier = self.build_identifier(
-                                    &format!("/{}", self.trunk_path.clone().unwrap_or_default()),
-                                    rev,
-                                );
-                                branches.insert("trunk".to_string(), identifier.clone());
-                                self.root_identifier = Some(identifier);
-                                break;
-                            }
+                    if !line.is_empty()
+                        && let Some(m) =
+                            Preg::is_match3(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
+                    {
+                        let rev: i64 = m
+                            .get(&CaptureKey::ByIndex(1))
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0);
+                        let path = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                        if path == "./" {
+                            let identifier = self.build_identifier(
+                                &format!("/{}", self.trunk_path.clone().unwrap_or_default()),
+                                rev,
+                            );
+                            branches.insert("trunk".to_string(), identifier.clone());
+                            self.root_identifier = Some(identifier);
+                            break;
                         }
                     }
                 }
@@ -442,29 +429,23 @@ impl SvnDriver {
                         .split_lines(&trim(&output, None))
                     {
                         let line = trim(&line, None);
-                        if !line.is_empty() {
-                            let mut m = PregMatchedGroups::new();
-                            if Preg::is_match3(
-                                php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"),
-                                &line,
-                                Some(&mut m),
-                            ) {
-                                let rev: i64 = m
-                                    .get(&CaptureKey::ByIndex(1))
-                                    .and_then(|s| s.parse().ok())
-                                    .unwrap_or(0);
-                                let path =
-                                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
-                                if path == "./" {
-                                    last_rev = rev;
-                                } else {
-                                    let identifier = self.build_identifier(
-                                        &format!("/{}/{}", self.branches_path, path),
-                                        std::cmp::max(last_rev, rev),
-                                    );
-                                    branches
-                                        .insert(path.trim_end_matches('/').to_string(), identifier);
-                                }
+                        if !line.is_empty()
+                            && let Some(m) =
+                                Preg::is_match3(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
+                        {
+                            let rev: i64 = m
+                                .get(&CaptureKey::ByIndex(1))
+                                .and_then(|s| s.parse().ok())
+                                .unwrap_or(0);
+                            let path = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                            if path == "./" {
+                                last_rev = rev;
+                            } else {
+                                let identifier = self.build_identifier(
+                                    &format!("/{}/{}", self.branches_path, path),
+                                    std::cmp::max(last_rev, rev),
+                                );
+                                branches.insert(path.trim_end_matches('/').to_string(), identifier);
                             }
                         }
                     }

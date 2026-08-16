@@ -15,7 +15,7 @@ use crate::util::Bitbucket;
 use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
@@ -84,18 +84,16 @@ impl GitBitbucketDriver {
 
     /// @inheritDoc
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        let mut m = PregMatchedGroups::new();
-        if !Preg::is_match3(
+        let Some(m) = Preg::is_match3(
             php_regex!(r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i"),
             &self.inner.url,
-            Some(&mut m),
-        ) {
+        ) else {
             return Err(InvalidArgumentException::new(format!(
                 "The Bitbucket repository URL {} is invalid. It must be the HTTPS URL of a Bitbucket repository.",
                 self.inner.url.clone(),
             ))
             .into());
-        }
+        };
 
         self.owner = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
         self.repository = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();

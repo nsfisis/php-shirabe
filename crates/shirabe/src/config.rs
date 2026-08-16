@@ -647,18 +647,16 @@ impl Config {
             // numbers with kb/mb/gb support, without env var support
             "cache-files-maxsize" => {
                 let raw = self.config.get(key).map(php_to_string).unwrap_or_default();
-                let mut matches = PregMatchedGroups::new();
-                if !Preg::is_match3(
+                let Some(matches) = Preg::is_match3(
                     php_regex!(r"/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i"),
                     &raw,
-                    Some(&mut matches),
-                ) {
+                ) else {
                     return Err(RuntimeException::new(format!(
                         "Could not parse the value of '{}': {}",
                         key, raw
                     ))
                     .into());
-                }
+                };
                 let mut size = matches
                     .get(&CaptureKey::ByIndex(1))
                     .cloned()

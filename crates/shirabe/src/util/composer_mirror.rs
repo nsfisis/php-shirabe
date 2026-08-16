@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/ComposerMirror.php
 
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{hash, php_regex};
 
 pub struct ComposerMirror;
@@ -53,14 +53,11 @@ impl ComposerMirror {
         url: &str,
         r#type: Option<&str>,
     ) -> String {
-        let mut gh_matches = PregMatchedGroups::new();
-        let mut bb_matches = PregMatchedGroups::new();
-        let normalized_url = if Preg::match3(
+        let normalized_url = if let Some(gh_matches) = Preg::match3(
             php_regex!(
                 r"#^(?:(?:https?|git)://github\.com/|git@github\.com:)([^/]+)/(.+?)(?:\.git)?$#"
             ),
             url,
-            Some(&mut gh_matches),
         ) {
             format!(
                 "gh-{}/{}",
@@ -73,10 +70,9 @@ impl ComposerMirror {
                     .cloned()
                     .unwrap_or_default(),
             )
-        } else if Preg::match3(
+        } else if let Some(bb_matches) = Preg::match3(
             php_regex!(r"#^https://bitbucket\.org/([^/]+)/(.+?)(?:\.git)?/?$#"),
             url,
-            Some(&mut bb_matches),
         ) {
             format!(
                 "bb-{}/{}",

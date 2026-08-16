@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileParser.php
 
 use crate::php_file_cleaner::PhpFileCleaner;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchesAll};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     PHP_EOL, RuntimeException, file_exists, file_get_contents, function_exists, is_file,
     is_readable, ltrim, php_strip_whitespace, str_replace_array, strrpos, substr, trim,
@@ -84,8 +84,7 @@ impl PhpFileParser {
         }}ix",
             et = extra_types
         );
-        let mut matches = PregMatchesAll::new();
-        Preg::match_all2(&pattern2, &contents, &mut matches);
+        let matches = Preg::match_all2(&pattern2, &contents);
 
         let mut classes = vec![];
         let mut namespace = String::new();

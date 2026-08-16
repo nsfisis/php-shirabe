@@ -21,7 +21,7 @@ use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
     call_function_with_dispatcher, call_php_method, call_static_method,
@@ -962,12 +962,9 @@ try {{
                             }
                             // match somename (not in quote, and not a qualified path) and if it is not a valid path from CWD then try to find it
                             // in $PATH. This allows support for `@php foo` where foo is a binary name found in PATH but not an actual relative path
-                            let mut m = PregMatchedGroups::new();
-                            if Preg::is_match3(
-                                php_regex!("{^[^\\'\"\\s/\\\\]+}"),
-                                &path_and_args,
-                                Some(&mut m),
-                            ) {
+                            if let Some(m) =
+                                Preg::is_match3(php_regex!("{^[^\\'\"\\s/\\\\]+}"), &path_and_args)
+                            {
                                 let m0 =
                                     m.get(&CaptureKey::ByIndex(0)).cloned().unwrap_or_default();
                                 if !file_exists(&m0) {

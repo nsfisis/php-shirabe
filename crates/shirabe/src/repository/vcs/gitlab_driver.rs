@@ -15,7 +15,7 @@ use crate::util::HttpDownloader;
 use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_search_mixed,
@@ -81,14 +81,13 @@ impl GitLabDriver {
     ///
     /// SSH urls use https by default. Set "secure-http": false on the repository config to use http instead.
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        let mut match_ = PregMatchedGroups::new();
-        if !Preg::is_match3(Self::URL_REGEX, &self.inner.url, Some(&mut match_)) {
+        let Some(match_) = Preg::is_match3(Self::URL_REGEX, &self.inner.url) else {
             return Err(InvalidArgumentException::new(format!(
                 "The GitLab repository URL {} is invalid. It must be the HTTP URL of a GitLab project.",
                 self.inner.url.clone(),
             ))
             .into());
-        }
+        };
 
         let guessed_domain = match_
             .get(&CaptureKey::ByName("domain".to_string()))
@@ -945,10 +944,9 @@ impl GitLabDriver {
         url: &str,
         _deep: bool,
     ) -> anyhow::Result<bool> {
-        let mut match_ = PregMatchedGroups::new();
-        if !Preg::is_match3(Self::URL_REGEX, url, Some(&mut match_)) {
+        let Some(match_) = Preg::is_match3(Self::URL_REGEX, url) else {
             return Ok(false);
-        }
+        };
 
         let scheme = match_
             .get(&CaptureKey::ByName("scheme".to_string()))
@@ -1011,12 +1009,7 @@ impl GitLabDriver {
 
         let links = explode(",", &header);
         for link in &links {
-            let mut match_ = PregMatchedGroups::new();
-            if Preg::is_match3(
-                php_regex!(r#"{<(.+?)>; *rel="next"}"#),
-                link,
-                Some(&mut match_),
-            ) {
+            if let Some(match_) = Preg::is_match3(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
                 return Some(
                     match_
                         .get(&CaptureKey::ByIndex(1))

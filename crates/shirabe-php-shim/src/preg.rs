@@ -96,6 +96,20 @@ preg_match_map! {
     pub struct PregMatchesAllWithOffsets(CaptureKey => Vec<(Option<String>, i64)>);
 }
 
+impl PregMatchesAll {
+    /// The number PHP's `preg_match_all` returns: every column holds one entry per occurrence.
+    pub fn occurrence_count(&self) -> usize {
+        self[&CaptureKey::ByIndex(0)].len()
+    }
+}
+
+impl PregMatchesAllWithOffsets {
+    /// The number PHP's `preg_match_all` returns: every column holds one entry per occurrence.
+    pub fn occurrence_count(&self) -> usize {
+        self[&CaptureKey::ByIndex(0)].len()
+    }
+}
+
 pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
     // Regex pattern compatibility:
     // PHP's preg_quote escapes `<` and `>` (PCRE treats `\<`/`\>` as literals), but the `regex`

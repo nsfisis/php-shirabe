@@ -10,7 +10,7 @@ use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositorySet;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, extension_loaded, implode, loosely_compare, php_regex,
     spl_object_hash, sprintf, str_replace, stripos, strpos, strtolower, substr, substr_count,
@@ -220,7 +220,6 @@ impl Problem {
                 installed_map,
                 learned_pool,
             )?;
-            let mut m = PregMatchedGroups::new();
             let matched = if matches!(
                 rule_ref.get_reason(),
                 rule::RULE_PACKAGE_REQUIRES | rule::RULE_PACKAGE_CONFLICT
@@ -230,12 +229,11 @@ impl Problem {
                         r"{^(?P<package>\S+) (?P<version>\S+) (?P<type>requires|conflicts)}"
                     ),
                     &message,
-                    Some(&mut m),
                 )
             } else {
-                false
+                None
             };
-            if matched {
+            if let Some(m) = matched {
                 message = str_replace("%", "%%", &message);
                 let template = Preg::replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &message);
                 messages.push(template.clone());
@@ -559,7 +557,7 @@ impl Problem {
         if let Some(c) = constraint
             && c.is_constraint()
             && c.get_operator() == Some(CmpOp::Eq)
-            && Preg::is_match3(php_regex!(r"{^dev-.*#.*}"), &c.get_pretty_string(), None)
+            && Preg::is_match3(php_regex!(r"{^dev-.*#.*}"), &c.get_pretty_string()).is_some()
         {
             let new_constraint = Preg::replace(
                 php_regex!(r"{ +as +([^,\s|]+)$}"),
@@ -993,7 +991,7 @@ impl Problem {
             ));
         }
 
-        if !Preg::is_match3(php_regex!(r"{^[A-Za-z0-9_./-]+$}"), package_name, None) {
+        if Preg::is_match3(php_regex!(r"{^[A-Za-z0-9_./-]+$}"), package_name).is_none() {
             let illegal_chars = Preg::replace(php_regex!(r"{[A-Za-z0-9_./-]+}"), "", package_name);
 
             return Ok((
@@ -1383,11 +1381,7 @@ impl Problem {
             && c.get_operator() == Some(CmpOp::Eq)
             && !c.get_version().starts_with("dev-")
         {
-            if !Preg::is_match3(
-                php_regex!(r"{^\d+(?:\.\d+)*$}"),
-                &c.get_pretty_string(),
-                None,
-            ) {
+            if Preg::is_match3(php_regex!(r"{^\d+(?:\.\d+)*$}"), &c.get_pretty_string()).is_none() {
                 return format!(" {} (exact version match)", c.get_pretty_string());
             }
 

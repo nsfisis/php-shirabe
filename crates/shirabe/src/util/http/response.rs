@@ -65,8 +65,7 @@ impl Response {
         let mut value = None;
         let pattern = format!("{{^{}:\\s*(.+?)\\s*$}}i", preg_quote(name, None));
         for header in headers {
-            let mut matches = shirabe_pcre::PregMatchedGroups::new();
-            if Preg::match3(&pattern, header, Some(&mut matches))
+            if let Some(matches) = Preg::match3(&pattern, header)
                 && let Some(s) = matches.get(&shirabe_pcre::CaptureKey::ByIndex(1))
             {
                 value = Some(s.clone());

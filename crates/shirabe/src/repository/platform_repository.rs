@@ -16,7 +16,7 @@ use crate::plugin::plugin_interface::{self};
 use crate::repository::ArrayRepository;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
@@ -316,11 +316,9 @@ impl PlatformRepository {
                     let info = platform_info.get_extension_info(name);
 
                     // librabbitmq version => 0.9.0
-                    let mut librabbitmq_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(librabbitmq_matches) = Preg::is_match3(
                         php_regex!("/^librabbitmq version => (?<version>.+)$/im"),
                         info,
-                        Some(&mut librabbitmq_matches),
                     ) {
                         self.add_library(
                             &mut libraries,
@@ -335,11 +333,9 @@ impl PlatformRepository {
                     }
 
                     // AMQP protocol version => 0-9-1
-                    let mut protocol_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(protocol_matches) = Preg::is_match3(
                         php_regex!("/^AMQP protocol version => (?<version>.+)$/im"),
                         info,
-                        Some(&mut protocol_matches),
                     ) {
                         let version_str = protocol_matches
                             .get(&CaptureKey::ByName("version".to_string()))
@@ -360,12 +356,9 @@ impl PlatformRepository {
                     let info = platform_info.get_extension_info(name);
 
                     // BZip2 Version => 1.0.6, 6-Sept-2010
-                    let mut matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
-                        php_regex!("/^BZip2 Version => (?<version>.*),/im"),
-                        info,
-                        Some(&mut matches),
-                    ) {
+                    if let Some(matches) =
+                        Preg::is_match3(php_regex!("/^BZip2 Version => (?<version>.*),/im"), info)
+                    {
                         self.add_library(
                             &mut libraries,
                             name,
@@ -393,11 +386,9 @@ impl PlatformRepository {
                     let info = platform_info.get_extension_info(name);
 
                     // SSL Version => OpenSSL/1.0.1t
-                    let mut ssl_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(ssl_matches) = Preg::is_match3(
                         php_regex!("{^SSL Version => (?<library>[^/]+)/(?<version>.+)$}im"),
                         info,
-                        Some(&mut ssl_matches),
                     ) {
                         let ssl_library_raw = ssl_matches
                             .get(&CaptureKey::ByName("library".to_string()))
@@ -428,11 +419,9 @@ impl PlatformRepository {
                         } else {
                             let (shortlib, ssl_lib);
                             if library.starts_with("(securetransport)") {
-                                let mut securetransport_matches = PregMatchedGroups::new();
-                                if Preg::is_match3(
+                                if let Some(securetransport_matches) = Preg::is_match3(
                                     php_regex!("{^\\(securetransport\\) ([a-z0-9]+)}"),
                                     &library,
-                                    Some(&mut securetransport_matches),
                                 ) {
                                     shortlib = "securetransport".to_string();
                                     let m1 = securetransport_matches
@@ -460,13 +449,11 @@ impl PlatformRepository {
                     }
 
                     // libSSH Version => libssh2/1.4.3
-                    let mut ssh_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(ssh_matches) = Preg::is_match3(
                         php_regex!(
                             "{^libSSH Version => (?<library>[^/]+)/(?<version>.+?)(?:/.*)?$}im"
                         ),
                         info,
-                        Some(&mut ssh_matches),
                     ) {
                         let ssh_library = ssh_matches
                             .get(&CaptureKey::ByName("library".to_string()))
@@ -487,12 +474,9 @@ impl PlatformRepository {
                     }
 
                     // ZLib Version => 1.2.8
-                    let mut zlib_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
-                        php_regex!("{^ZLib Version => (?<version>.+)$}im"),
-                        info,
-                        Some(&mut zlib_matches),
-                    ) {
+                    if let Some(zlib_matches) =
+                        Preg::is_match3(php_regex!("{^ZLib Version => (?<version>.+)$}im"), info)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-zlib", name),
@@ -510,12 +494,9 @@ impl PlatformRepository {
                     let info = platform_info.get_extension_info(name);
 
                     // timelib version => 2018.03
-                    let mut timelib_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
-                        php_regex!("/^timelib version => (?<version>.+)$/im"),
-                        info,
-                        Some(&mut timelib_matches),
-                    ) {
+                    if let Some(timelib_matches) =
+                        Preg::is_match3(php_regex!("/^timelib version => (?<version>.+)$/im"), info)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-timelib", name),
@@ -529,23 +510,19 @@ impl PlatformRepository {
                     }
 
                     // Timezone Database => internal
-                    let mut zoneinfo_source_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(zoneinfo_source_matches) = Preg::is_match3(
                         php_regex!("/^Timezone Database => (?<source>internal|external)$/im"),
                         info,
-                        Some(&mut zoneinfo_source_matches),
                     ) {
                         let external = zoneinfo_source_matches
                             .get(&CaptureKey::ByName("source".to_string()))
                             .map(|s| s == "external")
                             .unwrap_or(false);
-                        let mut zoneinfo_matches = PregMatchedGroups::new();
-                        if Preg::is_match3(
+                        if let Some(zoneinfo_matches) = Preg::is_match3(
                             php_regex!(
                                 "/^\"Olson\" Timezone Database Version => (?<version>.+?)(?:\\.system)?$/im"
                             ),
                             info,
-                            Some(&mut zoneinfo_matches),
                         ) {
                             let zoneinfo_version = zoneinfo_matches
                                 .get(&CaptureKey::ByName("version".to_string()))
@@ -554,15 +531,15 @@ impl PlatformRepository {
                             // If the timezonedb is provided by ext/timezonedb, register that version as a replacement
                             if external && loaded_extensions.iter().any(|n| n == "timezonedb") {
                                 self.add_library(
-                                    &mut libraries,
-                                    "timezonedb-zoneinfo",
-                                    Some(&zoneinfo_version),
-                                    Some(
-                                        "zoneinfo (\"Olson\") database for date (replaced by timezonedb)",
-                                    ),
-                                    &[format!("{}-zoneinfo", name)],
-                                    &[],
-                                )?;
+                                &mut libraries,
+                                "timezonedb-zoneinfo",
+                                Some(&zoneinfo_version),
+                                Some(
+                                    "zoneinfo (\"Olson\") database for date (replaced by timezonedb)",
+                                ),
+                                &[format!("{}-zoneinfo", name)],
+                                &[],
+                            )?;
                             } else {
                                 self.add_library(
                                     &mut libraries,
@@ -581,12 +558,9 @@ impl PlatformRepository {
                     let info = platform_info.get_extension_info(name);
 
                     // libmagic => 537
-                    let mut magic_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
-                        php_regex!("/^libmagic => (?<version>.+)$/im"),
-                        info,
-                        Some(&mut magic_matches),
-                    ) {
+                    if let Some(magic_matches) =
+                        Preg::is_match3(php_regex!("/^libmagic => (?<version>.+)$/im"), info)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmagic", name),
@@ -617,11 +591,9 @@ impl PlatformRepository {
 
                     let info = platform_info.get_extension_info(name);
 
-                    let mut libjpeg_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(libjpeg_matches) = Preg::is_match3(
                         php_regex!("/^libJPEG Version => (?<version>.+?)(?: compatible)?$/im"),
                         info,
-                        Some(&mut libjpeg_matches),
                     ) {
                         let libjpeg_version = libjpeg_matches
                             .get(&CaptureKey::ByName("version".to_string()))
@@ -638,12 +610,9 @@ impl PlatformRepository {
                         )?;
                     }
 
-                    let mut libpng_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
-                        php_regex!("/^libPNG Version => (?<version>.+)$/im"),
-                        info,
-                        Some(&mut libpng_matches),
-                    ) {
+                    if let Some(libpng_matches) =
+                        Preg::is_match3(php_regex!("/^libPNG Version => (?<version>.+)$/im"), info)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libpng", name),
@@ -656,11 +625,9 @@ impl PlatformRepository {
                         )?;
                     }
 
-                    let mut freetype_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(freetype_matches) = Preg::is_match3(
                         php_regex!("/^FreeType Version => (?<version>.+)$/im"),
                         info,
-                        Some(&mut freetype_matches),
                     ) {
                         self.add_library(
                             &mut libraries,
@@ -674,11 +641,9 @@ impl PlatformRepository {
                         )?;
                     }
 
-                    let mut libxpm_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(libxpm_matches) = Preg::is_match3(
                         php_regex!("/^libXpm Version => (?<versionId>\\d+)$/im"),
                         info,
-                        Some(&mut libxpm_matches),
                     ) {
                         let version_id: i64 = libxpm_matches
                             .get(&CaptureKey::ByName("versionId".to_string()))
@@ -748,12 +713,9 @@ impl PlatformRepository {
                             &[],
                         )?;
                     } else {
-                        let mut matches = PregMatchedGroups::new();
-                        if Preg::is_match3(
-                            php_regex!("/^ICU version => (?<version>.+)$/im"),
-                            info,
-                            Some(&mut matches),
-                        ) {
+                        if let Some(matches) =
+                            Preg::is_match3(php_regex!("/^ICU version => (?<version>.+)$/im"), info)
+                        {
                             self.add_library(
                                 &mut libraries,
                                 "icu",
@@ -768,11 +730,9 @@ impl PlatformRepository {
                     }
 
                     // ICU TZData version => 2019c
-                    let mut zoneinfo_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(zoneinfo_matches) = Preg::is_match3(
                         php_regex!("/^ICU TZData version => (?<version>.*)$/im"),
                         info,
-                        Some(&mut zoneinfo_matches),
                     ) {
                         let zi_version = zoneinfo_matches
                             .get(&CaptureKey::ByName("version".to_string()))
@@ -833,11 +793,9 @@ impl PlatformRepository {
                         Self::imagick_get_version_string(image_magick_version);
                     // 6.x: ImageMagick 6.2.9 08/24/06 Q16 http://www.imagemagick.org
                     // 7.x: ImageMagick 7.0.8-34 Q16 x86_64 2019-03-23 https://imagemagick.org
-                    let mut matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(matches) = Preg::is_match3(
                         php_regex!("/^ImageMagick (?<version>[\\d.]+)(?:-(?<patch>\\d+))?/"),
                         &image_magick_version_str,
-                        Some(&mut matches),
                     ) {
                         let mut version_built = matches
                             .get(&CaptureKey::ByName("version".to_string()))
@@ -861,17 +819,12 @@ impl PlatformRepository {
                 "ldap" => {
                     let info = platform_info.get_extension_info(name);
 
-                    let mut matches = PregMatchedGroups::new();
-                    let mut vendor_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(matches) = Preg::is_match3(
                         php_regex!("/^Vendor Version => (?<versionId>\\d+)$/im"),
                         info,
-                        Some(&mut matches),
-                    ) && Preg::is_match3(
-                        php_regex!("/^Vendor Name => (?<vendor>.+)$/im"),
-                        info,
-                        Some(&mut vendor_matches),
-                    ) {
+                    ) && let Some(vendor_matches) =
+                        Preg::is_match3(php_regex!("/^Vendor Name => (?<vendor>.+)$/im"), info)
+                    {
                         let version_id: i64 = matches
                             .get(&CaptureKey::ByName("versionId".to_string()))
                             .and_then(|s| s.parse().ok())
@@ -921,12 +874,9 @@ impl PlatformRepository {
                     let info = platform_info.get_extension_info(name);
 
                     // libmbfl version => 1.3.2
-                    let mut libmbfl_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
-                        php_regex!("/^libmbfl version => (?<version>.+)$/im"),
-                        info,
-                        Some(&mut libmbfl_matches),
-                    ) {
+                    if let Some(libmbfl_matches) =
+                        Preg::is_match3(php_regex!("/^libmbfl version => (?<version>.+)$/im"), info)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmbfl", name),
@@ -957,13 +907,11 @@ impl PlatformRepository {
                     // Multibyte regex (oniguruma) version => 5.9.5
                     // oniguruma version => 6.9.0
                     } else {
-                        let mut oniguruma_matches = PregMatchedGroups::new();
-                        if Preg::is_match3(
+                        if let Some(oniguruma_matches) = Preg::is_match3(
                             php_regex!(
                                 "/^(?:oniguruma|Multibyte regex \\(oniguruma\\)) version => (?<version>.+)$/im"
                             ),
                             info,
-                            Some(&mut oniguruma_matches),
                         ) {
                             self.add_library(
                                 &mut libraries,
@@ -983,11 +931,9 @@ impl PlatformRepository {
                     let info = platform_info.get_extension_info(name);
 
                     // libmemcached version => 1.0.18
-                    let mut matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(matches) = Preg::is_match3(
                         php_regex!("/^libmemcached version => (?<version>.+)$/im"),
                         info,
-                        Some(&mut matches),
                     ) {
                         self.add_library(
                             &mut libraries,
@@ -1009,11 +955,9 @@ impl PlatformRepository {
                         _ => "".to_string(),
                     };
                     // OpenSSL 1.1.1g  21 Apr 2020
-                    let mut matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(matches) = Preg::is_match3(
                         php_regex!("{^(?:OpenSSL|LibreSSL)?\\s*(?<version>\\S+)}i"),
                         &openssl_text_str,
-                        Some(&mut matches),
                     ) {
                         let version = matches
                             .get(&CaptureKey::ByName("version".to_string()))
@@ -1050,11 +994,9 @@ impl PlatformRepository {
                     let info = platform_info.get_extension_info(name);
 
                     // PCRE Unicode Version => 12.1.0
-                    let mut pcre_unicode_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(pcre_unicode_matches) = Preg::is_match3(
                         php_regex!("/^PCRE Unicode Version => (?<version>.+)$/im"),
                         info,
-                        Some(&mut pcre_unicode_matches),
                     ) {
                         self.add_library(
                             &mut libraries,
@@ -1072,13 +1014,11 @@ impl PlatformRepository {
                 "mysqlnd" | "pdo_mysql" => {
                     let info = platform_info.get_extension_info(name);
 
-                    let mut matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(matches) = Preg::is_match3(
                         php_regex!(
                             "/^(?:Client API version|Version) => mysqlnd (?<version>.+?) /mi"
                         ),
                         info,
-                        Some(&mut matches),
                     ) {
                         self.add_library(
                             &mut libraries,
@@ -1096,11 +1036,9 @@ impl PlatformRepository {
                 "mongodb" => {
                     let info = platform_info.get_extension_info(name);
 
-                    let mut libmongoc_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(libmongoc_matches) = Preg::is_match3(
                         php_regex!("/^libmongoc bundled version => (?<version>.+)$/im"),
                         info,
-                        Some(&mut libmongoc_matches),
                     ) {
                         self.add_library(
                             &mut libraries,
@@ -1114,11 +1052,9 @@ impl PlatformRepository {
                         )?;
                     }
 
-                    let mut libbson_matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(libbson_matches) = Preg::is_match3(
                         php_regex!("/^libbson bundled version => (?<version>.+)$/im"),
                         info,
-                        Some(&mut libbson_matches),
                     ) {
                         self.add_library(
                             &mut libraries,
@@ -1152,11 +1088,9 @@ impl PlatformRepository {
                         // intentional fall-through to next case...
                         let info = platform_info.get_extension_info(name);
 
-                        let mut matches = PregMatchedGroups::new();
-                        if Preg::is_match3(
+                        if let Some(matches) = Preg::is_match3(
                             php_regex!("/^PostgreSQL\\(libpq\\) Version => (?<version>.*)$/im"),
                             info,
-                            Some(&mut matches),
                         ) {
                             self.add_library(
                                 &mut libraries,
@@ -1175,11 +1109,9 @@ impl PlatformRepository {
                 "pdo_pgsql" => {
                     let info = platform_info.get_extension_info(name);
 
-                    let mut matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(matches) = Preg::is_match3(
                         php_regex!("/^PostgreSQL\\(libpq\\) Version => (?<version>.*)$/im"),
                         info,
-                        Some(&mut matches),
                     ) {
                         self.add_library(
                             &mut libraries,
@@ -1199,11 +1131,9 @@ impl PlatformRepository {
 
                     // Used Library => Compiled => Linked
                     // libpq => 14.3 (Ubuntu 14.3-1.pgdg22.04+1) => 15.0.2
-                    let mut matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(matches) = Preg::is_match3(
                         php_regex!("/^libpq => (?<compiled>.+) => (?<linked>.+)$/im"),
                         info,
-                        Some(&mut matches),
                     ) {
                         self.add_library(
                             &mut libraries,
@@ -1277,12 +1207,9 @@ impl PlatformRepository {
                 "sqlite3" | "pdo_sqlite" => {
                     let info = platform_info.get_extension_info(name);
 
-                    let mut matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
-                        php_regex!("/^SQLite Library => (?<version>.+)$/im"),
-                        info,
-                        Some(&mut matches),
-                    ) {
+                    if let Some(matches) =
+                        Preg::is_match3(php_regex!("/^SQLite Library => (?<version>.+)$/im"), info)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-sqlite", name),
@@ -1299,12 +1226,9 @@ impl PlatformRepository {
                 "ssh2" => {
                     let info = platform_info.get_extension_info(name);
 
-                    let mut matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
-                        php_regex!("/^libssh2 version => (?<version>.+)$/im"),
-                        info,
-                        Some(&mut matches),
-                    ) {
+                    if let Some(matches) =
+                        Preg::is_match3(php_regex!("/^libssh2 version => (?<version>.+)$/im"), info)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libssh2", name),
@@ -1335,13 +1259,11 @@ impl PlatformRepository {
                     )?;
 
                     let info = platform_info.get_extension_info("xsl");
-                    let mut matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
+                    if let Some(matches) = Preg::is_match3(
                         php_regex!(
                             "/^libxslt compiled against libxml Version => (?<version>.+)$/im"
                         ),
                         info,
-                        Some(&mut matches),
                     ) {
                         self.add_library(
                             &mut libraries,
@@ -1359,12 +1281,9 @@ impl PlatformRepository {
                 "yaml" => {
                     let info = platform_info.get_extension_info("yaml");
 
-                    let mut matches = PregMatchedGroups::new();
-                    if Preg::is_match3(
-                        php_regex!("/^LibYAML Version => (?<version>.+)$/im"),
-                        info,
-                        Some(&mut matches),
-                    ) {
+                    if let Some(matches) =
+                        Preg::is_match3(php_regex!("/^LibYAML Version => (?<version>.+)$/im"), info)
+                    {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libyaml", name),
@@ -1416,11 +1335,9 @@ impl PlatformRepository {
                     // Linked Version => 1.2.8
                     } else {
                         let info = platform_info.get_extension_info(name);
-                        let mut matches = PregMatchedGroups::new();
-                        if Preg::is_match3(
+                        if let Some(matches) = Preg::is_match3(
                             php_regex!("/^Linked Version => (?<version>.+)$/im"),
                             info,
-                            Some(&mut matches),
                         ) {
                             self.add_library(
                                 &mut libraries,
@@ -1619,11 +1536,9 @@ impl PlatformRepository {
             Ok(v) => v,
             Err(_) => {
                 extra_description = Some(format!(" (actual version: {})", pretty_version));
-                let mut m = PregMatchedGroups::new();
-                if Preg::is_match3(
+                if let Some(m) = Preg::is_match3(
                     php_regex!("{^(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)}"),
                     &pretty_version,
-                    Some(&mut m),
                 ) {
                     pretty_version = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 } else {

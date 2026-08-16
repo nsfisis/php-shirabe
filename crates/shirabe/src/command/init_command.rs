@@ -19,7 +19,7 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups, PregMatchesAll};
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
@@ -90,11 +90,9 @@ impl InitCommand {
         &self,
         author: &str,
     ) -> anyhow::Result<IndexMap<String, Option<String>>> {
-        let mut m = PregMatchedGroups::new();
-        if Preg::is_match3(
+        if let Some(m) = Preg::is_match3(
             php_regex!(r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#),
             author,
-            Some(&mut m),
         ) {
             let email = m.get(&CaptureKey::ByName("email".to_string())).cloned();
             if let Some(ref email) = email
@@ -175,8 +173,8 @@ impl InitCommand {
         ) == 0
         {
             *self.git_config.borrow_mut() = Some(IndexMap::new());
-            let mut m = PregMatchesAll::new();
-            if Preg::is_match_all(php_regex!(r"{^([^=]+)=(.*)$}m"), &output, &mut m) {
+            let m = Preg::is_match_all(php_regex!(r"{^([^=]+)=(.*)$}m"), &output);
+            if m.occurrence_count() > 0 {
                 let keys: Vec<Option<String>> =
                     m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let values: Vec<Option<String>> =
