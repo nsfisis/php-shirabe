@@ -2126,6 +2126,9 @@ dependencies = [
 [[package]]
 name = "shirabe-ca-bundle"
 version = "0.0.1"
+dependencies = [
+ "shirabe-php-shim",
+]
 
 [[package]]
 name = "shirabe-class-map-generator"

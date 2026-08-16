@@ -23,7 +23,7 @@ impl CaBundle {
     // not consult OpenSSL's default cert locations, does not validate the
     // candidate before returning it, and has no bundled cacert.pem fallback.
     pub fn get_system_ca_root_bundle_path(_logger: ()) -> String {
-        if let Ok(file) = std::env::var("SSL_CERT_FILE")
+        if let Some(file) = Self::get_env_variable("SSL_CERT_FILE")
             && std::path::Path::new(&file).is_file()
         {
             return file;
@@ -49,7 +49,7 @@ impl CaBundle {
             }
         }
 
-        if let Ok(dir) = std::env::var("SSL_CERT_DIR")
+        if let Some(dir) = Self::get_env_variable("SSL_CERT_DIR")
             && std::path::Path::new(&dir).is_dir()
         {
             return dir;
@@ -63,6 +63,15 @@ impl CaBundle {
         }
 
         String::new()
+    }
+
+    fn get_env_variable(name: &str) -> Option<String> {
+        if let Some(value) = shirabe_php_shim::PHP_SERVER.lock().unwrap().get(name) {
+            return Some(value.to_string_lossy().into_owned());
+        }
+
+        // PHP_SAPI is always 'cli' for this application
+        shirabe_php_shim::getenv(name).map(|value| value.to_string_lossy().into_owned())
     }
 
     // TODO(http): Dummy stand-in until reqwest validates certificates itself.
