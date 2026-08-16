@@ -280,13 +280,6 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
 
         let mut offset: i64 = 0;
         let mut output = String::new();
-        // Accurate PCRE patterns (possessive quantifiers `*+`), unsupported by the
-        // `regex` crate:
-        //   let open_tag_regex = "[a-z](?:[^\\\\<>]*+ | \\\\.)*";
-        //   let close_tag_regex = "[a-z][^<>]*+";
-        // TODO(pcre): restore the possessive quantifiers once a PCRE-compatible
-        // engine is available; greedy quantifiers match the same tags here but may
-        // differ in pathological backtracking cases.
         let open_tag_regex = "[a-z](?:[^\\\\<>]* | \\\\.)*";
         let close_tag_regex = "[a-z][^<>]*";
         let mut current_line_length: i64 = 0;
