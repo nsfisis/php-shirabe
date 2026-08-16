@@ -43,7 +43,7 @@ use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_pcre::preg::Preg;
-use shirabe_php_shim::{PREG_SPLIT_DELIM_CAPTURE, PhpMixed, php_regex};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_split_delim_capture};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_symfony_console::command::Command as SymfonyCommand;
@@ -580,12 +580,7 @@ fn read_test_file(
     fixtures_dir: &std::path::Path,
 ) -> IndexMap<String, String> {
     let contents = std::fs::read_to_string(file).unwrap();
-    let tokens = Preg::split4(
-        php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"),
-        &contents,
-        -1,
-        PREG_SPLIT_DELIM_CAPTURE,
-    );
+    let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
 
     let section_info: [(&str, bool); 13] = [
         ("TEST", true),

@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_pcre::preg::Preg;
-use shirabe_php_shim::{CaptureKey, PREG_SPLIT_DELIM_CAPTURE, PhpMixed, intval, php_regex};
+use shirabe_php_shim::{CaptureKey, PhpMixed, intval, php_regex, preg_split_delim_capture};
 use std::path::{Path, PathBuf};
 
 /// ref: AllFunctionalTest's `$oldcwd` / `$testDir` instance state plus its `setUp`/`tearDown`.
@@ -66,12 +66,7 @@ fn unique_tmp_directory() -> PathBuf {
 // ref: AllFunctionalTest::parseTestFile
 fn parse_test_file(file: &Path) -> IndexMap<String, String> {
     let contents = std::fs::read_to_string(file).unwrap();
-    let tokens = Preg::split4(
-        php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"),
-        &contents,
-        -1,
-        PREG_SPLIT_DELIM_CAPTURE,
-    );
+    let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
     let mut data: IndexMap<String, String> = IndexMap::new();
     let mut section: Option<String> = None;
 

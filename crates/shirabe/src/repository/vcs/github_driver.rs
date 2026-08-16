@@ -19,7 +19,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_map,
     array_search_mixed, base64_decode, basename, empty, explode, extension_loaded, in_array_loose,
-    parse_url, php_regex, strpos, strtolower, substr, trim, urlencode,
+    parse_url, php_regex, preg_split, strpos, strtolower, substr, trim, urlencode,
 };
 
 #[derive(Debug)]
@@ -493,7 +493,7 @@ impl GitHubDriver {
 
         let mut result: Vec<IndexMap<String, PhpMixed>> = vec![];
         let mut key: Option<String> = None;
-        for line in Preg::split(php_regex!(r"{\r?\n}"), &funding) {
+        for line in preg_split(php_regex!(r"{\r?\n}"), &funding) {
             let line = trim(&line, None);
             let mut m: IndexMap<CaptureKey, String> = IndexMap::new();
             if Preg::is_match3(php_regex!(r"{^(\w+)\s*:\s*(.+)$}"), &line, Some(&mut m)) {
@@ -508,7 +508,7 @@ impl GitHubDriver {
                     let inner = m2.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                     for item in array_map(
                         |s: &String| trim(s, None),
-                        &Preg::split(php_regex!(r#"{[\'\"]?\s*,\s*[\'\"]?}"#), &inner),
+                        &preg_split(php_regex!(r#"{[\'\"]?\s*,\s*[\'\"]?}"#), &inner),
                     ) {
                         let mut entry = IndexMap::new();
                         entry.insert("type".to_string(), PhpMixed::String(g1.clone()));

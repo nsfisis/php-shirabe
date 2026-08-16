@@ -2,8 +2,7 @@
 
 use crate::package::archiver::BaseExcludeFilter;
 use crate::package::archiver::BaseExcludeFilterBase;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::php_regex;
+use shirabe_php_shim::{php_regex, preg_split};
 use std::path::Path;
 
 pub struct GitExcludeFilter {
@@ -36,7 +35,7 @@ impl GitExcludeFilter {
     }
 
     fn parse_git_attributes_line_static(line: &str) -> Option<(String, bool, bool)> {
-        let parts = Preg::split(php_regex!(r"#\s+#"), line);
+        let parts = preg_split(php_regex!(r"#\s+#"), line);
 
         if parts.len() == 2 && parts[1] == "export-ignore" {
             return Some(BaseExcludeFilterBase::generate_pattern(&parts[0]));

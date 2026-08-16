@@ -20,8 +20,8 @@ use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class, implode,
-    in_array_strict, is_dir, php_regex, preg_quote, realpath, rtrim, strlen, strpos, substr, trim,
-    version_compare,
+    in_array_strict, is_dir, php_regex, preg_quote, preg_split, realpath, rtrim, strlen, strpos,
+    substr, trim, version_compare,
 };
 
 #[derive(Debug)]
@@ -1200,7 +1200,7 @@ impl VcsDownloader for GitDownloader {
 
         let changes: Vec<String> = array_map(
             |elem: &String| format!("    {}", elem),
-            &Preg::split(php_regex!(r"{\s*\r?\n\s*}"), &changes),
+            &preg_split(php_regex!(r"{\s*\r?\n\s*}"), &changes),
         );
         self.inner.io.write_error3(
             &format!(

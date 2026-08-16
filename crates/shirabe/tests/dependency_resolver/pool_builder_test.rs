@@ -20,8 +20,7 @@ use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_factory::RepositoryFactory;
 use shirabe::repository::repository_set::{RepositorySet, RootAliasInput};
 use shirabe_pcre::preg::Preg;
-use shirabe_php_shim::PhpMixed;
-use shirabe_php_shim::{PREG_SPLIT_DELIM_CAPTURE, php_regex};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_split_delim_capture};
 use std::path::PathBuf;
 
 /// Maps the PHP `$loadPackage` closure: pops the optional `id` from the data, loads the
@@ -57,12 +56,7 @@ fn load_package(
 
 fn read_test_file(file: &str, fixtures_dir: &str) -> IndexMap<String, String> {
     let contents = shirabe_php_shim::file_get_contents(file).unwrap();
-    let tokens = Preg::split4(
-        php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"),
-        &contents,
-        -1,
-        PREG_SPLIT_DELIM_CAPTURE,
-    );
+    let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
 
     // PHP section_info is a map of name => required flag.
     let section_info: Vec<(&str, bool)> = vec![

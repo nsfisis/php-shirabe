@@ -13,7 +13,7 @@ use crate::repository::{
 };
 use indexmap::IndexMap;
 use shirabe_pcre::Preg;
-use shirabe_php_shim::{implode, php_regex, preg_quote, strtolower};
+use shirabe_php_shim::{implode, php_regex, preg_quote, preg_split, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 use std::rc::Weak;
@@ -329,11 +329,11 @@ impl RepositoryInterface for ArrayRepository {
         r#type: Option<String>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let regex = if mode == crate::repository::SEARCH_FULLTEXT {
-            let parts = Preg::split(php_regex!("{\\s+}"), &preg_quote(&query, None));
+            let parts = preg_split(php_regex!("{\\s+}"), &preg_quote(&query, None));
             format!("{{(?:{})}}i", implode("|", &parts))
         } else {
             // vendor/name searches expect the caller to have preg_quoted the query
-            let parts = Preg::split(php_regex!("{\\s+}"), &query);
+            let parts = preg_split(php_regex!("{\\s+}"), &query);
             format!("{{(?:{})}}i", implode("|", &parts))
         };
 

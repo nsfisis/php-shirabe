@@ -42,7 +42,8 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
     RuntimeException, UnexpectedValueException, extension_loaded, hash, http_build_query_mixed,
-    json_decode_assoc, parse_url, php_regex, realpath, strtolower, strtr, urlencode, var_export,
+    json_decode_assoc, parse_url, php_regex, preg_split, realpath, strtolower, strtr, urlencode,
+    var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
@@ -764,7 +765,7 @@ impl ComposerRepository {
 
         if mode == SEARCH_VENDOR {
             let mut results: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-            let parts = Preg::split(php_regex!(r"{\s+}"), &query);
+            let parts = preg_split(php_regex!(r"{\s+}"), &query);
             let regex = format!("{{(?:{})}}i", parts.join("|"));
 
             let vendor_names = self.get_vendor_names()?;
@@ -828,7 +829,7 @@ impl ComposerRepository {
             }
 
             let mut results: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-            let parts = Preg::split(php_regex!(r"{\s+}"), &query);
+            let parts = preg_split(php_regex!(r"{\s+}"), &query);
             let regex = format!("{{(?:{})}}i", parts.join("|"));
 
             let package_names = self.get_package_names(None)?;

@@ -5,9 +5,6 @@ pub const PREG_PATTERN_ORDER: i64 = 1;
 pub const PREG_SET_ORDER: i64 = 2;
 pub const PREG_OFFSET_CAPTURE: i64 = 256;
 pub const PREG_UNMATCHED_AS_NULL: i64 = 512;
-pub const PREG_SPLIT_NO_EMPTY: i64 = 1;
-pub const PREG_SPLIT_DELIM_CAPTURE: i64 = 2;
-pub const PREG_SPLIT_OFFSET_CAPTURE: i64 = 4;
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub enum CaptureKey {
@@ -208,52 +205,34 @@ pub fn preg_grep<T: AsRef<str>>(
 }
 
 pub fn preg_split(pattern: impl PregPattern, subject: &str) -> Vec<String> {
-    preg_split2(pattern, subject, -1, 0)
+    preg_split_impl(pattern, subject, false)
 }
 
-pub fn preg_split2(
-    pattern: impl PregPattern,
-    subject: &str,
-    limit: i64,
-    flags: i64,
-) -> Vec<String> {
+pub fn preg_split_delim_capture(pattern: impl PregPattern, subject: &str) -> Vec<String> {
+    preg_split_impl(pattern, subject, true)
+}
+
+fn preg_split_impl(pattern: impl PregPattern, subject: &str, delim_capture: bool) -> Vec<String> {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
-    let no_empty = flags & PREG_SPLIT_NO_EMPTY != 0;
-    let delim_capture = flags & PREG_SPLIT_DELIM_CAPTURE != 0;
-    // `limit` counts the resulting pieces; a non-positive value means no limit.
-    let max_delims = if limit > 0 {
-        (limit as usize).saturating_sub(1)
-    } else {
-        usize::MAX
-    };
 
     let mut result: Vec<String> = Vec::new();
-    let push = |s: &str, result: &mut Vec<String>| {
-        if !(no_empty && s.is_empty()) {
-            result.push(s.to_string());
-        }
-    };
-
     let mut last = 0usize;
-    for (delims, caps) in re.captures_iter(subject).enumerate() {
-        if delims >= max_delims {
-            break;
-        }
+    for caps in re.captures_iter(subject) {
         let m = caps.get(0).unwrap();
-        push(&subject[last..m.start()], &mut result);
+        result.push(subject[last..m.start()].to_string());
         if delim_capture {
             // Mirror preg_match: trailing unmatched groups are dropped, interior
             // unmatched groups are emitted as "".
             if let Some(last_g) = (1..caps.len()).rev().find(|&g| caps.get(g).is_some()) {
                 for g in 1..=last_g {
-                    push(caps.get(g).map(|x| x.as_str()).unwrap_or(""), &mut result);
+                    result.push(caps.get(g).map(|x| x.as_str()).unwrap_or("").to_string());
                 }
             }
         }
         last = m.end();
     }
-    push(&subject[last..], &mut result);
+    result.push(subject[last..].to_string());
 
     result
 }

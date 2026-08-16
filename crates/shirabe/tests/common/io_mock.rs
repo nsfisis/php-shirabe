@@ -6,7 +6,7 @@ use shirabe::io::io_interface;
 use shirabe::io::{IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
 use shirabe::util::platform::Platform;
 use shirabe_pcre::Preg;
-use shirabe_php_shim::{PHP_EOL, PhpMixed, php_regex, preg_quote};
+use shirabe_php_shim::{PHP_EOL, PhpMixed, php_regex, preg_quote, preg_split};
 use shirabe_symfony_console::output::output_interface;
 use std::collections::VecDeque;
 
@@ -126,7 +126,7 @@ impl IOMock {
         };
 
         if !expectations.is_empty() {
-            let mut lines: VecDeque<String> = Preg::split(php_regex!("{\r?\n}"), &output).into();
+            let mut lines: VecDeque<String> = preg_split(php_regex!("{\r?\n}"), &output).into();
             let mut auth_log: VecDeque<(String, String, Option<String>)> =
                 self.auth_log.clone().into();
 

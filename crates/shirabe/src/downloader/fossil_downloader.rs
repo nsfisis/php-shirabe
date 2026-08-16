@@ -13,7 +13,7 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_pcre::Preg;
-use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class, php_regex};
+use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class, php_regex, preg_split};
 
 #[derive(Debug)]
 pub struct FossilDownloader {
@@ -223,7 +223,7 @@ impl VcsDownloader for FossilDownloader {
         let lines: Vec<String> = if trimmed.is_empty() {
             vec![]
         } else {
-            Preg::split(php_regex!(r"{\r?\n}"), &trimmed)
+            preg_split(php_regex!(r"{\r?\n}"), &trimmed)
         };
 
         for line in lines {

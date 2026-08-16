@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Util/NoProxyPattern.php
 
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     RuntimeException, array_key_exists, explode, filter_var_int_with_range, filter_var_ip,
-    inet_pton, ltrim, parse_url, php_regex, stripos, strlen, strpbrk, strpos, substr, substr_count,
+    inet_pton, ltrim, parse_url, php_regex, preg_split, stripos, strlen, strpbrk, strpos, substr,
+    substr_count,
 };
 
 /// Tests URLs against NO_PROXY patterns
@@ -37,7 +37,7 @@ impl NoProxyPattern {
     /// @param string $pattern NO_PROXY pattern
     pub fn new(pattern: &str) -> Self {
         // PHP: Preg::split('{[\s,]+}', $pattern, -1, PREG_SPLIT_NO_EMPTY)
-        let host_names = Preg::split(php_regex!(r"{[\s,]+}"), pattern);
+        let host_names = preg_split(php_regex!(r"{[\s,]+}"), pattern);
         let noproxy = host_names.is_empty() || host_names[0] == "*";
         Self {
             host_names,

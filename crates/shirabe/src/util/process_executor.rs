@@ -12,7 +12,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     LogicException, PHP_EOL, PhpMixed, RuntimeException, array_intersect, array_map,
     escapeshellarg, explode, implode, in_array_strict, is_array, is_dir, is_numeric, is_string,
-    php_regex, rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array,
+    php_regex, preg_split, rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array,
     substr_replace, trim,
 };
 use shirabe_symfony_process::ExecutableFinder;
@@ -779,7 +779,7 @@ impl ProcessExecutor {
         if output.is_empty() {
             vec![]
         } else {
-            Preg::split(php_regex!(r"{\r?\n}"), &output)
+            preg_split(php_regex!(r"{\r?\n}"), &output)
         }
     }
 

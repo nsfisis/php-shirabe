@@ -17,7 +17,7 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, php_regex, strtolower,
+    PhpMixed, RuntimeException, UnexpectedValueException, php_regex, preg_split, strtolower,
 };
 
 #[derive(Debug)]
@@ -305,7 +305,7 @@ impl RootPackageLoader {
         for (req_name, req_version) in requires {
             let mut constraints: Vec<String> = vec![];
 
-            let or_split = Preg::split(php_regex!(r"{\s*\|\|?\s*}"), req_version.trim());
+            let or_split = preg_split(php_regex!(r"{\s*\|\|?\s*}"), req_version.trim());
             for or_constraint in &or_split {
                 let and_split = shirabe_semver::split_and_constraints(or_constraint);
                 for and_constraint in and_split {

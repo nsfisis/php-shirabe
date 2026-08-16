@@ -14,9 +14,9 @@
 use indexmap::IndexMap;
 pub use shirabe_php_shim::CaptureKey;
 use shirabe_php_shim::{
-    PREG_OFFSET_CAPTURE, PREG_SET_ORDER, PREG_SPLIT_OFFSET_CAPTURE, PREG_UNMATCHED_AS_NULL,
-    PregPattern, preg_grep, preg_match_all_offset_capture, preg_match_all2, preg_match2,
-    preg_replace_callback, preg_replace2, preg_split2,
+    PREG_OFFSET_CAPTURE, PREG_SET_ORDER, PREG_UNMATCHED_AS_NULL, PregPattern, preg_grep,
+    preg_match_all_offset_capture, preg_match_all2, preg_match2, preg_replace_callback,
+    preg_replace2,
 };
 
 #[derive(Debug)]
@@ -118,19 +118,6 @@ impl Preg {
         };
 
         preg_replace_callback(pattern, adapter, subject).expect("$replacement cannot fail")
-    }
-
-    pub fn split(pattern: impl PregPattern, subject: &str) -> Vec<String> {
-        Self::split4(pattern, subject, -1, 0)
-    }
-
-    pub fn split4(pattern: impl PregPattern, subject: &str, limit: i64, flags: i64) -> Vec<String> {
-        assert!(
-            flags & PREG_SPLIT_OFFSET_CAPTURE == 0,
-            "PREG_SPLIT_OFFSET_CAPTURE is not supported as it changes the type of $matches, use splitWithOffsets() instead"
-        );
-
-        preg_split2(pattern, subject, limit, flags)
     }
 
     pub fn grep<T: AsRef<str>>(

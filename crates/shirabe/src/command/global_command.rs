@@ -9,7 +9,9 @@ use crate::factory::Factory;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use shirabe_pcre::Preg;
-use shirabe_php_shim::{LogicException, RuntimeException, chdir, impl_php_class, php_regex};
+use shirabe_php_shim::{
+    LogicException, RuntimeException, chdir, impl_php_class, php_regex, preg_split,
+};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::completion::CompletionInput;
 use shirabe_symfony_console::completion::{CompletionSuggestions, StringOrSuggestion};
@@ -223,7 +225,7 @@ impl Command for GlobalCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let tokens = Preg::split(
+        let tokens = preg_split(
             php_regex!(r"{\s+}"),
             &Self::input_to_string(&*input.borrow())?,
         );
