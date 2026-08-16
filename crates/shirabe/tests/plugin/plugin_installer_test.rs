@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Plugin/PluginInstallerTest.php
 
 use crate::async_runtime::run;
+use crate::php_worker::{load_composer_php_runtime, lock_php_worker, php_runtime_available};
 use indexmap::IndexMap;
 use shirabe::autoload::AutoloadGenerator;
 use shirabe::composer::{Composer, ComposerHandle, PartialOrFullComposer};
@@ -36,33 +37,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
-use shirabe_symfony_process::PhpExecutableFinder;
 use tempfile::TempDir;
-
-/// The register/activate flow runs the plugin in the real PHP worker; without a PHP binary the
-/// worker cannot start. Tests exercising it return early, following the convention of the
-/// non-mock tests in `shirabe-php-rpc`.
-pub(crate) fn php_runtime_available() -> bool {
-    PhpExecutableFinder::new().find(false).is_some()
-}
-
-/// All tests in this binary share the single PHP worker, whose loaded-class table persists
-/// across tests just like PHPUnit's single-process runs (that sharing is what exercises the
-/// `_composer_tmp` rename path). Interleaving two tests would let one test's class definitions
-/// race the other's `class_exists` checks, so the worker-touching tests run serialized.
-static PHP_WORKER_TESTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-pub(crate) fn lock_php_worker() -> std::sync::MutexGuard<'static, ()> {
-    PHP_WORKER_TESTS
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-}
-
-fn load_composer_php_runtime() {
-    static CACHE: std::sync::OnceLock<TempDir> = std::sync::OnceLock::new();
-    let cache = CACHE.get_or_init(|| tempfile::tempdir().expect("no cache directory for the test"));
-    EventDispatcher::__ensure_composer_php_runtime(cache.path()).unwrap();
-}
 
 /// `__DIR__ . '/Fixtures'` of the upstream test class.
 fn fixtures_dir() -> String {

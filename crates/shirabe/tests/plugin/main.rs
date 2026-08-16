@@ -2,6 +2,8 @@
 mod async_runtime;
 #[path = "../common/config_stub.rs"]
 mod config_stub;
+#[path = "../common/php_worker.rs"]
+mod php_worker;
 
 mod alias_package_test;
 mod e2e_command_provider_test;

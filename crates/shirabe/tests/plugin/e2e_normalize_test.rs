@@ -8,7 +8,7 @@
 //! The test skips while any of these is missing; test runs themselves are offline.
 
 use crate::e2e_extension_installer_test::{copy_dir, upstream_composer_bin};
-use crate::plugin_installer_test::{lock_php_worker, php_runtime_available};
+use crate::php_worker::{lock_php_worker, php_runtime_available};
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 

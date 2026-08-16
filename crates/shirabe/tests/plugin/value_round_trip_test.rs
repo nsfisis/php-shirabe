@@ -4,7 +4,8 @@
 //! in-process), so the fixture `fixtures/values-v1` is Shirabe-owned.
 
 use crate::async_runtime::run;
-use crate::plugin_installer_test::{lock_php_worker, new_installer, php_runtime_available, set_up};
+use crate::php_worker::{lock_php_worker, php_runtime_available};
+use crate::plugin_installer_test::{new_installer, set_up};
 use indexmap::IndexMap;
 use shirabe::installer::InstallerInterface;
 use shirabe::package::Link;
