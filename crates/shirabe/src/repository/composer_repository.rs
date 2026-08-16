@@ -42,7 +42,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
     RuntimeException, UnexpectedValueException, extension_loaded, hash, http_build_query_mixed,
-    json_decode, parse_url, php_regex, realpath, strtolower, strtr, urlencode, var_export,
+    json_decode_assoc, parse_url, php_regex, realpath, strtolower, strtr, urlencode, var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
@@ -1348,7 +1348,7 @@ impl ComposerRepository {
                 && self.cache.borrow_mut().sha256(&cache_key).as_deref() == hash_opt.as_deref()
             {
                 if let Some(raw) = self.cache.borrow_mut().read(&cache_key) {
-                    let decoded = json_decode(&raw, true)?;
+                    let decoded = json_decode_assoc(&raw)?;
                     if let Some(arr) = decoded.as_array() {
                         let map: IndexMap<String, PhpMixed> =
                             arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -1363,7 +1363,7 @@ impl ComposerRepository {
             } else if use_last_modified_check {
                 let contents_raw_opt = self.cache.borrow_mut().read(&cache_key);
                 if let Some(contents_raw) = contents_raw_opt {
-                    let contents = json_decode(&contents_raw, true)?;
+                    let contents = json_decode_assoc(&contents_raw)?;
                     let contents_arr = contents.as_array().cloned();
                     // we already loaded some packages from this file, so assume it is fresh and avoid fetching it again
                     if already_loaded.contains_key(name) {
@@ -1962,7 +1962,7 @@ impl ComposerRepository {
         let mut last_modified: Option<String> = None;
         let contents_opt: Option<IndexMap<String, PhpMixed>>;
         if let Some(raw) = self.cache.borrow_mut().read(&cache_key) {
-            let decoded = json_decode(&raw, true)?;
+            let decoded = json_decode_assoc(&raw)?;
             if let Some(arr) = decoded.as_array() {
                 let map: IndexMap<String, PhpMixed> =
                     arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -2127,7 +2127,7 @@ impl ComposerRepository {
         let mut data: Option<IndexMap<String, PhpMixed>> = None;
         let cached_raw_opt = self.cache.borrow_mut().read("packages.json");
         if let Some(cached_raw) = cached_raw_opt {
-            let cached_decoded = json_decode(&cached_raw, true)?;
+            let cached_decoded = json_decode_assoc(&cached_raw)?;
             if let Some(arr) = cached_decoded.as_array() {
                 let cached_data: IndexMap<String, PhpMixed> =
                     arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
@@ -2522,7 +2522,7 @@ impl ComposerRepository {
                         == Some(sha256.as_str())
                     {
                         let raw = self.cache.borrow_mut().read(&cache_key).unwrap_or_default();
-                        let decoded = json_decode(&raw, true)?;
+                        let decoded = json_decode_assoc(&raw)?;
                         decoded
                             .as_array()
                             .map(|a| a.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
@@ -2612,7 +2612,7 @@ impl ComposerRepository {
                 let included_data: IndexMap<String, PhpMixed> = if let Some(ref sha1) = sha1 {
                     if self.cache.borrow_mut().sha1(include).as_deref() == Some(sha1.as_str()) {
                         let raw = self.cache.borrow_mut().read(include).unwrap_or_default();
-                        let decoded = json_decode(&raw, true)?;
+                        let decoded = json_decode_assoc(&raw)?;
                         decoded
                             .as_array()
                             .map(|a| a.iter().map(|(k, v)| (k.clone(), v.clone())).collect())

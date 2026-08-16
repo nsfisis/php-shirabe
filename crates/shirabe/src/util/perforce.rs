@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, chdir, date_local, explode, fclose, feof, fgets,
-    file_get_contents, fopen, fwrite, gethostname, json_decode, php_regex, str_replace_array,
+    file_get_contents, fopen, fwrite, gethostname, json_decode_assoc, php_regex, str_replace_array,
     strcmp, strlen, strpos, strrpos, substr, time, trim,
 };
 use shirabe_symfony_process::ExecutableFinder;
@@ -577,7 +577,7 @@ impl Perforce {
             Some(s) => s,
         };
 
-        let decoded = json_decode(&composer_file_content, true)?;
+        let decoded = json_decode_assoc(&composer_file_content)?;
         Ok(match decoded {
             PhpMixed::Array(m) => Some(m.into_iter().collect()),
             _ => None,

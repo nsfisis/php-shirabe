@@ -24,7 +24,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
     array_slice, asort, explode, file_get_contents, implode, in_array_strict, is_array, is_file,
-    is_numeric, json_decode, levenshtein, php_regex, strlen, strpos, trim,
+    is_numeric, json_decode_assoc, levenshtein, php_regex, strlen, strpos, trim,
 };
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -113,7 +113,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         let file = Factory::get_composer_file().unwrap_or_default();
         if is_file(&file) && Filesystem::is_readable(&file) {
             let contents = file_get_contents(&file).unwrap_or_default();
-            let composer = json_decode(&contents, true).unwrap_or(PhpMixed::Null);
+            let composer = json_decode_assoc(&contents).unwrap_or(PhpMixed::Null);
             if is_array(&composer)
                 && let Some(arr) = composer.as_array()
                 && let Some(ms) = arr.get("minimum-stability")

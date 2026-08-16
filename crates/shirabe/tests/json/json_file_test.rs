@@ -198,9 +198,9 @@ fn test_double_escaped_unicode() {
     wrapper.insert("t".to_string(), PhpMixed::String(encoded_data));
     let double_encoded_data = JsonFile::encode(&PhpMixed::Array(wrapper)).unwrap();
 
-    let decoded_data = shirabe_php_shim::json_decode(&double_encoded_data, true).unwrap();
+    let decoded_data = shirabe_php_shim::json_decode_assoc(&double_encoded_data).unwrap();
     let t = decoded_data.as_array().unwrap().get("t").unwrap();
-    let double_data = shirabe_php_shim::json_decode(t.as_string().unwrap(), true).unwrap();
+    let double_data = shirabe_php_shim::json_decode_assoc(t.as_string().unwrap()).unwrap();
     assert_eq!(data, double_data);
 }
 
@@ -439,7 +439,7 @@ fn test_auth_schema_validation_with_custom_data_source() {
     // INCOMPATIBILITY NOTE: upstream asserts justinrainbow's "github-oauth : String value found, but an
     // object is required". The jsonschema crate reports the same type violation with different
     // wording.
-    let json = shirabe_php_shim::json_decode("{\"github-oauth\": \"foo\"}", false).unwrap();
+    let json = shirabe_php_shim::json_decode_obj("{\"github-oauth\": \"foo\"}").unwrap();
     let expected_message = "\"COMPOSER_AUTH\" does not match the expected JSON schema".to_string();
     let expected_error = "github-oauth : \"foo\" is not of type \"object\"".to_string();
 

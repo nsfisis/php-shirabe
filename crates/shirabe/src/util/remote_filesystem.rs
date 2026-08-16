@@ -19,7 +19,7 @@ use shirabe_php_shim::{
     PhpMixed, RuntimeException, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS,
     STREAM_NOTIFY_PROGRESS, array_replace_recursive, base64_encode, explode, extension_loaded,
     file_get_contents, file_get_contents5, file_put_contents, filter_var_boolean, gethostbyname,
-    http_clear_last_response_headers, http_get_last_response_headers, ini_get, json_decode,
+    http_clear_last_response_headers, http_get_last_response_headers, ini_get, json_decode_assoc,
     parse_url, php_regex, preg_quote, strpos, strtolower, strtr, substr, trim, zlib_decode,
 };
 
@@ -336,7 +336,7 @@ impl RemoteFilesystem {
                     {
                         let parsed = result
                             .as_deref()
-                            .map(|s| json_decode(s, true).unwrap_or(PhpMixed::Null))
+                            .map(|s| json_decode_assoc(s).unwrap_or(PhpMixed::Null))
                             .unwrap_or(PhpMixed::Null);
                         let parsed_map: IndexMap<String, PhpMixed> = match parsed {
                             PhpMixed::Array(m) => m.into_iter().collect(),

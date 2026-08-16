@@ -14,8 +14,8 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     PhpMixed, RuntimeException, UnexpectedValueException, dirname, file_exists, file_get_contents,
-    file_put_contents, is_dir, is_file, json_decode, json_encode_ex, mkdir, php_regex, realpath,
-    str_repeat, strlen, strpos, usleep,
+    file_put_contents, is_dir, is_file, json_decode_assoc, json_decode_obj, json_encode_ex, mkdir,
+    php_regex, realpath, str_repeat, strlen, strpos, usleep,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
 
@@ -309,7 +309,7 @@ impl JsonFile {
             .into());
         }
         let content = file_get_contents(&self.path).unwrap_or_default();
-        let data = json_decode(&content, false)?;
+        let data = json_decode_obj(&content)?;
 
         if matches!(data, PhpMixed::Null) && content != "null" {
             Self::validate_syntax(&content, Some(&self.path))?;
@@ -362,7 +362,7 @@ impl JsonFile {
         };
 
         if schema == Self::STRICT_SCHEMA && is_composer_schema_file {
-            schema_data = json_decode(Self::COMPOSER_SCHEMA_JSON, false)?;
+            schema_data = json_decode_obj(Self::COMPOSER_SCHEMA_JSON)?;
             if let PhpMixed::Object(map) = &mut schema_data {
                 map.insert("additionalProperties".to_string(), PhpMixed::Bool(false));
                 map.insert(
@@ -476,11 +476,12 @@ impl JsonFile {
             None => return Ok(PhpMixed::Null),
             Some(j) => j,
         };
-        let mut data = json_decode(json, true)?;
+        let mut data = json_decode_assoc(json)?;
         // PHP: `null === $data && JSON_ERROR_NONE !== json_last_error()`, i.e. the decode produced
-        // null because of an error rather than because the input was the literal `null`. json_decode
-        // here swallows the error into PhpMixed::Null, so detect the failure by comparing the source
-        // against `null`, mirroring validateSchema's own `'null' !== $content` check.
+        // null because of an error rather than because the input was the literal `null`.
+        // json_decode_assoc swallows the error into PhpMixed::Null, so detect the failure by
+        // comparing the source against `null`, mirroring validateSchema's own
+        // `'null' !== $content` check.
         if matches!(data, PhpMixed::Null) && json != "null" {
             // attempt resolving simple conflicts in lock files so that one can run `composer update --lock` and get a valid lock file
             if let Some(file) = file
@@ -498,7 +499,7 @@ impl JsonFile {
                     &mut count,
                 );
                 if count == 1 {
-                    data = json_decode(&replaced, true)?;
+                    data = json_decode_assoc(&replaced)?;
                     if !matches!(data, PhpMixed::Null) {
                         return Ok(data);
                     }

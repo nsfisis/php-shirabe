@@ -12,7 +12,8 @@ use indexmap::IndexMap;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, base64_encode, explode, in_array_loose, in_array_strict, is_array,
-    is_string, json_decode, parse_url, php_regex, str_replace, strpos, strtolower, substr, trim,
+    is_string, json_decode_assoc, parse_url, php_regex, str_replace, strpos, strtolower, substr,
+    trim,
 };
 
 #[derive(Debug)]
@@ -189,7 +190,7 @@ impl AuthHelper {
                 // Try to extract a more specific error message from GitHub's API response
                 let mut git_hub_api_message: Option<String> = None;
                 if let Some(body) = response_body {
-                    let decoded = json_decode(body, true)?;
+                    let decoded = json_decode_assoc(body)?;
                     if is_array(&decoded)
                         && let Some(arr) = decoded.as_array()
                         && let Some(msg) = arr.get("message")
@@ -520,7 +521,7 @@ impl AuthHelper {
                 let mut custom_headers: PhpMixed = PhpMixed::Null;
                 // PHP: if (is_string($auth['username']))
                 // username field is always String in our IndexMap representation
-                custom_headers = json_decode(&username, true)?;
+                custom_headers = json_decode_assoc(&username)?;
                 if is_array(&custom_headers) {
                     if let Some(arr) = custom_headers.as_array() {
                         for header in arr.values() {
@@ -580,12 +581,12 @@ impl AuthHelper {
                         Some("Using Bitbucket OAuth token authentication".to_string());
                 }
             } else if username == "client-certificate" {
-                // PHP: $options['ssl'] = array_merge($options['ssl'] ?? [], json_decode((string) $auth['password'], true));
+                // PHP: $options['ssl'] = array_merge($options['ssl'] ?? [], json_decode_assoc((string) $auth['password']));
                 let existing_ssl = options
                     .get("ssl")
                     .cloned()
                     .unwrap_or(PhpMixed::Array(IndexMap::new()));
-                let decoded = json_decode(&password, true)?;
+                let decoded = json_decode_assoc(&password)?;
                 options.insert(
                     "ssl".to_string(),
                     shirabe_php_shim::array_merge(existing_ssl, decoded),

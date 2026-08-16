@@ -10,7 +10,7 @@
 
 use shirabe::json::{JsonFile, JsonValidationException};
 use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::json_decode;
+use shirabe_php_shim::json_decode_obj;
 
 const NAME_PATTERN: &str = r#"^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$"#;
 const VERSION_PATTERN: &str = r#"^[vV]?\d+(?:[.-]\d+){0,3}[._-]?(?:(?:[sS][tT][aA][bB][lL][eE]|[bB][eE][tT][aA]|[bB]|[rR][cC]|[aA][lL][pP][hH][aA]|[aA]|[pP][aA][tT][cC][hH]|[pP][lL]|[pP])(?:(?:[.-]?\d+)*)?)?(?:[.-]?[dD][eE][vV]|\.x-dev)?(?:\+.*)?$|^dev-.*$"#;
@@ -19,7 +19,7 @@ const VERSION_PATTERN: &str = r#"^[vV]?\d+(?:[.-]\d+){0,3}[._-]?(?:(?:[sS][tT][a
 /// (the `{"$ref": "file://…"}` wrapper used by `LAX_SCHEMA`), returning the validation error
 /// strings, or an empty vec when the document is valid.
 fn check(json: &str) -> Vec<String> {
-    let data = json_decode(json, false).unwrap();
+    let data = json_decode_obj(json).unwrap();
     match JsonFile::validate_json_schema("test", &data, JsonFile::LAX_SCHEMA, None) {
         Ok(_) => Vec::new(),
         Err(e) => e

@@ -55,8 +55,8 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PhpMixed, RuntimeException,
     UnexpectedValueException, array_replace_recursive, class_exists, dirname, extension_loaded,
-    file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file, json_decode,
-    mkdir, pathinfo, realpath, rename, rtrim, strpos, strtr, substr, trim,
+    file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file, json_decode_assoc,
+    json_decode_obj, mkdir, pathinfo, realpath, rename, rtrim, strpos, strtr, substr, trim,
 };
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::formatter::OutputFormatterStyle;
@@ -1529,7 +1529,7 @@ impl Factory {
             _ => return Ok(()),
         };
 
-        let auth_data = json_decode(&composer_auth_env_str, false)?;
+        let auth_data = json_decode_obj(&composer_auth_env_str)?;
         if matches!(auth_data, PhpMixed::Null) {
             return Err(UnexpectedValueException::new(
                 "COMPOSER_AUTH environment variable is malformed, should be a valid JSON object"
@@ -1551,7 +1551,7 @@ impl Factory {
             JsonFile::AUTH_SCHEMA,
             Some("COMPOSER_AUTH"),
         )?;
-        let auth_data_assoc = json_decode(&composer_auth_env_str, true)?;
+        let auth_data_assoc = json_decode_assoc(&composer_auth_env_str)?;
         if !matches!(auth_data_assoc, PhpMixed::Null) {
             let mut wrapped: IndexMap<String, PhpMixed> = IndexMap::new();
             wrapped.insert("config".to_string(), auth_data_assoc);

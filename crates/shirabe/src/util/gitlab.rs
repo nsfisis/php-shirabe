@@ -12,7 +12,8 @@ use indexmap::IndexMap;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, http_build_query, in_array_strict, json_decode, php_regex, time,
+    PhpMixed, RuntimeException, http_build_query, in_array_strict, json_decode_assoc, php_regex,
+    time,
 };
 
 #[derive(Debug)]
@@ -253,7 +254,7 @@ impl GitLab {
                         Some(te) if te.get_code() == 403 || te.get_code() == 401 => {
                             if te.get_code() == 401 {
                                 let response =
-                                    te.get_response().and_then(|r| json_decode(r, true).ok());
+                                    te.get_response().and_then(|r| json_decode_assoc(r).ok());
                                 let is_invalid_grant = response
                                     .as_ref()
                                     .and_then(|r| r.as_array())

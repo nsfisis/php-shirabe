@@ -339,7 +339,7 @@ impl CurlDownloader {
             && curl_response.inner.get_header("content-type").as_deref() == Some("application/json")
             && let Some(body) = curl_response.inner.get_body()
         {
-            let decoded = shirabe_php_shim::json_decode(body, true)?;
+            let decoded = shirabe_php_shim::json_decode_assoc(body)?;
             if let PhpMixed::Array(a) = decoded {
                 HttpDownloader::output_warnings(self.io.clone(), origin, &a)?;
             }

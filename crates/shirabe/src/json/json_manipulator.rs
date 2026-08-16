@@ -8,8 +8,8 @@ use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
     array_reverse, empty, explode, implode, in_array_loose, is_array, is_int, is_numeric,
-    json_decode, php_regex, php_truthy, preg_quote, rtrim, str_repeat, str_replace, strlen,
-    strnatcmp, strpos, substr, trim, uksort,
+    json_decode_assoc, json_decode_obj, php_regex, php_truthy, preg_quote, rtrim, str_repeat,
+    str_replace, strlen, strnatcmp, strpos, substr, trim, uksort,
 };
 
 #[derive(Debug)]
@@ -156,7 +156,7 @@ impl JsonManipulator {
         }
 
         if sort_packages {
-            let mut requirements = json_decode(&links, true)?;
+            let mut requirements = json_decode_assoc(&links)?;
             Self::sort_packages(&mut requirements);
             links = self.format(&requirements, 0, false)?;
         }
@@ -230,7 +230,7 @@ impl JsonManipulator {
     }
 
     fn do_convert_repositories_from_assoc_to_list(&mut self) -> anyhow::Result<bool> {
-        let decoded = json_decode(&self.contents, false)?;
+        let decoded = json_decode_obj(&self.contents)?;
 
         let repositories_value: Option<PhpMixed> = decoded
             .as_object()
@@ -405,7 +405,7 @@ impl JsonManipulator {
 
         let raw_repo = self.contents[repo_pos..repo_end].to_string();
         // invalid match due to un-regexable content, abort
-        if json_decode(&raw_repo, false)?.as_bool() == Some(false) {
+        if json_decode_obj(&raw_repo)?.as_bool() == Some(false) {
             return Ok(false);
         }
 
@@ -515,7 +515,7 @@ impl JsonManipulator {
     }
 
     fn do_remove_repository(&mut self, name: &str) -> anyhow::Result<bool> {
-        let decoded = json_decode(&self.contents, false)?;
+        let decoded = json_decode_obj(&self.contents)?;
         let repositories_value: Option<PhpMixed> = decoded
             .as_object()
             .and_then(|o| o.get("repositories").cloned());
@@ -706,7 +706,7 @@ impl JsonManipulator {
         let node_end = self.contents[node.value_end..].to_string();
         let mut children = self.contents[node.value_pos..node.value_end].to_string();
         // invalid match due to un-regexable content, abort
-        if !php_truthy(&json_decode(&children, false)?) {
+        if !php_truthy(&json_decode_obj(&children)?) {
             return Ok(false);
         }
 
@@ -723,7 +723,7 @@ impl JsonManipulator {
             let content_str = children[cm.value_pos..cm.value_end].to_string();
             let mut value_local = value;
             if let Some(sub_name) = sub_name {
-                let mut cur_val = json_decode(&content_str, true).unwrap_or(PhpMixed::Null);
+                let mut cur_val = json_decode_assoc(&content_str).unwrap_or(PhpMixed::Null);
                 if !is_array(&cur_val) {
                     cur_val = PhpMixed::Array(IndexMap::new());
                 }
@@ -858,7 +858,7 @@ impl JsonManipulator {
         let children = self.contents[node.value_pos..node.value_end].to_string();
 
         // invalid match due to un-regexable content, abort
-        if !php_truthy(&json_decode(&children, true)?) {
+        if !php_truthy(&json_decode_assoc(&children)?) {
             return Ok(false);
         }
 
@@ -956,7 +956,7 @@ impl JsonManipulator {
 
             // we have a subname, so we restore the rest of $name
             if let Some(sub) = sub_name {
-                let mut cur_val = json_decode(&children, true)?;
+                let mut cur_val = json_decode_assoc(&children)?;
                 if let Some(arr) = cur_val.as_array_mut() {
                     if let Some(inner) = arr.get_mut(&name_owned).and_then(|v| v.as_array_mut()) {
                         inner.shift_remove(&sub);
@@ -985,7 +985,7 @@ impl JsonManipulator {
         // subkey removed when a sub_name is in play.
         let mut children_final = children_clean.clone();
         if let Some(ref sub) = sub_name {
-            let mut cur_val = json_decode(&children, true).unwrap_or(PhpMixed::Null);
+            let mut cur_val = json_decode_assoc(&children).unwrap_or(PhpMixed::Null);
             if let Some(arr) = cur_val.as_array_mut() {
                 if let Some(inner) = arr.get_mut(&name_owned).and_then(|v| v.as_array_mut()) {
                     inner.shift_remove(sub);
@@ -1035,7 +1035,7 @@ impl JsonManipulator {
         let node_end = self.contents[node.value_end..].to_string();
         let mut children = self.contents[node.value_pos..node.value_end].to_string();
         // invalid match due to un-regexable content, abort
-        if json_decode(&children, false)?.as_bool() == Some(false) {
+        if json_decode_obj(&children)?.as_bool() == Some(false) {
             return Ok(false);
         }
 
@@ -1168,7 +1168,7 @@ impl JsonManipulator {
         let node_end = self.contents[node.value_end..].to_string();
         let children = self.contents[node.value_pos..node.value_end].to_string();
         // invalid match due to un-regexable content, abort
-        if json_decode(&children, false)?.as_bool() == Some(false) {
+        if json_decode_obj(&children)?.as_bool() == Some(false) {
             return Ok(false);
         }
 
@@ -1233,7 +1233,7 @@ impl JsonManipulator {
         let children = self.contents[node.value_pos..node.value_end].to_string();
 
         // invalid match due to un-regexable content, abort
-        if json_decode(&children, true)?.as_bool() == Some(false) {
+        if json_decode_assoc(&children)?.as_bool() == Some(false) {
             return Ok(false);
         }
 
@@ -1314,7 +1314,7 @@ impl JsonManipulator {
         if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
             let key_capture = &self.contents[m.key_pos..m.value_end];
-            if json_decode(&format!("{{{}}}", key_capture), false)?.is_null() {
+            if json_decode_obj(&format!("{{{}}}", key_capture))?.is_null() {
                 return Ok(false);
             }
 
@@ -1396,7 +1396,7 @@ impl JsonManipulator {
         if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
             let removal = &self.contents[m.key_pos..m.value_end];
-            if json_decode(&format!("{{{}}}", removal), false)?.is_null() {
+            if json_decode_obj(&format!("{{{}}}", removal))?.is_null() {
                 return Ok(false);
             }
 
@@ -1448,7 +1448,7 @@ impl JsonManipulator {
         if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
             let removal = &self.contents[m.value_pos..m.value_end];
-            if json_decode(removal, false)?.as_bool() == Some(false) {
+            if json_decode_obj(removal)?.as_bool() == Some(false) {
                 return Ok(false);
             }
 

@@ -64,10 +64,20 @@ pub fn json_encode_ex<T: serde::Serialize + ?Sized>(
     Ok(s)
 }
 
-// PHP's two-argument `json_decode`: without JSON_THROW_ON_ERROR it never throws,
-// returning null on malformed input. With `assoc` false, JSON objects decode to
-// stdClass-equivalent `PhpMixed::Object` values; with `assoc` true, to associative arrays.
-pub fn json_decode(s: &str, assoc: bool) -> anyhow::Result<PhpMixed> {
+// PHP's `json_decode($s, true)`: JSON objects decode to associative arrays. Without
+// JSON_THROW_ON_ERROR it never throws, returning null on malformed input.
+pub fn json_decode_assoc(s: &str) -> anyhow::Result<PhpMixed> {
+    json_decode(s, true)
+}
+
+// PHP's `json_decode($s, false)`: JSON objects decode to stdClass-equivalent
+// `PhpMixed::Object` values. Without JSON_THROW_ON_ERROR it never throws, returning null on
+// malformed input.
+pub fn json_decode_obj(s: &str) -> anyhow::Result<PhpMixed> {
+    json_decode(s, false)
+}
+
+fn json_decode(s: &str, assoc: bool) -> anyhow::Result<PhpMixed> {
     match serde_json::from_str::<serde_json::Value>(s) {
         Ok(value) => Ok(json_value_to_php_mixed(value, assoc)),
         Err(_) => Ok(PhpMixed::Null),

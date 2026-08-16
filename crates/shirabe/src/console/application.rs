@@ -60,7 +60,7 @@ use shirabe_php_shim::{
     LogicException as ShimLogicException, PhpMixed, RuntimeException, bin2hex, chdir, defined,
     dirname, disk_free_space, extension_loaded, file_exists, file_get_contents, file_put_contents,
     function_exists, getcwd, getmypid, glob, ini_set, is_array, is_dir, is_file, is_string,
-    json_decode, memory_get_peak_usage, memory_get_usage, microtime, php_regex, php_uname,
+    json_decode_assoc, memory_get_peak_usage, memory_get_usage, microtime, php_regex, php_uname,
     posix_getuid, random_bytes, realpath, restore_error_handler, round, str_replace, strpos,
     strtoupper, sys_get_temp_dir, time, unlink,
 };
@@ -2341,7 +2341,7 @@ impl ApplicationHandle {
             let file = Factory::get_composer_file().unwrap_or_default();
             if may_need_script_command && is_file(&file) && Filesystem::is_readable(&file) {
                 let composer_json: PhpMixed =
-                    json_decode(&file_get_contents(&file).unwrap_or_default(), true)
+                    json_decode_assoc(&file_get_contents(&file).unwrap_or_default())
                         .unwrap_or(PhpMixed::Null);
                 if let Some(arr) = composer_json.as_array()
                     && let Some(scripts) = arr.get("scripts").and_then(|v| v.as_array())
