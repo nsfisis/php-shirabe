@@ -189,10 +189,15 @@ impl RecursiveIteratorFileInfo {
         self.path.to_string_lossy().into_owned()
     }
 
-    pub fn get_size(&self) -> i64 {
-        std::fs::metadata(&self.path)
-            .map(|m| m.len() as i64)
-            .unwrap_or(0)
+    pub fn get_size(&self) -> anyhow::Result<i64> {
+        match filesize(&self.path) {
+            Some(size) => Ok(size),
+            None => Err(crate::RuntimeException::new(format!(
+                "SplFileInfo::getSize(): stat failed for {}",
+                self.path.display()
+            ))
+            .into()),
+        }
     }
 
     fn sub_pathname(&self) -> String {

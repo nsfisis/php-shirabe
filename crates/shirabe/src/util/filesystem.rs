@@ -856,7 +856,7 @@ impl Filesystem {
         let mut size: i64 = 0;
         for file in &ri {
             if file.is_file() {
-                size += file.get_size();
+                size += file.get_size()?;
             }
         }
 
