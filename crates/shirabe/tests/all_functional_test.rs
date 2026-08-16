@@ -265,14 +265,14 @@ fn test_integration_create_project_shows_full_hash_for_dev_packages() {
 
 #[test]
 #[serial]
-#[ignore = "requires the Plugin API (PHP plugin Hooks emitting !! markers), which is not yet implemented"]
+#[ignore = "the fixture's Hooks read Composer\\InstalledVersions, which is not autoloadable in the plugin worker (the fixture ships no vendor/ directory), so the pre-update hook aborts with `Class \"Composer\\InstalledVersions\" not found`"]
 fn test_integration_installed_versions() {
     run_integration("installed-versions.test");
 }
 
 #[test]
 #[serial]
-#[ignore = "requires the Plugin API (PHP plugin Hooks emitting !! markers), which is not yet implemented"]
+#[ignore = "the plugin worker's Composer\\InstalledVersions is only reloaded on a repository write, never seeded from the project's installed.php at boot, so the fixture's plugins fail with `Package \"plugin/a\" is not installed`"]
 fn test_integration_installed_versions2() {
     run_integration("installed-versions2.test");
 }

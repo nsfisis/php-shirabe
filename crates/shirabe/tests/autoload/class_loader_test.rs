@@ -13,7 +13,7 @@ fn get_load_class_tests() -> Vec<&'static str> {
 }
 
 #[test]
-#[ignore = "shirabe_php_shim::class_exists models a fixed set of classes available in a PHP CLI environment; loadClass cannot add to it because including a PHP file does not define a class on the Rust side"]
+#[ignore = "loadClass reaches shirabe_php_shim::include_file, which is a todo!(): evaluating a PHP source file needs an interpreter. class_exists also models a fixed set of classes that loading a file cannot extend"]
 fn test_load_class() {
     let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Autoload/Fixtures")

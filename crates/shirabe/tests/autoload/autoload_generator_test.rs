@@ -1745,7 +1745,7 @@ fn test_exclude_from_classmap() {
 }
 
 #[test]
-#[ignore = "require autoload.php + function_exists() assertions are unportable (composer_require todo!())"]
+#[ignore = "asserts function_exists() after requiring the generated autoload.php inside the test process; there is no PHP interpreter to evaluate that file"]
 fn test_files_autoload_order_by_dependencies() {
     // TODO(php-runtime): PHP `require autoload.php` + function_exists() assertions have no Rust
     // equivalent (no runtime PHP file loading/class definition).
