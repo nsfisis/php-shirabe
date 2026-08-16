@@ -4,6 +4,7 @@ use crate::downloader::TransportException;
 use crate::util::NoProxyPattern;
 use crate::util::http::ProxyItem;
 use crate::util::http::RequestProxy;
+use shirabe_php_shim::PHP_SERVER;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -133,10 +134,10 @@ impl ProxyManager {
 
     fn get_proxy_env(env_name: &str) -> (Option<String>, String) {
         for name in [env_name.to_lowercase(), env_name.to_uppercase()] {
-            if let Ok(val) = std::env::var(&name)
+            if let Some(val) = PHP_SERVER.lock().unwrap().get(&name)
                 && !val.is_empty()
             {
-                return (Some(val), name);
+                return (Some(val.to_string_lossy().into_owned()), name);
             }
         }
         (None, String::new())
