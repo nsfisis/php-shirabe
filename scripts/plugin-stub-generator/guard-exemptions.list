@@ -1,0 +1,14 @@
+# Classes the Rust side owns that the worker still resolves to the real Composer implementation,
+# so no guard is emitted for them. An entry belongs here only when the worker has a mechanism that
+# makes a natively constructed instance correct; without one the class must be guarded, or code
+# running here would silently work on an instance the Rust side never sees. One FQCN per line,
+# each with the mechanism that justifies it.
+
+# The wire codec revives values of this class from the object record serialize() writes for them
+# (php/runtime/Shirabe/MaterializedValue.php), so the real declaration has to stay loadable.
+Composer\Package\Link
+
+# Real Composer\Command code running in this worker constructs one (BaseCommand::initialize), and
+# the dual-mode Composer\EventDispatcher\Event (php/runtime/) carries a natively constructed event
+# to the Rust side as a P-table entity.
+Composer\Plugin\PreCommandRunEvent

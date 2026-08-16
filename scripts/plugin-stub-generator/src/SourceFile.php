@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Shirabe\PluginStubGenerator;
 
+use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\ClassLike;
 use PhpParser\Node\Stmt\GroupUse;
 use PhpParser\Node\Stmt\Namespace_;
@@ -82,5 +83,25 @@ final class SourceFile
     public function verbatim(int $startLine, int $endLine): string
     {
         return implode("\n", array_slice($this->lines, $startLine - 1, $endLine - $startLine + 1));
+    }
+
+    /** This file's imports, restricted to the names the emitted text actually uses. */
+    public function importsUsedBy(string $emittedText): string
+    {
+        $kept = [];
+        foreach ($this->aliases as $alias => $fqcn) {
+            if (preg_match('/(?<![\\\\$\w])' . preg_quote($alias, '/') . '\b/', $emittedText) === 1) {
+                $kept[] = 'use ' . $fqcn
+                    . (str_ends_with($fqcn, '\\' . $alias) || $fqcn === $alias ? '' : " as $alias") . ';';
+            }
+        }
+        return implode("\n", $kept);
+    }
+
+    /** The FQCN a Name node resolved to, the NameResolver having left the node itself alone. */
+    public static function resolvedName(Name $name): string
+    {
+        $resolved = $name->getAttribute('resolvedName');
+        return $resolved instanceof Name ? $resolved->toString() : $name->toString();
     }
 }

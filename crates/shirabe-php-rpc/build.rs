@@ -79,6 +79,26 @@ fn main() {
     )
     .unwrap();
     println!("cargo::rustc-env=SHIRABE_COMPOSER_RUNTIME_BUNDLE_ID={bundle_id}");
+
+    write_guard_files(&manifest_dir.join("php/guards"), &out_dir);
+}
+
+/// Writes the initializer of `GUARD_FILES`: one `include_str!` per generated guard class. The
+/// list is built here rather than spelled out in the source because there is one guard for every
+/// Rust-owned class the worker has no proxy stub for.
+fn write_guard_files(guards: &Path, out_dir: &Path) {
+    println!("cargo::rerun-if-changed={}", guards.display());
+
+    let mut code = String::from("&[\n");
+    for file in find_files(guards) {
+        code += &format!(
+            "    ({:?}, include_str!({:?})),\n",
+            relative_path(guards, &file),
+            file.to_str().unwrap()
+        );
+    }
+    code += "]\n";
+    std::fs::write(out_dir.join("guard-files.rs"), code).unwrap();
 }
 
 /// Every file the bundle holds, in the order `Compiler::compile` adds them.

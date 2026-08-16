@@ -1,6 +1,6 @@
-//! Freshness check for the generated proxy stubs: `generate-stubs --check` verifies that the
-//! committed stub files and the `STUB_FILES` list in `lib.rs` match what the generator emits
-//! from the current Composer checkout and classifier report.
+//! Freshness check for the generated proxy stubs and guard classes: `generate-stubs --check`
+//! verifies that the committed stub and guard files, and the `STUB_FILES` list in `lib.rs`, match
+//! what the generator emits from the current Composer checkout and classifier report.
 //!
 //! The generator needs a PHP interpreter, its composer vendor directory and the classifier
 //! report; when any of those is missing the test returns early, following the non-mock test

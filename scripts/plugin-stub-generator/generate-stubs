@@ -7,6 +7,8 @@ require __DIR__ . '/vendor/autoload.php';
 
 use Shirabe\PluginStubGenerator\GenerationError;
 use Shirabe\PluginStubGenerator\Generator;
+use Shirabe\PluginStubGenerator\GuardGenerator;
+use Shirabe\PluginStubGenerator\NamePrinter;
 use Shirabe\PluginStubGenerator\Project;
 use Shirabe\PluginStubGenerator\Report;
 
@@ -14,6 +16,7 @@ $repoRoot = dirname(__DIR__, 2);
 $composerRoot = $repoRoot . '/composer';
 $reportPath = $repoRoot . '/scripts/plugin-class-classifier/report.json';
 $stubsDir = $repoRoot . '/crates/shirabe-php-rpc/php/stubs';
+$guardsDir = $repoRoot . '/crates/shirabe-php-rpc/php/guards';
 $libRs = $repoRoot . '/crates/shirabe-php-rpc/src/lib.rs';
 $check = false;
 
@@ -24,21 +27,31 @@ foreach (array_slice($argv, 1) as $arg) {
         $reportPath = substr($arg, strlen('--report='));
     } elseif (str_starts_with($arg, '--stubs-dir=')) {
         $stubsDir = substr($arg, strlen('--stubs-dir='));
+    } elseif (str_starts_with($arg, '--guards-dir=')) {
+        $guardsDir = substr($arg, strlen('--guards-dir='));
     } elseif ($arg === '--check') {
         $check = true;
     } else {
-        fwrite(STDERR, "usage: generate-stubs [--composer-root=DIR] [--report=FILE] [--stubs-dir=DIR] [--check]\n");
+        fwrite(STDERR, "usage: generate-stubs [--composer-root=DIR] [--report=FILE] [--stubs-dir=DIR]"
+            . " [--guards-dir=DIR] [--check]\n");
         exit(2);
     }
 }
 
-$targets = [];
-foreach (file(__DIR__ . '/targets.list', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-    $line = trim($line);
-    if ($line !== '' && !str_starts_with($line, '#')) {
-        $targets[] = $line;
+/** @return list<string> */
+$readList = static function (string $path): array {
+    $entries = [];
+    foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if ($line !== '' && !str_starts_with($line, '#')) {
+            $entries[] = $line;
+        }
     }
-}
+    return $entries;
+};
+
+$targets = $readList(__DIR__ . '/targets.list');
+$exemptions = $readList(__DIR__ . '/guard-exemptions.list');
 
 // Hand-written dual-mode classes (php/runtime/) resolve through the same worker autoloader as
 // the generated stubs; the generator must know them so they can serve as stub base classes and
@@ -61,17 +74,51 @@ if (is_dir($runtimeDir)) {
 sort($runtimeProvided);
 sort($runtimeFiles);
 
+$problems = [];
+$report = Report::load($reportPath);
+$project = new Project($composerRoot);
+
+// Every class the Rust side owns and neither a stub nor a runtime class shadows gets a guard, so
+// that the worker cannot fall through to the real implementation and run a second instance.
+// Exempt entries stay real because the worker has a mechanism that makes a native instance
+// correct; each one is justified where it is listed.
+$exempt = array_flip($exemptions);
+$guardTargets = [];
+foreach ($report->inCategories(['rust-proxy', 'rust-snapshot', 'unsupported']) as $fqcn) {
+    if (in_array($fqcn, $targets, true) || in_array($fqcn, $runtimeProvided, true)) {
+        continue;
+    }
+    if (isset($exempt[$fqcn])) {
+        unset($exempt[$fqcn]);
+        continue;
+    }
+    if ($report->kind($fqcn) !== 'class') {
+        $problems[] = "$fqcn is a {$report->kind($fqcn)} in a Rust-owned category; a guard can only"
+            . ' shadow a class';
+        continue;
+    }
+    $guardTargets[] = $fqcn;
+}
+foreach (array_keys($exempt) as $fqcn) {
+    $problems[] = "stale guard exemption in guard-exemptions.list: $fqcn needs no guard";
+}
+
 try {
-    $generator = new Generator($composerRoot, Report::load($reportPath), $targets, $runtimeProvided);
+    $generator = new Generator($composerRoot, $report, $targets, $runtimeProvided);
     $files = $generator->generate();
+    $guardGenerator = new GuardGenerator(
+        $project,
+        new NamePrinter(),
+        $guardTargets,
+        array_merge($targets, $runtimeProvided),
+    );
+    $guardFiles = $guardGenerator->generate();
 } catch (GenerationError $e) {
     foreach ($e->errors as $error) {
         fwrite(STDERR, "error: $error\n");
     }
     exit(1);
 }
-
-$problems = [];
 
 // Handoff classification of Composer\Console\Application's declared properties. The worker-side
 // runtime definition (php/runtime/Composer/Console/Application.php) hands off exactly the state
@@ -87,7 +134,7 @@ $applicationPropertyTable = [
     'hasPluginCommands' => 'rust-local',    // Rust-side runtime state, never shared
     'logo' => 'static-config',              // static rendering data, the worker never needs it
 ];
-$applicationFile = (new Project($composerRoot))->sourceFor('Composer\\Console\\Application');
+$applicationFile = $project->sourceFor('Composer\\Console\\Application');
 $declaredProperties = [];
 foreach ($applicationFile->classLike->getProperties() as $property) {
     foreach ($property->props as $prop) {
@@ -105,14 +152,23 @@ foreach ($applicationPropertyTable as $name => $_) {
     }
 }
 
-$iterator = new RecursiveIteratorIterator(
-    new RecursiveDirectoryIterator($stubsDir, FilesystemIterator::SKIP_DOTS)
-);
-foreach ($iterator as $entry) {
-    if ($entry->isFile() && str_ends_with($entry->getFilename(), '.php')) {
-        $relative = substr($entry->getPathname(), strlen($stubsDir) + 1);
-        if (!isset($files[$relative])) {
-            $problems[] = "stale stub not covered by targets.list: $stubsDir/$relative";
+$generatedSets = [
+    [$stubsDir, $files, 'targets.list'],
+    [$guardsDir, $guardFiles, 'the classifier report'],
+];
+foreach ($generatedSets as [$dir, $generated, $source]) {
+    if (!is_dir($dir)) {
+        continue;
+    }
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)
+    );
+    foreach ($iterator as $entry) {
+        if ($entry->isFile() && str_ends_with($entry->getFilename(), '.php')) {
+            $relative = substr($entry->getPathname(), strlen($dir) + 1);
+            if (!isset($generated[$relative])) {
+                $problems[] = "stale file not covered by $source: $dir/$relative";
+            }
         }
     }
 }
@@ -131,24 +187,26 @@ foreach ($runtimeFiles as $relative) {
     }
 }
 
-if ($check) {
-    foreach ($files as $relative => $content) {
-        $current = @file_get_contents("$stubsDir/$relative");
-        if ($current === false) {
-            $problems[] = "missing stub (regenerate): $stubsDir/$relative";
-        } elseif ($current !== $content) {
-            $problems[] = "stale stub (regenerate): $stubsDir/$relative";
+foreach ([[$stubsDir, $files, 'stubs'], [$guardsDir, $guardFiles, 'guards']] as [$dir, $generated, $what]) {
+    if ($check) {
+        foreach ($generated as $relative => $content) {
+            $current = @file_get_contents("$dir/$relative");
+            if ($current === false) {
+                $problems[] = "missing file (regenerate): $dir/$relative";
+            } elseif ($current !== $content) {
+                $problems[] = "stale file (regenerate): $dir/$relative";
+            }
         }
+        continue;
     }
-} else {
-    foreach ($files as $relative => $content) {
-        $path = "$stubsDir/$relative";
+    foreach ($generated as $relative => $content) {
+        $path = "$dir/$relative";
         if (!is_dir(dirname($path))) {
             mkdir(dirname($path), 0777, true);
         }
         file_put_contents($path, $content);
     }
-    fwrite(STDERR, count($files) . " stubs written to $stubsDir\n");
+    fwrite(STDERR, count($generated) . " $what written to $dir\n");
 }
 
 foreach ($problems as $problem) {

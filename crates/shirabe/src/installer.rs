@@ -273,7 +273,7 @@ impl Installer {
                 self.dev_mode,
                 vec![],
                 IndexMap::new(),
-            );
+            )?;
         }
 
         self.download_manager
@@ -469,7 +469,7 @@ impl Installer {
                 self.dev_mode,
                 vec![],
                 IndexMap::new(),
-            );
+            )?;
         }
 
         let audit_config = self.get_audit_config()?.clone();

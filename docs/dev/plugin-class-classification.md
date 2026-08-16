@@ -42,6 +42,12 @@ exactly one category.
 | `php-native` | PHP | the real, unmodified PHP source | none — Rust may or may not have its own port for internal use, and that port is free to diverge in shape |
 | `unsupported` | n/a | nothing; any reference raises an explicit error | none, until explicitly promoted |
 
+A Rust-owned class the child has no artifact for — every `unsupported` one, and
+every `rust-proxy`/`rust-snapshot` one whose stub is not written yet — is
+shadowed there by a generated *guard* class instead of the real Composer source:
+same FQCN, hierarchy and constants, every constructor and method an explicit
+error. See `docs/dev/plugin-stub-generation.md`.
+
 #### rust-proxy
 
 The living services: `Composer`, `Config`, `RepositoryManager`,

@@ -30,6 +30,23 @@ interface ShirabeRustStub
     public function __shirabeBind(int $rhandle, int $epoch): void;
 }
 
+/**
+ * Raised by the guard classes (php/guards/): classes whose entity lives on the Rust side but that
+ * this worker has no proxy for. Their declaration shadows the real Composer one, so running the
+ * real implementation here — on an instance the Rust side never sees — fails loudly instead.
+ */
+final class ShirabeUnsupportedClass
+{
+    public static function fail(string $class, string $member): void
+    {
+        throw new RuntimeException(
+            "{$class}::{$member}() is not available in the plugin runtime: the Rust side owns "
+            . 'this class and there is no proxy for it here, so the real implementation would '
+            . 'run on an instance the Rust side never sees.'
+        );
+    }
+}
+
 /** Interns proxy stubs so the same Rust handle always yields the same stub instance. */
 final class ShirabeRustObjectRegistry
 {
@@ -44,7 +61,9 @@ final class ShirabeRustObjectRegistry
                 return $existing;
             }
         }
-        if (!class_exists($class)) {
+        // A guard class exists for every proxied FQCN without a stub, so class_exists() alone no
+        // longer tells the two apart; only a stub can be bound to a Rust handle.
+        if (!class_exists($class) || !is_a($class, ShirabeRustStub::class, true)) {
             throw new RuntimeException(
                 "no proxy stub class is available for {$class}"
             );
@@ -143,6 +162,7 @@ final class ShirabeRpcRuntime
     /** @var resource */
     public static $socket;
     public static ?string $stubsDir = null;
+    public static ?string $guardsDir = null;
     /** @var ?callable(string): void */
     public static $stubAutoloader = null;
     /** @var array<string, callable(array): mixed> */
@@ -439,18 +459,20 @@ if ($client === false) {
 stream_set_write_buffer($client, 0);
 ShirabeRpcRuntime::$socket = $client;
 ShirabeRpcRuntime::$stubsDir = $argv[2] ?? null;
+ShirabeRpcRuntime::$guardsDir = $argv[3] ?? null;
 
 // Proxy stub classes take priority over any other autoloader (including autoloaders that a
 // script or the composer runtime registers later), so a proxied FQCN can never be shadowed by
 // the real implementation. `__shirabe_require` re-prepends this closure after loading code
-// that registers its own prepending autoloader.
+// that registers its own prepending autoloader. The guards come after the stubs: they cover the
+// Rust-owned classes no stub proxies, so the two directories never hold the same FQCN.
 ShirabeRpcRuntime::$stubAutoloader = static function (string $class): void {
-    if (ShirabeRpcRuntime::$stubsDir === null) {
-        return;
-    }
-    $file = ShirabeRpcRuntime::$stubsDir . '/' . str_replace('\\', '/', $class) . '.php';
-    if (is_file($file)) {
-        require $file;
+    $relative = '/' . str_replace('\\', '/', $class) . '.php';
+    foreach ([ShirabeRpcRuntime::$stubsDir, ShirabeRpcRuntime::$guardsDir] as $dir) {
+        if ($dir !== null && is_file($dir . $relative)) {
+            require $dir . $relative;
+            return;
+        }
     }
 };
 spl_autoload_register(ShirabeRpcRuntime::$stubAutoloader, true, true);
