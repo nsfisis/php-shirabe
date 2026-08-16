@@ -14,9 +14,8 @@
 use indexmap::IndexMap;
 pub use shirabe_php_shim::CaptureKey;
 use shirabe_php_shim::{
-    PREG_OFFSET_CAPTURE, PREG_SET_ORDER, PREG_UNMATCHED_AS_NULL, PregPattern, preg_grep,
-    preg_match_all_offset_capture, preg_match_all2, preg_match2, preg_replace_callback,
-    preg_replace2,
+    PREG_UNMATCHED_AS_NULL, PregPattern, preg_grep, preg_match_all_offset_capture, preg_match_all2,
+    preg_match2, preg_replace_callback, preg_replace2,
 };
 
 #[derive(Debug)]
@@ -38,8 +37,6 @@ impl Preg {
         flags: i64,
         offset: usize,
     ) -> bool {
-        Self::check_offset_capture(flags, "matchWithOffsets");
-
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
         let result = preg_match2(
             pattern,
@@ -215,21 +212,6 @@ impl Preg {
         matches: Option<&mut IndexMap<CaptureKey, Vec<(Option<String>, i64)>>>,
     ) -> bool {
         Self::match_all_with_offsets5(pattern, subject, matches) > 0
-    }
-
-    fn check_offset_capture(flags: i64, use_function_name: &str) {
-        assert!(
-            flags & PREG_OFFSET_CAPTURE == 0,
-            "PREG_OFFSET_CAPTURE is not supported as it changes the type of $matches, use {}() instead",
-            use_function_name
-        );
-    }
-
-    fn check_set_order(flags: i64) {
-        assert!(
-            flags & PREG_SET_ORDER == 0,
-            "PREG_SET_ORDER is not supported as it changes the type of $matches"
-        );
     }
 }
 

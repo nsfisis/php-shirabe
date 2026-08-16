@@ -1,9 +1,6 @@
 use indexmap::IndexMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
-pub const PREG_PATTERN_ORDER: i64 = 1;
-pub const PREG_SET_ORDER: i64 = 2;
-pub const PREG_OFFSET_CAPTURE: i64 = 256;
 pub const PREG_UNMATCHED_AS_NULL: i64 = 512;
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
