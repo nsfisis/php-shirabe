@@ -33,3 +33,4 @@ Composer\DependencyResolver\Operation\UpdateOperation
 Composer\DependencyResolver\Operation\UninstallOperation
 Composer\DependencyResolver\Operation\MarkAliasInstalledOperation
 Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation
+Composer\Util\Filesystem

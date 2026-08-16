@@ -45,6 +45,7 @@ enum RustEntity {
     DownloadManager(
         std::rc::Rc<std::cell::RefCell<dyn crate::downloader::DownloadManagerInterface>>,
     ),
+    Filesystem(std::rc::Rc<std::cell::RefCell<crate::util::Filesystem>>),
     Io(std::rc::Rc<std::cell::RefCell<dyn IOInterface>>),
     InstallationManager(std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>),
     RepositoryManager(std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>),
@@ -66,6 +67,7 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
         }
         RustEntity::Config(config) => std::rc::Rc::as_ptr(config) as *const () as usize,
         RustEntity::DownloadManager(dm) => std::rc::Rc::as_ptr(dm) as *const () as usize,
+        RustEntity::Filesystem(fs) => std::rc::Rc::as_ptr(fs) as *const () as usize,
         RustEntity::Io(io) => std::rc::Rc::as_ptr(io) as *const () as usize,
         RustEntity::InstallationManager(im) => std::rc::Rc::as_ptr(im) as *const () as usize,
         RustEntity::RepositoryManager(rm) => std::rc::Rc::as_ptr(rm) as *const () as usize,
@@ -361,6 +363,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             Some(RustEntity::DownloadManager(dm)) => {
                 dispatch_download_manager_method(&dm, method_name, &args)
             }
+            Some(RustEntity::Filesystem(fs)) => dispatch_filesystem_method(&fs, method_name, &args),
             Some(RustEntity::InstallationManager(im)) => {
                 dispatch_installation_manager_method(&im, method_name, &args)
             }
@@ -508,6 +511,25 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                 ),
             ));
         }
+        // A Filesystem shares no state with the object graph beyond the process executor it
+        // runs subprocesses through, so a plugin-built one is a complete instance rather than
+        // a second view on a Rust-side service.
+        "Composer\\Util\\Filesystem" => {
+            // TODO(plugin): `ProcessExecutor` has no proxy stub, so an executor argument could
+            // only be a second instance the Rust side never sees.
+            match ctor_args.first() {
+                None | Some(PluginValue::Null) => {}
+                other => {
+                    return Err(runtime_throw(format!(
+                        "{class} cannot take a ProcessExecutor over RPC yet, got {other:?}"
+                    )));
+                }
+            }
+            let rhandle = register_entity(RustEntity::Filesystem(std::rc::Rc::new(
+                std::cell::RefCell::new(crate::util::Filesystem::new(None)),
+            )));
+            return Ok(construction_result(rhandle));
+        }
         // TODO(plugin): the remaining proxied classes get a construction story on demand,
         // driven by explicit errors from real plugins. Each one has to decide what a
         // plugin-built instance means for the Rust-side graph, which is why none of them is
@@ -551,6 +573,7 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         RustEntity::Composer(_)
         | RustEntity::Config(_)
         | RustEntity::DownloadManager(_)
+        | RustEntity::Filesystem(_)
         | RustEntity::Io(_)
         | RustEntity::InstallationManager(_)
         | RustEntity::RepositoryManager(_)
@@ -898,6 +921,157 @@ fn resolved_promise(value: PluginValue) -> Result<PluginValue, PhpThrow> {
         Ok(Err(throw)) => Err(throw),
         Err(error) => Err(runtime_throw(format!(
             "creating a resolved promise in the plugin process failed: {error:#}"
+        ))),
+    }
+}
+
+fn dispatch_filesystem_method(
+    fs: &std::rc::Rc<std::cell::RefCell<crate::util::Filesystem>>,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    let string_arg = |position: usize| -> Result<String, PhpThrow> {
+        match args.get(position) {
+            // TODO(bytes): lossy UTF-8; paths are bytes in PHP.
+            Some(PluginValue::String(bytes)) => Ok(String::from_utf8_lossy(bytes).into_owned()),
+            other => Err(runtime_throw(format!(
+                "{method_name} expects a string argument at position {position}, got {other:?}"
+            ))),
+        }
+    };
+    // TODO(plugin): the exception class the real method throws (RuntimeException, IOException,
+    // LogicException) is collapsed to RuntimeException on this side of the boundary.
+    let failed = |error: anyhow::Error| runtime_throw(format!("{method_name} failed: {error:#}"));
+    match method_name {
+        "remove" => Ok(PluginValue::Bool(
+            fs.borrow_mut().remove(string_arg(0)?).map_err(failed)?,
+        )),
+        "isDirEmpty" => Ok(PluginValue::Bool(fs.borrow().is_dir_empty(&string_arg(0)?))),
+        "emptyDirectory" => {
+            fs.borrow_mut()
+                .empty_directory(&string_arg(0)?, bool_arg(method_name, args.get(1))?)
+                .map_err(failed)?;
+            Ok(PluginValue::Null)
+        }
+        "removeDirectory" => Ok(PluginValue::Bool(
+            fs.borrow_mut()
+                .remove_directory(string_arg(0)?)
+                .map_err(failed)?,
+        )),
+        "removeDirectoryAsync" => {
+            let directory = string_arg(0)?;
+            let removed = crate::util::sync_executor::block_on(async {
+                crate::util::Filesystem::remove_directory_async_via(fs, &directory).await
+            })
+            .map_err(failed)?;
+            resolved_promise(PluginValue::Bool(removed))
+        }
+        "removeDirectoryPhp" => Ok(PluginValue::Bool(
+            fs.borrow_mut()
+                .remove_directory_php(&string_arg(0)?)
+                .map_err(failed)?,
+        )),
+        "ensureDirectoryExists" => {
+            fs.borrow_mut()
+                .ensure_directory_exists(&string_arg(0)?)
+                .map_err(failed)?;
+            Ok(PluginValue::Null)
+        }
+        "unlink" => Ok(PluginValue::Bool(
+            fs.borrow().unlink(string_arg(0)?).map_err(failed)?,
+        )),
+        "rmdir" => Ok(PluginValue::Bool(
+            fs.borrow().rmdir(string_arg(0)?).map_err(failed)?,
+        )),
+        "copyThenRemove" => {
+            fs.borrow_mut()
+                .copy_then_remove(&string_arg(0)?, &string_arg(1)?)
+                .map_err(failed)?;
+            Ok(PluginValue::Null)
+        }
+        "copy" => Ok(PluginValue::Bool(
+            fs.borrow_mut()
+                .copy(&string_arg(0)?, &string_arg(1)?)
+                .map_err(failed)?,
+        )),
+        "rename" => {
+            fs.borrow_mut()
+                .rename(string_arg(0)?, string_arg(1)?)
+                .map_err(failed)?;
+            Ok(PluginValue::Null)
+        }
+        "findShortestPath" | "findShortestPathCode" => {
+            let from = string_arg(0)?;
+            let to = string_arg(1)?;
+            // TODO(error-model): the port panics on a relative path where PHP throws
+            // InvalidArgumentException, and a panic would take the whole process down instead
+            // of reaching the plugin's catch block, so the check is repeated here.
+            let fs = fs.borrow();
+            if !fs.is_absolute_path(&from) || !fs.is_absolute_path(&to) {
+                return Err(PhpThrow {
+                    exception_class: "InvalidArgumentException".to_string(),
+                    message: format!("$from ({from}) and $to ({to}) must be absolute paths."),
+                    code: 0,
+                });
+            }
+            Ok(PluginValue::string(if method_name == "findShortestPath" {
+                fs.find_shortest_path(
+                    &from,
+                    &to,
+                    bool_arg(method_name, args.get(2))?,
+                    bool_arg(method_name, args.get(3))?,
+                )
+            } else {
+                fs.find_shortest_path_code(
+                    &from,
+                    &to,
+                    bool_arg(method_name, args.get(2))?,
+                    bool_arg(method_name, args.get(3))?,
+                    bool_arg(method_name, args.get(4))?,
+                )
+            }))
+        }
+        "isAbsolutePath" => Ok(PluginValue::Bool(
+            fs.borrow().is_absolute_path(&string_arg(0)?),
+        )),
+        "size" => Ok(PluginValue::Int(
+            fs.borrow().size(string_arg(0)?).map_err(failed)?,
+        )),
+        "normalizePath" => Ok(PluginValue::string(
+            fs.borrow().normalize_path(&string_arg(0)?),
+        )),
+        "relativeSymlink" => Ok(PluginValue::Bool(
+            fs.borrow()
+                .relative_symlink(&string_arg(0)?, &string_arg(1)?),
+        )),
+        "isSymlinkedDirectory" => Ok(PluginValue::Bool(
+            fs.borrow().is_symlinked_directory(&string_arg(0)?),
+        )),
+        "junction" => {
+            fs.borrow_mut()
+                .junction(&string_arg(0)?, &string_arg(1)?)
+                .map_err(failed)?;
+            Ok(PluginValue::Null)
+        }
+        "isJunction" => Ok(PluginValue::Bool(fs.borrow().is_junction(&string_arg(0)?))),
+        "removeJunction" => Ok(PluginValue::Bool(
+            fs.borrow_mut()
+                .remove_junction(&string_arg(0)?)
+                .map_err(failed)?,
+        )),
+        "filePutContentsIfModified" => Ok(PluginValue::Int(
+            fs.borrow()
+                .file_put_contents_if_modified(&string_arg(0)?, &string_arg(1)?)
+                .map_err(failed)?,
+        )),
+        "safeCopy" => {
+            fs.borrow()
+                .safe_copy(&string_arg(0)?, &string_arg(1)?)
+                .map_err(failed)?;
+            Ok(PluginValue::Null)
+        }
+        other => Err(runtime_throw(format!(
+            "the Filesystem method `{other}` is not available over RPC yet"
         ))),
     }
 }

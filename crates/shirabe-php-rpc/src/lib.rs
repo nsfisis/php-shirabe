@@ -1007,6 +1007,10 @@ const STUB_FILES: &[(&str, &str)] = &[
             "../php/stubs/Composer/DependencyResolver/Operation/MarkAliasUninstalledOperation.php"
         ),
     ),
+    (
+        "Composer/Util/Filesystem.php",
+        include_str!("../php/stubs/Composer/Util/Filesystem.php"),
+    ),
 ];
 
 /// Hand-written worker-side classes (two-world implementations with behavior of their own, not
