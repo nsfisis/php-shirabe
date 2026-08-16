@@ -36,8 +36,10 @@ pub struct IpData {
 impl NoProxyPattern {
     /// @param string $pattern NO_PROXY pattern
     pub fn new(pattern: &str) -> Self {
-        // PHP: Preg::split('{[\s,]+}', $pattern, -1, PREG_SPLIT_NO_EMPTY)
-        let host_names = preg_split(php_regex!(r"{[\s,]+}"), pattern);
+        let host_names: Vec<String> = preg_split(php_regex!(r"{[\s,]+}"), pattern)
+            .into_iter()
+            .filter(|host_name| !host_name.is_empty())
+            .collect();
         let noproxy = host_names.is_empty() || host_names[0] == "*";
         Self {
             host_names,
