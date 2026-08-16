@@ -53,10 +53,11 @@ use crate::util::r#loop::Loop;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PhpMixed, RuntimeException,
-    UnexpectedValueException, array_replace_recursive, class_exists, dirname, extension_loaded,
-    file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file, json_decode_assoc,
-    json_decode_obj, mkdir, pathinfo, realpath, rename, rtrim, strpos, strtr, substr, trim,
+    InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER, PhpMixed,
+    RuntimeException, UnexpectedValueException, array_replace_recursive, class_exists, dirname,
+    extension_loaded, file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file,
+    json_decode_assoc, json_decode_obj, mkdir, pathinfo, realpath, rename, rtrim, strpos, strtr,
+    substr, trim,
 };
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::formatter::OutputFormatterStyle;
@@ -1561,9 +1562,14 @@ impl Factory {
     }
 
     fn use_xdg() -> bool {
-        // PHP: array_keys($_SERVER) — iterate env-style server vars
-        for (key, _) in std::env::vars() {
-            if strpos(&key, "XDG_") == Some(0) {
+        let keys: Vec<std::ffi::OsString> = PHP_SERVER
+            .lock()
+            .unwrap()
+            .get_all()
+            .map(|(key, _)| key)
+            .collect();
+        for key in keys {
+            if strpos(&key.to_string_lossy(), "XDG_") == Some(0) {
                 return true;
             }
         }
