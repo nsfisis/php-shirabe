@@ -37,6 +37,7 @@ futures = "0.3.32"
 indexmap = { version = "2.14.0", features = ["serde"] }
 jsonschema = { version = "0.46.6", default-features = false }
 md5 = "0.7.0"
+memchr = "2.8.3"
 mockall = "0.14.0"
 nix = { version = "0.31.3", features = ["feature", "fs", "poll", "process", "signal", "user"] }
 regex = "1.12.3"

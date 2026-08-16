@@ -16,6 +16,7 @@ fastrand.workspace = true
 flate2.workspace = true
 indexmap.workspace = true
 md5.workspace = true
+memchr.workspace = true
 nix.workspace = true
 regex.workspace = true
 regex-macro.workspace = true

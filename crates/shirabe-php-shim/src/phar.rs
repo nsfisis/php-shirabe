@@ -315,20 +315,27 @@ fn halt_compiler_token() -> [u8; 18] {
     token
 }
 
+/// Scans the stub for `token`, which phar matches in any letter case.
+fn find_halt_compiler_token(blob: &[u8], token: &[u8]) -> Option<usize> {
+    // The token starts with a byte that ASCII case folding leaves alone, so scanning for it first
+    // narrows the windows that need the full case-insensitive compare.
+    memchr::memchr_iter(token[0], blob).find(|&start| {
+        blob.get(start..start + token.len())
+            .is_some_and(|slice| slice.eq_ignore_ascii_case(token))
+    })
+}
+
 fn parse_native_phar(path: &std::path::Path) -> anyhow::Result<Vec<PharEntry>> {
     let bytes = std::fs::read(path)
         .map_err(|e| corruption_error(path, &format!("unable to open phar: {}", e)))?;
 
     let halt = halt_compiler_token();
-    let halt_pos = bytes
-        .windows(halt.len())
-        .position(|window| window.eq_ignore_ascii_case(&halt))
-        .ok_or_else(|| {
-            corruption_error(
-                path,
-                &format!("{} not found in stub", String::from_utf8_lossy(&halt)),
-            )
-        })?;
+    let halt_pos = find_halt_compiler_token(&bytes, &halt).ok_or_else(|| {
+        corruption_error(
+            path,
+            &format!("{} not found in stub", String::from_utf8_lossy(&halt)),
+        )
+    })?;
     let mut offset = halt_pos + halt.len();
     for close_tag in [&b" ?>"[..], &b"\n?>"[..]] {
         if bytes[offset..].starts_with(close_tag) {
