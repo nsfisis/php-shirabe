@@ -953,7 +953,8 @@ impl Application {
             .map(|p| preg_quote(&p, None))
             .collect();
         let expr = format!("{}{}", shirabe_php_shim::implode("[^:]*:", &parts), "[^:]*");
-        let namespaces = preg_grep(format!("{{^{}}}", expr), &all_namespaces);
+        let namespaces: Vec<String> =
+            preg_grep(format!("{{^{}}}", expr), all_namespaces.iter().cloned()).collect();
 
         if namespaces.is_empty() {
             let mut message = format!(
@@ -1049,14 +1050,19 @@ impl Application {
             .map(|p| preg_quote(&p, None))
             .collect();
         let expr = format!("{}{}", shirabe_php_shim::implode("[^:]*:", &parts), "[^:]*");
-        let mut commands = preg_grep(format!("{{^{}}}", expr), &all_commands);
+        let mut commands: Vec<String> =
+            preg_grep(format!("{{^{}}}", expr), all_commands.iter().cloned()).collect();
 
         if commands.is_empty() {
-            commands = preg_grep(format!("{{^{}}}i", expr), &all_commands);
+            commands = preg_grep(format!("{{^{}}}i", expr), all_commands.iter().cloned()).collect();
         }
 
         // if no commands matched or we just matched namespaces
-        if commands.is_empty() || preg_grep(format!("{{^{}$}}i", expr), &commands).is_empty() {
+        if commands.is_empty()
+            || preg_grep(format!("{{^{}$}}i", expr), commands.iter())
+                .next()
+                .is_none()
+        {
             if let Some(pos) = shirabe_php_shim::strrpos(name, ":") {
                 // check if a namespace exists and contains commands
                 self.find_namespace(&name[..pos])?;

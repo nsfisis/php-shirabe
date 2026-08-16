@@ -988,7 +988,7 @@ impl Process {
                     .map(|spec| {
                         format!(
                             "\"{}\"",
-                            preg_replace(php_regex!(r#"{(\\*+)"}"#), "$1$1\\\"", &spec,)
+                            preg_replace(php_regex!(r#"{(\\*+)"}"#), "$1$1\\\"", &spec)
                         )
                     })
             })

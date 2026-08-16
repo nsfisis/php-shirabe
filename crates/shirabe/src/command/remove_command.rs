@@ -393,11 +393,11 @@ impl Command for RemoveCommand {
                     .and_then(|v| v.as_array())
                     .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
-                let type_keys_refs: Vec<&str> = type_keys.iter().map(|s| s.as_str()).collect();
-                let matches_in_type = Preg::grep(
+                let matches_in_type: Vec<&String> = Preg::grep(
                     base_package::package_name_to_regexp(package),
-                    &type_keys_refs,
-                );
+                    type_keys.iter(),
+                )
+                .collect();
 
                 let alt_type_keys: Vec<String> = composer_data
                     .as_array()
@@ -405,15 +405,14 @@ impl Command for RemoveCommand {
                     .and_then(|v| v.as_array())
                     .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
-                let alt_type_keys_refs: Vec<&str> =
-                    alt_type_keys.iter().map(|s| s.as_str()).collect();
-                let matches_in_alt_type = Preg::grep(
+                let matches_in_alt_type: Vec<&String> = Preg::grep(
                     base_package::package_name_to_regexp(package),
-                    &alt_type_keys_refs,
-                );
+                    alt_type_keys.iter(),
+                )
+                .collect();
 
                 if !type_keys.is_empty() && !matches_in_type.is_empty() {
-                    for matched_package in &matches_in_type {
+                    for matched_package in matches_in_type {
                         if dry_run {
                             to_remove
                                 .entry(r#type.to_string())
@@ -424,7 +423,7 @@ impl Command for RemoveCommand {
                         }
                     }
                 } else if !alt_type_keys.is_empty() && !matches_in_alt_type.is_empty() {
-                    for matched_package in &matches_in_alt_type {
+                    for matched_package in matches_in_alt_type {
                         io.write_error(&format!(
                             "<warning>{} could not be found in {} but it is present in {}</warning>",
                             matched_package, r#type, alt_type

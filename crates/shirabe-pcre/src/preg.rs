@@ -15,7 +15,7 @@ use indexmap::IndexMap;
 pub use shirabe_php_shim::CaptureKey;
 use shirabe_php_shim::{
     PREG_OFFSET_CAPTURE, PREG_SET_ORDER, PREG_SPLIT_OFFSET_CAPTURE, PREG_UNMATCHED_AS_NULL,
-    PregPattern, preg_grep2, preg_match_all_offset_capture2, preg_match_all2, preg_match2,
+    PregPattern, preg_grep, preg_match_all_offset_capture2, preg_match_all2, preg_match2,
     preg_replace_callback, preg_replace2, preg_split2,
 };
 
@@ -180,12 +180,11 @@ impl Preg {
         preg_split2(pattern, subject, limit, flags)
     }
 
-    pub fn grep(pattern: impl PregPattern, array: &[&str]) -> Vec<String> {
-        Self::grep3(pattern, array, 0)
-    }
-
-    pub fn grep3(pattern: impl PregPattern, array: &[&str], flags: i64) -> Vec<String> {
-        preg_grep2(pattern, array, flags)
+    pub fn grep<T: AsRef<str>>(
+        pattern: impl PregPattern,
+        array: impl IntoIterator<Item = T>,
+    ) -> impl Iterator<Item = T> {
+        preg_grep(pattern, array)
     }
 
     pub fn is_match(pattern: impl PregPattern, subject: &str) -> bool {

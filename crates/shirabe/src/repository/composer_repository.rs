@@ -430,10 +430,7 @@ impl ComposerRepository {
         };
         let filter_results = |results: Vec<String>| -> anyhow::Result<Vec<String>> {
             match &package_filter_regex {
-                Some(regex) => {
-                    let results_refs: Vec<&str> = results.iter().map(|s| s.as_str()).collect();
-                    Ok(Preg::grep(regex, &results_refs))
-                }
+                Some(regex) => Ok(Preg::grep(regex, results).collect()),
                 None => Ok(results),
             }
         };
@@ -771,8 +768,7 @@ impl ComposerRepository {
             let regex = format!("{{(?:{})}}i", parts.join("|"));
 
             let vendor_names = self.get_vendor_names()?;
-            let vendor_names_refs: Vec<&str> = vendor_names.iter().map(|s| s.as_str()).collect();
-            for name in Preg::grep(&regex, &vendor_names_refs) {
+            for name in Preg::grep(&regex, vendor_names) {
                 let mut entry = IndexMap::new();
                 entry.insert("name".to_string(), PhpMixed::String(name));
                 entry.insert("description".to_string(), PhpMixed::String(String::new()));
@@ -836,8 +832,7 @@ impl ComposerRepository {
             let regex = format!("{{(?:{})}}i", parts.join("|"));
 
             let package_names = self.get_package_names(None)?;
-            let package_names_refs: Vec<&str> = package_names.iter().map(|s| s.as_str()).collect();
-            for name in Preg::grep(&regex, &package_names_refs) {
+            for name in Preg::grep(&regex, package_names) {
                 let mut entry = IndexMap::new();
                 entry.insert("name".to_string(), PhpMixed::String(name));
                 entry.insert("description".to_string(), PhpMixed::String(String::new()));

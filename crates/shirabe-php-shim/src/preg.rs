@@ -8,7 +8,6 @@ pub const PREG_UNMATCHED_AS_NULL: i64 = 512;
 pub const PREG_SPLIT_NO_EMPTY: i64 = 1;
 pub const PREG_SPLIT_DELIM_CAPTURE: i64 = 2;
 pub const PREG_SPLIT_OFFSET_CAPTURE: i64 = 4;
-pub const PREG_GREP_INVERT: i64 = 1;
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub enum CaptureKey {
@@ -242,21 +241,15 @@ pub fn preg_match_all_offset_capture2(
     count
 }
 
-pub fn preg_grep(pattern: impl PregPattern, input: &[String]) -> Vec<String> {
+pub fn preg_grep<T: AsRef<str>>(
+    pattern: impl PregPattern,
+    array: impl IntoIterator<Item = T>,
+) -> impl Iterator<Item = T> {
     let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
-    input.iter().filter(|s| re.is_match(s)).cloned().collect()
-}
-
-pub fn preg_grep2(pattern: impl PregPattern, array: &[&str], flags: i64) -> Vec<String> {
-    let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
-    let invert = flags & PREG_GREP_INVERT != 0;
-    array
-        .iter()
-        .filter(|s| re.is_match(s) != invert)
-        .map(|s| s.to_string())
-        .collect()
+    array.into_iter().filter(move |s| {
+        let (re, _anchored) = __resolved.parts();
+        re.is_match(s.as_ref())
+    })
 }
 
 pub fn preg_split(pattern: impl PregPattern, subject: &str) -> Vec<String> {
