@@ -33,8 +33,7 @@ impl VersionParser {
 
         let pattern = format!("{{{}(?:\\+.*)?$}}i", MODIFIER_REGEX);
         let lower = shirabe_php_shim::strtolower(&version);
-        let mut match_: Vec<Option<String>> = Vec::new();
-        preg_match(&pattern, &lower, &mut match_);
+        let match_ = preg_match(&pattern, &lower).unwrap_or_default();
 
         // match_[3] = the ([.-]?dev)? capture
         if match_
@@ -86,19 +85,14 @@ impl VersionParser {
         let mut version = version;
 
         // strip off aliasing
-        let mut match_: Vec<Option<String>> = Vec::new();
-        if preg_match(
-            php_regex!("{^([^,\\s]++) ++as ++([^,\\s]++)$}"),
-            &version,
-            &mut match_,
-        ) {
+        if let Some(match_) = preg_match(php_regex!("{^([^,\\s]++) ++as ++([^,\\s]++)$}"), &version)
+        {
             version = match_[1].clone().unwrap_or_default();
         }
 
         // strip off stability flag
         let stab_pattern = format!("{{@(?:{})$}}i", STABILITIES_REGEX);
-        let mut match_: Vec<Option<String>> = Vec::new();
-        if preg_match(&stab_pattern, &version, &mut match_) {
+        if let Some(match_) = preg_match(&stab_pattern, &version) {
             let match0_len = match_[0].as_deref().unwrap_or("").len();
             version = version[..version.len() - match0_len].to_string();
         }
@@ -115,12 +109,7 @@ impl VersionParser {
         }
 
         // strip off build metadata
-        let mut match_: Vec<Option<String>> = Vec::new();
-        if preg_match(
-            php_regex!("{^([^,\\s+]++)\\+[^\\s]++$}"),
-            &version,
-            &mut match_,
-        ) {
+        if let Some(match_) = preg_match(php_regex!("{^([^,\\s+]++)\\+[^\\s]++$}"), &version) {
             version = match_[1].clone().unwrap_or_default();
         }
 
@@ -137,7 +126,8 @@ impl VersionParser {
             "{{^v?(\\d{{1,5}})(\\.\\d++)?(\\.\\d++)?(\\.\\d++)?{}$}}i",
             MODIFIER_REGEX
         );
-        if preg_match(&classical_pattern, &version, &mut matches) {
+        if let Some(m) = preg_match(&classical_pattern, &version) {
+            matches = m;
             let m2 = matches[2].as_deref().unwrap_or("");
             let m3 = matches[3].as_deref().unwrap_or("");
             let m4 = matches[4].as_deref().unwrap_or("");
@@ -155,7 +145,8 @@ impl VersionParser {
                 "{{^v?(\\d{{4}}(?:[.:-]?\\d{{2}}){{1,6}}(?:[.:-]?\\d{{1,3}}){{0,2}}){}$}}i",
                 MODIFIER_REGEX
             );
-            if preg_match(&datetime_pattern, &version, &mut matches) {
+            if let Some(m) = preg_match(&datetime_pattern, &version) {
+                matches = m;
                 version = preg_replace(
                     php_regex!("{\\D}"),
                     ".",
@@ -201,8 +192,7 @@ impl VersionParser {
         }
 
         // match dev branches
-        let mut match_: Vec<Option<String>> = Vec::new();
-        if preg_match(php_regex!("{(.*?)[.-]?dev$}i"), &version, &mut match_) {
+        if let Some(match_) = preg_match(php_regex!("{(.*?)[.-]?dev$}i"), &version) {
             let branch_name = match_[1].clone().unwrap_or_default();
             // a branch ending with -dev is only valid if it is numeric
             // if it gets prefixed with dev- it means the branch name should
@@ -221,8 +211,9 @@ impl VersionParser {
                 STABILITIES_REGEX
             ),
             &full_version,
-            &mut Vec::new(),
-        ) {
+        )
+        .is_some()
+        {
             format!(
                 " in \"{}\", the alias must be an exact version",
                 full_version
@@ -234,8 +225,9 @@ impl VersionParser {
                 STABILITIES_REGEX
             ),
             &full_version,
-            &mut Vec::new(),
-        ) {
+        )
+        .is_some()
+        {
             format!(
                 " in \"{}\", the alias source must be an exact version, if it is a branch name \
                 you should prefix it with dev-",
@@ -253,12 +245,10 @@ impl VersionParser {
     }
 
     pub fn parse_numeric_alias_prefix(&self, branch: &str) -> Option<String> {
-        let mut matches: Vec<Option<String>> = Vec::new();
         // matches['version'] == matches[1] ((?P<version>...) is group 1)
-        if preg_match(
+        if let Some(matches) = preg_match(
             php_regex!("{^(?P<version>(\\d++\\.)*\\d++)(?:\\.x)?-dev$}i"),
             branch,
-            &mut matches,
         ) {
             let version = matches[1].clone().unwrap_or_default();
             return Some(format!("{}.", version));
@@ -270,14 +260,12 @@ impl VersionParser {
     pub fn normalize_branch(&self, name: &str) -> anyhow::Result<String> {
         let name = shirabe_php_shim::trim(name, None);
 
-        let mut matches: Vec<Option<String>> = Vec::new();
         // Groups: 1=major, 2=".minor"(outer), 3=minor(inner), 4=".patch"(outer),
         // 5=patch(inner), 6=".fourth"(outer), 7=fourth(inner).
         // We use the outer groups [1,2,4,6] to replicate PHP's groups [1,2,3,4].
-        if preg_match(
+        if let Some(matches) = preg_match(
             php_regex!("{^v?(\\d++)(\\.(\\d++|[xX*]))?(\\.(\\d++|[xX*]))?(\\.(\\d++|[xX*]))?$}i"),
             &name,
-            &mut matches,
         ) {
             let mut version = String::new();
             for i in [1usize, 2, 4, 6] {
@@ -349,20 +337,17 @@ impl VersionParser {
         let mut constraint = constraint.to_string();
 
         // strip off aliasing
-        let mut match_: Vec<Option<String>> = Vec::new();
-        if preg_match(
+        if let Some(match_) = preg_match(
             php_regex!("{^([^,\\s]++) ++as ++([^,\\s]++)$}"),
             &constraint,
-            &mut match_,
         ) {
             constraint = match_[1].clone().unwrap_or_default();
         }
 
         // strip @stability flags, and keep it for later use
         let mut stability_modifier: Option<String> = None;
-        let mut match_: Vec<Option<String>> = Vec::new();
         let stab_pattern = format!("{{^([^,\\s]*?)@({})$}}i", STABILITIES_REGEX);
-        if preg_match(&stab_pattern, &constraint, &mut match_) {
+        if let Some(match_) = preg_match(&stab_pattern, &constraint) {
             let m1 = match_[1].as_deref().unwrap_or("");
             constraint = if !m1.is_empty() {
                 m1.to_string()
@@ -376,21 +361,14 @@ impl VersionParser {
         }
 
         // get rid of #refs as those are used by composer only
-        let mut match_: Vec<Option<String>> = Vec::new();
-        if preg_match(
+        if let Some(match_) = preg_match(
             php_regex!("{^(dev-[^,\\s@]+?|[^,\\s@]+?\\.x-dev)#.+$}i"),
             &constraint,
-            &mut match_,
         ) {
             constraint = match_[1].clone().unwrap_or_default();
         }
 
-        let mut match_: Vec<Option<String>> = Vec::new();
-        if preg_match(
-            php_regex!("{^(v)?[xX*](\\.[xX*])*$}i"),
-            &constraint,
-            &mut match_,
-        ) {
+        if let Some(match_) = preg_match(php_regex!("{^(v)?[xX*](\\.[xX*])*$}i"), &constraint) {
             let m1_nonempty = !match_
                 .get(1)
                 .and_then(|o| o.as_deref())
@@ -423,9 +401,8 @@ impl VersionParser {
         // than the previous version, to ensure that unstable instances of the current version are
         // allowed. However, if a stability suffix is added to the constraint, then a >= match on
         // the current version is used instead.
-        let mut matches: Vec<Option<String>> = Vec::new();
         let tilde_pattern = format!("{{^~>?{}$}}i", version_regex);
-        if preg_match(&tilde_pattern, &constraint, &mut matches) {
+        if let Some(matches) = preg_match(&tilde_pattern, &constraint) {
             if constraint.starts_with("~>") {
                 anyhow::bail!(
                     "Could not parse version constraint {}: Invalid operator \"~>\", you probably \
@@ -486,9 +463,8 @@ impl VersionParser {
         // Allows changes that do not modify the left-most non-zero digit in the [major, minor,
         // patch] tuple. In other words, this allows patch and minor updates for versions 1.0.0
         // and above, patch updates for versions 0.X >=0.1.0, and no updates for versions 0.0.X
-        let mut matches: Vec<Option<String>> = Vec::new();
         let caret_pattern = format!("{{^\\^{}($)}}i", version_regex);
-        if preg_match(&caret_pattern, &constraint, &mut matches) {
+        if let Some(matches) = preg_match(&caret_pattern, &constraint) {
             // Work out which position in the version we are operating at
             let m1 = matches[1].as_deref().unwrap_or("");
             let m2 = matches[2].as_deref().unwrap_or("");
@@ -535,11 +511,9 @@ impl VersionParser {
         // Any of X, x, or * may be used to "stand in" for one of the numeric values in the
         // [major, minor, patch] tuple. A partial version range is treated as an X-Range, so the
         // special character is in fact optional.
-        let mut matches: Vec<Option<String>> = Vec::new();
-        if preg_match(
+        if let Some(matches) = preg_match(
             php_regex!("{^v?(\\d++)(?:\\.(\\d++))?(?:\\.(\\d++))?(?:\\.[xX*])++$}"),
             &constraint,
-            &mut matches,
         ) {
             let position = if !matches[3].as_deref().unwrap_or("").is_empty() {
                 3
@@ -581,12 +555,11 @@ impl VersionParser {
         // version is provided as the second version in the inclusive range, then all versions
         // that start with the supplied parts of the tuple are accepted, but nothing that would
         // be greater than the provided tuple parts.
-        let mut matches: Vec<Option<String>> = Vec::new();
         let hyphen_pattern = format!(
             "{{^(?P<from>{}) +- +(?P<to>{})($)}}i",
             version_regex, version_regex
         );
-        if preg_match(&hyphen_pattern, &constraint, &mut matches) {
+        if let Some(matches) = preg_match(&hyphen_pattern, &constraint) {
             // matches[1]='from' string, matches[2..9]=from captures, matches[10]='to' string,
             // matches[11..18]=to captures, matches[19]='($)'
             // matches[6]=from stability, matches[8]=from dev, matches[9]=from wildcard-dev
@@ -651,12 +624,8 @@ impl VersionParser {
         }
 
         // Basic Comparators
-        let mut match_: Vec<Option<String>> = Vec::new();
-        if preg_match(
-            php_regex!("{^(<>|!=|>=?|<=?|==?)?\\s*(.*)}"),
-            &constraint,
-            &mut match_,
-        ) {
+        if let Some(match_) = preg_match(php_regex!("{^(<>|!=|>=?|<=?|==?)?\\s*(.*)}"), &constraint)
+        {
             let version_str = match_[2].clone().unwrap_or_default();
             let op_str = match_[1].clone().unwrap_or_default();
 
@@ -667,11 +636,7 @@ impl VersionParser {
                     // dev-foobar except if the constraint uses a known operator, in which
                     // case it must be a parse error
                     if version_str.ends_with("-dev")
-                        && preg_match(
-                            php_regex!("{^[0-9a-zA-Z-./]+$}"),
-                            &version_str,
-                            &mut Vec::new(),
-                        )
+                        && preg_match(php_regex!("{^[0-9a-zA-Z-./]+$}"), &version_str).is_some()
                     {
                         self.normalize(
                             &format!("dev-{}", &version_str[..version_str.len() - 4]),
@@ -696,11 +661,12 @@ impl VersionParser {
                 }
                 if op == "<" || op == ">=" {
                     let modifier_pattern = format!("{{-{}$}}", MODIFIER_REGEX);
-                    if !preg_match(
+                    if preg_match(
                         &modifier_pattern,
                         &shirabe_php_shim::strtolower(&version_str),
-                        &mut Vec::new(),
-                    ) && !version_str.starts_with("dev-")
+                    )
+                    .is_none()
+                        && !version_str.starts_with("dev-")
                     {
                         version = format!("{}-dev", version);
                     }

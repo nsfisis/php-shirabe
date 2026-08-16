@@ -1043,11 +1043,7 @@ impl Process {
         if argument.contains('\0') {
             argument = argument.replace('\0', "?");
         }
-        if !preg_match(
-            php_regex!(r#"/[()%!^"<>&|\s\[\]=;*?'$]/"#),
-            &argument,
-            &mut Vec::new(),
-        ) {
+        if preg_match(php_regex!(r#"/[()%!^"<>&|\s\[\]=;*?'$]/"#), &argument).is_none() {
             return argument;
         }
         argument = preg_replace(php_regex!(r"/(\\+)$/"), "$1$1", &argument);

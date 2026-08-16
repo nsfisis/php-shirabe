@@ -46,19 +46,20 @@ impl Preg {
         matches: Option<&mut PregMatchedGroups>,
         offset: usize,
     ) -> bool {
-        let mut internal = PregMatches::new();
-        let result = preg_match2(pattern, subject, &mut internal, offset);
+        let internal = preg_match2(pattern, subject, offset);
 
         if let Some(out) = matches {
-            *out = drop_null_matches(internal);
+            *out = match &internal {
+                Some(internal) => drop_null_matches(internal),
+                None => PregMatchedGroups::new(),
+            };
         }
 
-        result
+        internal.is_some()
     }
 
     pub fn match_all(pattern: impl PregPattern, subject: &str) -> usize {
-        let mut dummy = PregMatchesAll::new();
-        preg_match_all2(pattern, subject, &mut dummy)
+        occurrence_count(&preg_match_all2(pattern, subject))
     }
 
     pub fn match_all2(
@@ -66,7 +67,8 @@ impl Preg {
         subject: &str,
         matches: &mut PregMatchesAll,
     ) -> usize {
-        preg_match_all2(pattern, subject, matches)
+        *matches = preg_match_all2(pattern, subject);
+        occurrence_count(matches)
     }
 
     fn match_all_with_offsets5(
@@ -74,14 +76,14 @@ impl Preg {
         subject: &str,
         matches: Option<&mut PregMatchesAllWithOffsets>,
     ) -> usize {
-        let mut internal = PregMatchesAllWithOffsets::new();
-        let result = preg_match_all_offset_capture(pattern, subject, &mut internal);
+        let internal = preg_match_all_offset_capture(pattern, subject);
+        let count = internal[&CaptureKey::ByIndex(0)].len();
 
         if let Some(out) = matches {
             *out = internal;
         }
 
-        result
+        count
     }
 
     pub fn replace(pattern: impl PregPattern, replacement: &str, subject: &str) -> String {
@@ -112,7 +114,7 @@ impl Preg {
         mut replacement: F,
         subject: &str,
     ) -> String {
-        let adapter = |internal: &PregMatches| Ok(replacement(&drop_null_matches_ref(internal)));
+        let adapter = |internal: &PregMatches| Ok(replacement(&drop_null_matches(internal)));
 
         preg_replace_callback(pattern, adapter, subject).expect("$replacement cannot fail")
     }
@@ -150,13 +152,15 @@ impl Preg {
         subject: &str,
         matches: &mut PregNamedGroups,
     ) -> bool {
-        let mut internal = PregMatches::new();
-        let result = preg_match2(pattern, subject, &mut internal, 0);
+        let internal = preg_match2(pattern, subject, 0);
+        let result = internal.is_some();
 
         matches.clear();
-        for (key, value) in internal {
-            if let (CaptureKey::ByName(name), Some(value)) = (key, value) {
-                matches.insert(name, value);
+        if let Some(internal) = internal {
+            for (key, value) in internal {
+                if let (CaptureKey::ByName(name), Some(value)) = (key, value) {
+                    matches.insert(name, value);
+                }
             }
         }
 
@@ -169,13 +173,8 @@ impl Preg {
         pattern: impl PregPattern,
         subject: &str,
     ) -> Option<Vec<Option<String>>> {
-        let mut internal = PregMatches::new();
-        if !preg_match2(pattern, subject, &mut internal, 0) {
-            return None;
-        }
-
         Some(
-            internal
+            preg_match2(pattern, subject, 0)?
                 .into_iter()
                 .filter_map(|(key, value)| match key {
                     CaptureKey::ByIndex(_) => Some(value),
@@ -204,16 +203,15 @@ impl Preg {
 
 // Drops `null` (unmatched) groups, mirroring how the public `string`-valued
 // `matches` map represents PHP's `string|null` entries by their absence.
-fn drop_null_matches(matches: PregMatches) -> PregMatchedGroups {
-    matches
-        .into_iter()
-        .filter_map(|(key, value)| value.map(|value| (key, value)))
-        .collect()
-}
-
-fn drop_null_matches_ref(matches: &PregMatches) -> PregMatchedGroups {
+fn drop_null_matches(matches: &PregMatches) -> PregMatchedGroups {
     matches
         .iter()
         .filter_map(|(key, value)| value.clone().map(|value| (key.clone(), value)))
         .collect()
+}
+
+// PHP's `preg_match_all` returns the number of occurrences; every column of a
+// PREG_PATTERN_ORDER map holds one entry per occurrence.
+fn occurrence_count(matches: &PregMatchesAll) -> usize {
+    matches[&CaptureKey::ByIndex(0)].len()
 }

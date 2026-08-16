@@ -7,8 +7,8 @@ use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInte
 use crate::formatter::output_formatter_style_stack::OutputFormatterStyleStack;
 use crate::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
 use shirabe_php_shim::{
-    CaptureKey, PregMatchesAllWithOffsets, php_regex, preg_match, preg_match_all,
-    preg_match_all_offset_capture, preg_match_all_set_order, preg_replace,
+    CaptureKey, php_regex, preg_match, preg_match_all, preg_match_all_offset_capture,
+    preg_match_all_set_order, preg_replace,
 };
 use shirabe_symfony_string::b;
 
@@ -109,9 +109,8 @@ impl OutputFormatter {
             return Ok(Some(style.borrow().clone_box()));
         }
 
-        let mut matches: Vec<Vec<Option<String>>> = vec![];
-        if preg_match_all_set_order(php_regex!("/([^=]+)=([^;]+)(;|$)/"), string, &mut matches) == 0
-        {
+        let matches = preg_match_all_set_order(php_regex!("/([^=]+)=([^;]+)(;|$)/"), string);
+        if matches.is_empty() {
             return Ok(None);
         }
 
@@ -191,8 +190,7 @@ impl OutputFormatter {
             prefix = String::new();
         }
 
-        let mut matches: Vec<Option<String>> = vec![];
-        preg_match(php_regex!("~(\\n)$~"), &text, &mut matches);
+        let matches = preg_match(php_regex!("~(\\n)$~"), &text).unwrap_or_default();
         text = format!("{}{}", prefix, self.add_line_breaks(&text, width));
         let trailing = matches.get(1).and_then(|m| m.clone()).unwrap_or_default();
         text = format!("{}{}", shirabe_php_shim::rtrim(&text, Some("\n")), trailing);
@@ -294,11 +292,9 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
         let open_tag_regex = "[a-z](?:[^\\\\<>]* | \\\\.)*";
         let close_tag_regex = "[a-z][^<>]*";
         let mut current_line_length: i64 = 0;
-        let mut matches = PregMatchesAllWithOffsets::new();
-        preg_match_all_offset_capture(
+        let matches = preg_match_all_offset_capture(
             format!("#<(({open_tag_regex}) | /({close_tag_regex})?)>#ix"),
             message,
-            &mut matches,
         );
         let full_matches = matches
             .get(&CaptureKey::ByIndex(0))

@@ -79,12 +79,10 @@ impl Terminal {
     fn init_dimensions() {
         if cfg!(windows) {
             let ansicon = shirabe_php_shim::getenv("ANSICON");
-            let mut matches: Vec<Option<String>> = Vec::new();
             if let Some(ansicon) = &ansicon
-                && preg_match(
+                && let Some(matches) = preg_match(
                     php_regex!("/^(\\d+)x(\\d+)(?: \\((\\d+)x(\\d+)\\))?$/"),
                     &shirabe_php_shim::trim(&ansicon.to_string_lossy(), None),
-                    &mut matches,
                 )
             {
                 // extract [w, H] from "wxh (WxH)"
@@ -137,12 +135,9 @@ impl Terminal {
             if stty_string.is_empty() {
                 return;
             }
-            let mut matches: Vec<Option<String>> = Vec::new();
-            if preg_match(
-                php_regex!("/rows.(\\d+);.columns.(\\d+);/i"),
-                &stty_string,
-                &mut matches,
-            ) {
+            if let Some(matches) =
+                preg_match(php_regex!("/rows.(\\d+);.columns.(\\d+);/i"), &stty_string)
+            {
                 // extract [w, h] from "rows h; columns w;"
                 WIDTH.with(|w| {
                     w.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
@@ -154,11 +149,9 @@ impl Terminal {
                         matches[1].clone().unwrap_or_default(),
                     ))))
                 });
-            } else if preg_match(
-                php_regex!("/;.(\\d+).rows;.(\\d+).columns/i"),
-                &stty_string,
-                &mut matches,
-            ) {
+            } else if let Some(matches) =
+                preg_match(php_regex!("/;.(\\d+).rows;.(\\d+).columns/i"), &stty_string)
+            {
                 // extract [w, h] from "; h rows; w columns"
                 WIDTH.with(|w| {
                     w.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
@@ -181,14 +174,10 @@ impl Terminal {
         let info = Self::read_from_process("mode CON");
 
         let info = info?;
-        let mut matches: Vec<Option<String>> = Vec::new();
-        if !preg_match(
+        let matches = preg_match(
             php_regex!("/--------+\\r?\\n.+?(\\d+)\\r?\\n.+?(\\d+)\\r?\\n/"),
             &info,
-            &mut matches,
-        ) {
-            return None;
-        }
+        )?;
 
         Some(vec![
             shirabe_php_shim::intval(&PhpMixed::String(matches[2].clone().unwrap_or_default())),

@@ -120,14 +120,13 @@ impl StreamOutput {
         }
 
         // See https://github.com/chalk/supports-color/blob/d4f413efaf8da045c5ab440ed418ef02dbb28bf1/index.js#L157
-        let mut matches: Vec<Option<String>> = Vec::new();
         preg_match(
             php_regex!(
                 "/^((screen|xterm|vt100|vt220|putty|rxvt|ansi|cygwin|linux).*)|(.*-256(color)?(-bce)?)$/"
             ),
             &term,
-            &mut matches,
         )
+        .is_some()
     }
 }
 

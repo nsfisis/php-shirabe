@@ -117,34 +117,22 @@ pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
     out
 }
 
-// Returns whether the pattern matched; populates matches[0]=full match, matches[1..]=captures.
-// Optional groups that did not participate in the match are stored as None.
-pub fn preg_match(
-    pattern: impl PregPattern,
-    subject: &str,
-    matches: &mut Vec<Option<String>>,
-) -> bool {
+// Returns None if the pattern did not match; otherwise index 0 is the full match and 1.. the
+// capture groups. A group that did not participate is None.
+pub fn preg_match(pattern: impl PregPattern, subject: &str) -> Option<Vec<Option<String>>> {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
-    matches.clear();
-    match re.captures(subject) {
-        Some(caps) => {
-            for g in 0..caps.len() {
-                matches.push(caps.get(g).map(|m| m.as_str().to_string()));
-            }
-            true
-        }
-        None => false,
-    }
+    let caps = re.captures(subject)?;
+    Some(
+        (0..caps.len())
+            .map(|g| caps.get(g).map(|m| m.as_str().to_string()))
+            .collect(),
+    )
 }
 
-// Returns whether the pattern matched, reporting the groups as single_match_map() does.
-pub fn preg_match2(
-    pattern: impl PregPattern,
-    subject: &str,
-    matches: &mut PregMatches,
-    offset: usize,
-) -> bool {
+// Returns None if the pattern did not match; otherwise the groups as single_match_map() reports
+// them.
+pub fn preg_match2(pattern: impl PregPattern, subject: &str, offset: usize) -> Option<PregMatches> {
     let __resolved = pattern.resolve();
     let (re, anchored) = __resolved.parts();
     // An anchored (`A`) pattern must match starting exactly at `offset`; the `regex` crate cannot
@@ -155,15 +143,10 @@ pub fn preg_match2(
             .filter(|c| c.get(0).map(|m| m.start()) == Some(0))
     } else {
         re.captures_at(subject, offset)
-    };
+    }?;
 
-    matches.clear();
-    if let Some(caps) = &caps {
-        let names: Vec<Option<&str>> = re.capture_names().collect();
-        *matches = single_match_map(caps, &names);
-    }
-
-    caps.is_some()
+    let names: Vec<Option<&str>> = re.capture_names().collect();
+    Some(single_match_map(&caps, &names))
 }
 
 // PREG_PATTERN_ORDER: the outer vec is indexed by capture group, the inner by
@@ -181,11 +164,9 @@ pub fn preg_match_all(pattern: impl PregPattern, subject: &str) -> Vec<Vec<Optio
     groups
 }
 
-pub fn preg_match_all2(
-    pattern: impl PregPattern,
-    subject: &str,
-    matches: &mut PregMatchesAll,
-) -> usize {
+// The number of occurrences the caller would get from PHP's return value is the length of any
+// one column, `matches[&CaptureKey::ByIndex(0)].len()`.
+pub fn preg_match_all2(pattern: impl PregPattern, subject: &str) -> PregMatchesAll {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
     let group_count = re.captures_len();
@@ -193,16 +174,14 @@ pub fn preg_match_all2(
 
     // PREG_PATTERN_ORDER: one column per group, one row per match occurrence.
     let mut groups: Vec<Vec<Option<String>>> = vec![Vec::new(); group_count];
-    let mut count = 0;
     for caps in re.captures_iter(subject) {
-        count += 1;
         for (g, column) in groups.iter_mut().enumerate() {
             let value = caps.get(g).map(|m| m.as_str().to_string());
             column.push(value);
         }
     }
 
-    matches.clear();
+    let mut matches = PregMatchesAll::new();
     for (g, column) in groups.into_iter().enumerate() {
         if let Some(Some(name)) = names.get(g) {
             matches.insert(CaptureKey::ByName((*name).to_string()), column.clone());
@@ -210,7 +189,7 @@ pub fn preg_match_all2(
         matches.insert(CaptureKey::ByIndex(g), column);
     }
 
-    count
+    matches
 }
 
 // PREG_SET_ORDER: the outer vec is indexed by match occurrence, the inner by
@@ -219,38 +198,32 @@ pub fn preg_match_all2(
 pub fn preg_match_all_set_order(
     pattern: impl PregPattern,
     subject: &str,
-    matches: &mut Vec<Vec<Option<String>>>,
-) -> usize {
+) -> Vec<Vec<Option<String>>> {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
-    let mut rows: Vec<Vec<Option<String>>> = Vec::new();
-    for caps in re.captures_iter(subject) {
-        rows.push(
+    re.captures_iter(subject)
+        .map(|caps| {
             (0..caps.len())
                 .map(|g| caps.get(g).map(|m| m.as_str().to_string()))
-                .collect(),
-        );
-    }
-    let count = rows.len();
-    *matches = rows;
-    count
+                .collect()
+        })
+        .collect()
 }
 
-// A non-participating group is reported as None, at offset -1.
+// A non-participating group is reported as None, at offset -1. The number of occurrences the
+// caller would get from PHP's return value is the length of any one column,
+// `matches[&CaptureKey::ByIndex(0)].len()`.
 pub fn preg_match_all_offset_capture(
     pattern: impl PregPattern,
     subject: &str,
-    matches: &mut PregMatchesAllWithOffsets,
-) -> usize {
+) -> PregMatchesAllWithOffsets {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
     let group_count = re.captures_len();
     let names: Vec<Option<&str>> = re.capture_names().collect();
 
     let mut groups: Vec<Vec<(Option<String>, i64)>> = vec![Vec::new(); group_count];
-    let mut count = 0;
     for caps in re.captures_iter(subject) {
-        count += 1;
         for (g, column) in groups.iter_mut().enumerate() {
             let entry = match caps.get(g) {
                 Some(m) => (Some(m.as_str().to_string()), m.start() as i64),
@@ -260,7 +233,7 @@ pub fn preg_match_all_offset_capture(
         }
     }
 
-    matches.clear();
+    let mut matches = PregMatchesAllWithOffsets::new();
     for (g, column) in groups.into_iter().enumerate() {
         if let Some(Some(name)) = names.get(g) {
             matches.insert(CaptureKey::ByName((*name).to_string()), column.clone());
@@ -268,7 +241,7 @@ pub fn preg_match_all_offset_capture(
         matches.insert(CaptureKey::ByIndex(g), column);
     }
 
-    count
+    matches
 }
 
 pub fn preg_grep<T: AsRef<str>>(

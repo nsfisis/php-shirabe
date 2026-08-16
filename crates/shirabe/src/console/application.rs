@@ -1790,13 +1790,8 @@ impl Application {
         let mut line = String::new();
 
         let mut offset = 0i64;
-        let mut m = shirabe_php_shim::PregMatches::new();
-        while preg_match2(
-            php_regex!(r"/.{1,10000}/u"),
-            &utf8_string,
-            &mut m,
-            offset as usize,
-        ) {
+        while let Some(m) = preg_match2(php_regex!(r"/.{1,10000}/u"), &utf8_string, offset as usize)
+        {
             let m0 = m[&shirabe_php_shim::CaptureKey::ByIndex(0)]
                 .as_deref()
                 .unwrap_or("");

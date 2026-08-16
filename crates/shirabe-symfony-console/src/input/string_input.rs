@@ -6,7 +6,7 @@ use crate::input::InputDefinition;
 use crate::input::InputInterface;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{CaptureKey, PhpMixed, PregMatches, php_regex, preg_match2};
+use shirabe_php_shim::{CaptureKey, PhpMixed, php_regex, preg_match2};
 
 /// StringInput represents an input provided as a string.
 ///
@@ -57,17 +57,15 @@ impl StringInput {
                 continue;
             }
 
-            let mut m = PregMatches::new();
-            if preg_match2(php_regex!(r"/\s+/A"), input, &mut m, cursor as usize) {
+            if let Some(m) = preg_match2(php_regex!(r"/\s+/A"), input, cursor as usize) {
                 if token.is_some() {
                     tokens.push(token.take().unwrap());
                 }
                 cursor +=
                     shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
-            } else if preg_match2(
+            } else if let Some(m) = preg_match2(
                 format!(r#"/([^="'\s]+?)(=?)({}+)/A"#, Self::REGEX_QUOTED_STRING),
                 input,
-                &mut m,
                 cursor as usize,
             ) {
                 let inner = shirabe_php_shim::substr(
@@ -86,10 +84,9 @@ impl StringInput {
                 ));
                 cursor +=
                     shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
-            } else if preg_match2(
+            } else if let Some(m) = preg_match2(
                 format!(r"/{}/A", Self::REGEX_QUOTED_STRING),
                 input,
-                &mut m,
                 cursor as usize,
             ) {
                 token = Some(format!(
@@ -103,10 +100,9 @@ impl StringInput {
                 ));
                 cursor +=
                     shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
-            } else if preg_match2(
+            } else if let Some(m) = preg_match2(
                 format!(r"/{}/A", Self::REGEX_UNQUOTED_STRING),
                 input,
-                &mut m,
                 cursor as usize,
             ) {
                 token = Some(format!(

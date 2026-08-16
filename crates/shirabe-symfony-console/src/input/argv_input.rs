@@ -523,8 +523,7 @@ impl std::fmt::Display for ArgvInput {
             .tokens
             .iter()
             .map(|token| {
-                let mut r#match: Vec<Option<String>> = Vec::new();
-                if preg_match(php_regex!("{^(-[^=]+=)(.+)}"), token, &mut r#match) {
+                if let Some(r#match) = preg_match(php_regex!("{^(-[^=]+=)(.+)}"), token) {
                     return format!(
                         "{}{}",
                         r#match[1].as_deref().unwrap_or(""),
