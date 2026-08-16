@@ -95,12 +95,14 @@ impl Platform {
         // Regex pattern compatibility:
         // The original pattern uses a conditional subpattern to make the trailing `%` required
         // only for the `%VAR%` form. The Rust regex crate does not support conditionals, so the
-        // two forms are written as an explicit alternation: `$VAR` or `%VAR%`.
+        // two forms are written as an explicit alternation: `$VAR` or `%VAR%`. The branch that did
+        // not participate is reported as an empty string, which `\w+` can never capture.
         Preg::replace_callback(
             php_regex!(r"#^(?:\$(?P<dvar>\w+)|%(?P<pvar>\w+)%)(?P<path>.*)#"),
             |matches: &indexmap::IndexMap<CaptureKey, String>| -> String {
                 let var = matches
                     .get(&CaptureKey::ByName("dvar".to_string()))
+                    .filter(|dvar| !dvar.is_empty())
                     .or_else(|| matches.get(&CaptureKey::ByName("pvar".to_string())))
                     .map(|s| s.as_str())
                     .unwrap_or("");
