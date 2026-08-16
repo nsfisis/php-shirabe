@@ -1,5 +1,7 @@
 use crate::PhpMixed;
 use indexmap::IndexMap;
+use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
+use std::fmt;
 
 pub trait JsonSerializable {
     fn json_serialize(&self) -> PhpMixed;
@@ -78,39 +80,96 @@ pub fn json_decode_obj(s: &str) -> anyhow::Result<PhpMixed> {
 }
 
 fn json_decode(s: &str, assoc: bool) -> anyhow::Result<PhpMixed> {
-    match serde_json::from_str::<serde_json::Value>(s) {
-        Ok(value) => Ok(json_value_to_php_mixed(value, assoc)),
-        Err(_) => Ok(PhpMixed::Null),
+    let mut deserializer = serde_json::Deserializer::from_str(s);
+    let Ok(value) = PhpMixedSeed { assoc }.deserialize(&mut deserializer) else {
+        return Ok(PhpMixed::Null);
+    };
+    if deserializer.end().is_err() {
+        return Ok(PhpMixed::Null);
+    }
+    Ok(value)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct PhpMixedSeed {
+    assoc: bool,
+}
+
+impl<'de> DeserializeSeed<'de> for PhpMixedSeed {
+    type Value = PhpMixed;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<PhpMixed, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_any(self)
     }
 }
 
-fn json_value_to_php_mixed(value: serde_json::Value, assoc: bool) -> PhpMixed {
-    match value {
-        serde_json::Value::Null => PhpMixed::Null,
-        serde_json::Value::Bool(b) => PhpMixed::Bool(b),
-        serde_json::Value::Number(n) => match n.as_i64() {
-            Some(i) => PhpMixed::Int(i),
-            // Integers beyond i64 and any fractional/exponent number decode to float,
-            // matching PHP's default (non-bigint) behaviour.
-            None => PhpMixed::Float(n.as_f64().unwrap_or(0.0)),
-        },
-        serde_json::Value::String(s) => PhpMixed::String(s),
-        serde_json::Value::Array(items) => PhpMixed::List(
-            items
-                .into_iter()
-                .map(|item| json_value_to_php_mixed(item, assoc))
-                .collect(),
-        ),
-        serde_json::Value::Object(entries) => {
-            let data: IndexMap<String, PhpMixed> = entries
-                .into_iter()
-                .map(|(k, v)| (k, json_value_to_php_mixed(v, assoc)))
-                .collect();
-            if assoc {
-                PhpMixed::Array(data)
-            } else {
-                PhpMixed::Object(data)
-            }
+impl<'de> Visitor<'de> for PhpMixedSeed {
+    type Value = PhpMixed;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a JSON value")
+    }
+
+    fn visit_unit<E>(self) -> Result<PhpMixed, E> {
+        Ok(PhpMixed::Null)
+    }
+
+    fn visit_bool<E>(self, v: bool) -> Result<PhpMixed, E> {
+        Ok(PhpMixed::Bool(v))
+    }
+
+    fn visit_i64<E>(self, v: i64) -> Result<PhpMixed, E> {
+        Ok(PhpMixed::Int(v))
+    }
+
+    // Integers beyond i64 and any fractional/exponent number decode to float, matching PHP's
+    // default (non-bigint) behaviour.
+    fn visit_u64<E>(self, v: u64) -> Result<PhpMixed, E> {
+        Ok(match i64::try_from(v) {
+            Ok(i) => PhpMixed::Int(i),
+            Err(_) => PhpMixed::Float(v as f64),
+        })
+    }
+
+    fn visit_f64<E>(self, v: f64) -> Result<PhpMixed, E> {
+        Ok(PhpMixed::Float(v))
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<PhpMixed, E> {
+        Ok(PhpMixed::String(v.to_owned()))
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<PhpMixed, E> {
+        Ok(PhpMixed::String(v))
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<PhpMixed, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut items = Vec::new();
+        while let Some(item) = seq.next_element_seed(self)? {
+            items.push(item);
         }
+        Ok(PhpMixed::List(items))
+    }
+
+    fn visit_map<A>(self, mut map: A) -> Result<PhpMixed, A::Error>
+    where
+        A: MapAccess<'de>,
+    {
+        let mut data = IndexMap::new();
+        while let Some(key) = map.next_key::<String>()? {
+            // A duplicate key keeps its original position and takes the later value, like PHP.
+            data.insert(key, map.next_value_seed(self)?);
+        }
+        Ok(if self.assoc {
+            PhpMixed::Array(data)
+        } else {
+            PhpMixed::Object(data)
+        })
     }
 }
