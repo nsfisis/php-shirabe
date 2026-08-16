@@ -76,7 +76,11 @@ pub fn preg_match2(
     matches.clear();
     if let Some(caps) = &caps {
         let names: Vec<Option<&str>> = re.capture_names().collect();
-        *matches = single_match_map(caps, &names, unmatched_as_null);
+        *matches = if unmatched_as_null {
+            single_match_map_unmatched_as_null(caps, &names)
+        } else {
+            single_match_map(caps, &names)
+        };
     }
 
     caps.is_some()
@@ -291,7 +295,7 @@ where
     for caps in re.captures_iter(subject) {
         let m = caps.get(0).unwrap();
         out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
-        let map = single_match_map(&caps, &names, false);
+        let map = single_match_map(&caps, &names);
         out.extend_from_slice(callback(&map)?.as_bytes());
         last = m.end();
     }
@@ -578,13 +582,11 @@ fn php_match_row(caps: &regex::Captures) -> Vec<String> {
 }
 
 // Builds a single match's `$matches` map with both named and numbered keys
-// (the named key precedes its number). With PREG_UNMATCHED_AS_NULL, every group
-// is present and non-participating ones are None; otherwise classic semantics
-// apply: trailing unmatched groups are dropped and interior ones become "".
+// (the named key precedes its number). Trailing unmatched groups are dropped
+// and interior ones become "".
 fn single_match_map(
     caps: &regex::Captures,
     names: &[Option<&str>],
-    unmatched_as_null: bool,
 ) -> indexmap::IndexMap<CaptureKey, Option<String>> {
     let mut out = indexmap::IndexMap::new();
     let group_count = caps.len();
@@ -592,18 +594,31 @@ fn single_match_map(
 
     for i in 0..group_count {
         let m = caps.get(i);
-        if !unmatched_as_null
-            && m.is_none()
+        if m.is_none()
             && let Some(last) = last_participating
             && i > last
         {
             break;
         }
-        let value = if unmatched_as_null {
-            m.map(|m| m.as_str().to_string())
-        } else {
-            Some(m.map(|m| m.as_str().to_string()).unwrap_or_default())
-        };
+        let value = Some(m.map(|m| m.as_str().to_string()).unwrap_or_default());
+        if let Some(Some(name)) = names.get(i) {
+            out.insert(CaptureKey::ByName((*name).to_string()), value.clone());
+        }
+        out.insert(CaptureKey::ByIndex(i), value);
+    }
+    out
+}
+
+// PREG_UNMATCHED_AS_NULL counterpart of single_match_map(): every group is
+// present and non-participating ones are None.
+fn single_match_map_unmatched_as_null(
+    caps: &regex::Captures,
+    names: &[Option<&str>],
+) -> indexmap::IndexMap<CaptureKey, Option<String>> {
+    let mut out = indexmap::IndexMap::new();
+
+    for i in 0..caps.len() {
+        let value = caps.get(i).map(|m| m.as_str().to_string());
         if let Some(Some(name)) = names.get(i) {
             out.insert(CaptureKey::ByName((*name).to_string()), value.clone());
         }
