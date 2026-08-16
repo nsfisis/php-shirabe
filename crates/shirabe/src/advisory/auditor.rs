@@ -18,6 +18,7 @@ use shirabe_php_shim::{
     array_keys, array_reduce, get_class,
 };
 use shirabe_symfony_console::formatter::OutputFormatter;
+use shirabe_symfony_console::helper::Cell;
 
 /// Shape of the `--format=json` audit output.
 #[derive(serde::Serialize)]
@@ -488,11 +489,10 @@ impl Auditor {
                     .set_horizontal(true)
                     .set_headers(headers.into_iter().map(|h| h.into()).collect());
                 table.add_row(
-                    ConsoleIO::sanitize(
-                        PhpMixed::List(row.into_iter().map(PhpMixed::String).collect()),
-                        false,
-                    )
-                    .into(),
+                    row.iter()
+                        .map(|cell| ConsoleIO::sanitize(cell, false).into())
+                        .collect::<Vec<Cell>>()
+                        .into(),
                 );
                 table
                     .set_column_width(1, 80)
@@ -614,16 +614,12 @@ impl Auditor {
             } else {
                 "none".to_string()
             };
-            table.add_row(
-                ConsoleIO::sanitize(
-                    PhpMixed::List(vec![
-                        PhpMixed::String(self.get_package_name_with_link(pkg.clone().into())),
-                        PhpMixed::String(replacement),
-                    ]),
-                    false,
-                )
-                .into(),
-            );
+            let row: Vec<Cell> = vec![
+                ConsoleIO::sanitize(&self.get_package_name_with_link(pkg.clone().into()), false)
+                    .into(),
+                ConsoleIO::sanitize(&replacement, false).into(),
+            ];
+            table.add_row(row.into());
         }
 
         table.render();

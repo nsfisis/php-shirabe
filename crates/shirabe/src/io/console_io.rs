@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 use indexmap::indexmap;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    PhpMixed, array_search, implode, in_array_strict, is_array, is_string, microtime, str_repeat,
+    PhpMixed, array_search, in_array_strict, is_array, is_string, microtime, str_repeat,
     strip_tags, strlen,
 };
 use shirabe_symfony_console::helper::ProgressBar;
@@ -78,7 +78,7 @@ impl ConsoleIO {
         self.start_time = Some(start_time);
     }
 
-    fn do_write(&self, messages: PhpMixed, newline: bool, stderr: bool, verbosity: i64, raw: bool) {
+    fn do_write(&self, messages: &str, newline: bool, stderr: bool, verbosity: i64, raw: bool) {
         let mut sf_verbosity = *self.verbosity_map.get(&verbosity).unwrap_or(&0);
         if sf_verbosity > self.output.borrow().get_verbosity() {
             return;
@@ -91,22 +91,9 @@ impl ConsoleIO {
         let messages = if let Some(start_time) = self.start_time {
             let memory_usage = (shirabe_php_shim::memory_get_usage() as f64) / 1024.0 / 1024.0;
             let time_spent = microtime() - start_time;
-            // PHP: array_map(fn ($message): string => sprintf(...), (array) $messages)
-            let arr: Vec<String> = match &messages {
-                PhpMixed::String(s) => vec![s.clone()],
-                PhpMixed::List(l) => l
-                    .iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect(),
-                _ => vec![],
-            };
-            let mapped: Vec<String> = arr
-                .into_iter()
-                .map(|message| format!("[{:.1}MiB/{:.2}s] {}", memory_usage, time_spent, message))
-                .collect();
-            PhpMixed::List(mapped.into_iter().map(PhpMixed::String).collect())
+            format!("[{:.1}MiB/{:.2}s] {}", memory_usage, time_spent, messages)
         } else {
-            messages
+            messages.to_string()
         };
 
         let error_output = if stderr {
@@ -119,45 +106,28 @@ impl ConsoleIO {
             None
         };
         if let Some(error_output) = error_output {
-            error_output.borrow().write(
-                &[Self::to_string_list(&messages).join(if newline { "\n" } else { "" })],
-                newline,
-                sf_verbosity,
-            );
-            // PHP: implode($newline ? "\n" : '', (array) $messages)
-            *self.last_message_err.borrow_mut() = implode(
-                if newline { "\n" } else { "" },
-                &Self::to_string_list(&messages),
-            );
+            error_output
+                .borrow()
+                .write(std::slice::from_ref(&messages), newline, sf_verbosity);
+            *self.last_message_err.borrow_mut() = messages;
 
             return;
         }
 
-        self.output.borrow().write(
-            &[Self::to_string_list(&messages).join(if newline { "\n" } else { "" })],
-            newline,
-            sf_verbosity,
-        );
-        *self.last_message.borrow_mut() = implode(
-            if newline { "\n" } else { "" },
-            &Self::to_string_list(&messages),
-        );
+        self.output
+            .borrow()
+            .write(std::slice::from_ref(&messages), newline, sf_verbosity);
+        *self.last_message.borrow_mut() = messages;
     }
 
     fn do_overwrite(
         &self,
-        messages: PhpMixed,
+        messages: &str,
         newline: bool,
         size: Option<i64>,
         stderr: bool,
         verbosity: i64,
     ) {
-        // messages can be an array, let's convert it to string anyway
-        let messages_str = implode(
-            if newline { "\n" } else { "" },
-            &Self::to_string_list(&messages),
-        );
-
         // since overwrite is supposed to overwrite last message...
         let size = size.unwrap_or_else(|| {
             // removing possible formatting of lastMessage with strip_tags
@@ -170,7 +140,7 @@ impl ConsoleIO {
         });
         // ...let's fill its length with backspaces
         self.do_write(
-            PhpMixed::String(str_repeat("\x08", size as usize)),
+            &str_repeat("\x08", size as usize),
             false,
             stderr,
             verbosity,
@@ -178,22 +148,16 @@ impl ConsoleIO {
         );
 
         // write the new message
-        self.do_write(
-            PhpMixed::String(messages_str.clone()),
-            false,
-            stderr,
-            verbosity,
-            false,
-        );
+        self.do_write(messages, false, stderr, verbosity, false);
 
         // In cmd.exe on Win8.1 (possibly 10?), the line can not be cleared, so we need to
         // track the length of previous output and fill it with spaces to make sure the line is cleared.
         // See https://github.com/composer/composer/pull/5836 for more details
-        let fill = size - strlen(&strip_tags(&messages_str));
+        let fill = size - strlen(&strip_tags(messages));
         if fill > 0 {
             // whitespace whatever has left
             self.do_write(
-                PhpMixed::String(str_repeat(" ", fill as usize)),
+                &str_repeat(" ", fill as usize),
                 false,
                 stderr,
                 verbosity,
@@ -201,7 +165,7 @@ impl ConsoleIO {
             );
             // move the cursor back
             self.do_write(
-                PhpMixed::String(str_repeat("\x08", fill as usize)),
+                &str_repeat("\x08", fill as usize),
                 false,
                 stderr,
                 verbosity,
@@ -210,19 +174,13 @@ impl ConsoleIO {
         }
 
         if newline {
-            self.do_write(
-                PhpMixed::String(String::new()),
-                true,
-                stderr,
-                verbosity,
-                false,
-            );
+            self.do_write("", true, stderr, verbosity, false);
         }
 
         if stderr {
-            *self.last_message_err.borrow_mut() = messages_str;
+            *self.last_message_err.borrow_mut() = messages.to_string();
         } else {
-            *self.last_message.borrow_mut() = messages_str;
+            *self.last_message.borrow_mut() = messages.to_string();
         }
     }
 
@@ -255,7 +213,7 @@ impl ConsoleIO {
     /// All other control chars (except NULL bytes) as well as ANSI escape sequences are removed.
     ///
     /// Invalid unicode sequences are turned into question marks.
-    pub fn sanitize(messages: PhpMixed, allow_newlines: bool) -> PhpMixed {
+    pub fn sanitize(messages: &str, allow_newlines: bool) -> String {
         // Match ANSI escape sequences:
         // - CSI (Control Sequence Introducer): ESC [ params intermediate final
         // - OSC (Operating System Command): ESC ] ... ESC \ or BEL
@@ -277,36 +235,9 @@ impl ConsoleIO {
         } else {
             (format!("{{{}|[\\x01-\\x1A]}}u", escape_pattern), "")
         };
-        if is_string(&messages) {
-            let message = Self::ensure_valid_utf8(messages.as_string().unwrap_or(""));
-            return PhpMixed::String(Preg::replace(&pattern, replacement, &message));
-        }
+        let messages = Self::ensure_valid_utf8(messages);
 
-        // PHP: $sanitized = []; foreach ($messages as $key => $message) { ... }
-        let mut sanitized: IndexMap<String, PhpMixed> = IndexMap::new();
-        match &messages {
-            PhpMixed::List(l) => {
-                for (key, message) in l.iter().enumerate() {
-                    let s = Self::ensure_valid_utf8(message.as_string().unwrap_or(""));
-                    sanitized.insert(
-                        key.to_string(),
-                        PhpMixed::String(Preg::replace(&pattern, replacement, &s)),
-                    );
-                }
-            }
-            PhpMixed::Array(a) => {
-                for (key, message) in a {
-                    let s = Self::ensure_valid_utf8(message.as_string().unwrap_or(""));
-                    sanitized.insert(
-                        key.clone(),
-                        PhpMixed::String(Preg::replace(&pattern, replacement, &s)),
-                    );
-                }
-            }
-            _ => {}
-        }
-
-        PhpMixed::Array(sanitized.into_iter().collect())
+        Preg::replace(&pattern, replacement, &messages)
     }
 
     /// Ensures a string is valid UTF-8, replacing invalid byte sequences with '?'
@@ -315,22 +246,6 @@ impl ConsoleIO {
     // `String`; once it does, this should take `&[u8]` and lossily convert it to `String`.
     fn ensure_valid_utf8(string: &str) -> String {
         string.to_string()
-    }
-
-    /// Helper: PHP `(array) $messages` then collect strings
-    fn to_string_list(messages: &PhpMixed) -> Vec<String> {
-        match messages {
-            PhpMixed::String(s) => vec![s.clone()],
-            PhpMixed::List(l) => l
-                .iter()
-                .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                .collect(),
-            PhpMixed::Array(a) => a
-                .values()
-                .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                .collect(),
-            _ => vec![],
-        }
     }
 
     /// Delegates to `QuestionHelper::ask`.
@@ -372,64 +287,40 @@ impl IOInterfaceImmutable for ConsoleIO {
     }
 
     fn write3(&self, message: &str, newline: bool, verbosity: i64) {
-        let message = Self::sanitize(PhpMixed::String(message.to_string()), true);
+        let message = Self::sanitize(message, true);
 
-        self.do_write(message, newline, false, verbosity, false);
+        self.do_write(&message, newline, false, verbosity, false);
     }
 
     fn write_error3(&self, message: &str, newline: bool, verbosity: i64) {
-        let message = Self::sanitize(PhpMixed::String(message.to_string()), true);
+        let message = Self::sanitize(message, true);
 
-        self.do_write(message, newline, true, verbosity, false);
+        self.do_write(&message, newline, true, verbosity, false);
     }
 
     fn write_raw3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.do_write(
-            PhpMixed::String(message.to_string()),
-            newline,
-            false,
-            verbosity,
-            true,
-        );
+        self.do_write(message, newline, false, verbosity, true);
     }
 
     fn write_error_raw3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.do_write(
-            PhpMixed::String(message.to_string()),
-            newline,
-            true,
-            verbosity,
-            true,
-        );
+        self.do_write(message, newline, true, verbosity, true);
     }
 
     fn overwrite4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
-        self.do_overwrite(
-            PhpMixed::String(message.to_string()),
-            newline,
-            size,
-            false,
-            verbosity,
-        );
+        self.do_overwrite(message, newline, size, false, verbosity);
     }
 
     fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
-        self.do_overwrite(
-            PhpMixed::String(message.to_string()),
-            newline,
-            size,
-            true,
-            verbosity,
-        );
+        self.do_overwrite(message, newline, size, true, verbosity);
     }
 
     fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
-        let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
-            .as_string()
-            .unwrap_or("")
-            .to_string();
+        let sanitized_question = Self::sanitize(&question, true);
         let sanitized_default = if is_string(&default) {
-            Some(Self::sanitize(default, true))
+            Some(PhpMixed::String(Self::sanitize(
+                default.as_string().unwrap_or(""),
+                true,
+            )))
         } else {
             Some(default)
         };
@@ -442,10 +333,7 @@ impl IOInterfaceImmutable for ConsoleIO {
     // errors with .expect() instead of propagating them; extending Result propagation to
     // them is a further IOInterface signature change that has not been decided yet.
     fn ask_confirmation(&self, question: String, default: bool) -> bool {
-        let sanitized = Self::sanitize(PhpMixed::String(question), true)
-            .as_string()
-            .unwrap_or("")
-            .to_string();
+        let sanitized = Self::sanitize(&question, true);
         let question = StrictConfirmationQuestion::new(
             sanitized,
             default,
@@ -466,12 +354,12 @@ impl IOInterfaceImmutable for ConsoleIO {
         attempts: Option<i64>,
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed> {
-        let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
-            .as_string()
-            .unwrap_or("")
-            .to_string();
+        let sanitized_question = Self::sanitize(&question, true);
         let sanitized_default = if is_string(&default) {
-            Some(Self::sanitize(default, true))
+            Some(PhpMixed::String(Self::sanitize(
+                default.as_string().unwrap_or(""),
+                true,
+            )))
         } else {
             Some(default)
         };
@@ -500,10 +388,7 @@ impl IOInterfaceImmutable for ConsoleIO {
     }
 
     fn ask_and_hide_answer(&self, question: String) -> Option<String> {
-        let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
-            .as_string()
-            .unwrap_or("")
-            .to_string();
+        let sanitized_question = Self::sanitize(&question, true);
         let mut question = Question::new(sanitized_question, Some(PhpMixed::Null));
         // setHidden only throws when an autocompleter is set, which is not the case here.
         question
@@ -525,24 +410,29 @@ impl IOInterfaceImmutable for ConsoleIO {
         error_message: String,
         multiselect: bool,
     ) -> anyhow::Result<PhpMixed> {
-        let sanitized_question = Self::sanitize(PhpMixed::String(question), true)
-            .as_string()
-            .unwrap_or("")
-            .to_string();
+        let sanitized_question = Self::sanitize(&question, true);
         // ChoiceQuestion::new expects an IndexMap<String, PhpMixed>; project the
         // sanitized choice list/map into the keyed form, preserving keys.
-        let sanitized_choices_mixed = Self::sanitize(choices.clone(), true);
-        let sanitized_choices: IndexMap<String, PhpMixed> = match sanitized_choices_mixed {
+        let sanitize_choice = |choice: &PhpMixed| {
+            PhpMixed::String(Self::sanitize(choice.as_string().unwrap_or(""), true))
+        };
+        let sanitized_choices: IndexMap<String, PhpMixed> = match &choices {
             PhpMixed::List(l) => l
-                .into_iter()
+                .iter()
                 .enumerate()
-                .map(|(i, b)| (i.to_string(), b))
+                .map(|(i, choice)| (i.to_string(), sanitize_choice(choice)))
                 .collect(),
-            PhpMixed::Array(a) => a,
-            other => indexmap! { "0".to_string() => other },
+            PhpMixed::Array(a) => a
+                .iter()
+                .map(|(key, choice)| (key.clone(), sanitize_choice(choice)))
+                .collect(),
+            other => indexmap! { "0".to_string() => sanitize_choice(other) },
         };
         let sanitized_default = if is_string(&default) {
-            Some(Self::sanitize(default, true))
+            Some(PhpMixed::String(Self::sanitize(
+                default.as_string().unwrap_or(""),
+                true,
+            )))
         } else {
             Some(default)
         };

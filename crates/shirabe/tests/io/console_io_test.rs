@@ -291,11 +291,11 @@ fn test_has_authentication() {
     assert!(!console_io.has_authentication("repoName2"));
 }
 
-#[ignore = "data provider includes malformed-UTF-8 inputs (e.g. \\xFF, \\xC3\\x28); sanitize() takes PhpMixed::String which is UTF-8-only and cannot carry invalid bytes, so those cases are unrepresentable"]
+#[ignore = "data provider includes malformed-UTF-8 inputs (e.g. \\xFF, \\xC3\\x28); sanitize() takes a &str which is UTF-8-only and cannot carry invalid bytes, so those cases are unrepresentable"]
 #[test]
 fn test_sanitize() {
     // TODO(bytes): the data provider includes malformed-UTF-8 inputs (e.g. \xFF, \xC3\x28);
-    // sanitize() takes PhpMixed::String which is UTF-8-only and cannot carry invalid bytes, so
-    // those cases are unrepresentable.
+    // sanitize() takes a &str which is UTF-8-only and cannot carry invalid bytes, so those cases
+    // are unrepresentable.
     todo!()
 }
