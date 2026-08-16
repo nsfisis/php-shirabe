@@ -5,9 +5,9 @@ use crate::util::Silencer;
 use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, RuntimeException, defined, file_exists,
-    file_get_contents, fstat, function_exists, getcwd, getenv, ini_get, is_array, is_readable,
-    mb_strlen, php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid, posix_isatty,
-    putenv, putenv_clear, realpath, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
+    file_get_contents, fstat, function_exists, getcwd, getenv, ini_get, is_readable, mb_strlen,
+    php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid, posix_isatty, putenv,
+    putenv_clear, realpath, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
 };
 use std::sync::Mutex;
 
@@ -146,16 +146,11 @@ impl Platform {
             return Ok(home);
         }
 
-        if function_exists("posix_getuid") && function_exists("posix_getpwuid") {
-            let info = posix_getpwuid(posix_getuid());
-
-            if is_array(&info)
-                && let Some(arr) = info.as_array()
-                && let Some(dir) = arr.get("dir")
-                && let Some(s) = dir.as_string()
-            {
-                return Ok(s.to_string());
-            }
+        if function_exists("posix_getuid")
+            && function_exists("posix_getpwuid")
+            && let Some(info) = posix_getpwuid(posix_getuid())
+        {
+            return Ok(info.dir);
         }
 
         Err(RuntimeException::new("Could not determine user directory".to_string()).into())
@@ -332,14 +327,7 @@ impl Platform {
 
             if function_exists("posix_getpwuid") && function_exists("posix_geteuid") {
                 let process_user = posix_getpwuid(posix_geteuid());
-                if is_array(&process_user)
-                    && let Some(arr) = process_user.as_array()
-                    && arr
-                        .get("name")
-                        .and_then(|v| v.as_string())
-                        .map(|s| s == "vagrant")
-                        .unwrap_or(false)
-                {
+                if process_user.is_some_and(|process_user| process_user.name == "vagrant") {
                     *cached = Some(true);
                     return true;
                 }

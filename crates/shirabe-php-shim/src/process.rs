@@ -396,42 +396,36 @@ pub fn getmypid() -> i64 {
     std::process::id() as i64
 }
 
-pub fn posix_getuid() -> i64 {
-    nix::unistd::getuid().as_raw() as i64
+pub fn posix_getuid() -> u32 {
+    nix::unistd::getuid().as_raw()
 }
 
-pub fn posix_geteuid() -> i64 {
-    nix::unistd::geteuid().as_raw() as i64
+pub fn posix_geteuid() -> u32 {
+    nix::unistd::geteuid().as_raw()
 }
 
-/// Looks up the passwd entry for `uid` and returns it in the shape of PHP's `posix_getpwuid`
-/// associative array, or `false` when no entry matches.
-pub fn posix_getpwuid(uid: i64) -> PhpMixed {
-    let user = match nix::unistd::User::from_uid(nix::unistd::Uid::from_raw(uid as u32)) {
-        Ok(Some(user)) => user,
-        _ => return PhpMixed::Bool(false),
-    };
-    let mut entry = indexmap::IndexMap::new();
-    entry.insert("name".to_string(), PhpMixed::String(user.name));
-    entry.insert(
-        "passwd".to_string(),
-        PhpMixed::String(user.passwd.to_string_lossy().into_owned()),
-    );
-    entry.insert("uid".to_string(), PhpMixed::Int(user.uid.as_raw() as i64));
-    entry.insert("gid".to_string(), PhpMixed::Int(user.gid.as_raw() as i64));
-    entry.insert(
-        "gecos".to_string(),
-        PhpMixed::String(user.gecos.to_string_lossy().into_owned()),
-    );
-    entry.insert(
-        "dir".to_string(),
-        PhpMixed::String(user.dir.to_string_lossy().into_owned()),
-    );
-    entry.insert(
-        "shell".to_string(),
-        PhpMixed::String(user.shell.to_string_lossy().into_owned()),
-    );
-    PhpMixed::Array(entry)
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PasswdEntry {
+    pub name: String,
+    pub passwd: String,
+    pub uid: i64,
+    pub gid: i64,
+    pub gecos: String,
+    pub dir: String,
+    pub shell: String,
+}
+
+pub fn posix_getpwuid(uid: u32) -> Option<PasswdEntry> {
+    let user = nix::unistd::User::from_uid(nix::unistd::Uid::from_raw(uid)).ok()??;
+    Some(PasswdEntry {
+        name: user.name,
+        passwd: user.passwd.to_string_lossy().into_owned(),
+        uid: user.uid.as_raw() as i64,
+        gid: user.gid.as_raw() as i64,
+        gecos: user.gecos.to_string_lossy().into_owned(),
+        dir: user.dir.to_string_lossy().into_owned(),
+        shell: user.shell.to_string_lossy().into_owned(),
+    })
 }
 
 pub fn posix_isatty(stream: PhpResource) -> bool {
