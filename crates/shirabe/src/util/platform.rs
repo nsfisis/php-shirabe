@@ -296,11 +296,7 @@ impl Platform {
         };
 
         // Check if formatted mode is S_IFCHR
-        if let Some(mode) = stat.get("mode").and_then(|v| v.as_int()) {
-            return 0o020000 == (mode & 0o170000);
-        }
-
-        false
+        0o020000 == (stat.mode & 0o170000)
     }
 
     /// Whether the current command is for bash completion

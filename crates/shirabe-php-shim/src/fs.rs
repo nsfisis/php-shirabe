@@ -3,7 +3,6 @@ use crate::PhpResource;
 use crate::StreamBacking;
 use crate::StreamState;
 use crate::UnexpectedValueException;
-use indexmap::IndexMap;
 use std::io::{Read as _, Write as _};
 
 pub const PHP_EOL: &str = "\n";
@@ -589,8 +588,46 @@ pub fn rewind(stream: &PhpResource) -> bool {
     fseek(stream, 0, SEEK_SET) == 0
 }
 
-/// PHP `fstat()`: the stat array of an open stream, or `None` for `false`-on-failure.
-pub fn fstat(stream: &PhpResource) -> Option<IndexMap<String, PhpMixed>> {
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FileStat {
+    pub dev: i64,
+    pub ino: i64,
+    pub mode: i64,
+    pub nlink: i64,
+    pub uid: i64,
+    pub gid: i64,
+    pub rdev: i64,
+    pub size: i64,
+    pub atime: i64,
+    pub mtime: i64,
+    pub ctime: i64,
+    pub blksize: i64,
+    pub blocks: i64,
+}
+
+impl FileStat {
+    fn from_metadata(m: &std::fs::Metadata) -> Self {
+        use std::os::unix::fs::MetadataExt as _;
+        Self {
+            dev: m.dev() as i64,
+            ino: m.ino() as i64,
+            mode: m.mode() as i64,
+            nlink: m.nlink() as i64,
+            uid: m.uid() as i64,
+            gid: m.gid() as i64,
+            rdev: m.rdev() as i64,
+            size: m.size() as i64,
+            atime: m.atime(),
+            mtime: m.mtime(),
+            ctime: m.ctime(),
+            blksize: m.blksize() as i64,
+            blocks: m.blocks() as i64,
+        }
+    }
+}
+
+/// PHP `fstat()`: the stat of an open stream, or `None` on failure.
+pub fn fstat(stream: &PhpResource) -> Option<FileStat> {
     use std::os::fd::AsFd as _;
     match stream {
         PhpResource::Stdin => fstat_fd(std::io::stdin().as_fd()),
@@ -603,93 +640,43 @@ pub fn fstat(stream: &PhpResource) -> Option<IndexMap<String, PhpMixed>> {
             if state.closed {
                 return None;
             }
-            let (size, file_meta) = match &mut state.backing {
-                StreamBacking::File(f) => {
-                    let m = f.metadata().ok()?;
-                    (m.len(), Some(m))
-                }
-                StreamBacking::Memory(c) => (c.get_ref().len() as u64, None),
+            match &mut state.backing {
+                StreamBacking::File(f) => Some(FileStat::from_metadata(&f.metadata().ok()?)),
+                // For in-memory streams only `size` is meaningful; the rest are reported as 0,
+                // matching PHP fstat on php://temp.
+                StreamBacking::Memory(c) => Some(FileStat {
+                    size: c.get_ref().len() as i64,
+                    ..FileStat::default()
+                }),
                 StreamBacking::Pipe(p) => {
                     use std::os::fd::{AsRawFd as _, BorrowedFd};
                     // SAFETY: the pipe end is owned by the stream state, which is borrowed here.
-                    return fstat_fd(unsafe { BorrowedFd::borrow_raw(p.as_raw_fd()) });
+                    fstat_fd(unsafe { BorrowedFd::borrow_raw(p.as_raw_fd()) })
                 }
-            };
-            Some(build_stat_map(size, file_meta.as_ref()))
+            }
         }
     }
 }
 
 /// Stats an open descriptor with `fstat(2)`, used for the stdio streams and for pipes, neither of
 /// which is backed by a `std::fs::File`.
-fn fstat_fd(fd: std::os::fd::BorrowedFd<'_>) -> Option<IndexMap<String, PhpMixed>> {
+fn fstat_fd(fd: std::os::fd::BorrowedFd<'_>) -> Option<FileStat> {
     let st = nix::sys::stat::fstat(fd).ok()?;
-    Some(stat_fields_map([
-        ("dev", st.st_dev as i64),
-        ("ino", st.st_ino as i64),
-        ("mode", st.st_mode as i64),
-        ("nlink", st.st_nlink as i64),
-        ("uid", st.st_uid as i64),
-        ("gid", st.st_gid as i64),
-        ("rdev", st.st_rdev as i64),
-        ("size", st.st_size as i64),
-        ("atime", st.st_atime as i64),
-        ("mtime", st.st_mtime as i64),
-        ("ctime", st.st_ctime as i64),
-        ("blksize", st.st_blksize as i64),
-        ("blocks", st.st_blocks as i64),
-    ]))
-}
-
-// Builds the 13-field PHP stat array (indexed 0..12 and by name). For in-memory streams only
-// `size` is meaningful; the rest are reported as 0, matching PHP fstat on php://temp.
-fn build_stat_map(size: u64, file_meta: Option<&std::fs::Metadata>) -> IndexMap<String, PhpMixed> {
-    use std::os::unix::fs::MetadataExt;
-    let fields: [(&str, i64); 13] = match file_meta {
-        Some(m) => [
-            ("dev", m.dev() as i64),
-            ("ino", m.ino() as i64),
-            ("mode", m.mode() as i64),
-            ("nlink", m.nlink() as i64),
-            ("uid", m.uid() as i64),
-            ("gid", m.gid() as i64),
-            ("rdev", m.rdev() as i64),
-            ("size", m.size() as i64),
-            ("atime", m.atime()),
-            ("mtime", m.mtime()),
-            ("ctime", m.ctime()),
-            ("blksize", m.blksize() as i64),
-            ("blocks", m.blocks() as i64),
-        ],
-        None => [
-            ("dev", 0),
-            ("ino", 0),
-            ("mode", 0),
-            ("nlink", 0),
-            ("uid", 0),
-            ("gid", 0),
-            ("rdev", 0),
-            ("size", size as i64),
-            ("atime", 0),
-            ("mtime", 0),
-            ("ctime", 0),
-            ("blksize", 0),
-            ("blocks", 0),
-        ],
-    };
-    stat_fields_map(fields)
-}
-
-// PHP stat/fstat/lstat return the 13 fields both by numeric index (0..12) and by name.
-fn stat_fields_map(fields: [(&str, i64); 13]) -> IndexMap<String, PhpMixed> {
-    let mut map = IndexMap::new();
-    for (i, (_, v)) in fields.iter().enumerate() {
-        map.insert(i.to_string(), PhpMixed::Int(*v));
-    }
-    for (name, v) in &fields {
-        map.insert(name.to_string(), PhpMixed::Int(*v));
-    }
-    map
+    Some(FileStat {
+        dev: st.st_dev as i64,
+        ino: st.st_ino as i64,
+        mode: st.st_mode as i64,
+        nlink: st.st_nlink as i64,
+        uid: st.st_uid as i64,
+        gid: st.st_gid as i64,
+        rdev: st.st_rdev as i64,
+        size: st.st_size as i64,
+        atime: st.st_atime as i64,
+        mtime: st.st_mtime as i64,
+        ctime: st.st_ctime as i64,
+        blksize: st.st_blksize as i64,
+        blocks: st.st_blocks as i64,
+    })
 }
 
 /// PHP `fflush()`.
@@ -709,24 +696,10 @@ pub fn fflush(stream: &PhpResource) -> bool {
     }
 }
 
-pub fn lstat(filename: impl AsRef<std::path::Path>) -> Option<IndexMap<String, PhpMixed>> {
-    use std::os::unix::fs::MetadataExt;
-    let m = std::fs::symlink_metadata(filename).ok()?;
-    Some(stat_fields_map([
-        ("dev", m.dev() as i64),
-        ("ino", m.ino() as i64),
-        ("mode", m.mode() as i64),
-        ("nlink", m.nlink() as i64),
-        ("uid", m.uid() as i64),
-        ("gid", m.gid() as i64),
-        ("rdev", m.rdev() as i64),
-        ("size", m.size() as i64),
-        ("atime", m.atime()),
-        ("mtime", m.mtime()),
-        ("ctime", m.ctime()),
-        ("blksize", m.blksize() as i64),
-        ("blocks", m.blocks() as i64),
-    ]))
+pub fn lstat(filename: impl AsRef<std::path::Path>) -> Option<FileStat> {
+    Some(FileStat::from_metadata(
+        &std::fs::symlink_metadata(filename).ok()?,
+    ))
 }
 
 /// PHP `touch($path)`: creates the file when it is missing and stamps mtime/atime with the current
@@ -1399,13 +1372,13 @@ mod tests {
 
         // fstat reports the buffer size.
         let stat = fstat(&stream).unwrap();
-        assert_eq!(stat.get("size"), Some(&PhpMixed::Int(11)));
+        assert_eq!(stat.size, 11);
 
         // seek + truncate.
         assert_eq!(fseek(&stream, 5, SEEK_SET), 0);
         assert!(!feof(&stream)); // seek clears eof
         assert!(ftruncate(&stream, 5));
-        assert_eq!(fstat(&stream).unwrap().get("size"), Some(&PhpMixed::Int(5)));
+        assert_eq!(fstat(&stream).unwrap().size, 5);
 
         assert!(fclose(&stream));
     }

@@ -1021,11 +1021,10 @@ impl Filesystem {
         let stat = lstat(junction);
 
         // S_ISDIR test (S_IFDIR is 0x4000, S_IFMT is 0xF000 bitmask)
-        if let Some(arr) = stat {
-            let mode = arr.get("mode").and_then(|v| v.as_int()).unwrap_or(0);
-            return 0x4000 != (mode & 0xF000);
+        match stat {
+            Some(stat) => 0x4000 != (stat.mode & 0xF000),
+            None => false,
         }
-        false
     }
 
     /// Removes a Windows NTFS junction.
