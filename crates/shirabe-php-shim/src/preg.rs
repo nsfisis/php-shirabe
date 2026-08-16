@@ -69,111 +69,6 @@ pub fn preg_match(
     }
 }
 
-pub fn preg_replace(pattern: impl PregPattern, replacement: &str, subject: &str) -> String {
-    preg_replace2(pattern, replacement, subject, -1, None)
-}
-
-pub fn preg_split(pattern: impl PregPattern, subject: &str) -> Vec<String> {
-    preg_split2(pattern, subject, -1, 0)
-}
-
-// PREG_PATTERN_ORDER: the outer vec is indexed by capture group, the inner by
-// match occurrence. Non-participating groups are reported as "".
-pub fn preg_match_all(pattern: impl PregPattern, subject: &str) -> Vec<Vec<String>> {
-    let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
-    let group_count = re.captures_len();
-    let mut groups: Vec<Vec<String>> = vec![Vec::new(); group_count];
-    for caps in re.captures_iter(subject) {
-        for (g, group) in groups.iter_mut().enumerate() {
-            group.push(
-                caps.get(g)
-                    .map(|m| m.as_str().to_string())
-                    .unwrap_or_default(),
-            );
-        }
-    }
-    groups
-}
-
-// PREG_SET_ORDER: the outer vec is indexed by match occurrence, the inner by
-// capture group (a classic `$matches` row).
-pub fn preg_match_all_set_order(
-    pattern: impl PregPattern,
-    subject: &str,
-    matches: &mut Vec<Vec<String>>,
-) -> usize {
-    let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
-    let mut rows: Vec<Vec<String>> = Vec::new();
-    for caps in re.captures_iter(subject) {
-        rows.push(php_match_row(&caps));
-    }
-    let count = rows.len();
-    *matches = rows;
-    count
-}
-
-pub fn preg_grep(pattern: impl PregPattern, input: &[String]) -> Vec<String> {
-    let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
-    input.iter().filter(|s| re.is_match(s)).cloned().collect()
-}
-
-pub fn preg_match_all_offset_capture(
-    pattern: impl PregPattern,
-    subject: &str,
-    matches: &mut PregOffsetCaptureMatches,
-) -> usize {
-    let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
-    let group_count = re.captures_len();
-    matches.groups = vec![Vec::new(); group_count];
-
-    let mut count = 0;
-    for caps in re.captures_iter(subject) {
-        count += 1;
-        for g in 0..group_count {
-            // PHP stores ["", -1] for non-participating groups under
-            // PREG_OFFSET_CAPTURE; the unsigned offset here approximates -1 as 0,
-            // which callers must not rely on for absent groups.
-            let entry = caps
-                .get(g)
-                .map(|m| (m.as_str().to_string(), m.start()))
-                .unwrap_or_else(|| (String::new(), 0));
-            matches.groups[g].push(entry);
-        }
-    }
-
-    count
-}
-
-pub fn preg_replace_callback<F>(
-    pattern: impl PregPattern,
-    mut callback: F,
-    subject: &str,
-) -> anyhow::Result<String>
-where
-    F: FnMut(&indexmap::IndexMap<CaptureKey, Option<String>>) -> anyhow::Result<String>,
-{
-    let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
-    let names: Vec<Option<&str>> = re.capture_names().collect();
-
-    let mut out: Vec<u8> = Vec::new();
-    let mut last = 0usize;
-    for caps in re.captures_iter(subject) {
-        let m = caps.get(0).unwrap();
-        out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
-        let map = single_match_map(&caps, &names, false);
-        out.extend_from_slice(callback(&map)?.as_bytes());
-        last = m.end();
-    }
-    out.extend_from_slice(&subject.as_bytes()[last..]);
-
-    Ok(String::from_utf8_lossy(&out).into_owned())
-}
-
 // Returns whether the pattern matched. Unmatched groups are reported as None
 // (PREG_UNMATCHED_AS_NULL).
 pub fn preg_match2(
@@ -203,6 +98,25 @@ pub fn preg_match2(
     }
 
     caps.is_some()
+}
+
+// PREG_PATTERN_ORDER: the outer vec is indexed by capture group, the inner by
+// match occurrence. Non-participating groups are reported as "".
+pub fn preg_match_all(pattern: impl PregPattern, subject: &str) -> Vec<Vec<String>> {
+    let __resolved = pattern.resolve();
+    let (re, _anchored) = __resolved.parts();
+    let group_count = re.captures_len();
+    let mut groups: Vec<Vec<String>> = vec![Vec::new(); group_count];
+    for caps in re.captures_iter(subject) {
+        for (g, group) in groups.iter_mut().enumerate() {
+            group.push(
+                caps.get(g)
+                    .map(|m| m.as_str().to_string())
+                    .unwrap_or_default(),
+            );
+        }
+    }
+    groups
 }
 
 pub fn preg_match_all2(
@@ -239,6 +153,52 @@ pub fn preg_match_all2(
             matches.insert(CaptureKey::ByName((*name).to_string()), column.clone());
         }
         matches.insert(CaptureKey::ByIndex(g), column);
+    }
+
+    count
+}
+
+// PREG_SET_ORDER: the outer vec is indexed by match occurrence, the inner by
+// capture group (a classic `$matches` row).
+pub fn preg_match_all_set_order(
+    pattern: impl PregPattern,
+    subject: &str,
+    matches: &mut Vec<Vec<String>>,
+) -> usize {
+    let __resolved = pattern.resolve();
+    let (re, _anchored) = __resolved.parts();
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    for caps in re.captures_iter(subject) {
+        rows.push(php_match_row(&caps));
+    }
+    let count = rows.len();
+    *matches = rows;
+    count
+}
+
+pub fn preg_match_all_offset_capture(
+    pattern: impl PregPattern,
+    subject: &str,
+    matches: &mut PregOffsetCaptureMatches,
+) -> usize {
+    let __resolved = pattern.resolve();
+    let (re, _anchored) = __resolved.parts();
+    let group_count = re.captures_len();
+    matches.groups = vec![Vec::new(); group_count];
+
+    let mut count = 0;
+    for caps in re.captures_iter(subject) {
+        count += 1;
+        for g in 0..group_count {
+            // PHP stores ["", -1] for non-participating groups under
+            // PREG_OFFSET_CAPTURE; the unsigned offset here approximates -1 as 0,
+            // which callers must not rely on for absent groups.
+            let entry = caps
+                .get(g)
+                .map(|m| (m.as_str().to_string(), m.start()))
+                .unwrap_or_else(|| (String::new(), 0));
+            matches.groups[g].push(entry);
+        }
     }
 
     count
@@ -282,40 +242,25 @@ pub fn preg_match_all_offset_capture2(
     count
 }
 
-pub fn preg_replace2(
-    pattern: impl PregPattern,
-    replacement: &str,
-    subject: &str,
-    limit: i64,
-    count: Option<&mut usize>,
-) -> String {
+pub fn preg_grep(pattern: impl PregPattern, input: &[String]) -> Vec<String> {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
-    let limit = if limit < 0 {
-        usize::MAX
-    } else {
-        limit as usize
-    };
+    input.iter().filter(|s| re.is_match(s)).cloned().collect()
+}
 
-    let mut out: Vec<u8> = Vec::new();
-    let mut last = 0usize;
-    let mut n = 0usize;
-    for caps in re.captures_iter(subject) {
-        if n >= limit {
-            break;
-        }
-        let m = caps.get(0).unwrap();
-        out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
-        php_replacement_expand(replacement, &caps, &mut out);
-        last = m.end();
-        n += 1;
-    }
-    out.extend_from_slice(&subject.as_bytes()[last..]);
+pub fn preg_grep2(pattern: impl PregPattern, array: &[&str], flags: i64) -> Vec<String> {
+    let __resolved = pattern.resolve();
+    let (re, _anchored) = __resolved.parts();
+    let invert = flags & PREG_GREP_INVERT != 0;
+    array
+        .iter()
+        .filter(|s| re.is_match(s) != invert)
+        .map(|s| s.to_string())
+        .collect()
+}
 
-    if let Some(count) = count {
-        *count = n;
-    }
-    String::from_utf8_lossy(&out).into_owned()
+pub fn preg_split(pattern: impl PregPattern, subject: &str) -> Vec<String> {
+    preg_split2(pattern, subject, -1, 0)
 }
 
 pub fn preg_split2(
@@ -365,15 +310,70 @@ pub fn preg_split2(
     result
 }
 
-pub fn preg_grep2(pattern: impl PregPattern, array: &[&str], flags: i64) -> Vec<String> {
+pub fn preg_replace(pattern: impl PregPattern, replacement: &str, subject: &str) -> String {
+    preg_replace2(pattern, replacement, subject, -1, None)
+}
+
+pub fn preg_replace2(
+    pattern: impl PregPattern,
+    replacement: &str,
+    subject: &str,
+    limit: i64,
+    count: Option<&mut usize>,
+) -> String {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
-    let invert = flags & PREG_GREP_INVERT != 0;
-    array
-        .iter()
-        .filter(|s| re.is_match(s) != invert)
-        .map(|s| s.to_string())
-        .collect()
+    let limit = if limit < 0 {
+        usize::MAX
+    } else {
+        limit as usize
+    };
+
+    let mut out: Vec<u8> = Vec::new();
+    let mut last = 0usize;
+    let mut n = 0usize;
+    for caps in re.captures_iter(subject) {
+        if n >= limit {
+            break;
+        }
+        let m = caps.get(0).unwrap();
+        out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
+        php_replacement_expand(replacement, &caps, &mut out);
+        last = m.end();
+        n += 1;
+    }
+    out.extend_from_slice(&subject.as_bytes()[last..]);
+
+    if let Some(count) = count {
+        *count = n;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+pub fn preg_replace_callback<F>(
+    pattern: impl PregPattern,
+    mut callback: F,
+    subject: &str,
+) -> anyhow::Result<String>
+where
+    F: FnMut(&indexmap::IndexMap<CaptureKey, Option<String>>) -> anyhow::Result<String>,
+{
+    let __resolved = pattern.resolve();
+    let (re, _anchored) = __resolved.parts();
+    let names: Vec<Option<&str>> = re.capture_names().collect();
+
+    let mut out: Vec<u8> = Vec::new();
+    let mut last = 0usize;
+    for caps in re.captures_iter(subject) {
+        let m = caps.get(0).unwrap();
+        out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
+        let map = single_match_map(&caps, &names, false);
+        out.extend_from_slice(callback(&map)?.as_bytes());
+        last = m.end();
+    }
+    out.extend_from_slice(&subject.as_bytes()[last..]);
+
+    Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
 // Translates a PHP PCRE pattern (delimiters + trailing modifiers) into a regex
