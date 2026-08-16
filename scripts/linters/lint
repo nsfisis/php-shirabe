@@ -9,6 +9,7 @@ use Shirabe\Lint\Linters\CargoWorkspaceDependencies;
 use Shirabe\Lint\Linters\ContiguousUseBlock;
 use Shirabe\Lint\Linters\NoBannedUse;
 use Shirabe\Lint\Linters\NoDecorativeSectionComment;
+use Shirabe\Lint\Linters\NoDirectEnvAccess;
 use Shirabe\Lint\Linters\NoExceptionDowncast;
 use Shirabe\Lint\Linters\NoFormatTrailingComma;
 use Shirabe\Lint\Linters\NoHaltCompilerLiteral;
@@ -27,6 +28,13 @@ $runner = new Runner($rootDir, [
     [new NoBannedUse(), []],
     [new NoDecorativeSectionComment(), [
         'crates/shirabe-semver/src/version_parser.rs',
+    ]],
+    [new NoDirectEnvAccess(), [
+        // Defines the shim the rule points at.
+        'crates/shirabe-php-shim/src/env.rs',
+        // Build scripts read Cargo's own variables, and run before the shim exists.
+        'crates/shirabe-php-rpc/build.rs',
+        'crates/shirabe/build.rs',
     ]],
     [new NoExceptionDowncast(), [
         // Defines the box and the walk the rule points at.
