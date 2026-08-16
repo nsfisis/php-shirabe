@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/console/Terminal.php
 
-use shirabe_php_shim::{PhpMixed, php_regex};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_match};
 use std::cell::Cell;
 
 thread_local! {
@@ -81,7 +81,7 @@ impl Terminal {
             let ansicon = shirabe_php_shim::getenv("ANSICON");
             let mut matches: Vec<Option<String>> = Vec::new();
             if let Some(ansicon) = &ansicon
-                && shirabe_php_shim::preg_match(
+                && preg_match(
                     php_regex!("/^(\\d+)x(\\d+)(?: \\((\\d+)x(\\d+)\\))?$/"),
                     &shirabe_php_shim::trim(&ansicon.to_string_lossy(), None),
                     &mut matches,
@@ -138,7 +138,7 @@ impl Terminal {
                 return;
             }
             let mut matches: Vec<Option<String>> = Vec::new();
-            if shirabe_php_shim::preg_match(
+            if preg_match(
                 php_regex!("/rows.(\\d+);.columns.(\\d+);/i"),
                 &stty_string,
                 &mut matches,
@@ -154,7 +154,7 @@ impl Terminal {
                         matches[1].clone().unwrap_or_default(),
                     ))))
                 });
-            } else if shirabe_php_shim::preg_match(
+            } else if preg_match(
                 php_regex!("/;.(\\d+).rows;.(\\d+).columns/i"),
                 &stty_string,
                 &mut matches,
@@ -182,7 +182,7 @@ impl Terminal {
 
         let info = info?;
         let mut matches: Vec<Option<String>> = Vec::new();
-        if !shirabe_php_shim::preg_match(
+        if !preg_match(
             php_regex!("/--------+\\r?\\n.+?(\\d+)\\r?\\n.+?(\\d+)\\r?\\n/"),
             &info,
             &mut matches,

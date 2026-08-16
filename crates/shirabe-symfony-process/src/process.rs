@@ -11,7 +11,10 @@ use crate::pipes::unix_pipes::UnixPipes;
 use crate::pipes::windows_pipes::WindowsPipes;
 use crate::process_utils::ProcessUtils;
 use indexmap::IndexMap;
-use shirabe_php_shim::{CaptureKey, Descriptor, PhpMixed, PhpResource, php_regex};
+use shirabe_php_shim::{
+    CaptureKey, Descriptor, PhpMixed, PhpResource, php_regex, preg_match, preg_replace,
+    preg_replace_callback,
+};
 use std::sync::OnceLock;
 
 /// A user-supplied callback invoked with the output type ("out"/"err") and a chunk of output.
@@ -925,7 +928,7 @@ impl Process {
         let uid = shirabe_php_shim::uniqid("", true);
         let mut var_count = 0;
         let mut var_cache: IndexMap<String, String> = IndexMap::new();
-        let cmd = shirabe_php_shim::preg_replace_callback(
+        let cmd = preg_replace_callback(
             php_regex!(
                 r#"/"(?:(
                 [^"%!^]*+
@@ -963,7 +966,7 @@ impl Process {
                 }
                 value = format!(
                     "\"{}\"",
-                    shirabe_php_shim::preg_replace(php_regex!(r#"/(\\*)"/"#), "$1$1\\\"", &value)
+                    preg_replace(php_regex!(r#"/(\\*)"/"#), "$1$1\\\"", &value)
                 );
                 var_count += 1;
                 let var = format!("{}{}", uid, var_count);
@@ -985,11 +988,7 @@ impl Process {
                     .map(|spec| {
                         format!(
                             "\"{}\"",
-                            shirabe_php_shim::preg_replace(
-                                php_regex!(r#"{(\\*+)"}"#),
-                                "$1$1\\\"",
-                                &spec,
-                            )
+                            preg_replace(php_regex!(r#"{(\\*+)"}"#), "$1$1\\\"", &spec,)
                         )
                     })
             })
@@ -1044,14 +1043,14 @@ impl Process {
         if argument.contains('\0') {
             argument = argument.replace('\0', "?");
         }
-        if !shirabe_php_shim::preg_match(
+        if !preg_match(
             php_regex!(r#"/[()%!^"<>&|\s\[\]=;*?'$]/"#),
             &argument,
             &mut Vec::new(),
         ) {
             return argument;
         }
-        argument = shirabe_php_shim::preg_replace(php_regex!(r"/(\\+)$/"), "$1$1", &argument);
+        argument = preg_replace(php_regex!(r"/(\\+)$/"), "$1$1", &argument);
 
         let mut result = argument;
         for (from, to) in [
@@ -1071,7 +1070,7 @@ impl Process {
         commandline: &str,
         env: &IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<String> {
-        shirabe_php_shim::preg_replace_callback(
+        preg_replace_callback(
             php_regex!(r#"/"\$\{:([_a-zA-Z]+[_a-zA-Z0-9]*)\}"/"#),
             |matches: &IndexMap<CaptureKey, Option<String>>| -> anyhow::Result<String> {
                 let key = matches

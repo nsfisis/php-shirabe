@@ -3,7 +3,7 @@
 use crate::exception::InvalidArgumentException;
 use crate::question::Question;
 use crate::question::QuestionInterface;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, preg_match};
 
 /// Represents a yes/no question.
 #[derive(Debug)]
@@ -40,11 +40,7 @@ impl ConfirmationQuestion {
 
             let answer_is_true = {
                 let mut matches: Vec<Option<String>> = Vec::new();
-                shirabe_php_shim::preg_match(
-                    &regex,
-                    &shirabe_php_shim::strval(&answer),
-                    &mut matches,
-                )
+                preg_match(&regex, &shirabe_php_shim::strval(&answer), &mut matches)
             };
 
             // false === $default

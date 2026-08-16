@@ -4,7 +4,7 @@ use crate::exception::InvalidArgumentException;
 use crate::exception::RuntimeException;
 use crate::input::InputDefinition;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, PhpResource, php_regex};
+use shirabe_php_shim::{PhpMixed, PhpResource, php_regex, preg_match};
 
 /// Input is the base class for all concrete Input classes.
 ///
@@ -208,7 +208,7 @@ impl Input {
     /// Escapes a token through escapeshellarg if it contains unsafe chars.
     pub fn escape_token(&self, token: &str) -> String {
         let mut matches: Vec<Option<String>> = vec![];
-        if shirabe_php_shim::preg_match(php_regex!("{^[\\w-]+$}"), token, &mut matches) {
+        if preg_match(php_regex!("{^[\\w-]+$}"), token, &mut matches) {
             token.to_string()
         } else {
             shirabe_php_shim::escapeshellarg(token)

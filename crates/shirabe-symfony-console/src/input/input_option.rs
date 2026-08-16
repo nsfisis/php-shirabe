@@ -2,7 +2,7 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::exception::LogicException;
-use shirabe_php_shim::{PhpMixed, php_regex};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_split};
 
 #[derive(Debug, Clone)]
 pub struct InputOption {
@@ -99,7 +99,7 @@ impl InputOption {
 
     fn normalize_shortcut(s: String) -> anyhow::Result<Option<String>> {
         let stripped = shirabe_php_shim::ltrim(&s, Some("-"));
-        let parts = shirabe_php_shim::preg_split(php_regex!(r"{(\|)-?}"), &stripped);
+        let parts = preg_split(php_regex!(r"{(\|)-?}"), &stripped);
         let filtered: Vec<String> =
             shirabe_php_shim::array_filter(&parts, |s: &String| !s.is_empty());
         let result = shirabe_php_shim::implode("|", &filtered);

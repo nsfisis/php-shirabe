@@ -9,7 +9,7 @@ use crate::output::OutputInterface;
 use crate::output::output_interface;
 use crate::terminal::Terminal;
 use indexmap::IndexMap;
-use shirabe_php_shim::CaptureKey;
+use shirabe_php_shim::{CaptureKey, preg_replace_callback};
 
 pub const FORMAT_VERBOSE: &str = "verbose";
 pub const FORMAT_VERY_VERBOSE: &str = "very_verbose";
@@ -831,6 +831,6 @@ impl ProgressBar {
             })
         };
 
-        shirabe_php_shim::preg_replace_callback(regex, callback, &format)
+        preg_replace_callback(regex, callback, &format)
     }
 }

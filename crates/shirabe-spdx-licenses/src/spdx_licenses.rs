@@ -296,7 +296,7 @@ fn ws0_end(s: &[u8], pos: usize) -> usize {
 }
 
 #[cfg(test)]
-mod is_valid_license_string_tests {
+mod tests {
     use super::SpdxLicenses;
 
     // Every case below was cross-checked against `Composer\Spdx\SpdxLicenses::validate()` running

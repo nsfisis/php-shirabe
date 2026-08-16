@@ -6,7 +6,7 @@ use crate::input::InputDefinition;
 use crate::input::InputInterface;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{CaptureKey, PhpMixed, php_regex};
+use shirabe_php_shim::{CaptureKey, PhpMixed, php_regex, preg_match2};
 
 /// StringInput represents an input provided as a string.
 ///
@@ -58,19 +58,13 @@ impl StringInput {
             }
 
             let mut m: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-            if shirabe_php_shim::preg_match2(
-                php_regex!(r"/\s+/A"),
-                input,
-                &mut m,
-                0,
-                cursor as usize,
-            ) {
+            if preg_match2(php_regex!(r"/\s+/A"), input, &mut m, 0, cursor as usize) {
                 if token.is_some() {
                     tokens.push(token.take().unwrap());
                 }
                 cursor +=
                     shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
-            } else if shirabe_php_shim::preg_match2(
+            } else if preg_match2(
                 format!(r#"/([^="'\s]+?)(=?)({}+)/A"#, Self::REGEX_QUOTED_STRING),
                 input,
                 &mut m,
@@ -93,7 +87,7 @@ impl StringInput {
                 ));
                 cursor +=
                     shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
-            } else if shirabe_php_shim::preg_match2(
+            } else if preg_match2(
                 format!(r"/{}/A", Self::REGEX_QUOTED_STRING),
                 input,
                 &mut m,
@@ -111,7 +105,7 @@ impl StringInput {
                 ));
                 cursor +=
                     shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
-            } else if shirabe_php_shim::preg_match2(
+            } else if preg_match2(
                 format!(r"/{}/A", Self::REGEX_UNQUOTED_STRING),
                 input,
                 &mut m,

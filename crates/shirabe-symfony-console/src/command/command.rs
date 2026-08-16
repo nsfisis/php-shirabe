@@ -11,7 +11,7 @@ use crate::input::InputInterface;
 use crate::input::InputOption;
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_match};
 use std::cell::{Cell, Ref};
 
 /// The base-class state of the PHP `Command` class.
@@ -109,8 +109,7 @@ impl CommandData {
     /// Throws InvalidArgumentException when the name is invalid.
     fn validate_name(&self, name: &str) -> anyhow::Result<Result<(), InvalidArgumentException>> {
         let mut matches: Vec<Option<String>> = Vec::new();
-        if !shirabe_php_shim::preg_match(php_regex!(r"/^[^\:]++(\:[^\:]++)*$/"), name, &mut matches)
-        {
+        if !preg_match(php_regex!(r"/^[^\:]++(\:[^\:]++)*$/"), name, &mut matches) {
             return Ok(Err(InvalidArgumentException::new(format!(
                 "Command name \"{}\" is invalid.",
                 name

@@ -15,7 +15,8 @@ use indexmap::IndexMap;
 pub use shirabe_php_shim::CaptureKey;
 use shirabe_php_shim::{
     PREG_OFFSET_CAPTURE, PREG_SET_ORDER, PREG_SPLIT_OFFSET_CAPTURE, PREG_UNMATCHED_AS_NULL,
-    PregPattern,
+    PregPattern, preg_grep2, preg_match_all_offset_capture2, preg_match_all2, preg_match2,
+    preg_replace_callback, preg_replace2, preg_split2,
 };
 
 #[derive(Debug)]
@@ -40,7 +41,7 @@ impl Preg {
         Self::check_offset_capture(flags, "matchWithOffsets");
 
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-        let result = shirabe_php_shim::preg_match2(
+        let result = preg_match2(
             pattern,
             subject,
             &mut internal,
@@ -78,7 +79,7 @@ impl Preg {
         Self::check_set_order(flags);
 
         let mut internal: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
-        let result = shirabe_php_shim::preg_match_all2(
+        let result = preg_match_all2(
             pattern,
             subject,
             &mut internal,
@@ -103,7 +104,7 @@ impl Preg {
         Self::check_set_order(flags);
 
         let mut internal: IndexMap<CaptureKey, Vec<(Option<String>, i64)>> = IndexMap::new();
-        let result = shirabe_php_shim::preg_match_all_offset_capture2(
+        let result = preg_match_all_offset_capture2(
             pattern,
             subject,
             &mut internal,
@@ -151,7 +152,7 @@ impl Preg {
         // `$subject` is statically a string here, so the is_scalar/is_array
         // guards (ARRAY_MSG / INVALID_TYPE_MSG) of the PHP original are
         // unreachable and not reproduced.
-        shirabe_php_shim::preg_replace2(pattern, replacement, subject, limit, count)
+        preg_replace2(pattern, replacement, subject, limit, count)
     }
 
     pub fn replace_callback<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
@@ -163,8 +164,7 @@ impl Preg {
             Ok(replacement(&drop_null_matches_ref(internal)))
         };
 
-        shirabe_php_shim::preg_replace_callback(pattern, adapter, subject)
-            .expect("$replacement cannot fail")
+        preg_replace_callback(pattern, adapter, subject).expect("$replacement cannot fail")
     }
 
     pub fn split(pattern: impl PregPattern, subject: &str) -> Vec<String> {
@@ -177,7 +177,7 @@ impl Preg {
             "PREG_SPLIT_OFFSET_CAPTURE is not supported as it changes the type of $matches, use splitWithOffsets() instead"
         );
 
-        shirabe_php_shim::preg_split2(pattern, subject, limit, flags)
+        preg_split2(pattern, subject, limit, flags)
     }
 
     pub fn grep(pattern: impl PregPattern, array: &[&str]) -> Vec<String> {
@@ -185,7 +185,7 @@ impl Preg {
     }
 
     pub fn grep3(pattern: impl PregPattern, array: &[&str], flags: i64) -> Vec<String> {
-        shirabe_php_shim::preg_grep2(pattern, array, flags)
+        preg_grep2(pattern, array, flags)
     }
 
     pub fn is_match(pattern: impl PregPattern, subject: &str) -> bool {
@@ -216,13 +216,7 @@ impl Preg {
         matches: &mut IndexMap<String, String>,
     ) -> bool {
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-        let result = shirabe_php_shim::preg_match2(
-            pattern,
-            subject,
-            &mut internal,
-            PREG_UNMATCHED_AS_NULL,
-            0,
-        );
+        let result = preg_match2(pattern, subject, &mut internal, PREG_UNMATCHED_AS_NULL, 0);
 
         matches.clear();
         for (key, value) in internal {
@@ -241,7 +235,7 @@ impl Preg {
         // Classic preg_match semantics (no PREG_UNMATCHED_AS_NULL): trailing
         // unmatched groups are truncated, interior unmatched groups become "".
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-        let result = shirabe_php_shim::preg_match2(pattern, subject, &mut internal, 0, 0);
+        let result = preg_match2(pattern, subject, &mut internal, 0, 0);
 
         if !result {
             return None;

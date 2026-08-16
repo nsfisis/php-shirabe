@@ -3,7 +3,7 @@
 use crate::input::ArgvInput;
 use crate::input::InputDefinition;
 use crate::input::InputOption;
-use shirabe_php_shim::{PhpMixed, php_regex};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_match_all};
 
 /// An input specialized for shell completion.
 ///
@@ -29,7 +29,7 @@ impl CompletionInput {
     ///
     /// This is required for shell completions without COMP_WORDS support.
     pub fn from_string(input_str: &str, current_index: i64) -> anyhow::Result<Self> {
-        let tokens = shirabe_php_shim::preg_match_all(
+        let tokens = preg_match_all(
             php_regex!("/(?<=^|\\s)(['\"]?)(.+?)(?<!\\\\)\\1(?=$|\\s)/"),
             input_str,
         );

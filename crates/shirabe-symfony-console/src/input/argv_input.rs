@@ -6,7 +6,7 @@ use crate::input::InputDefinition;
 use crate::input::InputInterface;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_match};
 
 /// ArgvInput represents an input coming from the CLI arguments.
 ///
@@ -524,8 +524,7 @@ impl std::fmt::Display for ArgvInput {
             .iter()
             .map(|token| {
                 let mut r#match: Vec<Option<String>> = Vec::new();
-                if shirabe_php_shim::preg_match(php_regex!("{^(-[^=]+=)(.+)}"), token, &mut r#match)
-                {
+                if preg_match(php_regex!("{^(-[^=]+=)(.+)}"), token, &mut r#match) {
                     return format!(
                         "{}{}",
                         r#match[1].as_deref().unwrap_or(""),
