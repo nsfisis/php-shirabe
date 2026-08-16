@@ -176,7 +176,7 @@ impl InitCommand {
         {
             *self.git_config.borrow_mut() = Some(IndexMap::new());
             let mut m: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
-            if Preg::is_match_all3(php_regex!(r"{^([^=]+)=(.*)$}m"), &output, Some(&mut m)) {
+            if Preg::is_match_all(php_regex!(r"{^([^=]+)=(.*)$}m"), &output, &mut m) {
                 let keys: Vec<Option<String>> =
                     m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
                 let values: Vec<Option<String>> =

@@ -86,7 +86,7 @@ impl PhpFileParser {
             et = extra_types
         );
         let mut matches: IndexMap<_, _> = IndexMap::new();
-        Preg::match_all3(&pattern2, &contents, Some(&mut matches));
+        Preg::match_all2(&pattern2, &contents, &mut matches);
 
         let mut classes = vec![];
         let mut namespace = String::new();

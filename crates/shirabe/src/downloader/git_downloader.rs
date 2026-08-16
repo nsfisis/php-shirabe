@@ -110,10 +110,10 @@ impl GitDownloader {
             .unwrap_or_default();
 
         let mut branches_match: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
-        if !Preg::is_match_all3(
+        if !Preg::is_match_all(
             format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
             &refs,
-            Some(&mut branches_match),
+            &mut branches_match,
         ) {
             // not on a branch, we are either on a not-modified tag or some sort of detached head, so skip this
             return Ok(None);
@@ -138,13 +138,13 @@ impl GitDownloader {
             // try to find matching branch names in remote repos
             for candidate in &candidate_branches {
                 let mut m: IndexMap<CaptureKey, Vec<Option<String>>> = IndexMap::new();
-                if Preg::is_match_all3(
+                if Preg::is_match_all(
                     format!(
                         "{{^[a-f0-9]+ refs/remotes/((?:[^/]+)/{})$}}mi",
                         preg_quote(candidate, None)
                     ),
                     &refs,
-                    Some(&mut m),
+                    &mut m,
                 ) {
                     let matches: Vec<Option<String>> =
                         m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
