@@ -57,18 +57,10 @@ impl Preg {
     }
 
     pub fn match_all(pattern: impl PregPattern, subject: &str) -> usize {
-        Self::match_all5(pattern, subject, None)
+        Self::match_all3(pattern, subject, None)
     }
 
     pub fn match_all3(
-        pattern: impl PregPattern,
-        subject: &str,
-        matches: Option<&mut IndexMap<CaptureKey, Vec<Option<String>>>>,
-    ) -> usize {
-        Self::match_all5(pattern, subject, matches)
-    }
-
-    fn match_all5(
         pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<Option<String>>>>,
@@ -100,7 +92,7 @@ impl Preg {
     }
 
     pub fn replace(pattern: impl PregPattern, replacement: &str, subject: &str) -> String {
-        Self::replace_impl(pattern, replacement, subject, -1, None)
+        preg_replace2(pattern, replacement, subject, -1, None)
     }
 
     pub fn replace4(
@@ -109,7 +101,7 @@ impl Preg {
         subject: &str,
         limit: i64,
     ) -> String {
-        Self::replace_impl(pattern, replacement, subject, limit, None)
+        preg_replace2(pattern, replacement, subject, limit, None)
     }
 
     pub fn replace5(
@@ -119,20 +111,7 @@ impl Preg {
         limit: i64,
         count: &mut usize,
     ) -> String {
-        Self::replace_impl(pattern, replacement, subject, limit, Some(count))
-    }
-
-    fn replace_impl(
-        pattern: impl PregPattern,
-        replacement: &str,
-        subject: &str,
-        limit: i64,
-        count: Option<&mut usize>,
-    ) -> String {
-        // `$subject` is statically a string here, so the is_scalar/is_array
-        // guards (ARRAY_MSG / INVALID_TYPE_MSG) of the PHP original are
-        // unreachable and not reproduced.
-        preg_replace2(pattern, replacement, subject, limit, count)
+        preg_replace2(pattern, replacement, subject, limit, Some(count))
     }
 
     pub fn replace_callback<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
@@ -246,7 +225,7 @@ impl Preg {
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, Vec<Option<String>>>>,
     ) -> bool {
-        Self::match_all5(pattern, subject, matches) > 0
+        Self::match_all3(pattern, subject, matches) > 0
     }
 
     pub fn is_match_all_with_offsets3(
