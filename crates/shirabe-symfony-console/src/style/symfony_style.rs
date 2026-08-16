@@ -1,15 +1,11 @@
 //! ref: composer/vendor/symfony/console/Style/SymfonyStyle.php
 
-use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatter;
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::Helper;
-use crate::helper::ProgressBar;
 use crate::helper::QuestionHelperInterface;
 use crate::helper::SymfonyQuestionHelper;
 use crate::helper::Table;
-use crate::helper::TableCell;
-use crate::helper::TableSeparator;
 use crate::helper::{Cell, Row};
 use crate::input::InputInterface;
 use crate::output::ConsoleOutput;
@@ -17,9 +13,7 @@ use crate::output::ConsoleOutputInterface;
 use crate::output::OUTPUT_NORMAL;
 use crate::output::OutputInterface;
 use crate::output::TrimmedBufferOutput;
-use crate::question::ChoiceQuestion;
 use crate::question::ConfirmationQuestion;
-use crate::question::Question;
 use crate::question::QuestionInterface;
 use crate::style::output_style::OutputStyle;
 use crate::style::style_interface::StyleInterface;
@@ -33,22 +27,11 @@ pub struct SymfonyStyle {
     input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     question_helper: Option<SymfonyQuestionHelper>,
-    progress_bar: Option<ProgressBar>,
     line_length: i64,
     buffered_output: TrimmedBufferOutput,
 }
 
 pub const MAX_LINE_LENGTH: i64 = 120;
-
-/// A `definition_list` entry. PHP types it as `string|array|TableSeparator`; any other type is
-/// rejected with an `InvalidArgumentException` (a `LogicException`), which this enum makes
-/// unrepresentable.
-#[derive(Debug)]
-pub enum DefinitionListItem {
-    String(String),
-    Array(indexmap::IndexMap<String, String>),
-    TableSeparator(TableSeparator),
-}
 
 impl SymfonyStyle {
     pub fn new(
@@ -77,7 +60,6 @@ impl SymfonyStyle {
             input,
             output,
             question_helper: None,
-            progress_bar: None,
             line_length,
             buffered_output,
         }
@@ -97,93 +79,6 @@ impl SymfonyStyle {
         let block = self.create_block(messages, r#type, style, prefix, padding, escape);
         self.writeln(&block, OUTPUT_NORMAL);
         self.new_line(1);
-    }
-
-    /// Formats a command comment.
-    pub fn comment(&mut self, message: &[String]) {
-        self.block(
-            message,
-            None,
-            None,
-            "<fg=default;bg=default> // </>",
-            false,
-            false,
-        );
-    }
-
-    /// Formats an info message.
-    pub fn info(&mut self, message: &[String]) {
-        self.block(message, Some("INFO"), Some("fg=green"), " ", true, true);
-    }
-
-    /// Formats a horizontal table.
-    pub fn horizontal_table(&mut self, headers: Vec<Cell>, rows: Vec<Row>) {
-        self.create_table()
-            .set_horizontal(true)
-            .set_headers(headers)
-            .set_rows(rows)
-            .render();
-
-        self.new_line(1);
-    }
-
-    /// Formats a list of key/value horizontally.
-    ///
-    /// Each row can be one of:
-    /// * 'A title'
-    /// * ['key' => 'value']
-    /// * new TableSeparator()
-    pub fn definition_list(&mut self, list: Vec<DefinitionListItem>) {
-        let mut headers: Vec<Cell> = Vec::new();
-        let mut row: Vec<Cell> = Vec::new();
-        for value in list {
-            match value {
-                DefinitionListItem::TableSeparator(separator) => {
-                    headers.push(Cell::Separator(separator.clone()));
-                    row.push(Cell::Separator(separator));
-                }
-                DefinitionListItem::String(value) => {
-                    headers.push(Cell::Cell(
-                        TableCell::new(&value, {
-                            let mut options = indexmap::IndexMap::new();
-                            options.insert(
-                                "colspan".to_string(),
-                                crate::helper::TableCellOption::Int(2),
-                            );
-                            options
-                        })
-                        .expect("colspan is a valid TableCell option"),
-                    ));
-                    row.push(Cell::Null);
-                }
-                DefinitionListItem::Array(value) => {
-                    // $headers[] = key($value); $row[] = current($value);
-                    let first_key = value.keys().next().cloned();
-                    // `current()` on an empty array is false, which renders as an empty cell.
-                    let first_value = value.values().next().cloned().unwrap_or_default();
-                    headers.push(first_key.map_or(Cell::Null, Cell::Value));
-                    row.push(Cell::Value(first_value));
-                }
-            }
-        }
-
-        self.horizontal_table(headers, vec![Row::Cells(row)]);
-    }
-
-    /// @see ProgressBar::iterate()
-    ///
-    /// PHP returns a generator (`yield from`); this port evaluates eagerly, following
-    /// `ProgressBar::iterate`.
-    pub fn progress_iterate(
-        &mut self,
-        iterable: Vec<(PhpMixed, PhpMixed)>,
-        max: Option<i64>,
-    ) -> anyhow::Result<Vec<(PhpMixed, PhpMixed)>> {
-        let yielded = self.create_progress_bar(0).iterate(iterable, max)?;
-
-        self.new_line(2);
-
-        Ok(yielded)
     }
 
     pub fn ask_question(&mut self, question: &impl QuestionInterface) -> PhpMixed {
@@ -221,11 +116,6 @@ impl SymfonyStyle {
         answer
     }
 
-    /// Returns a new instance which makes use of stderr if available.
-    pub fn get_error_style(&self) -> Self {
-        Self::new(self.input.clone(), self.inner.get_error_output())
-    }
-
     pub fn create_table(&mut self) -> Table {
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> =
             if Self::is_console_output_interface(&self.output) {
@@ -243,30 +133,6 @@ impl SymfonyStyle {
         let mut table = Table::new(output);
         let _ = table.set_style(crate::helper::StyleName::Style(style));
         table
-    }
-
-    pub fn create_progress_bar(&self, max: i64) -> ProgressBar {
-        let mut progress_bar = self.inner.create_progress_bar(max);
-
-        if !cfg!(windows)
-            || shirabe_php_shim::getenv("TERM_PROGRAM").as_deref()
-                == Some(std::ffi::OsStr::new("Hyper"))
-        {
-            progress_bar.set_empty_bar_character("░"); // light shade character ░
-            progress_bar.set_progress_character("");
-            progress_bar.set_bar_character("▓"); // dark shade character ▓
-        }
-
-        progress_bar
-    }
-
-    fn get_progress_bar(&mut self) -> &mut ProgressBar {
-        // PHP throws RuntimeException('The ProgressBar is not started.'). Reaching this without a
-        // prior progress_start() call is a caller bug, and the StyleInterface signatures carry no
-        // Result, so panic.
-        self.progress_bar
-            .as_mut()
-            .expect("The ProgressBar is not started.")
     }
 
     fn auto_prepend_block(&mut self) {
@@ -287,14 +153,6 @@ impl SymfonyStyle {
         }
         // Prepend new line for each non LF chars (This means no blank line was output before)
         self.new_line(2 - shirabe_php_shim::substr_count(&chars, "\n"));
-    }
-
-    fn auto_prepend_text(&mut self) {
-        let fetched = self.buffered_output.fetch();
-        // Prepend new line if last char isn't EOL:
-        if !fetched.ends_with('\n') {
-            self.new_line(1);
-        }
     }
 
     fn write_buffer(&mut self, message: &str, new_line: bool, r#type: i64) {
@@ -425,118 +283,15 @@ impl SymfonyStyle {
         .ok()
     }
 
-    /// Bridges the `StyleInterface` validator (which yields `anyhow::Error`) to the
-    /// `Question::set_validator` validator (which yields `InvalidArgumentException`) by
-    /// converting any error into an `InvalidArgumentException` carrying its message.
-    #[allow(clippy::type_complexity)]
-    fn adapt_validator(
-        validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
-    ) -> Option<Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>>> {
-        validator.map(|validator| {
-            Box::new(move |value: Option<PhpMixed>| {
-                validator(value).map_err(|e| InvalidArgumentException::new(e.to_string()))
-            })
-                as Box<dyn Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>>
-        })
-    }
-
-    /// {@inheritdoc}
     pub fn writeln(&mut self, messages: &[String], r#type: i64) {
         for message in messages {
             self.inner.writeln(std::slice::from_ref(message), r#type);
             self.write_buffer(message, true, r#type);
         }
     }
-
-    /// {@inheritdoc}
-    pub fn write(&mut self, messages: &[String], newline: bool, r#type: i64) {
-        for message in messages {
-            self.inner
-                .write(std::slice::from_ref(message), newline, r#type);
-            self.write_buffer(message, newline, r#type);
-        }
-    }
 }
 
 impl StyleInterface for SymfonyStyle {
-    /// {@inheritdoc}
-    fn title(&mut self, message: &str) {
-        self.auto_prepend_block();
-        let lines = [
-            format!(
-                "<comment>{}</>",
-                OutputFormatter::escape_trailing_backslash(message),
-            ),
-            format!(
-                "<comment>{}</>",
-                shirabe_php_shim::str_repeat(
-                    "=",
-                    Helper::width(&Helper::remove_decoration(
-                        &mut *self.get_formatter().borrow_mut(),
-                        message,
-                    )) as usize,
-                ),
-            ),
-        ];
-        self.writeln(&lines, OUTPUT_NORMAL);
-        self.new_line(1);
-    }
-
-    /// {@inheritdoc}
-    fn section(&mut self, message: &str) {
-        self.auto_prepend_block();
-        let lines = [
-            format!(
-                "<comment>{}</>",
-                OutputFormatter::escape_trailing_backslash(message),
-            ),
-            format!(
-                "<comment>{}</>",
-                shirabe_php_shim::str_repeat(
-                    "-",
-                    Helper::width(&Helper::remove_decoration(
-                        &mut *self.get_formatter().borrow_mut(),
-                        message,
-                    )) as usize,
-                ),
-            ),
-        ];
-        self.writeln(&lines, OUTPUT_NORMAL);
-        self.new_line(1);
-    }
-
-    /// {@inheritdoc}
-    fn listing(&mut self, elements: &[String]) {
-        self.auto_prepend_text();
-        let elements: Vec<String> =
-            shirabe_php_shim::array_map(|element: &String| format!(" * {}", element), elements);
-
-        self.writeln(&elements, OUTPUT_NORMAL);
-        self.new_line(1);
-    }
-
-    /// {@inheritdoc}
-    fn text(&mut self, message: &[String]) {
-        self.auto_prepend_text();
-
-        for message in message {
-            self.writeln(&[format!(" {}", message)], OUTPUT_NORMAL);
-        }
-    }
-
-    /// {@inheritdoc}
-    fn success(&mut self, message: &[String]) {
-        self.block(
-            message,
-            Some("OK"),
-            Some("fg=black;bg=green"),
-            " ",
-            true,
-            true,
-        );
-    }
-
-    /// {@inheritdoc}
     fn error(&mut self, message: &[String]) {
         self.block(
             message,
@@ -548,36 +303,6 @@ impl StyleInterface for SymfonyStyle {
         );
     }
 
-    /// {@inheritdoc}
-    fn warning(&mut self, message: &[String]) {
-        self.block(
-            message,
-            Some("WARNING"),
-            Some("fg=black;bg=yellow"),
-            " ",
-            true,
-            true,
-        );
-    }
-
-    /// {@inheritdoc}
-    fn note(&mut self, message: &[String]) {
-        self.block(message, Some("NOTE"), Some("fg=yellow"), " ! ", false, true);
-    }
-
-    /// {@inheritdoc}
-    fn caution(&mut self, message: &[String]) {
-        self.block(
-            message,
-            Some("CAUTION"),
-            Some("fg=white;bg=red"),
-            " ! ",
-            true,
-            true,
-        );
-    }
-
-    /// {@inheritdoc}
     fn table(&mut self, headers: Vec<Cell>, rows: Vec<Row>) {
         self.create_table()
             .set_headers(headers)
@@ -587,37 +312,6 @@ impl StyleInterface for SymfonyStyle {
         self.new_line(1);
     }
 
-    /// {@inheritdoc}
-    fn ask(
-        &mut self,
-        question: &str,
-        default: Option<&str>,
-        validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
-    ) -> PhpMixed {
-        let mut question = Question::new(
-            question.to_string(),
-            default.map(|d| PhpMixed::String(d.to_string())),
-        );
-        question.set_validator(Self::adapt_validator(validator));
-
-        self.ask_question(&question)
-    }
-
-    /// {@inheritdoc}
-    fn ask_hidden(
-        &mut self,
-        question: &str,
-        validator: Option<Box<dyn Fn(Option<PhpMixed>) -> anyhow::Result<PhpMixed>>>,
-    ) -> PhpMixed {
-        let mut question = Question::new(question.to_string(), None);
-
-        question.set_hidden(true);
-        question.set_validator(Self::adapt_validator(validator));
-
-        self.ask_question(&question)
-    }
-
-    /// {@inheritdoc}
     fn confirm(&mut self, question: &str, default: bool) -> bool {
         let answer = self.ask_question(&ConfirmationQuestion::new(
             question.to_string(),
@@ -628,31 +322,6 @@ impl StyleInterface for SymfonyStyle {
         shirabe_php_shim::boolval(&answer)
     }
 
-    /// {@inheritdoc}
-    fn choice(
-        &mut self,
-        question: &str,
-        choices: Vec<String>,
-        default: Option<PhpMixed>,
-    ) -> PhpMixed {
-        let default = default.map(|default| {
-            let values = shirabe_php_shim::array_flip_strings(&choices);
-            // $default = $values[$default] ?? $default;
-            values.get(&default.to_string()).cloned().unwrap_or(default)
-        });
-
-        // PHP: return $this->askQuestion(new ChoiceQuestion($question, $choices, $default));
-        let choices_map: indexmap::IndexMap<String, PhpMixed> = choices
-            .into_iter()
-            .enumerate()
-            .map(|(i, c)| (i.to_string(), PhpMixed::String(c)))
-            .collect();
-        let choice_question = ChoiceQuestion::new(question.to_string(), choices_map, default)
-            .expect("choice() always provides at least one choice");
-        self.ask_question(&choice_question)
-    }
-
-    /// {@inheritdoc}
     fn new_line(&mut self, count: i64) {
         self.inner.new_line(count);
         self.buffered_output.write(
@@ -660,24 +329,5 @@ impl StyleInterface for SymfonyStyle {
             false,
             OUTPUT_NORMAL,
         );
-    }
-
-    /// {@inheritdoc}
-    fn progress_start(&mut self, max: i64) {
-        let mut progress_bar = self.create_progress_bar(max);
-        progress_bar.start(None);
-        self.progress_bar = Some(progress_bar);
-    }
-
-    /// {@inheritdoc}
-    fn progress_advance(&mut self, step: i64) {
-        self.get_progress_bar().advance(step);
-    }
-
-    /// {@inheritdoc}
-    fn progress_finish(&mut self) {
-        self.get_progress_bar().finish();
-        self.new_line(2);
-        self.progress_bar = None;
     }
 }
