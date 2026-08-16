@@ -140,7 +140,7 @@ fn ensure_php_binary() -> bool {
     {
         return true;
     }
-    let path = std::env::var_os("PATH").unwrap_or_default();
+    let path = shirabe_php_shim::getenv("PATH").unwrap_or_default();
     for dir in std::env::split_paths(&path) {
         let candidate = dir.join("php");
         if candidate.is_file() {

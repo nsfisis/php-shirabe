@@ -8,7 +8,7 @@
 //! any of these is missing. Test runs themselves are offline: the fixture project resolves
 //! everything from local repositories.
 
-use crate::plugin_installer_test::{lock_php_worker, php_runtime_available};
+use crate::php_worker::{lock_php_worker, php_runtime_available};
 use indexmap::IndexMap;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -21,9 +21,9 @@ fn fixture_dir() -> PathBuf {
 /// the worker). Absent checkout means the oracle cannot run; the test returns early,
 /// following the convention of the non-mock tests in `shirabe-php-rpc`.
 pub(crate) fn upstream_composer_bin() -> Option<PathBuf> {
-    let root = match std::env::var("SHIRABE_COMPOSER_PHP_DIR") {
-        Ok(dir) => PathBuf::from(dir),
-        Err(_) => Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composer"),
+    let root = match shirabe_php_shim::getenv("SHIRABE_COMPOSER_PHP_DIR") {
+        Some(dir) => PathBuf::from(dir),
+        None => Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composer"),
     };
     let bin = root.join("bin/composer");
     if bin.is_file() && root.join("vendor/autoload.php").is_file() {

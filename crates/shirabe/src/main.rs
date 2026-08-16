@@ -5,9 +5,10 @@ use std::io::IsTerminal as _;
 
 /// Initialize a tracing subscriber from the environment variable `$SHIRABE_TRACING`.
 fn init_tracing() {
-    let Ok(directives) = std::env::var("SHIRABE_TRACING") else {
+    let Some(directives) = shirabe_php_shim::getenv("SHIRABE_TRACING") else {
         return;
     };
+    let directives = directives.to_string_lossy();
     if directives.is_empty() {
         return;
     }

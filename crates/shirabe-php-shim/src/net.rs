@@ -7,7 +7,11 @@ pub fn gethostname() -> String {
         .ok()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
-        .or_else(|| std::env::var("HOSTNAME").ok().filter(|s| !s.is_empty()))
+        .or_else(|| {
+            crate::getenv("HOSTNAME")
+                .map(|s| s.to_string_lossy().into_owned())
+                .filter(|s| !s.is_empty())
+        })
         .unwrap_or_else(|| "localhost".to_string())
 }
 

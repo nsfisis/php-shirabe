@@ -51,7 +51,7 @@ fn path_to_string(directory: std::path::PathBuf) -> anyhow::Result<String> {
 /// The checkout that stands in for the bundle, if `OVERRIDE_ENV` names one. Both the worker and
 /// the Rust side read the runtime from there instead.
 fn override_directory() -> anyhow::Result<Option<std::path::PathBuf>> {
-    let Some(directory) = std::env::var_os(OVERRIDE_ENV) else {
+    let Some(directory) = shirabe_php_shim::getenv(OVERRIDE_ENV) else {
         return Ok(None);
     };
     let directory = std::path::PathBuf::from(directory);
