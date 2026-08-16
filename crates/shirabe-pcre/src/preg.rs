@@ -156,25 +156,15 @@ impl Preg {
 
     pub fn replace_callback<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
         pattern: impl PregPattern,
-        replacement: F,
-        subject: &str,
-    ) -> String {
-        Self::replace_callback6(pattern, replacement, subject, -1, None, 0)
-    }
-
-    pub fn replace_callback6<F: FnMut(&IndexMap<CaptureKey, String>) -> String>(
-        pattern: impl PregPattern,
         mut replacement: F,
         subject: &str,
-        limit: i64,
-        count: Option<&mut usize>,
-        flags: i64,
     ) -> String {
-        let adapter = |internal: &IndexMap<CaptureKey, Option<String>>| -> String {
-            replacement(&drop_null_matches_ref(internal))
+        let adapter = |internal: &IndexMap<CaptureKey, Option<String>>| {
+            Ok(replacement(&drop_null_matches_ref(internal)))
         };
 
-        shirabe_php_shim::preg_replace_callback2(pattern, adapter, subject, limit, count, flags)
+        shirabe_php_shim::preg_replace_callback(pattern, adapter, subject)
+            .expect("$replacement cannot fail")
     }
 
     pub fn split(pattern: impl PregPattern, subject: &str) -> Vec<String> {

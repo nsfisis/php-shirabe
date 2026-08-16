@@ -154,23 +154,23 @@ pub fn preg_replace_callback<F>(
     subject: &str,
 ) -> anyhow::Result<String>
 where
-    F: FnMut(&[Option<String>]) -> anyhow::Result<String>,
+    F: FnMut(&indexmap::IndexMap<CaptureKey, Option<String>>) -> anyhow::Result<String>,
 {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
+    let names: Vec<Option<&str>> = re.capture_names().collect();
+
     let mut out: Vec<u8> = Vec::new();
-    let mut last = 0;
+    let mut last = 0usize;
     for caps in re.captures_iter(subject) {
         let m = caps.get(0).unwrap();
         out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
-        let groups: Vec<Option<String>> = (0..caps.len())
-            .map(|g| caps.get(g).map(|x| x.as_str().to_string()))
-            .collect();
-        let replaced = callback(&groups)?;
-        out.extend_from_slice(replaced.as_bytes());
+        let map = single_match_map(&caps, &names, false);
+        out.extend_from_slice(callback(&map)?.as_bytes());
         last = m.end();
     }
     out.extend_from_slice(&subject.as_bytes()[last..]);
+
     Ok(String::from_utf8_lossy(&out).into_owned())
 }
 
@@ -307,48 +307,6 @@ pub fn preg_replace2(
         let m = caps.get(0).unwrap();
         out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
         php_replacement_expand(replacement, &caps, &mut out);
-        last = m.end();
-        n += 1;
-    }
-    out.extend_from_slice(&subject.as_bytes()[last..]);
-
-    if let Some(count) = count {
-        *count = n;
-    }
-    String::from_utf8_lossy(&out).into_owned()
-}
-
-pub fn preg_replace_callback2<
-    F: FnMut(&indexmap::IndexMap<CaptureKey, Option<String>>) -> String,
->(
-    pattern: impl PregPattern,
-    mut callback: F,
-    subject: &str,
-    limit: i64,
-    count: Option<&mut usize>,
-    flags: i64,
-) -> String {
-    let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
-    let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
-    let names: Vec<Option<&str>> = re.capture_names().collect();
-    let limit = if limit < 0 {
-        usize::MAX
-    } else {
-        limit as usize
-    };
-
-    let mut out: Vec<u8> = Vec::new();
-    let mut last = 0usize;
-    let mut n = 0usize;
-    for caps in re.captures_iter(subject) {
-        if n >= limit {
-            break;
-        }
-        let m = caps.get(0).unwrap();
-        out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
-        let map = single_match_map(&caps, &names, unmatched_as_null);
-        out.extend_from_slice(callback(&map).as_bytes());
         last = m.end();
         n += 1;
     }

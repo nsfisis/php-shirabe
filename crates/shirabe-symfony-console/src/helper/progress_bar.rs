@@ -9,6 +9,7 @@ use crate::output::OutputInterface;
 use crate::output::output_interface;
 use crate::terminal::Terminal;
 use indexmap::IndexMap;
+use shirabe_php_shim::CaptureKey;
 
 pub const FORMAT_VERBOSE: &str = "verbose";
 pub const FORMAT_VERY_VERBOSE: &str = "very_verbose";
@@ -797,8 +798,8 @@ impl ProgressBar {
         let format = self.format.clone().unwrap_or_default();
 
         // $callback in PHP, expressed as a closure over $this and the matches.
-        let callback = |matches: &[Option<String>]| -> anyhow::Result<String> {
-            let name = matches[1].clone().unwrap_or_default();
+        let callback = |matches: &IndexMap<CaptureKey, Option<String>>| -> anyhow::Result<String> {
+            let name = matches[&CaptureKey::ByIndex(1)].clone().unwrap_or_default();
 
             let text: shirabe_php_shim::PhpMixed =
                 if Self::get_placeholder_formatter_definition(&name).is_some() {
@@ -812,10 +813,10 @@ impl ProgressBar {
                 } else if let Some(message) = self.messages.get(&name) {
                     shirabe_php_shim::PhpMixed::String(message.clone())
                 } else {
-                    return Ok(matches[0].clone().unwrap_or_default());
+                    return Ok(matches[&CaptureKey::ByIndex(0)].clone().unwrap_or_default());
                 };
 
-            if let Some(modifier) = matches.get(2).and_then(|m| m.clone()) {
+            if let Some(modifier) = matches.get(&CaptureKey::ByIndex(2)).and_then(|m| m.clone()) {
                 return Ok(shirabe_php_shim::sprintf(&format!("%{modifier}"), &[text]));
             }
 

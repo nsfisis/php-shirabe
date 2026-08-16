@@ -11,7 +11,7 @@ use crate::pipes::unix_pipes::UnixPipes;
 use crate::pipes::windows_pipes::WindowsPipes;
 use crate::process_utils::ProcessUtils;
 use indexmap::IndexMap;
-use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource, php_regex};
+use shirabe_php_shim::{CaptureKey, Descriptor, PhpMixed, PhpResource, php_regex};
 use std::sync::OnceLock;
 
 /// A user-supplied callback invoked with the output type ("out"/"err") and a chunk of output.
@@ -935,9 +935,9 @@ impl Process {
                 )++
             ) | [^"]*+ )"/x"#
             ),
-            |m: &[Option<String>]| -> anyhow::Result<String> {
-                let m0 = m.first().cloned().flatten().unwrap_or_default();
-                let m1 = m.get(1).cloned().flatten();
+            |m: &IndexMap<CaptureKey, Option<String>>| -> anyhow::Result<String> {
+                let m0 = m[&CaptureKey::ByIndex(0)].clone().unwrap_or_default();
+                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().flatten();
                 if m1.is_none() {
                     return Ok(m0);
                 }
@@ -1073,8 +1073,12 @@ impl Process {
     ) -> anyhow::Result<String> {
         shirabe_php_shim::preg_replace_callback(
             php_regex!(r#"/"\$\{:([_a-zA-Z]+[_a-zA-Z0-9]*)\}"/"#),
-            |matches: &[Option<String>]| -> anyhow::Result<String> {
-                let key = matches.get(1).cloned().flatten().unwrap_or_default();
+            |matches: &IndexMap<CaptureKey, Option<String>>| -> anyhow::Result<String> {
+                let key = matches
+                    .get(&CaptureKey::ByIndex(1))
+                    .cloned()
+                    .flatten()
+                    .unwrap_or_default();
                 match env.get(&key) {
                     None => Err(InvalidArgumentException::new(format!(
                         "Command line is missing a value for parameter \"{}\": {}",
