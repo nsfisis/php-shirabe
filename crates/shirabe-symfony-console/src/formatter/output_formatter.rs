@@ -7,8 +7,8 @@ use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInte
 use crate::formatter::output_formatter_style_stack::OutputFormatterStyleStack;
 use crate::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
 use shirabe_php_shim::{
-    php_regex, preg_match, preg_match_all, preg_match_all_offset_capture, preg_match_all_set_order,
-    preg_replace,
+    CaptureKey, php_regex, preg_match, preg_match_all, preg_match_all_offset_capture,
+    preg_match_all_set_order, preg_replace,
 };
 use shirabe_symfony_string::b;
 
@@ -290,16 +290,24 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
         let open_tag_regex = "[a-z](?:[^\\\\<>]* | \\\\.)*";
         let close_tag_regex = "[a-z][^<>]*";
         let mut current_line_length: i64 = 0;
-        let mut matches: shirabe_php_shim::PregOffsetCaptureMatches = Default::default();
+        let mut matches: indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>> =
+            indexmap::IndexMap::new();
         preg_match_all_offset_capture(
             format!("#<(({open_tag_regex}) | /({close_tag_regex})?)>#ix"),
             message,
             &mut matches,
+            0,
         );
-        let count = matches.group(0).len();
-        for i in 0..count {
-            let (text, pos) = matches.group(0)[i].clone();
-            let pos = pos as i64;
+        let full_matches = matches
+            .get(&CaptureKey::ByIndex(0))
+            .cloned()
+            .unwrap_or_default();
+        for (i, match_) in full_matches.iter().enumerate() {
+            let pos = match_.1;
+            let text = match_
+                .0
+                .clone()
+                .expect("group 0 participates whenever the pattern matches");
 
             if pos != 0 && shirabe_php_shim::byte_at(message, (pos - 1) as usize) == b'\\' {
                 continue;
@@ -315,12 +323,15 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
             // opening tag?
             let open = shirabe_php_shim::byte_at(&text, 1) != b'/';
             let tag = if open {
-                matches.group(1)[i].0.clone()
+                matches[&CaptureKey::ByIndex(1)][i]
+                    .0
+                    .clone()
+                    .expect("group 1 participates whenever the pattern matches")
             } else {
                 matches
-                    .group(3)
-                    .get(i)
-                    .map(|m| m.0.clone())
+                    .get(&CaptureKey::ByIndex(3))
+                    .and_then(|group| group.get(i))
+                    .and_then(|m| m.0.clone())
                     .unwrap_or_default()
             };
 

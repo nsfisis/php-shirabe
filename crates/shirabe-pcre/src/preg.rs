@@ -15,7 +15,7 @@ use indexmap::IndexMap;
 pub use shirabe_php_shim::CaptureKey;
 use shirabe_php_shim::{
     PREG_OFFSET_CAPTURE, PREG_SET_ORDER, PREG_SPLIT_OFFSET_CAPTURE, PREG_UNMATCHED_AS_NULL,
-    PregPattern, preg_grep, preg_match_all_offset_capture2, preg_match_all2, preg_match2,
+    PregPattern, preg_grep, preg_match_all_offset_capture, preg_match_all2, preg_match2,
     preg_replace_callback, preg_replace2, preg_split2,
 };
 
@@ -89,7 +89,8 @@ impl Preg {
         matches: Option<&mut IndexMap<CaptureKey, Vec<(Option<String>, i64)>>>,
     ) -> usize {
         let mut internal: IndexMap<CaptureKey, Vec<(Option<String>, i64)>> = IndexMap::new();
-        let result = preg_match_all_offset_capture2(pattern, subject, &mut internal);
+        let result =
+            preg_match_all_offset_capture(pattern, subject, &mut internal, PREG_UNMATCHED_AS_NULL);
 
         if let Some(out) = matches {
             *out = internal;

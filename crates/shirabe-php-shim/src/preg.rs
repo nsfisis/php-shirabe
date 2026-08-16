@@ -15,17 +15,6 @@ pub enum CaptureKey {
     ByName(String),
 }
 
-#[derive(Debug, Default)]
-pub struct PregOffsetCaptureMatches {
-    groups: Vec<Vec<(String, usize)>>,
-}
-
-impl PregOffsetCaptureMatches {
-    pub fn group(&self, i: usize) -> &[(String, usize)] {
-        &self.groups[i]
-    }
-}
-
 pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
     // Regex pattern compatibility:
     // PHP's preg_quote escapes `<` and `>` (PCRE treats `\<`/`\>` as literals), but the `regex`
@@ -171,38 +160,12 @@ pub fn preg_match_all_set_order(
 pub fn preg_match_all_offset_capture(
     pattern: impl PregPattern,
     subject: &str,
-    matches: &mut PregOffsetCaptureMatches,
-) -> usize {
-    let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
-    let group_count = re.captures_len();
-    matches.groups = vec![Vec::new(); group_count];
-
-    let mut count = 0;
-    for caps in re.captures_iter(subject) {
-        count += 1;
-        for g in 0..group_count {
-            // PHP stores ["", -1] for non-participating groups under
-            // PREG_OFFSET_CAPTURE; the unsigned offset here approximates -1 as 0,
-            // which callers must not rely on for absent groups.
-            let entry = caps
-                .get(g)
-                .map(|m| (m.as_str().to_string(), m.start()))
-                .unwrap_or_else(|| (String::new(), 0));
-            matches.groups[g].push(entry);
-        }
-    }
-
-    count
-}
-
-pub fn preg_match_all_offset_capture2(
-    pattern: impl PregPattern,
-    subject: &str,
     matches: &mut indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>>,
+    flags: i64,
 ) -> usize {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
+    let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let group_count = re.captures_len();
     let names: Vec<Option<&str>> = re.capture_names().collect();
 
@@ -211,9 +174,12 @@ pub fn preg_match_all_offset_capture2(
     for caps in re.captures_iter(subject) {
         count += 1;
         for (g, column) in groups.iter_mut().enumerate() {
+            // A non-participating group is reported at offset -1, holding "" or,
+            // with PREG_UNMATCHED_AS_NULL, null.
             let entry = match caps.get(g) {
                 Some(m) => (Some(m.as_str().to_string()), m.start() as i64),
-                None => (None, -1),
+                None if unmatched_as_null => (None, -1),
+                None => (Some(String::new()), -1),
             };
             column.push(entry);
         }
