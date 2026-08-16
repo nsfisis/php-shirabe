@@ -1,8 +1,6 @@
 use indexmap::IndexMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
-pub const PREG_UNMATCHED_AS_NULL: i64 = 512;
-
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub enum CaptureKey {
     ByIndex(usize),
@@ -51,18 +49,35 @@ pub fn preg_match(
     }
 }
 
-// Returns whether the pattern matched. Unmatched groups are reported as None
-// (PREG_UNMATCHED_AS_NULL).
+// Returns whether the pattern matched, reporting the groups as single_match_map() does.
 pub fn preg_match2(
     pattern: impl PregPattern,
     subject: &str,
     matches: &mut indexmap::IndexMap<CaptureKey, Option<String>>,
-    flags: i64,
     offset: usize,
+) -> bool {
+    preg_match2_impl(pattern, subject, matches, offset, false)
+}
+
+// PREG_UNMATCHED_AS_NULL counterpart of preg_match2().
+pub fn preg_match2_unmatched_as_null(
+    pattern: impl PregPattern,
+    subject: &str,
+    matches: &mut indexmap::IndexMap<CaptureKey, Option<String>>,
+    offset: usize,
+) -> bool {
+    preg_match2_impl(pattern, subject, matches, offset, true)
+}
+
+fn preg_match2_impl(
+    pattern: impl PregPattern,
+    subject: &str,
+    matches: &mut indexmap::IndexMap<CaptureKey, Option<String>>,
+    offset: usize,
+    unmatched_as_null: bool,
 ) -> bool {
     let __resolved = pattern.resolve();
     let (re, anchored) = __resolved.parts();
-    let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     // An anchored (`A`) pattern must match starting exactly at `offset`; the `regex` crate cannot
     // anchor a `captures_at` search, so search the sub-slice beginning at `offset` and require the
     // match to start at its head.
@@ -155,15 +170,33 @@ pub fn preg_match_all_set_order(
     count
 }
 
+// A non-participating group is reported at offset -1, holding "".
 pub fn preg_match_all_offset_capture(
     pattern: impl PregPattern,
     subject: &str,
     matches: &mut indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>>,
-    flags: i64,
+) -> usize {
+    preg_match_all_offset_capture_impl(pattern, subject, matches, false)
+}
+
+// PREG_UNMATCHED_AS_NULL counterpart of preg_match_all_offset_capture(): a
+// non-participating group holds null instead of "".
+pub fn preg_match_all_offset_capture_unmatched_as_null(
+    pattern: impl PregPattern,
+    subject: &str,
+    matches: &mut indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>>,
+) -> usize {
+    preg_match_all_offset_capture_impl(pattern, subject, matches, true)
+}
+
+fn preg_match_all_offset_capture_impl(
+    pattern: impl PregPattern,
+    subject: &str,
+    matches: &mut indexmap::IndexMap<CaptureKey, Vec<(Option<String>, i64)>>,
+    unmatched_as_null: bool,
 ) -> usize {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
-    let unmatched_as_null = flags & PREG_UNMATCHED_AS_NULL != 0;
     let group_count = re.captures_len();
     let names: Vec<Option<&str>> = re.capture_names().collect();
 
@@ -172,8 +205,6 @@ pub fn preg_match_all_offset_capture(
     for caps in re.captures_iter(subject) {
         count += 1;
         for (g, column) in groups.iter_mut().enumerate() {
-            // A non-participating group is reported at offset -1, holding "" or,
-            // with PREG_UNMATCHED_AS_NULL, null.
             let entry = match caps.get(g) {
                 Some(m) => (Some(m.as_str().to_string()), m.start() as i64),
                 None if unmatched_as_null => (None, -1),

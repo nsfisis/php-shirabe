@@ -296,7 +296,6 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
             format!("#<(({open_tag_regex}) | /({close_tag_regex})?)>#ix"),
             message,
             &mut matches,
-            0,
         );
         let full_matches = matches
             .get(&CaptureKey::ByIndex(0))

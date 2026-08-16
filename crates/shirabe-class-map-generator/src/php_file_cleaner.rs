@@ -145,11 +145,10 @@ impl PhpFileCleaner {
                         if end <= self.len && self.contents[self.index..end] == entry.name {
                             let offset = if self.index > 0 { self.index - 1 } else { 0 };
                             let mut r#match: IndexMap<CaptureKey, String> = IndexMap::new();
-                            if Preg::is_match5(
+                            if Preg::is_match4(
                                 &entry.pattern,
                                 &self.contents,
                                 Some(&mut r#match),
-                                0,
                                 offset,
                             ) {
                                 return clean
@@ -294,6 +293,6 @@ impl PhpFileCleaner {
     }
 
     fn r#match(&self, regex: &str, r#match: Option<&mut IndexMap<CaptureKey, String>>) -> bool {
-        Preg::is_match5(regex, &self.contents, r#match, 0, self.index)
+        Preg::is_match4(regex, &self.contents, r#match, self.index)
     }
 }

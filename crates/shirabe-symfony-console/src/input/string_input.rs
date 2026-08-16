@@ -58,7 +58,7 @@ impl StringInput {
             }
 
             let mut m: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-            if preg_match2(php_regex!(r"/\s+/A"), input, &mut m, 0, cursor as usize) {
+            if preg_match2(php_regex!(r"/\s+/A"), input, &mut m, cursor as usize) {
                 if token.is_some() {
                     tokens.push(token.take().unwrap());
                 }
@@ -68,7 +68,6 @@ impl StringInput {
                 format!(r#"/([^="'\s]+?)(=?)({}+)/A"#, Self::REGEX_QUOTED_STRING),
                 input,
                 &mut m,
-                0,
                 cursor as usize,
             ) {
                 let inner = shirabe_php_shim::substr(
@@ -91,7 +90,6 @@ impl StringInput {
                 format!(r"/{}/A", Self::REGEX_QUOTED_STRING),
                 input,
                 &mut m,
-                0,
                 cursor as usize,
             ) {
                 token = Some(format!(
@@ -109,7 +107,6 @@ impl StringInput {
                 format!(r"/{}/A", Self::REGEX_UNQUOTED_STRING),
                 input,
                 &mut m,
-                0,
                 cursor as usize,
             ) {
                 token = Some(format!(

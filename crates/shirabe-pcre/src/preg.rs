@@ -14,8 +14,8 @@
 use indexmap::IndexMap;
 pub use shirabe_php_shim::CaptureKey;
 use shirabe_php_shim::{
-    PREG_UNMATCHED_AS_NULL, PregPattern, preg_grep, preg_match_all_offset_capture, preg_match_all2,
-    preg_match2, preg_replace_callback, preg_replace2,
+    PregPattern, preg_grep, preg_match_all_offset_capture_unmatched_as_null, preg_match_all2,
+    preg_match2, preg_match2_unmatched_as_null, preg_replace_callback, preg_replace2,
 };
 
 #[derive(Debug)]
@@ -27,24 +27,17 @@ impl Preg {
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, String>>,
     ) -> bool {
-        Self::match5(pattern, subject, matches, 0, 0)
+        Self::match4(pattern, subject, matches, 0)
     }
 
-    pub fn match5(
+    pub fn match4(
         pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, String>>,
-        flags: i64,
         offset: usize,
     ) -> bool {
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-        let result = preg_match2(
-            pattern,
-            subject,
-            &mut internal,
-            flags | PREG_UNMATCHED_AS_NULL,
-            offset,
-        );
+        let result = preg_match2_unmatched_as_null(pattern, subject, &mut internal, offset);
 
         if let Some(out) = matches {
             *out = drop_null_matches(internal);
@@ -73,7 +66,7 @@ impl Preg {
     ) -> usize {
         let mut internal: IndexMap<CaptureKey, Vec<(Option<String>, i64)>> = IndexMap::new();
         let result =
-            preg_match_all_offset_capture(pattern, subject, &mut internal, PREG_UNMATCHED_AS_NULL);
+            preg_match_all_offset_capture_unmatched_as_null(pattern, subject, &mut internal);
 
         if let Some(out) = matches {
             *out = internal;
@@ -125,7 +118,7 @@ impl Preg {
     }
 
     pub fn is_match(pattern: impl PregPattern, subject: &str) -> bool {
-        Self::match5(pattern, subject, None, 0, 0)
+        Self::match4(pattern, subject, None, 0)
     }
 
     pub fn is_match3(
@@ -133,17 +126,16 @@ impl Preg {
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, String>>,
     ) -> bool {
-        Self::match5(pattern, subject, matches, 0, 0)
+        Self::match4(pattern, subject, matches, 0)
     }
 
-    pub fn is_match5(
+    pub fn is_match4(
         pattern: impl PregPattern,
         subject: &str,
         matches: Option<&mut IndexMap<CaptureKey, String>>,
-        flags: i64,
         offset: usize,
     ) -> bool {
-        Self::match5(pattern, subject, matches, flags, offset)
+        Self::match4(pattern, subject, matches, offset)
     }
 
     pub fn is_match_named(
@@ -152,7 +144,7 @@ impl Preg {
         matches: &mut IndexMap<String, String>,
     ) -> bool {
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-        let result = preg_match2(pattern, subject, &mut internal, PREG_UNMATCHED_AS_NULL, 0);
+        let result = preg_match2_unmatched_as_null(pattern, subject, &mut internal, 0);
 
         matches.clear();
         for (key, value) in internal {
@@ -171,7 +163,7 @@ impl Preg {
         // Classic preg_match semantics (no PREG_UNMATCHED_AS_NULL): trailing
         // unmatched groups are truncated, interior unmatched groups become "".
         let mut internal: IndexMap<CaptureKey, Option<String>> = IndexMap::new();
-        let result = preg_match2(pattern, subject, &mut internal, 0, 0);
+        let result = preg_match2(pattern, subject, &mut internal, 0);
 
         if !result {
             return None;

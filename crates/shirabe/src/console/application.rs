@@ -1796,7 +1796,6 @@ impl Application {
             php_regex!(r"/.{1,10000}/u"),
             &utf8_string,
             &mut m,
-            0,
             offset as usize,
         ) {
             let m0 = m[&shirabe_php_shim::CaptureKey::ByIndex(0)]
