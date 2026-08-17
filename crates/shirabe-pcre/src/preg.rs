@@ -118,9 +118,9 @@ impl Preg {
     pub fn is_match_named(pattern: impl PregPattern, subject: &str) -> Option<PregNamedGroups> {
         Some(
             preg_match2(pattern, subject, 0)?
-                .into_iter()
+                .iter()
                 .filter_map(|(key, value)| match (key, value) {
-                    (CaptureKey::ByName(name), Some(value)) => Some((name, value)),
+                    (CaptureKey::ByName(name), Some(value)) => Some((name, value.to_string())),
                     _ => None,
                 })
                 .collect(),
@@ -135,9 +135,9 @@ impl Preg {
     ) -> Option<Vec<Option<String>>> {
         Some(
             preg_match2(pattern, subject, 0)?
-                .into_iter()
+                .iter()
                 .filter_map(|(key, value)| match key {
-                    CaptureKey::ByIndex(_) => Some(value),
+                    CaptureKey::ByIndex(_) => Some(value.map(str::to_string)),
                     CaptureKey::ByName(_) => None,
                 })
                 .collect(),
@@ -161,6 +161,6 @@ impl Preg {
 fn drop_null_matches(matches: &PregMatches) -> PregMatchedGroups {
     matches
         .iter()
-        .filter_map(|(key, value)| value.clone().map(|value| (key.clone(), value)))
+        .filter_map(|(key, value)| value.map(|value| (key, value.to_string())))
         .collect()
 }

@@ -41,26 +41,6 @@ macro_rules! preg_match_map {
             }
         }
 
-        impl<Q> ::std::ops::Index<&Q> for $name
-        where
-            Q: ?Sized + ::std::hash::Hash + ::indexmap::Equivalent<$key>,
-        {
-            type Output = $value;
-
-            fn index(&self, key: &Q) -> &$value {
-                &self.0[key]
-            }
-        }
-
-        /// Looks a group up by its position in the map rather than by key, as `IndexMap` does.
-        impl ::std::ops::Index<usize> for $name {
-            type Output = $value;
-
-            fn index(&self, position: usize) -> &$value {
-                &self.0[position]
-            }
-        }
-
         impl IntoIterator for $name {
             type Item = ($key, $value);
             type IntoIter = ::indexmap::map::IntoIter<$key, $value>;
@@ -78,10 +58,44 @@ macro_rules! preg_match_map {
     };
 }
 
-preg_match_map! {
-    /// A single match's `$matches`, keyed by both the named and the numbered form of each capture
-    /// group. A `None` value is a group that did not participate in the match.
-    pub struct PregMatches(CaptureKey => Option<String>);
+/// A single match's `$matches`: the `regex::Captures` the search produced, held alongside the
+/// pattern that produced it so groups can be read by both their named and their numbered form.
+/// `'h` is the lifetime of the searched subject, which the group values borrow from.
+#[derive(Debug)]
+pub struct PregMatches<'h> {
+    pattern: ResolvedPattern,
+    caps: regex::Captures<'h>,
+}
+
+impl<'h> PregMatches<'h> {
+    fn new(pattern: ResolvedPattern, caps: regex::Captures<'h>) -> Self {
+        Self { pattern, caps }
+    }
+
+    /// The value of the group `key` names, or `None` if that group did not participate in the
+    /// match. A group the pattern does not have reads as `None` too, matching how PHP reports a
+    /// `$matches` entry that is not there.
+    pub fn get(&self, key: &CaptureKey) -> Option<&'h str> {
+        let group = match key {
+            CaptureKey::ByIndex(index) => self.caps.get(*index),
+            CaptureKey::ByName(name) => self.caps.name(name),
+        };
+        group.map(|group| group.as_str())
+    }
+
+    /// Every capture group under both its named and its numbered key (the name preceding its
+    /// number), in the order PHP fills `$matches` in.
+    pub fn iter(&self) -> impl Iterator<Item = (CaptureKey, Option<&'h str>)> + '_ {
+        let (re, _anchored) = self.pattern.parts();
+        re.capture_names()
+            .enumerate()
+            .flat_map(move |(index, name)| {
+                let value = self.caps.get(index).map(|group| group.as_str());
+                name.map(|name| (CaptureKey::ByName(name.to_string()), value))
+                    .into_iter()
+                    .chain(std::iter::once((CaptureKey::ByIndex(index), value)))
+            })
+    }
 }
 
 preg_match_map! {
@@ -99,14 +113,18 @@ preg_match_map! {
 impl PregMatchesAll {
     /// The number PHP's `preg_match_all` returns: every column holds one entry per occurrence.
     pub fn occurrence_count(&self) -> usize {
-        self[&CaptureKey::ByIndex(0)].len()
+        self.get(&CaptureKey::ByIndex(0))
+            .expect("group 0 is always present")
+            .len()
     }
 }
 
 impl PregMatchesAllWithOffsets {
     /// The number PHP's `preg_match_all` returns: every column holds one entry per occurrence.
     pub fn occurrence_count(&self) -> usize {
-        self[&CaptureKey::ByIndex(0)].len()
+        self.get(&CaptureKey::ByIndex(0))
+            .expect("group 0 is always present")
+            .len()
     }
 }
 
@@ -144,23 +162,27 @@ pub fn preg_match(pattern: impl PregPattern, subject: &str) -> Option<Vec<Option
     )
 }
 
-// Returns None if the pattern did not match; otherwise the groups as single_match_map() reports
-// them.
-pub fn preg_match2(pattern: impl PregPattern, subject: &str, offset: usize) -> Option<PregMatches> {
+// Returns None if the pattern did not match; otherwise the match's capture groups.
+pub fn preg_match2<'h>(
+    pattern: impl PregPattern,
+    subject: &'h str,
+    offset: usize,
+) -> Option<PregMatches<'h>> {
     let __resolved = pattern.resolve();
-    let (re, anchored) = __resolved.parts();
-    // An anchored (`A`) pattern must match starting exactly at `offset`; the `regex` crate cannot
-    // anchor a `captures_at` search, so search the sub-slice beginning at `offset` and require the
-    // match to start at its head.
-    let caps = if anchored {
-        re.captures(&subject[offset..])
-            .filter(|c| c.get(0).map(|m| m.start()) == Some(0))
-    } else {
-        re.captures_at(subject, offset)
+    let caps = {
+        let (re, anchored) = __resolved.parts();
+        // An anchored (`A`) pattern must match starting exactly at `offset`; the `regex` crate
+        // cannot anchor a `captures_at` search, so search the sub-slice beginning at `offset` and
+        // require the match to start at its head.
+        if anchored {
+            re.captures(&subject[offset..])
+                .filter(|c| c.get(0).map(|m| m.start()) == Some(0))
+        } else {
+            re.captures_at(subject, offset)
+        }
     }?;
 
-    let names: Vec<Option<&str>> = re.capture_names().collect();
-    Some(single_match_map(&caps, &names))
+    Some(PregMatches::new(__resolved, caps))
 }
 
 // PREG_PATTERN_ORDER: the outer vec is indexed by capture group, the inner by
@@ -343,25 +365,24 @@ pub fn preg_replace2(
     String::from_utf8_lossy(&out).into_owned()
 }
 
-pub fn preg_replace_callback<F>(
+pub fn preg_replace_callback<'h, F>(
     pattern: impl PregPattern,
     mut callback: F,
-    subject: &str,
+    subject: &'h str,
 ) -> anyhow::Result<String>
 where
-    F: FnMut(&PregMatches) -> anyhow::Result<String>,
+    F: FnMut(&PregMatches<'h>) -> anyhow::Result<String>,
 {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
-    let names: Vec<Option<&str>> = re.capture_names().collect();
 
     let mut out: Vec<u8> = Vec::new();
     let mut last = 0usize;
     for caps in re.captures_iter(subject) {
         let m = caps.get(0).unwrap();
         out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
-        let map = single_match_map(&caps, &names);
-        out.extend_from_slice(callback(&map)?.as_bytes());
+        let matches = PregMatches::new(__resolved.clone(), caps);
+        out.extend_from_slice(callback(&matches)?.as_bytes());
         last = m.end();
     }
     out.extend_from_slice(&subject.as_bytes()[last..]);
@@ -482,6 +503,7 @@ fn translate_php_pattern(pattern: &str) -> anyhow::Result<(String, bool)> {
 /// `LazyLock<Regex>`) rather than an owned `regex::Regex` — `regex::Regex::clone()` does not share
 /// the underlying meta engine's search-cache pool, so producing a fresh owned clone here would pay
 /// a ~10us per-call cache warmup cost regardless of which path produced it (measured).
+#[derive(Debug, Clone)]
 pub enum ResolvedPattern {
     Cached(Arc<(regex::Regex, bool)>),
     Static(&'static regex::Regex, bool),
@@ -628,20 +650,4 @@ fn php_replacement_group(bytes: &[u8]) -> (usize, usize) {
         consumed += 1;
     }
     (group, consumed)
-}
-
-// Builds a single match's `$matches` map with both named and numbered keys
-// (the named key precedes its number). Every group is present; a
-// non-participating one is None.
-fn single_match_map(caps: &regex::Captures, names: &[Option<&str>]) -> PregMatches {
-    let mut out = PregMatches::new();
-
-    for i in 0..caps.len() {
-        let value = caps.get(i).map(|m| m.as_str().to_string());
-        if let Some(Some(name)) = names.get(i) {
-            out.insert(CaptureKey::ByName((*name).to_string()), value.clone());
-        }
-        out.insert(CaptureKey::ByIndex(i), value);
-    }
-    out
 }

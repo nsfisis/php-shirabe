@@ -956,7 +956,13 @@ try {{
                             if Platform::is_windows() {
                                 path_and_args = Preg::replace_callback(
                                     php_regex!("{^\\S+}"),
-                                    |m| str_replace("/", "\\", &m[0]),
+                                    |m| {
+                                        str_replace(
+                                            "/",
+                                            "\\",
+                                            m.get(&CaptureKey::ByIndex(0)).unwrap(),
+                                        )
+                                    },
                                     &path_and_args,
                                 );
                             }
@@ -985,7 +991,11 @@ try {{
                                         path_and_args = format!(
                                             "{}{}",
                                             path_to_exec,
-                                            substr(&path_and_args, strlen(&m[0]), None)
+                                            substr(
+                                                &path_and_args,
+                                                strlen(m.get(&CaptureKey::ByIndex(0)).unwrap()),
+                                                None
+                                            )
                                         );
                                     }
                                 }
@@ -1001,7 +1011,13 @@ try {{
                             if Platform::is_windows() {
                                 exec = Preg::replace_callback(
                                     php_regex!("{^\\S+}"),
-                                    |m| str_replace("/", "\\", &m[0]),
+                                    |m| {
+                                        str_replace(
+                                            "/",
+                                            "\\",
+                                            m.get(&CaptureKey::ByIndex(0)).unwrap(),
+                                        )
+                                    },
                                     &exec,
                                 );
                             }

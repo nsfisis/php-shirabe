@@ -799,7 +799,10 @@ impl ProgressBar {
 
         // $callback in PHP, expressed as a closure over $this and the matches.
         let callback = |matches: &PregMatches| -> anyhow::Result<String> {
-            let name = matches[&CaptureKey::ByIndex(1)].clone().unwrap_or_default();
+            let name = matches
+                .get(&CaptureKey::ByIndex(1))
+                .unwrap_or_default()
+                .to_string();
 
             let text: shirabe_php_shim::PhpMixed =
                 if Self::get_placeholder_formatter_definition(&name).is_some() {
@@ -813,10 +816,13 @@ impl ProgressBar {
                 } else if let Some(message) = self.messages.get(&name) {
                     shirabe_php_shim::PhpMixed::String(message.clone())
                 } else {
-                    return Ok(matches[&CaptureKey::ByIndex(0)].clone().unwrap_or_default());
+                    return Ok(matches
+                        .get(&CaptureKey::ByIndex(0))
+                        .unwrap_or_default()
+                        .to_string());
                 };
 
-            if let Some(modifier) = matches.get(&CaptureKey::ByIndex(2)).and_then(|m| m.clone()) {
+            if let Some(modifier) = matches.get(&CaptureKey::ByIndex(2)) {
                 return Ok(shirabe_php_shim::sprintf(&format!("%{modifier}"), &[text]));
             }
 

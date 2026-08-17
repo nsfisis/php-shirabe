@@ -939,8 +939,11 @@ impl Process {
             ) | [^"]*+ )"/x"#
             ),
             |m: &PregMatches| -> anyhow::Result<String> {
-                let m0 = m[&CaptureKey::ByIndex(0)].clone().unwrap_or_default();
-                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().flatten();
+                let m0 = m
+                    .get(&CaptureKey::ByIndex(0))
+                    .unwrap_or_default()
+                    .to_string();
+                let m1 = m.get(&CaptureKey::ByIndex(1)).map(str::to_string);
                 if m1.is_none() {
                     return Ok(m0);
                 }
@@ -1071,9 +1074,8 @@ impl Process {
             |matches: &PregMatches| -> anyhow::Result<String> {
                 let key = matches
                     .get(&CaptureKey::ByIndex(1))
-                    .cloned()
-                    .flatten()
-                    .unwrap_or_default();
+                    .unwrap_or_default()
+                    .to_string();
                 match env.get(&key) {
                     None => Err(InvalidArgumentException::new(format!(
                         "Command line is missing a value for parameter \"{}\": {}",

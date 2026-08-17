@@ -321,7 +321,9 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
             // opening tag?
             let open = shirabe_php_shim::byte_at(&text, 1) != b'/';
             let tag = if open {
-                matches[&CaptureKey::ByIndex(1)][i]
+                matches
+                    .get(&CaptureKey::ByIndex(1))
+                    .expect("group 1 exists in the tag pattern")[i]
                     .0
                     .clone()
                     .expect("group 1 participates whenever the pattern matches")

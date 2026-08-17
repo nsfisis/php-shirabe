@@ -1792,8 +1792,8 @@ impl Application {
         let mut offset = 0i64;
         while let Some(m) = preg_match2(php_regex!(r"/.{1,10000}/u"), &utf8_string, offset as usize)
         {
-            let m0 = m[&shirabe_php_shim::CaptureKey::ByIndex(0)]
-                .as_deref()
+            let m0 = m
+                .get(&shirabe_php_shim::CaptureKey::ByIndex(0))
                 .unwrap_or("");
             offset += shirabe_php_shim::strlen(m0);
 

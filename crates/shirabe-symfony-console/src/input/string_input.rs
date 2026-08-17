@@ -61,15 +61,14 @@ impl StringInput {
                 if token.is_some() {
                     tokens.push(token.take().unwrap());
                 }
-                cursor +=
-                    shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
+                cursor += shirabe_php_shim::strlen(m.get(&CaptureKey::ByIndex(0)).unwrap_or(""));
             } else if let Some(m) = preg_match2(
                 format!(r#"/([^="'\s]+?)(=?)({}+)/A"#, Self::REGEX_QUOTED_STRING),
                 input,
                 cursor as usize,
             ) {
                 let inner = shirabe_php_shim::substr(
-                    m[&CaptureKey::ByIndex(3)].as_deref().unwrap_or(""),
+                    m.get(&CaptureKey::ByIndex(3)).unwrap_or(""),
                     1,
                     Some(-1),
                 );
@@ -78,12 +77,11 @@ impl StringInput {
                 token = Some(format!(
                     "{}{}{}{}",
                     token.unwrap_or_default(),
-                    m[&CaptureKey::ByIndex(1)].as_deref().unwrap_or(""),
-                    m[&CaptureKey::ByIndex(2)].as_deref().unwrap_or(""),
+                    m.get(&CaptureKey::ByIndex(1)).unwrap_or(""),
+                    m.get(&CaptureKey::ByIndex(2)).unwrap_or(""),
                     shirabe_php_shim::stripcslashes(&replaced)
                 ));
-                cursor +=
-                    shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
+                cursor += shirabe_php_shim::strlen(m.get(&CaptureKey::ByIndex(0)).unwrap_or(""));
             } else if let Some(m) = preg_match2(
                 format!(r"/{}/A", Self::REGEX_QUOTED_STRING),
                 input,
@@ -93,13 +91,12 @@ impl StringInput {
                     "{}{}",
                     token.unwrap_or_default(),
                     shirabe_php_shim::stripcslashes(&shirabe_php_shim::substr(
-                        m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""),
+                        m.get(&CaptureKey::ByIndex(0)).unwrap_or(""),
                         1,
                         Some(-1)
                     ))
                 ));
-                cursor +=
-                    shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
+                cursor += shirabe_php_shim::strlen(m.get(&CaptureKey::ByIndex(0)).unwrap_or(""));
             } else if let Some(m) = preg_match2(
                 format!(r"/{}/A", Self::REGEX_UNQUOTED_STRING),
                 input,
@@ -108,10 +105,9 @@ impl StringInput {
                 token = Some(format!(
                     "{}{}",
                     token.unwrap_or_default(),
-                    m[&CaptureKey::ByIndex(1)].as_deref().unwrap_or("")
+                    m.get(&CaptureKey::ByIndex(1)).unwrap_or("")
                 ));
-                cursor +=
-                    shirabe_php_shim::strlen(m[&CaptureKey::ByIndex(0)].as_deref().unwrap_or(""));
+                cursor += shirabe_php_shim::strlen(m.get(&CaptureKey::ByIndex(0)).unwrap_or(""));
             } else {
                 // should never happen
                 return Err(InvalidArgumentException::new(format!(
