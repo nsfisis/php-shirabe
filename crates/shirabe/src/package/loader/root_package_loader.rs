@@ -15,7 +15,7 @@ use crate::repository::RepositoryManager;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, UnexpectedValueException, php_regex, preg_split, strtolower,
 };
@@ -256,14 +256,8 @@ impl RootPackageLoader {
                 php_regex!(r"{(?:^|\| *|, *)([^,\s#|]+)(?:#[^ ]+)? +as +([^,\s|]+)(?:$| *\|| *,)}"),
                 req_version,
             ) {
-                let m1 = m
-                    .get(&CaptureKey::ByIndex(1))
-                    .unwrap_or_default()
-                    .to_string();
-                let m2 = m
-                    .get(&CaptureKey::ByIndex(2))
-                    .unwrap_or_default()
-                    .to_string();
+                let m1 = m.get(1).unwrap_or_default().to_string();
+                let m2 = m.get(2).unwrap_or_default().to_string();
                 let mut alias = IndexMap::new();
                 alias.insert("package".to_string(), strtolower(req_name));
                 alias.insert(
@@ -324,10 +318,7 @@ impl RootPackageLoader {
             for constraint in &constraints {
                 if let Some(m) = Preg::is_match3(&pattern, constraint) {
                     let name = strtolower(req_name);
-                    let m1 = m
-                        .get(&CaptureKey::ByIndex(1))
-                        .unwrap_or_default()
-                        .to_string();
+                    let m1 = m.get(1).unwrap_or_default().to_string();
                     let normalized_m1 = VersionParser::normalize_stability(&m1).unwrap_or_default();
                     let stability = stabilities[normalized_m1.as_str()];
 
@@ -375,12 +366,7 @@ impl RootPackageLoader {
                 && VersionParser::parse_stability(&req_version) == "dev"
             {
                 let name = strtolower(req_name);
-                references.insert(
-                    name,
-                    m.get(&CaptureKey::ByIndex(1))
-                        .unwrap_or_default()
-                        .to_string(),
-                );
+                references.insert(name, m.get(1).unwrap_or_default().to_string());
             }
         }
         references

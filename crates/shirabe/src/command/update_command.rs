@@ -27,7 +27,7 @@ use crate::repository::PlatformRepository;
 use crate::repository::RepositorySet;
 use crate::util::HttpDownloader;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
     array_keys, array_merge_map, array_search_in_vec, impl_php_class, php_regex, strtolower,
@@ -464,10 +464,8 @@ impl Command for UpdateCommand {
                 let Some(matches) = matches else {
                     continue;
                 };
-                let constraint = parser.parse_constraints(&format!(
-                    "~{}",
-                    matches.get(&CaptureKey::ByIndex(1)).unwrap_or_default()
-                ))?;
+                let constraint = parser
+                    .parse_constraints(&format!("~{}", matches.get(1).unwrap_or_default()))?;
                 if let Some(existing) = temporary_constraints.get(&package.get_name()) {
                     temporary_constraints.insert(
                         package.get_name(),

@@ -4,7 +4,7 @@ use crate::json::JsonFile;
 use crate::json::json_grammar::{self, ValueKind};
 use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
     array_reverse, empty, explode, implode, in_array_loose, is_array, is_int, is_numeric,
@@ -115,10 +115,7 @@ impl JsonManipulator {
             if let Some(groups) =
                 Preg::is_match3(php_regex!("#^\\s*\\{\\s*\\S+.*?(\\s*\\}\\s*)$#s"), &links)
             {
-                let groups_1 = groups
-                    .get(&CaptureKey::ByIndex(1))
-                    .unwrap_or_default()
-                    .to_string();
+                let groups_1 = groups.get(1).unwrap_or_default().to_string();
                 // link missing but non empty links
                 links = Preg::replace(
                     format!("{{{}$}}", preg_quote(&groups_1, None)),
@@ -744,16 +741,14 @@ impl JsonManipulator {
                 &children,
             ) {
                 let mut whitespace = leading_match
-                    .get(&CaptureKey::ByName("trailingspace".to_string()))
+                    .name("trailingspace")
                     .unwrap_or_default()
                     .to_string();
                 let leading_space = leading_match
-                    .get(&CaptureKey::ByName("leadingspace".to_string()))
+                    .name("leadingspace")
                     .unwrap_or_default()
                     .to_string();
-                let content_present = leading_match
-                    .get(&CaptureKey::ByName("content".to_string()))
-                    .is_some();
+                let content_present = leading_match.name("content").is_some();
                 if content_present {
                     let mut value_local = value;
                     if let Some(ref sub) = sub_name {
@@ -942,9 +937,7 @@ impl JsonManipulator {
         if let Some(empty_match) = Preg::is_match3(
             php_regex!("#^\\{\\s*?(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\}$#s"),
             &children_clean,
-        ) && empty_match
-            .get(&CaptureKey::ByName("content".to_string()))
-            .is_none()
+        ) && empty_match.name("content").is_none()
         {
             self.contents = format!(
                 "{}{{{}{}}}{}",
@@ -1043,11 +1036,11 @@ impl JsonManipulator {
             &children,
         ) {
             let leading_whitespace = leading_match
-                .get(&CaptureKey::ByName("leadingspace".to_string()))
+                .name("leadingspace")
                 .unwrap_or_default()
                 .to_string();
             let mut whitespace = leading_match
-                .get(&CaptureKey::ByName("trailingspace".to_string()))
+                .name("trailingspace")
                 .unwrap_or_default()
                 .to_string();
             let mut leading_item_whitespace =
@@ -1062,10 +1055,7 @@ impl JsonManipulator {
                 item_depth = 0;
             }
 
-            if leading_match
-                .get(&CaptureKey::ByName("content".to_string()))
-                .is_some()
-            {
+            if leading_match.name("content").is_some() {
                 // child missing but non empty children
                 if append {
                     children = Preg::replace(
@@ -1330,10 +1320,7 @@ impl JsonManipulator {
         // append at the end of the file and keep whitespace
         if let Some(tail_match) = Preg::is_match3(php_regex!("#[^{\\s](\\s*)\\}$#"), &self.contents)
         {
-            let tail_match_1 = tail_match
-                .get(&CaptureKey::ByIndex(1))
-                .unwrap_or_default()
-                .to_string();
+            let tail_match_1 = tail_match.get(1).unwrap_or_default().to_string();
             self.contents = Preg::replace(
                 format!("#{}\\}}$#", tail_match_1),
                 &addcslashes(

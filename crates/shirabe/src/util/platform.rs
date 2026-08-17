@@ -83,7 +83,6 @@ impl Platform {
 
     /// Parses tildes and environment variables in paths.
     pub fn expand_path(path: &str) -> String {
-        use shirabe_pcre::CaptureKey;
         if Preg::is_match(php_regex!(r"#^~[\\/]#"), path) {
             return format!(
                 "{}{}",
@@ -100,12 +99,10 @@ impl Platform {
             php_regex!(r"#^(?:\$(?P<dvar>\w+)|%(?P<pvar>\w+)%)(?P<path>.*)#"),
             |matches: &PregMatches| -> String {
                 let var = matches
-                    .get(&CaptureKey::ByName("dvar".to_string()))
-                    .or_else(|| matches.get(&CaptureKey::ByName("pvar".to_string())))
+                    .name("dvar")
+                    .or_else(|| matches.name("pvar"))
                     .unwrap_or("");
-                let path_part = matches
-                    .get(&CaptureKey::ByName("path".to_string()))
-                    .unwrap_or("");
+                let path_part = matches.name("path").unwrap_or("");
                 // Treat HOME as an alias for USERPROFILE on Windows for legacy reasons
                 if Platform::is_windows() && var == "HOME" {
                     let home =

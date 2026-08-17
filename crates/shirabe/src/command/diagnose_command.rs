@@ -33,7 +33,7 @@ use crate::util::ProcessExecutor;
 use crate::util::http::ProxyManager;
 use crate::util::http::RequestProxy;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpClass as _, PhpMixed,
@@ -866,10 +866,7 @@ impl DiagnoseCommand {
             php_regex!("{Configure Command(?: *</td><td class=\"v\">| *=> *)(.*?)(?:</td>|$)}m"),
             &diagnostics.phpinfo_general,
         ) {
-            let configure = phpinfo_match
-                .get(&CaptureKey::ByIndex(1))
-                .unwrap_or_default()
-                .to_string();
+            let configure = phpinfo_match.get(1).unwrap_or_default().to_string();
             let configure = configure.as_str();
 
             if configure.contains("--enable-sigchild") {

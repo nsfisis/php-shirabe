@@ -12,8 +12,8 @@ use crate::pipes::windows_pipes::WindowsPipes;
 use crate::process_utils::ProcessUtils;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CaptureKey, Descriptor, PhpMixed, PhpResource, PregMatches, php_regex, preg_match,
-    preg_replace, preg_replace_callback,
+    Descriptor, PhpMixed, PhpResource, PregMatches, php_regex, preg_match, preg_replace,
+    preg_replace_callback,
 };
 use std::sync::OnceLock;
 
@@ -939,11 +939,8 @@ impl Process {
             ) | [^"]*+ )"/x"#
             ),
             |m: &PregMatches| -> anyhow::Result<String> {
-                let m0 = m
-                    .get(&CaptureKey::ByIndex(0))
-                    .unwrap_or_default()
-                    .to_string();
-                let m1 = m.get(&CaptureKey::ByIndex(1)).map(str::to_string);
+                let m0 = m.get(0).unwrap_or_default().to_string();
+                let m1 = m.get(1).map(str::to_string);
                 if m1.is_none() {
                     return Ok(m0);
                 }
@@ -1072,10 +1069,7 @@ impl Process {
         preg_replace_callback(
             php_regex!(r#"/"\$\{:([_a-zA-Z]+[_a-zA-Z0-9]*)\}"/"#),
             |matches: &PregMatches| -> anyhow::Result<String> {
-                let key = matches
-                    .get(&CaptureKey::ByIndex(1))
-                    .unwrap_or_default()
-                    .to_string();
+                let key = matches.get(1).unwrap_or_default().to_string();
                 match env.get(&key) {
                     None => Err(InvalidArgumentException::new(format!(
                         "Command line is missing a value for parameter \"{}\": {}",

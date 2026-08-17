@@ -37,7 +37,7 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException, array_pop,
@@ -540,12 +540,7 @@ impl CreateProjectCommand {
                     package_version.as_deref().unwrap_or(""),
                 );
                 if let Some(matched) = matched {
-                    stability = Some(
-                        matched
-                            .get(&CaptureKey::ByIndex(1))
-                            .unwrap_or_default()
-                            .to_string(),
-                    );
+                    stability = Some(matched.get(1).unwrap_or_default().to_string());
                 } else {
                     stability = Some(VersionParser::parse_stability(
                         package_version.as_deref().unwrap_or(""),

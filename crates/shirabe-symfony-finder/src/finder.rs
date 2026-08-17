@@ -9,7 +9,7 @@
 use crate::glob::Glob;
 use chrono::{NaiveDate, NaiveDateTime};
 use indexmap::IndexSet;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{file_exists, glob, is_dir, php_regex, preg_quote, rtrim};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -644,10 +644,7 @@ fn is_regex(str: &str) -> bool {
 
     let pattern = format!("/^(.{{3,}}?)[{available_modifiers}]*$/");
     if let Some(matches) = Preg::is_match3(&pattern, str) {
-        let group = matches
-            .get(&CaptureKey::ByIndex(1))
-            .unwrap_or_default()
-            .to_string();
+        let group = matches.get(1).unwrap_or_default().to_string();
         let bytes = group.as_bytes();
         let start = bytes
             .first()
@@ -691,14 +688,11 @@ fn parse_date_comparator(test: &str) -> (String, i64) {
         panic!("Don't understand \"{test}\" as a date test.");
     };
 
-    let date = matches
-        .get(&CaptureKey::ByIndex(2))
-        .unwrap_or_default()
-        .to_string();
+    let date = matches.get(2).unwrap_or_default().to_string();
     let target = parse_datetime_to_unix(&date);
 
     let mut operator = matches
-        .get(&CaptureKey::ByIndex(1))
+        .get(1)
         .map(str::to_string)
         .unwrap_or_else(|| "==".to_string());
     if operator == "since" || operator == "after" {

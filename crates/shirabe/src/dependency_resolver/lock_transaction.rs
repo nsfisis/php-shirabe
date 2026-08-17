@@ -177,11 +177,7 @@ impl LockTransaction {
                 let new_dist_url = Preg::replace_callback(
                     php_regex!(r"{(/|sha=)[a-f0-9]{40}(/|$)}i"),
                     |m: &shirabe_pcre::PregMatches| -> String {
-                        let get = |i: usize| -> String {
-                            m.get(&shirabe_pcre::CaptureKey::ByIndex(i))
-                                .unwrap_or_default()
-                                .to_string()
-                        };
+                        let get = |i: usize| -> String { m.get(i).unwrap_or_default().to_string() };
                         format!("{}{}{}", get(1), dist_reference, get(2))
                     },
                     &package.get_dist_url().unwrap(),

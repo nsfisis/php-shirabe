@@ -19,7 +19,7 @@ use crate::repository::RepositorySet;
 use crate::repository::{RepositoryInterface, SearchResult};
 use crate::util::Filesystem;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
@@ -334,27 +334,21 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                 php_regex!(r"{^\s*(?P<name>[\S/]+)(?:\s+(?P<version>\S+))?\s*$}"),
                                 &selection,
                             ) {
-                                if let Some(v) = m
-                                    .get(&CaptureKey::ByName("version".to_string()))
-                                    .map(str::to_string)
-                                {
+                                if let Some(v) = m.name("version").map(str::to_string) {
                                     // parsing `acme/example ~2.3`
                                     // validate version constraint
                                     version_parser_clone.parse_constraints(&v)?;
 
                                     return Ok(PhpMixed::String(format!(
                                         "{} {}",
-                                        m.get(&CaptureKey::ByName("name".to_string()))
-                                            .unwrap_or_default(),
+                                        m.name("name").unwrap_or_default(),
                                         v,
                                     )));
                                 }
 
                                 // parsing `acme/example`
                                 return Ok(PhpMixed::String(
-                                    m.get(&CaptureKey::ByName("name".to_string()))
-                                        .unwrap_or_default()
-                                        .to_string(),
+                                    m.name("name").unwrap_or_default().to_string(),
                                 ));
                             }
 

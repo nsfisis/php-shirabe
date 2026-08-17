@@ -16,7 +16,7 @@ use crate::plugin::plugin_interface::{self};
 use crate::repository::ArrayRepository;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
@@ -323,7 +323,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-librabbitmq", name),
-                            librabbitmq_matches.get(&CaptureKey::ByName("version".to_string())),
+                            librabbitmq_matches.name("version"),
                             Some("AMQP librabbitmq version"),
                             &[],
                             &[],
@@ -336,7 +336,7 @@ impl PlatformRepository {
                         info,
                     ) {
                         let version_str = protocol_matches
-                            .get(&CaptureKey::ByName("version".to_string()))
+                            .name("version")
                             .unwrap_or_default()
                             .to_string();
                         self.add_library(
@@ -360,7 +360,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             name,
-                            matches.get(&CaptureKey::ByName("version".to_string())),
+                            matches.name("version"),
                             None,
                             &[],
                             &[],
@@ -386,14 +386,10 @@ impl PlatformRepository {
                         php_regex!("{^SSL Version => (?<library>[^/]+)/(?<version>.+)$}im"),
                         info,
                     ) {
-                        let ssl_library_raw = ssl_matches
-                            .get(&CaptureKey::ByName("library".to_string()))
-                            .unwrap_or_default()
-                            .to_string();
-                        let ssl_version = ssl_matches
-                            .get(&CaptureKey::ByName("version".to_string()))
-                            .unwrap_or_default()
-                            .to_string();
+                        let ssl_library_raw =
+                            ssl_matches.name("library").unwrap_or_default().to_string();
+                        let ssl_version =
+                            ssl_matches.name("version").unwrap_or_default().to_string();
                         let library = strtolower(&ssl_library_raw);
                         if library == "openssl" {
                             let mut is_fips = false;
@@ -421,7 +417,7 @@ impl PlatformRepository {
                                 ) {
                                     shortlib = "securetransport".to_string();
                                     let m1 = securetransport_matches
-                                        .get(&CaptureKey::ByIndex(1))
+                                        .get(1)
                                         .unwrap_or_default()
                                         .to_string();
                                     ssl_lib = format!("curl-{}", m1);
@@ -451,14 +447,10 @@ impl PlatformRepository {
                         ),
                         info,
                     ) {
-                        let ssh_library = ssh_matches
-                            .get(&CaptureKey::ByName("library".to_string()))
-                            .unwrap_or_default()
-                            .to_string();
-                        let ssh_version = ssh_matches
-                            .get(&CaptureKey::ByName("version".to_string()))
-                            .unwrap_or_default()
-                            .to_string();
+                        let ssh_library =
+                            ssh_matches.name("library").unwrap_or_default().to_string();
+                        let ssh_version =
+                            ssh_matches.name("version").unwrap_or_default().to_string();
                         self.add_library(
                             &mut libraries,
                             &format!("{}-{}", name, strtolower(&ssh_library)),
@@ -476,7 +468,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-zlib", name),
-                            zlib_matches.get(&CaptureKey::ByName("version".to_string())),
+                            zlib_matches.name("version"),
                             Some("curl zlib version"),
                             &[],
                             &[],
@@ -494,7 +486,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-timelib", name),
-                            timelib_matches.get(&CaptureKey::ByName("version".to_string())),
+                            timelib_matches.name("version"),
                             Some("date timelib version"),
                             &[],
                             &[],
@@ -507,7 +499,7 @@ impl PlatformRepository {
                         info,
                     ) {
                         let external = zoneinfo_source_matches
-                            .get(&CaptureKey::ByName("source".to_string()))
+                            .name("source")
                             .map(|s| s == "external")
                             .unwrap_or(false);
                         if let Some(zoneinfo_matches) = Preg::is_match3(
@@ -517,7 +509,7 @@ impl PlatformRepository {
                             info,
                         ) {
                             let zoneinfo_version = zoneinfo_matches
-                                .get(&CaptureKey::ByName("version".to_string()))
+                                .name("version")
                                 .unwrap_or_default()
                                 .to_string();
                             // If the timezonedb is provided by ext/timezonedb, register that version as a replacement
@@ -556,7 +548,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmagic", name),
-                            magic_matches.get(&CaptureKey::ByName("version".to_string())),
+                            magic_matches.name("version"),
                             Some("fileinfo libmagic version"),
                             &[],
                             &[],
@@ -586,7 +578,7 @@ impl PlatformRepository {
                         info,
                     ) {
                         let libjpeg_version = libjpeg_matches
-                            .get(&CaptureKey::ByName("version".to_string()))
+                            .name("version")
                             .unwrap_or_default()
                             .to_string();
                         let parsed = Version::parse_libjpeg(&libjpeg_version).unwrap_or_default();
@@ -606,7 +598,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libpng", name),
-                            libpng_matches.get(&CaptureKey::ByName("version".to_string())),
+                            libpng_matches.name("version"),
                             Some("libpng version for gd"),
                             &[],
                             &[],
@@ -620,7 +612,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-freetype", name),
-                            freetype_matches.get(&CaptureKey::ByName("version".to_string())),
+                            freetype_matches.name("version"),
                             Some("freetype version for gd"),
                             &[],
                             &[],
@@ -632,7 +624,7 @@ impl PlatformRepository {
                         info,
                     ) {
                         let version_id: i64 = libxpm_matches
-                            .get(&CaptureKey::ByName("versionId".to_string()))
+                            .name("versionId")
                             .and_then(|s| s.parse().ok())
                             .unwrap_or(0);
                         let converted = Version::convert_libxpm_version_id(version_id);
@@ -705,7 +697,7 @@ impl PlatformRepository {
                             self.add_library(
                                 &mut libraries,
                                 "icu",
-                                matches.get(&CaptureKey::ByName("version".to_string())),
+                                matches.name("version"),
                                 Some(description),
                                 &[],
                                 &[],
@@ -719,7 +711,7 @@ impl PlatformRepository {
                         info,
                     ) {
                         let zi_version = zoneinfo_matches
-                            .get(&CaptureKey::ByName("version".to_string()))
+                            .name("version")
                             .unwrap_or_default()
                             .to_string();
                         if let Some(parsed) = Version::parse_zoneinfo_version(&zi_version) {
@@ -781,11 +773,9 @@ impl PlatformRepository {
                         php_regex!("/^ImageMagick (?<version>[\\d.]+)(?:-(?<patch>\\d+))?/"),
                         &image_magick_version_str,
                     ) {
-                        let mut version_built = matches
-                            .get(&CaptureKey::ByName("version".to_string()))
-                            .unwrap_or_default()
-                            .to_string();
-                        if let Some(patch) = matches.get(&CaptureKey::ByName("patch".to_string())) {
+                        let mut version_built =
+                            matches.name("version").unwrap_or_default().to_string();
+                        if let Some(patch) = matches.name("patch") {
                             version_built = format!("{}.{}", version_built, patch);
                         }
 
@@ -810,12 +800,12 @@ impl PlatformRepository {
                         Preg::is_match3(php_regex!("/^Vendor Name => (?<vendor>.+)$/im"), info)
                     {
                         let version_id: i64 = matches
-                            .get(&CaptureKey::ByName("versionId".to_string()))
+                            .name("versionId")
                             .and_then(|s| s.parse().ok())
                             .unwrap_or(0);
                         let converted = Version::convert_openldap_version_id(version_id);
                         let vendor = vendor_matches
-                            .get(&CaptureKey::ByName("vendor".to_string()))
+                            .name("vendor")
                             .unwrap_or_default()
                             .to_string();
                         self.add_library(
@@ -864,7 +854,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmbfl", name),
-                            libmbfl_matches.get(&CaptureKey::ByName("version".to_string())),
+                            libmbfl_matches.name("version"),
                             Some("mbstring libmbfl version"),
                             &[],
                             &[],
@@ -898,7 +888,7 @@ impl PlatformRepository {
                             self.add_library(
                                 &mut libraries,
                                 &format!("{}-oniguruma", name),
-                                oniguruma_matches.get(&CaptureKey::ByName("version".to_string())),
+                                oniguruma_matches.name("version"),
                                 Some("mbstring oniguruma version"),
                                 &[],
                                 &[],
@@ -918,7 +908,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmemcached", name),
-                            matches.get(&CaptureKey::ByName("version".to_string())),
+                            matches.name("version"),
                             Some("libmemcached version"),
                             &[],
                             &[],
@@ -937,10 +927,7 @@ impl PlatformRepository {
                         php_regex!("{^(?:OpenSSL|LibreSSL)?\\s*(?<version>\\S+)}i"),
                         &openssl_text_str,
                     ) {
-                        let version = matches
-                            .get(&CaptureKey::ByName("version".to_string()))
-                            .unwrap_or_default()
-                            .to_string();
+                        let version = matches.name("version").unwrap_or_default().to_string();
                         let mut is_fips = false;
                         let parsed_version =
                             Version::parse_openssl(&version, &mut is_fips).unwrap_or_default();
@@ -979,7 +966,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-unicode", name),
-                            pcre_unicode_matches.get(&CaptureKey::ByName("version".to_string())),
+                            pcre_unicode_matches.name("version"),
                             Some("PCRE Unicode version support"),
                             &[],
                             &[],
@@ -999,7 +986,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-mysqlnd", name),
-                            matches.get(&CaptureKey::ByName("version".to_string())),
+                            matches.name("version"),
                             Some(&format!("mysqlnd library version for {}", name)),
                             &[],
                             &[],
@@ -1017,7 +1004,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libmongoc", name),
-                            libmongoc_matches.get(&CaptureKey::ByName("version".to_string())),
+                            libmongoc_matches.name("version"),
                             Some("libmongoc version of mongodb"),
                             &[],
                             &[],
@@ -1031,7 +1018,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libbson", name),
-                            libbson_matches.get(&CaptureKey::ByName("version".to_string())),
+                            libbson_matches.name("version"),
                             Some("libbson version of mongodb"),
                             &[],
                             &[],
@@ -1065,7 +1052,7 @@ impl PlatformRepository {
                             self.add_library(
                                 &mut libraries,
                                 &format!("{}-libpq", name),
-                                matches.get(&CaptureKey::ByName("version".to_string())),
+                                matches.name("version"),
                                 Some(&format!("libpq for {}", name)),
                                 &[],
                                 &[],
@@ -1084,7 +1071,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libpq", name),
-                            matches.get(&CaptureKey::ByName("version".to_string())),
+                            matches.name("version"),
                             Some(&format!("libpq for {}", name)),
                             &[],
                             &[],
@@ -1104,7 +1091,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libpq", name),
-                            matches.get(&CaptureKey::ByName("linked".to_string())),
+                            matches.name("linked"),
                             Some(&format!("libpq for {}", name)),
                             &[],
                             &[],
@@ -1177,7 +1164,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-sqlite", name),
-                            matches.get(&CaptureKey::ByName("version".to_string())),
+                            matches.name("version"),
                             None,
                             &[],
                             &[],
@@ -1194,7 +1181,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libssh2", name),
-                            matches.get(&CaptureKey::ByName("version".to_string())),
+                            matches.name("version"),
                             None,
                             &[],
                             &[],
@@ -1228,7 +1215,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             "libxslt-libxml",
-                            matches.get(&CaptureKey::ByName("version".to_string())),
+                            matches.name("version"),
                             Some("libxml version libxslt is compiled against"),
                             &[],
                             &[],
@@ -1245,7 +1232,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-libyaml", name),
-                            matches.get(&CaptureKey::ByName("version".to_string())),
+                            matches.name("version"),
                             Some("libyaml version of yaml"),
                             &[],
                             &[],
@@ -1298,7 +1285,7 @@ impl PlatformRepository {
                             self.add_library(
                                 &mut libraries,
                                 name,
-                                matches.get(&CaptureKey::ByName("version".to_string())),
+                                matches.name("version"),
                                 None,
                                 &[],
                                 &[],
@@ -1494,10 +1481,7 @@ impl PlatformRepository {
                     php_regex!("{^(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)}"),
                     &pretty_version,
                 ) {
-                    pretty_version = m
-                        .get(&CaptureKey::ByIndex(1))
-                        .unwrap_or_default()
-                        .to_string();
+                    pretty_version = m.get(1).unwrap_or_default().to_string();
                 } else {
                     pretty_version = "0".to_string();
                 }

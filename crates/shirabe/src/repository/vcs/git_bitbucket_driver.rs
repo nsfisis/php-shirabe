@@ -15,7 +15,7 @@ use crate::util::Bitbucket;
 use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
@@ -95,14 +95,8 @@ impl GitBitbucketDriver {
             .into());
         };
 
-        self.owner = m
-            .get(&CaptureKey::ByIndex(1))
-            .unwrap_or_default()
-            .to_string();
-        self.repository = m
-            .get(&CaptureKey::ByIndex(2))
-            .unwrap_or_default()
-            .to_string();
+        self.owner = m.get(1).unwrap_or_default().to_string();
+        self.repository = m.get(2).unwrap_or_default().to_string();
         self.inner.origin_url = "bitbucket.org".to_string();
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),

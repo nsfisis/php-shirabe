@@ -15,7 +15,7 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, preg_split,
     version_compare,
@@ -384,10 +384,7 @@ impl VcsDownloader for SvnDownloader {
 
             let url_pattern = "#<url>(.*)</url>#";
             let base_url = if let Some(matches) = Preg::match3(url_pattern, &output) {
-                matches
-                    .get(&CaptureKey::ByIndex(1))
-                    .unwrap_or_default()
-                    .to_string()
+                matches.get(1).unwrap_or_default().to_string()
             } else {
                 return Err(RuntimeException::new(format!(
                     "Unable to determine svn url for path {}",

@@ -77,15 +77,9 @@ impl BufferIO {
             let next = Preg::replace_callback(
                 php_regex!(r"{(^|\n|\x08)(.+?)(\x08+)}"),
                 |matches: &shirabe_pcre::PregMatches| -> String {
-                    let g1 = matches
-                        .get(&shirabe_pcre::CaptureKey::ByIndex(1))
-                        .unwrap_or("");
-                    let g2 = matches
-                        .get(&shirabe_pcre::CaptureKey::ByIndex(2))
-                        .unwrap_or("");
-                    let g3 = matches
-                        .get(&shirabe_pcre::CaptureKey::ByIndex(3))
-                        .unwrap_or("");
+                    let g1 = matches.get(1).unwrap_or("");
+                    let g2 = matches.get(2).unwrap_or("");
+                    let g3 = matches.get(3).unwrap_or("");
                     let pre = strip_tags(g2);
 
                     if pre.len() == g3.len() {

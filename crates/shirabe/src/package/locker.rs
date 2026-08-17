@@ -24,7 +24,7 @@ use crate::repository::RootPackageRepository;
 use crate::util::Git as GitUtil;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
@@ -848,7 +848,7 @@ impl Locker {
                         output.as_string().unwrap_or(""),
                     ) {
                         let ts = m
-                            .get(&CaptureKey::ByIndex(1))
+                            .get(1)
                             .unwrap_or_default()
                             .to_string()
                             .parse::<i64>()

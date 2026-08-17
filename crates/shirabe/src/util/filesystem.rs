@@ -739,10 +739,7 @@ impl Filesystem {
             php_regex!("{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
             &path,
         ) {
-            prefix = prefix_match
-                .get(&shirabe_pcre::CaptureKey::ByIndex(1))
-                .unwrap_or_default()
-                .to_string();
+            prefix = prefix_match.get(1).unwrap_or_default().to_string();
             path = substr(&path, strlen(&prefix), None);
         }
 
@@ -766,10 +763,7 @@ impl Filesystem {
         prefix = Preg::replace_callback(
             php_regex!("{(^|://)[a-z]:$}i"),
             |m: &shirabe_pcre::PregMatches| -> String {
-                let s = m
-                    .get(&shirabe_pcre::CaptureKey::ByIndex(0))
-                    .unwrap_or_default()
-                    .to_string();
+                let s = m.get(0).unwrap_or_default().to_string();
                 strtoupper(&s)
             },
             &prefix,

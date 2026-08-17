@@ -10,7 +10,7 @@ use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositorySet;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, extension_loaded, implode, loosely_compare, php_regex,
     spl_object_hash, sprintf, str_replace, stripos, strpos, strtolower, substr, substr_count,
@@ -234,14 +234,8 @@ impl Problem {
                 None
             };
             if let Some(m) = matched {
-                let pkg_key = m
-                    .get(&CaptureKey::ByIndex(1))
-                    .unwrap_or_default()
-                    .to_string();
-                let m2 = m
-                    .get(&CaptureKey::ByIndex(2))
-                    .unwrap_or_default()
-                    .to_string();
+                let pkg_key = m.get(1).unwrap_or_default().to_string();
+                let m2 = m.get(2).unwrap_or_default().to_string();
                 message = str_replace("%", "%%", &message);
                 let template = Preg::replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &message);
                 messages.push(template.clone());

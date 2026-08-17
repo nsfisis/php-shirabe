@@ -6,7 +6,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, implode, parse_url, php_regex, stripos, strpos,
     trim,
@@ -407,12 +407,7 @@ impl Svn {
                 None,
             ) && let Some(matches) = Preg::is_match3(php_regex!(r"{(\d+(?:\.\d+)+)}"), &output)
             {
-                *cached = Some(
-                    matches
-                        .get(&CaptureKey::ByIndex(1))
-                        .unwrap_or_default()
-                        .to_string(),
-                );
+                *cached = Some(matches.get(1).unwrap_or_default().to_string());
             }
         }
 

@@ -14,7 +14,7 @@ use crate::util::Url;
 use chrono::TimeZone;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, realpath,
@@ -200,7 +200,7 @@ impl GitDriver {
                 for branch in &branches {
                     if !branch.is_empty()
                         && let Some(caps) = Preg::match3(php_regex!(r"{^\* +(\S+)}"), branch)
-                        && let Some(name) = caps.get(&CaptureKey::ByIndex(1))
+                        && let Some(name) = caps.get(1)
                     {
                         self.root_identifier = Some(name.to_string());
                         break;
@@ -313,10 +313,7 @@ impl GitDriver {
                         php_regex!(r"{^([a-f0-9]{40}) refs/tags/(\S+?)(\^\{\})?$}"),
                         &tag,
                     )
-                    && let (Some(hash), Some(name)) = (
-                        caps.get(&CaptureKey::ByIndex(1)),
-                        caps.get(&CaptureKey::ByIndex(2)),
-                    )
+                    && let (Some(hash), Some(name)) = (caps.get(1), caps.get(2))
                 {
                     self.tags
                         .as_mut()
@@ -352,10 +349,7 @@ impl GitDriver {
                         php_regex!(r"{^(?:\* )? *(\S+) *([a-f0-9]+)(?: .*)?$}"),
                         &branch,
                     )
-                    && let (Some(name), Some(hash)) = (
-                        caps.get(&CaptureKey::ByIndex(1)),
-                        caps.get(&CaptureKey::ByIndex(2)),
-                    )
+                    && let (Some(name), Some(hash)) = (caps.get(1), caps.get(2))
                     && !name.starts_with('-')
                 {
                     branches.insert(name.to_string(), hash.to_string());

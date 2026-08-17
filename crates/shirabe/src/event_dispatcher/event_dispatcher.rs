@@ -21,7 +21,7 @@ use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
     call_function_with_dispatcher, call_php_method, call_static_method,
@@ -956,13 +956,7 @@ try {{
                             if Platform::is_windows() {
                                 path_and_args = Preg::replace_callback(
                                     php_regex!("{^\\S+}"),
-                                    |m| {
-                                        str_replace(
-                                            "/",
-                                            "\\",
-                                            m.get(&CaptureKey::ByIndex(0)).unwrap(),
-                                        )
-                                    },
+                                    |m| str_replace("/", "\\", m.get(0).unwrap()),
                                     &path_and_args,
                                 );
                             }
@@ -971,10 +965,7 @@ try {{
                             if let Some(m) =
                                 Preg::is_match3(php_regex!("{^[^\\'\"\\s/\\\\]+}"), &path_and_args)
                             {
-                                let m0 = m
-                                    .get(&CaptureKey::ByIndex(0))
-                                    .unwrap_or_default()
-                                    .to_string();
+                                let m0 = m.get(0).unwrap_or_default().to_string();
                                 if !file_exists(&m0) {
                                     let finder = ExecutableFinder::new();
                                     if let Some(path_to_exec) = finder.find(&m0, None, &[]) {
@@ -993,11 +984,7 @@ try {{
                                         path_and_args = format!(
                                             "{}{}",
                                             path_to_exec,
-                                            substr(
-                                                &path_and_args,
-                                                strlen(m.get(&CaptureKey::ByIndex(0)).unwrap()),
-                                                None
-                                            )
+                                            substr(&path_and_args, strlen(m.get(0).unwrap()), None)
                                         );
                                     }
                                 }
@@ -1013,13 +1000,7 @@ try {{
                             if Platform::is_windows() {
                                 exec = Preg::replace_callback(
                                     php_regex!("{^\\S+}"),
-                                    |m| {
-                                        str_replace(
-                                            "/",
-                                            "\\",
-                                            m.get(&CaptureKey::ByIndex(0)).unwrap(),
-                                        )
-                                    },
+                                    |m| str_replace("/", "\\", m.get(0).unwrap()),
                                     &exec,
                                 );
                             }

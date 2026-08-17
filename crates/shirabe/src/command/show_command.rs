@@ -36,7 +36,7 @@ use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
 use crate::util::PackageInfo;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
     array_search, date_format_to_strftime, date_local, extension_loaded, impl_php_class,
@@ -1378,12 +1378,9 @@ impl ShowCommand {
                     &package.get_version(),
                 )
             {
-                let zero_major = groups
-                    .get(&CaptureKey::ByName("zero_major".to_string()))
-                    .unwrap_or_default()
-                    .to_string();
+                let zero_major = groups.name("zero_major").unwrap_or_default().to_string();
                 let first_meaningful = groups
-                    .get(&CaptureKey::ByName("first_meaningful".to_string()))
+                    .name("first_meaningful")
                     .unwrap_or_default()
                     .to_string()
                     .parse::<i64>()

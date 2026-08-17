@@ -13,7 +13,7 @@ use crate::util::Svn as SvnUtil;
 use crate::util::Url;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, php_regex, stripos, strrpos, strtr, substr, trim,
@@ -259,14 +259,9 @@ impl SvnDriver {
 
         let (path, rev) = if let Some(m) =
             Preg::is_match3(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
-            && let Some(rev) = m.get(&CaptureKey::ByIndex(2))
+            && let Some(rev) = m.get(2)
         {
-            (
-                m.get(&CaptureKey::ByIndex(1))
-                    .unwrap_or_default()
-                    .to_string(),
-                rev.to_string(),
-            )
+            (m.get(1).unwrap_or_default().to_string(), rev.to_string())
         } else {
             (identifier, String::new())
         };
@@ -298,14 +293,9 @@ impl SvnDriver {
 
         let (path, rev) = if let Some(m) =
             Preg::is_match3(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
-            && let Some(rev) = m.get(&CaptureKey::ByIndex(2))
+            && let Some(rev) = m.get(2)
         {
-            (
-                m.get(&CaptureKey::ByIndex(1))
-                    .unwrap_or_default()
-                    .to_string(),
-                rev.to_string(),
-            )
+            (m.get(1).unwrap_or_default().to_string(), rev.to_string())
         } else {
             (identifier, String::new())
         };
@@ -319,10 +309,7 @@ impl SvnDriver {
                 && let Some(m) =
                     Preg::is_match3(php_regex!(r"{^Last Changed Date: ([^(]+)}"), &line)
             {
-                let date_str = m
-                    .get(&CaptureKey::ByIndex(1))
-                    .unwrap_or_default()
-                    .to_string();
+                let date_str = m.get(1).unwrap_or_default().to_string();
                 return Ok(shirabe_php_shim::date_create::<Utc>(date_str.trim())
                     .ok()
                     .map(|d| d.fixed_offset()));
@@ -350,14 +337,8 @@ impl SvnDriver {
                             && let Some(m) =
                                 Preg::is_match3(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                         {
-                            let rev: i64 = m
-                                .get(&CaptureKey::ByIndex(1))
-                                .and_then(|s| s.parse().ok())
-                                .unwrap_or(0);
-                            let path = m
-                                .get(&CaptureKey::ByIndex(2))
-                                .unwrap_or_default()
-                                .to_string();
+                            let rev: i64 = m.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+                            let path = m.get(2).unwrap_or_default().to_string();
                             if path == "./" {
                                 last_rev = rev;
                             } else {
@@ -399,14 +380,8 @@ impl SvnDriver {
                         && let Some(m) =
                             Preg::is_match3(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                     {
-                        let rev: i64 = m
-                            .get(&CaptureKey::ByIndex(1))
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(0);
-                        let path = m
-                            .get(&CaptureKey::ByIndex(2))
-                            .unwrap_or_default()
-                            .to_string();
+                        let rev: i64 = m.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+                        let path = m.get(2).unwrap_or_default().to_string();
                         if path == "./" {
                             let identifier = self.build_identifier(
                                 &format!("/{}", self.trunk_path.clone().unwrap_or_default()),
@@ -440,14 +415,8 @@ impl SvnDriver {
                             && let Some(m) =
                                 Preg::is_match3(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                         {
-                            let rev: i64 = m
-                                .get(&CaptureKey::ByIndex(1))
-                                .and_then(|s| s.parse().ok())
-                                .unwrap_or(0);
-                            let path = m
-                                .get(&CaptureKey::ByIndex(2))
-                                .unwrap_or_default()
-                                .to_string();
+                            let rev: i64 = m.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+                            let path = m.get(2).unwrap_or_default().to_string();
                             if path == "./" {
                                 last_rev = rev;
                             } else {

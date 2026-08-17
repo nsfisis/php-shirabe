@@ -5,7 +5,7 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{php_regex, rawurlencode};
 use std::sync::OnceLock;
 
@@ -64,44 +64,30 @@ impl Hg {
         );
 
         if let Some(matches) = matched
-            && self.io.has_authentication(
-                matches
-                    .get(&CaptureKey::ByName("host".to_string()))
-                    .unwrap_or(""),
-            )
+            && self
+                .io
+                .has_authentication(matches.name("host").unwrap_or(""))
         {
-            let authenticated_url = if matches.get(&CaptureKey::ByName("proto".to_string()))
-                == Some("ssh")
-            {
-                let user = if let Some(u) = matches.get(&CaptureKey::ByName("user".to_string())) {
+            let authenticated_url = if matches.name("proto") == Some("ssh") {
+                let user = if let Some(u) = matches.name("user") {
                     format!("{}@", rawurlencode(u))
                 } else {
                     String::new()
                 };
                 format!(
                     "{}://{}{}{}",
-                    matches
-                        .get(&CaptureKey::ByName("proto".to_string()))
-                        .unwrap_or(""),
+                    matches.name("proto").unwrap_or(""),
                     user,
-                    matches
-                        .get(&CaptureKey::ByName("host".to_string()))
-                        .unwrap_or(""),
-                    matches
-                        .get(&CaptureKey::ByName("path".to_string()))
-                        .unwrap_or(""),
+                    matches.name("host").unwrap_or(""),
+                    matches.name("path").unwrap_or(""),
                 )
             } else {
-                let auth = self.io.get_authentication(
-                    matches
-                        .get(&CaptureKey::ByName("host".to_string()))
-                        .unwrap_or(""),
-                );
+                let auth = self
+                    .io
+                    .get_authentication(matches.name("host").unwrap_or(""));
                 format!(
                     "{}://{}:{}@{}{}",
-                    matches
-                        .get(&CaptureKey::ByName("proto".to_string()))
-                        .unwrap_or(""),
+                    matches.name("proto").unwrap_or(""),
                     rawurlencode(
                         auth.get("username")
                             .and_then(|s| s.as_deref())
@@ -112,12 +98,8 @@ impl Hg {
                             .and_then(|s| s.as_deref())
                             .unwrap_or("")
                     ),
-                    matches
-                        .get(&CaptureKey::ByName("host".to_string()))
-                        .unwrap_or(""),
-                    matches
-                        .get(&CaptureKey::ByName("path".to_string()))
-                        .unwrap_or(""),
+                    matches.name("host").unwrap_or(""),
+                    matches.name("path").unwrap_or(""),
                 )
             };
 
@@ -174,7 +156,7 @@ impl Hg {
                         &output,
                     )
                 {
-                    return matches.get(&CaptureKey::ByIndex(1)).map(str::to_string);
+                    return matches.get(1).map(str::to_string);
                 }
                 None
             })

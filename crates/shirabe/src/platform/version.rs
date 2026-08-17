@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Platform/Version.php
 
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{CmpOp, php_regex, version_compare};
 
 pub struct Version;
@@ -16,18 +16,9 @@ impl Version {
             openssl_version,
         )?;
 
-        let version = matches
-            .get(&CaptureKey::ByName("version".to_string()))
-            .unwrap_or_default()
-            .to_string();
-        let patch_str = matches
-            .get(&CaptureKey::ByName("patch".to_string()))
-            .unwrap_or_default()
-            .to_string();
-        let suffix_str = matches
-            .get(&CaptureKey::ByName("suffix".to_string()))
-            .unwrap_or_default()
-            .to_string();
+        let version = matches.name("version").unwrap_or_default().to_string();
+        let patch_str = matches.name("patch").unwrap_or_default().to_string();
+        let suffix_str = matches.name("suffix").unwrap_or_default().to_string();
 
         let patch = if version_compare(&version, "3.0.0", CmpOp::Lt) {
             format!(
@@ -56,14 +47,8 @@ impl Version {
             libjpeg_version,
         )?;
 
-        let major = matches
-            .get(&CaptureKey::ByName("major".to_string()))
-            .unwrap_or_default()
-            .to_string();
-        let minor = matches
-            .get(&CaptureKey::ByName("minor".to_string()))
-            .unwrap_or_default()
-            .to_string();
+        let major = matches.name("major").unwrap_or_default().to_string();
+        let minor = matches.name("minor").unwrap_or_default().to_string();
         Some(format!(
             "{}.{}",
             major,
@@ -77,14 +62,8 @@ impl Version {
             zoneinfo_version,
         )?;
 
-        let year = matches
-            .get(&CaptureKey::ByName("year".to_string()))
-            .unwrap_or_default()
-            .to_string();
-        let revision = matches
-            .get(&CaptureKey::ByName("revision".to_string()))
-            .unwrap_or_default()
-            .to_string();
+        let year = matches.name("year").unwrap_or_default().to_string();
+        let revision = matches.name("revision").unwrap_or_default().to_string();
         Some(format!(
             "{}.{}",
             year,

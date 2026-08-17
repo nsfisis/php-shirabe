@@ -8,7 +8,7 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
     file_get_contents5, file_put_contents, fopen, is_dir, is_file, is_link, php_regex, realpath,
@@ -205,7 +205,7 @@ impl BinaryInstaller {
             php_regex!(r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m"),
             &line,
         ) {
-            return trim(m.get(&CaptureKey::ByIndex(1)).unwrap_or(""), None);
+            return trim(m.get(1).unwrap_or(""), None);
         }
 
         "php".to_string()
@@ -321,7 +321,7 @@ impl BinaryInstaller {
             &bin_contents,
         ) {
             // carry over the existing shebang if present, otherwise add our own
-            let proxy_code = match m.get(&CaptureKey::ByIndex(1)) {
+            let proxy_code = match m.get(1) {
                 None => "#!/usr/bin/env php".to_string(),
                 Some(shebang) => trim(shebang, None),
             };
@@ -369,7 +369,7 @@ impl BinaryInstaller {
                 $data = str_replace('__FILE__', var_export($this->realpath, true), $data);"
                     .to_string();
             }
-            if trim(m.get(&CaptureKey::ByIndex(0)).unwrap_or(""), None) != "<?php" {
+            if trim(m.get(0).unwrap_or(""), None) != "<?php" {
                 stream_hint =
                     " using a stream wrapper to prevent the shebang from being output on PHP<8\n *"
                         .to_string();

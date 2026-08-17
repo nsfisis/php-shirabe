@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::util::GitHub;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{PhpMixed, in_array_strict, parse_url, php_regex};
 
 pub struct Url;
@@ -22,9 +22,9 @@ impl Url {
             ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
-                    m.get(&CaptureKey::ByIndex(1)).unwrap_or_default(),
-                    m.get(&CaptureKey::ByIndex(2)).unwrap_or_default(),
-                    m.get(&CaptureKey::ByIndex(3)).unwrap_or_default(),
+                    m.get(1).unwrap_or_default(),
+                    m.get(2).unwrap_or_default(),
+                    m.get(3).unwrap_or_default(),
                     r#ref
                 );
             } else if let Some(m) = Preg::match3(
@@ -35,9 +35,9 @@ impl Url {
             ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
-                    m.get(&CaptureKey::ByIndex(1)).unwrap_or_default(),
-                    m.get(&CaptureKey::ByIndex(2)).unwrap_or_default(),
-                    m.get(&CaptureKey::ByIndex(3)).unwrap_or_default(),
+                    m.get(1).unwrap_or_default(),
+                    m.get(2).unwrap_or_default(),
+                    m.get(3).unwrap_or_default(),
                     r#ref
                 );
             } else if let Some(m) = Preg::match3(
@@ -48,9 +48,9 @@ impl Url {
             ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
-                    m.get(&CaptureKey::ByIndex(1)).unwrap_or_default(),
-                    m.get(&CaptureKey::ByIndex(2)).unwrap_or_default(),
-                    m.get(&CaptureKey::ByIndex(3)).unwrap_or_default(),
+                    m.get(1).unwrap_or_default(),
+                    m.get(2).unwrap_or_default(),
+                    m.get(3).unwrap_or_default(),
                     r#ref
                 );
             }
@@ -63,10 +63,10 @@ impl Url {
             ) {
                 url = format!(
                     "https://bitbucket.org/{}/{}/get/{}.{}",
-                    m.get(&CaptureKey::ByIndex(1)).unwrap_or_default(),
-                    m.get(&CaptureKey::ByIndex(2)).unwrap_or_default(),
+                    m.get(1).unwrap_or_default(),
+                    m.get(2).unwrap_or_default(),
                     r#ref,
-                    m.get(&CaptureKey::ByIndex(4)).unwrap_or_default()
+                    m.get(4).unwrap_or_default()
                 );
             }
         } else if host == "gitlab.com" || host == "www.gitlab.com" {
@@ -78,8 +78,8 @@ impl Url {
             ) {
                 url = format!(
                     "https://gitlab.com/api/v4/projects/{}/repository/archive.{}?sha={}",
-                    m.get(&CaptureKey::ByIndex(1)).unwrap_or_default(),
-                    m.get(&CaptureKey::ByIndex(2)).unwrap_or_default(),
+                    m.get(1).unwrap_or_default(),
+                    m.get(2).unwrap_or_default(),
                     r#ref
                 );
             }
@@ -163,14 +163,8 @@ impl Url {
         Preg::replace_callback(
             php_regex!(r"{^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@}i"),
             |m| {
-                let user = m
-                    .get(&CaptureKey::ByName("user".to_string()))
-                    .unwrap_or_default()
-                    .to_string();
-                let prefix = m
-                    .get(&CaptureKey::ByName("prefix".to_string()))
-                    .unwrap_or_default()
-                    .to_string();
+                let user = m.name("user").unwrap_or_default().to_string();
+                let prefix = m.name("prefix").unwrap_or_default().to_string();
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
                 if Preg::is_match(GitHub::GITHUB_TOKEN_REGEX, &user) {
                     format!("{}***:***@", prefix)

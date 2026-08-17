@@ -8,7 +8,7 @@ use crate::io::io_interface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, date_local, in_array_loose, php_regex, stripos, strtolower};
 
@@ -326,9 +326,7 @@ impl GitHub {
                 continue;
             }
             if let Some(caps) = Preg::match3(php_regex!(r"{\burl=(?P<url>[^\s;]+)}"), header) {
-                return caps
-                    .get(&CaptureKey::ByName("url".to_string()))
-                    .map(str::to_string);
+                return caps.name("url").map(str::to_string);
             }
         }
 

@@ -70,15 +70,16 @@ impl<'h> PregMatches<'h> {
         Self { caps }
     }
 
-    /// The value of the group `key` names, or `None` if that group did not participate in the
-    /// match. A group the pattern does not have reads as `None` too, matching how PHP reports a
-    /// `$matches` entry that is not there.
-    pub fn get(&self, key: &CaptureKey) -> Option<&'h str> {
-        let group = match key {
-            CaptureKey::ByIndex(index) => self.caps.get(*index),
-            CaptureKey::ByName(name) => self.caps.name(name),
-        };
-        group.map(|group| group.as_str())
+    /// The value of the capture group at `index`, or `None` if that group did not participate in
+    /// the match. A group the pattern does not have reads as `None` too, matching how PHP reports
+    /// a `$matches` entry that is not there.
+    pub fn get(&self, index: usize) -> Option<&'h str> {
+        self.caps.get(index).map(|group| group.as_str())
+    }
+
+    /// The value of the capture group called `name`, under the same rules as `get`.
+    pub fn name(&self, name: &str) -> Option<&'h str> {
+        self.caps.name(name).map(|group| group.as_str())
     }
 }
 
@@ -183,7 +184,7 @@ pub fn preg_match_all(pattern: impl PregPattern, subject: &str) -> Vec<Vec<Optio
 }
 
 // The number of occurrences the caller would get from PHP's return value is the length of any
-// one column, `matches[&CaptureKey::ByIndex(0)].len()`.
+// one column, as `PregMatchesAll::occurrence_count` reports it.
 pub fn preg_match_all2(pattern: impl PregPattern, subject: &str) -> PregMatchesAll {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
@@ -229,8 +230,8 @@ pub fn preg_match_all_set_order(
 }
 
 // A non-participating group is reported as None, at offset -1. The number of occurrences the
-// caller would get from PHP's return value is the length of any one column,
-// `matches[&CaptureKey::ByIndex(0)].len()`.
+// caller would get from PHP's return value is the length of any one column, as
+// `PregMatchesAllWithOffsets::occurrence_count` reports it.
 pub fn preg_match_all_offset_capture(
     pattern: impl PregPattern,
     subject: &str,

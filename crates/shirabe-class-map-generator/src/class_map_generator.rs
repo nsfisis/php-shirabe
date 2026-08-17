@@ -3,7 +3,7 @@
 use crate::class_map::ClassMap;
 use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, explode,
     getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_quote, realpath, str_replace,
@@ -351,10 +351,7 @@ impl ClassMapGenerator {
             php_regex!(r"{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
             &path,
         ) {
-            prefix = r#match
-                .get(&CaptureKey::ByIndex(1))
-                .unwrap_or_default()
-                .to_string();
+            prefix = r#match.get(1).unwrap_or_default().to_string();
             path = substr(&path, strlen(&prefix), None);
         }
 
@@ -377,12 +374,7 @@ impl ClassMapGenerator {
         // ensure c: is normalized to C:
         let prefix = Preg::replace_callback(
             php_regex!(r"{(?:^|://)[a-z]:$}i"),
-            |m| {
-                m.get(&CaptureKey::ByIndex(0))
-                    .unwrap_or_default()
-                    .to_string()
-                    .to_uppercase()
-            },
+            |m| m.get(0).unwrap_or_default().to_string().to_uppercase(),
             &prefix,
         );
 

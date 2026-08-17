@@ -13,7 +13,7 @@ use crate::util::Url;
 use crate::util::http::ProxyManager;
 use crate::util::http::Response;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS,
@@ -149,10 +149,7 @@ impl RemoteFilesystem {
         let mut value: Option<i64> = None;
         for header in headers {
             if let Some(m) = Preg::is_match3(php_regex!("{^HTTP/\\S+ (\\d+)}i"), header) {
-                value = m
-                    .get(&CaptureKey::ByIndex(1))
-                    .and_then(|s| s.parse().ok())
-                    .or(Some(0));
+                value = m.get(1).and_then(|s| s.parse().ok()).or(Some(0));
             }
         }
 

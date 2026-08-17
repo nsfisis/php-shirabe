@@ -37,7 +37,7 @@ use futures::StreamExt;
 use futures::stream::FuturesOrdered;
 use indexmap::IndexMap;
 use shirabe_metadata_minifier::MetadataMinifier;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
@@ -250,7 +250,7 @@ impl ComposerRepository {
             &url,
         ) {
             let proto = match_packagist
-                .get(&CaptureKey::ByName("proto".to_string()))
+                .name("proto")
                 .unwrap_or_default()
                 .to_string();
             url = format!("{}://repo.packagist.org", proto);
@@ -784,14 +784,8 @@ impl ComposerRepository {
                 &query,
             ) && let Some(list_url) = self.list_url.as_ref()
             {
-                let q = match_groups
-                    .get(&CaptureKey::ByName("query".to_string()))
-                    .unwrap_or_default()
-                    .to_string();
-                let vendor = match_groups
-                    .get(&CaptureKey::ByName("vendor".to_string()))
-                    .unwrap_or_default()
-                    .to_string();
+                let q = match_groups.name("query").unwrap_or_default().to_string();
+                let vendor = match_groups.name("vendor").unwrap_or_default().to_string();
                 let url = format!(
                     "{}?vendor={}&filter={}",
                     list_url,
@@ -2427,11 +2421,7 @@ impl ComposerRepository {
 
         if url.starts_with('/') {
             if let Some(matches) = Preg::is_match3(php_regex!(r"{^[^:]++://[^/]*+}"), &self.url) {
-                return Ok(format!(
-                    "{}{}",
-                    matches.get(&CaptureKey::ByIndex(0)).unwrap_or_default(),
-                    url
-                ));
+                return Ok(format!("{}{}", matches.get(0).unwrap_or_default(), url));
             }
 
             return Ok(self.url.clone());

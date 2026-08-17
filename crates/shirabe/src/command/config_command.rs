@@ -18,7 +18,7 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
     escapeshellcmd, exec, explode, file_exists, impl_php_class, implode, in_array_loose,
@@ -705,16 +705,13 @@ impl Command for ConfigCommand {
                 php_regex!("/^repos?(?:itories)?(?:\\.(.+))?/"),
                 &setting_key,
             ) {
-                if matches.get(&CaptureKey::ByIndex(1)).is_none() {
+                if matches.get(1).is_none() {
                     value = data
                         .get("repositories")
                         .cloned()
                         .unwrap_or_else(|| PhpMixed::Array(IndexMap::new()));
                 } else {
-                    let repo_key = matches
-                        .get(&CaptureKey::ByIndex(1))
-                        .unwrap_or_default()
-                        .to_string();
+                    let repo_key = matches.get(1).unwrap_or_default().to_string();
                     let repos = data.get("repositories").cloned();
                     value = match repos
                         .as_ref()
@@ -1038,7 +1035,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_repository(matches.get(&CaptureKey::ByIndex(1)).unwrap());
+                    .remove_repository(matches.get(1).unwrap());
 
                 return Ok(0);
             }
@@ -1052,7 +1049,7 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .add_repository(
-                        matches.get(&CaptureKey::ByIndex(1)).unwrap(),
+                        matches.get(1).unwrap(),
                         PhpMixed::Array(repo),
                         input.borrow().get_option("append")?.as_bool() == Some(true),
                     );
@@ -1072,7 +1069,7 @@ impl Command for ConfigCommand {
                             .as_mut()
                             .unwrap()
                             .add_repository(
-                                matches.get(&CaptureKey::ByIndex(1)).unwrap(),
+                                matches.get(1).unwrap(),
                                 PhpMixed::Bool(false),
                                 input.borrow().get_option("append")?.as_bool() == Some(true),
                             );
@@ -1086,7 +1083,7 @@ impl Command for ConfigCommand {
                         .as_mut()
                         .unwrap()
                         .add_repository(
-                            matches.get(&CaptureKey::ByIndex(1)).unwrap(),
+                            matches.get(1).unwrap(),
                             value,
                             input.borrow().get_option("append")?.as_bool() == Some(true),
                         );
@@ -1336,8 +1333,8 @@ impl Command for ConfigCommand {
                     .unwrap()
                     .remove_config_setting(&format!(
                         "{}.{}",
-                        matches.get(&CaptureKey::ByIndex(1)).unwrap(),
-                        matches.get(&CaptureKey::ByIndex(2)).unwrap()
+                        matches.get(1).unwrap(),
+                        matches.get(2).unwrap()
                     ));
                 self.config_source
                     .borrow_mut()
@@ -1345,19 +1342,15 @@ impl Command for ConfigCommand {
                     .unwrap()
                     .remove_config_setting(&format!(
                         "{}.{}",
-                        matches.get(&CaptureKey::ByIndex(1)).unwrap(),
-                        matches.get(&CaptureKey::ByIndex(2)).unwrap()
+                        matches.get(1).unwrap(),
+                        matches.get(2).unwrap()
                     ));
 
                 return Ok(0);
             }
 
-            let key = format!(
-                "{}.{}",
-                matches.get(&CaptureKey::ByIndex(1)).unwrap(),
-                matches.get(&CaptureKey::ByIndex(2)).unwrap()
-            );
-            if matches.get(&CaptureKey::ByIndex(1)).unwrap() == "bitbucket-oauth" {
+            let key = format!("{}.{}", matches.get(1).unwrap(), matches.get(2).unwrap());
+            if matches.get(1).unwrap() == "bitbucket-oauth" {
                 if 2 != values.len() {
                     return Err(RuntimeException::new(format!(
                         "Expected two arguments (consumer-key, consumer-secret), got {}",
@@ -1384,9 +1377,7 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::Array(obj));
-            } else if matches.get(&CaptureKey::ByIndex(1)).unwrap() == "gitlab-token"
-                && 2 == values.len()
-            {
+            } else if matches.get(1).unwrap() == "gitlab-token" && 2 == values.len() {
                 self.config_source
                     .borrow_mut()
                     .as_mut()
@@ -1401,7 +1392,7 @@ impl Command for ConfigCommand {
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::Array(obj));
             } else if matches!(
-                matches.get(&CaptureKey::ByIndex(1)).unwrap(),
+                matches.get(1).unwrap(),
                 "github-oauth" | "gitlab-oauth" | "gitlab-token" | "bearer"
             ) {
                 if 1 != values.len() {
@@ -1420,7 +1411,7 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::String(values[0].clone()));
-            } else if matches.get(&CaptureKey::ByIndex(1)).unwrap() == "http-basic" {
+            } else if matches.get(1).unwrap() == "http-basic" {
                 if 2 != values.len() {
                     return Err(RuntimeException::new(format!(
                         "Expected two arguments (username, password), got {}",
@@ -1441,7 +1432,7 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::Array(obj));
-            } else if matches.get(&CaptureKey::ByIndex(1)).unwrap() == "custom-headers" {
+            } else if matches.get(1).unwrap() == "custom-headers" {
                 if values.is_empty() {
                     return Err(RuntimeException::new(
                         "Expected at least one argument (header), got none".to_string(),
@@ -1482,7 +1473,7 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::List(formatted_headers));
-            } else if matches.get(&CaptureKey::ByIndex(1)).unwrap() == "forgejo-token" {
+            } else if matches.get(1).unwrap() == "forgejo-token" {
                 if 2 != values.len() {
                     return Err(RuntimeException::new(format!(
                         "Expected two arguments (username, access token), got {}",

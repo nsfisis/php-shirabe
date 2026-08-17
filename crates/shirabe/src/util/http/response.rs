@@ -66,7 +66,7 @@ impl Response {
         let pattern = format!("{{^{}:\\s*(.+?)\\s*$}}i", preg_quote(name, None));
         for header in headers {
             if let Some(matches) = Preg::match3(&pattern, header)
-                && let Some(s) = matches.get(&shirabe_pcre::CaptureKey::ByIndex(1))
+                && let Some(s) = matches.get(1)
             {
                 value = Some(s.to_string());
             }

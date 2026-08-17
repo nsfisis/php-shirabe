@@ -12,7 +12,7 @@ use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, function_exists,
     implode, is_string, json_encode, php_regex, preg_quote, str_replace, strlen, strnatcasecmp,
@@ -236,14 +236,8 @@ impl VersionGuesser {
                         &branch,
                     )
                 {
-                    let g1 = m
-                        .get(&CaptureKey::ByIndex(1))
-                        .unwrap_or_default()
-                        .to_string();
-                    let g2 = m
-                        .get(&CaptureKey::ByIndex(2))
-                        .unwrap_or_default()
-                        .to_string();
+                    let g1 = m.get(1).unwrap_or_default().to_string();
+                    let g2 = m.get(2).unwrap_or_default().to_string();
                     if g1 == "(no branch)"
                         || strpos(&g1, "(detached ") == Some(0)
                         || strpos(&g1, "(HEAD detached at") == Some(0)
@@ -270,11 +264,7 @@ impl VersionGuesser {
                         &branch,
                     )
                 {
-                    branches.push(
-                        m.get(&CaptureKey::ByIndex(1))
-                            .unwrap_or_default()
-                            .to_string(),
-                    );
+                    branches.push(m.get(1).unwrap_or_default().to_string());
                 }
             }
 
@@ -708,9 +698,9 @@ impl VersionGuesser {
             );
 
             if let Some(matches) = Preg::is_match3(&url_pattern, &output) {
-                let m1 = matches.get(&CaptureKey::ByIndex(1)).unwrap_or_default();
-                let m2 = matches.get(&CaptureKey::ByIndex(2));
-                let m3 = matches.get(&CaptureKey::ByIndex(3));
+                let m1 = matches.get(1).unwrap_or_default();
+                let m2 = matches.get(2);
+                let m3 = matches.get(3);
                 if let Some(m2) = m2
                     && let Some(m3) = m3
                     && (branches_path == *m2 || tags_path == *m2)
@@ -761,10 +751,7 @@ impl VersionGuesser {
             }
         };
         if let Some(m) = Preg::is_match3(php_regex!(r"{^(\d+(?:\.\d+)*)-dev$}i"), &version) {
-            return Ok(format!(
-                "{}.x-dev",
-                m.get(&CaptureKey::ByIndex(1)).unwrap_or_default()
-            ));
+            return Ok(format!("{}.x-dev", m.get(1).unwrap_or_default()));
         }
 
         Ok(version)

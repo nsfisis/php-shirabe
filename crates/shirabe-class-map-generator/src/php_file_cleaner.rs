@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileCleaner.php
 
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatches};
+use shirabe_pcre::{Preg, PregMatches};
 use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
@@ -106,14 +106,14 @@ impl PhpFileCleaner {
                         r#"{<<<[ \t]*(?:"([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)"|'([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)'|([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*))(?:\r\n|\n|\r)}A"#,
                     ) {
                         let matched_len = r#match
-                            .get(&CaptureKey::ByIndex(0))
+                            .get(0)
                             .map(|s| s.len())
                             .unwrap_or(0);
                         let delimiter = [1, 2, 3]
                             .iter()
                             .find_map(|i| {
                                 r#match
-                                    .get(&CaptureKey::ByIndex(*i))
+                                    .get(*i)
                                     .filter(|s| !s.is_empty())
                                     .map(str::to_string)
                             })
@@ -149,7 +149,7 @@ impl PhpFileCleaner {
                             if let Some(r#match) =
                                 Preg::is_match4(&entry.pattern, &self.contents, offset)
                             {
-                                return clean + r#match.get(&CaptureKey::ByIndex(0)).unwrap_or("");
+                                return clean + r#match.get(0).unwrap_or("");
                             }
                         }
                     }
@@ -159,10 +159,7 @@ impl PhpFileCleaner {
                 let rest_pattern = REST_PATTERN.lock().unwrap().clone();
                 if let Some(rest_pattern) = rest_pattern {
                     if let Some(r#match) = self.r#match(&rest_pattern) {
-                        let m0 = r#match
-                            .get(&CaptureKey::ByIndex(0))
-                            .unwrap_or_default()
-                            .to_string();
+                        let m0 = r#match.get(0).unwrap_or_default().to_string();
                         clean.push(char);
                         clean.push_str(&m0);
                         self.index += m0.len();

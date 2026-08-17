@@ -99,10 +99,7 @@ impl GitDownloader {
             // could not match the HEAD for some reason
             return Ok(None);
         };
-        let head_ref = head_match
-            .get(&CaptureKey::ByIndex(1))
-            .unwrap_or_default()
-            .to_string();
+        let head_ref = head_match.get(1).unwrap_or_default().to_string();
 
         let branches_match = Preg::is_match_all(
             format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
@@ -511,18 +508,9 @@ impl GitDownloader {
             url,
         ) {
             let protocols = self.inner.config.borrow_mut().get("github-protocols");
-            let m1 = match_
-                .get(&CaptureKey::ByIndex(1))
-                .unwrap_or_default()
-                .to_string();
-            let m2 = match_
-                .get(&CaptureKey::ByIndex(2))
-                .unwrap_or_default()
-                .to_string();
-            let m3 = match_
-                .get(&CaptureKey::ByIndex(3))
-                .unwrap_or_default()
-                .to_string();
+            let m1 = match_.get(1).unwrap_or_default().to_string();
+            let m2 = match_.get(2).unwrap_or_default().to_string();
+            let m3 = match_.get(3).unwrap_or_default().to_string();
             let mut push_url = format!("git@{}:{}/{}.git", m1, m2, m3);
             if !in_array_strict("ssh".to_string(), protocols.values()) {
                 push_url = format!("https://{}/{}/{}.git", m1, m2, m3);
@@ -1110,14 +1098,8 @@ impl VcsDownloader for GitDownloader {
             && let Some(composer_match) =
                 Preg::is_match3(php_regex!(r"{^composer\s+(?P<url>\S+)}m"), &output)
         {
-            let origin_url = origin_match
-                .get(&CaptureKey::ByName("url".to_string()))
-                .unwrap_or_default()
-                .to_string();
-            let composer_url = composer_match
-                .get(&CaptureKey::ByName("url".to_string()))
-                .unwrap_or_default()
-                .to_string();
+            let origin_url = origin_match.name("url").unwrap_or_default().to_string();
+            let composer_url = composer_match.name("url").unwrap_or_default().to_string();
             if origin_url == composer_url
                 && Some(composer_url.as_str()) != target.get_source_url().as_deref()
             {

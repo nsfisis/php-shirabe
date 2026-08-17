@@ -11,7 +11,7 @@ use crate::util::Hg as HgUtils;
 use crate::util::Url;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_writable, php_regex};
 
@@ -236,12 +236,8 @@ impl HgDriver {
                     && let Some(m) = Preg::match3(php_regex!(r"(^([^\s]+)\s+\d+:(.*)$)"), &tag)
                 {
                     tags.insert(
-                        m.get(&CaptureKey::ByIndex(1))
-                            .unwrap_or_default()
-                            .to_string(),
-                        m.get(&CaptureKey::ByIndex(2))
-                            .unwrap_or_default()
-                            .to_string(),
+                        m.get(1).unwrap_or_default().to_string(),
+                        m.get(2).unwrap_or_default().to_string(),
                     );
                 }
             }
@@ -269,17 +265,9 @@ impl HgDriver {
                     && let Some(m) =
                         Preg::match3(php_regex!(r"(^([^\s]+)\s+\d+:([a-f0-9]+))"), &branch)
                 {
-                    let name = m
-                        .get(&CaptureKey::ByIndex(1))
-                        .unwrap_or_default()
-                        .to_string();
+                    let name = m.get(1).unwrap_or_default().to_string();
                     if !name.starts_with('-') {
-                        branches.insert(
-                            name,
-                            m.get(&CaptureKey::ByIndex(2))
-                                .unwrap_or_default()
-                                .to_string(),
-                        );
+                        branches.insert(name, m.get(2).unwrap_or_default().to_string());
                     }
                 }
             }
@@ -295,17 +283,9 @@ impl HgDriver {
                     && let Some(m) =
                         Preg::match3(php_regex!(r"(^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$)"), &branch)
                 {
-                    let name = m
-                        .get(&CaptureKey::ByIndex(1))
-                        .unwrap_or_default()
-                        .to_string();
+                    let name = m.get(1).unwrap_or_default().to_string();
                     if !name.starts_with('-') {
-                        bookmarks.insert(
-                            name,
-                            m.get(&CaptureKey::ByIndex(2))
-                                .unwrap_or_default()
-                                .to_string(),
-                        );
+                        bookmarks.insert(name, m.get(2).unwrap_or_default().to_string());
                     }
                 }
             }

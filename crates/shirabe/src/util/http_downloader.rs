@@ -16,7 +16,7 @@ use crate::util::http::CurlDownloader;
 use crate::util::http::Response;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg};
+use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, extension_loaded,
@@ -244,17 +244,9 @@ impl HttpDownloader {
         {
             self.io.borrow_mut().set_authentication(
                 origin.clone(),
-                rawurldecode(
-                    m.get(&CaptureKey::ByIndex(1))
-                        .unwrap_or_default()
-                        .to_string()
-                        .as_str(),
-                ),
+                rawurldecode(m.get(1).unwrap_or_default().to_string().as_str()),
                 Some(rawurldecode(
-                    m.get(&CaptureKey::ByIndex(2))
-                        .unwrap_or_default()
-                        .to_string()
-                        .as_str(),
+                    m.get(2).unwrap_or_default().to_string().as_str(),
                 )),
             );
         }
