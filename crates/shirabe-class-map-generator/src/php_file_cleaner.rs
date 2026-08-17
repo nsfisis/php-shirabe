@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileCleaner.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{PregMatches, preg_match, preg_match2};
+use shirabe_php_shim::{PregMatches, preg_match};
 use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
@@ -40,11 +40,10 @@ impl PhpFileCleaner {
                     // consumed char plus both guards collapse into one negated class
                     // `[^a-zA-Z0-9_$:>]` (the `\w` set reproducing `\b`, plus the three operators).
                     // The possessive quantifiers (`++`, `*+`) are performance-only and become plain
-                    // `+`/`*`. The leftmost-match semantics of `captures_at(.., offset)` stand in for
-                    // the dropped `A` (anchored) modifier, since the keyword is known to sit exactly
-                    // one char past the search offset.
+                    // `+`/`*`. The `A` (anchored) modifier becomes a leading `^` over the sub-slice
+                    // that begins at the search offset.
                     pattern: format!(
-                        "{{[^a-zA-Z0-9_$:>]{}\\s+[a-zA-Z_\\x7f-\\xff:][a-zA-Z0-9_\\x7f-\\xff:\\-]*}}is",
+                        "{{^[^a-zA-Z0-9_$:>]{}\\s+[a-zA-Z_\\x7f-\\xff:][a-zA-Z0-9_\\x7f-\\xff:\\-]*}}is",
                         r#type
                     ),
                 },
@@ -147,7 +146,7 @@ impl PhpFileCleaner {
                         if end <= self.len && self.contents[self.index..end] == entry.name {
                             let offset = if self.index > 0 { self.index - 1 } else { 0 };
                             if let Some(r#match) =
-                                preg_match2(&entry.pattern, &self.contents, offset)
+                                preg_match(&entry.pattern, &self.contents[offset..])
                             {
                                 return clean + r#match.get(0).unwrap_or("");
                             }
