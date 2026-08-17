@@ -6,10 +6,7 @@ use crate::formatter::output_formatter_style::OutputFormatterStyle;
 use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
 use crate::formatter::output_formatter_style_stack::OutputFormatterStyleStack;
 use crate::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
-use shirabe_php_shim::{
-    CaptureKey, php_regex, preg_match, preg_match_all, preg_match_all_offset_capture,
-    preg_match_all_set_order, preg_replace,
-};
+use shirabe_php_shim::{PregMatches, php_regex, preg_match, preg_match_all, preg_replace};
 use shirabe_symfony_string::b;
 
 /// Formatter class for console output.
@@ -109,43 +106,37 @@ impl OutputFormatter {
             return Ok(Some(style.borrow().clone_box()));
         }
 
-        let matches = preg_match_all_set_order(php_regex!("/([^=]+)=([^;]+)(;|$)/"), string);
+        let matches: Vec<PregMatches> =
+            preg_match_all(php_regex!("/([^=]+)=([^;]+)(;|$)/"), string).collect();
         if matches.is_empty() {
             return Ok(None);
         }
 
         let mut style = OutputFormatterStyle::new(None, None, vec![]);
         for r#match in &matches {
-            let mut r#match: Vec<String> = r#match
-                .iter()
-                .map(|group| {
-                    group
-                        .clone()
-                        .expect("every group participates whenever the pattern matches")
-                })
-                .collect();
-            shirabe_php_shim::array_shift(&mut r#match);
-            r#match[0] = shirabe_php_shim::strtolower(&r#match[0]);
+            let key = shirabe_php_shim::strtolower(
+                r#match
+                    .get(1)
+                    .expect("every group participates whenever the pattern matches"),
+            );
+            let value = r#match
+                .get(2)
+                .expect("every group participates whenever the pattern matches");
 
-            if r#match[0] == "fg" {
-                style.set_foreground(Some(&shirabe_php_shim::strtolower(&r#match[1])));
-            } else if r#match[0] == "bg" {
-                style.set_background(Some(&shirabe_php_shim::strtolower(&r#match[1])));
-            } else if r#match[0] == "href" {
-                let url = preg_replace(php_regex!("{\\\\([<>])}"), "$1", &r#match[1]);
+            if key == "fg" {
+                style.set_foreground(Some(&shirabe_php_shim::strtolower(value)));
+            } else if key == "bg" {
+                style.set_background(Some(&shirabe_php_shim::strtolower(value)));
+            } else if key == "href" {
+                let url = preg_replace(php_regex!("{\\\\([<>])}"), "$1", value);
                 style.set_href(&url);
-            } else if r#match[0] == "options" {
-                let options = preg_match_all(
-                    php_regex!("([^,;]+)"),
-                    &shirabe_php_shim::strtolower(&r#match[1]),
-                );
-                let options = options
-                    .get(&CaptureKey::ByIndex(0))
-                    .expect("group 0 is always present");
+            } else if key == "options" {
+                let value = shirabe_php_shim::strtolower(value);
+                let options = preg_match_all(php_regex!("([^,;]+)"), &value);
                 for option in options {
                     style.set_option(
                         option
-                            .as_deref()
+                            .get(0)
                             .expect("group 0 participates whenever the pattern matches"),
                     );
                 }
@@ -296,19 +287,17 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
         let open_tag_regex = "[a-z](?:[^\\\\<>]* | \\\\.)*";
         let close_tag_regex = "[a-z][^<>]*";
         let mut current_line_length: i64 = 0;
-        let matches = preg_match_all_offset_capture(
+        let matches = preg_match_all(
             format!("#<(({open_tag_regex}) | /({close_tag_regex})?)>#ix"),
             message,
         );
-        let full_matches = matches
-            .get(&CaptureKey::ByIndex(0))
-            .cloned()
-            .unwrap_or_default();
-        for (i, match_) in full_matches.iter().enumerate() {
-            let pos = match_.1;
+        for match_ in matches {
+            let pos = match_
+                .get_offset(0)
+                .expect("group 0 participates whenever the pattern matches")
+                as i64;
             let text = match_
-                .0
-                .clone()
+                .get(0)
                 .expect("group 0 participates whenever the pattern matches");
 
             if pos != 0 && shirabe_php_shim::byte_at(message, (pos - 1) as usize) == b'\\' {
@@ -320,29 +309,22 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
             let applied =
                 self.apply_current_style(&segment, &output, width, &mut current_line_length);
             output.push_str(&applied);
-            offset = pos + shirabe_php_shim::strlen(&text);
+            offset = pos + shirabe_php_shim::strlen(text);
 
             // opening tag?
-            let open = shirabe_php_shim::byte_at(&text, 1) != b'/';
+            let open = shirabe_php_shim::byte_at(text, 1) != b'/';
             let tag = if open {
-                matches
-                    .get(&CaptureKey::ByIndex(1))
-                    .expect("group 1 exists in the tag pattern")[i]
-                    .0
-                    .clone()
+                match_
+                    .get(1)
                     .expect("group 1 participates whenever the pattern matches")
             } else {
-                matches
-                    .get(&CaptureKey::ByIndex(3))
-                    .and_then(|group| group.get(i))
-                    .and_then(|m| m.0.clone())
-                    .unwrap_or_default()
+                match_.get(3).unwrap_or_default()
             };
 
             if !open && tag.is_empty() {
                 // </>
                 self.style_stack.pop(None)?.ok();
-            } else if let Some(style) = self.create_style_from_string(&tag)? {
+            } else if let Some(style) = self.create_style_from_string(tag)? {
                 if open {
                     self.style_stack.push(style);
                 } else {
@@ -350,7 +332,7 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
                 }
             } else {
                 let applied =
-                    self.apply_current_style(&text, &output, width, &mut current_line_length);
+                    self.apply_current_style(text, &output, width, &mut current_line_length);
                 output.push_str(&applied);
             }
         }

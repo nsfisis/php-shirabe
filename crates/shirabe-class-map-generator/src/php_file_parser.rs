@@ -2,9 +2,9 @@
 
 use crate::php_file_cleaner::PhpFileCleaner;
 use shirabe_php_shim::{
-    CaptureKey, PHP_EOL, RuntimeException, file_exists, file_get_contents, function_exists,
-    is_file, is_readable, ltrim, php_strip_whitespace, preg_match_all, str_replace_array, strrpos,
-    substr, trim,
+    PHP_EOL, RuntimeException, file_exists, file_get_contents, function_exists, is_file,
+    is_readable, ltrim, php_strip_whitespace, preg_match_all, str_replace_array, strrpos, substr,
+    trim,
 };
 use std::sync::OnceLock;
 
@@ -58,7 +58,7 @@ impl PhpFileParser {
 
         // return early if there is no chance of matching anything in this file
         let pattern = format!("{{\\b(?:class|interface|trait{})\\s}}i", extra_types);
-        let max_matches = preg_match_all(&pattern, &contents).occurrence_count();
+        let max_matches = preg_match_all(&pattern, &contents).count();
         if max_matches == 0 {
             return Ok(vec![]);
         }
@@ -89,21 +89,10 @@ impl PhpFileParser {
         let mut classes = vec![];
         let mut namespace = String::new();
 
-        let len = matches
-            .get(&CaptureKey::ByName("type".to_owned()))
-            .map(|v| v.len())
-            .unwrap_or(0);
-        for i in 0..len {
-            let ns = matches
-                .get(&CaptureKey::ByName("ns".to_owned()))
-                .and_then(|v| v.get(i))
-                .and_then(|s| s.as_deref());
+        for r#match in matches {
+            let ns = r#match.name("ns");
             if ns.is_some_and(|ns| !ns.is_empty()) {
-                let nsname = matches
-                    .get(&CaptureKey::ByName("nsname".to_owned()))
-                    .and_then(|v| v.get(i))
-                    .and_then(|s| s.as_deref())
-                    .unwrap_or("");
+                let nsname = r#match.name("nsname").unwrap_or("");
                 namespace = str_replace_array(
                     &[
                         " ".to_string(),
@@ -115,10 +104,8 @@ impl PhpFileParser {
                     nsname,
                 ) + "\\";
             } else {
-                let name = matches
-                    .get(&CaptureKey::ByName("name".to_owned()))
-                    .and_then(|v| v.get(i))
-                    .and_then(|s| s.as_deref())
+                let name = r#match
+                    .name("name")
                     .expect("the `name` group participates whenever `ns` does not");
                 // skip anon classes extending/implementing
                 if name == "extends" {
@@ -136,14 +123,7 @@ impl PhpFileParser {
                             &["_".to_string(), "__".to_string()],
                             stripped,
                         )
-                } else if matches
-                    .get(&CaptureKey::ByName("type".to_owned()))
-                    .and_then(|v| v.get(i))
-                    .and_then(|s| s.as_deref())
-                    .unwrap_or("")
-                    .to_lowercase()
-                    == "enum"
-                {
+                } else if r#match.name("type").unwrap_or("").to_lowercase() == "enum" {
                     // something like:
                     //   enum Foo: int { HERP = '123'; }
                     // The regex above captures the colon, which isn't part of

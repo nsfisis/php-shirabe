@@ -5,9 +5,7 @@ use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::util::Platform;
-use shirabe_php_shim::{
-    CaptureKey, php_regex, preg_is_match, preg_match_all_offset_capture, preg_replace,
-};
+use shirabe_php_shim::{php_regex, preg_is_match, preg_match_all, preg_replace};
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -78,19 +76,21 @@ impl VersionBumper {
             major = major
         );
 
-        let matches = preg_match_all_offset_capture(&pattern, &pretty_constraint);
-        if matches.occurrence_count() > 0 {
-            let mut modified = pretty_constraint.clone();
-            let constraint_matches = matches
-                .get(&CaptureKey::ByName("constraint".to_string()))
-                .cloned()
-                .unwrap_or_default();
-            for match_ in constraint_matches.iter().rev() {
-                let match_str = match_
-                    .0
-                    .as_deref()
+        // Collected eagerly: a match borrows `pretty_constraint`, which the returns below move.
+        let constraint_matches: Vec<(String, i64)> = preg_match_all(&pattern, &pretty_constraint)
+            .map(|match_| {
+                let constraint = match_
+                    .name("constraint")
                     .expect("the `constraint` group participates whenever the pattern matches");
-                let match_offset = match_.1;
+                let offset = match_
+                    .name_offset("constraint")
+                    .expect("the `constraint` group participates whenever the pattern matches");
+                (constraint.to_string(), offset as i64)
+            })
+            .collect();
+        if !constraint_matches.is_empty() {
+            let mut modified = pretty_constraint.clone();
+            for (match_str, match_offset) in constraint_matches.into_iter().rev() {
                 let suffix = if match_str.matches('.').count() == 2
                     && version_without_suffix.matches('.').count() == 1
                 {
@@ -119,7 +119,7 @@ impl VersionBumper {
                     &modified,
                     &replacement,
                     match_offset,
-                    Some(Platform::strlen(match_str)),
+                    Some(Platform::strlen(&match_str)),
                 );
             }
 

@@ -16,62 +16,6 @@
 use indexmap::IndexMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
-pub enum CaptureKey {
-    ByIndex(usize),
-    ByName(String),
-}
-
-/// Defines a newtype over `IndexMap` for one of the `$matches` shapes the `preg_*` functions fill
-/// in.
-macro_rules! preg_match_map {
-    ($(#[$attr:meta])* $vis:vis struct $name:ident($key:ty => $value:ty);) => {
-        $(#[$attr])*
-        #[derive(Debug, Default, Clone, PartialEq, Eq)]
-        $vis struct $name(::indexmap::IndexMap<$key, $value>);
-
-        impl $name {
-            pub fn new() -> Self {
-                Self(::indexmap::IndexMap::new())
-            }
-
-            pub fn clear(&mut self) {
-                self.0.clear();
-            }
-
-            pub fn get<Q>(&self, key: &Q) -> Option<&$value>
-            where
-                Q: ?Sized + ::std::hash::Hash + ::indexmap::Equivalent<$key>,
-            {
-                self.0.get(key)
-            }
-
-            pub fn insert(&mut self, key: $key, value: $value) -> Option<$value> {
-                self.0.insert(key, value)
-            }
-
-            pub fn iter(&self) -> ::indexmap::map::Iter<'_, $key, $value> {
-                self.0.iter()
-            }
-        }
-
-        impl IntoIterator for $name {
-            type Item = ($key, $value);
-            type IntoIter = ::indexmap::map::IntoIter<$key, $value>;
-
-            fn into_iter(self) -> Self::IntoIter {
-                self.0.into_iter()
-            }
-        }
-
-        impl FromIterator<($key, $value)> for $name {
-            fn from_iter<I: IntoIterator<Item = ($key, $value)>>(iter: I) -> Self {
-                Self(iter.into_iter().collect())
-            }
-        }
-    };
-}
-
 /// A single match's `$matches`: the `regex::Captures` the search produced, read by either the named
 /// or the numbered form of a capture group. `'h` is the lifetime of the searched subject, which the
 /// group values borrow from.
@@ -96,35 +40,16 @@ impl<'h> PregMatches<'h> {
     pub fn name(&self, name: &str) -> Option<&'h str> {
         self.caps.name(name).map(|group| group.as_str())
     }
-}
 
-preg_match_map! {
-    /// `PREG_PATTERN_ORDER` `$matches`: one entry per capture group, holding that group's value
-    /// across every match occurrence.
-    pub struct PregMatchesAll(CaptureKey => Vec<Option<String>>);
-}
-
-preg_match_map! {
-    /// `PREG_OFFSET_CAPTURE` counterpart of `PregMatchesAll`, pairing each value with the byte
-    /// offset it was captured at (`-1` for a group that did not participate).
-    pub struct PregMatchesAllWithOffsets(CaptureKey => Vec<(Option<String>, i64)>);
-}
-
-impl PregMatchesAll {
-    /// The number PHP's `preg_match_all` returns: every column holds one entry per occurrence.
-    pub fn occurrence_count(&self) -> usize {
-        self.get(&CaptureKey::ByIndex(0))
-            .expect("group 0 is always present")
-            .len()
+    /// The byte offset the capture group at `index` starts at, under the same rules as `get`.
+    /// `PREG_OFFSET_CAPTURE` reports a non-participating group at offset `-1`.
+    pub fn get_offset(&self, index: usize) -> Option<usize> {
+        self.caps.get(index).map(|group| group.start())
     }
-}
 
-impl PregMatchesAllWithOffsets {
-    /// The number PHP's `preg_match_all` returns: every column holds one entry per occurrence.
-    pub fn occurrence_count(&self) -> usize {
-        self.get(&CaptureKey::ByIndex(0))
-            .expect("group 0 is always present")
-            .len()
+    /// The byte offset of the capture group called `name`, under the same rules as `get_offset`.
+    pub fn name_offset(&self, name: &str) -> Option<usize> {
+        self.caps.name(name).map(|group| group.start())
     }
 }
 
@@ -166,84 +91,21 @@ pub fn preg_match<'h>(pattern: impl PregPattern, subject: &'h str) -> Option<Pre
     Some(PregMatches::new(caps))
 }
 
-// The number of occurrences the caller would get from PHP's return value is the length of any
-// one column, as `PregMatchesAll::occurrence_count` reports it.
-pub fn preg_match_all(pattern: impl PregPattern, subject: &str) -> PregMatchesAll {
-    let __resolved = pattern.resolve();
-    let re = __resolved.regex();
-    let group_count = re.captures_len();
-    let names: Vec<Option<&str>> = re.capture_names().collect();
-
-    // PREG_PATTERN_ORDER: one column per group, one row per match occurrence.
-    let mut groups: Vec<Vec<Option<String>>> = vec![Vec::new(); group_count];
-    for caps in re.captures_iter(subject) {
-        for (g, column) in groups.iter_mut().enumerate() {
-            let value = caps.get(g).map(|m| m.as_str().to_string());
-            column.push(value);
-        }
-    }
-
-    let mut matches = PregMatchesAll::new();
-    for (g, column) in groups.into_iter().enumerate() {
-        if let Some(Some(name)) = names.get(g) {
-            matches.insert(CaptureKey::ByName((*name).to_string()), column.clone());
-        }
-        matches.insert(CaptureKey::ByIndex(g), column);
-    }
-
-    matches
-}
-
-// PREG_SET_ORDER: the outer vec is indexed by match occurrence, the inner by
-// capture group (a `$matches` row). A non-participating group is reported as
-// None.
-pub fn preg_match_all_set_order(
+// Every occurrence of the pattern in `subject`, in match order. The search runs eagerly, as PHP's
+// does: a match borrows `subject` alone, so the matches outlive the compiled pattern, which is only
+// resolved for the duration of this call.
+pub fn preg_match_all<'h>(
     pattern: impl PregPattern,
-    subject: &str,
-) -> Vec<Vec<Option<String>>> {
+    subject: &'h str,
+) -> impl Iterator<Item = PregMatches<'h>> {
     let __resolved = pattern.resolve();
-    let re = __resolved.regex();
-    re.captures_iter(subject)
-        .map(|caps| {
-            (0..caps.len())
-                .map(|g| caps.get(g).map(|m| m.as_str().to_string()))
-                .collect()
-        })
-        .collect()
-}
+    let matches: Vec<PregMatches<'h>> = __resolved
+        .regex()
+        .captures_iter(subject)
+        .map(PregMatches::new)
+        .collect();
 
-// A non-participating group is reported as None, at offset -1. The number of occurrences the
-// caller would get from PHP's return value is the length of any one column, as
-// `PregMatchesAllWithOffsets::occurrence_count` reports it.
-pub fn preg_match_all_offset_capture(
-    pattern: impl PregPattern,
-    subject: &str,
-) -> PregMatchesAllWithOffsets {
-    let __resolved = pattern.resolve();
-    let re = __resolved.regex();
-    let group_count = re.captures_len();
-    let names: Vec<Option<&str>> = re.capture_names().collect();
-
-    let mut groups: Vec<Vec<(Option<String>, i64)>> = vec![Vec::new(); group_count];
-    for caps in re.captures_iter(subject) {
-        for (g, column) in groups.iter_mut().enumerate() {
-            let entry = match caps.get(g) {
-                Some(m) => (Some(m.as_str().to_string()), m.start() as i64),
-                None => (None, -1),
-            };
-            column.push(entry);
-        }
-    }
-
-    let mut matches = PregMatchesAllWithOffsets::new();
-    for (g, column) in groups.into_iter().enumerate() {
-        if let Some(Some(name)) = names.get(g) {
-            matches.insert(CaptureKey::ByName((*name).to_string()), column.clone());
-        }
-        matches.insert(CaptureKey::ByIndex(g), column);
-    }
-
-    matches
+    matches.into_iter()
 }
 
 pub fn preg_grep<T: AsRef<str>>(

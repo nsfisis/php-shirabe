@@ -21,7 +21,7 @@ use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    CaptureKey, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
+    FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_flip_strings, array_intersect_key, array_map, basename, empty, explode, file,
     file_exists, file_get_contents, file_put_contents, get_current_user, impl_php_class, implode,
     is_dir, is_string, php_regex, preg_is_match, preg_match, preg_match_all, preg_quote,
@@ -167,21 +167,15 @@ impl InitCommand {
         ) == 0
         {
             *self.git_config.borrow_mut() = Some(IndexMap::new());
-            let m = preg_match_all(php_regex!(r"{^([^=]+)=(.*)$}m"), &output);
-            if m.occurrence_count() > 0 {
-                let keys: Vec<Option<String>> =
-                    m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                let values: Vec<Option<String>> =
-                    m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
-                for (key, value) in keys.iter().zip(values.iter()) {
-                    self.git_config.borrow_mut().as_mut().unwrap().insert(
-                        key.clone()
-                            .expect("group 1 participates whenever the pattern matches"),
-                        value
-                            .clone()
-                            .expect("group 2 participates whenever the pattern matches"),
-                    );
-                }
+            for m in preg_match_all(php_regex!(r"{^([^=]+)=(.*)$}m"), &output) {
+                self.git_config.borrow_mut().as_mut().unwrap().insert(
+                    m.get(1)
+                        .expect("group 1 participates whenever the pattern matches")
+                        .to_string(),
+                    m.get(2)
+                        .expect("group 2 participates whenever the pattern matches")
+                        .to_string(),
+                );
             }
 
             return self.git_config.borrow().clone().unwrap_or_default();

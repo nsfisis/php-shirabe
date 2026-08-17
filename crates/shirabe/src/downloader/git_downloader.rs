@@ -18,10 +18,9 @@ use crate::util::ProcessExecutor;
 use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CaptureKey, CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class,
-    implode, in_array_strict, is_dir, php_regex, preg_is_match, preg_match, preg_match_all,
-    preg_quote, preg_replace, preg_split, realpath, rtrim, strlen, strpos, substr, trim,
-    version_compare,
+    CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class, implode,
+    in_array_strict, is_dir, php_regex, preg_is_match, preg_match, preg_match_all, preg_quote,
+    preg_replace, preg_split, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
 };
 
 #[derive(Debug)]
@@ -101,21 +100,21 @@ impl GitDownloader {
         };
         let head_ref = head_match.get(1).unwrap_or_default().to_string();
 
-        let branches_match = preg_match_all(
+        let candidate_branches: Vec<String> = preg_match_all(
             format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
             &refs,
-        );
-        if branches_match.occurrence_count() == 0 {
+        )
+        .map(|branch_match| {
+            branch_match
+                .get(1)
+                .expect("group 1 participates whenever the pattern matches")
+                .to_string()
+        })
+        .collect();
+        if candidate_branches.is_empty() {
             // not on a branch, we are either on a not-modified tag or some sort of detached head, so skip this
             return Ok(None);
         }
-        let candidate_branches: Vec<String> = branches_match
-            .get(&CaptureKey::ByIndex(1))
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|branch| branch.expect("group 1 participates whenever the pattern matches"))
-            .collect();
 
         // use the first match as branch name for now
         let mut branch = candidate_branches[0].clone();
@@ -128,21 +127,23 @@ impl GitDownloader {
 
             // try to find matching branch names in remote repos
             for candidate in &candidate_branches {
-                let m = preg_match_all(
+                let matches: Vec<String> = preg_match_all(
                     format!(
                         "{{^[a-f0-9]+ refs/remotes/((?:[^/]+)/{})$}}mi",
                         preg_quote(candidate, None)
                     ),
                     &refs,
-                );
-                if m.occurrence_count() > 0 {
-                    let matches: Vec<Option<String>> =
-                        m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                )
+                .map(|m| {
+                    m.get(1)
+                        .expect("group 1 participates whenever the pattern matches")
+                        .to_string()
+                })
+                .collect();
+                if !matches.is_empty() {
                     for match_ in matches {
                         branch = candidate.clone();
-                        remote_branches.push(
-                            match_.expect("group 1 participates whenever the pattern matches"),
-                        );
+                        remote_branches.push(match_);
                     }
                     break;
                 }
