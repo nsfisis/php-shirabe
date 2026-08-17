@@ -8,9 +8,9 @@ use crate::util::Silencer;
 use chrono::Utc;
 use shirabe_php_shim::{
     ErrorException, bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space,
-    file_exists, file_get_contents, file_put_contents, filemtime, function_exists, hash_file,
-    is_dir, is_writable, mkdir, php_regex, preg_is_match, preg_match, preg_replace, random_bytes,
-    random_int, rename, time, unlink,
+    file_exists, file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable,
+    mkdir, php_regex, preg_is_match, preg_match, preg_replace, random_bytes, random_int, rename,
+    time, unlink,
 };
 use shirabe_symfony_finder::Finder;
 use std::sync::Mutex;
@@ -195,13 +195,9 @@ impl Cache {
                         // Remove partial file.
                         unlink(&temp_file_name);
 
-                        let free_space = if function_exists("disk_free_space") {
-                            disk_free_space(dirname(&temp_file_name))
-                                .map(|space| space.to_string())
-                                .unwrap_or_default()
-                        } else {
-                            "unknown".to_string()
-                        };
+                        let free_space = disk_free_space(dirname(&temp_file_name))
+                            .map(|space| space.to_string())
+                            .unwrap_or_default();
                         let message = format!(
                             "<warning>Writing {} into cache failed after {} of {} bytes written, only {} bytes of free space available</warning>",
                             temp_file_name,

@@ -27,9 +27,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
-    array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array_loose,
-    is_int, ksort, php_regex, preg_is_match, preg_match, realpath, strcmp, strtolower, touch2,
-    trim, usort,
+    array_map, array_merge, file_get_contents, filemtime, hash, in_array_loose, is_int, ksort,
+    php_regex, preg_is_match, preg_match, realpath, strcmp, strtolower, touch2, trim, usort,
 };
 use shirabe_seld_json_lint::ParsingException;
 
@@ -773,10 +772,6 @@ impl Locker {
         &mut self,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<String>> {
-        if !function_exists("proc_open") {
-            return Ok(None);
-        }
-
         let path = self
             .installation_manager
             .borrow_mut()

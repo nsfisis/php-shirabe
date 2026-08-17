@@ -21,9 +21,7 @@ use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    PhpMixed, RuntimeException, file_exists, function_exists, impl_php_class, is_dir, realpath,
-};
+use shirabe_php_shim::{PhpMixed, RuntimeException, file_exists, impl_php_class, is_dir, realpath};
 use shirabe_symfony_filesystem::Filesystem as SymfonyFilesystem;
 
 #[derive(Debug)]
@@ -154,19 +152,6 @@ impl PathDownloader {
         {
             if !allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
                 return Err(RuntimeException::new("You are on an old Windows / old PHP combo which does not allow Shirabe to use junctions/symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string())
-                .into());
-            }
-            current_strategy = Self::STRATEGY_MIRROR;
-            allowed_strategies = vec![Self::STRATEGY_MIRROR];
-        }
-
-        // Check we can use symlink() otherwise
-        if !Platform::is_windows()
-            && Self::STRATEGY_SYMLINK == current_strategy
-            && !function_exists("symlink")
-        {
-            if !allowed_strategies.contains(&Self::STRATEGY_MIRROR) {
-                return Err(RuntimeException::new("Your PHP has the symlink() function disabled which does not allow Shirabe to use symlinks and this path repository has symlink:true in its options so copying is not allowed".to_string())
                 .into());
             }
             current_strategy = Self::STRATEGY_MIRROR;

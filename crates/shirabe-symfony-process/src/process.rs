@@ -213,13 +213,6 @@ impl Process {
         input: PhpMixed,
         timeout: Option<f64>,
     ) -> anyhow::Result<Self> {
-        if !shirabe_php_shim::function_exists("proc_open") {
-            return Err(LogicException::new(
-                "The Process class relies on proc_open, which is not available on your PHP installation.".to_string(),
-            )
-            .into());
-        }
-
         let mut this = Self::empty();
         this.commandline = CommandLine::Array(command);
         this.cwd = cwd;

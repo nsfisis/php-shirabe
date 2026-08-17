@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     FilesystemIterator, Phar, PharData, RuntimeException, UnexpectedValueException, bzcompress,
-    file_exists, file_put_contents, function_exists, gzcompress, str_repeat, strrpos, unlink,
+    file_exists, file_put_contents, gzcompress, str_repeat, strrpos, unlink,
 };
 
 fn formats() -> IndexMap<&'static str, i64> {
@@ -108,11 +108,11 @@ impl ArchiverInterface for PharArchiver {
                         ))
                         .into());
                     }
-                    if format == "tar.gz" && function_exists("gzcompress") {
+                    if format == "tar.gz" {
                         let data =
                             gzcompress(&str_repeat("\0", 10240).into_bytes()).unwrap_or_default();
                         file_put_contents(&target, &data);
-                    } else if format == "tar.bz2" && function_exists("bzcompress") {
+                    } else if format == "tar.bz2" {
                         let data =
                             bzcompress(&str_repeat("\0", 10240).into_bytes()).unwrap_or_default();
                         file_put_contents(&target, &data);

@@ -9,8 +9,8 @@ use crate::util::http::ProxyManager;
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
-    PhpMixed, array_replace_recursive, extension_loaded, function_exists, php_uname,
-    stream_context_create, stripos, uasort,
+    PhpMixed, array_replace_recursive, extension_loaded, php_uname, stream_context_create, stripos,
+    uasort,
 };
 
 pub struct StreamContextFactory;
@@ -180,16 +180,8 @@ impl StreamContextFactory {
             let user_agent = format!(
                 "User-Agent: Composer/{} ({os}; {release}; {php_version}; {http_version}{platform}{ci})",
                 composer::get_version(),
-                os = if function_exists("php_uname") {
-                    php_uname("s")
-                } else {
-                    "Unknown".to_string()
-                },
-                release = if function_exists("php_uname") {
-                    php_uname("r")
-                } else {
-                    "Unknown".to_string()
-                },
+                os = php_uname("s"),
+                release = php_uname("r"),
                 php_version = php_version,
                 http_version = http_version,
                 platform = platform_php_version

@@ -62,11 +62,6 @@ impl Terminal {
             return stty;
         }
 
-        // skip check if shell_exec function is disabled
-        if !shirabe_php_shim::function_exists("shell_exec") {
-            return false;
-        }
-
         let result = shirabe_php_shim::shell_exec(&format!(
             "stty 2> {}",
             if cfg!(windows) { "NUL" } else { "/dev/null" }
@@ -195,10 +190,6 @@ impl Terminal {
     }
 
     fn read_from_process(command: &str) -> Option<String> {
-        if !shirabe_php_shim::function_exists("proc_open") {
-            return None;
-        }
-
         // Sparse PHP descriptorspec `[1 => ['pipe', 'w'], 2 => ['pipe', 'w']]`: fd 0 is inherited.
         let descriptorspec = [
             shirabe_php_shim::Descriptor::Inherit,

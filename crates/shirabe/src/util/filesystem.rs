@@ -6,11 +6,11 @@ use crate::util::Silencer;
 use shirabe_php_shim::{
     ErrorException, LogicException, PhpMixed, PregMatches, RuntimeException, array_pop, basename,
     chdir, clearstatcache, clearstatcache2, copy, dirname, explode, fclose, feof, file_exists,
-    file_get_contents, file_put_contents, fileatime, filemtime, filesize, fopen, fread,
-    function_exists, fwrite, implode, is_dir, is_file, is_link, is_readable, lstat, mkdir,
-    php_regex, preg_is_match, preg_match, preg_replace, preg_replace_callback, rename, rmdir,
-    rtrim, str_repeat, str_replace, strlen, strpos, strtoupper, strtr, substr, substr_count,
-    symlink, touch, unlink, usleep, var_export,
+    file_get_contents, file_put_contents, fileatime, filemtime, filesize, fopen, fread, fwrite,
+    implode, is_dir, is_file, is_link, is_readable, lstat, mkdir, php_regex, preg_is_match,
+    preg_match, preg_replace, preg_replace_callback, rename, rmdir, rtrim, str_repeat, str_replace,
+    strlen, strpos, strtoupper, strtr, substr, substr_count, symlink, touch, unlink, usleep,
+    var_export,
 };
 use shirabe_symfony_filesystem::exception::IOException;
 use shirabe_symfony_finder::Finder;
@@ -114,9 +114,6 @@ impl Filesystem {
     }
 
     /// Recursively remove a directory
-    ///
-    /// Uses the process component if proc_open is enabled on the PHP
-    /// installation.
     pub fn remove_directory(&mut self, directory: impl AsRef<Path>) -> anyhow::Result<bool> {
         // TODO(bytes):
         // This path is matched against a regex (remove_edge_cases) and passed to an
@@ -129,7 +126,7 @@ impl Filesystem {
                 directory.display()
             ))
         })?;
-        let edge_case_result = self.remove_edge_cases(directory, true)?;
+        let edge_case_result = self.remove_edge_cases(directory)?;
         if let Some(r) = edge_case_result {
             return Ok(r);
         }
@@ -167,13 +164,6 @@ impl Filesystem {
     }
 
     /// Recursively remove a directory asynchronously
-    ///
-    /// Uses the process component if proc_open is enabled on the PHP
-    /// installation.
-    ///
-    /// Takes the shared handle instead of `&mut self`: the Filesystem is borrowed only for the
-    /// synchronous head and tail, never across the subprocess await, so sibling futures can keep
-    /// using the same `Rc<RefCell<Filesystem>>` while the removal runs.
     pub async fn remove_directory_async_via(
         this: &std::rc::Rc<std::cell::RefCell<Filesystem>>,
         directory: &str,
@@ -189,7 +179,7 @@ impl Filesystem {
                 return Ok(result);
             }
 
-            let edge_case_result = fs.remove_edge_cases(directory, true)?;
+            let edge_case_result = fs.remove_edge_cases(directory)?;
             if let Some(r) = edge_case_result {
                 return Ok(r);
             }
@@ -225,11 +215,7 @@ impl Filesystem {
     }
 
     /// Returns null when no edge case was hit. Otherwise a bool whether removal was successful
-    fn remove_edge_cases(
-        &mut self,
-        directory: &str,
-        fallback_to_php: bool,
-    ) -> anyhow::Result<Option<bool>> {
+    fn remove_edge_cases(&mut self, directory: &str) -> anyhow::Result<Option<bool>> {
         if self.is_symlinked_directory(directory) {
             return Ok(Some(self.unlink_symlinked_directory(directory)?));
         }
@@ -251,10 +237,6 @@ impl Filesystem {
             .into());
         }
 
-        if !function_exists("proc_open") && fallback_to_php {
-            return Ok(Some(self.remove_directory_php(directory)?));
-        }
-
         Ok(None)
     }
 
@@ -264,7 +246,7 @@ impl Filesystem {
     /// before directories, creating a single non-recursive loop
     /// to delete files/directories in the correct order.
     pub fn remove_directory_php(&mut self, directory: &str) -> anyhow::Result<bool> {
-        let edge_case_result = self.remove_edge_cases(directory, false)?;
+        let edge_case_result = self.remove_edge_cases(directory)?;
         if let Some(r) = edge_case_result {
             return Ok(r);
         }
@@ -496,10 +478,6 @@ impl Filesystem {
         let target = target.to_str().ok_or_else(|| {
             RuntimeException::new(format!("Path contains invalid UTF-8: {}", target.display()))
         })?;
-
-        if !function_exists("proc_open") {
-            return self.copy_then_remove(source, target);
-        }
 
         if Platform::is_windows() {
             // Try to copy & delete - this is a workaround for random "Access denied" errors.
@@ -884,10 +862,6 @@ impl Filesystem {
 
     /// Creates a relative symlink from $link to $target
     pub fn relative_symlink(&self, target: &str, link: &str) -> bool {
-        if !function_exists("symlink") {
-            return false;
-        }
-
         let cwd = Platform::get_cwd(false).unwrap_or_default();
 
         let relative_path = self.find_shortest_path(link, target, false, false);

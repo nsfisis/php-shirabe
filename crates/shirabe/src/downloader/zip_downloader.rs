@@ -11,9 +11,9 @@ use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException, ZipArchive,
-    bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists, hash_file,
-    impl_php_class, is_file, json_encode, php_regex, preg_match, random_int, str_replace, strlen,
-    substr, version_compare,
+    bin2hex, class_exists, file_exists, file_get_contents, filesize, hash_file, impl_php_class,
+    is_file, json_encode, php_regex, preg_match, random_int, str_replace, strlen, substr,
+    version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
@@ -528,11 +528,6 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
             }
         }
 
-        let proc_open_missing = !function_exists("proc_open");
-        if proc_open_missing {
-            *UNZIP_COMMANDS.lock().unwrap() = Some(vec![]);
-        }
-
         {
             let mut has_zip_archive = HAS_ZIP_ARCHIVE.lock().unwrap();
             if has_zip_archive.is_none() {
@@ -549,17 +544,10 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
 
         if !has_zip_archive && unzip_commands_empty {
             let ini_message = IniHelper::get_message();
-            let error = if proc_open_missing {
-                format!(
-                    "The zip extension is missing and unzip/7z commands cannot be called as proc_open is disabled, skipping.\n{}",
-                    ini_message
-                )
-            } else {
-                format!(
-                    "The zip extension and unzip/7z commands are both missing, skipping.\n{}",
-                    ini_message
-                )
-            };
+            let error = format!(
+                "The zip extension and unzip/7z commands are both missing, skipping.\n{}",
+                ini_message
+            );
             return Err(RuntimeException::new(error).into());
         }
 
@@ -569,15 +557,9 @@ impl crate::downloader::DownloaderInterface for ZipDownloader {
                 *is_windows_guard = Some(Platform::is_windows());
 
                 if !is_windows_guard.unwrap() && unzip_commands_empty {
-                    if proc_open_missing {
-                        self.inner.io.borrow().write_error("<warning>proc_open is disabled so 'unzip' and '7z' commands cannot be used, zip files are being unpacked using the PHP zip extension.</warning>");
-                        self.inner.io.borrow().write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
-                        self.inner.io.borrow().write_error("<warning>Enabling proc_open and installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
-                    } else {
-                        self.inner.io.borrow().write_error("<warning>As there is no 'unzip' nor '7z' command installed zip files are being unpacked using the PHP zip extension.</warning>");
-                        self.inner.io.borrow().write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
-                        self.inner.io.borrow().write_error("<warning>Installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
-                    }
+                    self.inner.io.borrow().write_error("<warning>As there is no 'unzip' nor '7z' command installed zip files are being unpacked using the PHP zip extension.</warning>");
+                    self.inner.io.borrow().write_error("<warning>This may cause invalid reports of corrupted archives. Besides, any UNIX permissions (e.g. executable) defined in the archives will be lost.</warning>");
+                    self.inner.io.borrow().write_error("<warning>Installing 'unzip' or '7z' (21.01+) may remediate them.</warning>");
                 }
             }
         }

@@ -98,11 +98,7 @@ impl ConsoleOutput {
     /// doesn't properly convert character-encodings between ASCII to EBCDIC.
     fn is_running_os400() -> bool {
         let checks = [
-            if shirabe_php_shim::function_exists("php_uname") {
-                shirabe_php_shim::php_uname("s")
-            } else {
-                String::new()
-            },
+            shirabe_php_shim::php_uname("s"),
             shirabe_php_shim::getenv("OSTYPE")
                 .unwrap_or_default()
                 .to_string_lossy()

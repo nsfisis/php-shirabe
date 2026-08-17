@@ -4,8 +4,8 @@ use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, defined,
-    file_exists, file_get_contents, fstat, function_exists, getcwd, getenv, ini_get, is_readable,
-    mb_strlen, php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid, posix_isatty,
+    file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get, is_readable,
+    mb_strlen, php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid,
     preg_is_match, preg_replace_callback, putenv, putenv_clear, realpath, stream_isatty, stripos,
     strlen, strtoupper, substr, usleep,
 };
@@ -244,9 +244,7 @@ impl Platform {
         let mut use_mb_string = USE_MB_STRING.lock().unwrap();
         if use_mb_string.is_none() {
             *use_mb_string = Some(
-                function_exists("mb_strlen")
-                    && ini_get("mbstring.func_overload")
-                        .is_some_and(|s| PhpMixed::String(s).to_bool()),
+                ini_get("mbstring.func_overload").is_some_and(|s| PhpMixed::String(s).to_bool()),
             );
         }
 
@@ -270,29 +268,7 @@ impl Platform {
             return true;
         }
 
-        // modern cross-platform function, includes the fstat
-        // fallback so if it is present we trust it
-        if function_exists("stream_isatty") {
-            return stream_isatty(fd);
-        }
-
-        // only trusting this if it is positive, otherwise prefer fstat fallback
-        if function_exists("posix_isatty") && posix_isatty(fd.clone()) {
-            return true;
-        }
-
-        let stat = Silencer::call(|| Ok(fstat(&fd)));
-        let stat = match stat {
-            Ok(s) => s,
-            Err(_) => return false,
-        };
-        let stat = match stat {
-            Some(stat) => stat,
-            None => return false,
-        };
-
-        // Check if formatted mode is S_IFCHR
-        0o020000 == (stat.mode & 0o170000)
+        stream_isatty(fd)
     }
 
     /// Whether the current command is for bash completion

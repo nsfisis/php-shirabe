@@ -2,9 +2,8 @@
 
 use crate::php_file_cleaner::PhpFileCleaner;
 use shirabe_php_shim::{
-    PHP_EOL, RuntimeException, file_exists, file_get_contents, function_exists, is_file,
-    is_readable, ltrim, php_strip_whitespace, preg_match_all, str_replace_array, strrpos, substr,
-    trim,
+    PHP_EOL, RuntimeException, file_exists, file_get_contents, is_file, is_readable, ltrim,
+    php_strip_whitespace, preg_match_all, str_replace_array, strrpos, substr, trim,
 };
 use std::sync::OnceLock;
 
@@ -13,10 +12,6 @@ pub struct PhpFileParser;
 impl PhpFileParser {
     pub fn find_classes(path: &str) -> anyhow::Result<Vec<String>> {
         let extra_types = Self::get_extra_types();
-
-        if !function_exists("php_strip_whitespace") {
-            return Err(RuntimeException::new("Classmap generation relies on the php_strip_whitespace function, but it has been disabled by the disable_functions directive.".to_string()).into());
-        }
 
         // Use @ here instead of Silencer to actively suppress 'unhelpful' output
         let contents = match php_strip_whitespace(path) {

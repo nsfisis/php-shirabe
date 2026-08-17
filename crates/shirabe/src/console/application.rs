@@ -246,7 +246,7 @@ impl Application {
         // avoid overlapping borrows of self (get_composer needs &mut self).
         let disk_hint_msg: Option<String> = (|| -> anyhow::Result<Option<String>> {
             let composer = self.get_composer(false, Some(true), None)?;
-            if let Some(composer) = composer && function_exists("disk_free_space") {
+            if let Some(composer) = composer {
                 let composer = composer.borrow_partial();
                 let config = composer.get_config();
 
@@ -1536,9 +1536,7 @@ impl Application {
             input.borrow_mut().set_interactive(false);
         }
 
-        if shirabe_php_shim::function_exists("putenv") {
-            unsafe { shirabe_php_shim::putenv("SHELL_VERBOSITY", shell_verbosity.to_string()) };
-        }
+        unsafe { shirabe_php_shim::putenv("SHELL_VERBOSITY", shell_verbosity.to_string()) };
         shirabe_php_shim::PHP_ENV
             .lock()
             .unwrap()
@@ -2106,7 +2104,6 @@ impl ApplicationHandle {
         }
 
         let needs_sudo_check = !Platform::is_windows()
-            && function_exists("exec")
             && Platform::get_env("COMPOSER_ALLOW_SUPERUSER").is_none()
             && !Platform::is_docker();
         let mut is_non_allowed_root = false;
@@ -2243,16 +2240,13 @@ impl ApplicationHandle {
         if !is_proxy_command {
             io.write_error3(
                 &format!(
-                    "Running Shirabe {} ({}, based on Composer {}) with PHP {} on {}",
+                    "Running Shirabe {} ({}, based on Composer {}) with PHP {} on {} / {}",
                     composer::SHIRABE_VERSION,
                     composer::SHIRABE_RELEASE_DATE,
                     composer::VERSION,
                     shirabe_php_rpc::get_php_version().version,
-                    (if function_exists("php_uname") {
-                        format!("{} / {}", php_uname("s"), php_uname("r"))
-                    } else {
-                        "Unknown OS".to_string()
-                    }),
+                    php_uname("s"),
+                    php_uname("r"),
                 ),
                 true,
                 io_interface::DEBUG,
@@ -2305,11 +2299,7 @@ impl ApplicationHandle {
 
             // Check system temp folder for usability as it can cause weird runtime issues otherwise
             let tempfile_msg: Option<String> = Silencer::call(|| -> anyhow::Result<Option<String>> {
-                let pid = if function_exists("getmypid") {
-                    format!("{}-", getmypid())
-                } else {
-                    String::new()
-                };
+                let pid = format!("{}-", getmypid());
                 let tempfile = format!(
                     "{}/temp-{}{}",
                     sys_get_temp_dir(),
@@ -2688,14 +2678,12 @@ impl ApplicationHandle {
         output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
     ) -> anyhow::Result<i32> {
         let application = &self.0;
-        if shirabe_php_shim::function_exists("putenv") {
-            let (height, width) = {
-                let app = application.borrow();
-                (app.terminal.get_height(), app.terminal.get_width())
-            };
-            unsafe { shirabe_php_shim::putenv("LINES", height.to_string()) };
-            unsafe { shirabe_php_shim::putenv("COLUMNS", width.to_string()) };
-        }
+        let (height, width) = {
+            let app = application.borrow();
+            (app.terminal.get_height(), app.terminal.get_width())
+        };
+        unsafe { shirabe_php_shim::putenv("LINES", height.to_string()) };
+        unsafe { shirabe_php_shim::putenv("COLUMNS", width.to_string()) };
 
         let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = match input {
             None => std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(None, None)?)),

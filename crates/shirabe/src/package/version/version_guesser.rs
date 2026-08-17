@@ -13,9 +13,9 @@ use crate::util::Svn as SvnUtil;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, function_exists,
-    implode, is_string, json_encode, php_regex, preg_is_match, preg_match, preg_quote,
-    preg_replace, str_replace, strlen, strnatcasecmp, strpos, substr, trim, usort,
+    PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, implode, is_string,
+    json_encode, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, str_replace,
+    strlen, strnatcasecmp, strpos, substr, trim, usort,
 };
 
 /// Seam over the parts of [`VersionGuesser`] that consumers depend on, so they can be exercised
@@ -101,10 +101,6 @@ impl VersionGuesser {
     ) -> anyhow::Result<Option<VersionData>> {
         // For testing only (ref VersionGuesserMock::guessVersion returns null).
         if self.mock {
-            return Ok(None);
-        }
-
-        if !function_exists("proc_open") {
             return Ok(None);
         }
 
