@@ -5,6 +5,7 @@ use crate::exception::InvalidOptionException;
 use crate::input::Input;
 use crate::input::InputDefinition;
 use crate::input::InputInterface;
+use crate::input::InputOptionValue;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
@@ -336,7 +337,7 @@ impl InputInterface for ArrayInput {
         self.inner.get_options()
     }
 
-    fn get_option(&self, name: &str) -> anyhow::Result<PhpMixed> {
+    fn get_option(&self, name: &str) -> anyhow::Result<InputOptionValue> {
         self.inner.get_option(name)
     }
 

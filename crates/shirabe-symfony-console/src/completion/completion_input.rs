@@ -350,7 +350,7 @@ impl crate::input::InputInterface for CompletionInput {
         crate::input::InputInterface::get_options(&self.inner)
     }
 
-    fn get_option(&self, name: &str) -> anyhow::Result<PhpMixed> {
+    fn get_option(&self, name: &str) -> anyhow::Result<crate::input::InputOptionValue> {
         crate::input::InputInterface::get_option(&self.inner, name)
     }
 

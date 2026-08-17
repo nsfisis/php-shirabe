@@ -149,8 +149,14 @@ impl Command for HelpCommand {
         let mut helper = DescriptorHelper::new();
         let object = DescribableObject::Command(self.command.borrow().clone().unwrap());
         let mut options = indexmap::IndexMap::new();
-        options.insert("format".to_string(), input.borrow().get_option("format")?);
-        options.insert("raw_text".to_string(), input.borrow().get_option("raw")?);
+        options.insert(
+            "format".to_string(),
+            input.borrow().get_option("format")?.into(),
+        );
+        options.insert(
+            "raw_text".to_string(),
+            input.borrow().get_option("raw")?.into(),
+        );
         helper.describe2(output.clone(), object, options)?;
 
         *self.command.borrow_mut() = None;

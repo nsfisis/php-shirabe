@@ -20,7 +20,7 @@ use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, count, explode, in_array_strict, is_string,
+    UnexpectedValueException, count, explode, in_array_strict,
 };
 use shirabe_symfony_console::Terminal;
 use shirabe_symfony_console::command::{Command, CommandData, SetDefinitionArg};
@@ -445,7 +445,11 @@ impl BaseCommand for BaseCommandData {
         }
 
         if input.borrow().has_option("prefer-install")
-            && is_string(&input.borrow().get_option("prefer-install")?)
+            && input
+                .borrow()
+                .get_option("prefer-install")?
+                .as_string()
+                .is_some()
         {
             if input
                 .borrow()
@@ -556,7 +560,7 @@ impl BaseCommand for BaseCommandData {
             return Ok(PlatformRequirementFilterFactory::ignore_all());
         }
 
-        let ignores = input.borrow().get_option("ignore-platform-req")?;
+        let ignores: PhpMixed = input.borrow().get_option("ignore-platform-req")?.into();
         if count(&ignores) > 0 {
             return PlatformRequirementFilterFactory::from_bool_or_list(ignores);
         }
@@ -906,8 +910,9 @@ pub fn base_command_initialize(
     {
         let ignore_platform_req_env = Platform::get_env("COMPOSER_IGNORE_PLATFORM_REQ");
         let ignore_str = ignore_platform_req_env.clone().unwrap_or_default();
-        if 0 == count(&input.borrow().get_option("ignore-platform-req")?)
-            && ignore_platform_req_env.is_some()
+        if 0 == count(&PhpMixed::from(
+            input.borrow().get_option("ignore-platform-req")?,
+        )) && ignore_platform_req_env.is_some()
             && !ignore_str.is_empty()
         {
             input.borrow_mut().set_option(

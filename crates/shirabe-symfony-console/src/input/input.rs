@@ -3,6 +3,7 @@
 use crate::exception::InvalidArgumentException;
 use crate::exception::RuntimeException;
 use crate::input::InputDefinition;
+use crate::input::InputOptionValue;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, PhpResource, php_regex, preg_is_match};
 
@@ -156,14 +157,14 @@ impl Input {
         )
     }
 
-    pub fn get_option(&self, name: &str) -> anyhow::Result<PhpMixed> {
+    pub fn get_option(&self, name: &str) -> anyhow::Result<InputOptionValue> {
         if self.definition.has_negation(name) {
             let value = self.get_option(&self.definition.negation_to_name(name)?)?;
-            if matches!(value, PhpMixed::Null) {
+            if value.is_null() {
                 return Ok(value);
             }
 
-            return Ok(PhpMixed::Bool(!value.as_bool().unwrap_or(false)));
+            return Ok(InputOptionValue::Bool(!value.to_bool()));
         }
 
         if !self.definition.has_option(name) {
@@ -174,10 +175,11 @@ impl Input {
             .into());
         }
 
-        Ok(if self.options.contains_key(name) {
-            self.options[name].clone()
+        Ok(if let Some(value) = self.options.get(name) {
+            InputOptionValue::from_php_mixed(value)
         } else {
-            self.definition.get_option(name)?.get_default().clone()
+            let option = self.definition.get_option(name)?;
+            InputOptionValue::from_php_mixed(option.get_default())
         })
     }
 

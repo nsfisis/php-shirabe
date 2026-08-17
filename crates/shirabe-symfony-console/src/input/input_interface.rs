@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/console/Input/InputInterface.php
 
 use crate::input::InputDefinition;
+use crate::input::InputOptionValue;
 use crate::input::StreamableInputInterface;
 use shirabe_php_shim::PhpMixed;
 
@@ -33,7 +34,7 @@ pub trait InputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
 
     fn get_options(&self) -> indexmap::IndexMap<String, PhpMixed>;
 
-    fn get_option(&self, name: &str) -> anyhow::Result<PhpMixed>;
+    fn get_option(&self, name: &str) -> anyhow::Result<InputOptionValue>;
 
     fn set_option(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
 

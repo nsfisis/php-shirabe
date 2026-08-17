@@ -365,12 +365,8 @@ impl Command for UpdateCommand {
             input
                 .borrow()
                 .get_option("with")?
-                .as_list()
-                .map(|l| {
-                    l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
+                .as_array()
+                .map(<[String]>::to_vec)
                 .unwrap_or_default(),
         )?;
 
@@ -708,7 +704,8 @@ impl Command for UpdateCommand {
                 .as_bool()
                 .unwrap_or(false)
         {
-            let mut bump_after_update = input.borrow().get_option("bump-after-update")?;
+            let mut bump_after_update: PhpMixed =
+                input.borrow().get_option("bump-after-update")?.into();
             // PHP: false === $bumpAfterUpdate (strict)
             if matches!(bump_after_update, PhpMixed::Bool(false)) {
                 bump_after_update = composer.get_config().borrow().get("bump-after-update");

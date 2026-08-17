@@ -52,6 +52,7 @@ use shirabe_symfony_console::command::CommandData;
 use shirabe_symfony_console::input::InputArgument;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::input::InputOption;
+use shirabe_symfony_console::input::InputOptionValue;
 use shirabe_symfony_console::input::StringInput;
 use shirabe_symfony_console::output::StreamOutput;
 use shirabe_symfony_console::output::{OutputInterface, VERBOSITY_NORMAL};
@@ -828,10 +829,9 @@ fn ignore_platform_reqs_value(input: &dyn InputInterface) -> PhpMixed {
     }
     let list = input
         .get_option("ignore-platform-req")
-        .unwrap_or(PhpMixed::Bool(false));
+        .unwrap_or(InputOptionValue::Bool(false));
     match &list {
-        PhpMixed::List(items) if !items.is_empty() => list,
-        PhpMixed::Array(map) if !map.is_empty() => list,
+        InputOptionValue::Array(items) if !items.is_empty() => list.into(),
         _ => PhpMixed::Bool(false),
     }
 }

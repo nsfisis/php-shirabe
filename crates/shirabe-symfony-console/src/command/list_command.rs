@@ -147,13 +147,22 @@ impl Command for ListCommand {
         let mut helper = DescriptorHelper::new();
         let object = DescribableObject::Application(self.get_application().unwrap());
         let mut options = indexmap::IndexMap::new();
-        options.insert("format".to_string(), input.borrow().get_option("format")?);
-        options.insert("raw_text".to_string(), input.borrow().get_option("raw")?);
+        options.insert(
+            "format".to_string(),
+            input.borrow().get_option("format")?.into(),
+        );
+        options.insert(
+            "raw_text".to_string(),
+            input.borrow().get_option("raw")?.into(),
+        );
         options.insert(
             "namespace".to_string(),
             input.borrow().get_argument("namespace")?,
         );
-        options.insert("short".to_string(), input.borrow().get_option("short")?);
+        options.insert(
+            "short".to_string(),
+            input.borrow().get_option("short")?.into(),
+        );
         helper.describe2(output.clone(), object, options)?;
 
         Ok(0)

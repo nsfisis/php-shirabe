@@ -243,12 +243,8 @@ impl Command for AuditCommand {
         let mut ignore_severities: indexmap::IndexMap<String, Option<String>> =
             indexmap::IndexMap::new();
         let cli_severities = input.borrow().get_option("ignore-severity")?;
-        if let Some(list) = cli_severities.as_list() {
-            for sev in list {
-                if let Some(s) = sev.as_string() {
-                    ignore_severities.insert(s.to_string(), None);
-                }
-            }
+        for severity in cli_severities.as_array().unwrap_or_default() {
+            ignore_severities.insert(severity.clone(), None);
         }
         for (k, v) in audit_config.ignore_severity_for_audit.clone() {
             ignore_severities.insert(k, v);

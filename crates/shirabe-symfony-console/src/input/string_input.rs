@@ -4,6 +4,7 @@ use crate::exception::InvalidArgumentException;
 use crate::input::ArgvInput;
 use crate::input::InputDefinition;
 use crate::input::InputInterface;
+use crate::input::InputOptionValue;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, php_regex, preg_match};
@@ -177,7 +178,7 @@ impl InputInterface for StringInput {
         InputInterface::get_options(&self.inner)
     }
 
-    fn get_option(&self, name: &str) -> anyhow::Result<PhpMixed> {
+    fn get_option(&self, name: &str) -> anyhow::Result<InputOptionValue> {
         self.inner.get_option(name)
     }
 

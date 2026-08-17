@@ -1489,8 +1489,8 @@ impl Command for ShowCommand {
         } else if input
             .borrow()
             .get_option("ignore")?
-            .as_list()
-            .map_or(0, |l| l.len())
+            .as_array()
+            .map_or(0, <[String]>::len)
             > 0
         {
             self.get_io().write_error("<warning>You are using the option \"ignore\" for action other than \"outdated\", it will be ignored.</warning>");
@@ -2180,12 +2180,8 @@ impl Command for ShowCommand {
             &input
                 .borrow()
                 .get_option("ignore")?
-                .as_list()
-                .map(|l| {
-                    l.iter()
-                        .filter_map(|v| v.as_string().map(strtolower))
-                        .collect::<Vec<_>>()
-                })
+                .as_array()
+                .map(|l| l.iter().map(|v| strtolower(v)).collect::<Vec<_>>())
                 .unwrap_or_default(),
             "{^(?:%s)$}iD",
         );

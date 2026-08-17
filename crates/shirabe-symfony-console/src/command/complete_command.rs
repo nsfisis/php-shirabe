@@ -78,19 +78,26 @@ impl CompleteCommand {
         input: &dyn InputInterface,
     ) -> anyhow::Result<CompletionInput> {
         let current_index = input.get_option("current")?;
-        if !current_index.to_bool() || !shirabe_php_shim::ctype_digit(&current_index.to_string()) {
+        if !current_index.to_bool()
+            || !shirabe_php_shim::ctype_digit(current_index.as_string().unwrap_or_default())
+        {
             anyhow::bail!(shirabe_php_shim::RuntimeException::new(
                 "The \"--current\" option must be set and it must be an integer.".to_string()
             ));
         }
 
-        let tokens: Vec<String> = match input.get_option("input")?.as_list() {
-            Some(list) => list.iter().map(|v| v.to_string()).collect(),
-            None => Vec::new(),
-        };
+        let tokens: Vec<String> = input
+            .get_option("input")?
+            .as_array()
+            .map(<[String]>::to_vec)
+            .unwrap_or_default();
         let mut completion_input = CompletionInput::from_tokens(
             tokens,
-            current_index.to_string().parse::<i64>().unwrap_or(0),
+            current_index
+                .as_string()
+                .unwrap_or_default()
+                .parse::<i64>()
+                .unwrap_or(0),
         )?;
 
         // try { $completionInput->bind(...); } catch (ExceptionInterface $e) {}
@@ -254,13 +261,13 @@ impl Command for CompleteCommand {
 
             let completion_output = self
                 .completion_outputs
-                .get(&shell.to_string())
+                .get(shell.as_string().unwrap_or_default())
                 .cloned()
                 .unwrap_or(PhpMixed::Bool(false));
             if !completion_output.to_bool() {
                 anyhow::bail!(shirabe_php_shim::RuntimeException::new(format!(
                     "Shell completion is not supported for your shell: \"{}\" (supported: \"{}\").",
-                    shell,
+                    shell.as_string().unwrap_or_default(),
                     self.completion_outputs
                         .keys()
                         .cloned()

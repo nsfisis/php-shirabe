@@ -91,7 +91,7 @@ impl Command for ReinstallCommand {
         let mut package_names_to_reinstall: Vec<String> = vec![];
 
         let type_option = input.borrow().get_option("type")?;
-        let type_count = type_option.as_list().map_or(0, |l| l.len());
+        let type_count = type_option.as_array().map_or(0, <[String]>::len);
         let packages_arg = input.borrow().get_argument("packages")?;
         let packages_count = packages_arg.as_list().map_or(0, |l| l.len());
 
@@ -104,12 +104,8 @@ impl Command for ReinstallCommand {
                 .into());
             }
             let filter_types: Vec<String> = type_option
-                .as_list()
-                .map(|l| {
-                    l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
+                .as_array()
+                .map(<[String]>::to_vec)
                 .unwrap_or_default();
             for package in local_repo.get_canonical_packages()? {
                 if filter_types.contains(&package.get_type()) {

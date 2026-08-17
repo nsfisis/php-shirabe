@@ -191,3 +191,90 @@ impl InputOption {
             && option.is_value_optional() == self.is_value_optional()
     }
 }
+
+/// The `bool|string|string[]|null` domain of a parsed option value, as returned by
+/// [`InputInterface::get_option`](crate::input::InputInterface::get_option).
+#[derive(Debug, Clone, PartialEq)]
+pub enum InputOptionValue {
+    Null,
+    Bool(bool),
+    String(String),
+    Array(Vec<String>),
+}
+
+impl InputOptionValue {
+    /// Narrows a raw option value to this domain.
+    ///
+    /// TODO(type-model): `Input` keeps parsed options and `InputOption` defaults as `PhpMixed`, so
+    /// a value outside this domain — an int, a float, or an array holding one — can only be
+    /// rejected here.
+    pub(crate) fn from_php_mixed(value: &PhpMixed) -> Self {
+        match value {
+            PhpMixed::Null => Self::Null,
+            PhpMixed::Bool(b) => Self::Bool(*b),
+            PhpMixed::String(s) => Self::String(s.clone()),
+            PhpMixed::List(_) | PhpMixed::Array(_) => Self::Array(
+                value
+                    .values()
+                    .into_iter()
+                    .map(|item| match item {
+                        PhpMixed::String(s) => s.clone(),
+                        other => panic!("an option array holds {:?}, not a string", other),
+                    })
+                    .collect(),
+            ),
+            other => panic!(
+                "an option holds {:?}, not a bool, string, array or null",
+                other
+            ),
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        matches!(self, Self::Null)
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        match self {
+            Self::Bool(b) => Some(*b),
+            _ => None,
+        }
+    }
+
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            Self::String(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    pub fn as_array(&self) -> Option<&[String]> {
+        match self {
+            Self::Array(items) => Some(items),
+            _ => None,
+        }
+    }
+
+    /// PHP loose boolean cast `(bool) $value`.
+    pub fn to_bool(&self) -> bool {
+        match self {
+            Self::Null => false,
+            Self::Bool(b) => *b,
+            Self::String(s) => !s.is_empty() && s != "0",
+            Self::Array(items) => !items.is_empty(),
+        }
+    }
+}
+
+impl From<InputOptionValue> for PhpMixed {
+    fn from(value: InputOptionValue) -> Self {
+        match value {
+            InputOptionValue::Null => PhpMixed::Null,
+            InputOptionValue::Bool(b) => PhpMixed::Bool(b),
+            InputOptionValue::String(s) => PhpMixed::String(s),
+            InputOptionValue::Array(items) => {
+                PhpMixed::List(items.into_iter().map(PhpMixed::String).collect())
+            }
+        }
+    }
+}

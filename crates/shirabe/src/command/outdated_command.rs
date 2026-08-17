@@ -187,7 +187,7 @@ impl Command for OutdatedCommand {
         }
         args.insert(
             "--ignore-platform-req".to_string(),
-            input.borrow().get_option("ignore-platform-req")?,
+            input.borrow().get_option("ignore-platform-req")?.into(),
         );
         if input
             .borrow()
@@ -197,8 +197,14 @@ impl Command for OutdatedCommand {
         {
             args.insert("--ignore-platform-reqs".to_string(), PhpMixed::Bool(true));
         }
-        args.insert("--format".to_string(), input.borrow().get_option("format")?);
-        args.insert("--ignore".to_string(), input.borrow().get_option("ignore")?);
+        args.insert(
+            "--format".to_string(),
+            input.borrow().get_option("format")?.into(),
+        );
+        args.insert(
+            "--ignore".to_string(),
+            input.borrow().get_option("ignore")?.into(),
+        );
 
         let input = ArrayInput::new(
             args.into_iter()

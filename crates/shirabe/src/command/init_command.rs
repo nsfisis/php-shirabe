@@ -527,12 +527,8 @@ impl Command for InitCommand {
         let repositories: Vec<String> = input
             .borrow()
             .get_option("repository")?
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
+            .as_array()
+            .map(<[String]>::to_vec)
             .unwrap_or_default();
         if (repositories.len() as i64) > 0 {
             let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
@@ -790,12 +786,8 @@ impl Command for InitCommand {
             let repositories: Vec<String> = input
                 .borrow()
                 .get_option("repository")?
-                .as_list()
-                .map(|l| {
-                    l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
+                .as_array()
+                .map(<[String]>::to_vec)
                 .unwrap_or_default();
             if (repositories.len() as i64) > 0 {
                 let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
@@ -1048,7 +1040,7 @@ impl Command for InitCommand {
                 "Package Type (e.g. library, project, metapackage, composer-plugin) [<comment>{}</comment>]: ",
                 type_str
             ),
-            type_val,
+            type_val.into(),
         )?;
             if type_value.as_string() == Some("") || matches!(type_value, PhpMixed::Bool(false)) {
                 type_value = PhpMixed::Null;
@@ -1126,12 +1118,8 @@ impl Command for InitCommand {
             let require: Vec<String> = input
                 .borrow()
                 .get_option("require")?
-                .as_list()
-                .map(|l| {
-                    l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
+                .as_array()
+                .map(<[String]>::to_vec)
                 .unwrap_or_default();
             let requirements = if (require.len() as i64) > 0 || io.ask_confirmation(question, true)
             {
@@ -1156,12 +1144,8 @@ impl Command for InitCommand {
             let require_dev: Vec<String> = input
                 .borrow()
                 .get_option("require-dev")?
-                .as_list()
-                .map(|l| {
-                    l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
+                .as_array()
+                .map(<[String]>::to_vec)
                 .unwrap_or_default();
             let dev_requirements =
                 if (require_dev.len() as i64) > 0 || io.ask_confirmation(question, true) {

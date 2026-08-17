@@ -926,15 +926,12 @@ impl Command for CreateProjectCommand {
 
         let repository_opt = input.borrow().get_option("repository")?;
         let repository_url_opt = input.borrow().get_option("repository-url")?;
-        let repositories = if repository_opt
-            .as_list()
-            .map(|l| !l.is_empty())
-            .unwrap_or(false)
-        {
-            Some(repository_opt)
-        } else {
-            Some(repository_url_opt)
-        };
+        let repositories: Option<PhpMixed> =
+            if repository_opt.as_array().is_some_and(|l| !l.is_empty()) {
+                Some(repository_opt.into())
+            } else {
+                Some(repository_url_opt.into())
+            };
 
         self.install_project(
             io,
