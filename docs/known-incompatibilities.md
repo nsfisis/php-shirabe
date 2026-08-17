@@ -3,6 +3,21 @@
 NOTE: This is not an exhaustive list. Shirabe is in early development and there are still a number of significant incompatibilities with Composer that are not documented here yet.
 
 
+## Platform Support
+
+We plan to support all platforms that Composer does, but currently:
+
+* Linux: fully supported and tested
+* macOS: not well tested
+* Windows: unsupported
+
+
+## Commands
+
+The command `self-update` is intentionally disabled because there are no
+releases yet.
+
+
 ## Default Home/Cache/Data Directories
 
 To avoid conflicting with an existing Composer installation, Shirabe's default system directories
@@ -60,7 +75,10 @@ Signal handling in plugins and scripts is undefined behavior: it may or may not
 work. See [docs/dev/signals.md](./dev/signals.md) for details.
 
 
-## Plugins
+## Plugins and Scripts
+
+Plugins and scripts in Shirabe are executed in a separate PHP process that
+communicates with Shirabe. This architecture has some limitations.
 
 ### Reflection
 
