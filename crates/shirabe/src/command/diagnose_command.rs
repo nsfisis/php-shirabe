@@ -36,14 +36,31 @@ use indexmap::IndexMap;
 use shirabe_php_shim::PhpClass as _;
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException,
-    disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class, implode, is_array,
-    is_string, php_regex, preg_match, rtrim, str_replace, strpos, strstr, strstr3, strtolower,
-    trim, version_compare,
+    disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class, implode, php_regex,
+    preg_match, rtrim, str_replace, strpos, strstr, strstr3, strtolower, trim, version_compare,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_process::ExecutableFinder;
+
+/// What a `check_*` method hands to `output_result`, mirroring PHP's `true|string|string[]`.
+#[derive(Debug)]
+enum CheckResult {
+    Ok,
+    /// A falsey PHP result: counted as an error, with no message of its own.
+    Failed,
+    Message(String),
+    Messages(Vec<String>),
+}
+
+/// What `get_github_rate_limit` returns: PHP yields either the `resources.core` entry of
+/// GitHub's response, or a non-array value that goes straight to `output_result`.
+#[derive(Debug)]
+enum GithubRateLimit {
+    Unavailable(CheckResult),
+    Core { limit: i64, remaining: i64 },
+}
 
 #[derive(Debug)]
 pub struct DiagnoseCommand {
@@ -76,7 +93,7 @@ impl DiagnoseCommand {
         command
     }
 
-    fn check_composer_schema(&self) -> anyhow::Result<PhpMixed> {
+    fn check_composer_schema(&self) -> anyhow::Result<CheckResult> {
         let validator = ConfigValidator::new(self.get_io().clone());
         let (errors, _, warnings) = validator.validate(&Factory::get_composer_file()?, 0, 0);
 
@@ -92,13 +109,19 @@ impl DiagnoseCommand {
                 }
             }
 
-            return Ok(PhpMixed::String(rtrim(&output, Some(" \t\n\r\0\u{0B}"))));
+            return Ok(CheckResult::Message(rtrim(
+                &output,
+                Some(" \t\n\r\0\u{0B}"),
+            )));
         }
 
-        Ok(PhpMixed::Bool(true))
+        Ok(CheckResult::Ok)
     }
 
-    fn check_composer_lock_schema(&self, locker: &dyn LockerInterface) -> anyhow::Result<PhpMixed> {
+    fn check_composer_lock_schema(
+        &self,
+        locker: &dyn LockerInterface,
+    ) -> anyhow::Result<CheckResult> {
         let json = locker.get_json_file();
 
         match json.validate_schema(JsonFile::LOCK_SCHEMA, None) {
@@ -110,13 +133,13 @@ impl DiagnoseCommand {
                         output.push_str(&format!("<error>{}</error>{}", error, PHP_EOL));
                     }
 
-                    return Ok(PhpMixed::String(trim(&output, Some(" \t\n\r\0\u{0B}"))));
+                    return Ok(CheckResult::Message(trim(&output, Some(" \t\n\r\0\u{0B}"))));
                 }
                 return Err(e);
             }
         }
 
-        Ok(PhpMixed::Bool(true))
+        Ok(CheckResult::Ok)
     }
 
     fn check_git(&self) -> anyhow::Result<String> {
@@ -170,13 +193,13 @@ impl DiagnoseCommand {
         &self,
         proto: &str,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-    ) -> anyhow::Result<PhpMixed> {
+    ) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
-        if result.as_bool() != Some(true) {
+        if !matches!(result, CheckResult::Ok) {
             return Ok(result);
         }
 
-        let mut result_list: Vec<PhpMixed> = vec![];
+        let mut result_list: Vec<String> = vec![];
         let mut tls_warning: Option<String> = None;
         if proto == "https" && config.borrow().get("disable-tls").as_bool() == Some(true) {
             tls_warning = Some("<warning>Shirabe is configured to disable SSL/TLS protection. This will leave remote HTTPS requests vulnerable to Man-In-The-Middle attacks.</warning>".to_string());
@@ -198,15 +221,17 @@ impl DiagnoseCommand {
                     let hints = HttpDownloader::get_exception_hints(&e).unwrap_or_default();
                     if !hints.is_empty() {
                         for hint in hints {
-                            result_list.push(PhpMixed::String(hint));
+                            result_list.push(hint);
                         }
                     }
 
-                    result_list.push(PhpMixed::String(format!(
+                    result_list.push(format!(
                         "<error>[{}] {}</error>",
-                        std::any::type_name_of_val(te),
+                        AnyThrowable::of(e.as_ref())
+                            .expect("the catch above proved the error carries a \\Throwable")
+                            .php_class_name(),
                         te.get_message()
-                    )));
+                    ));
                 } else {
                     return Err(e);
                 }
@@ -214,27 +239,27 @@ impl DiagnoseCommand {
         }
 
         if let Some(w) = tls_warning {
-            result_list.push(PhpMixed::String(w));
+            result_list.push(w);
         }
 
         if !result_list.is_empty() {
-            return Ok(PhpMixed::List(result_list));
+            return Ok(CheckResult::Messages(result_list));
         }
 
-        Ok(PhpMixed::Bool(true))
+        Ok(CheckResult::Ok)
     }
 
     fn check_composer_repo(
         &self,
         url: &str,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-    ) -> anyhow::Result<PhpMixed> {
+    ) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
-        if result.as_bool() != Some(true) {
+        if !matches!(result, CheckResult::Ok) {
             return Ok(result);
         }
 
-        let mut result_list: Vec<PhpMixed> = vec![];
+        let mut result_list: Vec<String> = vec![];
         let mut tls_warning: Option<String> = None;
         if url.starts_with("https://") && config.borrow().get("disable-tls").as_bool() == Some(true)
         {
@@ -255,15 +280,17 @@ impl DiagnoseCommand {
                     let hints = HttpDownloader::get_exception_hints(&e).unwrap_or_default();
                     if !hints.is_empty() {
                         for hint in hints {
-                            result_list.push(PhpMixed::String(hint));
+                            result_list.push(hint);
                         }
                     }
 
-                    result_list.push(PhpMixed::String(format!(
+                    result_list.push(format!(
                         "<error>[{}] {}</error>",
-                        std::any::type_name_of_val(te),
+                        AnyThrowable::of(e.as_ref())
+                            .expect("the catch above proved the error carries a \\Throwable")
+                            .php_class_name(),
                         te.get_message()
-                    )));
+                    ));
                 } else {
                     return Err(e);
                 }
@@ -271,26 +298,33 @@ impl DiagnoseCommand {
         }
 
         if let Some(w) = tls_warning {
-            result_list.push(PhpMixed::String(w));
+            result_list.push(w);
         }
 
         if !result_list.is_empty() {
-            return Ok(PhpMixed::List(result_list));
+            return Ok(CheckResult::Messages(result_list));
         }
 
-        Ok(PhpMixed::Bool(true))
+        Ok(CheckResult::Ok)
     }
 
-    fn check_http_proxy(&self, proxy: &RequestProxy, protocol: &str) -> anyhow::Result<PhpMixed> {
+    fn check_http_proxy(
+        &self,
+        proxy: &RequestProxy,
+        protocol: &str,
+    ) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
-        if result.as_bool() != Some(true) {
+        if !matches!(result, CheckResult::Ok) {
             return Ok(result);
         }
 
+        // TODO(error-model): PHP catches every \Exception below and returns it, so `output_result`
+        // renders it as `<error>[class] message</error>` and the caller goes on to the next
+        // protocol. The errors below propagate instead, cutting the proxy checks short.
         let proxy_status = proxy.get_status(None).unwrap_or_default();
 
         if proxy.is_excluded_by_no_proxy() {
-            return Ok(PhpMixed::String(format!(
+            return Ok(CheckResult::Message(format!(
                 "<info>SKIP</> <comment>Because repo.packagist.org is {}</>",
                 proxy_status
             )));
@@ -340,22 +374,22 @@ impl DiagnoseCommand {
             let provider = response.get_body().unwrap_or_default().to_string();
 
             if hash("sha256", &provider) != hash_val.as_string().unwrap_or("") {
-                return Ok(PhpMixed::String(format!(
+                return Ok(CheckResult::Message(format!(
                     "<warning>It seems that your proxy ({}) is modifying {} traffic on the fly</>",
                     proxy_status, protocol
                 )));
             }
         }
 
-        Ok(PhpMixed::String(format!(
+        Ok(CheckResult::Message(format!(
             "<info>OK</> <comment>{}</>",
             proxy_status
         )))
     }
 
-    fn check_github_oauth(&self, domain: &str, token: &str) -> anyhow::Result<PhpMixed> {
+    fn check_github_oauth(&self, domain: &str, token: &str) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
-        if result.as_bool() != Some(true) {
+        if !matches!(result, CheckResult::Ok) {
             return Ok(result);
         }
 
@@ -385,12 +419,12 @@ impl DiagnoseCommand {
                 let expiration = response.get_header("github-authentication-token-expiration");
 
                 if expiration.is_none() {
-                    return Ok(PhpMixed::String(
+                    return Ok(CheckResult::Message(
                         "<info>OK</> <comment>does not expire</>".to_string(),
                     ));
                 }
 
-                Ok(PhpMixed::String(format!(
+                Ok(CheckResult::Message(format!(
                     "<info>OK</> <comment>expires on {}</>",
                     expiration.unwrap()
                 )))
@@ -399,12 +433,12 @@ impl DiagnoseCommand {
                 if let Some(te) = e.catch::<TransportException>()
                     && te.get_code() == 401
                 {
-                    return Ok(PhpMixed::String(format!(
+                    return Ok(CheckResult::Message(format!(
                         "<comment>The oauth token for {} seems invalid, run \"composer config --global --unset github-oauth.{}\" to remove it</comment>",
                         domain, domain
                     )));
                 }
-                Ok(PhpMixed::String(format!(
+                Ok(CheckResult::Message(format!(
                     "<error>[{}] {}</error>",
                     AnyThrowable::of(e.as_ref())
                         .expect("PHP reaches this only with a caught \\Throwable")
@@ -415,10 +449,14 @@ impl DiagnoseCommand {
         }
     }
 
-    fn get_github_rate_limit(&self, domain: &str, token: Option<&str>) -> anyhow::Result<PhpMixed> {
+    fn get_github_rate_limit(
+        &self,
+        domain: &str,
+        token: Option<&str>,
+    ) -> anyhow::Result<GithubRateLimit> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
-        if result.as_bool() != Some(true) {
-            return Ok(result);
+        if !matches!(result, CheckResult::Ok) {
+            return Ok(GithubRateLimit::Unavailable(result));
         }
 
         if let Some(t) = token {
@@ -450,13 +488,17 @@ impl DiagnoseCommand {
             .and_then(|a| a.get("resources"))
             .and_then(|v| v.as_array())
             .and_then(|a| a.get("core"))
-            .cloned()
-            .unwrap_or(PhpMixed::Null))
+            .and_then(|core| core.as_array())
+            .map(|core| GithubRateLimit::Core {
+                limit: core.get("limit").and_then(|v| v.as_int()).unwrap_or(0),
+                remaining: core.get("remaining").and_then(|v| v.as_int()).unwrap_or(0),
+            })
+            .unwrap_or(GithubRateLimit::Unavailable(CheckResult::Failed)))
     }
 
-    fn check_disk_space(&self, config: &Config) -> PhpMixed {
+    fn check_disk_space(&self, config: &Config) -> CheckResult {
         if !shirabe_php_rpc::get_diagnostics().function_exists("disk_free_space") {
-            return PhpMixed::Bool(true);
+            return CheckResult::Ok;
         }
 
         let min_space_free: f64 = (1024 * 1024) as f64;
@@ -469,20 +511,26 @@ impl DiagnoseCommand {
         let mut dir = home_dir.clone();
         let df_home = disk_free_space(&home_dir);
         if df_home.map(|d| d < min_space_free).unwrap_or(false) {
-            return PhpMixed::String(format!("<error>The disk hosting {} is full</error>", dir));
+            return CheckResult::Message(format!(
+                "<error>The disk hosting {} is full</error>",
+                dir
+            ));
         }
         dir = vendor_dir.clone();
         let df_vendor = disk_free_space(&vendor_dir);
         if df_vendor.map(|d| d < min_space_free).unwrap_or(false) {
-            return PhpMixed::String(format!("<error>The disk hosting {} is full</error>", dir));
+            return CheckResult::Message(format!(
+                "<error>The disk hosting {} is full</error>",
+                dir
+            ));
         }
 
-        PhpMixed::Bool(true)
+        CheckResult::Ok
     }
 
-    fn check_pub_keys(&self, config: &Config) -> anyhow::Result<PhpMixed> {
+    fn check_pub_keys(&self, config: &Config) -> anyhow::Result<CheckResult> {
         let home = config.get("home").as_string().unwrap_or("").to_string();
-        let mut errors: Vec<PhpMixed> = vec![];
+        let mut errors: Vec<String> = vec![];
         let io = self.get_io();
 
         if file_exists(format!("{}/keys.tags.pub", home))
@@ -497,9 +545,7 @@ impl DiagnoseCommand {
                 Keys::fingerprint(&format!("{}/keys.tags.pub", home))?
             ));
         } else {
-            errors.push(PhpMixed::String(
-                "<error>Missing pubkey for tags verification</error>".to_string(),
-            ));
+            errors.push("<error>Missing pubkey for tags verification</error>".to_string());
         }
 
         if file_exists(format!("{}/keys.dev.pub", home)) {
@@ -508,30 +554,28 @@ impl DiagnoseCommand {
                 Keys::fingerprint(&format!("{}/keys.dev.pub", home))?
             ));
         } else {
-            errors.push(PhpMixed::String(
-                "<error>Missing pubkey for dev verification</error>".to_string(),
-            ));
+            errors.push("<error>Missing pubkey for dev verification</error>".to_string());
         }
 
         if !errors.is_empty() {
-            errors.push(PhpMixed::String(
+            errors.push(
                 "<error>Run composer self-update --update-keys to set them up</error>".to_string(),
-            ));
+            );
         }
 
         Ok(if !errors.is_empty() {
-            PhpMixed::List(errors)
+            CheckResult::Messages(errors)
         } else {
-            PhpMixed::Bool(true)
+            CheckResult::Ok
         })
     }
 
     fn check_version(
         &self,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-    ) -> anyhow::Result<PhpMixed> {
+    ) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
-        if result.as_bool() != Some(true) {
+        if !matches!(result, CheckResult::Ok) {
             return Ok(result);
         }
 
@@ -542,14 +586,14 @@ impl DiagnoseCommand {
         let latest = match versions_util.get_latest(None) {
             Ok(Ok(l)) => l,
             Ok(Err(e)) => {
-                return Ok(PhpMixed::String(format!(
+                return Ok(CheckResult::Message(format!(
                     "<error>[{}] {}</error>",
                     "UnexpectedValueException",
                     e.get_message()
                 )));
             }
             Err(e) => {
-                return Ok(PhpMixed::String(format!(
+                return Ok(CheckResult::Message(format!(
                     "<error>[{}] {}</error>",
                     AnyThrowable::of(e.as_ref())
                         .expect("PHP reaches this only with a caught \\Throwable")
@@ -565,7 +609,7 @@ impl DiagnoseCommand {
             .unwrap_or("")
             .to_string();
         if composer::VERSION != latest_version && composer::VERSION != "@package_version@" {
-            return Ok(PhpMixed::String(format!(
+            return Ok(CheckResult::Message(format!(
                 "<comment>You are not running the latest {} version, run `composer self-update` to update ({} => {})</comment>",
                 versions_util.get_channel()?,
                 composer::VERSION,
@@ -573,15 +617,15 @@ impl DiagnoseCommand {
             )));
         }
 
-        Ok(PhpMixed::Bool(true))
+        Ok(CheckResult::Ok)
     }
 
     fn check_composer_audit(
         &self,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-    ) -> anyhow::Result<PhpMixed> {
+    ) -> anyhow::Result<CheckResult> {
         let result = self.check_connectivity_and_composer_network_http_enablement();
-        if result.as_bool() != Some(true) {
+        if !matches!(result, CheckResult::Ok) {
             return Ok(result);
         }
 
@@ -606,7 +650,7 @@ impl DiagnoseCommand {
         })?;
         let installed_json = JsonFile::new(path.to_string(), None, None)?;
         if !installed_json.exists() {
-            return Ok(PhpMixed::String(
+            return Ok(CheckResult::Message(
                 "<warning>Could not find Composer's installed.json, this must be a non-standard Composer installation.</>".to_string(),
             ));
         }
@@ -657,7 +701,7 @@ impl DiagnoseCommand {
         ) {
             Ok(r) => r,
             Err(e) => {
-                return Ok(PhpMixed::String(format!(
+                return Ok(CheckResult::Message(format!(
                     "<highlight>Failed performing audit: {}</>",
                     e
                 )));
@@ -665,7 +709,7 @@ impl DiagnoseCommand {
         };
 
         if result > 0 {
-            return Ok(PhpMixed::String(format!(
+            return Ok(CheckResult::Message(format!(
                 "<highlight>Audit found some issues:</>{}{}",
                 PHP_EOL,
                 io.borrow()
@@ -676,7 +720,7 @@ impl DiagnoseCommand {
             )));
         }
 
-        Ok(PhpMixed::Bool(true))
+        Ok(CheckResult::Ok)
     }
 
     fn get_curl_version(&self) -> String {
@@ -735,65 +779,47 @@ impl DiagnoseCommand {
         "<error>missing, using php streams fallback, which reduces performance</error>".to_string()
     }
 
-    fn output_result(&self, result: PhpMixed) {
-        let prev_exit_code = self.exit_code.get();
+    // PHP: $result instanceof \Exception → already converted to string at call sites here
+    fn output_result(&self, result: CheckResult) {
         let io = self.get_io();
-        if result.as_bool() == Some(true) {
-            io.write("<info>OK</info>");
+        let messages = match result {
+            CheckResult::Ok => {
+                io.write("<info>OK</info>");
 
-            return;
-        }
-
-        let mut had_error = false;
-        let mut had_warning = false;
-        let mut result = result;
-        // PHP: $result instanceof \Exception → already converted to string at call sites here
-        if !result.as_bool().unwrap_or(true) && result.as_string().is_none() && !is_array(&result) {
-            // falsey results should be considered as an error, even if there is nothing to output
-            had_error = true;
-        } else {
-            let result_list: Vec<PhpMixed> = match &result {
-                PhpMixed::List(l) => l.clone(),
-                other => vec![other.clone()],
-            };
-            for message in &result_list {
-                let s = message.as_string().unwrap_or("");
-                if strpos(s, "<error>").is_some() {
-                    had_error = true;
-                } else if strpos(s, "<warning>").is_some() {
-                    had_warning = true;
-                }
+                return;
             }
-            // re-wrap so the final output loop works the same
-            result = PhpMixed::List(result_list);
+            CheckResult::Failed => vec![],
+            // PHP treats '' and '0' as falsey, so such a message never reaches the output loop.
+            CheckResult::Message(message) if message.is_empty() || message == "0" => vec![],
+            CheckResult::Message(message) => vec![message],
+            CheckResult::Messages(messages) => messages,
+        };
+
+        // falsey results should be considered as an error, even if there is nothing to output
+        let mut had_error = messages.is_empty();
+        let mut had_warning = false;
+        for message in &messages {
+            if strpos(message, "<error>").is_some() {
+                had_error = true;
+            } else if strpos(message, "<warning>").is_some() {
+                had_warning = true;
+            }
         }
 
         if had_error {
             io.write("<error>FAIL</error>");
+            self.exit_code.set(self.exit_code.get().max(2));
         } else if had_warning {
             io.write("<warning>WARNING</warning>");
+            self.exit_code.set(self.exit_code.get().max(1));
         }
 
-        if !result.as_bool().unwrap_or(false) {
-            // PHP: if ($result) — falsey skips; this branch matches truthy
-        }
-        if let Some(list) = result.as_list() {
-            for message in list {
-                io.write(&trim(
-                    message.as_string().unwrap_or(""),
-                    Some(" \t\n\r\0\u{0B}"),
-                ));
-            }
-        }
-        // Apply exit code updates after io borrow ends
-        if had_error {
-            self.exit_code.set(prev_exit_code.max(2));
-        } else if had_warning {
-            self.exit_code.set(prev_exit_code.max(1));
+        for message in &messages {
+            io.write(&trim(message, Some(" \t\n\r\0\u{0B}")));
         }
     }
 
-    fn check_platform(&self) -> anyhow::Result<PhpMixed> {
+    fn check_platform(&self) -> anyhow::Result<CheckResult> {
         let mut output = String::new();
         let mut display_ini_message = false;
 
@@ -802,31 +828,32 @@ impl DiagnoseCommand {
 
         let diagnostics = shirabe_php_rpc::get_diagnostics();
 
-        let mut errors: IndexMap<String, PhpMixed> = IndexMap::new();
-        let mut warnings: IndexMap<String, PhpMixed> = IndexMap::new();
+        // PHP stores `true` for an issue with no detail, and a version string otherwise.
+        let mut errors: IndexMap<String, Option<String>> = IndexMap::new();
+        let mut warnings: IndexMap<String, Option<String>> = IndexMap::new();
 
         if !diagnostics.function_exists("json_decode") {
-            errors.insert("json".to_string(), PhpMixed::Bool(true));
+            errors.insert("json".to_string(), None);
         }
 
         if !diagnostics.extension_loaded("Phar") {
-            errors.insert("phar".to_string(), PhpMixed::Bool(true));
+            errors.insert("phar".to_string(), None);
         }
 
         if !diagnostics.extension_loaded("filter") {
-            errors.insert("filter".to_string(), PhpMixed::Bool(true));
+            errors.insert("filter".to_string(), None);
         }
 
         if !diagnostics.extension_loaded("hash") {
-            errors.insert("hash".to_string(), PhpMixed::Bool(true));
+            errors.insert("hash".to_string(), None);
         }
 
         if !diagnostics.extension_loaded("iconv") && !diagnostics.extension_loaded("mbstring") {
-            errors.insert("iconv_mbstring".to_string(), PhpMixed::Bool(true));
+            errors.insert("iconv_mbstring".to_string(), None);
         }
 
         if !filter_var_boolean(diagnostics.ini_get("allow_url_fopen").unwrap_or("")) {
-            errors.insert("allow_url_fopen".to_string(), PhpMixed::Bool(true));
+            errors.insert("allow_url_fopen".to_string(), None);
         }
 
         if diagnostics.extension_loaded("ionCube Loader")
@@ -834,36 +861,33 @@ impl DiagnoseCommand {
         {
             errors.insert(
                 "ioncube".to_string(),
-                PhpMixed::String(diagnostics.ioncube_loader_version.clone()),
+                Some(diagnostics.ioncube_loader_version.clone()),
             );
         }
 
         if diagnostics.php_version_id < 70205 {
-            errors.insert(
-                "php".to_string(),
-                PhpMixed::String(diagnostics.php_version.clone()),
-            );
+            errors.insert("php".to_string(), Some(diagnostics.php_version.clone()));
         }
 
         if !diagnostics.extension_loaded("openssl") {
-            errors.insert("openssl".to_string(), PhpMixed::Bool(true));
+            errors.insert("openssl".to_string(), None);
         }
 
         if diagnostics.extension_loaded("openssl")
             && diagnostics.openssl_version_number < 0x1000100f
         {
-            warnings.insert("openssl_version".to_string(), PhpMixed::Bool(true));
+            warnings.insert("openssl_version".to_string(), None);
         }
 
         if !diagnostics.has_hhvm_version
             && !diagnostics.extension_loaded("apcu")
             && filter_var_boolean(diagnostics.ini_get("apc.enable_cli").unwrap_or(""))
         {
-            warnings.insert("apc_cli".to_string(), PhpMixed::Bool(true));
+            warnings.insert("apc_cli".to_string(), None);
         }
 
         if !diagnostics.extension_loaded("zlib") {
-            warnings.insert("zlib".to_string(), PhpMixed::Bool(true));
+            warnings.insert("zlib".to_string(), None);
         }
 
         if let Some(phpinfo_match) = preg_match(
@@ -874,18 +898,18 @@ impl DiagnoseCommand {
             let configure = configure.as_str();
 
             if configure.contains("--enable-sigchild") {
-                warnings.insert("sigchild".to_string(), PhpMixed::Bool(true));
+                warnings.insert("sigchild".to_string(), None);
             }
 
             if configure.contains("--with-curlwrappers") {
-                warnings.insert("curlwrappers".to_string(), PhpMixed::Bool(true));
+                warnings.insert("curlwrappers".to_string(), None);
             }
         }
 
         if filter_var_boolean(diagnostics.ini_get("xdebug.profiler_enabled").unwrap_or("")) {
-            warnings.insert("xdebug_profile".to_string(), PhpMixed::Bool(true));
+            warnings.insert("xdebug_profile".to_string(), None);
         } else if diagnostics.xdebug_active {
-            warnings.insert("xdebug_loaded".to_string(), PhpMixed::Bool(true));
+            warnings.insert("xdebug_loaded".to_string(), None);
         }
 
         if diagnostics.has_php_windows_version_build
@@ -895,7 +919,7 @@ impl DiagnoseCommand {
         {
             warnings.insert(
                 "onedrive".to_string(),
-                PhpMixed::String(diagnostics.php_version.clone()),
+                Some(diagnostics.php_version.clone()),
             );
         }
 
@@ -903,7 +927,7 @@ impl DiagnoseCommand {
             && !(filter_var_boolean(diagnostics.ini_get("uopz.disable").unwrap_or(""))
                 || filter_var_boolean(diagnostics.ini_get("uopz.exit").unwrap_or("")))
         {
-            warnings.insert("uopz".to_string(), PhpMixed::Bool(true));
+            warnings.insert("uopz".to_string(), None);
         }
 
         let out_fn = |msg: &str, style: &str, output: &mut String| {
@@ -936,7 +960,9 @@ impl DiagnoseCommand {
                     "php" => format!(
                         "{}Your PHP ({}) is too old, you must upgrade to PHP 7.2.5 or higher.",
                         PHP_EOL,
-                        current.as_string().unwrap_or("")
+                        current
+                            .as_deref()
+                            .expect("checkPlatform stores the PHP version with the php error")
                     ),
                     "allow_url_fopen" => {
                         display_ini_message = true;
@@ -950,7 +976,9 @@ impl DiagnoseCommand {
                         format!(
                             "{}Your ionCube Loader extension ({}) is incompatible with Phar files.{}Upgrade to ionCube 4.0.9 or higher or remove this line (path may be different) from your `php.ini` to disable it:{}    zend_extension = /usr/lib/php5/20090626+lfs/ioncube_loader_lin_5.3.so",
                             PHP_EOL,
-                            current.as_string().unwrap_or(""),
+                            current.as_deref().expect(
+                                "checkPlatform stores the loader version with the ioncube error"
+                            ),
                             PHP_EOL,
                             PHP_EOL
                         )
@@ -1031,7 +1059,9 @@ impl DiagnoseCommand {
                     "onedrive" => format!(
                         "The Windows OneDrive folder is not supported on PHP versions below 7.2.23 and 7.3.10.{}Upgrade your PHP ({}) to use this location with Shirabe.{}",
                         PHP_EOL,
-                        current.as_string().unwrap_or(""),
+                        current.as_deref().expect(
+                            "checkPlatform stores the PHP version with the onedrive warning"
+                        ),
                         PHP_EOL
                     ),
                     "uopz" => format!(
@@ -1056,7 +1086,7 @@ impl DiagnoseCommand {
 
         let composer_ipresolve = Platform::get_env("COMPOSER_IPRESOLVE").unwrap_or_default();
         if ["4".to_string(), "6".to_string()].contains(&composer_ipresolve) {
-            warnings.insert("ipresolve".to_string(), PhpMixed::Bool(true));
+            warnings.insert("ipresolve".to_string(), None);
             out_fn(
                 &format!(
                     "The COMPOSER_IPRESOLVE env var is set to {} which may result in network failures below.",
@@ -1068,52 +1098,52 @@ impl DiagnoseCommand {
         }
 
         Ok(if warnings.is_empty() && errors.is_empty() {
-            PhpMixed::Bool(true)
+            CheckResult::Ok
         } else {
-            PhpMixed::String(output)
+            CheckResult::Message(output)
         })
     }
 
     /// Check if allow_url_fopen is ON
-    fn check_connectivity(&self) -> PhpMixed {
+    fn check_connectivity(&self) -> CheckResult {
         // PHP: if (!ini_get('allow_url_fopen')) — a missing setting, "" and "0" are all falsey.
         let allow_url_fopen = shirabe_php_rpc::get_diagnostics().ini_get("allow_url_fopen");
         if !allow_url_fopen.is_some_and(|value| !value.is_empty() && value != "0") {
-            return PhpMixed::String(
+            return CheckResult::Message(
                 "<info>SKIP</> <comment>Because allow_url_fopen is missing.</>".to_string(),
             );
         }
 
-        PhpMixed::Bool(true)
+        CheckResult::Ok
     }
 
-    fn check_connectivity_and_composer_network_http_enablement(&self) -> PhpMixed {
+    fn check_connectivity_and_composer_network_http_enablement(&self) -> CheckResult {
         let result = self.check_connectivity();
-        if result.as_bool() != Some(true) {
+        if !matches!(result, CheckResult::Ok) {
             return result;
         }
 
         let result = self.check_composer_network_http_enablement();
-        if result.as_bool() != Some(true) {
+        if !matches!(result, CheckResult::Ok) {
             return result;
         }
 
-        PhpMixed::Bool(true)
+        CheckResult::Ok
     }
 
     /// Check if Composer network is enabled for HTTP/S
-    fn check_composer_network_http_enablement(&self) -> PhpMixed {
+    fn check_composer_network_http_enablement(&self) -> CheckResult {
         if Platform::get_env("COMPOSER_DISABLE_NETWORK")
             .map(|v| !v.is_empty() && v != "0")
             .unwrap_or(false)
         {
-            return PhpMixed::String(
+            return CheckResult::Message(
                 "<info>SKIP</> <comment>Network is disabled by COMPOSER_DISABLE_NETWORK.</>"
                     .to_string(),
             );
         }
 
-        PhpMixed::Bool(true)
+        CheckResult::Ok
     }
 }
 
@@ -1189,6 +1219,9 @@ impl Command for DiagnoseCommand {
             Factory::create_http_downloader(io.clone(), &config, indexmap::IndexMap::new())?,
         )));
 
+        // TODO(distribution): PHP tests `__FILE__`, which starts with `phar:` when Composer runs
+        // from its phar. Shirabe ships as a native binary, so this never matches and the pubkey
+        // and version checks below never run.
         if strpos(file!(), "phar:") == Some(0) {
             io.write_no_newline("Checking pubkeys: ");
             let r = self.check_pub_keys(&config.borrow())?;
@@ -1331,7 +1364,7 @@ impl Command for DiagnoseCommand {
 
         io.write_no_newline("Checking git settings: ");
         let r = self.check_git()?;
-        self.output_result(PhpMixed::String(r));
+        self.output_result(CheckResult::Message(r));
 
         io.write_no_newline("Checking http connectivity to packagist: ");
         let r = self.check_http("http", &config)?;
@@ -1410,10 +1443,10 @@ impl Command for DiagnoseCommand {
             if let Some(_te) = e.catch::<TransportException>() {
                 io.write_no_newline("Checking HTTP proxy: ");
                 let status = self.check_connectivity_and_composer_network_http_enablement();
-                self.output_result(if is_string(&status) {
+                self.output_result(if matches!(status, CheckResult::Message(_)) {
                     status
                 } else {
-                    PhpMixed::String(format!(
+                    CheckResult::Message(format!(
                         "<error>[{}] {}</error>",
                         AnyThrowable::of(e.as_ref())
                             .expect("PHP reaches this only with a caught \\Throwable")
@@ -1441,29 +1474,24 @@ impl Command for DiagnoseCommand {
         } else {
             io.write_no_newline("Checking github.com rate limit: ");
             match self.get_github_rate_limit("github.com", None) {
-                Ok(rate) => {
-                    if !is_array(&rate) {
-                        self.output_result(rate);
-                    } else if let Some(arr) = rate.as_array() {
-                        let remaining = arr.get("remaining").and_then(|v| v.as_int()).unwrap_or(0);
-                        let limit = arr.get("limit").and_then(|v| v.as_int()).unwrap_or(0);
-                        if 10 > remaining {
-                            io.write("<warning>WARNING</warning>");
-                            io.write(&format!(
-                                "<comment>GitHub has a rate limit on their API. You currently have <options=bold>{}</options=bold> out of <options=bold>{}</options=bold> requests left.\nSee https://developer.github.com/v3/#rate-limiting and also\n    https://getcomposer.org/doc/articles/troubleshooting.md#api-rate-limit-and-oauth-tokens</comment>",
-                                remaining, limit,
-                            ));
-                        } else {
-                            self.output_result(PhpMixed::Bool(true));
-                        }
+                Ok(GithubRateLimit::Unavailable(rate)) => self.output_result(rate),
+                Ok(GithubRateLimit::Core { limit, remaining }) => {
+                    if 10 > remaining {
+                        io.write("<warning>WARNING</warning>");
+                        io.write(&format!(
+                            "<comment>GitHub has a rate limit on their API. You currently have <options=bold>{}</options=bold> out of <options=bold>{}</options=bold> requests left.\nSee https://developer.github.com/v3/#rate-limiting and also\n    https://getcomposer.org/doc/articles/troubleshooting.md#api-rate-limit-and-oauth-tokens</comment>",
+                            remaining, limit,
+                        ));
+                    } else {
+                        self.output_result(CheckResult::Ok);
                     }
                 }
                 Err(e) => {
                     if let Some(te) = e.catch::<TransportException>() {
                         if te.get_code() == 401 {
-                            self.output_result(PhpMixed::String("<comment>The oauth token for github.com seems invalid, run \"composer config --global --unset github-oauth.github.com\" to remove it</comment>".to_string()));
+                            self.output_result(CheckResult::Message("<comment>The oauth token for github.com seems invalid, run \"composer config --global --unset github-oauth.github.com\" to remove it</comment>".to_string()));
                         } else {
-                            self.output_result(PhpMixed::String(format!(
+                            self.output_result(CheckResult::Message(format!(
                                 "<error>[{}] {}</error>",
                                 AnyThrowable::of(e.as_ref())
                                     .expect("PHP reaches this only with a caught \\Throwable")
@@ -1472,7 +1500,7 @@ impl Command for DiagnoseCommand {
                             )));
                         }
                     } else {
-                        self.output_result(PhpMixed::String(format!(
+                        self.output_result(CheckResult::Message(format!(
                             "<error>[{}] {}</error>",
                             AnyThrowable::of(e.as_ref())
                                 .expect("PHP reaches this only with a caught \\Throwable")
