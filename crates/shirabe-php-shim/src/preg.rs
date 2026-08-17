@@ -149,20 +149,12 @@ pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
     out
 }
 
-// Returns None if the pattern did not match; otherwise index 0 is the full match and 1.. the
-// capture groups. A group that did not participate is None.
-pub fn preg_match(pattern: impl PregPattern, subject: &str) -> Option<Vec<Option<String>>> {
-    let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
-    let caps = re.captures(subject)?;
-    Some(
-        (0..caps.len())
-            .map(|g| caps.get(g).map(|m| m.as_str().to_string()))
-            .collect(),
-    )
+// Returns None if the pattern did not match; otherwise the match's capture groups.
+pub fn preg_match<'h>(pattern: impl PregPattern, subject: &'h str) -> Option<PregMatches<'h>> {
+    preg_match2(pattern, subject, 0)
 }
 
-// Returns None if the pattern did not match; otherwise the match's capture groups.
+// `preg_match` with PHP's `$offset` argument: the search starts at byte offset `offset`.
 pub fn preg_match2<'h>(
     pattern: impl PregPattern,
     subject: &'h str,

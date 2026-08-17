@@ -89,17 +89,17 @@ impl Terminal {
                 // or [w, h] from "wxh"
                 WIDTH.with(|w| {
                     w.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
-                        matches[1].clone().unwrap_or_default(),
+                        matches.get(1).unwrap_or_default().to_string(),
                     ))))
                 });
                 HEIGHT.with(|h| {
-                    let value = if matches.get(4).map(|m| m.is_some()).unwrap_or(false) {
+                    let value = if matches.get(4).is_some() {
                         shirabe_php_shim::intval(&PhpMixed::String(
-                            matches[4].clone().unwrap_or_default(),
+                            matches.get(4).unwrap_or_default().to_string(),
                         ))
                     } else {
                         shirabe_php_shim::intval(&PhpMixed::String(
-                            matches[2].clone().unwrap_or_default(),
+                            matches.get(2).unwrap_or_default().to_string(),
                         ))
                     };
                     h.set(Some(value));
@@ -141,12 +141,12 @@ impl Terminal {
                 // extract [w, h] from "rows h; columns w;"
                 WIDTH.with(|w| {
                     w.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
-                        matches[2].clone().unwrap_or_default(),
+                        matches.get(2).unwrap_or_default().to_string(),
                     ))))
                 });
                 HEIGHT.with(|h| {
                     h.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
-                        matches[1].clone().unwrap_or_default(),
+                        matches.get(1).unwrap_or_default().to_string(),
                     ))))
                 });
             } else if let Some(matches) =
@@ -155,12 +155,12 @@ impl Terminal {
                 // extract [w, h] from "; h rows; w columns"
                 WIDTH.with(|w| {
                     w.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
-                        matches[2].clone().unwrap_or_default(),
+                        matches.get(2).unwrap_or_default().to_string(),
                     ))))
                 });
                 HEIGHT.with(|h| {
                     h.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
-                        matches[1].clone().unwrap_or_default(),
+                        matches.get(1).unwrap_or_default().to_string(),
                     ))))
                 });
             }
@@ -180,8 +180,12 @@ impl Terminal {
         )?;
 
         Some(vec![
-            shirabe_php_shim::intval(&PhpMixed::String(matches[2].clone().unwrap_or_default())),
-            shirabe_php_shim::intval(&PhpMixed::String(matches[1].clone().unwrap_or_default())),
+            shirabe_php_shim::intval(&PhpMixed::String(
+                matches.get(2).unwrap_or_default().to_string(),
+            )),
+            shirabe_php_shim::intval(&PhpMixed::String(
+                matches.get(1).unwrap_or_default().to_string(),
+            )),
         ])
     }
 

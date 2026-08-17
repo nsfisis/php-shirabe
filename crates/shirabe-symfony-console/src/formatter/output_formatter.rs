@@ -190,9 +190,11 @@ impl OutputFormatter {
             prefix = String::new();
         }
 
-        let matches = preg_match(php_regex!("~(\\n)$~"), &text).unwrap_or_default();
+        let trailing = preg_match(php_regex!("~(\\n)$~"), &text)
+            .and_then(|matches| matches.get(1))
+            .unwrap_or("")
+            .to_string();
         text = format!("{}{}", prefix, self.add_line_breaks(&text, width));
-        let trailing = matches.get(1).and_then(|m| m.clone()).unwrap_or_default();
         text = format!("{}{}", shirabe_php_shim::rtrim(&text, Some("\n")), trailing);
 
         if *current_line_length == 0

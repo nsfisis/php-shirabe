@@ -33,19 +33,19 @@ impl VersionParser {
 
         let pattern = format!("{{{}(?:\\+.*)?$}}i", MODIFIER_REGEX);
         let lower = shirabe_php_shim::strtolower(&version);
-        let match_ = preg_match(&pattern, &lower).unwrap_or_default();
+        let match_ = preg_match(&pattern, &lower);
 
         // match_[3] = the ([.-]?dev)? capture
         if match_
-            .get(3)
-            .and_then(|o| o.as_deref())
+            .as_ref()
+            .and_then(|m| m.get(3))
             .is_some_and(|s| !s.is_empty())
         {
             return "dev".to_string();
         }
 
         // match_[1] = the (stable|beta|b|RC|alpha|a|patch|pl|p) capture
-        let m1 = match_.get(1).and_then(|o| o.as_deref()).unwrap_or("");
+        let m1 = match_.as_ref().and_then(|m| m.get(1)).unwrap_or("");
         if !m1.is_empty() {
             if m1 == "beta" || m1 == "b" {
                 return "beta".to_string();
@@ -87,13 +87,13 @@ impl VersionParser {
         // strip off aliasing
         if let Some(match_) = preg_match(php_regex!("{^([^,\\s]++) ++as ++([^,\\s]++)$}"), &version)
         {
-            version = match_[1].clone().unwrap_or_default();
+            version = match_.get(1).unwrap_or_default().to_string();
         }
 
         // strip off stability flag
         let stab_pattern = format!("{{@(?:{})$}}i", STABILITIES_REGEX);
         if let Some(match_) = preg_match(&stab_pattern, &version) {
-            let match0_len = match_[0].as_deref().unwrap_or("").len();
+            let match0_len = match_.get(0).unwrap_or_default().len();
             version = version[..version.len() - match0_len].to_string();
         }
 
@@ -110,11 +110,12 @@ impl VersionParser {
 
         // strip off build metadata
         if let Some(match_) = preg_match(php_regex!("{^([^,\\s+]++)\\+[^\\s]++$}"), &version) {
-            version = match_[1].clone().unwrap_or_default();
+            version = match_.get(1).unwrap_or_default().to_string();
         }
 
         let mut index: Option<usize> = None;
-        let mut matches: Vec<Option<String>> = Vec::new();
+        let subject = version.clone();
+        let mut matches: Option<shirabe_php_shim::PregMatches> = None;
 
         // match classical versioning
         // Regex pattern compatibility:
@@ -126,47 +127,41 @@ impl VersionParser {
             "{{^v?(\\d{{1,5}})(\\.\\d++)?(\\.\\d++)?(\\.\\d++)?{}$}}i",
             MODIFIER_REGEX
         );
-        if let Some(m) = preg_match(&classical_pattern, &version) {
-            matches = m;
-            let m2 = matches[2].as_deref().unwrap_or("");
-            let m3 = matches[3].as_deref().unwrap_or("");
-            let m4 = matches[4].as_deref().unwrap_or("");
+        if let Some(m) = preg_match(&classical_pattern, &subject) {
+            let m2 = m.get(2).unwrap_or_default();
+            let m3 = m.get(3).unwrap_or_default();
+            let m4 = m.get(4).unwrap_or_default();
             version = format!(
                 "{}{}{}{}",
-                matches[1].as_deref().unwrap_or(""),
+                m.get(1).unwrap_or_default(),
                 if m2.is_empty() { ".0" } else { m2 },
                 if m3.is_empty() { ".0" } else { m3 },
                 if m4.is_empty() { ".0" } else { m4 },
             );
             index = Some(5);
+            matches = Some(m);
         } else {
             // match date(time) based versioning
             let datetime_pattern = format!(
                 "{{^v?(\\d{{4}}(?:[.:-]?\\d{{2}}){{1,6}}(?:[.:-]?\\d{{1,3}}){{0,2}}){}$}}i",
                 MODIFIER_REGEX
             );
-            if let Some(m) = preg_match(&datetime_pattern, &version) {
-                matches = m;
-                version = preg_replace(
-                    php_regex!("{\\D}"),
-                    ".",
-                    matches[1].as_deref().unwrap_or(""),
-                );
+            if let Some(m) = preg_match(&datetime_pattern, &subject) {
+                version = preg_replace(php_regex!("{\\D}"), ".", m.get(1).unwrap_or_default());
                 index = Some(2);
+                matches = Some(m);
             }
         }
 
         // add version modifiers if a version was matched
         if let Some(idx) = index {
-            let mi = matches.get(idx).and_then(|o| o.as_deref()).unwrap_or("");
+            let matches = matches.as_ref().expect("index is set with the captures");
+            let mi = matches.get(idx).unwrap_or_default();
             if !mi.is_empty() {
                 if mi == "stable" {
                     return Ok(version);
                 }
-                let mi1 = matches
-                    .get(idx + 1)
-                    .and_then(|o| o.as_deref())
-                    .unwrap_or("");
+                let mi1 = matches.get(idx + 1).unwrap_or_default();
                 version = format!(
                     "{}-{}{}",
                     version,
@@ -179,12 +174,7 @@ impl VersionParser {
                 );
             }
 
-            if !matches
-                .get(idx + 2)
-                .and_then(|o| o.as_deref())
-                .unwrap_or("")
-                .is_empty()
-            {
+            if !matches.get(idx + 2).unwrap_or_default().is_empty() {
                 version = format!("{}-dev", version);
             }
 
@@ -193,11 +183,11 @@ impl VersionParser {
 
         // match dev branches
         if let Some(match_) = preg_match(php_regex!("{(.*?)[.-]?dev$}i"), &version) {
-            let branch_name = match_[1].clone().unwrap_or_default();
+            let branch_name = match_.get(1).unwrap_or_default();
             // a branch ending with -dev is only valid if it is numeric
             // if it gets prefixed with dev- it means the branch name should
             // have had a dev- prefix already when passed to normalize
-            if let Ok(normalized) = self.normalize_branch(&branch_name)
+            if let Ok(normalized) = self.normalize_branch(branch_name)
                 && !normalized.starts_with("dev-")
             {
                 return Ok(normalized);
@@ -250,7 +240,7 @@ impl VersionParser {
             php_regex!("{^(?P<version>(\\d++\\.)*\\d++)(?:\\.x)?-dev$}i"),
             branch,
         ) {
-            let version = matches[1].clone().unwrap_or_default();
+            let version = matches.get(1).unwrap_or_default();
             return Some(format!("{}.", version));
         }
 
@@ -269,7 +259,7 @@ impl VersionParser {
         ) {
             let mut version = String::new();
             for i in [1usize, 2, 4, 6] {
-                if let Some(Some(m)) = matches.get(i) {
+                if let Some(m) = matches.get(i) {
                     version.push_str(&m.replace(['*', 'X'], "x"));
                 } else {
                     version.push_str(".x");
@@ -341,22 +331,18 @@ impl VersionParser {
             php_regex!("{^([^,\\s]++) ++as ++([^,\\s]++)$}"),
             &constraint,
         ) {
-            constraint = match_[1].clone().unwrap_or_default();
+            constraint = match_.get(1).unwrap_or_default().to_string();
         }
 
         // strip @stability flags, and keep it for later use
         let mut stability_modifier: Option<String> = None;
         let stab_pattern = format!("{{^([^,\\s]*?)@({})$}}i", STABILITIES_REGEX);
         if let Some(match_) = preg_match(&stab_pattern, &constraint) {
-            let m1 = match_[1].as_deref().unwrap_or("");
-            constraint = if !m1.is_empty() {
-                m1.to_string()
-            } else {
-                "*".to_string()
-            };
-            let m2 = match_[2].as_deref().unwrap_or("");
+            let m1 = match_.get(1).unwrap_or_default().to_string();
+            let m2 = match_.get(2).unwrap_or_default().to_string();
+            constraint = if !m1.is_empty() { m1 } else { "*".to_string() };
             if m2 != "stable" {
-                stability_modifier = Some(m2.to_string());
+                stability_modifier = Some(m2);
             }
         }
 
@@ -365,20 +351,12 @@ impl VersionParser {
             php_regex!("{^(dev-[^,\\s@]+?|[^,\\s@]+?\\.x-dev)#.+$}i"),
             &constraint,
         ) {
-            constraint = match_[1].clone().unwrap_or_default();
+            constraint = match_.get(1).unwrap_or_default().to_string();
         }
 
         if let Some(match_) = preg_match(php_regex!("{^(v)?[xX*](\\.[xX*])*$}i"), &constraint) {
-            let m1_nonempty = !match_
-                .get(1)
-                .and_then(|o| o.as_deref())
-                .unwrap_or("")
-                .is_empty();
-            let m2_nonempty = !match_
-                .get(2)
-                .and_then(|o| o.as_deref())
-                .unwrap_or("")
-                .is_empty();
+            let m1_nonempty = !match_.get(1).unwrap_or_default().is_empty();
+            let m2_nonempty = !match_.get(2).unwrap_or_default().is_empty();
             if m1_nonempty || m2_nonempty {
                 return Ok(vec![AnyConstraint::Simple(SimpleConstraint::new(
                     ">=".to_string(),
@@ -412,11 +390,11 @@ impl VersionParser {
             }
 
             // Work out which position in the version we are operating at
-            let mut position = if !matches[4].as_deref().unwrap_or("").is_empty() {
+            let mut position = if !matches.get(4).unwrap_or_default().is_empty() {
                 4
-            } else if !matches[3].as_deref().unwrap_or("").is_empty() {
+            } else if !matches.get(3).unwrap_or_default().is_empty() {
                 3
-            } else if !matches[2].as_deref().unwrap_or("").is_empty() {
+            } else if !matches.get(2).unwrap_or_default().is_empty() {
                 2
             } else {
                 1
@@ -424,14 +402,14 @@ impl VersionParser {
 
             // when matching 2.x-dev or 3.0.x-dev we have to shift the second or third number,
             // despite no second/third number matching above
-            if !matches[8].as_deref().unwrap_or("").is_empty() {
+            if !matches.get(8).unwrap_or_default().is_empty() {
                 position += 1;
             }
 
             // Calculate the stability suffix
-            let stability_suffix = if matches[5].as_deref().unwrap_or("").is_empty()
-                && matches[7].as_deref().unwrap_or("").is_empty()
-                && matches[8].as_deref().unwrap_or("").is_empty()
+            let stability_suffix = if matches.get(5).unwrap_or_default().is_empty()
+                && matches.get(7).unwrap_or_default().is_empty()
+                && matches.get(8).unwrap_or_default().is_empty()
             {
                 "-dev"
             } else {
@@ -447,7 +425,7 @@ impl VersionParser {
             let high_position = (position - 1).max(1);
             let high_version = format!(
                 "{}-dev",
-                self.manipulate_version_string(&matches, high_position, 1, "0")
+                self.manipulate_version_string(|i| matches.get(i), high_position, 1, "0")
                     .unwrap_or_default()
             );
             let upper_bound = SimpleConstraint::new("<".to_string(), high_version, None);
@@ -466,9 +444,9 @@ impl VersionParser {
         let caret_pattern = format!("{{^\\^{}($)}}i", version_regex);
         if let Some(matches) = preg_match(&caret_pattern, &constraint) {
             // Work out which position in the version we are operating at
-            let m1 = matches[1].as_deref().unwrap_or("");
-            let m2 = matches[2].as_deref().unwrap_or("");
-            let m3 = matches[3].as_deref().unwrap_or("");
+            let m1 = matches.get(1).unwrap_or_default();
+            let m2 = matches.get(2).unwrap_or_default();
+            let m3 = matches.get(3).unwrap_or_default();
             let position = if m1 != "0" || m2.is_empty() {
                 1
             } else if m2 != "0" || m3.is_empty() {
@@ -478,9 +456,9 @@ impl VersionParser {
             };
 
             // Calculate the stability suffix
-            let stability_suffix = if matches[5].as_deref().unwrap_or("").is_empty()
-                && matches[7].as_deref().unwrap_or("").is_empty()
-                && matches[8].as_deref().unwrap_or("").is_empty()
+            let stability_suffix = if matches.get(5).unwrap_or_default().is_empty()
+                && matches.get(7).unwrap_or_default().is_empty()
+                && matches.get(8).unwrap_or_default().is_empty()
             {
                 "-dev"
             } else {
@@ -495,7 +473,7 @@ impl VersionParser {
             // but highPosition = 0 would be illegal
             let high_version = format!(
                 "{}-dev",
-                self.manipulate_version_string(&matches, position, 1, "0")
+                self.manipulate_version_string(|i| matches.get(i), position, 1, "0")
                     .unwrap_or_default()
             );
             let upper_bound = SimpleConstraint::new("<".to_string(), high_version, None);
@@ -515,9 +493,9 @@ impl VersionParser {
             php_regex!("{^v?(\\d++)(?:\\.(\\d++))?(?:\\.(\\d++))?(?:\\.[xX*])++$}"),
             &constraint,
         ) {
-            let position = if !matches[3].as_deref().unwrap_or("").is_empty() {
+            let position = if !matches.get(3).unwrap_or_default().is_empty() {
                 3
-            } else if !matches[2].as_deref().unwrap_or("").is_empty() {
+            } else if !matches.get(2).unwrap_or_default().is_empty() {
                 2
             } else {
                 1
@@ -525,12 +503,12 @@ impl VersionParser {
 
             let low_version = format!(
                 "{}-dev",
-                self.manipulate_version_string(&matches, position, 0, "0")
+                self.manipulate_version_string(|i| matches.get(i), position, 0, "0")
                     .unwrap_or_default()
             );
             let high_version = format!(
                 "{}-dev",
-                self.manipulate_version_string(&matches, position, 1, "0")
+                self.manipulate_version_string(|i| matches.get(i), position, 1, "0")
                     .unwrap_or_default()
             );
 
@@ -563,17 +541,17 @@ impl VersionParser {
             // matches[1]='from' string, matches[2..9]=from captures, matches[10]='to' string,
             // matches[11..18]=to captures, matches[19]='($)'
             // matches[6]=from stability, matches[8]=from dev, matches[9]=from wildcard-dev
-            let low_stability_suffix = if matches[6].as_deref().unwrap_or("").is_empty()
-                && matches[8].as_deref().unwrap_or("").is_empty()
-                && matches[9].as_deref().unwrap_or("").is_empty()
+            let low_stability_suffix = if matches.get(6).unwrap_or_default().is_empty()
+                && matches.get(8).unwrap_or_default().is_empty()
+                && matches.get(9).unwrap_or_default().is_empty()
             {
                 "-dev"
             } else {
                 ""
             };
 
-            let from_str = matches[1].clone().unwrap_or_default(); // matches['from']
-            let low_version = self.normalize(&from_str, None)?;
+            let from_str = matches.get(1).unwrap_or_default(); // matches['from']
+            let low_version = self.normalize(from_str, None)?;
             let lower_bound = SimpleConstraint::new(
                 ">=".to_string(),
                 format!("{}{}", low_version, low_stability_suffix),
@@ -581,37 +559,38 @@ impl VersionParser {
             );
 
             // PHP's empty() on "0" returns true, but here we only check for truly empty/missing
-            let empty = |x: &Option<String>| -> bool { x.as_deref().is_none_or(|s| s.is_empty()) };
+            let empty = |x: Option<&str>| -> bool { x.is_none_or(|s| s.is_empty()) };
 
             // matches[12]=to minor, matches[13]=to patch, matches[15]=to stability,
             // matches[17]=to dev, matches[18]=to wildcard-dev
-            let upper_bound: SimpleConstraint = if (!empty(&matches[12]) && !empty(&matches[13]))
-                || !matches[15].as_deref().unwrap_or("").is_empty()
-                || !matches[17].as_deref().unwrap_or("").is_empty()
-                || !matches[18].as_deref().unwrap_or("").is_empty()
+            let upper_bound: SimpleConstraint = if (!empty(matches.get(12))
+                && !empty(matches.get(13)))
+                || !matches.get(15).unwrap_or_default().is_empty()
+                || !matches.get(17).unwrap_or_default().is_empty()
+                || !matches.get(18).unwrap_or_default().is_empty()
             {
-                let to_str = matches[10].clone().unwrap_or_default(); // matches['to']
-                let hv = self.normalize(&to_str, None)?;
+                let to_str = matches.get(10).unwrap_or_default(); // matches['to']
+                let hv = self.normalize(to_str, None)?;
                 SimpleConstraint::new("<=".to_string(), hv, None)
             } else {
                 // matches[11]=to major, matches[12]=to minor, matches[13]=to patch,
                 // matches[14]=to fourth
-                let high_match = vec![
-                    Some(String::new()),
-                    matches[11].clone(),
-                    matches[12].clone(),
-                    matches[13].clone(),
-                    matches[14].clone(),
+                let high_match = [
+                    Some(""),
+                    matches.get(11),
+                    matches.get(12),
+                    matches.get(13),
+                    matches.get(14),
                 ];
 
                 // validate to version
-                let to_str = matches[10].clone().unwrap_or_default(); // matches['to']
-                self.normalize(&to_str, None)?;
+                let to_str = matches.get(10).unwrap_or_default(); // matches['to']
+                self.normalize(to_str, None)?;
 
-                let position = if empty(&matches[12]) { 1 } else { 2 };
+                let position = if empty(matches.get(12)) { 1 } else { 2 };
                 let hv = format!(
                     "{}-dev",
-                    self.manipulate_version_string(&high_match, position, 1, "0")
+                    self.manipulate_version_string(|i| high_match[i], position, 1, "0")
                         .unwrap_or_default()
                 );
                 SimpleConstraint::new("<".to_string(), hv, None)
@@ -626,8 +605,8 @@ impl VersionParser {
         // Basic Comparators
         if let Some(match_) = preg_match(php_regex!("{^(<>|!=|>=?|<=?|==?)?\\s*(.*)}"), &constraint)
         {
-            let version_str = match_[2].clone().unwrap_or_default();
-            let op_str = match_[1].clone().unwrap_or_default();
+            let version_str = match_.get(2).unwrap_or_default().to_string();
+            let op_str = match_.get(1).unwrap_or_default().to_string();
 
             let version_result: anyhow::Result<String> = match self.normalize(&version_str, None) {
                 Ok(v) => Ok(v),
@@ -692,40 +671,15 @@ impl VersionParser {
         anyhow::bail!("Could not parse version constraint {}", constraint)
     }
 
-    fn manipulate_version_string(
+    fn manipulate_version_string<'a>(
         &self,
-        matches: &[Option<String>],
+        matches: impl Fn(usize) -> Option<&'a str>,
         position: usize,
         increment: i64,
         pad: &str,
     ) -> Option<String> {
-        let mut parts: [i64; 5] = [
-            0,
-            matches
-                .get(1)
-                .and_then(|o| o.as_deref())
-                .unwrap_or("0")
-                .parse()
-                .unwrap_or(0),
-            matches
-                .get(2)
-                .and_then(|o| o.as_deref())
-                .unwrap_or("0")
-                .parse()
-                .unwrap_or(0),
-            matches
-                .get(3)
-                .and_then(|o| o.as_deref())
-                .unwrap_or("0")
-                .parse()
-                .unwrap_or(0),
-            matches
-                .get(4)
-                .and_then(|o| o.as_deref())
-                .unwrap_or("0")
-                .parse()
-                .unwrap_or(0),
-        ];
+        let part = |i: usize| -> i64 { matches(i).unwrap_or("0").parse().unwrap_or(0) };
+        let mut parts: [i64; 5] = [0, part(1), part(2), part(3), part(4)];
         let pad_val: i64 = pad.parse().unwrap_or(0);
         let mut position = position;
 
