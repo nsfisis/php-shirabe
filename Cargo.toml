@@ -30,6 +30,7 @@ async-trait = "0.1.89"
 base64 = "0.22.1"
 bzip2 = "0.6.1"
 chrono = { version = "0.4.44", features = ["serde"] }
+criterion = { version = "0.8.2", features = ["async_tokio", "html_reports"] }
 fastrand = "2.4.1"
 flate2 = "1.1.9"
 futures = "0.3.32"

@@ -40,9 +40,14 @@ tracing-subscriber.workspace = true
 url.workspace = true
 
 [dev-dependencies]
+criterion.workspace = true
 mockall.workspace = true
 serial_test.workspace = true
 tempfile.workspace = true
+
+[[bench]]
+name = "process_executor"
+harness = false
 
 [lints]
 workspace = true
