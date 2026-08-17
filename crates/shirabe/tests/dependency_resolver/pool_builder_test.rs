@@ -19,7 +19,7 @@ use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterface
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_factory::RepositoryFactory;
 use shirabe::repository::repository_set::{RepositorySet, RootAliasInput};
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match, preg_split_delim_capture};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_split_delim_capture};
 use std::path::PathBuf;
 
 /// Maps the PHP `$loadPackage` closure: pops the optional `id` from the data, loads the
@@ -137,7 +137,7 @@ fn get_integration_tests(fixtures_dir: &std::path::Path) -> IndexMap<String, Int
     for file in files {
         let file = file.to_str().unwrap().to_string();
 
-        if preg_match(php_regex!(r"/\.test$/"), &file).is_none() {
+        if !preg_is_match(php_regex!(r"/\.test$/"), &file) {
             continue;
         }
 

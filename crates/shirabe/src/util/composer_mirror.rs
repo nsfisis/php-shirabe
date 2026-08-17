@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/ComposerMirror.php
 
-use shirabe_php_shim::{hash, php_regex, preg_match, preg_replace};
+use shirabe_php_shim::{hash, php_regex, preg_is_match, preg_match, preg_replace};
 
 pub struct ComposerMirror;
 
@@ -14,7 +14,7 @@ impl ComposerMirror {
         pretty_version: Option<&str>,
     ) -> String {
         let reference = reference.map(|r| {
-            if preg_match(php_regex!(r"{^([a-f0-9]*|%reference%)$}"), r).is_some() {
+            if preg_is_match(php_regex!(r"{^([a-f0-9]*|%reference%)$}"), r) {
                 r.to_string()
             } else {
                 hash("md5", r)

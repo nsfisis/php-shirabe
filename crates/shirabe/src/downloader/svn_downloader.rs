@@ -16,8 +16,8 @@ use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, preg_match, preg_replace,
-    preg_split, version_compare,
+    CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, preg_is_match,
+    preg_match, preg_replace, preg_split, version_compare,
 };
 
 #[derive(Debug)]
@@ -353,8 +353,8 @@ impl VcsDownloader for SvnDownloader {
         to_reference: &str,
         path: &str,
     ) -> anyhow::Result<String> {
-        if preg_match(php_regex!(r"{@(\d+)$}"), from_reference).is_some()
-            && preg_match(php_regex!(r"{@(\d+)$}"), to_reference).is_some()
+        if preg_is_match(php_regex!(r"{@(\d+)$}"), from_reference)
+            && preg_is_match(php_regex!(r"{@(\d+)$}"), to_reference)
         {
             // retrieve the svn base url from the checkout folder
             let command = vec![
@@ -452,13 +452,11 @@ impl ChangeReportInterface for SvnDownloader {
             Some(path),
         );
 
-        Ok(
-            if preg_match(php_regex!("{^ *[^X ] +}m"), &output).is_some() {
-                Some(output)
-            } else {
-                None
-            },
-        )
+        Ok(if preg_is_match(php_regex!("{^ *[^X ] +}m"), &output) {
+            Some(output)
+        } else {
+            None
+        })
     }
 }
 

@@ -29,8 +29,8 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, file_exists, get_class, hash, implode, ini_get, is_array,
-    is_callable, is_object, is_string, krsort, php_regex, preg_match, preg_quote, preg_replace,
-    preg_replace_callback, realpath, spl_autoload_functions, spl_autoload_register,
+    is_callable, is_object, is_string, krsort, php_regex, preg_is_match, preg_match, preg_quote,
+    preg_replace, preg_replace_callback, realpath, spl_autoload_functions, spl_autoload_register,
     spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos, strtoupper, substr,
     trim,
 };
@@ -922,12 +922,10 @@ try {{
                             .get_binaries();
                         if !possible_local_binaries.is_empty() {
                             for local_exec in &possible_local_binaries {
-                                if preg_match(
+                                if preg_is_match(
                                     format!("{{\\b{}$}}", preg_quote(&callable_str, None)),
                                     local_exec,
-                                )
-                                .is_some()
-                                {
+                                ) {
                                     let caller =
                                         BinaryInstaller::determine_binary_caller(local_exec);
                                     exec = preg_replace(

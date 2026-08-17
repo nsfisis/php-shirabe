@@ -4,7 +4,9 @@ use crate::constraint::AnyConstraint;
 use crate::constraint::MatchAllConstraint;
 use crate::constraint::MultiConstraint;
 use crate::constraint::SimpleConstraint;
-use shirabe_php_shim::{php_regex, preg_match, preg_quote, preg_replace, preg_split};
+use shirabe_php_shim::{
+    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_split,
+};
 
 // Regex to match pre-release data (sort of).
 //
@@ -194,30 +196,26 @@ impl VersionParser {
             }
         }
 
-        let extra_message = if preg_match(
+        let extra_message = if preg_is_match(
             format!(
                 "{{ +as +{}(?:@(?:{}))?$}}",
                 preg_quote(&version, None),
                 STABILITIES_REGEX
             ),
             &full_version,
-        )
-        .is_some()
-        {
+        ) {
             format!(
                 " in \"{}\", the alias must be an exact version",
                 full_version
             )
-        } else if preg_match(
+        } else if preg_is_match(
             format!(
                 "{{^{}(?:@(?:{}))?  +as +}}",
                 preg_quote(&version, None),
                 STABILITIES_REGEX
             ),
             &full_version,
-        )
-        .is_some()
-        {
+        ) {
             format!(
                 " in \"{}\", the alias source must be an exact version, if it is a branch name \
                 you should prefix it with dev-",
@@ -615,7 +613,7 @@ impl VersionParser {
                     // dev-foobar except if the constraint uses a known operator, in which
                     // case it must be a parse error
                     if version_str.ends_with("-dev")
-                        && preg_match(php_regex!("{^[0-9a-zA-Z-./]+$}"), &version_str).is_some()
+                        && preg_is_match(php_regex!("{^[0-9a-zA-Z-./]+$}"), &version_str)
                     {
                         self.normalize(
                             &format!("dev-{}", &version_str[..version_str.len() - 4]),
@@ -640,12 +638,10 @@ impl VersionParser {
                 }
                 if op == "<" || op == ">=" {
                     let modifier_pattern = format!("{{-{}$}}", MODIFIER_REGEX);
-                    if preg_match(
+                    if !preg_is_match(
                         &modifier_pattern,
                         &shirabe_php_shim::strtolower(&version_str),
-                    )
-                    .is_none()
-                        && !version_str.starts_with("dev-")
+                    ) && !version_str.starts_with("dev-")
                     {
                         version = format!("{}-dev", version);
                     }

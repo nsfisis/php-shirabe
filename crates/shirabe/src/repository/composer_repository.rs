@@ -43,7 +43,7 @@ use shirabe_php_shim::{
     json_decode_assoc, parse_url, php_regex, preg_split, realpath, strtolower, strtr, urlencode,
     var_export,
 };
-use shirabe_php_shim::{Catch as _, preg_grep, preg_match, preg_replace};
+use shirabe_php_shim::{Catch as _, preg_grep, preg_is_match, preg_match, preg_replace};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
@@ -161,7 +161,7 @@ impl ComposerRepository {
             .and_then(|v| v.as_string())
             .unwrap_or("")
             .to_string();
-        if preg_match(php_regex!(r"{^[\w.]+\??://}"), &url_str).is_none() {
+        if !preg_is_match(php_regex!(r"{^[\w.]+\??://}"), &url_str) {
             if let Some(local_file_path) = realpath(&url_str) {
                 // it is a local path, add file scheme
                 repo_config.insert(
@@ -2708,7 +2708,7 @@ impl ComposerRepository {
         // url-encode $ signs in URLs as bad proxies choke on them
         if let Some(pos) = filename.find('$')
             && pos > 0
-            && preg_match(php_regex!(r"{^https?://}i"), &filename).is_some()
+            && preg_is_match(php_regex!(r"{^https?://}i"), &filename)
         {
             filename = format!("{}%24{}", &filename[..pos], &filename[pos + 1..]);
         }
@@ -3307,7 +3307,7 @@ impl ComposerRepository {
 
         if let Some(ref patterns) = self.available_package_patterns {
             for provider_regex in patterns.iter() {
-                if preg_match(provider_regex, name).is_some() {
+                if preg_is_match(provider_regex, name) {
                     return Ok(true);
                 }
             }

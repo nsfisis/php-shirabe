@@ -2,7 +2,7 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::HelperSet;
-use shirabe_php_shim::{php_regex, preg_match, preg_replace};
+use shirabe_php_shim::{php_regex, preg_is_match, preg_replace};
 use shirabe_symfony_string::unicode_string::UnicodeString;
 
 /// Helper is the base class for all helper classes.
@@ -40,7 +40,7 @@ impl Helper {
     /// Returns the width of a string, using mb_strwidth if it is available.
     /// The width is how many characters positions the string will use.
     pub fn width(string: &str) -> i64 {
-        if preg_match(php_regex!("//u"), string).is_some() {
+        if preg_is_match(php_regex!("//u"), string) {
             return UnicodeString::new(string).width(false);
         }
 
@@ -56,7 +56,7 @@ impl Helper {
     /// Returns the length of a string, using mb_strlen if it is available.
     /// The length is related to how many bytes the string will use.
     pub fn length(string: &str) -> i64 {
-        if preg_match(php_regex!("//u"), string).is_some() {
+        if preg_is_match(php_regex!("//u"), string) {
             return UnicodeString::new(string).length();
         }
 

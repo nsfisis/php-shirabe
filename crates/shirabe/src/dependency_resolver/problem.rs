@@ -12,8 +12,8 @@ use crate::repository::RepositorySet;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, extension_loaded, implode, loosely_compare, php_regex,
-    preg_match, preg_replace, spl_object_hash, sprintf, str_replace, stripos, strpos, strtolower,
-    substr, substr_count, version_compare,
+    preg_is_match, preg_match, preg_replace, spl_object_hash, sprintf, str_replace, stripos,
+    strpos, strtolower, substr, substr_count, version_compare,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
@@ -556,7 +556,7 @@ impl Problem {
         if let Some(c) = constraint
             && c.is_constraint()
             && c.get_operator() == Some(CmpOp::Eq)
-            && preg_match(php_regex!(r"{^dev-.*#.*}"), &c.get_pretty_string()).is_some()
+            && preg_is_match(php_regex!(r"{^dev-.*#.*}"), &c.get_pretty_string())
         {
             let new_constraint = preg_replace(
                 php_regex!(r"{ +as +([^,\s|]+)$}"),
@@ -990,7 +990,7 @@ impl Problem {
             ));
         }
 
-        if preg_match(php_regex!(r"{^[A-Za-z0-9_./-]+$}"), package_name).is_none() {
+        if !preg_is_match(php_regex!(r"{^[A-Za-z0-9_./-]+$}"), package_name) {
             let illegal_chars = preg_replace(php_regex!(r"{[A-Za-z0-9_./-]+}"), "", package_name);
 
             return Ok((
@@ -1380,7 +1380,7 @@ impl Problem {
             && c.get_operator() == Some(CmpOp::Eq)
             && !c.get_version().starts_with("dev-")
         {
-            if preg_match(php_regex!(r"{^\d+(?:\.\d+)*$}"), &c.get_pretty_string()).is_none() {
+            if !preg_is_match(php_regex!(r"{^\d+(?:\.\d+)*$}"), &c.get_pretty_string()) {
                 return format!(" {} (exact version match)", c.get_pretty_string());
             }
 

@@ -23,7 +23,8 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
     array_slice, asort, explode, file_get_contents, implode, in_array_strict, is_array, is_file,
-    is_numeric, json_decode_assoc, levenshtein, php_regex, preg_match, strlen, strpos, trim,
+    is_numeric, json_decode_assoc, levenshtein, php_regex, preg_is_match, preg_match, strlen,
+    strpos, trim,
 };
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -143,11 +144,10 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
             for mut requirement in requires_norm {
                 if requirement.contains_key("version")
-                    && preg_match(
+                    && preg_is_match(
                         php_regex!(r"{^\d+(\.\d+)?$}"),
                         requirement.get("version").map(|s| s.as_str()).unwrap_or(""),
                     )
-                    .is_some()
                 {
                     io.write_error3(
                         &format!(

@@ -16,8 +16,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, preg_match,
-    preg_replace, realpath, sys_get_temp_dir,
+    InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, preg_is_match,
+    preg_match, preg_replace, realpath, sys_get_temp_dir,
 };
 use shirabe_php_shim::{PhpMixed, php_regex};
 
@@ -98,7 +98,7 @@ impl GitDriver {
                 .into());
             }
 
-            if preg_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), &self.inner.url).is_some() {
+            if preg_is_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), &self.inner.url) {
                 return Err(InvalidArgumentException::new(format!(
                     "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
                     self.inner.url
@@ -343,7 +343,7 @@ impl GitDriver {
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
-                    && preg_match(php_regex!(r"{^ *[^/]+/HEAD }"), &branch).is_none()
+                    && !preg_is_match(php_regex!(r"{^ *[^/]+/HEAD }"), &branch)
                     && let Some(caps) = preg_match(
                         php_regex!(r"{^(?:\* )? *(\S+) *([a-f0-9]+)(?: .*)?$}"),
                         &branch,
@@ -367,12 +367,10 @@ impl GitDriver {
         url: &str,
         deep: bool,
     ) -> anyhow::Result<bool> {
-        if preg_match(
+        if preg_is_match(
             php_regex!(r"#(^git://|\.git/?$|git(?:olite)?@|//git\.|//github.com/)#i"),
             url,
-        )
-        .is_some()
-        {
+        ) {
             return Ok(true);
         }
 

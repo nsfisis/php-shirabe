@@ -10,7 +10,7 @@ use crate::package::loader::ValidatingArrayLoader;
 use indexmap::IndexMap;
 use serde::de::Error as _;
 use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match, preg_replace};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_replace};
 use shirabe_spdx_licenses::SpdxLicenses;
 
 #[derive(Debug)]
@@ -117,16 +117,13 @@ impl ConfigValidator {
             for license in &licenses {
                 let spdx_license = license_validator.get_license_by_identifier(license);
                 if spdx_license.is_some_and(|l| l.is_deprecated_license_id) {
-                    if preg_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?\+$}i"), license).is_some()
-                    {
+                    if preg_is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?\+$}i"), license) {
                         warnings.push(format!(
                             "License \"{}\" is a deprecated SPDX license identifier, use \"{}-or-later\" instead",
                             license,
                             license.replace('+', "")
                         ));
-                    } else if preg_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?$}i"), license)
-                        .is_some()
-                    {
+                    } else if preg_is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?$}i"), license) {
                         warnings.push(format!(
                             "License \"{}\" is a deprecated SPDX license identifier, use \"{}-only\" or \"{}-or-later\" instead",
                             license, license, license
@@ -147,7 +144,7 @@ impl ConfigValidator {
 
         if let Some(PhpMixed::String(name)) = manifest.get("name")
             && !name.is_empty()
-            && preg_match(php_regex!(r"{[A-Z]}"), name).is_some()
+            && preg_is_match(php_regex!(r"{[A-Z]}"), name)
         {
             let suggest_name = preg_replace(
                 php_regex!(r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
@@ -224,7 +221,7 @@ impl ConfigValidator {
         packages.extend(require_dev);
         for (package, version) in &packages {
             if let PhpMixed::String(version_str) = version
-                && preg_match(php_regex!(r"{#}"), version_str).is_some()
+                && preg_is_match(php_regex!(r"{#}"), version_str)
             {
                 warnings.push(format!(
                         "The package \"{}\" is pointing to a commit-ref, this is bad practice and can cause unforeseen issues.",

@@ -11,8 +11,9 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, PregMatches, RuntimeException, array_key_exists, array_merge,
     array_search_mixed, array_unique, empty, filter_var_url, implode, in_array_loose,
-    in_array_strict, intval, is_array, is_string, parse_url, php_regex, php_to_string, preg_match,
-    preg_replace_callback, rtrim, strtolower, strtoupper, strtr, substr, trigger_error,
+    in_array_strict, intval, is_array, is_string, parse_url, php_regex, php_to_string,
+    preg_is_match, preg_match, preg_replace_callback, rtrim, strtolower, strtoupper, strtr, substr,
+    trigger_error,
 };
 
 use crate::advisory::Auditor;
@@ -481,11 +482,10 @@ impl Config {
                     .unwrap_or("")
                     .to_string();
                 if is_composer
-                    && preg_match(
+                    && preg_is_match(
                         php_regex!(r"{^https?://(?:[a-z0-9-.]+\.)?packagist.org(/|$)}"),
                         &repo_url,
                     )
-                    .is_some()
                 {
                     self.disable_repo_by_name("packagist.org");
                 }
@@ -971,7 +971,7 @@ impl Config {
     ///
     /// Since the dirs might not exist yet we can not call realpath or it will fail.
     fn realpath(&self, path: &str) -> String {
-        if preg_match(php_regex!(r"{^(?:/|[a-z]:|[a-z0-9.]+://|\\\\\\\\)}i"), path).is_some() {
+        if preg_is_match(php_regex!(r"{^(?:/|[a-z]:|[a-z0-9.]+://|\\\\\\\\)}i"), path) {
             return path.to_string();
         }
 
@@ -1013,7 +1013,7 @@ impl Config {
         repo_options: &IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         // Return right away if the URL is malformed or custom (see issue #5173), but only for non-HTTP(S) URLs
-        if !filter_var_url(url) && preg_match(php_regex!(r"{^https?://}"), url).is_none() {
+        if !filter_var_url(url) && !preg_is_match(php_regex!(r"{^https?://}"), url) {
             return Ok(());
         }
 

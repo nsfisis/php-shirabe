@@ -19,8 +19,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, extension_loaded,
-    file_get_contents, function_exists, implode, is_numeric, php_regex, preg_match, preg_replace,
-    rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
+    file_get_contents, function_exists, implode, is_numeric, php_regex, preg_is_match, preg_match,
+    preg_replace, rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -485,7 +485,7 @@ impl HttpDownloader {
             return false;
         }
 
-        if preg_match(php_regex!(r"{^https?://}i"), url).is_none() {
+        if !preg_is_match(php_regex!(r"{^https?://}i"), url) {
             return false;
         }
 

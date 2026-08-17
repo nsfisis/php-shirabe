@@ -32,7 +32,7 @@ use crate::util::http::Response;
 use crate::util::{AuthHelper, PromptAuthResult, StoreAuth};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, in_array_loose, in_array_strict, parse_url, php_regex, preg_match, preg_quote,
+    PhpMixed, in_array_loose, in_array_strict, parse_url, php_regex, preg_is_match, preg_quote,
     preg_replace, rename, strpos, substr, unlink_silent,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -146,7 +146,7 @@ impl CurlDownloader {
 
         // check URL can be accessed (i.e. is not insecure), but allow insecure Packagist calls to
         // $hashed providers as file integrity is verified with sha256
-        if preg_match(php_regex!(r"{^http://(repo\.)?packagist\.org/p/}"), url).is_none()
+        if !preg_is_match(php_regex!(r"{^http://(repo\.)?packagist\.org/p/}"), url)
             || (strpos(url, "$").is_none() && strpos(url, "%24").is_none())
         {
             self.config.borrow_mut().prohibit_url_by_config(
@@ -746,14 +746,13 @@ impl CurlDownloader {
             && substr(url, -4, None) == ".zip"
             && (location_header.is_none()
                 || substr(location_header.as_deref().unwrap_or(""), -4, None) != ".zip")
-            && preg_match(
+            && preg_is_match(
                 php_regex!(r"{^text/html\b}i"),
                 &response
                     .inner
                     .get_header("content-type")
                     .unwrap_or_default(),
             )
-            .is_some()
         {
             needs_auth_retry = Some("Bitbucket requires authentication and it was not provided");
         }

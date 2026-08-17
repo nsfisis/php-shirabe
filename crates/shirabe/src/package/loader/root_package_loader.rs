@@ -16,8 +16,8 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, php_regex, preg_match, preg_replace,
-    preg_split, strtolower,
+    PhpMixed, RuntimeException, UnexpectedValueException, php_regex, preg_is_match, preg_match,
+    preg_replace, preg_split, strtolower,
 };
 
 #[derive(Debug)]
@@ -337,7 +337,7 @@ impl RootPackageLoader {
             for constraint in &constraints {
                 let req_version_stripped =
                     preg_replace(php_regex!(r"{^([^,\s@]+) as .+$}"), "$1", constraint);
-                if preg_match(php_regex!(r"{^[^,\s@]+$}"), &req_version_stripped).is_some() {
+                if preg_is_match(php_regex!(r"{^[^,\s@]+$}"), &req_version_stripped) {
                     let stability_name = VersionParser::parse_stability(&req_version_stripped);
                     if stability_name != "stable" {
                         let name = strtolower(req_name);

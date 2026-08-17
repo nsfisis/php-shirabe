@@ -6,7 +6,7 @@ use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, defined,
     file_exists, file_get_contents, fstat, function_exists, getcwd, getenv, ini_get, is_readable,
     mb_strlen, php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid, posix_isatty,
-    preg_match, preg_replace_callback, putenv, putenv_clear, realpath, stream_isatty, stripos,
+    preg_is_match, preg_replace_callback, putenv, putenv_clear, realpath, stream_isatty, stripos,
     strlen, strtoupper, substr, usleep,
 };
 use std::sync::Mutex;
@@ -83,7 +83,7 @@ impl Platform {
 
     /// Parses tildes and environment variables in paths.
     pub fn expand_path(path: &str) -> String {
-        if preg_match(php_regex!(r"#^~[\\/]#"), path).is_some() {
+        if preg_is_match(php_regex!(r"#^~[\\/]#"), path) {
             return format!(
                 "{}{}",
                 Self::get_user_directory().unwrap(),

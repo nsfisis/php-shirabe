@@ -11,7 +11,7 @@ use shirabe::package::loader::{ArrayLoader, LoaderInterface};
 use shirabe::package::version::version_parser::VersionParser;
 use shirabe::repository::handle::LockArrayRepositoryHandle;
 use shirabe::repository::lock_array_repository::LockArrayRepository;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match, preg_split_delim_capture};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_split_delim_capture};
 use std::path::PathBuf;
 
 fn load_package(package_data: &PhpMixed) -> BasePackageHandle {
@@ -140,7 +140,7 @@ fn provide_integration_tests() -> IndexMap<
     for file in files {
         let file = file.to_str().unwrap().to_string();
 
-        if preg_match(php_regex!(r"/\.test$/"), &file).is_none() {
+        if !preg_is_match(php_regex!(r"/\.test$/"), &file) {
             continue;
         }
 

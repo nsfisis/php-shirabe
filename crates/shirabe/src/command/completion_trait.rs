@@ -11,7 +11,7 @@ use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use crate::repository::repository_interface::{SEARCH_NAME, SEARCH_VENDOR, SearchResult};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match, preg_quote};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_quote};
 
 /// Adds completion to arguments and options.
 ///
@@ -256,12 +256,10 @@ pub trait CompletionTrait: BaseCommand {
     /// platform packages from the ones available on the currently-running PHP
     fn suggest_available_package_incl_platform(&self) -> SuggestedValues {
         SuggestedValues::Closure(Box::new(|this, input, suggestions| {
-            let matches = if preg_match(
+            let matches = if preg_is_match(
                 php_regex!(r"{^(ext|lib|php)(-|$)|^com}"),
                 &input.get_completion_value(),
-            )
-            .is_some()
-            {
+            ) {
                 this.suggest_platform_package()
                     .call(this, input, suggestions)?
             } else {
@@ -296,7 +294,7 @@ pub trait CompletionTrait: BaseCommand {
             let mut names: Vec<String> = vec![];
             for package in repos.get_packages()? {
                 let name = package.get_name();
-                if preg_match(pattern.clone(), &name).is_some() {
+                if preg_is_match(pattern.clone(), &name) {
                     names.push(name);
                 }
             }

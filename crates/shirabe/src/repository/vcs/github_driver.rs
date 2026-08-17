@@ -18,8 +18,8 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_map,
     array_search_mixed, base64_decode, basename, empty, explode, extension_loaded, in_array_loose,
-    parse_url, php_regex, preg_match, preg_replace, preg_split, strpos, strtolower, substr, trim,
-    urlencode,
+    parse_url, php_regex, preg_is_match, preg_match, preg_replace, preg_split, strpos, strtolower,
+    substr, trim, urlencode,
 };
 
 #[derive(Debug)]
@@ -642,9 +642,7 @@ impl GitHubDriver {
                     };
 
                     if bits.scheme.is_none() && bits.host.is_none() {
-                        if preg_match(php_regex!(r"{^[a-z0-9-]++\.[a-z]{2,3}$}"), &item_url)
-                            .is_some()
-                        {
+                        if preg_is_match(php_regex!(r"{^[a-z0-9-]++\.[a-z]{2,3}$}"), &item_url) {
                             result[key_idx].insert(
                                 "url".to_string(),
                                 PhpMixed::String(format!("https://{}", item_url)),

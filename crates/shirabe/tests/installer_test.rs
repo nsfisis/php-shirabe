@@ -42,7 +42,9 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match, preg_replace, preg_split_delim_capture};
+use shirabe_php_shim::{
+    PhpMixed, php_regex, preg_is_match, preg_match, preg_replace, preg_split_delim_capture,
+};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_symfony_console::command::Command as SymfonyCommand;
@@ -691,7 +693,7 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
                     return;
                 }
                 if let Some(url) = repo.get("url").and_then(|u| u.as_str())
-                    && preg_match(php_regex!(r"{^file://[^/]}"), url).is_some()
+                    && preg_is_match(php_regex!(r"{^file://[^/]}"), url)
                 {
                     let new_url = format!("file://{}/{}", fixtures_str, &url[7..]);
                     repo["url"] = serde_json::Value::String(new_url);

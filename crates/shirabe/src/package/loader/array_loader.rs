@@ -19,8 +19,8 @@ use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, is_scalar, is_string,
-    json_encode, ltrim, php_regex, preg_match, preg_replace, stripos, strpos, strtolower, strval,
-    substr, trigger_error, trim,
+    json_encode, ltrim, php_regex, preg_is_match, preg_replace, stripos, strpos, strtolower,
+    strval, substr, trigger_error, trim,
 };
 
 #[derive(Debug)]
@@ -339,7 +339,7 @@ impl ArrayLoader {
             && !shirabe_php_shim::empty(time_value)
         {
             let time_str = time_value.as_string().unwrap_or("");
-            let time = if preg_match(php_regex!(r"/^\d++$/D"), time_str).is_some() {
+            let time = if preg_is_match(php_regex!(r"/^\d++$/D"), time_str) {
                 format!("@{}", time_str)
             } else {
                 time_str.to_string()

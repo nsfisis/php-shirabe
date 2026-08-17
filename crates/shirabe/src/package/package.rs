@@ -11,8 +11,8 @@ use crate::util::ComposerMirror;
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, LogicException, PhpMixed, PregMatches, php_regex, preg_match, preg_replace,
-    preg_replace_callback, strpos, trigger_error,
+    E_USER_DEPRECATED, LogicException, PhpMixed, PregMatches, php_regex, preg_is_match,
+    preg_replace, preg_replace_callback, strpos, trigger_error,
 };
 
 /// Mirror entry, e.g. `['url' => 'https://...', 'preferred' => true]`.
@@ -416,10 +416,12 @@ impl Package {
         // only bitbucket, github and gitlab have auto generated dist URLs that easily allow replacing the reference in the dist URL
         // TODO generalize this a bit for self-managed/on-prem versions? Some kind of replace token in dist urls which allow this?
         if self.get_dist_url().is_some()
-            && preg_match(php_regex!(
-                "{^https?://(?:(?:www\\.)?bitbucket\\.org|(api\\.)?github\\.com|(?:www\\.)?gitlab\\.com)/}i"
-            ), &self.get_dist_url().unwrap_or_default())
-            .is_some()
+            && preg_is_match(
+                php_regex!(
+                    "{^https?://(?:(?:www\\.)?bitbucket\\.org|(api\\.)?github\\.com|(?:www\\.)?gitlab\\.com)/}i"
+                ),
+                &self.get_dist_url().unwrap_or_default(),
+            )
         {
             self.set_dist_reference(Some(reference.clone()));
             // Regex pattern compatibility:

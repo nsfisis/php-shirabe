@@ -19,8 +19,8 @@ use indexmap::IndexMap;
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
-    array_slice_strs, explode, get_class, implode, is_string, php_regex, preg_match, preg_replace,
-    str_replace, strpos, strtolower, var_export,
+    array_slice_strs, explode, get_class, implode, is_string, php_regex, preg_is_match, preg_match,
+    preg_replace, str_replace, strpos, strtolower, var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 use std::sync::{LazyLock, Mutex};
@@ -1604,7 +1604,7 @@ impl PlatformRepository {
             return cached;
         }
 
-        let result = preg_match(Self::PLATFORM_PACKAGE_REGEX, name).is_some();
+        let result = preg_is_match(Self::PLATFORM_PACKAGE_REGEX, name);
         cache.insert(name.to_string(), result);
         result
     }

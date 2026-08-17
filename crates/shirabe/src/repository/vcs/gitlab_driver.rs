@@ -19,7 +19,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_search_mixed,
     array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array_loose, is_array,
-    is_string, ord, php_regex, preg_match, preg_replace, strpos, strtolower,
+    is_string, ord, php_regex, preg_is_match, preg_match, preg_replace, strpos, strtolower,
 };
 
 /// Driver for GitLab API, use the Git driver for local checkouts.
@@ -382,7 +382,7 @@ impl GitLabDriver {
 
         // Convert the root identifier to a cacheable commit id
         let mut identifier = identifier.to_string();
-        if preg_match(php_regex!(r"{[a-f0-9]{40}}i"), &identifier).is_none() {
+        if !preg_is_match(php_regex!(r"{[a-f0-9]{40}}i"), &identifier) {
             let branches = self.get_branches()?;
             if let Some(sha) = branches.get(&identifier) {
                 identifier = sha.clone();

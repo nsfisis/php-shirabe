@@ -5,7 +5,7 @@ use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Transaction;
 use crate::package::PackageInterfaceHandle;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PregMatches, php_regex, preg_match, preg_replace_callback};
+use shirabe_php_shim::{PregMatches, php_regex, preg_is_match, preg_replace_callback};
 
 #[derive(Debug)]
 pub struct LockTransaction {
@@ -158,9 +158,12 @@ impl LockTransaction {
 
             if package.get_dist_url().is_some()
                 && present_package.get_dist_reference().is_some()
-                && preg_match(php_regex!(
-                    r"{^https?://(?:(?:www\.)?bitbucket\.org|(api\.)?github\.com|(?:www\.)?gitlab\.com)/}i"
-                ), &package.get_dist_url().unwrap()).is_some()
+                && preg_is_match(
+                    php_regex!(
+                        r"{^https?://(?:(?:www\.)?bitbucket\.org|(api\.)?github\.com|(?:www\.)?gitlab\.com)/}i"
+                    ),
+                    &package.get_dist_url().unwrap(),
+                )
             {
                 // Regex pattern compatibility:
                 // The `regex` crate has no look-around, so `(?<=/|sha=)[a-f0-9]{40}(?=/|$)` is

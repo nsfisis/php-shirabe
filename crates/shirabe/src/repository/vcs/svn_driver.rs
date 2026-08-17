@@ -15,8 +15,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, php_regex, preg_match, preg_replace, stripos, strrpos, strtr,
-    substr, trim,
+    PhpMixed, RuntimeException, php_regex, preg_is_match, preg_match, preg_replace, stripos,
+    strrpos, strtr, substr, trim,
 };
 
 #[derive(Debug)]
@@ -153,7 +153,7 @@ impl SvnDriver {
     }
 
     fn should_cache(&self, identifier: &str) -> bool {
-        self.inner.cache.is_some() && preg_match(php_regex!(r"{@\d+$}"), identifier).is_some()
+        self.inner.cache.is_some() && preg_is_match(php_regex!(r"{@\d+$}"), identifier)
     }
 
     pub fn get_composer_information(
@@ -440,7 +440,7 @@ impl SvnDriver {
         deep: bool,
     ) -> anyhow::Result<bool> {
         let url = Self::normalize_url(url);
-        if preg_match(php_regex!(r"#(^svn://|^svn\+ssh://|svn\.)#i"), &url).is_some() {
+        if preg_is_match(php_regex!(r"#(^svn://|^svn\+ssh://|svn\.)#i"), &url) {
             return Ok(true);
         }
 

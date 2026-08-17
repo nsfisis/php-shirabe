@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::util::GitHub;
 use shirabe_php_shim::{
-    PhpMixed, in_array_strict, parse_url, php_regex, preg_match, preg_replace,
+    PhpMixed, in_array_strict, parse_url, php_regex, preg_is_match, preg_match, preg_replace,
     preg_replace_callback,
 };
 
@@ -168,7 +168,7 @@ impl Url {
                 let user = m.name("user").unwrap_or_default().to_string();
                 let prefix = m.name("prefix").unwrap_or_default().to_string();
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
-                Ok(if preg_match(GitHub::GITHUB_TOKEN_REGEX, &user).is_some() {
+                Ok(if preg_is_match(GitHub::GITHUB_TOKEN_REGEX, &user) {
                     format!("{}***:***@", prefix)
                 } else {
                     format!("{}{}:***@", prefix, user)

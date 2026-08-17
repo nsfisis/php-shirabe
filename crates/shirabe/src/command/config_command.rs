@@ -22,8 +22,8 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
     escapeshellcmd, exec, explode, file_exists, impl_php_class, implode, in_array_loose,
     in_array_strict, is_array, is_bool, is_dir, is_numeric, is_object, is_string, json_encode,
-    php_regex, preg_match, preg_replace, str_replace, strpos, strtolower, system, touch,
-    var_export,
+    php_regex, preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower, system,
+    touch, var_export,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
@@ -1449,7 +1449,7 @@ impl Command for ConfigCommand {
                     }
 
                     // Check if the header is in correct "Name: Value" format
-                    if preg_match(php_regex!("/^[^:]+:\\s*.+$/"), header).is_none() {
+                    if !preg_is_match(php_regex!("/^[^:]+:\\s*.+$/"), header) {
                         return Err(RuntimeException::new(format!(
                             "Header \"{}\" is not in \"Header-Name: Header-Value\" format",
                             header
@@ -1735,13 +1735,10 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "cache-files-maxsize".to_string(),
         (
             Box::new(|val| {
-                PhpMixed::Bool(
-                    preg_match(
-                        php_regex!("/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i"),
-                        val.as_string().unwrap_or(""),
-                    )
-                    .is_some(),
-                )
+                PhpMixed::Bool(preg_is_match(
+                    php_regex!("/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i"),
+                    val.as_string().unwrap_or(""),
+                ))
             }),
             Box::new(|val| val.clone()),
         ),

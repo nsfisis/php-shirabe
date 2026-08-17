@@ -5,7 +5,7 @@ use crate::exception::LogicException;
 use crate::question::Question;
 use crate::question::QuestionInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match};
 
 /// Represents a choice question.
 #[derive(Debug)]
@@ -122,12 +122,10 @@ impl ChoiceQuestion {
 
             let selected_choices: Vec<PhpMixed> = if multiselect {
                 // Check for a separated comma values
-                if preg_match(
+                if !preg_is_match(
                     php_regex!("/^[^,]+(?:,[^,]+)*$/"),
                     &shirabe_php_shim::strval(&selected),
-                )
-                .is_none()
-                {
+                ) {
                     return Err(InvalidArgumentException::new(shirabe_php_shim::sprintf(
                         &error_message,
                         std::slice::from_ref(&selected),

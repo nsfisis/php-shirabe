@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Question/StrictConfirmationQuestion.php
 
-use shirabe_php_shim::{PhpMixed, empty, is_bool, preg_match};
+use shirabe_php_shim::{PhpMixed, empty, is_bool, preg_is_match};
 use shirabe_symfony_console::exception::InvalidArgumentException;
 use shirabe_symfony_console::question::Question;
 use shirabe_symfony_console::question::QuestionInterface;
@@ -53,10 +53,10 @@ impl StrictConfirmationQuestion {
                 return default.clone();
             }
             if let PhpMixed::String(s) = &answer {
-                if preg_match(&true_regex, s).is_some() {
+                if preg_is_match(&true_regex, s) {
                     return PhpMixed::Bool(true);
                 }
-                if preg_match(&false_regex, s).is_some() {
+                if preg_is_match(&false_regex, s) {
                     return PhpMixed::Bool(false);
                 }
             }

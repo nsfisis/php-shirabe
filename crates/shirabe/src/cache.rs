@@ -9,8 +9,8 @@ use chrono::Utc;
 use shirabe_php_shim::{
     ErrorException, bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space,
     file_exists, file_get_contents, file_put_contents, filemtime, function_exists, hash_file,
-    is_dir, is_writable, mkdir, php_regex, preg_match, preg_replace, random_bytes, random_int,
-    rename, time, unlink,
+    is_dir, is_writable, mkdir, php_regex, preg_is_match, preg_match, preg_replace, random_bytes,
+    random_int, rename, time, unlink,
 };
 use shirabe_symfony_finder::Finder;
 use std::sync::Mutex;
@@ -94,11 +94,10 @@ impl Cache {
     }
 
     pub fn is_usable(path: &str) -> bool {
-        preg_match(
+        !preg_is_match(
             php_regex!(r"{(^|[\\\\/])(\$null|nul|NUL|/dev/null)([\\\\/]|$)}"),
             path,
         )
-        .is_none()
     }
 
     pub fn is_enabled(&mut self) -> bool {

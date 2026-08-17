@@ -28,7 +28,8 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
     array_map, array_merge, file_get_contents, filemtime, function_exists, hash, in_array_loose,
-    is_int, ksort, php_regex, preg_match, realpath, strcmp, strtolower, touch2, trim, usort,
+    is_int, ksort, php_regex, preg_is_match, preg_match, realpath, strcmp, strtolower, touch2,
+    trim, usort,
 };
 use shirabe_seld_json_lint::ParsingException;
 
@@ -823,7 +824,7 @@ impl Locker {
                             ),
                             None,
                         );
-                        if preg_match(php_regex!(r"{^\s*\d+\s*$}"), &output_str).is_some() {
+                        if preg_is_match(php_regex!(r"{^\s*\d+\s*$}"), &output_str) {
                             let ts = trim(&output_str, None).parse::<i64>().unwrap_or(0);
                             datetime = chrono::DateTime::from_timestamp(ts, 0);
                         }

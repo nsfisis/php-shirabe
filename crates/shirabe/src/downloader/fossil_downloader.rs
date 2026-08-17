@@ -13,7 +13,7 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, impl_php_class, php_regex, preg_match, preg_split,
+    PhpMixed, RuntimeException, impl_php_class, php_regex, preg_is_match, preg_split,
 };
 
 #[derive(Debug)]
@@ -228,7 +228,7 @@ impl VcsDownloader for FossilDownloader {
         };
 
         for line in lines {
-            if preg_match(&match_pattern, &line).is_some() {
+            if preg_is_match(&match_pattern, &line) {
                 break;
             }
             log.push_str(&line);

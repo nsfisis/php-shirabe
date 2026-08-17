@@ -10,7 +10,7 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PhpMixed, date_local, in_array_loose, php_regex, preg_match, stripos, strtolower,
+    PhpMixed, date_local, in_array_loose, php_regex, preg_is_match, preg_match, stripos, strtolower,
 };
 
 #[derive(Debug)]
@@ -336,7 +336,7 @@ impl GitHub {
 
     pub fn is_rate_limited(&self, headers: &[String]) -> bool {
         for header in headers {
-            if preg_match(php_regex!(r"{^x-ratelimit-remaining: *0$}i"), header.trim()).is_some() {
+            if preg_is_match(php_regex!(r"{^x-ratelimit-remaining: *0$}i"), header.trim()) {
                 return true;
             }
         }
@@ -346,7 +346,7 @@ impl GitHub {
 
     pub fn requires_sso(&self, headers: &[String]) -> bool {
         for header in headers {
-            if preg_match(php_regex!(r"{^x-github-sso: required}i"), header.trim()).is_some() {
+            if preg_is_match(php_regex!(r"{^x-github-sso: required}i"), header.trim()) {
                 return true;
             }
         }

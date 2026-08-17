@@ -13,8 +13,8 @@ use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     PhpMixed, PregMatches, RuntimeException, UnexpectedValueException, dirname, file_exists,
     file_get_contents, file_put_contents, is_dir, is_file, json_decode_assoc, json_decode_obj,
-    json_encode_ex, mkdir, php_regex, preg_match, preg_replace_callback, preg_replace2, realpath,
-    str_repeat, strlen, strpos, usleep,
+    json_encode_ex, mkdir, php_regex, preg_is_match, preg_match, preg_replace_callback,
+    preg_replace2, realpath, str_repeat, strlen, strpos, usleep,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
 
@@ -107,7 +107,7 @@ impl JsonFile {
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<Self> {
-        if http_downloader.is_none() && preg_match(php_regex!(r"{^https?://}i"), &path).is_some() {
+        if http_downloader.is_none() && preg_is_match(php_regex!(r"{^https?://}i"), &path) {
             return Err(InvalidArgumentException::new(
                 "http urls require a HttpDownloader instance to be passed".to_string(),
             )

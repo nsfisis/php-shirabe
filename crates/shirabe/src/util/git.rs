@@ -17,8 +17,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
     RuntimeException, array_map, clearstatcache, explode, implode, in_array_loose, in_array_strict,
-    is_dir, php_regex, preg_match, preg_quote, preg_replace, rawurldecode, rawurlencode,
-    str_replace_array, strlen, strpos, substr, trim, version_compare,
+    is_dir, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, rawurldecode,
+    rawurlencode, str_replace_array, strlen, strpos, substr, trim, version_compare,
 };
 use std::sync::Mutex;
 
@@ -209,7 +209,7 @@ impl Git {
             status
         };
 
-        if preg_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), url).is_some() {
+        if preg_is_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), url) {
             return Err(InvalidArgumentException::new(format!(
                 "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
                 url
@@ -310,21 +310,19 @@ impl Git {
                 .collect(),
             _ => vec![],
         };
-        let bypass_ssh_for_github = preg_match(
+        let bypass_ssh_for_github = preg_is_match(
             format!(
                 "{{^git@{}:(.+?)\\.git$}}i",
                 Self::get_github_domains_regex(&self.config.borrow())
             ),
             url,
-        )
-        .is_some()
-            && !in_array_strict(
-                "ssh".to_string(),
-                &protocols_list
-                    .iter()
-                    .map(|s| PhpMixed::String(s.clone()))
-                    .collect::<Vec<_>>(),
-            );
+        ) && !in_array_strict(
+            "ssh".to_string(),
+            &protocols_list
+                .iter()
+                .map(|s| PhpMixed::String(s.clone()))
+                .collect::<Vec<_>>(),
+        );
 
         let mut auth: Option<IndexMap<String, Option<String>>> = None;
         let mut credentials: Vec<String> = vec![];
@@ -915,7 +913,7 @@ impl Git {
         pretty_version: Option<&str>,
     ) -> anyhow::Result<bool> {
         if self.check_ref_is_in_mirror(dir, r#ref)? {
-            if preg_match(php_regex!(r"{^[a-f0-9]{40}$}"), r#ref).is_some()
+            if preg_is_match(php_regex!(r"{^[a-f0-9]{40}$}"), r#ref)
                 && let Some(pretty_version) = pretty_version
             {
                 let branch = preg_replace(
@@ -949,17 +947,15 @@ impl Git {
                 // this can occur if a git tag gets created *after* the reference is already put into the cache, as the ref check above will then not sync the new tags
                 // see https://github.com/composer/composer/discussions/11002
                 if branches.is_some()
-                    && preg_match(
+                    && !preg_is_match(
                         format!(r"{{^[\s*]*v?{}$}}m", preg_quote(&branch, None)),
                         branches.as_deref().unwrap_or(""),
                     )
-                    .is_none()
                     && tags.is_some()
-                    && preg_match(
+                    && !preg_is_match(
                         format!(r"{{^[\s*]*{}$}}m", preg_quote(&branch, None)),
                         tags.as_deref().unwrap_or(""),
                     )
-                    .is_none()
                 {
                     self.sync_mirror(url, dir)?;
                 }

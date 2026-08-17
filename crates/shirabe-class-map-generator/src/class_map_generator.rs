@@ -5,9 +5,9 @@ use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, explode,
-    getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_match, preg_quote, preg_replace,
-    preg_replace_callback, realpath, str_replace, stream_get_wrappers, strlen, strpos, strrpos,
-    strtr, substr,
+    getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_is_match, preg_match, preg_quote,
+    preg_replace, preg_replace_callback, realpath, str_replace, stream_get_wrappers, strlen,
+    strpos, strrpos, strtr, substr,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::PathBuf;
@@ -134,8 +134,7 @@ impl ClassMapGenerator {
                 continue;
             }
 
-            let is_stream_wrapper_path =
-                preg_match(&self.stream_wrappers_regex, &file_path).is_some();
+            let is_stream_wrapper_path = preg_is_match(&self.stream_wrappers_regex, &file_path);
             if !Self::is_absolute_path(&file_path) && !is_stream_wrapper_path {
                 file_path = format!("{}/{}", cwd, file_path);
                 file_path = Self::normalize_path(&file_path);
@@ -183,11 +182,11 @@ impl ClassMapGenerator {
 
             // check the realpath of the file against the excluded paths as the path might be a symlink and the excluded path is realpath'd so symlink are resolved
             if let Some(ref excluded) = excluded {
-                if preg_match(excluded, &strtr(&real_path, "\\", "/")).is_some() {
+                if preg_is_match(excluded, &strtr(&real_path, "\\", "/")) {
                     continue;
                 }
                 // check non-realpath of file for directories symlink in project dir
-                if preg_match(excluded, &strtr(&file_path, "\\", "/")).is_some() {
+                if preg_is_match(excluded, &strtr(&file_path, "\\", "/")) {
                     continue;
                 }
             }

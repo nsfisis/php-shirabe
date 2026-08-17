@@ -39,8 +39,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
     array_search, date_format_to_strftime, date_local, extension_loaded, impl_php_class,
-    in_array_loose, in_array_strict, php_regex, preg_match, preg_quote, preg_replace, realpath,
-    strtolower, version_compare,
+    in_array_loose, in_array_strict, php_regex, preg_is_match, preg_match, preg_quote,
+    preg_replace, realpath, strtolower, version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -2341,7 +2341,7 @@ impl Command for ShowCommand {
                         }
                         let matches_filter = match &package_filter_regex {
                             None => true,
-                            Some(r) => preg_match(r, &p.get_name()).is_some(),
+                            Some(r) => preg_is_match(r, &p.get_name()),
                         };
                         if matches_filter {
                             let matches_list = match &package_list_filter {
@@ -2420,8 +2420,7 @@ impl Command for ShowCommand {
                 if show_latest && *show_version {
                     for package_or_name in type_packages.values() {
                         if let PackageOrName::Pkg(package) = package_or_name
-                            && preg_match(&ignored_packages_regex, &package.get_pretty_name())
-                                .is_none()
+                            && !preg_is_match(&ignored_packages_regex, &package.get_pretty_name())
                         {
                             let latest = self.find_latest_package(
                                 package.clone(),
@@ -2492,8 +2491,7 @@ impl Command for ShowCommand {
                         package_is_up_to_date =
                             package_is_up_to_date || (latest_package.is_none() && show_major_only);
                         let package_is_ignored =
-                            preg_match(&ignored_packages_regex, &package.get_pretty_name())
-                                .is_some();
+                            preg_is_match(&ignored_packages_regex, &package.get_pretty_name());
                         if input.borrow().get_option("outdated")?.as_bool() == Some(true)
                             && (package_is_up_to_date || package_is_ignored)
                         {

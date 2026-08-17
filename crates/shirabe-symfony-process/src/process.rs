@@ -12,7 +12,7 @@ use crate::pipes::windows_pipes::WindowsPipes;
 use crate::process_utils::ProcessUtils;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Descriptor, PhpMixed, PhpResource, PregMatches, php_regex, preg_match, preg_replace,
+    Descriptor, PhpMixed, PhpResource, PregMatches, php_regex, preg_is_match, preg_replace,
     preg_replace_callback,
 };
 use std::sync::OnceLock;
@@ -1043,7 +1043,7 @@ impl Process {
         if argument.contains('\0') {
             argument = argument.replace('\0', "?");
         }
-        if preg_match(php_regex!(r#"/[()%!^"<>&|\s\[\]=;*?'$]/"#), &argument).is_none() {
+        if !preg_is_match(php_regex!(r#"/[()%!^"<>&|\s\[\]=;*?'$]/"#), &argument) {
             return argument;
         }
         argument = preg_replace(php_regex!(r"/(\\+)$/"), "$1$1", &argument);

@@ -149,6 +149,14 @@ pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
     out
 }
 
+// Whether the pattern matches, for the call sites that ignore the capture groups.
+pub fn preg_is_match(pattern: impl PregPattern, subject: &str) -> bool {
+    let __resolved = pattern.resolve();
+    let re = __resolved.regex();
+
+    re.is_match(subject)
+}
+
 // Returns None if the pattern did not match; otherwise the match's capture groups.
 pub fn preg_match<'h>(pattern: impl PregPattern, subject: &'h str) -> Option<PregMatches<'h>> {
     let __resolved = pattern.resolve();

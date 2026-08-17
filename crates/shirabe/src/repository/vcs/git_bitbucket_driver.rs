@@ -19,7 +19,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
     array_search_mixed, extension_loaded, http_build_query, implode, is_array, php_regex,
-    preg_match, preg_replace, strpos,
+    preg_is_match, preg_match, preg_replace, strpos,
 };
 
 #[derive(Debug)]
@@ -797,12 +797,10 @@ impl GitBitbucketDriver {
         url: &str,
         _deep: bool,
     ) -> anyhow::Result<bool> {
-        if preg_match(
+        if !preg_is_match(
             php_regex!(r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(\.git|/?)?$#i"),
             url,
-        )
-        .is_none()
-        {
+        ) {
             return Ok(false);
         }
 

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Http/Response.php
 
 use crate::json::JsonFile;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match, preg_quote};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_match, preg_quote};
 
 #[derive(Debug)]
 pub struct Response {
@@ -28,7 +28,7 @@ impl Response {
     pub fn get_status_message(&self) -> Option<String> {
         let mut value = None;
         for header in &self.headers {
-            if preg_match(php_regex!(r"{^HTTP/\S+ \d+}i"), header).is_some() {
+            if preg_is_match(php_regex!(r"{^HTTP/\S+ \d+}i"), header) {
                 // In case of redirects, headers contain the headers of all responses
                 // so we can not return directly and need to keep iterating
                 value = Some(header.clone());

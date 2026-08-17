@@ -12,7 +12,7 @@ use crate::repository::{
     RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle, SearchResult,
 };
 use indexmap::IndexMap;
-use shirabe_php_shim::{implode, php_regex, preg_match, preg_quote, preg_split, strtolower};
+use shirabe_php_shim::{implode, php_regex, preg_is_match, preg_quote, preg_split, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 use std::rc::Weak;
@@ -357,7 +357,7 @@ impl RepositoryInterface for ArrayRepository {
 
             let fulltext_match = mode == crate::repository::SEARCH_FULLTEXT
                 && complete.is_some()
-                && preg_match(
+                && preg_is_match(
                     &regex,
                     &format!(
                         "{} {}",
@@ -368,10 +368,9 @@ impl RepositoryInterface for ArrayRepository {
                             .get_description()
                             .unwrap_or_default()
                     ),
-                )
-                .is_some();
+                );
 
-            if preg_match(&regex, &name).is_some() || fulltext_match {
+            if preg_is_match(&regex, &name) || fulltext_match {
                 if mode == crate::repository::SEARCH_VENDOR {
                     matches.insert(
                         name.clone(),

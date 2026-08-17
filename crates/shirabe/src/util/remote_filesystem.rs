@@ -19,8 +19,8 @@ use shirabe_php_shim::{
     STREAM_NOTIFY_PROGRESS, array_replace_recursive, base64_encode, explode, extension_loaded,
     file_get_contents, file_get_contents5, file_put_contents, filter_var_boolean, gethostbyname,
     http_clear_last_response_headers, http_get_last_response_headers, ini_get, json_decode_assoc,
-    parse_url, php_regex, preg_match, preg_quote, preg_replace, strpos, strtolower, strtr, substr,
-    trim, zlib_decode,
+    parse_url, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, strpos, strtolower,
+    strtr, substr, trim, zlib_decode,
 };
 
 /// Result of `RemoteFilesystem::get` — string content, `true` (for copy), or `false`.
@@ -159,7 +159,7 @@ impl RemoteFilesystem {
     pub fn find_status_message(&self, headers: &[String]) -> Option<String> {
         let mut value: Option<String> = None;
         for header in headers {
-            if preg_match(php_regex!("{^HTTP/\\S+ \\d+}i"), header).is_some() {
+            if preg_is_match(php_regex!("{^HTTP/\\S+ \\d+}i"), header) {
                 value = Some(header.clone());
             }
         }
@@ -285,12 +285,10 @@ impl RemoteFilesystem {
             crate::io::DEBUG,
         );
 
-        if (preg_match(
+        if (!preg_is_match(
             php_regex!("{^http://(repo\\.)?packagist\\.org/p/}"),
             &file_url,
-        )
-        .is_none()
-            || (strpos(&file_url, "$").is_none() && strpos(&file_url, "%24").is_none()))
+        ) || (strpos(&file_url, "$").is_none() && strpos(&file_url, "%24").is_none()))
             && !degraded_packagist
         {
             let _ = self.config.borrow_mut().prohibit_url_by_config(
@@ -474,11 +472,10 @@ impl RemoteFilesystem {
                     None,
                 ) != ".zip")
             && content_type.is_some()
-            && preg_match(
+            && preg_is_match(
                 php_regex!("{^text/html\\b}i"),
                 content_type.as_deref().unwrap_or(""),
-            )
-            .is_some();
+            );
         if bitbucket_login_match {
             result = None;
             if retry_auth_failure {

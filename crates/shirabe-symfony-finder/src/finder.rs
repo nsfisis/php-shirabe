@@ -9,7 +9,9 @@
 use crate::glob::Glob;
 use chrono::{NaiveDate, NaiveDateTime};
 use indexmap::IndexSet;
-use shirabe_php_shim::{file_exists, glob, is_dir, php_regex, preg_match, preg_quote, rtrim};
+use shirabe_php_shim::{
+    file_exists, glob, is_dir, php_regex, preg_is_match, preg_match, preg_quote, rtrim,
+};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -310,7 +312,7 @@ impl Finder {
 
         let dir = rtrim(dir, Some("/"));
 
-        if preg_match(php_regex!("#^(ssh2\\.)?s?ftp://#"), &dir).is_some() {
+        if preg_is_match(php_regex!("#^(ssh2\\.)?s?ftp://#"), &dir) {
             format!("{dir}/")
         } else {
             dir
@@ -591,7 +593,7 @@ fn exclude_accept(
         };
         let path = path.replace('\\', "/");
 
-        return preg_match(pattern, &path).is_none();
+        return !preg_is_match(pattern, &path);
     }
 
     true
@@ -618,14 +620,14 @@ fn to_regex_path(pattern: &str) -> String {
 /// `MultiplePcreFilterIterator::isAccepted`.
 fn is_accepted(string: &str, match_regexps: &[String], nomatch_regexps: &[String]) -> bool {
     for regex in nomatch_regexps {
-        if preg_match(regex, string).is_some() {
+        if preg_is_match(regex, string) {
             return false;
         }
     }
 
     if !match_regexps.is_empty() {
         for regex in match_regexps {
-            if preg_match(regex, string).is_some() {
+            if preg_is_match(regex, string) {
                 return true;
             }
         }
@@ -655,7 +657,7 @@ fn is_regex(str: &str) -> bool {
             .unwrap_or_default();
 
         if start == end {
-            return preg_match(php_regex!("/[*?[:alnum:] \\\\]/"), &start).is_none();
+            return !preg_is_match(php_regex!("/[*?[:alnum:] \\\\]/"), &start);
         }
 
         for (open, close) in [("{", "}"), ("(", ")"), ("[", "]"), ("<", ">")] {

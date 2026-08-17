@@ -24,8 +24,8 @@ use shirabe_php_shim::{
     CaptureKey, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_flip_strings, array_intersect_key, array_map, basename, empty, explode, file,
     file_exists, file_get_contents, file_put_contents, get_current_user, impl_php_class, implode,
-    is_dir, is_string, php_regex, preg_match, preg_match_all, preg_quote, preg_replace, realpath,
-    str_replace, strpos, strtolower, trim, ucwords,
+    is_dir, is_string, php_regex, preg_is_match, preg_match, preg_match_all, preg_quote,
+    preg_replace, realpath, str_replace, strpos, strtolower, trim, ucwords,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 use shirabe_symfony_console::command::Command;
@@ -209,7 +209,7 @@ impl InitCommand {
 
         let lines = file(ignore_file, FILE_IGNORE_NEW_LINES).unwrap_or_default();
         for line in &lines {
-            if preg_match(&pattern, line).is_some() {
+            if preg_is_match(&pattern, line) {
                 return true;
             }
         }
@@ -497,14 +497,13 @@ impl Command for InitCommand {
         });
 
         if options.contains_key("name")
-            && preg_match(
+            && !preg_is_match(
                 php_regex!(r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"),
                 options
                     .get("name")
                     .and_then(|v| v.as_string())
                     .unwrap_or(""),
             )
-            .is_none()
         {
             return Err(InvalidArgumentException::new(format!(
                 "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
@@ -908,9 +907,12 @@ impl Command for InitCommand {
                         return Ok(PhpMixed::String(name_for_validate.clone()));
                     }
 
-                    if preg_match(php_regex!(r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"), value.as_string().unwrap_or(""))
-                    .is_none()
-                    {
+                    if !preg_is_match(
+                        php_regex!(
+                            r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"
+                        ),
+                        value.as_string().unwrap_or(""),
+                    ) {
                         return Err(InvalidArgumentException::new(format!(
                             "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
                             value.as_string().unwrap_or("")
@@ -1220,8 +1222,7 @@ impl Command for InitCommand {
                     value_str
                 };
 
-                if preg_match(php_regex!(r"{^[^/][A-Za-z0-9\-_/]+/$}"), &value_or_default)
-                    .is_none()
+                if !preg_is_match(php_regex!(r"{^[^/][A-Za-z0-9\-_/]+/$}"), &value_or_default)
                 {
                     return Err(InvalidArgumentException::new(format!(
                         "The src folder name \"{}\" is invalid. Please add a relative path with tailing forward slash. [A-Za-z0-9_-/]+/",

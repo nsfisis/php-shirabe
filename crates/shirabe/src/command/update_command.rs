@@ -29,8 +29,8 @@ use crate::util::HttpDownloader;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_keys, array_merge_map, array_search_in_vec, impl_php_class, php_regex, preg_match,
-    preg_replace, strtolower,
+    array_keys, array_merge_map, array_search_in_vec, impl_php_class, php_regex, preg_is_match,
+    preg_match, preg_replace, strtolower,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::MultiConstraint;
@@ -115,7 +115,7 @@ impl UpdateCommand {
         let mut version_selector = self.create_version_selector(composer)?;
         for package in &installed_packages {
             if let Some(filter) = &filter
-                && preg_match(filter, &package.get_name()).is_none()
+                && !preg_is_match(filter, &package.get_name())
             {
                 continue;
             }
@@ -378,7 +378,7 @@ impl Command for UpdateCommand {
         if !packages.is_empty() {
             let allowlist_packages_with_requirements: Vec<String> =
                 array_filter(&packages, |pkg: &String| -> bool {
-                    preg_match(php_regex!(r"{\S+[ =:]\S+}"), pkg).is_some()
+                    preg_is_match(php_regex!(r"{\S+[ =:]\S+}"), pkg)
                 });
             for (package, constraint) in
                 self.format_requirements(allowlist_packages_with_requirements.clone())?

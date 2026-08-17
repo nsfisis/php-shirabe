@@ -13,7 +13,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, dirname, is_dir, is_writable, php_regex, preg_match, preg_replace,
+    PhpMixed, RuntimeException, dirname, is_dir, is_writable, php_regex, preg_is_match, preg_match,
+    preg_replace,
 };
 
 #[derive(Debug)]
@@ -305,14 +306,12 @@ impl HgDriver {
         url: &str,
         deep: bool,
     ) -> anyhow::Result<bool> {
-        if preg_match(
+        if preg_is_match(
             php_regex!(
                 r"#(^(?:https?|ssh)://(?:[^@]+@)?bitbucket.org|https://(?:.*?)\.kilnhg.com)#i"
             ),
             url,
-        )
-        .is_some()
-        {
+        ) {
             return Ok(true);
         }
 

@@ -19,8 +19,9 @@ use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CaptureKey, CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class,
-    implode, in_array_strict, is_dir, php_regex, preg_match, preg_match_all, preg_quote,
-    preg_replace, preg_split, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
+    implode, in_array_strict, is_dir, php_regex, preg_is_match, preg_match, preg_match_all,
+    preg_quote, preg_replace, preg_split, realpath, rtrim, strlen, strpos, substr, trim,
+    version_compare,
 };
 
 #[derive(Debug)]
@@ -298,13 +299,12 @@ impl GitDownloader {
 
         // check whether non-commitish are branches or tags, and fetch branches with the remote name
         let git_ref = reference.to_string();
-        if preg_match(php_regex!(r"{^[a-f0-9]{40}$}"), reference).is_none()
+        if !preg_is_match(php_regex!(r"{^[a-f0-9]{40}$}"), reference)
             && branches.is_some()
-            && preg_match(
+            && preg_is_match(
                 format!("{{^\\s+composer/{}$}}m", preg_quote(reference, None)),
                 branches.as_deref().unwrap_or(""),
             )
-            .is_some()
         {
             let mut command1: Vec<String> = vec!["git".to_string(), "checkout".to_string()];
             command1.extend(force.clone());
@@ -345,19 +345,17 @@ impl GitDownloader {
         }
 
         // try to checkout branch by name and then reset it so it's on the proper branch name
-        if preg_match(php_regex!(r"{^[a-f0-9]{40}$}"), reference).is_some() {
+        if preg_is_match(php_regex!(r"{^[a-f0-9]{40}$}"), reference) {
             // add 'v' in front of the branch if it was stripped when generating the pretty name
             if branches.is_some()
-                && preg_match(
+                && !preg_is_match(
                     format!("{{^\\s+composer/{}$}}m", preg_quote(&branch, None)),
                     branches.as_deref().unwrap_or(""),
                 )
-                .is_none()
-                && preg_match(
+                && preg_is_match(
                     format!("{{^\\s+composer/v{}$}}m", preg_quote(&branch, None)),
                     branches.as_deref().unwrap_or(""),
                 )
-                .is_some()
             {
                 branch = format!("v{}", branch);
             }
@@ -642,8 +640,7 @@ impl GitDownloader {
     }
 
     fn get_short_hash(&self, reference: &str) -> String {
-        if !self.inner.io.is_verbose()
-            && preg_match(php_regex!(r"{^[0-9a-f]{40}$}"), reference).is_some()
+        if !self.inner.io.is_verbose() && preg_is_match(php_regex!(r"{^[0-9a-f]{40}$}"), reference)
         {
             return substr(reference, 0, Some(10));
         }

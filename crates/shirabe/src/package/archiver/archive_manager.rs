@@ -11,7 +11,7 @@ use crate::util::SyncHelper;
 use crate::util::r#loop::Loop;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, RuntimeException, bin2hex, file_exists, php_regex, preg_match,
+    InvalidArgumentException, RuntimeException, bin2hex, file_exists, php_regex, preg_is_match,
     preg_replace, random_bytes, realpath, sys_get_temp_dir,
 };
 
@@ -65,7 +65,7 @@ impl ArchiveManager {
 
         let dist_reference = package.get_dist_reference();
         if let Some(ref dist_ref) = dist_reference {
-            if preg_match(php_regex!("{^[a-f0-9]{40}$}"), dist_ref).is_some() {
+            if preg_is_match(php_regex!("{^[a-f0-9]{40}$}"), dist_ref) {
                 parts.insert("dist_reference".to_string(), dist_ref.to_string());
                 if let Some(dist_type) = package.get_dist_type() {
                     parts.insert("dist_type".to_string(), dist_type);

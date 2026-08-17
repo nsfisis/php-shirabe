@@ -26,9 +26,9 @@ use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, PregMatches, array_keys, array_map, array_merge_map,
     array_merge_recursive, array_shift, array_slice_strs, array_unique, bin2hex, explode,
-    file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, php_regex, preg_match,
-    preg_quote, preg_replace, preg_replace_callback, random_bytes, realpath, str_replace, strlen,
-    strpos, strtr, substr, substr_count, trim, unlink, var_export,
+    file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, php_regex,
+    preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback, random_bytes,
+    realpath, str_replace, strlen, strpos, strtr, substr, substr_count, trim, unlink, var_export,
 };
 use shirabe_semver::constraint::Bound;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -1126,7 +1126,7 @@ return array(
             }
         }
 
-        if preg_match(php_regex!("{\\.phar([\\\\/]|$)}"), &path).is_some() {
+        if preg_is_match(php_regex!("{\\.phar([\\\\/]|$)}"), &path) {
             base_dir = format!("'phar://' . {}", base_dir);
         }
 
