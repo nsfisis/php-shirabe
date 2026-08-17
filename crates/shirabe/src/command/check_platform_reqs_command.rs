@@ -27,6 +27,24 @@ struct CheckResult {
     provider: String,
 }
 
+/// Shape of one entry of the `check-platform-reqs --format=json` output.
+#[derive(Debug, serde::Serialize)]
+struct PlatformRequirementJson {
+    name: String,
+    version: String,
+    status: String,
+    failed_requirement: Option<FailedRequirementJson>,
+    provider: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct FailedRequirementJson {
+    source: String,
+    r#type: String,
+    target: String,
+    constraint: String,
+}
+
 #[derive(Debug)]
 pub struct CheckPlatformReqsCommand {
     base_command_data: BaseCommandData,
@@ -63,61 +81,27 @@ impl CheckPlatformReqsCommand {
         let io = self.get_io();
 
         if format == "json" {
-            let rows: Vec<PhpMixed> = results
+            let rows: Vec<PlatformRequirementJson> = results
                 .iter()
-                .map(|result| {
-                    let mut row = IndexMap::new();
-                    row.insert(
-                        "name".to_string(),
-                        PhpMixed::String(result.platform_package.clone()),
-                    );
-                    row.insert(
-                        "version".to_string(),
-                        PhpMixed::String(result.version.clone()),
-                    );
-                    row.insert(
-                        "status".to_string(),
-                        PhpMixed::String(strip_tags(&result.status)),
-                    );
-                    if let Some(link) = &result.link {
-                        let mut failed_req = IndexMap::new();
-                        failed_req.insert(
-                            "source".to_string(),
-                            PhpMixed::String(link.get_source().to_string()),
-                        );
-                        failed_req.insert(
-                            "type".to_string(),
-                            PhpMixed::String(link.get_description().to_string()),
-                        );
-                        failed_req.insert(
-                            "target".to_string(),
-                            PhpMixed::String(link.get_target().to_string()),
-                        );
-                        failed_req.insert(
-                            "constraint".to_string(),
-                            PhpMixed::String(link.get_pretty_constraint().to_string()),
-                        );
-                        row.insert(
-                            "failed_requirement".to_string(),
-                            PhpMixed::Array(failed_req),
-                        );
+                .map(|result| PlatformRequirementJson {
+                    name: result.platform_package.clone(),
+                    version: result.version.clone(),
+                    status: strip_tags(&result.status),
+                    failed_requirement: result.link.as_ref().map(|link| FailedRequirementJson {
+                        source: link.get_source().to_string(),
+                        r#type: link.get_description().to_string(),
+                        target: link.get_target().to_string(),
+                        constraint: link.get_pretty_constraint().to_string(),
+                    }),
+                    provider: if result.provider.is_empty() {
+                        None
                     } else {
-                        row.insert("failed_requirement".to_string(), PhpMixed::Null);
-                    }
-                    let provider_str = strip_tags(&result.provider);
-                    row.insert(
-                        "provider".to_string(),
-                        if provider_str.is_empty() {
-                            PhpMixed::Null
-                        } else {
-                            PhpMixed::String(provider_str)
-                        },
-                    );
-                    PhpMixed::Array(row)
+                        Some(strip_tags(&result.provider))
+                    },
                 })
                 .collect();
 
-            io.write(&JsonFile::encode(&PhpMixed::List(rows))?);
+            io.write(&JsonFile::encode(&rows)?);
         } else {
             let rows: Vec<PhpMixed> = results
                 .iter()
