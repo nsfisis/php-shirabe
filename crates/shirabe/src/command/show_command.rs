@@ -107,7 +107,7 @@ impl ShowCommand {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn print_packages(
         &self,
-        packages: &[IndexMap<String, PhpMixed>],
+        packages: &[PackageViewData],
         indent: &str,
         write_version: bool,
         write_latest: bool,
@@ -126,23 +126,12 @@ impl ShowCommand {
         let pad_release_date = write_description;
         for package in packages.iter() {
             let link = package
-                .get("source")
-                .and_then(|v| v.as_string())
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-                .or_else(|| {
-                    package
-                        .get("homepage")
-                        .and_then(|v| v.as_string())
-                        .filter(|s| !s.is_empty())
-                        .map(|s| s.to_string())
-                })
+                .source
+                .clone()
+                .flatten()
+                .or_else(|| package.homepage.clone().flatten())
                 .unwrap_or_default();
-            let name = package
-                .get("name")
-                .and_then(|v| v.as_string())
-                .unwrap_or("")
-                .to_string();
+            let name = &package.name;
             if !link.is_empty() {
                 let pad = if pad_name && name_length > name.len() {
                     name_length - name.len()
@@ -160,18 +149,17 @@ impl ShowCommand {
                 let width_pad = if pad_name { name_length } else { 0 };
                 io.write_no_newline(&format!("{}{:<width$}", indent, name, width = width_pad));
             }
-            if let Some(version) = package.get("version").and_then(|v| v.as_string())
+            if let Some(version) = &package.version
                 && write_version
             {
                 let width_pad = if pad_version { version_length } else { 0 };
                 io.write_no_newline(&format!(" {:<width$}", version, width = width_pad));
             }
-            if let (Some(latest_version), Some(update_status)) = (
-                package.get("latest").and_then(|v| v.as_string()),
-                package.get("latest-status").and_then(|v| v.as_string()),
-            ) && write_latest
+            if let (Some(latest_version), Some(update_status)) =
+                (&package.latest, &package.latest_status)
+                && write_latest
             {
-                let mut latest_version = latest_version.to_string();
+                let mut latest_version = latest_version.clone();
                 let style = Self::update_status_to_version_style(update_status);
                 if !io.is_decorated() {
                     let marker = update_status
@@ -188,9 +176,7 @@ impl ShowCommand {
                     style,
                     width = width_pad
                 ));
-                if write_release_date
-                    && let Some(age) = package.get("release-age").and_then(|v| v.as_string())
-                {
+                if write_release_date && let Some(age) = &package.release_age {
                     let width_pad = if pad_release_date {
                         release_date_length
                     } else {
@@ -199,7 +185,7 @@ impl ShowCommand {
                     io.write_no_newline(&format!(" {:<width$}", age, width = width_pad));
                 }
             }
-            if let Some(description) = package.get("description").and_then(|v| v.as_string())
+            if let Some(Some(description)) = &package.description
                 && write_description
             {
                 let mut description = description
@@ -245,15 +231,15 @@ impl ShowCommand {
 
                 io.write_no_newline(&format!(" {}", description));
             }
-            if package.contains_key("path") {
-                let path_str = match package.get("path") {
-                    Some(PhpMixed::String(s)) => s.clone(),
-                    _ => "null".to_string(),
+            if let Some(path) = &package.path {
+                let path_str = match path {
+                    Some(s) => s.clone(),
+                    None => "null".to_string(),
                 };
                 io.write_no_newline(&format!(" {}", path_str));
             }
             io.write("");
-            if let Some(warning) = package.get("warning").and_then(|v| v.as_string()) {
+            if let Some(warning) = &package.warning {
                 io.write(&format!("<warning>{}</warning>", warning));
             }
         }
@@ -607,6 +593,9 @@ impl ShowCommand {
     ) {
         let title = title.unwrap_or(link_type);
         let io = self.get_io();
+        // TODO(port): `get_links_for_type` matches the composer.json key names ("require",
+        // "require-dev", ...), not the `Link::TYPE_*` values passed here, so it always returns
+        // an empty map and these sections never print. PHP dispatches on `Link::$TYPES`.
         let links = package.get_links_for_type(link_type);
         if !links.is_empty() {
             io.write(&format!("\n<info>{}</info>", title));
@@ -657,91 +646,56 @@ impl ShowCommand {
         installed_repo: &mut dyn RepositoryInterface,
         latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
-        let mut json: IndexMap<String, PhpMixed> = IndexMap::new();
-        json.insert(
-            "name".to_string(),
-            PhpMixed::String(package.get_pretty_name()),
-        );
-        json.insert(
-            "description".to_string(),
-            PhpMixed::String(package.get_description().unwrap_or_default()),
-        );
-        let keywords: Vec<PhpMixed> = package
-            .get_keywords()
-            .into_iter()
-            .map(PhpMixed::String)
-            .collect();
-        json.insert("keywords".to_string(), PhpMixed::List(keywords));
-        json.insert("type".to_string(), PhpMixed::String(package.get_type()));
-        json.insert(
-            "homepage".to_string(),
-            match package.get_homepage() {
-                Some(h) => PhpMixed::String(h),
-                None => PhpMixed::Null,
-            },
-        );
-        json.insert(
-            "names".to_string(),
-            PhpMixed::List(
-                package
-                    .get_names(true)
-                    .into_iter()
-                    .map(PhpMixed::String)
-                    .collect(),
-            ),
-        );
+        let mut json = PackageInfoJson {
+            name: package.get_pretty_name(),
+            description: package.get_description(),
+            keywords: package.get_keywords(),
+            r#type: package.get_type(),
+            homepage: package.get_homepage(),
+            names: package.get_names(true),
+            versions: Vec::new(),
+            licenses: None,
+            latest: None,
+            source: None,
+            dist: None,
+            path: None,
+            released: None,
+            replacement: None,
+            suggests: None,
+            support: None,
+            autoload: None,
+            include_path: None,
+            requires: None,
+            dev_requires: None,
+            provides: None,
+            conflicts: None,
+            replaces: None,
+        };
 
-        json = Self::append_versions(json, versions);
-        json = Self::append_licenses(json, package.clone());
+        Self::append_versions(&mut json, versions);
+        Self::append_licenses(&mut json, package.clone());
 
         let latest: PackageInterfaceHandle = if let Some(latest) = latest_package {
-            json.insert(
-                "latest".to_string(),
-                PhpMixed::String(latest.get_pretty_version()),
-            );
+            json.latest = Some(latest.get_pretty_version());
             latest
         } else {
             package.clone().into()
         };
 
-        if package.get_source_type().is_some() {
-            let mut src: IndexMap<String, PhpMixed> = IndexMap::new();
-            src.insert(
-                "type".to_string(),
-                PhpMixed::String(package.get_source_type().unwrap_or_default()),
-            );
-            src.insert(
-                "url".to_string(),
-                PhpMixed::String(package.get_source_url().unwrap_or_default()),
-            );
-            src.insert(
-                "reference".to_string(),
-                PhpMixed::String(package.get_source_reference().unwrap_or_default()),
-            );
-            json.insert(
-                "source".to_string(),
-                PhpMixed::Array(src.into_iter().collect()),
-            );
+        if let Some(source_type) = package.get_source_type() {
+            json.source = Some(PackageReferenceJson {
+                r#type: source_type,
+                url: package.get_source_url(),
+                reference: package.get_source_reference(),
+            });
         }
 
-        if package.get_dist_type().is_some() {
-            let mut dst: IndexMap<String, PhpMixed> = IndexMap::new();
-            dst.insert(
-                "type".to_string(),
-                PhpMixed::String(package.get_dist_type().unwrap_or_default()),
-            );
-            dst.insert(
-                "url".to_string(),
-                PhpMixed::String(package.get_dist_url().unwrap_or_default()),
-            );
-            dst.insert(
-                "reference".to_string(),
-                PhpMixed::String(package.get_dist_reference().unwrap_or_default()),
-            );
-            json.insert(
-                "dist".to_string(),
-                PhpMixed::Array(dst.into_iter().collect()),
-            );
+        if let Some(dist_type) = package.get_dist_type() {
+            json.dist = Some(PackageReferenceJson {
+                r#type: dist_type,
+                url: package.get_dist_url(),
+                reference: package.get_dist_reference(),
+            });
         }
 
         if !PlatformRepository::is_platform_package(&package.get_name())
@@ -755,83 +709,46 @@ impl ShowCommand {
             match path {
                 Some(p) => {
                     if let Some(r) = realpath(&p) {
-                        json.insert("path".to_string(), PhpMixed::String(r));
+                        json.path = Some(Some(r));
                     }
                 }
                 None => {
-                    json.insert("path".to_string(), PhpMixed::Null);
+                    json.path = Some(None);
                 }
             }
 
             if let Some(rd) = package.get_release_date() {
-                json.insert(
-                    "released".to_string(),
-                    PhpMixed::String(rd.format(DATE_ATOM).to_string()),
-                );
+                json.released = Some(rd.format(DATE_ATOM).to_string());
             }
         }
 
         if let Some(c) = latest.as_complete()
             && c.is_abandoned()
         {
-            json.insert(
-                "replacement".to_string(),
-                match c.get_replacement_package() {
-                    Some(rp) => PhpMixed::String(rp),
-                    None => PhpMixed::Null,
-                },
-            );
+            json.replacement = Some(c.get_replacement_package());
         }
 
         if !package.get_suggests().is_empty() {
-            let mut s: IndexMap<String, PhpMixed> = IndexMap::new();
-            for (k, v) in package.get_suggests().iter() {
-                s.insert(k.clone(), PhpMixed::String(v.clone()));
-            }
-            json.insert(
-                "suggests".to_string(),
-                PhpMixed::Array(s.into_iter().collect()),
-            );
+            json.suggests = Some(package.get_suggests());
         }
 
         if !package.get_support().is_empty() {
-            let mut s: IndexMap<String, PhpMixed> = IndexMap::new();
-            for (k, v) in package.get_support().iter() {
-                s.insert(k.clone(), PhpMixed::String(v.clone()));
-            }
-            json.insert(
-                "support".to_string(),
-                PhpMixed::Array(s.into_iter().collect()),
-            );
+            json.support = Some(package.get_support());
         }
 
-        json = Self::append_autoload(json, package.clone());
+        Self::append_autoload(&mut json, package.clone());
 
         if !package.get_include_paths().is_empty() {
-            json.insert(
-                "include_path".to_string(),
-                PhpMixed::List(
-                    package
-                        .get_include_paths()
-                        .into_iter()
-                        .map(PhpMixed::String)
-                        .collect(),
-                ),
-            );
+            json.include_path = Some(package.get_include_paths());
         }
 
-        json = Self::append_links(json, package);
+        Self::append_links(&mut json, package);
 
-        self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
-            json.into_iter().collect(),
-        ))?);
+        self.get_io().write(&JsonFile::encode(&json)?);
         Ok(())
     }
 
-    fn append_versions(
-        mut json: IndexMap<String, PhpMixed>,
-        versions: &IndexMap<String, String>,
-    ) -> IndexMap<String, PhpMixed> {
+    fn append_versions(json: &mut PackageInfoJson, versions: &IndexMap<String, String>) {
         let mut versions_pairs: Vec<(String, String)> = versions
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
@@ -847,50 +764,35 @@ impl ShowCommand {
             }
         });
         versions_pairs.reverse();
-        let keys: Vec<PhpMixed> = versions_pairs
-            .into_iter()
-            .map(|(k, _)| PhpMixed::String(k))
-            .collect();
-        json.insert("versions".to_string(), PhpMixed::List(keys));
-
-        json
+        json.versions = versions_pairs.into_iter().map(|(k, _)| k).collect();
     }
 
-    fn append_licenses(
-        mut json: IndexMap<String, PhpMixed>,
-        package: CompletePackageInterfaceHandle,
-    ) -> IndexMap<String, PhpMixed> {
+    fn append_licenses(json: &mut PackageInfoJson, package: CompletePackageInterfaceHandle) {
         let licenses = package.get_license();
         if !licenses.is_empty() {
             let spdx_licenses = SpdxLicenses::new();
 
-            let mapped: Vec<PhpMixed> = licenses
-                .into_iter()
-                .map(|license_id| {
-                    let license = spdx_licenses.get_license_by_identifier(&license_id);
-                    match license {
-                        None => PhpMixed::String(license_id),
-                        Some(l) => {
+            json.licenses = Some(
+                licenses
+                    .into_iter()
+                    .map(|license_id| {
+                        let license = spdx_licenses.get_license_by_identifier(&license_id);
+                        match license {
+                            None => LicenseJson::Id(license_id),
                             // The 'osi' key holds the license id string, not the OSI-approved flag.
-                            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                            m.insert("name".to_string(), PhpMixed::String(l.name));
-                            m.insert("osi".to_string(), PhpMixed::String(license_id));
-                            m.insert("url".to_string(), PhpMixed::String(l.url));
-                            PhpMixed::Array(m.into_iter().collect())
+                            Some(l) => LicenseJson::Detail {
+                                name: l.name,
+                                osi: license_id,
+                                url: l.url,
+                            },
                         }
-                    }
-                })
-                .collect();
-            json.insert("licenses".to_string(), PhpMixed::List(mapped));
+                    })
+                    .collect(),
+            );
         }
-
-        json
     }
 
-    fn append_autoload(
-        mut json: IndexMap<String, PhpMixed>,
-        package: CompletePackageInterfaceHandle,
-    ) -> IndexMap<String, PhpMixed> {
+    fn append_autoload(json: &mut PackageInfoJson, package: CompletePackageInterfaceHandle) {
         let autoload_config = package.get_autoload();
         if !autoload_config.is_empty() {
             let mut autoload: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -920,54 +822,50 @@ impl ShowCommand {
                         }
                     }
 
-                    autoload.insert(r#type.clone(), PhpMixed::Array(psr.into_iter().collect()));
+                    autoload.insert(r#type.clone(), PhpMixed::Array(psr));
                 } else if r#type == "classmap" {
                     autoload.insert("classmap".to_string(), autoloads.clone());
                 }
             }
 
-            json.insert(
-                "autoload".to_string(),
-                PhpMixed::Array(autoload.into_iter().collect()),
-            );
+            json.autoload = Some(PhpMixed::Array(autoload));
         }
-
-        json
     }
 
-    fn append_links(
-        mut json: IndexMap<String, PhpMixed>,
-        package: CompletePackageInterfaceHandle,
-    ) -> IndexMap<String, PhpMixed> {
+    fn append_links(json: &mut PackageInfoJson, package: CompletePackageInterfaceHandle) {
         for link_type in Link::types().iter() {
-            json = Self::append_link(json, package.clone(), link_type);
+            Self::append_link(json, package.clone(), link_type);
         }
-
-        json
     }
 
     fn append_link(
-        mut json: IndexMap<String, PhpMixed>,
+        json: &mut PackageInfoJson,
         package: CompletePackageInterfaceHandle,
         link_type: &str,
-    ) -> IndexMap<String, PhpMixed> {
+    ) {
+        // TODO(port): `get_links_for_type` matches the composer.json key names ("require",
+        // "require-dev", ...), not the `Link::TYPE_*` values passed here, so it always returns
+        // an empty map and these keys never reach the JSON. PHP dispatches on `Link::$TYPES`.
         let links = package.get_links_for_type(link_type);
 
         if !links.is_empty() {
-            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+            let mut m: IndexMap<String, String> = IndexMap::new();
             for link in links.iter() {
                 m.insert(
                     link.1.get_target().to_string(),
-                    PhpMixed::String(link.1.get_pretty_constraint().to_string()),
+                    link.1.get_pretty_constraint().to_string(),
                 );
             }
-            json.insert(
-                link_type.to_string(),
-                PhpMixed::Array(m.into_iter().collect()),
-            );
+            let slot = match link_type {
+                Link::TYPE_REQUIRE => &mut json.requires,
+                Link::TYPE_DEV_REQUIRE => &mut json.dev_requires,
+                Link::TYPE_PROVIDE => &mut json.provides,
+                Link::TYPE_CONFLICT => &mut json.conflicts,
+                Link::TYPE_REPLACE => &mut json.replaces,
+                _ => unreachable!("Link::types() yields only the five link types"),
+            };
+            *slot = Some(m);
         }
-
-        json
     }
 
     /// Init styles for tree
@@ -991,22 +889,13 @@ impl ShowCommand {
     }
 
     /// Display the tree
-    fn display_package_tree(&self, array_tree: Vec<IndexMap<String, PhpMixed>>) {
+    fn display_package_tree(&self, array_tree: Vec<PackageTree>) {
         for package in array_tree.iter() {
-            let name = package
-                .get("name")
-                .and_then(|v| v.as_string())
-                .unwrap_or("")
-                .to_string();
             self.get_io()
-                .write_no_newline(&format!("<info>{}</info>", name));
-            let version = package
-                .get("version")
-                .and_then(|v| v.as_string())
-                .unwrap_or("")
-                .to_string();
-            self.get_io().write_no_newline(&format!(" {}", version));
-            if let Some(description) = package.get("description").and_then(|v| v.as_string()) {
+                .write_no_newline(&format!("<info>{}</info>", package.name));
+            self.get_io()
+                .write_no_newline(&format!(" {}", package.version));
+            if let Some(description) = &package.description {
                 let trimmed = description.split(['\r', '\n']).next().unwrap_or("");
                 self.get_io().write(&format!(" {}", trimmed));
             } else {
@@ -1014,20 +903,11 @@ impl ShowCommand {
                 self.get_io().write("");
             }
 
-            if let Some(requires) = package.get("requires").and_then(|v| v.as_list()).cloned() {
+            if let Some(requires) = &package.requires {
                 let mut tree_bar = "├".to_string();
                 let mut j = 0_usize;
                 let total = requires.len();
-                for require_mixed in requires.iter() {
-                    let require = match require_mixed.as_array() {
-                        Some(a) => a,
-                        None => continue,
-                    };
-                    let require_name = require
-                        .get("name")
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("")
-                        .to_string();
+                for require in requires.iter() {
                     j += 1;
                     if j == total {
                         tree_bar = "└".to_string();
@@ -1036,34 +916,15 @@ impl ShowCommand {
                     let color = self.colors.borrow().get(level).cloned().unwrap_or_default();
                     let info = format!(
                         "{}──<{}>{}</{}> {}",
-                        tree_bar,
-                        color,
-                        require_name,
-                        color,
-                        require
-                            .get("version")
-                            .and_then(|v| v.as_string())
-                            .unwrap_or("")
+                        tree_bar, color, require.name, color, require.version
                     );
                     self.write_tree_line(&info);
 
                     tree_bar = tree_bar.replace('└', " ");
-                    let packages_in_tree: Vec<PhpMixed> = vec![
-                        PhpMixed::String(name.clone()),
-                        PhpMixed::String(require_name.clone()),
-                    ];
+                    let packages_in_tree: Vec<String> =
+                        vec![package.name.clone(), require.name.clone()];
 
-                    self.display_tree(
-                        &PhpMixed::Array(
-                            require
-                                .iter()
-                                .map(|(k, v)| (k.clone(), v.clone()))
-                                .collect(),
-                        ),
-                        &packages_in_tree,
-                        &tree_bar,
-                        level + 1,
-                    );
+                    self.display_tree(require, &packages_in_tree, &tree_bar, level + 1);
                 }
             }
         }
@@ -1075,25 +936,22 @@ impl ShowCommand {
         package: PackageInterfaceHandle,
         installed_repo: &RepositoryInterfaceHandle,
         remote_repos: &RepositoryInterfaceHandle,
-    ) -> IndexMap<String, PhpMixed> {
+    ) -> PackageTree {
         let requires = {
             let mut r: IndexMap<String, Link> = package.get_requires();
             r.sort_keys();
             r
         };
-        let mut children: Vec<PhpMixed> = Vec::new();
+        let mut children: Vec<PackageTreeChild> = Vec::new();
         for (require_name, require) in requires.iter() {
-            let packages_in_tree: Vec<PhpMixed> = vec![
-                PhpMixed::String(package.get_name().to_string()),
-                PhpMixed::String(require_name.clone()),
-            ];
+            let packages_in_tree: Vec<String> =
+                vec![package.get_name().to_string(), require_name.clone()];
 
-            let mut tree_child_desc: IndexMap<String, PhpMixed> = IndexMap::new();
-            tree_child_desc.insert("name".to_string(), PhpMixed::String(require_name.clone()));
-            tree_child_desc.insert(
-                "version".to_string(),
-                PhpMixed::String(require.get_pretty_constraint().to_string()),
-            );
+            let mut tree_child_desc = PackageTreeChild {
+                name: require_name.clone(),
+                version: require.get_pretty_constraint().to_string(),
+                requires: None,
+            };
 
             let deep_children = self
                 .add_tree(
@@ -1106,41 +964,23 @@ impl ShowCommand {
                 .unwrap_or_default();
 
             if !deep_children.is_empty() {
-                tree_child_desc.insert(
-                    "requires".to_string(),
-                    PhpMixed::List(
-                        deep_children
-                            .into_iter()
-                            .map(|m| PhpMixed::Array(m.into_iter().collect()))
-                            .collect(),
-                    ),
-                );
+                tree_child_desc.requires = Some(deep_children);
             }
 
-            children.push(PhpMixed::Array(tree_child_desc.into_iter().collect()));
+            children.push(tree_child_desc);
         }
-        let mut tree: IndexMap<String, PhpMixed> = IndexMap::new();
-        tree.insert(
-            "name".to_string(),
-            PhpMixed::String(package.get_pretty_name()),
-        );
-        tree.insert(
-            "version".to_string(),
-            PhpMixed::String(package.get_pretty_version()),
-        );
-        tree.insert(
-            "description".to_string(),
-            match package.as_complete() {
-                Some(c) => match c.get_description() {
-                    Some(d) => PhpMixed::String(d),
-                    None => PhpMixed::Null,
-                },
-                None => PhpMixed::String(String::new()),
+        let mut tree = PackageTree {
+            name: package.get_pretty_name(),
+            version: package.get_pretty_version(),
+            description: match package.as_complete() {
+                Some(c) => c.get_description(),
+                None => Some(String::new()),
             },
-        );
+            requires: None,
+        };
 
         if !children.is_empty() {
-            tree.insert("requires".to_string(), PhpMixed::List(children));
+            tree.requires = Some(children);
         }
 
         tree
@@ -1149,24 +989,20 @@ impl ShowCommand {
     /// Display a package tree
     fn display_tree(
         &self,
-        package: &PhpMixed,
-        packages_in_tree: &[PhpMixed],
+        package: &PackageTreeChild,
+        packages_in_tree: &[String],
         previous_tree_bar: &str,
         level: usize,
     ) {
         let previous_tree_bar = previous_tree_bar.replace('├', "│");
-        let arr = match package.as_array() {
-            Some(a) => a,
-            None => return,
-        };
-        let requires = match arr.get("requires").and_then(|v| v.as_list()).cloned() {
-            Some(l) => l,
+        let requires = match &package.requires {
+            Some(r) => r,
             None => return,
         };
         let mut tree_bar = format!("{}  ├", previous_tree_bar);
         let mut i = 0_usize;
         let total = requires.len();
-        for require_mixed in requires.iter() {
+        for require in requires.iter() {
             let mut current_tree = packages_in_tree.to_vec();
             i += 1;
             if i == total {
@@ -1180,29 +1016,14 @@ impl ShowCommand {
                 .cloned()
                 .unwrap_or_default();
 
-            let require = match require_mixed.as_array() {
-                Some(a) => a,
-                None => continue,
-            };
-            let require_name = require
-                .get("name")
-                .and_then(|v| v.as_string())
-                .unwrap_or("")
-                .to_string();
-            let require_version = require
-                .get("version")
-                .and_then(|v| v.as_string())
-                .unwrap_or("")
-                .to_string();
-
-            let circular_warn = if in_array_strict(require_name.clone(), &current_tree) {
+            let circular_warn = if current_tree.contains(&require.name) {
                 "(circular dependency aborted here)"
             } else {
                 ""
             };
             let info = format!(
                 "{}──<{}>{}</{}> {} {}",
-                tree_bar, color, require_name, color, require_version, circular_warn
+                tree_bar, color, require.name, color, require.version, circular_warn
             )
             .trim_end()
             .to_string();
@@ -1210,8 +1031,8 @@ impl ShowCommand {
 
             tree_bar = tree_bar.replace('└', " ");
 
-            current_tree.push(PhpMixed::String(require_name.clone()));
-            self.display_tree(require_mixed, &current_tree, &tree_bar, level + 1);
+            current_tree.push(require.name.clone());
+            self.display_tree(require, &current_tree, &tree_bar, level + 1);
         }
     }
 
@@ -1222,9 +1043,9 @@ impl ShowCommand {
         link: &Link,
         installed_repo: &RepositoryInterfaceHandle,
         remote_repos: &RepositoryInterfaceHandle,
-        packages_in_tree: &[PhpMixed],
-    ) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
-        let mut children: Vec<IndexMap<String, PhpMixed>> = Vec::new();
+        packages_in_tree: &[String],
+    ) -> anyhow::Result<Vec<PackageTreeChild>> {
+        let mut children: Vec<PackageTreeChild> = Vec::new();
         let version_arg: PhpMixed = if link.get_pretty_constraint() == "self.version" {
             // pass the ConstraintInterface object — signal via Null in this scalar shape
             PhpMixed::Null
@@ -1238,15 +1059,14 @@ impl ShowCommand {
             for (require_name, require) in requires.iter() {
                 let mut current_tree = packages_in_tree.to_vec();
 
-                let mut tree_child_desc: IndexMap<String, PhpMixed> = IndexMap::new();
-                tree_child_desc.insert("name".to_string(), PhpMixed::String(require_name.clone()));
-                tree_child_desc.insert(
-                    "version".to_string(),
-                    PhpMixed::String(require.get_pretty_constraint().to_string()),
-                );
+                let mut tree_child_desc = PackageTreeChild {
+                    name: require_name.clone(),
+                    version: require.get_pretty_constraint().to_string(),
+                    requires: None,
+                };
 
-                if !in_array_strict(require_name.clone(), &current_tree) {
-                    current_tree.push(PhpMixed::String(require_name.clone()));
+                if !current_tree.contains(require_name) {
+                    current_tree.push(require_name.clone());
                     let deep_children = self.add_tree(
                         require_name,
                         require,
@@ -1255,15 +1075,7 @@ impl ShowCommand {
                         &current_tree,
                     )?;
                     if !deep_children.is_empty() {
-                        tree_child_desc.insert(
-                            "requires".to_string(),
-                            PhpMixed::List(
-                                deep_children
-                                    .into_iter()
-                                    .map(|m| PhpMixed::Array(m.into_iter().collect()))
-                                    .collect(),
-                            ),
-                        );
+                        tree_child_desc.requires = Some(deep_children);
                     }
                 }
 
@@ -2127,14 +1939,9 @@ impl Command for ShowCommand {
                     self.generate_package_tree(package.clone().into(), &installed_repo, &repos);
 
                 if format == "json" {
-                    let mut wrapper: IndexMap<String, PhpMixed> = IndexMap::new();
-                    wrapper.insert(
-                        "installed".to_string(),
-                        PhpMixed::List(vec![PhpMixed::Array(array_tree.into_iter().collect())]),
-                    );
-                    self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
-                        wrapper.into_iter().collect(),
-                    ))?);
+                    self.get_io().write(&JsonFile::encode(&PackageTreeJson {
+                        installed: vec![array_tree],
+                    })?);
                 } else {
                     self.display_package_tree(vec![array_tree]);
                 }
@@ -2232,7 +2039,7 @@ impl Command for ShowCommand {
                 let sb: String = b.to_string();
                 sa.cmp(&sb)
             });
-            let mut array_tree: Vec<IndexMap<String, PhpMixed>> = Vec::new();
+            let mut array_tree: Vec<PackageTree> = Vec::new();
             for package in packages.iter() {
                 if in_array_strict(
                     package.get_name(),
@@ -2250,19 +2057,9 @@ impl Command for ShowCommand {
             }
 
             if format == "json" {
-                let mut wrapper: IndexMap<String, PhpMixed> = IndexMap::new();
-                wrapper.insert(
-                    "installed".to_string(),
-                    PhpMixed::List(
-                        array_tree
-                            .into_iter()
-                            .map(|m| PhpMixed::Array(m.into_iter().collect()))
-                            .collect(),
-                    ),
-                );
-                self.get_io().write(&JsonFile::encode(&PhpMixed::Array(
-                    wrapper.into_iter().collect(),
-                ))?);
+                self.get_io().write(&JsonFile::encode(&PackageTreeJson {
+                    installed: array_tree,
+                })?);
             } else {
                 self.display_package_tree(array_tree);
             }
@@ -2396,7 +2193,7 @@ impl Command for ShowCommand {
         let mut latest_packages: IndexMap<String, crate::package::PackageInterfaceHandle> =
             IndexMap::new();
         let mut exit_code: i64 = 0;
-        let mut view_data: IndexMap<String, Vec<IndexMap<String, PhpMixed>>> = IndexMap::new();
+        let mut view_data: IndexMap<String, Vec<PackageViewData>> = IndexMap::new();
         let mut view_meta_data: IndexMap<String, ViewMetaData> = IndexMap::new();
 
         let mut write_version = false;
@@ -2463,9 +2260,9 @@ impl Command for ShowCommand {
                     });
                 }
 
-                let mut view_type: Vec<IndexMap<String, PhpMixed>> = Vec::new();
+                let mut view_type: Vec<PackageViewData> = Vec::new();
                 for package_or_name in type_packages.values() {
-                    let mut package_view_data: IndexMap<String, PhpMixed> = IndexMap::new();
+                    let mut package_view_data = PackageViewData::default();
                     if let PackageOrName::Pkg(package) = package_or_name {
                         let latest_package = if show_latest
                             && latest_packages.contains_key(&package.get_pretty_name())
@@ -2504,43 +2301,24 @@ impl Command for ShowCommand {
                             has_outdated_packages = true;
                         }
 
-                        package_view_data.insert(
-                            "name".to_string(),
-                            PhpMixed::String(package.get_pretty_name()),
-                        );
-                        package_view_data.insert(
-                            "direct-dependency".to_string(),
-                            PhpMixed::Bool(in_array_strict(
-                                package.get_name(),
-                                &self
-                                    .get_root_requires()
-                                    .into_iter()
-                                    .map(PhpMixed::String)
-                                    .collect::<Vec<_>>(),
-                            )),
-                        );
+                        package_view_data.name = package.get_pretty_name();
+                        package_view_data.direct_dependency = Some(in_array_strict(
+                            package.get_name(),
+                            &self
+                                .get_root_requires()
+                                .into_iter()
+                                .map(PhpMixed::String)
+                                .collect::<Vec<_>>(),
+                        ));
                         if format != "json"
                             || input.borrow().get_option("name-only")?.as_bool() != Some(true)
                         {
-                            package_view_data.insert(
-                                "homepage".to_string(),
-                                match package.as_complete() {
-                                    Some(c) => match c.get_homepage() {
-                                        Some(h) => PhpMixed::String(h),
-                                        None => PhpMixed::Null,
-                                    },
-                                    None => PhpMixed::Null,
-                                },
-                            );
-                            package_view_data.insert(
-                                "source".to_string(),
-                                match PackageInfo::get_view_source_url(package.clone()) {
-                                    Some(s) => PhpMixed::String(s),
-                                    None => PhpMixed::Null,
-                                },
-                            );
+                            package_view_data.homepage =
+                                Some(package.as_complete().and_then(|c| c.get_homepage()));
+                            package_view_data.source =
+                                Some(PackageInfo::get_view_source_url(package.clone()));
                         }
-                        name_length = name_length.max(package.get_pretty_name().len());
+                        name_length = name_length.max(package_view_data.name.len());
                         if write_version {
                             let mut version_str = package.get_full_pretty_version(
                                 true,
@@ -2550,8 +2328,7 @@ impl Command for ShowCommand {
                                 version_str = version_str.trim_start_matches('v').to_string();
                             }
                             version_length = version_length.max(version_str.len());
-                            package_view_data
-                                .insert("version".to_string(), PhpMixed::String(version_str));
+                            package_view_data.version = Some(version_str);
                         }
                         if write_release_date {
                             if let Some(release_date) = package.get_release_date() {
@@ -2562,21 +2339,12 @@ impl Command for ShowCommand {
                                     age = format!("from {}", age);
                                 }
                                 release_date_length = release_date_length.max(age.len());
-                                package_view_data
-                                    .insert("release-age".to_string(), PhpMixed::String(age));
-                                package_view_data.insert(
-                                    "release-date".to_string(),
-                                    PhpMixed::String(release_date.format(DATE_ATOM).to_string()),
-                                );
+                                package_view_data.release_age = Some(age);
+                                package_view_data.release_date =
+                                    Some(release_date.format(DATE_ATOM).to_string());
                             } else {
-                                package_view_data.insert(
-                                    "release-age".to_string(),
-                                    PhpMixed::String(String::new()),
-                                );
-                                package_view_data.insert(
-                                    "release-date".to_string(),
-                                    PhpMixed::String(String::new()),
-                                );
+                                package_view_data.release_age = Some(String::new());
+                                package_view_data.release_date = Some(String::new());
                             }
                         }
                         if write_latest && let Some(latest) = latest_package {
@@ -2591,43 +2359,22 @@ impl Command for ShowCommand {
                             let update_status =
                                 Self::get_update_status(latest.clone(), package.clone())?;
                             latest_length = latest_length.max(latest_version_str.len());
-                            package_view_data
-                                .insert("latest".to_string(), PhpMixed::String(latest_version_str));
-                            package_view_data.insert(
-                                "latest-status".to_string(),
-                                PhpMixed::String(update_status),
-                            );
+                            package_view_data.latest = Some(latest_version_str);
+                            package_view_data.latest_status = Some(update_status);
 
                             if let Some(rd) = latest.get_release_date() {
-                                package_view_data.insert(
-                                    "latest-release-date".to_string(),
-                                    PhpMixed::String(rd.format(DATE_ATOM).to_string()),
-                                );
+                                package_view_data.latest_release_date =
+                                    Some(rd.format(DATE_ATOM).to_string());
                             } else {
-                                package_view_data.insert(
-                                    "latest-release-date".to_string(),
-                                    PhpMixed::String(String::new()),
-                                );
+                                package_view_data.latest_release_date = Some(String::new());
                             }
                         } else if write_latest {
-                            package_view_data.insert(
-                                "latest".to_string(),
-                                PhpMixed::String("[none matched]".to_string()),
-                            );
-                            package_view_data.insert(
-                                "latest-status".to_string(),
-                                PhpMixed::String("up-to-date".to_string()),
-                            );
+                            package_view_data.latest = Some("[none matched]".to_string());
+                            package_view_data.latest_status = Some("up-to-date".to_string());
                             latest_length = latest_length.max("[none matched]".len());
                         }
                         if write_description && let Some(c) = package.as_complete() {
-                            package_view_data.insert(
-                                "description".to_string(),
-                                match c.get_description() {
-                                    Some(d) => PhpMixed::String(d),
-                                    None => PhpMixed::Null,
-                                },
-                            );
+                            package_view_data.description = Some(c.get_description());
                         }
                         if write_path {
                             let installation_manager = composer
@@ -2641,16 +2388,13 @@ impl Command for ShowCommand {
                             if let Some(p) = path {
                                 let r = realpath(&p).unwrap_or_default();
                                 let trimmed = r.split(['\r', '\n']).next().unwrap_or("");
-                                package_view_data.insert(
-                                    "path".to_string(),
-                                    PhpMixed::String(trimmed.to_string()),
-                                );
+                                package_view_data.path = Some(Some(trimmed.to_string()));
                             } else {
-                                package_view_data.insert("path".to_string(), PhpMixed::Null);
+                                package_view_data.path = Some(None);
                             }
                         }
 
-                        let mut package_is_abandoned: PhpMixed = PhpMixed::Bool(false);
+                        let mut package_is_abandoned = AbandonedState::Flag(false);
                         if let Some(latest) = latest_package
                             && let Some(c) = latest.as_complete()
                             && c.is_abandoned()
@@ -2666,18 +2410,16 @@ impl Command for ShowCommand {
                                 package.get_pretty_name(),
                                 replacement
                             );
-                            package_view_data
-                                .insert("warning".to_string(), PhpMixed::String(package_warning));
+                            package_view_data.warning = Some(package_warning);
                             package_is_abandoned = match replacement_package_name {
-                                Some(rp) => PhpMixed::String(rp),
-                                None => PhpMixed::Bool(true),
+                                Some(rp) => AbandonedState::Replacement(rp),
+                                None => AbandonedState::Flag(true),
                             };
                         }
 
-                        package_view_data.insert("abandoned".to_string(), package_is_abandoned);
+                        package_view_data.abandoned = Some(package_is_abandoned);
                     } else if let PackageOrName::Name(name) = package_or_name {
-                        package_view_data
-                            .insert("name".to_string(), PhpMixed::String(name.clone()));
+                        package_view_data.name = name.clone();
                         name_length = name_length.max(name.len());
                     }
                     view_type.push(package_view_data);
@@ -2704,25 +2446,8 @@ impl Command for ShowCommand {
         }
 
         if format == "json" {
-            let mut json_map: IndexMap<String, PhpMixed> = IndexMap::new();
-            for (k, v) in view_data.iter() {
-                json_map.insert(
-                    k.clone(),
-                    PhpMixed::List(
-                        v.iter()
-                            .map(|m| {
-                                PhpMixed::Array(
-                                    m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
-                                )
-                            })
-                            .collect(),
-                    ),
-                );
-            }
             let io = self.get_io();
-            io.write(&JsonFile::encode(&PhpMixed::Array(
-                json_map.into_iter().collect(),
-            ))?);
+            io.write(&JsonFile::encode(&ViewDataJson(&view_data))?);
         } else {
             if input.borrow().get_option("latest")?.as_bool() == Some(true)
                 && view_data.values().any(|v| !v.is_empty())
@@ -2785,13 +2510,10 @@ impl Command for ShowCommand {
                 }
 
                 if write_latest && input.borrow().get_option("direct")?.as_bool() != Some(true) {
-                    let mut direct_deps: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-                    let mut transitive_deps: Vec<IndexMap<String, PhpMixed>> = Vec::new();
+                    let mut direct_deps: Vec<PackageViewData> = Vec::new();
+                    let mut transitive_deps: Vec<PackageViewData> = Vec::new();
                     for pkg in packages.iter() {
-                        let is_direct = pkg
-                            .get("direct-dependency")
-                            .and_then(|v| v.as_bool())
-                            .unwrap_or(false);
+                        let is_direct = pkg.direct_dependency.unwrap_or(false);
                         if is_direct {
                             direct_deps.push(pkg.clone());
                         } else {
@@ -2901,6 +2623,153 @@ impl BaseCommand for ShowCommand {
 pub enum PackageOrName {
     Pkg(crate::package::PackageInterfaceHandle),
     Name(String),
+}
+
+/// Shape of `show <package> --format=json` output.
+#[derive(Debug, serde::Serialize)]
+struct PackageInfoJson {
+    name: String,
+    description: Option<String>,
+    keywords: Vec<String>,
+    r#type: String,
+    homepage: Option<String>,
+    names: Vec<String>,
+    versions: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    licenses: Option<Vec<LicenseJson>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    latest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source: Option<PackageReferenceJson>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dist: Option<PackageReferenceJson>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    path: Option<Option<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    released: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    replacement: Option<Option<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    suggests: Option<IndexMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    support: Option<IndexMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    autoload: Option<PhpMixed>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    include_path: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    requires: Option<IndexMap<String, String>>,
+    #[serde(rename = "devRequires", skip_serializing_if = "Option::is_none")]
+    dev_requires: Option<IndexMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    provides: Option<IndexMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    conflicts: Option<IndexMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    replaces: Option<IndexMap<String, String>>,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct PackageReferenceJson {
+    r#type: String,
+    url: Option<String>,
+    reference: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(untagged)]
+enum LicenseJson {
+    Id(String),
+    Detail {
+        name: String,
+        osi: String,
+        url: String,
+    },
+}
+
+/// Shape of `show --tree --format=json` output.
+#[derive(Debug, serde::Serialize)]
+struct PackageTreeJson {
+    installed: Vec<PackageTree>,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct PackageTree {
+    name: String,
+    version: String,
+    description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    requires: Option<Vec<PackageTreeChild>>,
+}
+
+#[derive(Debug, serde::Serialize)]
+struct PackageTreeChild {
+    name: String,
+    version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    requires: Option<Vec<PackageTreeChild>>,
+}
+
+/// Shape of the package list `--format=json` output. PHP `json_encode` emits an empty
+/// associative array as `[]`, not `{}`; mirror that for the top-level map.
+#[derive(Debug)]
+struct ViewDataJson<'a>(&'a IndexMap<String, Vec<PackageViewData>>);
+
+impl serde::Serialize for ViewDataJson<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if self.0.is_empty() {
+            use serde::ser::SerializeSeq;
+            return serializer.serialize_seq(Some(0))?.end();
+        }
+        serializer.collect_map(self.0.iter())
+    }
+}
+
+/// One entry of the package list, shared by the text renderer and the `--format=json` output.
+/// In a doubly wrapped field the outer `Option` marks key presence and the inner one the value,
+/// which PHP `isset()` and `array_key_exists()` tell apart.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+struct PackageViewData {
+    name: String,
+    #[serde(rename = "direct-dependency", skip_serializing_if = "Option::is_none")]
+    direct_dependency: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    homepage: Option<Option<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source: Option<Option<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    version: Option<String>,
+    #[serde(rename = "release-age", skip_serializing_if = "Option::is_none")]
+    release_age: Option<String>,
+    #[serde(rename = "release-date", skip_serializing_if = "Option::is_none")]
+    release_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    latest: Option<String>,
+    #[serde(rename = "latest-status", skip_serializing_if = "Option::is_none")]
+    latest_status: Option<String>,
+    #[serde(
+        rename = "latest-release-date",
+        skip_serializing_if = "Option::is_none"
+    )]
+    latest_release_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<Option<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    path: Option<Option<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    warning: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    abandoned: Option<AbandonedState>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(untagged)]
+enum AbandonedState {
+    Flag(bool),
+    Replacement(String),
 }
 
 #[derive(Debug, Clone)]
