@@ -5,7 +5,7 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
-use shirabe_pcre::Preg;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{php_regex, rawurlencode};
 use std::sync::OnceLock;
 
@@ -56,7 +56,7 @@ impl Hg {
         }
 
         // Try with the authentication information available
-        let matched = Preg::is_match_named(
+        let matched = Preg::is_match3(
             php_regex!(
                 r"{^(?P<proto>ssh|https?)://(?:(?P<user>[^:@]+)(?::(?P<pass>[^:@]+))?@)?(?P<host>[^/]+)(?P<path>/.*)?}mi"
             ),
@@ -64,30 +64,44 @@ impl Hg {
         );
 
         if let Some(matches) = matched
-            && self
-                .io
-                .has_authentication(matches.get("host").map(|s| s.as_str()).unwrap_or(""))
+            && self.io.has_authentication(
+                matches
+                    .get(&CaptureKey::ByName("host".to_string()))
+                    .unwrap_or(""),
+            )
         {
-            let authenticated_url = if matches.get("proto").map(|s| s.as_str()) == Some("ssh") {
-                let user = if let Some(u) = matches.get("user") {
+            let authenticated_url = if matches.get(&CaptureKey::ByName("proto".to_string()))
+                == Some("ssh")
+            {
+                let user = if let Some(u) = matches.get(&CaptureKey::ByName("user".to_string())) {
                     format!("{}@", rawurlencode(u))
                 } else {
                     String::new()
                 };
                 format!(
                     "{}://{}{}{}",
-                    matches.get("proto").unwrap_or(&String::new()),
+                    matches
+                        .get(&CaptureKey::ByName("proto".to_string()))
+                        .unwrap_or(""),
                     user,
-                    matches.get("host").unwrap_or(&String::new()),
-                    matches.get("path").unwrap_or(&String::new()),
+                    matches
+                        .get(&CaptureKey::ByName("host".to_string()))
+                        .unwrap_or(""),
+                    matches
+                        .get(&CaptureKey::ByName("path".to_string()))
+                        .unwrap_or(""),
                 )
             } else {
-                let auth = self
-                    .io
-                    .get_authentication(matches.get("host").map(|s| s.as_str()).unwrap_or(""));
+                let auth = self.io.get_authentication(
+                    matches
+                        .get(&CaptureKey::ByName("host".to_string()))
+                        .unwrap_or(""),
+                );
                 format!(
                     "{}://{}:{}@{}{}",
-                    matches.get("proto").unwrap_or(&String::new()),
+                    matches
+                        .get(&CaptureKey::ByName("proto".to_string()))
+                        .unwrap_or(""),
                     rawurlencode(
                         auth.get("username")
                             .and_then(|s| s.as_deref())
@@ -98,8 +112,12 @@ impl Hg {
                             .and_then(|s| s.as_deref())
                             .unwrap_or("")
                     ),
-                    matches.get("host").unwrap_or(&String::new()),
-                    matches.get("path").unwrap_or(&String::new()),
+                    matches
+                        .get(&CaptureKey::ByName("host".to_string()))
+                        .unwrap_or(""),
+                    matches
+                        .get(&CaptureKey::ByName("path".to_string()))
+                        .unwrap_or(""),
                 )
             };
 
@@ -151,12 +169,12 @@ impl Hg {
                     &mut output,
                     None,
                 ) == 0
-                    && let Some(matches) = Preg::is_match_with_indexed_captures(
+                    && let Some(matches) = Preg::is_match3(
                         php_regex!(r"/^.+? (\d+(?:\.\d+)+)(?:\+.*?)?\)?\r?\n/"),
                         &output,
                     )
                 {
-                    return matches.into_iter().nth(1).flatten();
+                    return matches.get(&CaptureKey::ByIndex(1)).map(str::to_string);
                 }
                 None
             })

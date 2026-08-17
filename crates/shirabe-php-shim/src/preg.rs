@@ -8,8 +8,7 @@ pub enum CaptureKey {
 }
 
 /// Defines a newtype over `IndexMap` for one of the `$matches` shapes the `preg_*` functions fill
-/// in. Also used by `shirabe_pcre` for the shapes `Composer\Pcre\Preg` adds on top.
-#[macro_export]
+/// in.
 macro_rules! preg_match_map {
     ($(#[$attr:meta])* $vis:vis struct $name:ident($key:ty => $value:ty);) => {
         $(#[$attr])*
@@ -58,18 +57,17 @@ macro_rules! preg_match_map {
     };
 }
 
-/// A single match's `$matches`: the `regex::Captures` the search produced, held alongside the
-/// pattern that produced it so groups can be read by both their named and their numbered form.
-/// `'h` is the lifetime of the searched subject, which the group values borrow from.
+/// A single match's `$matches`: the `regex::Captures` the search produced, read by either the named
+/// or the numbered form of a capture group. `'h` is the lifetime of the searched subject, which the
+/// group values borrow from.
 #[derive(Debug)]
 pub struct PregMatches<'h> {
-    pattern: ResolvedPattern,
     caps: regex::Captures<'h>,
 }
 
 impl<'h> PregMatches<'h> {
-    fn new(pattern: ResolvedPattern, caps: regex::Captures<'h>) -> Self {
-        Self { pattern, caps }
+    fn new(caps: regex::Captures<'h>) -> Self {
+        Self { caps }
     }
 
     /// The value of the group `key` names, or `None` if that group did not participate in the
@@ -81,20 +79,6 @@ impl<'h> PregMatches<'h> {
             CaptureKey::ByName(name) => self.caps.name(name),
         };
         group.map(|group| group.as_str())
-    }
-
-    /// Every capture group under both its named and its numbered key (the name preceding its
-    /// number), in the order PHP fills `$matches` in.
-    pub fn iter(&self) -> impl Iterator<Item = (CaptureKey, Option<&'h str>)> + '_ {
-        let (re, _anchored) = self.pattern.parts();
-        re.capture_names()
-            .enumerate()
-            .flat_map(move |(index, name)| {
-                let value = self.caps.get(index).map(|group| group.as_str());
-                name.map(|name| (CaptureKey::ByName(name.to_string()), value))
-                    .into_iter()
-                    .chain(std::iter::once((CaptureKey::ByIndex(index), value)))
-            })
     }
 }
 
@@ -169,20 +153,18 @@ pub fn preg_match2<'h>(
     offset: usize,
 ) -> Option<PregMatches<'h>> {
     let __resolved = pattern.resolve();
-    let caps = {
-        let (re, anchored) = __resolved.parts();
-        // An anchored (`A`) pattern must match starting exactly at `offset`; the `regex` crate
-        // cannot anchor a `captures_at` search, so search the sub-slice beginning at `offset` and
-        // require the match to start at its head.
-        if anchored {
-            re.captures(&subject[offset..])
-                .filter(|c| c.get(0).map(|m| m.start()) == Some(0))
-        } else {
-            re.captures_at(subject, offset)
-        }
+    let (re, anchored) = __resolved.parts();
+    // An anchored (`A`) pattern must match starting exactly at `offset`; the `regex` crate cannot
+    // anchor a `captures_at` search, so search the sub-slice beginning at `offset` and require the
+    // match to start at its head.
+    let caps = if anchored {
+        re.captures(&subject[offset..])
+            .filter(|c| c.get(0).map(|m| m.start()) == Some(0))
+    } else {
+        re.captures_at(subject, offset)
     }?;
 
-    Some(PregMatches::new(__resolved, caps))
+    Some(PregMatches::new(caps))
 }
 
 // PREG_PATTERN_ORDER: the outer vec is indexed by capture group, the inner by
@@ -381,7 +363,7 @@ where
     for caps in re.captures_iter(subject) {
         let m = caps.get(0).unwrap();
         out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
-        let matches = PregMatches::new(__resolved.clone(), caps);
+        let matches = PregMatches::new(caps);
         out.extend_from_slice(callback(&matches)?.as_bytes());
         last = m.end();
     }
@@ -503,7 +485,7 @@ fn translate_php_pattern(pattern: &str) -> anyhow::Result<(String, bool)> {
 /// `LazyLock<Regex>`) rather than an owned `regex::Regex` — `regex::Regex::clone()` does not share
 /// the underlying meta engine's search-cache pool, so producing a fresh owned clone here would pay
 /// a ~10us per-call cache warmup cost regardless of which path produced it (measured).
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum ResolvedPattern {
     Cached(Arc<(regex::Regex, bool)>),
     Static(&'static regex::Regex, bool),

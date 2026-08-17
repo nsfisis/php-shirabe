@@ -707,12 +707,12 @@ impl VersionGuesser {
                 trunk_path, branches_path, tags_path,
             );
 
-            if let Some(matches) = Preg::is_match_with_indexed_captures(&url_pattern, &output) {
-                let m1 = matches[1].clone().unwrap_or_default();
-                let m2 = matches[2].clone();
-                let m3 = matches[3].clone();
-                if let Some(m2) = m2.as_ref()
-                    && let Some(m3) = m3.as_ref()
+            if let Some(matches) = Preg::is_match3(&url_pattern, &output) {
+                let m1 = matches.get(&CaptureKey::ByIndex(1)).unwrap_or_default();
+                let m2 = matches.get(&CaptureKey::ByIndex(2));
+                let m3 = matches.get(&CaptureKey::ByIndex(3));
+                if let Some(m2) = m2
+                    && let Some(m3) = m3
                     && (branches_path == *m2 || tags_path == *m2)
                 {
                     // we are in a branches path
@@ -728,8 +728,8 @@ impl VersionGuesser {
                     }));
                 }
 
-                assert!(is_string(&PhpMixed::String(m1.clone())));
-                let pretty_version = trim(&m1, None);
+                assert!(is_string(&PhpMixed::String(m1.to_string())));
+                let pretty_version = trim(m1, None);
                 let version = if pretty_version == "trunk" {
                     "dev-trunk".to_string()
                 } else {

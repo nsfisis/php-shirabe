@@ -13,14 +13,9 @@
 
 pub use shirabe_php_shim::{CaptureKey, PregMatches, PregMatchesAll, PregMatchesAllWithOffsets};
 use shirabe_php_shim::{
-    PregPattern, preg_grep, preg_match_all_offset_capture, preg_match_all2, preg_match_map,
-    preg_match2, preg_replace_callback, preg_replace2,
+    PregPattern, preg_grep, preg_match_all_offset_capture, preg_match_all2, preg_match2,
+    preg_replace_callback, preg_replace2,
 };
-
-preg_match_map! {
-    /// The named capture groups of a single match, keyed by group name alone.
-    pub struct PregNamedGroups(String => String);
-}
 
 #[derive(Debug)]
 pub struct Preg;
@@ -107,35 +102,6 @@ impl Preg {
         offset: usize,
     ) -> Option<PregMatches<'h>> {
         Self::match4(pattern, subject, offset)
-    }
-
-    pub fn is_match_named(pattern: impl PregPattern, subject: &str) -> Option<PregNamedGroups> {
-        Some(
-            preg_match2(pattern, subject, 0)?
-                .iter()
-                .filter_map(|(key, value)| match (key, value) {
-                    (CaptureKey::ByName(name), Some(value)) => Some((name, value.to_string())),
-                    _ => None,
-                })
-                .collect(),
-        )
-    }
-
-    /// `is_match3` with the groups positioned by number rather than keyed, for callers that only
-    /// read numbered groups. Index 0 is the full match; an unmatched group is `None`.
-    pub fn is_match_with_indexed_captures(
-        pattern: impl PregPattern,
-        subject: &str,
-    ) -> Option<Vec<Option<String>>> {
-        Some(
-            preg_match2(pattern, subject, 0)?
-                .iter()
-                .filter_map(|(key, value)| match key {
-                    CaptureKey::ByIndex(_) => Some(value.map(str::to_string)),
-                    CaptureKey::ByName(_) => None,
-                })
-                .collect(),
-        )
     }
 
     pub fn is_match_all(pattern: impl PregPattern, subject: &str) -> PregMatchesAll {

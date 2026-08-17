@@ -737,21 +737,23 @@ impl JsonManipulator {
                 &children[cm.value_end..]
             );
         } else {
-            if let Some(leading_match) = Preg::is_match_named(
+            if let Some(leading_match) = Preg::is_match3(
                 php_regex!(
                     "#^\\{(?P<leadingspace>\\s*?)(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\}$#s"
                 ),
                 &children,
             ) {
                 let mut whitespace = leading_match
-                    .get("trailingspace")
-                    .cloned()
-                    .unwrap_or_default();
+                    .get(&CaptureKey::ByName("trailingspace".to_string()))
+                    .unwrap_or_default()
+                    .to_string();
                 let leading_space = leading_match
-                    .get("leadingspace")
-                    .cloned()
-                    .unwrap_or_default();
-                let content_present = leading_match.get("content").is_some();
+                    .get(&CaptureKey::ByName("leadingspace".to_string()))
+                    .unwrap_or_default()
+                    .to_string();
+                let content_present = leading_match
+                    .get(&CaptureKey::ByName("content".to_string()))
+                    .is_some();
                 if content_present {
                     let mut value_local = value;
                     if let Some(ref sub) = sub_name {
@@ -937,10 +939,12 @@ impl JsonManipulator {
         let children_clean = children_clean.ok_or_else(|| InvalidArgumentException::new("JsonManipulator: $childrenClean is not defined. Please report at https://github.com/nsfisis/php-shirabe/issues/new.".to_string()))?;
 
         // no child data left, $name was the only key in
-        if let Some(empty_match) = Preg::is_match_named(
+        if let Some(empty_match) = Preg::is_match3(
             php_regex!("#^\\{\\s*?(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\}$#s"),
             &children_clean,
-        ) && empty_match.get("content").is_none()
+        ) && empty_match
+            .get(&CaptureKey::ByName("content".to_string()))
+            .is_none()
         {
             self.contents = format!(
                 "{}{{{}{}}}{}",
@@ -1032,20 +1036,20 @@ impl JsonManipulator {
             return Ok(false);
         }
 
-        if let Some(leading_match) = Preg::is_match_named(
+        if let Some(leading_match) = Preg::is_match3(
             php_regex!(
                 "#^\\[(?P<leadingspace>\\s*?)(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\]$#s"
             ),
             &children,
         ) {
             let leading_whitespace = leading_match
-                .get("leadingspace")
-                .cloned()
-                .unwrap_or_default();
+                .get(&CaptureKey::ByName("leadingspace".to_string()))
+                .unwrap_or_default()
+                .to_string();
             let mut whitespace = leading_match
-                .get("trailingspace")
-                .cloned()
-                .unwrap_or_default();
+                .get(&CaptureKey::ByName("trailingspace".to_string()))
+                .unwrap_or_default()
+                .to_string();
             let mut leading_item_whitespace =
                 format!("{}{}{}", self.newline, self.indent, self.indent);
             let mut trailing_item_whitespace = whitespace.clone();
@@ -1058,7 +1062,10 @@ impl JsonManipulator {
                 item_depth = 0;
             }
 
-            if leading_match.get("content").is_some() {
+            if leading_match
+                .get(&CaptureKey::ByName("content".to_string()))
+                .is_some()
+            {
                 // child missing but non empty children
                 if append {
                     children = Preg::replace(

@@ -10,7 +10,7 @@ use crate::package::base_package::{self};
 use crate::repository::CompositeRepository;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
+use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{PhpMixed, impl_php_class, php_regex};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
@@ -63,11 +63,9 @@ impl FundCommand {
                 .and_then(|v| v.as_string())
                 .unwrap_or("");
             if r#type == "github"
-                && let Some(matches) = Preg::is_match_with_indexed_captures(
-                    php_regex!(r"{^https://github.com/([^/]+)$}"),
-                    &url,
-                )
-                && let Some(sponsor) = matches.into_iter().nth(1).flatten()
+                && let Some(matches) =
+                    Preg::is_match3(php_regex!(r"{^https://github.com/([^/]+)$}"), &url)
+                && let Some(sponsor) = matches.get(&CaptureKey::ByIndex(1)).map(str::to_string)
             {
                 url = format!("https://github.com/sponsors/{}", sponsor);
             }

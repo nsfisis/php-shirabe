@@ -316,15 +316,14 @@ impl BinaryInstaller {
             file_get_contents5(bin, false, PhpMixed::Null, 0, Some(500)).unwrap_or_default();
         // For php files, we generate a PHP proxy instead of a shell one,
         // which allows calling the proxy with a custom php process
-        if let Some(m) = Preg::is_match_with_indexed_captures(
+        if let Some(m) = Preg::is_match3(
             php_regex!(r"{^(#!.*\r?\n)?[\r\n\t ]*<\?php}"),
             &bin_contents,
         ) {
             // carry over the existing shebang if present, otherwise add our own
-            let proxy_code = if m[1].is_none() {
-                "#!/usr/bin/env php".to_string()
-            } else {
-                trim(m[1].as_deref().unwrap_or(""), None)
+            let proxy_code = match m.get(&CaptureKey::ByIndex(1)) {
+                None => "#!/usr/bin/env php".to_string(),
+                Some(shebang) => trim(shebang, None),
             };
             let bin_path_exported = self
                 .filesystem
@@ -370,7 +369,7 @@ impl BinaryInstaller {
                 $data = str_replace('__FILE__', var_export($this->realpath, true), $data);"
                     .to_string();
             }
-            if trim(m[0].as_deref().unwrap_or(""), None) != "<?php" {
+            if trim(m.get(&CaptureKey::ByIndex(0)).unwrap_or(""), None) != "<?php" {
                 stream_hint =
                     " using a stream wrapper to prevent the shebang from being output on PHP<8\n *"
                         .to_string();

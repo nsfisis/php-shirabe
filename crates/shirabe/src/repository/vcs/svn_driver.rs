@@ -258,16 +258,15 @@ impl SvnDriver {
         let identifier = format!("/{}/", trim(identifier, Some("/")));
 
         let (path, rev) = if let Some(m) =
-            Preg::is_match_with_indexed_captures(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
+            Preg::is_match3(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
+            && let Some(rev) = m.get(&CaptureKey::ByIndex(2))
         {
-            if m[2].is_some() {
-                (
-                    m[1].clone().unwrap_or_default(),
-                    m[2].clone().unwrap_or_default(),
-                )
-            } else {
-                (identifier.clone(), String::new())
-            }
+            (
+                m.get(&CaptureKey::ByIndex(1))
+                    .unwrap_or_default()
+                    .to_string(),
+                rev.to_string(),
+            )
         } else {
             (identifier, String::new())
         };
@@ -298,16 +297,15 @@ impl SvnDriver {
         let identifier = format!("/{}/", trim(identifier, Some("/")));
 
         let (path, rev) = if let Some(m) =
-            Preg::is_match_with_indexed_captures(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
+            Preg::is_match3(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
+            && let Some(rev) = m.get(&CaptureKey::ByIndex(2))
         {
-            if m[2].is_some() {
-                (
-                    m[1].clone().unwrap_or_default(),
-                    m[2].clone().unwrap_or_default(),
-                )
-            } else {
-                (identifier.clone(), String::new())
-            }
+            (
+                m.get(&CaptureKey::ByIndex(1))
+                    .unwrap_or_default()
+                    .to_string(),
+                rev.to_string(),
+            )
         } else {
             (identifier, String::new())
         };
