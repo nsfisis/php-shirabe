@@ -2,6 +2,7 @@
 
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::util::CommandLine;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
@@ -138,28 +139,19 @@ impl Perforce {
         let task = vec!["client".to_string(), "-d".to_string(), client];
         let use_p4_client = false;
         let command = self.generate_p4_command(task, use_p4_client);
-        self.execute_command(PhpMixed::List(
-            command.into_iter().map(PhpMixed::String).collect(),
-        ));
+        self.execute_command(CommandLine::Args(command));
         let client_spec = self.get_p4_client_spec();
         let file_system = self.get_filesystem();
         file_system.borrow_mut().remove(&client_spec);
     }
 
-    fn execute_command(&mut self, command: PhpMixed) -> i64 {
+    fn execute_command(&mut self, command: CommandLine) -> i64 {
         self.command_result = String::new();
 
-        let cmd_vec: Vec<String> = match &command {
-            PhpMixed::List(l) => l
-                .iter()
-                .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                .collect(),
-            PhpMixed::String(s) => vec![s.clone()],
-            _ => vec![],
-        };
         self.process
             .borrow_mut()
-            .execute_args(&cmd_vec, &mut self.command_result, None)
+            .execute(command, &mut self.command_result, None)
+            .unwrap_or(1)
     }
 
     pub fn get_client(&mut self) -> String {
@@ -272,7 +264,7 @@ impl Perforce {
                 ProcessExecutor::escape(self.p4_user.as_deref().unwrap_or(""))
             )
         };
-        self.execute_command(PhpMixed::String(command));
+        self.execute_command(CommandLine::Shell(command));
 
         Ok(())
     }
@@ -280,7 +272,7 @@ impl Perforce {
     fn get_p4_variable(&mut self, name: &str) -> Option<String> {
         if self.windows_flag {
             let command = format!("{} set", Self::get_p4_executable());
-            self.execute_command(PhpMixed::String(command));
+            self.execute_command(CommandLine::Shell(command));
             let result = trim(&self.command_result, None);
             let res_array = explode(PHP_EOL, &result);
             for line in &res_array {
@@ -302,7 +294,7 @@ impl Perforce {
         }
 
         let command = format!("echo ${}", name);
-        self.execute_command(PhpMixed::String(command));
+        self.execute_command(CommandLine::Shell(command));
         let result = trim(&self.command_result, None);
 
         Some(result)
@@ -346,9 +338,7 @@ impl Perforce {
 
     pub fn is_logged_in(&mut self) -> anyhow::Result<bool> {
         let command = self.generate_p4_command(vec!["login".to_string(), "-s".to_string()], false);
-        let exit_code = self.execute_command(PhpMixed::List(
-            command.into_iter().map(PhpMixed::String).collect(),
-        ));
+        let exit_code = self.execute_command(CommandLine::Args(command));
         if exit_code != 0 {
             let error_output = self.process.borrow().get_error_output().to_string();
             let user = self.get_user().unwrap_or_default();
@@ -395,9 +385,7 @@ impl Perforce {
         if let Some(source_reference) = source_reference {
             p4_sync_command.push(format!("@{}", source_reference));
         }
-        self.execute_command(PhpMixed::List(
-            p4_sync_command.into_iter().map(PhpMixed::String).collect(),
-        ));
+        self.execute_command(CommandLine::Args(p4_sync_command));
         chdir(&prev_dir);
 
         Ok(())
@@ -587,9 +575,7 @@ impl Perforce {
         let path = self.get_file_path(file, identifier)?;
 
         let command = self.generate_p4_command(vec!["print".to_string(), path], true);
-        self.execute_command(PhpMixed::List(
-            command.into_iter().map(PhpMixed::String).collect(),
-        ));
+        self.execute_command(CommandLine::Args(command));
         let result = self.command_result.clone();
 
         if trim(&result, None).is_empty() {
@@ -613,9 +599,7 @@ impl Perforce {
             substr(identifier, idx, None)
         );
         let command = self.generate_p4_command(vec!["files".to_string(), path], false);
-        self.execute_command(PhpMixed::List(
-            command.into_iter().map(PhpMixed::String).collect(),
-        ));
+        self.execute_command(CommandLine::Args(command));
         let result = self.command_result.clone();
         let index2 = strpos(&result, "no such file(s).");
         if index2.is_none() {
@@ -651,9 +635,7 @@ impl Perforce {
                 ],
                 true,
             );
-            self.execute_command(PhpMixed::List(
-                command.into_iter().map(PhpMixed::String).collect(),
-            ));
+            self.execute_command(CommandLine::Args(command));
             let result = self.command_result.clone();
             let res_array = explode(PHP_EOL, &result);
             for line in &res_array {
@@ -673,9 +655,7 @@ impl Perforce {
             vec!["changes".to_string(), format!("{}/...", stream)],
             false,
         );
-        self.execute_command(PhpMixed::List(
-            command.into_iter().map(PhpMixed::String).collect(),
-        ));
+        self.execute_command(CommandLine::Args(command));
         let result = self.command_result.clone();
         let res_array = explode(PHP_EOL, &result);
         let last_commit = res_array.first().cloned().unwrap_or_default();
@@ -699,9 +679,7 @@ impl Perforce {
 
     pub fn get_tags(&mut self) -> IndexMap<String, String> {
         let command = self.generate_p4_command(vec!["labels".to_string()], true);
-        self.execute_command(PhpMixed::List(
-            command.into_iter().map(PhpMixed::String).collect(),
-        ));
+        self.execute_command(CommandLine::Args(command));
         let result = self.command_result.clone();
         let res_array = explode(PHP_EOL, &result);
         let mut tags: IndexMap<String, String> = IndexMap::new();
@@ -719,9 +697,7 @@ impl Perforce {
 
     pub fn check_stream(&mut self) -> bool {
         let command = self.generate_p4_command(vec!["depots".to_string()], false);
-        self.execute_command(PhpMixed::List(
-            command.into_iter().map(PhpMixed::String).collect(),
-        ));
+        self.execute_command(CommandLine::Args(command));
         let result = self.command_result.clone();
         let res_array = explode(PHP_EOL, &result);
         for line in &res_array {
@@ -747,9 +723,7 @@ impl Perforce {
         let label = substr(reference, index as i64, None);
         let command =
             self.generate_p4_command(vec!["changes".to_string(), "-m1".to_string(), label], true);
-        self.execute_command(PhpMixed::List(
-            command.into_iter().map(PhpMixed::String).collect(),
-        ));
+        self.execute_command(CommandLine::Args(command));
         let changes = self.command_result.clone();
         if strpos(&changes, "Change") != Some(0) {
             return None;
@@ -771,9 +745,7 @@ impl Perforce {
             ],
             true,
         );
-        self.execute_command(PhpMixed::List(
-            command.into_iter().map(PhpMixed::String).collect(),
-        ));
+        self.execute_command(CommandLine::Args(command));
 
         Some(self.command_result.clone())
     }

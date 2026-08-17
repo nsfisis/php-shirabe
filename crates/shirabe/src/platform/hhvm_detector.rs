@@ -58,22 +58,17 @@ impl HhvmDetectorInterface for HhvmDetector {
                     std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)))
                 });
                 let mut version_output = shirabe_php_shim::PhpMixed::Null;
-                let cmd = shirabe_php_shim::PhpMixed::List(
-                    [
-                        hhvm_path.as_str(),
-                        "--php",
-                        "-d",
-                        "hhvm.jit=0",
-                        "-r",
-                        "echo HHVM_VERSION;",
-                    ]
-                    .into_iter()
-                    .map(|s| shirabe_php_shim::PhpMixed::String(s.to_string()))
-                    .collect(),
-                );
+                let cmd = [
+                    hhvm_path.as_str(),
+                    "--php",
+                    "-d",
+                    "hhvm.jit=0",
+                    "-r",
+                    "echo HHVM_VERSION;",
+                ];
                 let exit_code = executor
                     .borrow_mut()
-                    .execute(cmd, &mut version_output, None)
+                    .execute(&cmd, &mut version_output, None)
                     .unwrap_or(1);
                 if exit_code == 0 {
                     *cache = Some(version_output.as_string().map(|s| s.to_string()));

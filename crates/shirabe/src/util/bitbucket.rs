@@ -81,7 +81,7 @@ impl Bitbucket {
             .process
             .borrow_mut()
             .execute(
-                PhpMixed::from(vec!["git", "config", "bitbucket.accesstoken"]),
+                &["git", "config", "bitbucket.accesstoken"],
                 &mut output,
                 None,
             )

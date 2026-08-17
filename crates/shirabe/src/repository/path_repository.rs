@@ -256,16 +256,16 @@ impl PathRepository {
             {
                 let mut ref1 = PhpMixed::Null;
                 let mut ref2 = PhpMixed::Null;
-                let cmd = PhpMixed::from(vec!["git", "rev-parse", "HEAD"]);
+                let cmd = ["git", "rev-parse", "HEAD"];
                 let code1 = self
                     .process
                     .borrow_mut()
-                    .execute(cmd.clone(), &mut ref1, Some(path.as_str()))
+                    .execute(&cmd, &mut ref1, Some(path.as_str()))
                     .unwrap_or(1);
                 let code2 = self
                     .process
                     .borrow_mut()
-                    .execute(cmd, &mut ref2, None)
+                    .execute(&cmd, &mut ref2, None)
                     .unwrap_or(1);
                 if code1 == 0 && code2 == 0 && ref1.as_string() == ref2.as_string() {
                     package.insert(
@@ -292,7 +292,7 @@ impl PathRepository {
                 && self
                     .process
                     .borrow_mut()
-                    .execute(PhpMixed::from(command), &mut output, Some(path.as_str()))
+                    .execute(command, &mut output, Some(path.as_str()))
                     .unwrap_or(1)
                     == 0
             {

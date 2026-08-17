@@ -79,16 +79,12 @@ impl ArchiveDownloader for RarDownloader {
             ];
 
             let mut process_output = PhpMixed::Null;
-            if self.inner.process.borrow_mut().execute(
-                PhpMixed::List(
-                    command
-                        .iter()
-                        .map(|s| PhpMixed::String(s.clone()))
-                        .collect(),
-                ),
-                &mut process_output,
-                None,
-            )? == 0
+            if self
+                .inner
+                .process
+                .borrow_mut()
+                .execute(&command, &mut process_output, None)?
+                == 0
             {
                 return Ok(None);
             }

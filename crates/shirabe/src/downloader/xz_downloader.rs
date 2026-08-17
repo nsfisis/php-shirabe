@@ -66,16 +66,12 @@ impl ArchiveDownloader for XzDownloader {
         let command = ["tar", "-xJf", file, "-C", path];
 
         let mut ignored_output = PhpMixed::Null;
-        if self.inner.process.borrow_mut().execute(
-            PhpMixed::List(
-                command
-                    .iter()
-                    .map(|s| PhpMixed::String(s.to_string()))
-                    .collect(),
-            ),
-            &mut ignored_output,
-            None,
-        )? == 0
+        if self
+            .inner
+            .process
+            .borrow_mut()
+            .execute(&command, &mut ignored_output, None)?
+            == 0
         {
             return Ok(None);
         }

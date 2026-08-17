@@ -808,7 +808,7 @@ impl Locker {
                     let command = GitUtil::build_rev_list_command(&self.process, args);
                     let mut output = PhpMixed::Null;
                     if 0 == self.process.borrow_mut().execute(
-                        PhpMixed::List(command.into_iter().map(PhpMixed::String).collect()),
+                        command,
                         &mut output,
                         path.as_deref(),
                     )? {
@@ -828,14 +828,14 @@ impl Locker {
                 "hg" => {
                     let mut output = PhpMixed::Null;
                     if 0 == self.process.borrow_mut().execute(
-                        PhpMixed::List(vec![
-                            PhpMixed::String("hg".to_string()),
-                            PhpMixed::String("log".to_string()),
-                            PhpMixed::String("--template".to_string()),
-                            PhpMixed::String("{date|hgdate}".to_string()),
-                            PhpMixed::String("-r".to_string()),
-                            PhpMixed::String(source_ref),
-                        ]),
+                        vec![
+                            "hg".to_string(),
+                            "log".to_string(),
+                            "--template".to_string(),
+                            "{date|hgdate}".to_string(),
+                            "-r".to_string(),
+                            source_ref,
+                        ],
                         &mut output,
                         path.as_deref(),
                     )? && let Some(m) = preg_match(

@@ -5,6 +5,7 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::util::Bitbucket;
+use crate::util::CommandLine;
 use crate::util::Filesystem;
 use crate::util::GitHub;
 use crate::util::GitLab;
@@ -101,10 +102,10 @@ impl Git {
         initial_clone: bool,
         command_output: impl RunCommandOutput,
     ) -> anyhow::Result<()> {
-        let mut callables: Vec<Box<dyn Fn(&str) -> Vec<String>>> = vec![];
+        let mut callables: Vec<Box<dyn Fn(&str) -> CommandLine>> = vec![];
         for cmd in commands {
             let cmd_clone = cmd.clone();
-            callables.push(Box::new(move |url: &str| -> Vec<String> {
+            callables.push(Box::new(move |url: &str| -> CommandLine {
                 let mut map: IndexMap<String, String> = IndexMap::new();
                 map.insert("%url%".to_string(), url.to_string());
                 map.insert(
@@ -112,10 +113,10 @@ impl Git {
                     preg_replace(php_regex!(r"{://([^@]+?):(.+?)@}"), "://", url),
                 );
 
-                array_map(
+                CommandLine::Args(array_map(
                     |value: &String| map.get(value).cloned().unwrap_or_else(|| value.clone()),
                     &cmd_clone,
-                )
+                ))
             }));
         }
 
@@ -127,7 +128,7 @@ impl Git {
     /// mirroring `Git::runCommand` as exercised by `GitTest`.
     pub fn __run_command(
         &mut self,
-        command_callable: Vec<Box<dyn Fn(&str) -> Vec<String>>>,
+        command_callable: Vec<Box<dyn Fn(&str) -> CommandLine>>,
         url: &str,
         cwd: Option<&str>,
         initial_clone: bool,
@@ -140,14 +141,14 @@ impl Git {
     ///                                    if a callable is passed it will be used as output handler
     fn run_command(
         &mut self,
-        command_callable: Vec<Box<dyn Fn(&str) -> Vec<String>>>,
+        command_callable: Vec<Box<dyn Fn(&str) -> CommandLine>>,
         url: &str,
         cwd: Option<&str>,
         initial_clone: bool,
         mut command_output: impl RunCommandOutput,
     ) -> anyhow::Result<()> {
         let command_callables = command_callable;
-        let mut last_command: PhpMixed = PhpMixed::String(String::new());
+        let mut last_command = CommandLine::Shell(String::new());
 
         // Ensure we are allowed to use this URL by config
         self.config.borrow_mut().prohibit_url_by_config(
@@ -167,7 +168,7 @@ impl Git {
         // PHP closure: $runCommands = function ($url) use (...) { ... };
         let run_commands_inline = |url_arg: &str,
                                    this_process: &mut ProcessExecutor,
-                                   last_cmd: &mut PhpMixed,
+                                   last_cmd: &mut CommandLine,
                                    output: &mut dyn RunCommandOutput|
          -> i64 {
             let collect_outputs = output.collect_outputs();
@@ -176,8 +177,7 @@ impl Git {
             let mut status: i64 = 0;
             for (counter, callable) in command_callables.iter().enumerate() {
                 let cmd = callable(url_arg);
-                *last_cmd =
-                    PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect());
+                *last_cmd = cmd.clone();
                 let exec_cwd = if initial_clone && counter == 0 {
                     None
                 } else {
@@ -185,16 +185,13 @@ impl Git {
                 };
                 if collect_outputs {
                     let mut local_output = String::new();
-                    status =
-                        this_process.execute_args(&cmd, &mut local_output, exec_cwd.as_deref());
+                    status = this_process
+                        .execute(cmd, &mut local_output, exec_cwd.as_deref())
+                        .unwrap_or(1);
                     outputs.push(local_output);
                 } else {
                     status = this_process
-                        .execute(
-                            &cmd[..],
-                            output.make_handler().unwrap(),
-                            exec_cwd.as_deref(),
-                        )
+                        .execute(cmd, output.make_handler().unwrap(), exec_cwd.as_deref())
                         .unwrap_or(1);
                 }
                 if status != 0 {
@@ -747,14 +744,8 @@ impl Git {
             }
 
             let mut last_command_str = match &last_command {
-                PhpMixed::List(l) => {
-                    let parts: Vec<String> = l
-                        .iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect();
-                    implode(" ", &parts)
-                }
-                _ => last_command.as_string().unwrap_or("").to_string(),
+                CommandLine::Args(args) => implode(" ", args),
+                CommandLine::Shell(command) => command.clone(),
             };
             if (credentials.len() as i64) > 0 {
                 last_command_str = self.mask_credentials(&last_command_str, &credentials);

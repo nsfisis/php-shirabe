@@ -192,7 +192,7 @@ fn test_query_p4_user_with_user_already_set() {
 fn test_query_p4_user_with_user_set_in_p4_variables_with_windows_os() {
     let (process, _guard) = get_process_executor_mock(
         vec![cmd_full(
-            vec!["p4 set"],
+            "p4 set",
             0,
             format!("P4USER=TEST_P4VARIABLE_USER{}", shirabe_php_shim::PHP_EOL),
             "",
@@ -216,7 +216,7 @@ fn test_query_p4_user_with_user_set_in_p4_variables_with_windows_os() {
 fn test_query_p4_user_with_user_set_in_p4_variables_not_windows_os() {
     let (process, _guard) = get_process_executor_mock(
         vec![cmd_full(
-            vec!["echo $P4USER"],
+            "echo $P4USER",
             0,
             format!("TEST_P4VARIABLE_USER{}", shirabe_php_shim::PHP_EOL),
             "",
@@ -259,7 +259,7 @@ fn test_query_p4_user_stores_response_to_query_for_user_with_windows() {
         ProcessExecutor::escape("TEST_QUERY_USER")
     );
     let (process, _guard) = get_process_executor_mock(
-        vec![cmd(vec!["p4 set"]), cmd(vec![expected_command.as_str()])],
+        vec![cmd("p4 set"), cmd(expected_command.as_str())],
         true,
         MockHandler::default(),
     );
@@ -280,10 +280,7 @@ fn test_query_p4_user_stores_response_to_query_for_user_without_windows() {
         ProcessExecutor::escape("TEST_QUERY_USER")
     );
     let (process, _guard) = get_process_executor_mock(
-        vec![
-            cmd(vec!["echo $P4USER"]),
-            cmd(vec![expected_command.as_str()]),
-        ],
+        vec![cmd("echo $P4USER"), cmd(expected_command.as_str())],
         true,
         MockHandler::default(),
     );
@@ -304,7 +301,7 @@ fn test_query_p4_user_escapes_injection_on_windows() {
         ProcessExecutor::escape("foo && calc.exe")
     );
     let (process, _guard) = get_process_executor_mock(
-        vec![cmd(vec!["p4 set"]), cmd(vec![expected_command.as_str()])],
+        vec![cmd("p4 set"), cmd(expected_command.as_str())],
         true,
         MockHandler::default(),
     );
@@ -322,10 +319,7 @@ fn test_query_p4_user_escapes_injection_on_windows() {
 fn test_query_p4_user_escapes_injection_on_unix() {
     let expected_command = format!("export P4USER={}", ProcessExecutor::escape("foo; id"));
     let (process, _guard) = get_process_executor_mock(
-        vec![
-            cmd(vec!["echo $P4USER"]),
-            cmd(vec![expected_command.as_str()]),
-        ],
+        vec![cmd("echo $P4USER"), cmd(expected_command.as_str())],
         true,
         MockHandler::default(),
     );
@@ -368,7 +362,7 @@ fn test_query_p4_password_with_password_already_set() {
 fn test_query_p4_password_with_password_set_in_p4_variables_with_windows_os() {
     let (process, _guard) = get_process_executor_mock(
         vec![cmd_full(
-            vec!["p4 set"],
+            "p4 set",
             0,
             format!(
                 "P4PASSWD=TEST_P4VARIABLE_PASSWORD{}",
@@ -391,7 +385,7 @@ fn test_query_p4_password_with_password_set_in_p4_variables_with_windows_os() {
 fn test_query_p4_password_with_password_set_in_p4_variables_not_windows_os() {
     let (process, _guard) = get_process_executor_mock(
         vec![cmd_full(
-            vec!["echo $P4PASSWD"],
+            "echo $P4PASSWD",
             0,
             format!("TEST_P4VARIABLE_PASSWORD{}", shirabe_php_shim::PHP_EOL),
             "",

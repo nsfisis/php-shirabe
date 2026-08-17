@@ -10,10 +10,9 @@ use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect, array_map,
-    escapeshellarg, explode, implode, in_array_strict, is_array, is_dir, is_numeric, is_string,
-    php_regex, preg_is_match, preg_match, preg_replace, preg_replace_callback, preg_replace2,
-    preg_split, rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array,
-    substr_replace, trim,
+    escapeshellarg, explode, implode, in_array_strict, is_dir, is_numeric, php_regex,
+    preg_is_match, preg_match, preg_replace, preg_replace_callback, preg_replace2, preg_split,
+    rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use shirabe_symfony_process::Process;
@@ -26,6 +25,12 @@ static EXECUTABLES: LazyLock<Mutex<IndexMap<String, String>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 static TIMEOUT: LazyLock<Mutex<i64>> = LazyLock::new(|| Mutex::new(300));
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommandLine {
+    Shell(String),
+    Args(Vec<String>),
+}
 
 #[derive(Debug)]
 pub struct ProcessExecutor {
@@ -63,8 +68,7 @@ pub struct ProcessExecutorMockState {
 
 /// A single expected command (`array{cmd, return, stdout, stderr, callback}` in PHP).
 pub struct MockExpectation {
-    /// `string|list<string>`: a `PhpMixed::String` or `PhpMixed::List`.
-    pub cmd: PhpMixed,
+    pub cmd: CommandLine,
     pub r#return: i64,
     pub stdout: String,
     pub stderr: String,
@@ -87,7 +91,7 @@ impl std::fmt::Debug for MockExpectation {
 impl MockExpectation {
     /// Builds an expectation from just a command (string or list), defaulting the rest, matching
     /// PHP's handling of bare `string`/`list` entries in `expects`.
-    pub fn from_cmd(cmd: PhpMixed) -> Self {
+    pub fn from_cmd(cmd: CommandLine) -> Self {
         Self {
             cmd,
             r#return: 0,
@@ -174,15 +178,11 @@ impl ProcessExecutor {
         output: &mut String,
         cwd: Option<&str>,
     ) -> i64 {
-        let cmd = PhpMixed::List(
-            command
-                .iter()
-                .map(|s| PhpMixed::String(s.clone()))
-                .collect(),
-        );
-        let mut buf = PhpMixed::String(String::new());
-        let rc = self.execute(cmd, &mut buf, cwd).unwrap_or(1);
-        *output = buf.as_string().unwrap_or("").to_string();
+        let mut buf = String::new();
+        let rc = self
+            .execute(CommandLine::Args(command.to_vec()), &mut buf, cwd)
+            .unwrap_or(1);
+        *output = buf;
         rc
     }
 
@@ -201,7 +201,7 @@ impl ProcessExecutor {
 
     fn run_process<'o, O>(
         &mut self,
-        command: PhpMixed,
+        command: CommandLine,
         cwd: Option<&str>,
         env: Option<IndexMap<String, String>>,
         tty: bool,
@@ -213,48 +213,44 @@ impl ProcessExecutor {
         // On Windows, we don't rely on the OS to find the executable if possible to avoid lookups
         // in the current directory which could be untrusted. Instead we use the ExecutableFinder.
 
-        let mut process: Process;
-        if is_string(&command) {
-            let mut command_str = command.as_string().unwrap_or("").to_string();
-            if Platform::is_windows()
-                && let Some(m) = preg_match(php_regex!(r"{^([^:/\\]++) }"), &command_str)
-            {
-                let m1 = m.get(1).unwrap_or_default().to_string();
-                command_str = substr_replace(
-                    &command_str,
-                    &Self::escape(&Self::get_executable(&m1)),
-                    0,
-                    Some(strlen(&m1)),
-                );
-            }
+        let mut process: Process = match command {
+            CommandLine::Shell(mut command) => {
+                if Platform::is_windows()
+                    && let Some(m) = preg_match(php_regex!(r"{^([^:/\\]++) }"), &command)
+                {
+                    let m1 = m.get(1).unwrap_or_default().to_string();
+                    command = substr_replace(
+                        &command,
+                        &Self::escape(&Self::get_executable(&m1)),
+                        0,
+                        Some(strlen(&m1)),
+                    );
+                }
 
-            process = Process::from_shell_commandline(
-                &command_str,
-                cwd,
-                env,
-                PhpMixed::Null,
-                Some(Self::get_timeout() as f64),
-            )?;
-        } else if let PhpMixed::List(ref list) = command {
-            let mut cmd_vec: Vec<String> = list
-                .iter()
-                .map(|v| v.as_string().unwrap_or("").to_string())
-                .collect();
-            if Platform::is_windows() && strlen(&cmd_vec[0]) == strcspn(&cmd_vec[0], ":/\\") as i64
-            {
-                cmd_vec[0] = Self::get_executable(&cmd_vec[0]);
+                Process::from_shell_commandline(
+                    &command,
+                    cwd,
+                    env,
+                    PhpMixed::Null,
+                    Some(Self::get_timeout() as f64),
+                )?
             }
+            CommandLine::Args(mut command) => {
+                if Platform::is_windows()
+                    && strlen(&command[0]) == strcspn(&command[0], ":/\\") as i64
+                {
+                    command[0] = Self::get_executable(&command[0]);
+                }
 
-            process = Process::new(
-                cmd_vec,
-                cwd.map(String::from),
-                env,
-                PhpMixed::Null,
-                Some(Self::get_timeout() as f64),
-            )?;
-        } else {
-            return Err(LogicException::new("Invalid command type".to_string()).into());
-        }
+                Process::new(
+                    command,
+                    cwd.map(String::from),
+                    env,
+                    PhpMixed::Null,
+                    Some(Self::get_timeout() as f64),
+                )?
+            }
+        };
 
         if !Platform::is_windows() && tty {
             // PHP: try { $process->setTty(true); } catch (RuntimeException $e) { /* ignore */ }
@@ -324,7 +320,7 @@ impl ProcessExecutor {
 
     fn do_execute<'o, O>(
         &mut self,
-        command: PhpMixed,
+        command: CommandLine,
         cwd: Option<&str>,
         tty: bool,
         output: O,
@@ -349,21 +345,21 @@ impl ProcessExecutor {
         {
             let is_bare_repository = !is_dir(format!("{}/.git", rtrim(cwd, Some("/"))));
             if is_bare_repository {
-                let mut config_value = PhpMixed::String(String::new());
+                let mut config_value = String::new();
                 let mut git_env: IndexMap<String, String> = IndexMap::new();
                 git_env.insert("GIT_DIR".to_string(), cwd.to_string());
                 self.run_process(
-                    PhpMixed::List(vec![
-                        PhpMixed::String("git".to_string()),
-                        PhpMixed::String("config".to_string()),
-                        PhpMixed::String("safe.bareRepository".to_string()),
+                    CommandLine::Args(vec![
+                        "git".to_string(),
+                        "config".to_string(),
+                        "safe.bareRepository".to_string(),
                     ]),
                     Some(cwd),
                     Some(git_env.clone()),
                     tty,
                     &mut config_value,
                 )?;
-                let trimmed = trim(config_value.as_string().unwrap_or(""), None);
+                let trimmed = trim(&config_value, None);
                 if trimmed == "explicit" {
                     env = Some(git_env);
                 }
@@ -386,27 +382,12 @@ impl ProcessExecutor {
     /// `execute_async`'s `&self` receiver can still consume it.
     fn mock_match(
         &self,
-        command: &PhpMixed,
+        command: &CommandLine,
         cwd: Option<&str>,
     ) -> anyhow::Result<(String, String, i64)> {
-        let command_string = if is_array(command) {
-            match command {
-                PhpMixed::List(l) => implode(
-                    " ",
-                    &l.iter()
-                        .map(|v| v.as_string().unwrap_or("").to_string())
-                        .collect::<Vec<_>>(),
-                ),
-                PhpMixed::Array(m) => implode(
-                    " ",
-                    &m.values()
-                        .map(|v| v.as_string().unwrap_or("").to_string())
-                        .collect::<Vec<_>>(),
-                ),
-                _ => String::new(),
-            }
-        } else {
-            command.as_string().unwrap_or("").to_string()
+        let command_string = match command {
+            CommandLine::Args(args) => implode(" ", args),
+            CommandLine::Shell(command) => command.clone(),
         };
 
         let mut mock = self.mock.as_ref().unwrap().borrow_mut();
@@ -473,7 +454,7 @@ impl ProcessExecutor {
     /// emits stdout/stderr through the output target and records `error_output`.
     fn mock_do_execute<'o, O>(
         &mut self,
-        command: PhpMixed,
+        command: CommandLine,
         cwd: Option<&str>,
         output: O,
     ) -> anyhow::Result<i64>
@@ -546,26 +527,9 @@ impl ProcessExecutor {
         if !expectations.is_empty() {
             let remaining: Vec<String> = expectations
                 .iter()
-                .map(|expect| {
-                    if is_array(&expect.cmd) {
-                        match &expect.cmd {
-                            PhpMixed::List(l) => implode(
-                                " ",
-                                &l.iter()
-                                    .map(|v| v.as_string().unwrap_or("").to_string())
-                                    .collect::<Vec<_>>(),
-                            ),
-                            PhpMixed::Array(m) => implode(
-                                " ",
-                                &m.values()
-                                    .map(|v| v.as_string().unwrap_or("").to_string())
-                                    .collect::<Vec<_>>(),
-                            ),
-                            _ => String::new(),
-                        }
-                    } else {
-                        expect.cmd.as_string().unwrap_or("").to_string()
-                    }
+                .map(|expect| match &expect.cmd {
+                    CommandLine::Args(args) => implode(" ", args),
+                    CommandLine::Shell(command) => command.clone(),
                 })
                 .collect();
             panic!(
@@ -648,26 +612,21 @@ impl ProcessExecutor {
             Self::output_command_run_with(&io, &command, cwd.as_deref(), true);
 
             // PHP: $job['reject']($e) on process construction/start failure — surfaced as Err here.
-            let mut process = if is_string(&command) {
-                Process::from_shell_commandline(
-                    command.as_string().unwrap_or(""),
+            let mut process = match command {
+                CommandLine::Shell(command) => Process::from_shell_commandline(
+                    &command,
                     cwd.as_deref(),
                     None,
                     PhpMixed::Null,
                     Some(Self::get_timeout() as f64),
-                )?
-            } else if let PhpMixed::List(ref list) = command {
-                Process::new(
-                    list.iter()
-                        .map(|v| v.as_string().unwrap_or("").to_string())
-                        .collect(),
+                )?,
+                CommandLine::Args(command) => Process::new(
+                    command,
                     cwd.clone(),
                     None,
                     PhpMixed::Null,
                     Some(Self::get_timeout() as f64),
-                )?
-            } else {
-                return Err(LogicException::new("Invalid command type".to_string()).into());
+                )?,
             };
 
             process.start(None, IndexMap::new())?;
@@ -802,7 +761,7 @@ impl ProcessExecutor {
         Self::escape_argument(argument)
     }
 
-    fn output_command_run(&self, command: &PhpMixed, cwd: Option<&str>, r#async: bool) {
+    fn output_command_run(&self, command: &CommandLine, cwd: Option<&str>, r#async: bool) {
         Self::output_command_run_with(&self.io, command, cwd, r#async);
     }
 
@@ -810,7 +769,7 @@ impl ProcessExecutor {
     /// clone of the io handle instead of borrowing the executor.
     fn output_command_run_with(
         io: &Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-        command: &PhpMixed,
+        command: &CommandLine,
         cwd: Option<&str>,
         r#async: bool,
     ) {
@@ -818,16 +777,9 @@ impl ProcessExecutor {
             return;
         }
 
-        let command_string = if is_string(command) {
-            command.as_string().unwrap_or("").to_string()
-        } else if let PhpMixed::List(list) = command {
-            let parts: Vec<String> = array_map(
-                |v| Self::escape(v.as_string().unwrap_or("")),
-                &list.to_vec(),
-            );
-            implode(" ", &parts)
-        } else {
-            String::new()
+        let command_string = match command {
+            CommandLine::Shell(command) => command.clone(),
+            CommandLine::Args(args) => implode(" ", &array_map(|arg| Self::escape(arg), args)),
         };
         let safe_command = preg_replace_callback(
             php_regex!(r"{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i"),
@@ -920,21 +872,10 @@ impl ProcessExecutor {
         argument
     }
 
-    pub fn requires_git_dir_env(&self, command: &PhpMixed) -> bool {
-        let cmd: Vec<String> = if !is_array(command) {
-            explode(" ", command.as_string().unwrap_or(""))
-        } else {
-            match command {
-                PhpMixed::List(l) => l
-                    .iter()
-                    .map(|v| v.as_string().unwrap_or("").to_string())
-                    .collect(),
-                PhpMixed::Array(m) => m
-                    .values()
-                    .map(|v| v.as_string().unwrap_or("").to_string())
-                    .collect(),
-                _ => vec![],
-            }
+    pub fn requires_git_dir_env(&self, command: &CommandLine) -> bool {
+        let cmd: Vec<String> = match command {
+            CommandLine::Shell(command) => explode(" ", command),
+            CommandLine::Args(args) => args.clone(),
         };
         if cmd.first().map(|s| s.as_str()) != Some("git") {
             return false;
@@ -978,76 +919,68 @@ impl ProcessExecutor {
     }
 }
 
-/// Helper trait: convert various command argument forms into `PhpMixed`.
+/// Helper trait: convert various command argument forms into a [`CommandLine`].
 pub trait IntoExecCommand {
-    fn into_exec_command(self) -> PhpMixed;
+    fn into_exec_command(self) -> CommandLine;
 }
 
-impl IntoExecCommand for PhpMixed {
-    fn into_exec_command(self) -> PhpMixed {
+impl IntoExecCommand for CommandLine {
+    fn into_exec_command(self) -> CommandLine {
         self
     }
 }
 
-impl IntoExecCommand for &PhpMixed {
-    fn into_exec_command(self) -> PhpMixed {
+impl IntoExecCommand for &CommandLine {
+    fn into_exec_command(self) -> CommandLine {
         self.clone()
     }
 }
 
 impl IntoExecCommand for &str {
-    fn into_exec_command(self) -> PhpMixed {
-        PhpMixed::String(self.to_string())
+    fn into_exec_command(self) -> CommandLine {
+        CommandLine::Shell(self.to_string())
     }
 }
 
 impl IntoExecCommand for String {
-    fn into_exec_command(self) -> PhpMixed {
-        PhpMixed::String(self)
+    fn into_exec_command(self) -> CommandLine {
+        CommandLine::Shell(self)
     }
 }
 
 impl IntoExecCommand for &String {
-    fn into_exec_command(self) -> PhpMixed {
-        PhpMixed::String(self.clone())
+    fn into_exec_command(self) -> CommandLine {
+        CommandLine::Shell(self.clone())
     }
 }
 
 impl IntoExecCommand for Vec<String> {
-    fn into_exec_command(self) -> PhpMixed {
-        PhpMixed::List(self.into_iter().map(PhpMixed::String).collect())
+    fn into_exec_command(self) -> CommandLine {
+        CommandLine::Args(self)
     }
 }
 
 impl IntoExecCommand for &Vec<String> {
-    fn into_exec_command(self) -> PhpMixed {
-        PhpMixed::List(self.iter().map(|s| PhpMixed::String(s.clone())).collect())
+    fn into_exec_command(self) -> CommandLine {
+        CommandLine::Args(self.clone())
     }
 }
 
 impl<const N: usize> IntoExecCommand for &[&str; N] {
-    fn into_exec_command(self) -> PhpMixed {
-        PhpMixed::List(
-            self.iter()
-                .map(|s| PhpMixed::String(s.to_string()))
-                .collect(),
-        )
+    fn into_exec_command(self) -> CommandLine {
+        CommandLine::Args(self.iter().map(|s| s.to_string()).collect())
     }
 }
 
 impl IntoExecCommand for &[&str] {
-    fn into_exec_command(self) -> PhpMixed {
-        PhpMixed::List(
-            self.iter()
-                .map(|s| PhpMixed::String(s.to_string()))
-                .collect(),
-        )
+    fn into_exec_command(self) -> CommandLine {
+        CommandLine::Args(self.iter().map(|s| s.to_string()).collect())
     }
 }
 
 impl IntoExecCommand for &[String] {
-    fn into_exec_command(self) -> PhpMixed {
-        PhpMixed::List(self.iter().map(|s| PhpMixed::String(s.clone())).collect())
+    fn into_exec_command(self) -> CommandLine {
+        CommandLine::Args(self.to_vec())
     }
 }
 

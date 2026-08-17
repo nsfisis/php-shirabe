@@ -10,7 +10,7 @@ use shirabe::io::IOInterface;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::git::Git;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
-use shirabe::util::process_executor::{MockExpectation, MockHandler, ProcessExecutor};
+use shirabe::util::process_executor::{CommandLine, MockExpectation, MockHandler, ProcessExecutor};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
 
@@ -118,15 +118,15 @@ fn mock_sync_mirror_config() -> Config {
 #[test]
 fn test_run_command_public_git_hub_repository_not_initial_clone_ssh() {
     let expected_url = "git@github.com:acme/repo";
-    let command_callable: Box<dyn Fn(&str) -> Vec<String>> = Box::new(move |url: &str| {
+    let command_callable: Box<dyn Fn(&str) -> CommandLine> = Box::new(move |url: &str| {
         assert_eq!(expected_url, url);
-        vec!["git command".to_string()]
+        CommandLine::Shell("git command".to_string())
     });
 
     let config = mock_config("ssh");
 
     let (process, _guard) =
-        get_process_executor_mock(vec![cmd(vec!["git command"])], true, MockHandler::default());
+        get_process_executor_mock(vec![cmd("git command")], true, MockHandler::default());
 
     let mut git = build_git(IOStub::new(), config, process);
 
@@ -144,15 +144,15 @@ fn test_run_command_public_git_hub_repository_not_initial_clone_ssh() {
 #[test]
 fn test_run_command_public_git_hub_repository_not_initial_clone_https() {
     let expected_url = "https://github.com/acme/repo";
-    let command_callable: Box<dyn Fn(&str) -> Vec<String>> = Box::new(move |url: &str| {
+    let command_callable: Box<dyn Fn(&str) -> CommandLine> = Box::new(move |url: &str| {
         assert_eq!(expected_url, url);
-        vec!["git command".to_string()]
+        CommandLine::Shell("git command".to_string())
     });
 
     let config = mock_config("https");
 
     let (process, _guard) =
-        get_process_executor_mock(vec![cmd(vec!["git command"])], true, MockHandler::default());
+        get_process_executor_mock(vec![cmd("git command")], true, MockHandler::default());
 
     let mut git = build_git(IOStub::new(), config, process);
 
@@ -169,16 +169,16 @@ fn test_run_command_public_git_hub_repository_not_initial_clone_https() {
 #[test]
 fn test_run_command_private_git_hub_repository_not_initial_clone_not_interactive_without_authentication()
  {
-    let command_callable: Box<dyn Fn(&str) -> Vec<String>> = Box::new(|url: &str| {
+    let command_callable: Box<dyn Fn(&str) -> CommandLine> = Box::new(|url: &str| {
         assert_eq!("https://github.com/acme/repo", url);
-        vec!["git command".to_string()]
+        CommandLine::Shell("git command".to_string())
     });
 
     let config = mock_config("https");
 
     let (process, _guard) = get_process_executor_mock(
         vec![
-            cmd_full(vec!["git command"], 1, "", ""),
+            cmd_full("git command", 1, "", ""),
             cmd_full(vec!["git", "--version"], 0, "", ""),
         ],
         true,
@@ -208,20 +208,20 @@ fn run_command_private_github_with_authentication(
     expected_failures_before_success: usize,
 ) {
     let expected_url_owned = expected_url.to_string();
-    let command_callable: Box<dyn Fn(&str) -> Vec<String>> = Box::new(move |url: &str| {
+    let command_callable: Box<dyn Fn(&str) -> CommandLine> = Box::new(move |url: &str| {
         if url != expected_url_owned {
-            return vec!["git command failing".to_string()];
+            return CommandLine::Shell("git command failing".to_string());
         }
-        vec!["git command ok".to_string()]
+        CommandLine::Shell("git command ok".to_string())
     });
 
     let config = mock_config(protocol);
 
     let mut expected_calls: Vec<MockExpectation> = Vec::new();
     for _ in 0..expected_failures_before_success {
-        expected_calls.push(cmd_full(vec!["git command failing"], 1, "", ""));
+        expected_calls.push(cmd_full("git command failing", 1, "", ""));
     }
-    expected_calls.push(cmd_full(vec!["git command ok"], 0, "", ""));
+    expected_calls.push(cmd_full("git command ok", 0, "", ""));
 
     let (process, _guard) = get_process_executor_mock(expected_calls, true, MockHandler::default());
 
@@ -273,11 +273,11 @@ fn run_command_private_bitbucket_with_authentication(
     bitbucket_git_auth_calls: usize,
 ) {
     let expected_url_owned = expected_url.to_string();
-    let command_callable: Box<dyn Fn(&str) -> Vec<String>> = Box::new(move |url: &str| {
+    let command_callable: Box<dyn Fn(&str) -> CommandLine> = Box::new(move |url: &str| {
         if url != expected_url_owned {
-            return vec!["git command failing".to_string()];
+            return CommandLine::Shell("git command failing".to_string());
         }
-        vec!["git command ok".to_string()]
+        CommandLine::Shell("git command ok".to_string())
     });
 
     let config = ConfigStubBuilder::new()
@@ -293,7 +293,7 @@ fn run_command_private_bitbucket_with_authentication(
 
     let mut expected_calls: Vec<MockExpectation> = Vec::new();
     for _ in 0..expected_failures_before_success {
-        expected_calls.push(cmd_full(vec!["git command failing"], 1, "", ""));
+        expected_calls.push(cmd_full("git command failing", 1, "", ""));
     }
     if bitbucket_git_auth_calls > 0 {
         for _ in 0..bitbucket_git_auth_calls {
@@ -305,7 +305,7 @@ fn run_command_private_bitbucket_with_authentication(
             ));
         }
     }
-    expected_calls.push(cmd_full(vec!["git command ok"], 0, "", ""));
+    expected_calls.push(cmd_full("git command ok", 0, "", ""));
 
     let (process, _guard) = get_process_executor_mock(expected_calls, true, MockHandler::default());
 
@@ -416,11 +416,11 @@ fn run_command_private_bitbucket_interactive_with_oauth(
     initial_config: Option<(&str, &str)>,
 ) {
     let expected_url_owned = expected_url.to_string();
-    let command_callable: Box<dyn Fn(&str) -> Vec<String>> = Box::new(move |url: &str| {
+    let command_callable: Box<dyn Fn(&str) -> CommandLine> = Box::new(move |url: &str| {
         if url != expected_url_owned {
-            return vec!["git command failing".to_string()];
+            return CommandLine::Shell("git command failing".to_string());
         }
-        vec!["git command ok".to_string()]
+        CommandLine::Shell("git command ok".to_string())
     });
 
     let mut config = ConfigStubBuilder::new()
@@ -437,9 +437,9 @@ fn run_command_private_bitbucket_interactive_with_oauth(
     config.set_auth_config_source(Box::new(NullConfigSource));
 
     let mut expected_calls: Vec<MockExpectation> = Vec::new();
-    expected_calls.push(cmd_full(vec!["git command failing"], 1, "", ""));
+    expected_calls.push(cmd_full("git command failing", 1, "", ""));
     if initial_config.is_some() {
-        expected_calls.push(cmd_full(vec!["git command failing"], 1, "", ""));
+        expected_calls.push(cmd_full("git command failing", 1, "", ""));
     } else {
         expected_calls.push(cmd_full(
             vec!["git", "config", "bitbucket.accesstoken"],
@@ -448,7 +448,7 @@ fn run_command_private_bitbucket_interactive_with_oauth(
             "",
         ));
     }
-    expected_calls.push(cmd_full(vec!["git command ok"], 0, "", ""));
+    expected_calls.push(cmd_full("git command ok", 0, "", ""));
 
     let (process, _guard) = get_process_executor_mock(expected_calls, true, MockHandler::default());
 

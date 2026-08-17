@@ -145,11 +145,7 @@ impl Filesystem {
         let mut output = PhpMixed::Null;
         let result = self
             .get_process()
-            .execute(
-                PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect()),
-                &mut output,
-                None,
-            )
+            .execute(&cmd, &mut output, None)
             .map(|n| n == 0)
             .unwrap_or(false);
 
@@ -198,10 +194,7 @@ impl Filesystem {
             (fs.get_process_handle(), cmd)
         };
 
-        let process_future = process_executor.borrow_mut().execute_async(
-            PhpMixed::List(cmd.iter().map(|s| PhpMixed::String(s.clone())).collect()),
-            None,
-        );
+        let process_future = process_executor.borrow_mut().execute_async(&cmd, None);
         let mut process = process_future.await?;
 
         // clear stat cache because external processes aren't tracked by the php stat cache

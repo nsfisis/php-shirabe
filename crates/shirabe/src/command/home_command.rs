@@ -13,7 +13,7 @@ use crate::repository::RootPackageRepository;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use shirabe_php_shim::filter_var_url;
-use shirabe_php_shim::{PhpMixed, impl_php_class};
+use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -79,25 +79,19 @@ impl HomeCommand {
     fn open_browser(&self, url: &str) {
         let mut process = ProcessExecutor::new(Some(self.get_io().clone()));
         if Platform::is_windows() {
-            let _ = process.execute(
-                PhpMixed::from(vec!["start", "\"web\"", "explorer", url]),
-                (),
-                None,
-            );
+            let _ = process.execute(&["start", "\"web\"", "explorer", url], (), None);
             return;
         }
 
         let linux = process
-            .execute(PhpMixed::from(vec!["which", "xdg-open"]), (), None)
+            .execute(&["which", "xdg-open"], (), None)
             .unwrap_or(1);
-        let osx = process
-            .execute(PhpMixed::from(vec!["which", "open"]), (), None)
-            .unwrap_or(1);
+        let osx = process.execute(&["which", "open"], (), None).unwrap_or(1);
 
         if linux == 0 {
-            let _ = process.execute(PhpMixed::from(vec!["xdg-open", url]), (), None);
+            let _ = process.execute(&["xdg-open", url], (), None);
         } else if osx == 0 {
-            let _ = process.execute(PhpMixed::from(vec!["open", url]), (), None);
+            let _ = process.execute(&["open", url], (), None);
         } else {
             self.get_io().write_error(&format!(
                 "No suitable browser opening command found, open yourself: {}",
