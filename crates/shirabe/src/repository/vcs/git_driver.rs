@@ -185,7 +185,7 @@ impl GitDriver {
             }
 
             let mut output = String::new();
-            self.inner.process.borrow_mut().execute_args(
+            self.inner.process.borrow_mut().execute(
                 &[
                     "git".to_string(),
                     "branch".to_string(),
@@ -193,7 +193,7 @@ impl GitDriver {
                 ],
                 &mut output,
                 Some(&self.repo_dir),
-            );
+            )?;
             let branches = self.inner.process.borrow().split_lines(&output);
             if !branches.contains(&"* master".to_string()) {
                 for branch in &branches {
@@ -241,7 +241,7 @@ impl GitDriver {
         }
 
         let mut content = String::new();
-        self.inner.process.borrow_mut().execute_args(
+        self.inner.process.borrow_mut().execute(
             &[
                 "git".to_string(),
                 "show".to_string(),
@@ -249,7 +249,7 @@ impl GitDriver {
             ],
             &mut content,
             Some(&self.repo_dir),
-        );
+        )?;
 
         if content.trim().is_empty() {
             return Ok(None);
@@ -277,14 +277,14 @@ impl GitDriver {
                 "--format=%at".to_string(),
                 identifier.to_string(),
             ],
-        );
+        )?;
         let mut output = String::new();
         self.inner
             .process
             .borrow_mut()
-            .execute_args(&command, &mut output, Some(&self.repo_dir));
+            .execute(&command, &mut output, Some(&self.repo_dir))?;
 
-        let timestamp_str = GitUtil::parse_rev_list_output(&output, &self.inner.process);
+        let timestamp_str = GitUtil::parse_rev_list_output(&output, &self.inner.process)?;
         let timestamp: i64 = timestamp_str.trim().parse().unwrap_or(0);
         Ok(Some(
             Utc.timestamp_opt(timestamp, 0).unwrap().fixed_offset(),
@@ -296,7 +296,7 @@ impl GitDriver {
             self.tags = Some(IndexMap::new());
 
             let mut output = String::new();
-            self.inner.process.borrow_mut().execute_args(
+            self.inner.process.borrow_mut().execute(
                 &[
                     "git".to_string(),
                     "show-ref".to_string(),
@@ -305,7 +305,7 @@ impl GitDriver {
                 ],
                 &mut output,
                 Some(&self.repo_dir),
-            );
+            )?;
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty()
                     && let Some(caps) = preg_match(
@@ -330,7 +330,7 @@ impl GitDriver {
             let mut branches = IndexMap::new();
 
             let mut output = String::new();
-            self.inner.process.borrow_mut().execute_args(
+            self.inner.process.borrow_mut().execute(
                 &[
                     "git".to_string(),
                     "branch".to_string(),
@@ -340,7 +340,7 @@ impl GitDriver {
                 ],
                 &mut output,
                 Some(&self.repo_dir),
-            );
+            )?;
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
                     && !preg_is_match(php_regex!(r"{^ *[^/]+/HEAD }"), &branch)
@@ -384,11 +384,11 @@ impl GitDriver {
                 io.clone(),
             ))));
             let mut output = String::new();
-            if process.borrow_mut().execute_args(
+            if process.borrow_mut().execute(
                 &["git".to_string(), "tag".to_string()],
                 &mut output,
                 Some(&url),
-            ) == 0
+            )? == 0
             {
                 return Ok(true);
             }

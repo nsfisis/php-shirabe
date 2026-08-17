@@ -191,10 +191,7 @@ impl PerforceDriver {
         deep: bool,
     ) -> anyhow::Result<bool> {
         if deep || preg_is_match(php_regex!(r"#\b(perforce|p4)\b#i"), url) {
-            return Ok(Perforce::check_server_exists(
-                url,
-                &mut ProcessExecutor::new(Some(io)),
-            ));
+            return Perforce::check_server_exists(url, &mut ProcessExecutor::new(Some(io)));
         }
         Ok(false)
     }

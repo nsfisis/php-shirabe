@@ -51,7 +51,7 @@ impl GitLab {
         })
     }
 
-    pub fn authorize_oauth(&mut self, origin_url: &str) -> bool {
+    pub fn authorize_oauth(&mut self, origin_url: &str) -> anyhow::Result<bool> {
         // before composer 1.9, origin URLs had no port number in them
         let bc_origin_url = preg_replace(php_regex!("{:\\d+}"), "", origin_url);
 
@@ -59,12 +59,12 @@ impl GitLab {
         if !in_array_strict(origin_url.to_string(), gitlab_domains.values())
             && !in_array_strict(bc_origin_url.clone(), gitlab_domains.values())
         {
-            return false;
+            return Ok(false);
         }
 
         // if available use token from git config
         let mut output = String::new();
-        if self.process.borrow_mut().execute_args(
+        if self.process.borrow_mut().execute(
             &[
                 "git".to_string(),
                 "config".to_string(),
@@ -72,20 +72,20 @@ impl GitLab {
             ],
             &mut output,
             None,
-        ) == 0
+        )? == 0
         {
             self.io.borrow_mut().set_authentication(
                 origin_url.to_string(),
                 output.trim().to_string(),
                 Some("oauth2".to_string()),
             );
-            return true;
+            return Ok(true);
         }
 
         // if available use deploy token from git config
         let mut token_user = String::new();
         let mut token_password = String::new();
-        if self.process.borrow_mut().execute_args(
+        if self.process.borrow_mut().execute(
             &[
                 "git".to_string(),
                 "config".to_string(),
@@ -93,8 +93,8 @@ impl GitLab {
             ],
             &mut token_user,
             None,
-        ) == 0
-            && self.process.borrow_mut().execute_args(
+        )? == 0
+            && self.process.borrow_mut().execute(
                 &[
                     "git".to_string(),
                     "config".to_string(),
@@ -102,14 +102,14 @@ impl GitLab {
                 ],
                 &mut token_password,
                 None,
-            ) == 0
+            )? == 0
         {
             self.io.borrow_mut().set_authentication(
                 origin_url.to_string(),
                 token_user.trim().to_string(),
                 Some(token_password.trim().to_string()),
             );
-            return true;
+            return Ok(true);
         }
 
         // if available use token from composer config
@@ -165,10 +165,10 @@ impl GitLab {
                 );
             }
 
-            return true;
+            return Ok(true);
         }
 
-        false
+        Ok(false)
     }
 
     pub fn authorize_oauth_interactively(

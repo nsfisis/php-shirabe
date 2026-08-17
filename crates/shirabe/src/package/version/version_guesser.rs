@@ -206,7 +206,7 @@ impl VersionGuesser {
 
         // try to fetch current version from git branch
         let mut output = String::new();
-        if 0 == self.process.borrow_mut().execute_args(
+        if 0 == self.process.borrow_mut().execute(
             &[
                 "git".to_string(),
                 "branch".to_string(),
@@ -217,7 +217,7 @@ impl VersionGuesser {
             ],
             &mut output,
             Some(path),
-        ) {
+        )? {
             let mut branches: Vec<String> = vec![];
             let mut is_feature_branch = false;
 
@@ -309,7 +309,7 @@ impl VersionGuesser {
                         PhpMixed::String("HEAD".to_string()),
                     ]),
                     PhpMixed::List(
-                        GitUtil::get_no_show_signature_flags(&self.process)
+                        GitUtil::get_no_show_signature_flags(&self.process)?
                             .into_iter()
                             .map(PhpMixed::String)
                             .collect(),
@@ -322,15 +322,15 @@ impl VersionGuesser {
                         .collect()
                 })
                 .unwrap_or_default(),
-            );
+            )?;
             let mut command_output = String::new();
-            if 0 == self.process.borrow_mut().execute_args(
-                &command,
-                &mut command_output,
-                Some(path),
-            ) {
+            if 0 == self
+                .process
+                .borrow_mut()
+                .execute(&command, &mut command_output, Some(path))?
+            {
                 let parsed = trim(
-                    &GitUtil::parse_rev_list_output(&command_output, &self.process),
+                    &GitUtil::parse_rev_list_output(&command_output, &self.process)?,
                     None,
                 );
                 commit = if parsed.is_empty() {
@@ -353,7 +353,7 @@ impl VersionGuesser {
     fn version_from_git_tags(&mut self, path: &str) -> anyhow::Result<Option<(String, String)>> {
         // try to fetch current version from git tags
         let mut output = String::new();
-        if 0 == self.process.borrow_mut().execute_args(
+        if 0 == self.process.borrow_mut().execute(
             &[
                 "git".to_string(),
                 "describe".to_string(),
@@ -362,7 +362,7 @@ impl VersionGuesser {
             ],
             &mut output,
             Some(path),
-        ) {
+        )? {
             match self.version_parser.normalize(&trim(&output, None), None) {
                 Ok(version) => return Ok(Some((version, trim(&output, None)))),
                 Err(_e) => {}
@@ -379,11 +379,11 @@ impl VersionGuesser {
     ) -> anyhow::Result<Option<VersionData>> {
         // try to fetch current version from hg branch
         let mut output = String::new();
-        if 0 == self.process.borrow_mut().execute_args(
+        if 0 == self.process.borrow_mut().execute(
             &["hg".to_string(), "branch".to_string()],
             &mut output,
             Some(path),
-        ) {
+        )? {
             let branch = trim(&output, None);
             let version = self.version_parser.normalize_branch(&branch)?;
             let is_feature_branch = strpos(&version, "dev-") == Some(0);
@@ -617,7 +617,7 @@ impl VersionGuesser {
 
         // try to fetch current version from fossil
         let mut output = String::new();
-        if 0 == self.process.borrow_mut().execute_args(
+        if 0 == self.process.borrow_mut().execute(
             &[
                 "fossil".to_string(),
                 "branch".to_string(),
@@ -625,7 +625,7 @@ impl VersionGuesser {
             ],
             &mut output,
             Some(path),
-        ) {
+        )? {
             let branch = trim(&output, None);
             version = Some(self.version_parser.normalize_branch(&branch)?);
             pretty_version = Some(format!("dev-{}", branch));
@@ -633,11 +633,11 @@ impl VersionGuesser {
 
         // try to fetch current version from fossil tags
         let mut output = String::new();
-        if 0 == self.process.borrow_mut().execute_args(
+        if 0 == self.process.borrow_mut().execute(
             &["fossil".to_string(), "tag".to_string(), "list".to_string()],
             &mut output,
             Some(path),
-        ) {
+        )? {
             match self.version_parser.normalize(&trim(&output, None), None) {
                 Ok(v) => {
                     version = Some(v);
@@ -665,11 +665,11 @@ impl VersionGuesser {
 
         // try to fetch current version from svn
         let mut output = String::new();
-        if 0 == self.process.borrow_mut().execute_args(
+        if 0 == self.process.borrow_mut().execute(
             &["svn".to_string(), "info".to_string(), "--xml".to_string()],
             &mut output,
             Some(path),
-        ) {
+        )? {
             let trunk_path = package_config
                 .get("trunk-path")
                 .and_then(|v| v.as_string())

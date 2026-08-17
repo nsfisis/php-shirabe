@@ -475,7 +475,7 @@ impl Filesystem {
         if Platform::is_windows() {
             // Try to copy & delete - this is a workaround for random "Access denied" errors.
             let mut output = String::new();
-            let result = self.get_process().execute_args(
+            let result = self.get_process().execute(
                 &[
                     "xcopy".to_string(),
                     source.to_string(),
@@ -487,7 +487,7 @@ impl Filesystem {
                 ],
                 &mut output,
                 None,
-            );
+            )?;
 
             // clear stat cache because external processes aren't tracked by the php stat cache
             clearstatcache2(false, "");
@@ -501,11 +501,11 @@ impl Filesystem {
             // We do not use PHP's "rename" function here since it does not support
             // the case where $source, and $target are located on different partitions.
             let mut output = String::new();
-            let result = self.get_process().execute_args(
+            let result = self.get_process().execute(
                 &["mv".to_string(), source.to_string(), target.to_string()],
                 &mut output,
                 None,
-            );
+            )?;
 
             // clear stat cache because external processes aren't tracked by the php stat cache
             clearstatcache2(false, "");
@@ -932,7 +932,7 @@ impl Filesystem {
             Platform::realpath(target),
         ];
         let mut output = String::new();
-        if self.get_process().execute_args(&cmd, &mut output, None) != 0 {
+        if self.get_process().execute(&cmd, &mut output, None)? != 0 {
             return Err(IOException::new(
                 format!(
                     "Failed to create junction to \"{}\" at \"{}\".",

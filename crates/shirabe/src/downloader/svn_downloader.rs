@@ -69,11 +69,11 @@ impl SvnDownloader {
 
     async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let mut output = String::new();
-        if self.inner.process.borrow_mut().execute_args(
+        if self.inner.process.borrow_mut().execute(
             ["svn", "revert", "-R", "."].map(|s| s.to_string()).as_ref(),
             &mut output,
             Some(path),
-        ) != 0
+        )? != 0
         {
             return Err(RuntimeException::new(format!(
                 "Could not reset changes\n\n:{}",
@@ -139,7 +139,7 @@ impl VcsDownloader for SvnDownloader {
             self.inner.config.clone(),
             Some(self.inner.process.clone()),
         );
-        if util.binary_version().is_none() {
+        if util.binary_version()?.is_none() {
             return Err(RuntimeException::new(
                 "svn was not found in your PATH, skipping source download".to_string(),
             )
@@ -217,7 +217,7 @@ impl VcsDownloader for SvnDownloader {
         );
         let mut flags: Vec<String> = vec![];
         if version_compare(
-            &util.binary_version().unwrap_or_default(),
+            &util.binary_version()?.unwrap_or_default(),
             "1.7.0",
             CmpOp::Ge,
         ) {
@@ -370,7 +370,7 @@ impl VcsDownloader for SvnDownloader {
                 .inner
                 .process
                 .borrow_mut()
-                .execute_args(&command, &mut output, Some(path))
+                .execute(&command, &mut output, Some(path))?
                 != 0
             {
                 return Err(RuntimeException::new(format!(
@@ -444,13 +444,13 @@ impl ChangeReportInterface for SvnDownloader {
         }
 
         let mut output = String::new();
-        self.inner.process.borrow_mut().execute_args(
+        self.inner.process.borrow_mut().execute(
             ["svn", "status", "--ignore-externals"]
                 .map(|s| s.to_string())
                 .as_ref(),
             &mut output,
             Some(path),
-        );
+        )?;
 
         Ok(if preg_is_match(php_regex!("{^ *[^X ] +}m"), &output) {
             Some(output)

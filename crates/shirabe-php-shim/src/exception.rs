@@ -269,6 +269,12 @@ macro_rules! impl_php_exception {
                 ::anyhow::Error::new($crate::AnyThrowable::new(exception))
             }
         }
+
+        impl From<Box<$ty>> for ::anyhow::Error {
+            fn from(exception: Box<$ty>) -> Self {
+                ::anyhow::Error::new($crate::AnyThrowable::new(*exception))
+            }
+        }
     };
     // For an exception the port cannot let travel as a Rust error, because its state is not
     // `Send + Sync`. It gets the accessors but no [`Throwable`], so asking for it in a `catch`

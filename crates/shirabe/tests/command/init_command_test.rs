@@ -617,7 +617,7 @@ fn test_get_git_config() {
     let _restore_home = RestoreEnv::new("HOME", original_home);
 
     let command = InitCommand::new();
-    let git_config = command.__get_git_config();
+    let git_config = command.__get_git_config().unwrap();
     assert!(git_config.contains_key("user.name"));
     assert!(git_config.contains_key("user.email"));
 }

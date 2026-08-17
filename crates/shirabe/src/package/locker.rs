@@ -798,14 +798,14 @@ impl Locker {
                 .unwrap_or_default();
             match source_type.as_deref().unwrap_or("") {
                 "git" => {
-                    GitUtil::clean_env(&self.process);
+                    GitUtil::clean_env(&self.process)?;
 
                     let no_show_signature_flags =
-                        GitUtil::get_no_show_signature_flags(&self.process);
+                        GitUtil::get_no_show_signature_flags(&self.process)?;
                     let mut args: Vec<String> =
                         vec!["-n1".to_string(), "--format=%ct".to_string(), source_ref];
                     args.extend(no_show_signature_flags);
-                    let command = GitUtil::build_rev_list_command(&self.process, args);
+                    let command = GitUtil::build_rev_list_command(&self.process, args)?;
                     let mut output = PhpMixed::Null;
                     if 0 == self.process.borrow_mut().execute(
                         command,
@@ -816,7 +816,7 @@ impl Locker {
                             &GitUtil::parse_rev_list_output(
                                 output.as_string().unwrap_or(""),
                                 &self.process,
-                            ),
+                            )?,
                             None,
                         );
                         if preg_is_match(php_regex!(r"{^\s*\d+\s*$}"), &output_str) {

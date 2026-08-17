@@ -451,7 +451,7 @@ impl SvnDriver {
 
         let mut process = ProcessExecutor::new(Some(io));
         let mut ignored_output = String::new();
-        let exit = process.execute_args(
+        let exit = process.execute(
             &[
                 "svn".to_string(),
                 "info".to_string(),
@@ -461,7 +461,7 @@ impl SvnDriver {
             ],
             &mut ignored_output,
             None,
-        );
+        )?;
 
         if exit == 0 {
             // This is definitely a Subversion repository.
@@ -523,7 +523,7 @@ impl SvnDriver {
         {
             Ok(o) => Ok(o),
             Err(e) => {
-                if self.util.as_mut().unwrap().binary_version().is_none() {
+                if self.util.as_mut().unwrap().binary_version()?.is_none() {
                     return Err(RuntimeException::new(format!(
                         "Failed to load {}, svn was not found, check that it is installed and in your PATH env.\n\n{}",
                         self.inner.url,

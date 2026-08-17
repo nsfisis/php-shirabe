@@ -396,20 +396,20 @@ impl Svn {
     }
 
     /// Returns the version of the svn binary contained in PATH
-    pub fn binary_version(&mut self) -> Option<String> {
+    pub fn binary_version(&mut self) -> anyhow::Result<Option<String>> {
         let mut cached = VERSION.lock().unwrap();
         if cached.is_none() {
             let mut output = String::new();
-            if 0 == self.process.borrow_mut().execute_args(
+            if 0 == self.process.borrow_mut().execute(
                 &["svn".to_string(), "--version".to_string()],
                 &mut output,
                 None,
-            ) && let Some(matches) = preg_match(php_regex!(r"{(\d+(?:\.\d+)+)}"), &output)
+            )? && let Some(matches) = preg_match(php_regex!(r"{(\d+(?:\.\d+)+)}"), &output)
             {
                 *cached = Some(matches.get(1).unwrap_or_default().to_string());
             }
         }
 
-        cached.clone()
+        Ok(cached.clone())
     }
 }

@@ -152,19 +152,19 @@ impl InitCommand {
         Some(implode("\\", &namespace))
     }
 
-    fn get_git_config(&self) -> IndexMap<String, String> {
+    fn get_git_config(&self) -> anyhow::Result<IndexMap<String, String>> {
         if self.git_config.borrow().is_some() {
-            return self.git_config.borrow().clone().unwrap_or_default();
+            return Ok(self.git_config.borrow().clone().unwrap_or_default());
         }
 
         let mut process = ProcessExecutor::new(Some(self.get_io().clone()));
 
         let mut output = String::new();
-        if process.execute_args(
+        if process.execute(
             &["git".to_string(), "config".to_string(), "-l".to_string()],
             &mut output,
             None,
-        ) == 0
+        )? == 0
         {
             *self.git_config.borrow_mut() = Some(IndexMap::new());
             for m in preg_match_all(php_regex!(r"{^([^=]+)=(.*)$}m"), &output) {
@@ -178,11 +178,11 @@ impl InitCommand {
                 );
             }
 
-            return self.git_config.borrow().clone().unwrap_or_default();
+            return Ok(self.git_config.borrow().clone().unwrap_or_default());
         }
 
         *self.git_config.borrow_mut() = Some(IndexMap::new());
-        IndexMap::new()
+        Ok(IndexMap::new())
     }
 
     /// Checks the local .gitignore file for the Composer vendor directory.
@@ -241,7 +241,7 @@ impl InitCommand {
     }
 
     /// For testing only: invoke the crate-private `get_git_config`.
-    pub fn __get_git_config(&self) -> IndexMap<String, String> {
+    pub fn __get_git_config(&self) -> anyhow::Result<IndexMap<String, String>> {
         self.get_git_config()
     }
 
@@ -333,8 +333,8 @@ impl InitCommand {
         preg_replace(php_regex!(r"{([_.-]){2,}}u"), "$1", &name)
     }
 
-    fn get_default_package_name(&self) -> String {
-        let git = self.get_git_config();
+    fn get_default_package_name(&self) -> anyhow::Result<String> {
+        let git = self.get_git_config()?;
         let cwd = realpath(".").unwrap_or_default();
         let name = basename(&cwd);
         let name = self.sanitize_package_name_component(&name);
@@ -384,11 +384,11 @@ impl InitCommand {
 
         let vendor = self.sanitize_package_name_component(&vendor);
 
-        format!("{}/{}", vendor, name)
+        Ok(format!("{}/{}", vendor, name))
     }
 
-    fn get_default_author(&self) -> Option<String> {
-        let git = self.get_git_config();
+    fn get_default_author(&self) -> anyhow::Result<Option<String>> {
+        let git = self.get_git_config()?;
 
         let mut author_name: Option<String> = None;
         let composer_default_author = PHP_SERVER
@@ -425,10 +425,10 @@ impl InitCommand {
         }
 
         if let (Some(name), Some(email)) = (author_name, author_email) {
-            return Some(format!("{} <{}>", name, email));
+            return Ok(Some(format!("{} <{}>", name, email)));
         }
 
-        None
+        Ok(None)
     }
 }
 
@@ -753,7 +753,7 @@ impl Command for InitCommand {
 
         if !input.borrow().is_interactive() {
             if input.borrow().get_option("name")?.is_null() {
-                let name = self.get_default_package_name();
+                let name = self.get_default_package_name()?;
                 input
                     .borrow_mut()
                     .set_option("name", PhpMixed::from(name))
@@ -761,7 +761,7 @@ impl Command for InitCommand {
             }
 
             if input.borrow().get_option("author")?.is_null() {
-                let author = self.get_default_author();
+                let author = self.get_default_author()?;
                 input
                     .borrow_mut()
                     .set_option("author", PhpMixed::from(author))
@@ -881,12 +881,15 @@ impl Command for InitCommand {
                 io_interface::NORMAL,
             );
 
-            let mut name = input
+            let name_option = input
                 .borrow()
                 .get_option("name")?
                 .as_string()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| self.get_default_package_name());
+                .map(|s| s.to_string());
+            let mut name = match name_option {
+                Some(name) => name,
+                None => self.get_default_package_name()?,
+            };
 
             let name_default = name.clone();
             let name_for_validate = name.clone();
@@ -943,12 +946,15 @@ impl Command for InitCommand {
             )?;
             input.borrow_mut().set_option("description", description);
 
-            let author = input
+            let author_option = input
                 .borrow()
                 .get_option("author")?
                 .as_string()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| self.get_default_author().unwrap_or_default());
+                .map(|s| s.to_string());
+            let author = match author_option {
+                Some(author) => author,
+                None => self.get_default_author()?.unwrap_or_default(),
+            };
 
             let author_for_validate = author.clone();
             let author_default = author.clone();

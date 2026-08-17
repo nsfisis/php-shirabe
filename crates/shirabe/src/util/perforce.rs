@@ -78,9 +78,12 @@ impl Perforce {
         Self::new(repo_config, port, path, process, Platform::is_windows(), io)
     }
 
-    pub fn check_server_exists(url: &str, process_executor: &mut ProcessExecutor) -> bool {
+    pub fn check_server_exists(
+        url: &str,
+        process_executor: &mut ProcessExecutor,
+    ) -> anyhow::Result<bool> {
         let mut ignored_output = String::new();
-        process_executor.execute_args(
+        Ok(process_executor.execute(
             &[
                 "p4".to_string(),
                 "-p".to_string(),
@@ -90,7 +93,7 @@ impl Perforce {
             ],
             &mut ignored_output,
             Option::<&str>::None,
-        ) == 0
+        )? == 0)
     }
 
     pub fn initialize(&mut self, repo_config: &IndexMap<String, PhpMixed>) {

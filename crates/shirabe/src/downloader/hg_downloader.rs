@@ -63,7 +63,7 @@ impl VcsDownloader for HgDownloader {
         _url: &str,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        if HgUtils::get_version(&self.inner.process).is_none() {
+        if HgUtils::get_version(&self.inner.process)?.is_none() {
             return Err(RuntimeException::new(
                 "hg was not found in your PATH, skipping source download".to_string(),
             )
@@ -104,11 +104,11 @@ impl VcsDownloader for HgDownloader {
             package.get_source_reference().unwrap_or_default(),
         ];
         let mut ignored_output = String::new();
-        if self.inner.process.borrow_mut().execute_args(
+        if self.inner.process.borrow_mut().execute(
             &command,
             &mut ignored_output,
             shirabe_php_shim::realpath(path).as_deref(),
-        ) != 0
+        )? != 0
         {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",
@@ -182,11 +182,11 @@ impl VcsDownloader for HgDownloader {
         ];
 
         let mut output = String::new();
-        if self.inner.process.borrow_mut().execute_args(
+        if self.inner.process.borrow_mut().execute(
             &command,
             &mut output,
             shirabe_php_shim::realpath(path).as_deref(),
-        ) != 0
+        )? != 0
         {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",
@@ -215,11 +215,11 @@ impl ChangeReportInterface for HgDownloader {
         }
 
         let mut output = String::new();
-        self.inner.process.borrow_mut().execute_args(
+        self.inner.process.borrow_mut().execute(
             &["hg".to_string(), "st".to_string()],
             &mut output,
             shirabe_php_shim::realpath(path).as_deref(),
-        );
+        )?;
 
         let output = output.trim().to_string();
 

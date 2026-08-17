@@ -641,48 +641,43 @@ impl GitBitbucketDriver {
         url: &str,
         fetching_repo_data: bool,
     ) -> anyhow::Result<Response> {
-        match self.inner.get_contents(url) {
-            Ok(r) => Ok(r),
-            Err(e) => {
-                let mut bitbucket_util = Bitbucket::new(
-                    self.inner.io.clone(),
-                    self.inner.config.clone(),
-                    Some(self.inner.process.clone()),
-                    Some(self.inner.http_downloader.clone()),
-                    None,
-                )?;
+        let e = match self.inner.get_contents(url)? {
+            Ok(r) => return Ok(r),
+            Err(e) => e,
+        };
 
-                {
-                    let te = &e;
-                    let code = te.get_code();
-                    let in_set = matches!(code, 403 | 404);
-                    if in_set
-                        || (401 == code
-                            && strpos(te.get_message(), "Could not authenticate against")
-                                == Some(0))
-                    {
-                        if !self.inner.io.has_authentication(&self.inner.origin_url)
-                            && bitbucket_util.authorize_oauth(&self.inner.origin_url)
-                        {
-                            return self.inner.get_contents(url).map_err(|e| (*e).into());
-                        }
+        let mut bitbucket_util = Bitbucket::new(
+            self.inner.io.clone(),
+            self.inner.config.clone(),
+            Some(self.inner.process.clone()),
+            Some(self.inner.http_downloader.clone()),
+            None,
+        )?;
 
-                        if !self.inner.io.is_interactive() && fetching_repo_data {
-                            self.attempt_clone_fallback()?;
+        let code = e.get_code();
+        let in_set = matches!(code, 403 | 404);
+        if in_set
+            || (401 == code && strpos(e.get_message(), "Could not authenticate against") == Some(0))
+        {
+            if !self.inner.io.has_authentication(&self.inner.origin_url)
+                && bitbucket_util.authorize_oauth(&self.inner.origin_url)?
+            {
+                return Ok(self.inner.get_contents(url)??);
+            }
 
-                            return Ok(Response::new(
-                                "dummy".to_string(),
-                                Some(200),
-                                vec![],
-                                Some("null".to_string()),
-                            ));
-                        }
-                    }
-                }
+            if !self.inner.io.is_interactive() && fetching_repo_data {
+                self.attempt_clone_fallback()?;
 
-                Err((*e).into())
+                return Ok(Response::new(
+                    "dummy".to_string(),
+                    Some(200),
+                    vec![],
+                    Some("null".to_string()),
+                ));
             }
         }
+
+        Err((*e).into())
     }
 
     /// Generate an SSH URL

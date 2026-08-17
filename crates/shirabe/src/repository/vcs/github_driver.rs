@@ -696,10 +696,7 @@ impl GitHubDriver {
             file,
             urlencode(identifier)
         );
-        let mut resource = self
-            .get_contents(&resource_url, false)
-            .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?
-            .decode_json()?;
+        let mut resource = self.get_contents(&resource_url, false)??.decode_json()?;
 
         // The GitHub contents API only returns files up to 1MB as base64 encoded files
         // larger files either need be fetched with a raw accept header or by using the git blob endpoint
@@ -724,10 +721,7 @@ impl GitHubDriver {
                 .and_then(|v| v.as_string())
                 .unwrap_or("")
                 .to_string();
-            resource = self
-                .get_contents(&git_url, false)
-                .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?
-                .decode_json()?;
+            resource = self.get_contents(&git_url, false)??.decode_json()?;
         }
 
         let resource_map = match resource {
@@ -776,10 +770,7 @@ impl GitHubDriver {
             self.repository,
             urlencode(identifier)
         );
-        let commit = self
-            .get_contents(&resource, false)
-            .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?
-            .decode_json()?;
+        let commit = self.get_contents(&resource, false)??.decode_json()?;
 
         let date_str = match commit {
             PhpMixed::Array(m) => m
@@ -812,9 +803,7 @@ impl GitHubDriver {
             ));
 
             loop {
-                let response = self
-                    .get_contents(resource.as_deref().unwrap_or(""), false)
-                    .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
+                let response = self.get_contents(resource.as_deref().unwrap_or(""), false)??;
                 let tags_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = tags_data {
                     for tag in list {
@@ -862,9 +851,7 @@ impl GitHubDriver {
             ));
 
             loop {
-                let response = self
-                    .get_contents(resource.as_deref().unwrap_or(""), false)
-                    .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
+                let response = self.get_contents(resource.as_deref().unwrap_or(""), false)??;
                 let branch_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = branch_data {
                     for branch in list {
@@ -969,40 +956,38 @@ impl GitHubDriver {
         &mut self,
         url: &str,
         fetching_repo_data: bool,
-    ) -> anyhow::Result<Response, Box<TransportException>> {
-        let response_result = self.inner.get_contents(url);
+    ) -> anyhow::Result<Result<Response, Box<TransportException>>> {
+        let response_result = self.inner.get_contents(url)?;
         match response_result {
-            Ok(r) => Ok(r),
+            Ok(r) => Ok(Ok(r)),
             Err(e) => {
                 let mut git_hub_util = GitHub::new(
                     self.inner.io.clone(),
                     self.inner.config.clone(),
                     Some(self.inner.process.clone()),
                     Some(self.inner.http_downloader.clone()),
-                )
-                .map_err(|err| TransportException::new(err.to_string(), 0))?;
+                )?;
 
                 match e.get_code() {
                     401 | 404 => {
                         // try to authorize only if we are fetching the main /repos/foo/bar data, otherwise it must be a real 404
                         if !fetching_repo_data {
-                            return Err(e);
+                            return Ok(Err(e));
                         }
 
-                        if git_hub_util.authorize_oauth(&self.inner.origin_url) {
+                        if git_hub_util.authorize_oauth(&self.inner.origin_url)? {
                             return self.inner.get_contents(url);
                         }
 
                         if !self.inner.io.is_interactive() {
-                            self.attempt_clone_fallback(Some(std::sync::Arc::new((*e).into())))
-                                .map_err(|err| TransportException::new(err.to_string(), 0))?;
+                            self.attempt_clone_fallback(Some(std::sync::Arc::new((*e).into())))?;
 
-                            return Ok(Response::new(
+                            return Ok(Ok(Response::new(
                                 "dummy".to_string(),
                                 Some(200),
                                 vec![],
                                 Some("null".to_string()),
-                            ));
+                            )));
                         }
 
                         let mut scopes_issued: Vec<String> = vec![];
@@ -1033,28 +1018,27 @@ impl GitHubDriver {
                                     "Your GitHub credentials are required to fetch private repository metadata (<info>{}</info>)",
                                     self.inner.url
                                 )),
-                            );
+                            )?;
                         }
 
                         self.inner.get_contents(url)
                     }
                     403 => {
                         if !self.inner.io.has_authentication(&self.inner.origin_url)
-                            && git_hub_util.authorize_oauth(&self.inner.origin_url)
+                            && git_hub_util.authorize_oauth(&self.inner.origin_url)?
                         {
                             return self.inner.get_contents(url);
                         }
 
                         if !self.inner.io.is_interactive() && fetching_repo_data {
-                            self.attempt_clone_fallback(Some(std::sync::Arc::new((*e).into())))
-                                .map_err(|err| TransportException::new(err.to_string(), 0))?;
+                            self.attempt_clone_fallback(Some(std::sync::Arc::new((*e).into())))?;
 
-                            return Ok(Response::new(
+                            return Ok(Ok(Response::new(
                                 "dummy".to_string(),
                                 Some(200),
                                 vec![],
                                 Some("null".to_string()),
-                            ));
+                            )));
                         }
 
                         let rate_limited = git_hub_util
@@ -1070,7 +1054,7 @@ impl GitHubDriver {
                                     true,
                                     io_interface::NORMAL,
                                 );
-                                return Err(e);
+                                return Ok(Err(e));
                             }
 
                             git_hub_util.authorize_oauth_interactively(
@@ -1079,7 +1063,7 @@ impl GitHubDriver {
                                     "API limit exhausted. Enter your GitHub credentials to get a larger API limit (<info>{}</info>)",
                                     self.inner.url
                                 )),
-                            );
+                            )?;
 
                             return self.inner.get_contents(url);
                         }
@@ -1099,9 +1083,9 @@ impl GitHubDriver {
                             );
                         }
 
-                        Err(e)
+                        Ok(Err(e))
                     }
-                    _ => Err(e),
+                    _ => Ok(Err(e)),
                 }
             }
         }
@@ -1122,7 +1106,7 @@ impl GitHubDriver {
             self.repository
         );
 
-        let repo_data_result = self.get_contents(&repo_data_url, true);
+        let repo_data_result = self.get_contents(&repo_data_url, true)?;
         match repo_data_result {
             Ok(response) => {
                 let data = response.decode_json()?;

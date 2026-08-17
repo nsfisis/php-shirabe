@@ -310,7 +310,7 @@ impl Platform {
                 let mut process = ProcessExecutor::new(None);
                 let mut output = String::new();
                 let result: anyhow::Result<()> = (|| {
-                    if process.execute_args(&["lsmod".to_string()], &mut output, None) == 0
+                    if process.execute(&["lsmod".to_string()], &mut output, None)? == 0
                         && output.contains("vboxguest")
                     {
                         *cached = Some(true);

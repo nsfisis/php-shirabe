@@ -66,7 +66,10 @@ impl VcsDriverBase {
         "http"
     }
 
-    pub fn get_contents(&self, url: &str) -> anyhow::Result<Response, Box<TransportException>> {
+    pub fn get_contents(
+        &self,
+        url: &str,
+    ) -> anyhow::Result<Result<Response, Box<TransportException>>> {
         let options_mixed = self
             .repo_config
             .get("options")
@@ -76,15 +79,13 @@ impl VcsDriverBase {
             PhpMixed::Array(a) => a,
             _ => IndexMap::new(),
         };
-        self.http_downloader
-            .borrow_mut()
-            .get(url, options)
-            .map_err(|e| {
-                Box::new(match e.catch::<TransportException>() {
-                    Some(te) => te.clone(),
-                    None => TransportException::new(e.to_string(), 0),
-                })
-            })
+        match self.http_downloader.borrow_mut().get(url, options) {
+            Ok(response) => Ok(Ok(response)),
+            Err(e) => match e.catch::<TransportException>() {
+                Some(te) => Ok(Err(Box::new(te.clone()))),
+                None => Err(e),
+            },
+        }
     }
 
     // Helper for concrete drivers: produces the same value as the trait default
@@ -301,7 +302,7 @@ pub trait VcsDriver: VcsDriverInterface {
         "http"
     }
 
-    fn get_contents(&self, url: &str) -> anyhow::Result<Response, Box<TransportException>> {
+    fn get_contents(&self, url: &str) -> anyhow::Result<Result<Response, Box<TransportException>>> {
         let options_mixed = self
             .repo_config()
             .get("options")
@@ -311,15 +312,13 @@ pub trait VcsDriver: VcsDriverInterface {
             PhpMixed::Array(a) => a,
             _ => IndexMap::new(),
         };
-        self.http_downloader()
-            .borrow_mut()
-            .get(url, options)
-            .map_err(|e| {
-                Box::new(match e.catch::<TransportException>() {
-                    Some(te) => te.clone(),
-                    None => TransportException::new(e.to_string(), 0),
-                })
-            })
+        match self.http_downloader().borrow_mut().get(url, options) {
+            Ok(response) => Ok(Ok(response)),
+            Err(e) => match e.catch::<TransportException>() {
+                Some(te) => Ok(Err(Box::new(te.clone()))),
+                None => Err(e),
+            },
+        }
     }
 
     fn cleanup(&self) {}

@@ -52,14 +52,14 @@ impl GitHub {
         })
     }
 
-    pub fn authorize_oauth(&mut self, origin_url: &str) -> bool {
+    pub fn authorize_oauth(&mut self, origin_url: &str) -> anyhow::Result<bool> {
         let github_domains = self.config.borrow_mut().get("github-domains");
         if !in_array_loose(origin_url.to_string(), github_domains.values()) {
-            return false;
+            return Ok(false);
         }
 
         let mut output = String::new();
-        if self.process.borrow_mut().execute_args(
+        if self.process.borrow_mut().execute(
             &[
                 "git".to_string(),
                 "config".to_string(),
@@ -67,17 +67,17 @@ impl GitHub {
             ],
             &mut output,
             None,
-        ) == 0
+        )? == 0
         {
             self.io.borrow_mut().set_authentication(
                 origin_url.to_string(),
                 output.trim().to_string(),
                 Some("x-oauth-basic".to_string()),
             );
-            return true;
+            return Ok(true);
         }
 
-        false
+        Ok(false)
     }
 
     pub fn authorize_oauth_interactively(
@@ -101,7 +101,7 @@ impl GitHub {
             if self
                 .process
                 .borrow_mut()
-                .execute_args(&["hostname".to_string()], &mut output, None)
+                .execute(&["hostname".to_string()], &mut output, None)?
                 == 0
             {
                 note += &format!(" on {}", output.trim());

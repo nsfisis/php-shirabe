@@ -119,9 +119,11 @@ impl DiagnoseCommand {
         Ok(PhpMixed::Bool(true))
     }
 
-    fn check_git(&self) -> String {
+    fn check_git(&self) -> anyhow::Result<String> {
         if !shirabe_php_rpc::get_diagnostics().function_exists("proc_open") {
-            return "<comment>proc_open is not available, git cannot be used</comment>".to_string();
+            return Ok(
+                "<comment>proc_open is not available, git cannot be used</comment>".to_string(),
+            );
         }
 
         let mut output = String::new();
@@ -141,24 +143,27 @@ impl DiagnoseCommand {
                 None,
             );
         if strtolower(&trim(&output, Some(" \t\n\r\0\u{0B}"))) == "always" {
-            return "<comment>Your git color.ui setting is set to always, this is known to create issues. Use \"git config --global color.ui true\" to set it correctly.</comment>".to_string();
+            return Ok("<comment>Your git color.ui setting is set to always, this is known to create issues. Use \"git config --global color.ui true\" to set it correctly.</comment>".to_string());
         }
 
         let process = self.process.borrow();
-        let git_version = Git::get_version(process.as_ref().unwrap());
+        let git_version = Git::get_version(process.as_ref().unwrap())?;
         let git_version = match git_version {
             Some(v) => v,
-            None => return "<comment>No git process found</>".to_string(),
+            None => return Ok("<comment>No git process found</>".to_string()),
         };
 
         if version_compare("2.24.0", &git_version, CmpOp::Gt) {
-            return format!(
+            return Ok(format!(
                 "<warning>Your git version ({}) is too old and possibly will cause issues. Please upgrade to git 2.24 or above</>",
                 git_version
-            );
+            ));
         }
 
-        format!("<info>OK</> <comment>git version {}</>", git_version)
+        Ok(format!(
+            "<info>OK</> <comment>git version {}</>",
+            git_version
+        ))
     }
 
     fn check_http(
@@ -1325,7 +1330,7 @@ impl Command for DiagnoseCommand {
         self.output_result(r);
 
         io.write_no_newline("Checking git settings: ");
-        let r = self.check_git();
+        let r = self.check_git()?;
         self.output_result(PhpMixed::String(r));
 
         io.write_no_newline("Checking http connectivity to packagist: ");

@@ -213,7 +213,7 @@ impl AuthHelper {
                 }
             }
 
-            if !git_hub_util.authorize_oauth(origin)
+            if !git_hub_util.authorize_oauth(origin)?
                 && (!self.io.is_interactive()
                     || !git_hub_util.authorize_oauth_interactively(origin, Some(&message))?)
             {
@@ -257,7 +257,7 @@ impl AuthHelper {
             }
 
             let scheme = parse_url(url).and_then(|parsed| parsed.scheme);
-            if !git_lab_util.authorize_oauth(origin)
+            if !git_lab_util.authorize_oauth(origin)?
                 && (!self.io.is_interactive()
                     || !git_lab_util.authorize_oauth_interactively(
                         scheme.as_deref().unwrap_or(""),
@@ -337,7 +337,7 @@ impl AuthHelper {
                 );
                 let mut bit_bucket_util =
                     Bitbucket::new(self.io.clone(), self.config.clone(), None, None, None)?;
-                if !bit_bucket_util.authorize_oauth(&origin)
+                if !bit_bucket_util.authorize_oauth(&origin)?
                     && (!self.io.is_interactive()
                         || !bit_bucket_util
                             .authorize_oauth_interactively(&origin, Some(&message))?)

@@ -97,11 +97,11 @@ impl FossilDriver {
 
     fn check_fossil(&self) -> anyhow::Result<()> {
         let mut ignored_output = String::new();
-        if self.inner.process.borrow_mut().execute_args(
+        if self.inner.process.borrow_mut().execute(
             ["fossil", "version"].map(|s| s.to_string()).as_ref(),
             &mut ignored_output,
             None,
-        ) != 0
+        )? != 0
         {
             return Err(RuntimeException::new(format!(
                 "fossil was not found, check that it is installed and in your PATH env.\n\n{}",
@@ -131,17 +131,17 @@ impl FossilDriver {
         // update the repo if it is a valid fossil repository
         if is_file(&repo_file)
             && is_dir(&self.checkout_dir)
-            && self.inner.process.borrow_mut().execute_args(
+            && self.inner.process.borrow_mut().execute(
                 ["fossil", "info"].map(|s| s.to_string()).as_ref(),
                 &mut String::new(),
                 Some(&self.checkout_dir),
-            ) == 0
+            )? == 0
         {
-            if self.inner.process.borrow_mut().execute_args(
+            if self.inner.process.borrow_mut().execute(
                 ["fossil", "pull"].map(|s| s.to_string()).as_ref(),
                 &mut String::new(),
                 Some(&self.checkout_dir),
-            ) != 0
+            )? != 0
             {
                 self.inner.io.write_error3(&format!(
                     "<error>Failed to update {}, package information from this repository may be outdated ({})</error>",
@@ -156,13 +156,13 @@ impl FossilDriver {
             fs.ensure_directory_exists(&self.checkout_dir)?;
 
             let mut output = String::new();
-            if self.inner.process.borrow_mut().execute_args(
+            if self.inner.process.borrow_mut().execute(
                 ["fossil", "clone", "--", &self.inner.url, &repo_file]
                     .map(|s| s.to_string())
                     .as_ref(),
                 &mut output,
                 None,
-            ) != 0
+            )? != 0
             {
                 let output = self.inner.process.borrow().get_error_output().to_string();
                 return Err(RuntimeException::new(format!(
@@ -172,13 +172,13 @@ impl FossilDriver {
                 .into());
             }
 
-            if self.inner.process.borrow_mut().execute_args(
+            if self.inner.process.borrow_mut().execute(
                 ["fossil", "open", "--nested", "--", &repo_file]
                     .map(|s| s.to_string())
                     .as_ref(),
                 &mut output,
                 Some(&self.checkout_dir),
-            ) != 0
+            )? != 0
             {
                 let output = self.inner.process.borrow().get_error_output().to_string();
                 return Err(RuntimeException::new(format!(
@@ -225,13 +225,13 @@ impl FossilDriver {
         }
 
         let mut content = String::new();
-        self.inner.process.borrow_mut().execute_args(
+        self.inner.process.borrow_mut().execute(
             ["fossil", "cat", "-r", identifier, "--", file]
                 .map(|s| s.to_string())
                 .as_ref(),
             &mut content,
             Some(&self.checkout_dir),
-        );
+        )?;
 
         if content.trim().is_empty() {
             return Ok(None);
@@ -245,13 +245,13 @@ impl FossilDriver {
         _identifier: &str,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         let mut output = String::new();
-        self.inner.process.borrow_mut().execute_args(
+        self.inner.process.borrow_mut().execute(
             ["fossil", "finfo", "-b", "-n", "1", "composer.json"]
                 .map(|s| s.to_string())
                 .as_ref(),
             &mut output,
             Some(&self.checkout_dir),
-        );
+        )?;
         let parts: Vec<&str> = output.trim().splitn(3, ' ').collect();
         let date = parts.get(1).copied().unwrap_or("");
 
@@ -263,11 +263,11 @@ impl FossilDriver {
         if self.tags.is_none() {
             let mut tags: IndexMap<String, String> = IndexMap::new();
             let mut output = String::new();
-            self.inner.process.borrow_mut().execute_args(
+            self.inner.process.borrow_mut().execute(
                 ["fossil", "tag", "list"].map(|s| s.to_string()).as_ref(),
                 &mut output,
                 Some(&self.checkout_dir),
-            );
+            )?;
             for tag in self.inner.process.borrow().split_lines(&output) {
                 tags.insert(tag.clone(), tag);
             }
@@ -280,11 +280,11 @@ impl FossilDriver {
         if self.branches.is_none() {
             let mut branches: IndexMap<String, String> = IndexMap::new();
             let mut output = String::new();
-            self.inner.process.borrow_mut().execute_args(
+            self.inner.process.borrow_mut().execute(
                 ["fossil", "branch", "list"].map(|s| s.to_string()).as_ref(),
                 &mut output,
                 Some(&self.checkout_dir),
-            );
+            )?;
             for branch in self.inner.process.borrow().split_lines(&output) {
                 let branch = preg_replace(php_regex!(r"/^\*/"), "", branch.trim());
                 let branch = branch.trim().to_string();
@@ -321,11 +321,11 @@ impl FossilDriver {
 
             let mut process = ProcessExecutor::new(Some(io));
             let mut output = String::new();
-            if process.execute_args(
+            if process.execute(
                 ["fossil", "info"].map(|s| s.to_string()).as_ref(),
                 &mut output,
                 Some(&url),
-            ) == 0
+            )? == 0
             {
                 return Ok(true);
             }

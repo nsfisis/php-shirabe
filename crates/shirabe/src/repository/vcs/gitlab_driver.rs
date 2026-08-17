@@ -396,7 +396,7 @@ impl GitLabDriver {
             identifier,
         );
 
-        let content = match self.get_contents(&resource, false) {
+        let content = match self.get_contents(&resource, false)? {
             Ok(response) => response.get_body().map(|s| s.to_string()),
             Err(e) => {
                 if e.get_code() != 404 {
@@ -587,9 +587,7 @@ impl GitLabDriver {
 
         let mut references: IndexMap<String, String> = IndexMap::new();
         loop {
-            let response = self
-                .get_contents(resource.as_deref().unwrap_or(""), false)
-                .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
+            let response = self.get_contents(resource.as_deref().unwrap_or(""), false)??;
             let data = response.decode_json()?;
 
             if let PhpMixed::List(ref list) = data {
@@ -646,10 +644,7 @@ impl GitLabDriver {
 
         // we need to fetch the default branch from the api
         let resource = self.get_api_url();
-        let project = self
-            .get_contents(&resource, true)
-            .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?
-            .decode_json()?;
+        let project = self.get_contents(&resource, true)??.decode_json()?;
         self.project = match project {
             PhpMixed::Array(m) => Some(m),
             _ => None,
@@ -741,14 +736,18 @@ impl GitLabDriver {
         &mut self,
         url: &str,
         fetching_repo_data: bool,
-    ) -> anyhow::Result<Response, Box<TransportException>> {
-        let response_result = self.inner.get_contents(url);
-        match response_result {
-            Ok(response) => {
+    ) -> anyhow::Result<Result<Response, Box<TransportException>>> {
+        // PHP body of the `try` block: a TransportException raised anywhere in here, including the
+        // ones thrown below to force authentication, is handled by the `catch` that follows.
+        let response_result =
+            (|this: &mut Self| -> anyhow::Result<Result<Response, Box<TransportException>>> {
+                let response = match this.inner.get_contents(url)? {
+                    Ok(response) => response,
+                    Err(e) => return Ok(Err(e)),
+                };
+
                 if fetching_repo_data {
-                    let json = response
-                        .decode_json()
-                        .map_err(|e| TransportException::new(e.to_string(), 0))?;
+                    let json = response.decode_json()?;
                     let json_map = match json {
                         PhpMixed::Array(ref m) => m.clone(),
                         _ => IndexMap::new(),
@@ -760,7 +759,7 @@ impl GitLabDriver {
                     if !json_map.contains_key("default_branch")
                         && json_map.contains_key("permissions")
                     {
-                        self.is_private = json_map
+                        this.is_private = json_map
                             .get("visibility")
                             .and_then(|v| v.as_string())
                             .map(|s| s != "public")
@@ -785,21 +784,20 @@ impl GitLabDriver {
                         }
 
                         if !more_than_guest_access {
-                            self.inner.io.write_error3(
-                                "<warning>GitLab token with Guest or Planner only access detected</warning>",
-                                true,
-                                io_interface::NORMAL,
-                            );
+                            this.inner.io.write_error3(
+                            "<warning>GitLab token with Guest or Planner only access detected</warning>",
+                            true,
+                            io_interface::NORMAL,
+                        );
 
-                            self.attempt_clone_fallback()
-                                .map_err(|e| TransportException::new(e.to_string(), 0))?;
+                            this.attempt_clone_fallback()?;
 
-                            return Ok(Response::new(
+                            return Ok(Ok(Response::new(
                                 "dummy".to_string(),
                                 Some(200),
                                 vec![],
                                 Some("null".to_string()),
-                            ));
+                            )));
                         }
                     }
 
@@ -811,110 +809,108 @@ impl GitLabDriver {
                             .and_then(|v| v.as_string())
                             == Some("disabled")
                         {
-                            return Err(Box::new(TransportException::new(
+                            return Ok(Err(Box::new(TransportException::new(
                                 "The GitLab repository is disabled in the project".to_string(),
                                 400,
-                            )));
+                            ))));
                         }
 
                         if !empty(&json_map.get("id").cloned().unwrap_or(PhpMixed::Null)) {
-                            self.is_private = false;
+                            this.is_private = false;
                         }
 
-                        return Err(Box::new(TransportException::new(
-                            "GitLab API seems to not be authenticated as it did not return a default_branch"
-                                    .to_string(),
-                            401,
-                        )));
+                        return Ok(Err(Box::new(TransportException::new(
+                        "GitLab API seems to not be authenticated as it did not return a default_branch"
+                            .to_string(),
+                        401,
+                    ))));
                     }
                 }
 
-                Ok(response)
-            }
-            Err(e) => {
-                let mut git_lab_util = GitLab::new(
-                    self.inner.io.clone(),
-                    self.inner.config.clone(),
-                    Some(self.inner.process.clone()),
-                    Some(self.inner.http_downloader.clone()),
-                )
-                .map_err(|err| TransportException::new(err.to_string(), 0))?;
+                Ok(Ok(response))
+            })(self);
 
-                match e.get_code() {
-                    401 | 404 => {
-                        // try to authorize only if we are fetching the main /repos/foo/bar data, otherwise it must be a real 404
-                        if !fetching_repo_data {
-                            return Err(e);
-                        }
+        let e = match response_result? {
+            Ok(response) => return Ok(Ok(response)),
+            Err(e) => e,
+        };
 
-                        if git_lab_util.authorize_oauth(&self.inner.origin_url) {
-                            return self.inner.get_contents(url);
-                        }
+        let mut git_lab_util = GitLab::new(
+            self.inner.io.clone(),
+            self.inner.config.clone(),
+            Some(self.inner.process.clone()),
+            Some(self.inner.http_downloader.clone()),
+        )?;
 
-                        if git_lab_util.is_oauth_expired(&self.inner.origin_url)
-                            && git_lab_util
-                                .authorize_oauth_refresh(&self.scheme, &self.inner.origin_url)
-                                .map_err(|err| TransportException::new(err.to_string(), 0))?
-                        {
-                            return self.inner.get_contents(url);
-                        }
-
-                        if !self.inner.io.is_interactive() {
-                            self.attempt_clone_fallback()
-                                .map_err(|err| TransportException::new(err.to_string(), 0))?;
-
-                            return Ok(Response::new(
-                                "dummy".to_string(),
-                                Some(200),
-                                vec![],
-                                Some("null".to_string()),
-                            ));
-                        }
-                        self.inner.io.write_error3(
-                            &format!(
-                                "<warning>Failed to download {}/{}:{}</warning>",
-                                self.namespace,
-                                self.repository,
-                                e.get_message()
-                            ),
-                            true,
-                            io_interface::NORMAL,
-                        );
-                        git_lab_util.authorize_oauth_interactively(
-                            &self.scheme,
-                            &self.inner.origin_url,
-                            Some(&format!(
-                                "Your credentials are required to fetch private repository metadata (<info>{}</info>)",
-                                self.inner.url
-                            )),
-                        );
-
-                        self.inner.get_contents(url)
-                    }
-                    403 => {
-                        if !self.inner.io.has_authentication(&self.inner.origin_url)
-                            && git_lab_util.authorize_oauth(&self.inner.origin_url)
-                        {
-                            return self.inner.get_contents(url);
-                        }
-
-                        if !self.inner.io.is_interactive() && fetching_repo_data {
-                            self.attempt_clone_fallback()
-                                .map_err(|err| TransportException::new(err.to_string(), 0))?;
-
-                            return Ok(Response::new(
-                                "dummy".to_string(),
-                                Some(200),
-                                vec![],
-                                Some("null".to_string()),
-                            ));
-                        }
-
-                        Err(e)
-                    }
-                    _ => Err(e),
+        match e.get_code() {
+            401 | 404 => {
+                // try to authorize only if we are fetching the main /repos/foo/bar data, otherwise it must be a real 404
+                if !fetching_repo_data {
+                    return Ok(Err(e));
                 }
+
+                if git_lab_util.authorize_oauth(&self.inner.origin_url)? {
+                    return self.inner.get_contents(url);
+                }
+
+                if git_lab_util.is_oauth_expired(&self.inner.origin_url)
+                    && git_lab_util.authorize_oauth_refresh(&self.scheme, &self.inner.origin_url)?
+                {
+                    return self.inner.get_contents(url);
+                }
+
+                if !self.inner.io.is_interactive() {
+                    self.attempt_clone_fallback()?;
+
+                    return Ok(Ok(Response::new(
+                        "dummy".to_string(),
+                        Some(200),
+                        vec![],
+                        Some("null".to_string()),
+                    )));
+                }
+                self.inner.io.write_error3(
+                    &format!(
+                        "<warning>Failed to download {}/{}:{}</warning>",
+                        self.namespace,
+                        self.repository,
+                        e.get_message()
+                    ),
+                    true,
+                    io_interface::NORMAL,
+                );
+                git_lab_util.authorize_oauth_interactively(
+                    &self.scheme,
+                    &self.inner.origin_url,
+                    Some(&format!(
+                        "Your credentials are required to fetch private repository metadata (<info>{}</info>)",
+                        self.inner.url
+                    )),
+                )?;
+
+                self.inner.get_contents(url)
             }
+            403 => {
+                if !self.inner.io.has_authentication(&self.inner.origin_url)
+                    && git_lab_util.authorize_oauth(&self.inner.origin_url)?
+                {
+                    return self.inner.get_contents(url);
+                }
+
+                if !self.inner.io.is_interactive() && fetching_repo_data {
+                    self.attempt_clone_fallback()?;
+
+                    return Ok(Ok(Response::new(
+                        "dummy".to_string(),
+                        Some(200),
+                        vec![],
+                        Some("null".to_string()),
+                    )));
+                }
+
+                Ok(Err(e))
+            }
+            _ => Ok(Err(e)),
         }
     }
 

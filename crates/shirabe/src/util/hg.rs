@@ -6,9 +6,9 @@ use crate::io::IOInterfaceImmutable;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 use shirabe_php_shim::{php_regex, preg_match, rawurlencode};
-use std::sync::OnceLock;
+use std::sync::Mutex;
 
-static VERSION: OnceLock<Option<String>> = OnceLock::new();
+static VERSION: Mutex<Option<Option<String>>> = Mutex::new(None);
 
 #[derive(Debug)]
 pub struct Hg {
@@ -48,7 +48,7 @@ impl Hg {
         if self
             .process
             .borrow_mut()
-            .execute_args(&command, &mut ignored_output, cwd.as_deref())
+            .execute(&command, &mut ignored_output, cwd.as_deref())?
             == 0
         {
             return Ok(());
@@ -107,7 +107,7 @@ impl Hg {
             if self
                 .process
                 .borrow_mut()
-                .execute_args(&command, &mut ignored_output, cwd.as_deref())
+                .execute(&command, &mut ignored_output, cwd.as_deref())?
                 == 0
             {
                 return Ok(());
@@ -125,7 +125,7 @@ impl Hg {
     }
 
     fn throw_exception(&self, message: &str, url: &str) -> anyhow::Result<()> {
-        if Self::get_version(&self.process).is_none() {
+        if Self::get_version(&self.process)?.is_none() {
             anyhow::bail!(
                 "{}",
                 Url::sanitize(format!(
@@ -141,24 +141,25 @@ impl Hg {
 
     pub fn get_version(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> Option<&'static str> {
-        VERSION
-            .get_or_init(|| {
-                let mut output = String::new();
-                if process.borrow_mut().execute_args(
-                    &["hg".to_string(), "--version".to_string()],
-                    &mut output,
-                    None,
-                ) == 0
-                    && let Some(matches) = preg_match(
-                        php_regex!(r"/^.+? (\d+(?:\.\d+)+)(?:\+.*?)?\)?\r?\n/"),
-                        &output,
-                    )
-                {
-                    return matches.get(1).map(str::to_string);
-                }
-                None
-            })
-            .as_deref()
+    ) -> anyhow::Result<Option<String>> {
+        let mut version = VERSION.lock().unwrap();
+        if version.is_none() {
+            *version = Some(None);
+            let mut output = String::new();
+            if process.borrow_mut().execute(
+                &["hg".to_string(), "--version".to_string()],
+                &mut output,
+                None,
+            )? == 0
+                && let Some(matches) = preg_match(
+                    php_regex!(r"/^.+? (\d+(?:\.\d+)+)(?:\+.*?)?\)?\r?\n/"),
+                    &output,
+                )
+            {
+                *version = Some(matches.get(1).map(str::to_string));
+            }
+        }
+
+        Ok(version.clone().unwrap_or(None))
     }
 }

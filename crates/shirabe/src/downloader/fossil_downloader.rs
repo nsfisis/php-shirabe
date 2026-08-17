@@ -254,11 +254,11 @@ impl ChangeReportInterface for FossilDownloader {
         }
 
         let mut output = String::new();
-        self.inner.process.borrow_mut().execute_args(
+        self.inner.process.borrow_mut().execute(
             &["fossil".to_string(), "changes".to_string()],
             &mut output,
             shirabe_php_shim::realpath(path).as_deref(),
-        );
+        )?;
 
         let output = output.trim().to_string();
 

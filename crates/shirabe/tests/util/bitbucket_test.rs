@@ -555,7 +555,11 @@ fn test_get_token_without_access_token() {
 fn test_authorize_oauth_with_wrong_origin_url() {
     let config = ConfigStubBuilder::new().build_shared();
     let mut f = set_up_with_config_and_http(config, vec![]);
-    assert!(!f.bitbucket.authorize_oauth(&format!("non-{}", ORIGIN)));
+    assert!(
+        !f.bitbucket
+            .authorize_oauth(&format!("non-{}", ORIGIN))
+            .unwrap()
+    );
 }
 
 #[test]
@@ -578,7 +582,7 @@ fn test_authorize_oauth_without_available_git_config_token() {
     let mut bitbucket =
         Bitbucket::new(io, config, Some(process), Some(http_downloader), Some(time)).unwrap();
 
-    assert!(!bitbucket.authorize_oauth(ORIGIN));
+    assert!(!bitbucket.authorize_oauth(ORIGIN).unwrap());
 }
 
 #[test]
@@ -595,5 +599,5 @@ fn test_authorize_oauth_with_available_git_config_token() {
     let mut bitbucket =
         Bitbucket::new(io, config, Some(process), Some(http_downloader), Some(time)).unwrap();
 
-    assert!(bitbucket.authorize_oauth(ORIGIN));
+    assert!(bitbucket.authorize_oauth(ORIGIN).unwrap());
 }

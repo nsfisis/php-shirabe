@@ -284,9 +284,9 @@ impl PathRepository {
                     "--format=%H".to_string(),
                     "HEAD".to_string(),
                 ];
-                args.extend(GitUtil::get_no_show_signature_flags(&self.process));
+                args.extend(GitUtil::get_no_show_signature_flags(&self.process)?);
                 args
-            });
+            })?;
             if reference == "auto"
                 && shirabe_php_shim::is_dir(format!("{}/.git", path.trim_end_matches('/')))
                 && self
@@ -297,7 +297,7 @@ impl PathRepository {
                     == 0
             {
                 let output_str = output.as_string().unwrap_or("").to_string();
-                let ref_val = GitUtil::parse_rev_list_output(&output_str, &self.process)
+                let ref_val = GitUtil::parse_rev_list_output(&output_str, &self.process)?
                     .trim()
                     .to_string();
                 if let Some(PhpMixed::Array(dist)) = package.get_mut("dist") {

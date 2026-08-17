@@ -71,22 +71,17 @@ impl Bitbucket {
         }
     }
 
-    pub fn authorize_oauth(&mut self, origin_url: &str) -> bool {
+    pub fn authorize_oauth(&mut self, origin_url: &str) -> anyhow::Result<bool> {
         if origin_url != "bitbucket.org" {
-            return false;
+            return Ok(false);
         }
 
         let mut output = PhpMixed::Null;
-        if self
-            .process
-            .borrow_mut()
-            .execute(
-                &["git", "config", "bitbucket.accesstoken"],
-                &mut output,
-                None,
-            )
-            .unwrap_or(1)
-            == 0
+        if self.process.borrow_mut().execute(
+            &["git", "config", "bitbucket.accesstoken"],
+            &mut output,
+            None,
+        )? == 0
         {
             let output_str = output.as_string().unwrap_or("").trim().to_string();
             self.io.borrow_mut().set_authentication(
@@ -94,10 +89,10 @@ impl Bitbucket {
                 "x-token-auth".to_string(),
                 Some(output_str),
             );
-            return true;
+            return Ok(true);
         }
 
-        false
+        Ok(false)
     }
 
     fn request_access_token(&mut self) -> anyhow::Result<bool> {

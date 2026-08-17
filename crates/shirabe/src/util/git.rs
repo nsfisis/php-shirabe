@@ -362,8 +362,8 @@ impl Git {
                     )?;
                     let message = "Cloning failed using an ssh key for authentication, enter your GitHub credentials to access private repos";
 
-                    if !git_hub_util.authorize_oauth(&m1) && self.io.is_interactive() {
-                        git_hub_util.authorize_oauth_interactively(&m1, Some(message));
+                    if !git_hub_util.authorize_oauth(&m1)? && self.io.is_interactive() {
+                        git_hub_util.authorize_oauth_interactively(&m1, Some(message))?;
                     }
                 }
 
@@ -423,8 +423,8 @@ impl Git {
                 if !self.io.has_authentication(&domain) {
                     let message = "Enter your Bitbucket credentials to access private repos";
 
-                    if !bitbucket_util.authorize_oauth(&domain) && self.io.is_interactive() {
-                        bitbucket_util.authorize_oauth_interactively(&domain, Some(message));
+                    if !bitbucket_util.authorize_oauth(&domain)? && self.io.is_interactive() {
+                        bitbucket_util.authorize_oauth_interactively(&domain, Some(message))?;
                         let access_token = bitbucket_util.get_token();
                         self.io.borrow_mut().set_authentication(
                             domain.clone(),
@@ -575,8 +575,8 @@ impl Git {
                     let message =
                         "Cloning failed, enter your GitLab credentials to access private repos";
 
-                    if !git_lab_util.authorize_oauth(&m2) && self.io.is_interactive() {
-                        git_lab_util.authorize_oauth_interactively(&m1, &m2, Some(message));
+                    if !git_lab_util.authorize_oauth(&m2)? && self.io.is_interactive() {
+                        git_lab_util.authorize_oauth_interactively(&m1, &m2, Some(message))?;
                     }
                 }
 
@@ -783,7 +783,7 @@ impl Git {
         // update the repo if it is a valid git repository
         let mut output = String::new();
         if is_dir(dir)
-            && self.process.borrow_mut().execute_args(
+            && self.process.borrow_mut().execute(
                 &[
                     "git".to_string(),
                     "rev-parse".to_string(),
@@ -791,7 +791,7 @@ impl Git {
                 ],
                 &mut output,
                 Some(dir),
-            ) == 0
+            )? == 0
             && trim(&output, None) == "."
         {
             // PHP try/finally
@@ -915,20 +915,20 @@ impl Git {
                 let mut branches: Option<String> = None;
                 let mut tags: Option<String> = None;
                 let mut output = String::new();
-                if self.process.borrow_mut().execute_args(
+                if self.process.borrow_mut().execute(
                     &["git".to_string(), "branch".to_string()],
                     &mut output,
                     Some(dir),
-                ) == 0
+                )? == 0
                 {
                     branches = Some(output);
                 }
                 let mut output = String::new();
-                if self.process.borrow_mut().execute_args(
+                if self.process.borrow_mut().execute(
                     &["git".to_string(), "tag".to_string()],
                     &mut output,
                     Some(dir),
-                ) == 0
+                )? == 0
                 {
                     tags = Some(output);
                 }
@@ -964,26 +964,26 @@ impl Git {
 
     pub fn get_no_show_signature_flag(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> String {
-        let git_version = Self::get_version(process);
+    ) -> anyhow::Result<String> {
+        let git_version = Self::get_version(process)?;
         if let Some(v) = git_version
             && version_compare(&v, "2.10.0-rc0", CmpOp::Ge)
         {
-            return " --no-show-signature".to_string();
+            return Ok(" --no-show-signature".to_string());
         }
 
-        String::new()
+        Ok(String::new())
     }
 
     pub fn get_no_show_signature_flags(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> Vec<String> {
-        let flags = Self::get_no_show_signature_flag(process);
+    ) -> anyhow::Result<Vec<String>> {
+        let flags = Self::get_no_show_signature_flag(process)?;
         if flags.is_empty() {
-            return vec![];
+            return Ok(vec![]);
         }
 
-        explode(" ", &substr(&flags, 1, None))
+        Ok(explode(" ", &substr(&flags, 1, None)))
     }
 
     /// Checks if git version supports --no-commit-header flag (git 2.33+)
@@ -991,12 +991,12 @@ impl Git {
     /// @internal
     pub fn supports_no_commit_header_flag(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> bool {
-        let git_version = Self::get_version(process);
+    ) -> anyhow::Result<bool> {
+        let git_version = Self::get_version(process)?;
 
-        git_version
+        Ok(git_version
             .map(|v| version_compare(&v, "2.33.0-rc0", CmpOp::Ge))
-            .unwrap_or(false)
+            .unwrap_or(false))
     }
 
     /// Builds a git rev-list command with --no-commit-header flag when supported (git 2.33+)
@@ -1006,14 +1006,14 @@ impl Git {
     pub fn build_rev_list_command(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         arguments: Vec<String>,
-    ) -> Vec<String> {
+    ) -> anyhow::Result<Vec<String>> {
         let mut command = vec!["git".to_string(), "rev-list".to_string()];
-        if Self::supports_no_commit_header_flag(process) {
+        if Self::supports_no_commit_header_flag(process)? {
             command.push("--no-commit-header".to_string());
         }
 
         command.extend(arguments);
-        command
+        Ok(command)
     }
 
     /// Parses git rev-list output, removing 'commit <hash>' header lines for git < 2.33.
@@ -1025,20 +1025,24 @@ impl Git {
     pub fn parse_rev_list_output(
         output: &str,
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> String {
+    ) -> anyhow::Result<String> {
         // If git supports --no-commit-header, output is already clean
-        if Self::supports_no_commit_header_flag(process) {
-            return output.to_string();
+        if Self::supports_no_commit_header_flag(process)? {
+            return Ok(output.to_string());
         }
 
         // Filter out "commit <hash>" lines for older git versions
-        preg_replace(php_regex!(r"{^commit [a-f0-9]{40}\n?}m"), "", output)
+        Ok(preg_replace(
+            php_regex!(r"{^commit [a-f0-9]{40}\n?}m"),
+            "",
+            output,
+        ))
     }
 
     fn check_ref_is_in_mirror(&mut self, dir: &str, r#ref: &str) -> anyhow::Result<bool> {
         let mut output = String::new();
         if is_dir(dir)
-            && self.process.borrow_mut().execute_args(
+            && self.process.borrow_mut().execute(
                 &[
                     "git".to_string(),
                     "rev-parse".to_string(),
@@ -1046,11 +1050,11 @@ impl Git {
                 ],
                 &mut output,
                 Some(dir),
-            ) == 0
+            )? == 0
             && trim(&output, None) == "."
         {
             let mut ignored_output = String::new();
-            let exit_code = self.process.borrow_mut().execute_args(
+            let exit_code = self.process.borrow_mut().execute(
                 &[
                     "git".to_string(),
                     "rev-parse".to_string(),
@@ -1060,7 +1064,7 @@ impl Git {
                 ],
                 &mut ignored_output,
                 Some(dir),
-            );
+            )?;
             if exit_code == 0 {
                 return Ok(true);
             }
@@ -1108,7 +1112,7 @@ impl Git {
             let mut output_mixed = PhpMixed::Null;
             if is_local_path_repository {
                 let mut output = String::new();
-                self.process.borrow_mut().execute_args(
+                self.process.borrow_mut().execute(
                     &[
                         "git".to_string(),
                         "remote".to_string(),
@@ -1117,7 +1121,7 @@ impl Git {
                     ],
                     &mut output,
                     Some(dir),
-                );
+                )?;
                 output_mixed = PhpMixed::String(output);
             } else {
                 let commands = vec![
@@ -1178,9 +1182,11 @@ impl Git {
         }
     }
 
-    pub fn clean_env(process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>) {
+    pub fn clean_env(
+        process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
+    ) -> anyhow::Result<()> {
         // PHP: $process ?? new ProcessExecutor()
-        let git_version = Self::get_version(process);
+        let git_version = Self::get_version(process)?;
         if let Some(v) = git_version {
             if version_compare(&v, "2.3.0", CmpOp::Ge) {
                 // added in git 2.3.0, prevents prompting the user for username/password
@@ -1210,6 +1216,8 @@ impl Git {
 
         // clean up env for OSX, see https://github.com/composer/composer/issues/2146#issuecomment-35478940
         Platform::clear_env("DYLD_LIBRARY_PATH");
+
+        Ok(())
     }
 
     pub fn get_github_domains_regex(config: &Config) -> String {
@@ -1241,11 +1249,11 @@ impl Git {
         clearstatcache();
 
         let mut ignored_output = String::new();
-        if self.process.borrow_mut().execute_args(
+        if self.process.borrow_mut().execute(
             &["git".to_string(), "--version".to_string()],
             &mut ignored_output,
             Option::<&str>::None,
-        ) != 0
+        )? != 0
         {
             return Err(RuntimeException::new(Url::sanitize(format!(
                 "Failed to clone {}, git was not found, check that it is installed and in your PATH env.\n\n{}",
@@ -1263,16 +1271,16 @@ impl Git {
     /// @return string|null The git version number, if present.
     pub fn get_version(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> Option<String> {
+    ) -> anyhow::Result<Option<String>> {
         let mut version = VERSION.lock().unwrap();
         if version.is_none() {
             *version = Some(None);
             let mut output = String::new();
-            let exit_code: i64 = process.borrow_mut().execute_args(
+            let exit_code: i64 = process.borrow_mut().execute(
                 &["git".to_string(), "--version".to_string()],
                 &mut output,
                 Option::<&str>::None,
-            );
+            )?;
             if exit_code == 0
                 && let Some(matches) =
                     preg_match(php_regex!(r"/^git version (\d+(?:\.\d+)+)/m"), &output)
@@ -1280,7 +1288,7 @@ impl Git {
                 *version = Some(matches.get(1).map(str::to_string));
             }
         }
-        version.clone().unwrap_or(None)
+        Ok(version.clone().unwrap_or(None))
     }
 
     /// For testing only. Resets the cached git `version` static so the next

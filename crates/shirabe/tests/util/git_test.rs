@@ -68,10 +68,6 @@ impl ConfigSourceInterface for NullConfigSource {
     }
 }
 
-// PHP's `commandCallable` returns a bare string (`'git command'`); Rust's `run_command`
-// flattens each callable to a `Vec<String>` and hands it to `execute_args`, which always
-// builds a `PhpMixed::List`. So the single-token string command becomes a one-element list,
-// and the corresponding process expectation is a one-element list as well.
 fn build_git(
     io: IOStub,
     config: Config,

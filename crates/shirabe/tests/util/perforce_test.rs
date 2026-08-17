@@ -823,7 +823,8 @@ fn test_check_server_exists() {
     );
 
     let result =
-        Perforce::check_server_exists("perforce.does.exist:port", &mut process.borrow_mut());
+        Perforce::check_server_exists("perforce.does.exist:port", &mut process.borrow_mut())
+            .unwrap();
     assert!(result);
 }
 
@@ -843,7 +844,8 @@ fn test_check_server_client_error() {
     );
 
     let result =
-        Perforce::check_server_exists("perforce.does.exist:port", &mut process.borrow_mut());
+        Perforce::check_server_exists("perforce.does.exist:port", &mut process.borrow_mut())
+            .unwrap();
     assert!(!result);
 }
 

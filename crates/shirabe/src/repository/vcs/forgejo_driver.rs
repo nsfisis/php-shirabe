@@ -106,9 +106,7 @@ impl ForgejoDriver {
             file,
             urlencode(identifier)
         );
-        let response = self
-            .get_contents(&resource_url, false)
-            .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
+        let response = self.get_contents(&resource_url, false)??;
         let mut resource = response.decode_json()?;
 
         // The Forgejo contents API only returns files up to 1MB as base64 encoded files;
@@ -133,10 +131,7 @@ impl ForgejoDriver {
                 None
             };
             if let Some(git_url) = git_url {
-                resource = self
-                    .get_contents(&git_url, false)
-                    .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?
-                    .decode_json()?;
+                resource = self.get_contents(&git_url, false)??.decode_json()?;
             }
         }
 
@@ -192,10 +187,7 @@ impl ForgejoDriver {
             api_url,
             urlencode(identifier)
         );
-        let commit = self
-            .get_contents(&resource_url, false)
-            .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?
-            .decode_json()?;
+        let commit = self.get_contents(&resource_url, false)??.decode_json()?;
 
         let date_str = if let PhpMixed::Array(ref arr) = commit {
             arr.get("commit")
@@ -241,9 +233,7 @@ impl ForgejoDriver {
             let mut resource: Option<String> = Some(format!("{}/branches?per_page=100", api_url));
 
             while let Some(url) = resource {
-                let response = self
-                    .get_contents(&url, false)
-                    .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
+                let response = self.get_contents(&url, false)??;
                 let branch_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = branch_data {
                     for branch in list {
@@ -284,9 +274,7 @@ impl ForgejoDriver {
             let mut resource: Option<String> = Some(format!("{}/tags?per_page=100", api_url));
 
             while let Some(url) = resource {
-                let response = self
-                    .get_contents(&url, false)
-                    .map_err(|e| anyhow::anyhow!("{}", e.get_message()))?;
+                let response = self.get_contents(&url, false)??;
                 let tags_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = tags_data {
                     for tag in list {
@@ -558,7 +546,7 @@ impl ForgejoDriver {
         }
 
         let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-        match self.get_contents(&api_url, true) {
+        match self.get_contents(&api_url, true)? {
             Err(_) => {
                 if self.git_driver.is_some() {
                     return Ok(());
@@ -598,56 +586,56 @@ impl ForgejoDriver {
         &mut self,
         url: &str,
         fetching_repo_data: bool,
-    ) -> anyhow::Result<Response, Box<TransportException>> {
-        match self.inner.get_contents(url) {
-            Ok(response) => Ok(response),
-            Err(e) => match e.get_code() {
-                401 | 403 | 404 | 429 => {
-                    if !fetching_repo_data {
-                        return Err(e);
-                    }
+    ) -> anyhow::Result<Result<Response, Box<TransportException>>> {
+        let e = match self.inner.get_contents(url)? {
+            Ok(response) => return Ok(Ok(response)),
+            Err(e) => e,
+        };
 
-                    if !self.inner.io.is_interactive() {
-                        self.attempt_clone_fallback()
-                            .map_err(|inner_e| TransportException::new(inner_e.to_string(), 0))?;
-
-                        return Ok(Response::new(
-                            "dummy".to_string(),
-                            Some(200),
-                            vec![],
-                            Some("null".to_string()),
-                        ));
-                    }
-
-                    if !self.inner.io.has_authentication(&self.inner.origin_url) {
-                        let origin_url = self.forgejo_url.as_ref().unwrap().origin_url.clone();
-                        let message = if e.get_code() == 429 {
-                            Some(format!(
-                                "API limit exhausted. Enter your Forgejo credentials to get a larger API limit (<info>{}</info>)",
-                                self.inner.url
-                            ))
-                        } else {
-                            None
-                        };
-
-                        let mut forgejo = Forgejo::new(
-                            self.inner.io.clone(),
-                            self.inner.config.clone(),
-                            self.inner.http_downloader.clone(),
-                        );
-                        let auth_result = forgejo
-                            .authorize_o_auth_interactively(&origin_url, message.as_deref())
-                            .map_err(|inner_e| TransportException::new(inner_e.to_string(), 0))?;
-
-                        if let Ok(true) = auth_result {
-                            return self.inner.get_contents(url);
-                        }
-                    }
-
-                    Err(e)
+        match e.get_code() {
+            401 | 403 | 404 | 429 => {
+                if !fetching_repo_data {
+                    return Ok(Err(e));
                 }
-                _ => Err(e),
-            },
+
+                if !self.inner.io.is_interactive() {
+                    self.attempt_clone_fallback()?;
+
+                    return Ok(Ok(Response::new(
+                        "dummy".to_string(),
+                        Some(200),
+                        vec![],
+                        Some("null".to_string()),
+                    )));
+                }
+
+                if !self.inner.io.has_authentication(&self.inner.origin_url) {
+                    let origin_url = self.forgejo_url.as_ref().unwrap().origin_url.clone();
+                    let message = if e.get_code() == 429 {
+                        Some(format!(
+                            "API limit exhausted. Enter your Forgejo credentials to get a larger API limit (<info>{}</info>)",
+                            self.inner.url
+                        ))
+                    } else {
+                        None
+                    };
+
+                    let mut forgejo = Forgejo::new(
+                        self.inner.io.clone(),
+                        self.inner.config.clone(),
+                        self.inner.http_downloader.clone(),
+                    );
+                    let auth_result =
+                        forgejo.authorize_o_auth_interactively(&origin_url, message.as_deref())?;
+
+                    if let Ok(true) = auth_result {
+                        return self.inner.get_contents(url);
+                    }
+                }
+
+                Ok(Err(e))
+            }
+            _ => Ok(Err(e)),
         }
     }
 

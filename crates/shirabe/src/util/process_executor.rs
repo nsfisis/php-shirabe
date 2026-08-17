@@ -160,32 +160,6 @@ impl ProcessExecutor {
         self.do_execute(command, cwd, false, output)
     }
 
-    /// Convenience wrapper used by phase-A code that calls
-    /// `process.execute(&[String], &mut String, Option<&str>) == 0`.
-    /// Forwards to `execute`, returning the status code (1 on Err for compatibility) — this
-    /// mirrors PHP call sites that check the `int` return of `execute()` without a surrounding
-    /// `try`/`catch`, where an uncaught mock-mismatch exception would otherwise propagate.
-    // TODO(mock): under a strict `ProcessExecutorMock`, an incomplete expectation list now
-    // surfaces here as a swallowed "exit code 1" instead of the old `panic!`, so a future test
-    // ported through this call site could silently take a wrong branch instead of failing loudly.
-    // `ProcessExecutorMockGuard::__assert_complete` still catches unconsumed expectations at
-    // scope exit, but not a mismatch that happened to consume nothing. Distinguishing "expectation
-    // mismatch" from "real process failure" here would need a marker type incompatible with
-    // `RuntimeException` (see `mock_match`'s doc comment) — deferred until a concrete test needs it.
-    pub fn execute_args(
-        &mut self,
-        command: &[String],
-        output: &mut String,
-        cwd: Option<&str>,
-    ) -> i64 {
-        let mut buf = String::new();
-        let rc = self
-            .execute(CommandLine::Args(command.to_vec()), &mut buf, cwd)
-            .unwrap_or(1);
-        *output = buf;
-        rc
-    }
-
     /// runs a process on the commandline in TTY mode
     pub fn execute_tty<C>(&mut self, command: C, cwd: Option<&str>) -> anyhow::Result<i64>
     where
@@ -979,6 +953,12 @@ impl IntoExecCommand for &[&str] {
 }
 
 impl IntoExecCommand for &[String] {
+    fn into_exec_command(self) -> CommandLine {
+        CommandLine::Args(self.to_vec())
+    }
+}
+
+impl<const N: usize> IntoExecCommand for &[String; N] {
     fn into_exec_command(self) -> CommandLine {
         CommandLine::Args(self.to_vec())
     }
