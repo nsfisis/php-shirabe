@@ -27,6 +27,19 @@ for performance, replace it with the plain quantifier (`+`, `*`, `?`).
 
 The `regex` crate never backtracks, so it has no possessive quantifiers and has no need for them.
 
+## `A` (anchored) modifier
+
+The PCRE `A` modifier requires the match to start exactly at the search offset. The `regex` crate
+anchors a pattern only at the head of the haystack.
+
+Port such a pattern by searching the sub-slice that begins at the offset, with a `^` in place of
+the `A` modifier:
+
+```rust
+// PHP: preg_match('/foo/A', $subject, offset: $offset)
+preg_match(php_regex!(r"/^foo/"), &subject[offset..])
+```
+
 ## Port other unsupported features ad hoc
 
 For any other PCRE feature the `regex` crate does not support (conditional subpatterns,

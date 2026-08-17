@@ -161,16 +161,8 @@ pub fn preg_match2<'h>(
     offset: usize,
 ) -> Option<PregMatches<'h>> {
     let __resolved = pattern.resolve();
-    let (re, anchored) = __resolved.parts();
-    // An anchored (`A`) pattern must match starting exactly at `offset`; the `regex` crate cannot
-    // anchor a `captures_at` search, so search the sub-slice beginning at `offset` and require the
-    // match to start at its head.
-    let caps = if anchored {
-        re.captures(&subject[offset..])
-            .filter(|c| c.get(0).map(|m| m.start()) == Some(0))
-    } else {
-        re.captures_at(subject, offset)
-    }?;
+    let re = __resolved.regex();
+    let caps = re.captures_at(subject, offset)?;
 
     Some(PregMatches::new(caps))
 }
@@ -179,7 +171,7 @@ pub fn preg_match2<'h>(
 // one column, as `PregMatchesAll::occurrence_count` reports it.
 pub fn preg_match_all(pattern: impl PregPattern, subject: &str) -> PregMatchesAll {
     let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
+    let re = __resolved.regex();
     let group_count = re.captures_len();
     let names: Vec<Option<&str>> = re.capture_names().collect();
 
@@ -211,7 +203,7 @@ pub fn preg_match_all_set_order(
     subject: &str,
 ) -> Vec<Vec<Option<String>>> {
     let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
+    let re = __resolved.regex();
     re.captures_iter(subject)
         .map(|caps| {
             (0..caps.len())
@@ -229,7 +221,7 @@ pub fn preg_match_all_offset_capture(
     subject: &str,
 ) -> PregMatchesAllWithOffsets {
     let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
+    let re = __resolved.regex();
     let group_count = re.captures_len();
     let names: Vec<Option<&str>> = re.capture_names().collect();
 
@@ -261,7 +253,7 @@ pub fn preg_grep<T: AsRef<str>>(
 ) -> impl Iterator<Item = T> {
     let __resolved = pattern.resolve();
     array.into_iter().filter(move |s| {
-        let (re, _anchored) = __resolved.parts();
+        let re = __resolved.regex();
         re.is_match(s.as_ref())
     })
 }
@@ -276,7 +268,7 @@ pub fn preg_split_delim_capture(pattern: impl PregPattern, subject: &str) -> Vec
 
 fn preg_split_impl(pattern: impl PregPattern, subject: &str, delim_capture: bool) -> Vec<String> {
     let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
+    let re = __resolved.regex();
 
     let mut result: Vec<String> = Vec::new();
     let mut last = 0usize;
@@ -312,7 +304,7 @@ pub fn preg_replace2(
     count: Option<&mut usize>,
 ) -> String {
     let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
+    let re = __resolved.regex();
     let limit = if limit < 0 {
         usize::MAX
     } else {
@@ -349,7 +341,7 @@ where
     F: FnMut(&PregMatches<'h>) -> anyhow::Result<String>,
 {
     let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
+    let re = __resolved.regex();
 
     let mut out: Vec<u8> = Vec::new();
     let mut last = 0usize;
@@ -407,15 +399,15 @@ fn translate_pcre_literals(inner: &str) -> String {
 // `regex::Regex::clone()` does not share the underlying meta engine's search-cache pool, so
 // handing out fresh clones here would pay a ~10us per-clone cache warmup cost on every single
 // `preg_*` call (measured), defeating the point of this cache. `Arc::clone()` is a refcount bump.
-static PATTERN_CACHE: LazyLock<Mutex<IndexMap<String, Arc<(regex::Regex, bool)>>>> =
+static PATTERN_CACHE: LazyLock<Mutex<IndexMap<String, Arc<regex::Regex>>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
-fn compile_php_pattern(pattern: &str) -> anyhow::Result<Arc<(regex::Regex, bool)>> {
+fn compile_php_pattern(pattern: &str) -> anyhow::Result<Arc<regex::Regex>> {
     if let Some(cached) = PATTERN_CACHE.lock().unwrap().get(pattern) {
         return Ok(Arc::clone(cached));
     }
 
-    let compiled = Arc::new(compile_php_pattern_uncached(pattern)?);
+    let compiled = Arc::new(regex::Regex::new(&translate_php_pattern(pattern)?)?);
     PATTERN_CACHE
         .lock()
         .unwrap()
@@ -423,15 +415,9 @@ fn compile_php_pattern(pattern: &str) -> anyhow::Result<Arc<(regex::Regex, bool)
     Ok(compiled)
 }
 
-fn compile_php_pattern_uncached(pattern: &str) -> anyhow::Result<(regex::Regex, bool)> {
-    let (translated, anchored) = translate_php_pattern(pattern)?;
-    Ok((regex::Regex::new(&translated)?, anchored))
-}
-
 // Strips PHP-style delimiters and modifiers from `pattern` and translates the body into
-// `regex`-crate syntax, without compiling it. Returns the translated source alongside whether the
-// PCRE `A` (anchored) modifier was present.
-fn translate_php_pattern(pattern: &str) -> anyhow::Result<(String, bool)> {
+// `regex`-crate syntax, without compiling it.
+fn translate_php_pattern(pattern: &str) -> anyhow::Result<String> {
     let delimiter = pattern
         .chars()
         .next()
@@ -457,19 +443,20 @@ fn translate_php_pattern(pattern: &str) -> anyhow::Result<(String, bool)> {
         .filter(|c| matches!(c, 'i' | 'x' | 's' | 'm'))
         .collect();
 
-    // PCRE's `A` (PCRE_ANCHORED) modifier requires the match to start exactly at the search offset.
-    // The `regex` crate has no per-search anchoring, so `preg_match2` honours it by searching a
-    // sub-slice that begins at the offset; here we only surface the flag.
-    let anchored = modifiers.contains('A');
+    // PCRE's `A` (PCRE_ANCHORED) modifier requires the match to start exactly at the search offset,
+    // which the `regex` crate cannot express: it anchors a pattern only at the head of the haystack.
+    // Anchor the pattern at the call site instead, by searching the sub-slice that begins at the
+    // offset with a `^`-prefixed pattern.
+    if modifiers.contains('A') {
+        anyhow::bail!("anchored (A) regex pattern is not supported: {pattern}");
+    }
 
     let inner = translate_pcre_literals(inner);
-    let translated = if flags.is_empty() {
+    Ok(if flags.is_empty() {
         inner
     } else {
         format!("(?{flags}){inner}")
-    };
-
-    Ok((translated, anchored))
+    })
 }
 
 /// The result of resolving a `PregPattern`. Deliberately holds either a shared `Arc` (string
@@ -479,22 +466,22 @@ fn translate_php_pattern(pattern: &str) -> anyhow::Result<(String, bool)> {
 /// a ~10us per-call cache warmup cost regardless of which path produced it (measured).
 #[derive(Debug)]
 pub enum ResolvedPattern {
-    Cached(Arc<(regex::Regex, bool)>),
-    Static(&'static regex::Regex, bool),
+    Cached(Arc<regex::Regex>),
+    Static(&'static regex::Regex),
 }
 
 impl ResolvedPattern {
-    pub fn parts(&self) -> (&regex::Regex, bool) {
+    pub fn regex(&self) -> &regex::Regex {
         match self {
-            Self::Cached(arc) => (&arc.0, arc.1),
-            Self::Static(re, anchored) => (re, *anchored),
+            Self::Cached(arc) => arc,
+            Self::Static(re) => re,
         }
     }
 }
 
 /// Implemented by anything `preg_*` can accept as a pattern: a PHP-style pattern string (parsed
-/// and cached in `PATTERN_CACHE`) or an already-compiled `&'static regex::Regex` paired with its
-/// PCRE `A` (anchored) flag, as produced by the `php_regex!` macro.
+/// and cached in `PATTERN_CACHE`) or an already-compiled `&'static regex::Regex`, as produced by
+/// the `php_regex!` macro.
 pub trait PregPattern {
     fn resolve(self) -> ResolvedPattern;
 }
@@ -519,41 +506,28 @@ impl PregPattern for String {
     }
 }
 
-impl PregPattern for (&'static regex::Regex, bool) {
+impl PregPattern for &'static regex::Regex {
     fn resolve(self) -> ResolvedPattern {
-        ResolvedPattern::Static(self.0, self.1)
+        ResolvedPattern::Static(self)
     }
 }
 
 // Used by the `php_regex!` macro to obtain the `regex`-crate-syntax source for a PHP pattern.
 pub fn php_regex_source(pattern: &str) -> String {
-    translate_php_pattern(pattern)
-        .unwrap_or_else(|e| panic!("invalid regex: {e}"))
-        .0
-}
-
-// Used by the `php_regex!` macro to obtain the PCRE `A` (anchored) modifier flag for a PHP
-// pattern.
-pub fn php_regex_anchored(pattern: &str) -> bool {
-    translate_php_pattern(pattern)
-        .unwrap_or_else(|e| panic!("invalid regex: {e}"))
-        .1
+    translate_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"))
 }
 
 /// Wraps `regex_macro::regex!` so a PHP-style `preg_*` pattern literal (delimiters + modifiers)
 /// compiles to a per-call-site cached `&'static regex::Regex`, instead of going through the
-/// runtime `PATTERN_CACHE` lookup by string key. Expands to a `(&'static regex::Regex, bool)`
-/// tuple, ready to pass straight into any `preg_*` function.
+/// runtime `PATTERN_CACHE` lookup by string key. Expands to a `&'static regex::Regex`, ready to
+/// pass straight into any `preg_*` function.
 // TODO(pcre): `$php_pattern` is still translated from PHP delimiter/modifier syntax at runtime (on
 // first use at each call site). Once call sites pass native `regex`-crate syntax directly, drop
 // this wrapper and call `regex_macro::regex!` directly.
 #[macro_export]
 macro_rules! php_regex {
     ($php_pattern:expr $(,)?) => {
-        (
-            &**$crate::regex!(&$crate::php_regex_source($php_pattern)),
-            $crate::php_regex_anchored($php_pattern),
-        )
+        &**$crate::regex!(&$crate::php_regex_source($php_pattern))
     };
 }
 

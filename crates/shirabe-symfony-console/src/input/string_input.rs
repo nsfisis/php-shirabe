@@ -6,7 +6,7 @@ use crate::input::InputDefinition;
 use crate::input::InputInterface;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match2};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_match};
 
 /// StringInput represents an input provided as a string.
 ///
@@ -57,15 +57,21 @@ impl StringInput {
                 continue;
             }
 
-            if let Some(m) = preg_match2(php_regex!(r"/\s+/A"), input, cursor as usize) {
+            // Regex pattern compatibility:
+            // PHP runs these patterns anchored (`A`) at `$cursor`, so each one must match starting
+            // exactly there. The `regex` crate anchors only at the head of the haystack, so the
+            // search runs over the part of the input that begins at the cursor and each pattern
+            // carries a leading `^` instead of the `A` modifier.
+            let rest = &input[cursor as usize..];
+
+            if let Some(m) = preg_match(php_regex!(r"/^\s+/"), rest) {
                 if token.is_some() {
                     tokens.push(token.take().unwrap());
                 }
                 cursor += shirabe_php_shim::strlen(m.get(0).unwrap_or(""));
-            } else if let Some(m) = preg_match2(
-                format!(r#"/([^="'\s]+?)(=?)({}+)/A"#, Self::REGEX_QUOTED_STRING),
-                input,
-                cursor as usize,
+            } else if let Some(m) = preg_match(
+                format!(r#"/^([^="'\s]+?)(=?)({}+)/"#, Self::REGEX_QUOTED_STRING),
+                rest,
             ) {
                 let inner = shirabe_php_shim::substr(m.get(3).unwrap_or(""), 1, Some(-1));
                 let replaced =
@@ -78,11 +84,7 @@ impl StringInput {
                     shirabe_php_shim::stripcslashes(&replaced)
                 ));
                 cursor += shirabe_php_shim::strlen(m.get(0).unwrap_or(""));
-            } else if let Some(m) = preg_match2(
-                format!(r"/{}/A", Self::REGEX_QUOTED_STRING),
-                input,
-                cursor as usize,
-            ) {
+            } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_QUOTED_STRING), rest) {
                 token = Some(format!(
                     "{}{}",
                     token.unwrap_or_default(),
@@ -93,11 +95,8 @@ impl StringInput {
                     ))
                 ));
                 cursor += shirabe_php_shim::strlen(m.get(0).unwrap_or(""));
-            } else if let Some(m) = preg_match2(
-                format!(r"/{}/A", Self::REGEX_UNQUOTED_STRING),
-                input,
-                cursor as usize,
-            ) {
+            } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_UNQUOTED_STRING), rest)
+            {
                 token = Some(format!(
                     "{}{}",
                     token.unwrap_or_default(),

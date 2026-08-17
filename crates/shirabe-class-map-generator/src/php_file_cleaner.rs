@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileCleaner.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{PregMatches, preg_match2};
+use shirabe_php_shim::{PregMatches, preg_match, preg_match2};
 use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
@@ -52,7 +52,7 @@ impl PhpFileCleaner {
         }
 
         let keys: String = type_config.keys().collect();
-        let rest_pattern = format!("{{[^?\"'</{}]+}}A", keys);
+        let rest_pattern = format!("{{^[^?\"'</{}]+}}", keys);
 
         *REST_PATTERN.lock().unwrap() = Some(rest_pattern);
         *TYPE_CONFIG.lock().unwrap() = Some(type_config);
@@ -103,7 +103,7 @@ impl PhpFileCleaner {
                     // no backreferences, so the three quote states (none, `'`, `"`) are expanded
                     // into separate alternatives, each capturing the identifier in its own group.
                     if let Some(r#match) = self.r#match(
-                        r#"{<<<[ \t]*(?:"([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)"|'([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)'|([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*))(?:\r\n|\n|\r)}A"#,
+                        r#"{^<<<[ \t]*(?:"([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)"|'([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)'|([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*))(?:\r\n|\n|\r)}"#,
                     ) {
                         let matched_len = r#match
                             .get(0)
@@ -282,7 +282,12 @@ impl PhpFileCleaner {
         self.index + 1 < self.len && self.contents.as_bytes()[self.index + 1] as char == char
     }
 
+    // Regex pattern compatibility:
+    // PHP runs `$regex` anchored (`A`) at `$this->index`, so it must match starting exactly there.
+    // The `regex` crate anchors only at the head of the haystack, so the search runs over the part
+    // of the contents that begins at the index and the patterns carry a leading `^` instead of the
+    // `A` modifier.
     fn r#match(&self, regex: &str) -> Option<PregMatches<'_>> {
-        preg_match2(regex, &self.contents, self.index)
+        preg_match(regex, &self.contents[self.index..])
     }
 }
