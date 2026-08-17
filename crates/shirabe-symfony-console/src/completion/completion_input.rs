@@ -3,7 +3,7 @@
 use crate::input::ArgvInput;
 use crate::input::InputDefinition;
 use crate::input::InputOption;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match_all};
+use shirabe_php_shim::{CaptureKey, PhpMixed, php_regex, preg_match_all};
 
 /// An input specialized for shell completion.
 ///
@@ -35,7 +35,9 @@ impl CompletionInput {
         );
 
         Self::from_tokens(
-            tokens[0]
+            tokens
+                .get(&CaptureKey::ByIndex(0))
+                .expect("group 0 is always present")
                 .iter()
                 .map(|token| {
                     token

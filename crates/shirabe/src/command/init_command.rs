@@ -24,7 +24,7 @@ use shirabe_php_shim::{
     CaptureKey, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_flip_strings, array_intersect_key, array_map, basename, empty, explode, file,
     file_exists, file_get_contents, file_put_contents, get_current_user, impl_php_class, implode,
-    is_dir, is_string, php_regex, preg_match_all2, preg_match2, preg_quote, preg_replace, realpath,
+    is_dir, is_string, php_regex, preg_match_all, preg_match2, preg_quote, preg_replace, realpath,
     str_replace, strpos, strtolower, trim, ucwords,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
@@ -168,7 +168,7 @@ impl InitCommand {
         ) == 0
         {
             *self.git_config.borrow_mut() = Some(IndexMap::new());
-            let m = preg_match_all2(php_regex!(r"{^([^=]+)=(.*)$}m"), &output);
+            let m = preg_match_all(php_regex!(r"{^([^=]+)=(.*)$}m"), &output);
             if m.occurrence_count() > 0 {
                 let keys: Vec<Option<String>> =
                     m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();

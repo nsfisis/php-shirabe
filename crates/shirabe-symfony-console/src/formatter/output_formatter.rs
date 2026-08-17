@@ -135,12 +135,14 @@ impl OutputFormatter {
                 let url = preg_replace(php_regex!("{\\\\([<>])}"), "$1", &r#match[1]);
                 style.set_href(&url);
             } else if r#match[0] == "options" {
-                let mut options = preg_match_all(
+                let options = preg_match_all(
                     php_regex!("([^,;]+)"),
                     &shirabe_php_shim::strtolower(&r#match[1]),
                 );
-                let options = shirabe_php_shim::array_shift(&mut options).unwrap_or_default();
-                for option in &options {
+                let options = options
+                    .get(&CaptureKey::ByIndex(0))
+                    .expect("group 0 is always present");
+                for option in options {
                     style.set_option(
                         option
                             .as_deref()

@@ -19,7 +19,7 @@ use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CaptureKey, CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class,
-    implode, in_array_strict, is_dir, php_regex, preg_match_all2, preg_match2, preg_quote,
+    implode, in_array_strict, is_dir, php_regex, preg_match_all, preg_match2, preg_quote,
     preg_replace, preg_split, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
 };
 
@@ -100,7 +100,7 @@ impl GitDownloader {
         };
         let head_ref = head_match.get(1).unwrap_or_default().to_string();
 
-        let branches_match = preg_match_all2(
+        let branches_match = preg_match_all(
             format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
             &refs,
         );
@@ -127,7 +127,7 @@ impl GitDownloader {
 
             // try to find matching branch names in remote repos
             for candidate in &candidate_branches {
-                let m = preg_match_all2(
+                let m = preg_match_all(
                     format!(
                         "{{^[a-f0-9]+ refs/remotes/((?:[^/]+)/{})$}}mi",
                         preg_quote(candidate, None)

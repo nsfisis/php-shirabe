@@ -175,24 +175,9 @@ pub fn preg_match2<'h>(
     Some(PregMatches::new(caps))
 }
 
-// PREG_PATTERN_ORDER: the outer vec is indexed by capture group, the inner by
-// match occurrence. A non-participating group is reported as None.
-pub fn preg_match_all(pattern: impl PregPattern, subject: &str) -> Vec<Vec<Option<String>>> {
-    let __resolved = pattern.resolve();
-    let (re, _anchored) = __resolved.parts();
-    let group_count = re.captures_len();
-    let mut groups: Vec<Vec<Option<String>>> = vec![Vec::new(); group_count];
-    for caps in re.captures_iter(subject) {
-        for (g, group) in groups.iter_mut().enumerate() {
-            group.push(caps.get(g).map(|m| m.as_str().to_string()));
-        }
-    }
-    groups
-}
-
 // The number of occurrences the caller would get from PHP's return value is the length of any
 // one column, as `PregMatchesAll::occurrence_count` reports it.
-pub fn preg_match_all2(pattern: impl PregPattern, subject: &str) -> PregMatchesAll {
+pub fn preg_match_all(pattern: impl PregPattern, subject: &str) -> PregMatchesAll {
     let __resolved = pattern.resolve();
     let (re, _anchored) = __resolved.parts();
     let group_count = re.captures_len();
@@ -473,9 +458,8 @@ fn translate_php_pattern(pattern: &str) -> anyhow::Result<(String, bool)> {
         .collect();
 
     // PCRE's `A` (PCRE_ANCHORED) modifier requires the match to start exactly at the search offset.
-    // The `regex` crate has no per-search anchoring, so the offset-based callers
-    // (`preg_match2`/`preg_match_all2`) honour it by searching a sub-slice that begins at the offset;
-    // here we only surface the flag.
+    // The `regex` crate has no per-search anchoring, so `preg_match2` honours it by searching a
+    // sub-slice that begins at the offset; here we only surface the flag.
     let anchored = modifiers.contains('A');
 
     let inner = translate_pcre_literals(inner);
