@@ -10,7 +10,7 @@ use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PhpMixed, date_local, in_array_loose, php_regex, preg_match2, stripos, strtolower,
+    PhpMixed, date_local, in_array_loose, php_regex, preg_match, stripos, strtolower,
 };
 
 #[derive(Debug)]
@@ -326,7 +326,7 @@ impl GitHub {
             if stripos(header, "x-github-sso: required").is_none() {
                 continue;
             }
-            if let Some(caps) = preg_match2(php_regex!(r"{\burl=(?P<url>[^\s;]+)}"), header, 0) {
+            if let Some(caps) = preg_match(php_regex!(r"{\burl=(?P<url>[^\s;]+)}"), header) {
                 return caps.name("url").map(str::to_string);
             }
         }
@@ -336,13 +336,7 @@ impl GitHub {
 
     pub fn is_rate_limited(&self, headers: &[String]) -> bool {
         for header in headers {
-            if preg_match2(
-                php_regex!(r"{^x-ratelimit-remaining: *0$}i"),
-                header.trim(),
-                0,
-            )
-            .is_some()
-            {
+            if preg_match(php_regex!(r"{^x-ratelimit-remaining: *0$}i"), header.trim()).is_some() {
                 return true;
             }
         }
@@ -352,7 +346,7 @@ impl GitHub {
 
     pub fn requires_sso(&self, headers: &[String]) -> bool {
         for header in headers {
-            if preg_match2(php_regex!(r"{^x-github-sso: required}i"), header.trim(), 0).is_some() {
+            if preg_match(php_regex!(r"{^x-github-sso: required}i"), header.trim()).is_some() {
                 return true;
             }
         }

@@ -24,7 +24,7 @@ use shirabe_php_shim::{
     CaptureKey, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_flip_strings, array_intersect_key, array_map, basename, empty, explode, file,
     file_exists, file_get_contents, file_put_contents, get_current_user, impl_php_class, implode,
-    is_dir, is_string, php_regex, preg_match_all, preg_match2, preg_quote, preg_replace, realpath,
+    is_dir, is_string, php_regex, preg_match, preg_match_all, preg_quote, preg_replace, realpath,
     str_replace, strpos, strtolower, trim, ucwords,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
@@ -89,10 +89,9 @@ impl InitCommand {
         &self,
         author: &str,
     ) -> anyhow::Result<IndexMap<String, Option<String>>> {
-        if let Some(m) = preg_match2(
+        if let Some(m) = preg_match(
             php_regex!(r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#),
             author,
-            0,
         ) {
             let email = m.name("email").map(str::to_string);
             if let Some(ref email) = email
@@ -210,7 +209,7 @@ impl InitCommand {
 
         let lines = file(ignore_file, FILE_IGNORE_NEW_LINES).unwrap_or_default();
         for line in &lines {
-            if preg_match2(&pattern, line, 0).is_some() {
+            if preg_match(&pattern, line).is_some() {
                 return true;
             }
         }
@@ -498,13 +497,12 @@ impl Command for InitCommand {
         });
 
         if options.contains_key("name")
-            && preg_match2(
+            && preg_match(
                 php_regex!(r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"),
                 options
                     .get("name")
                     .and_then(|v| v.as_string())
                     .unwrap_or(""),
-                0,
             )
             .is_none()
         {
@@ -910,11 +908,7 @@ impl Command for InitCommand {
                         return Ok(PhpMixed::String(name_for_validate.clone()));
                     }
 
-                    if preg_match2(
-                        php_regex!(r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"),
-                        value.as_string().unwrap_or(""),
-                        0,
-                    )
+                    if preg_match(php_regex!(r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"), value.as_string().unwrap_or(""))
                     .is_none()
                     {
                         return Err(InvalidArgumentException::new(format!(
@@ -1226,7 +1220,7 @@ impl Command for InitCommand {
                     value_str
                 };
 
-                if preg_match2(php_regex!(r"{^[^/][A-Za-z0-9\-_/]+/$}"), &value_or_default, 0)
+                if preg_match(php_regex!(r"{^[^/][A-Za-z0-9\-_/]+/$}"), &value_or_default)
                     .is_none()
                 {
                     return Err(InvalidArgumentException::new(format!(

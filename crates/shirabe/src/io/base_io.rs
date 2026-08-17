@@ -8,7 +8,7 @@ use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
-    UnexpectedValueException, array_merge, in_array_strict, json_encode_ex, php_regex, preg_match2,
+    UnexpectedValueException, array_merge, in_array_strict, json_encode_ex, php_regex, preg_match,
 };
 
 /// ref: composer/vendor/psr/log/Psr/Log/LogLevel.php
@@ -156,7 +156,7 @@ pub trait BaseIO: IOInterface {
                     config.merge(&config_outer, "implicit-due-to-auth");
                 }
 
-                if preg_match2(php_regex!(r"{^[.A-Za-z0-9_]+$}"), &token_str, 0).is_none() {
+                if preg_match(php_regex!(r"{^[.A-Za-z0-9_]+$}"), &token_str).is_none() {
                     return Err(UnexpectedValueException::new(format!(
                         "Your github oauth token for {} contains invalid characters: \"{}\"",
                         domain, token_str

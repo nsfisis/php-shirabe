@@ -5,7 +5,7 @@ use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, explode,
-    getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_match2, preg_quote, preg_replace,
+    getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_match, preg_quote, preg_replace,
     preg_replace_callback, realpath, str_replace, stream_get_wrappers, strlen, strpos, strrpos,
     strtr, substr,
 };
@@ -135,7 +135,7 @@ impl ClassMapGenerator {
             }
 
             let is_stream_wrapper_path =
-                preg_match2(&self.stream_wrappers_regex, &file_path, 0).is_some();
+                preg_match(&self.stream_wrappers_regex, &file_path).is_some();
             if !Self::is_absolute_path(&file_path) && !is_stream_wrapper_path {
                 file_path = format!("{}/{}", cwd, file_path);
                 file_path = Self::normalize_path(&file_path);
@@ -183,11 +183,11 @@ impl ClassMapGenerator {
 
             // check the realpath of the file against the excluded paths as the path might be a symlink and the excluded path is realpath'd so symlink are resolved
             if let Some(ref excluded) = excluded {
-                if preg_match2(excluded, &strtr(&real_path, "\\", "/"), 0).is_some() {
+                if preg_match(excluded, &strtr(&real_path, "\\", "/")).is_some() {
                     continue;
                 }
                 // check non-realpath of file for directories symlink in project dir
-                if preg_match2(excluded, &strtr(&file_path, "\\", "/"), 0).is_some() {
+                if preg_match(excluded, &strtr(&file_path, "\\", "/")).is_some() {
                     continue;
                 }
             }
@@ -348,10 +348,9 @@ impl ClassMapGenerator {
         }
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
-        if let Some(r#match) = preg_match2(
+        if let Some(r#match) = preg_match(
             php_regex!(r"{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
             &path,
-            0,
         ) {
             prefix = r#match.get(1).unwrap_or_default().to_string();
             path = substr(&path, strlen(&prefix), None);

@@ -43,7 +43,7 @@ use shirabe_php_shim::{
     json_decode_assoc, parse_url, php_regex, preg_split, realpath, strtolower, strtr, urlencode,
     var_export,
 };
-use shirabe_php_shim::{Catch as _, preg_grep, preg_match2, preg_replace};
+use shirabe_php_shim::{Catch as _, preg_grep, preg_match, preg_replace};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
@@ -161,7 +161,7 @@ impl ComposerRepository {
             .and_then(|v| v.as_string())
             .unwrap_or("")
             .to_string();
-        if preg_match2(php_regex!(r"{^[\w.]+\??://}"), &url_str, 0).is_none() {
+        if preg_match(php_regex!(r"{^[\w.]+\??://}"), &url_str).is_none() {
             if let Some(local_file_path) = realpath(&url_str) {
                 // it is a local path, add file scheme
                 repo_config.insert(
@@ -244,10 +244,9 @@ impl ComposerRepository {
             .to_string();
 
         // force url for packagist.org to repo.packagist.org
-        if let Some(match_packagist) = preg_match2(
+        if let Some(match_packagist) = preg_match(
             php_regex!(r"{^(?P<proto>https?)://packagist\.org/?$}i"),
             &url,
-            0,
         ) {
             let proto = match_packagist
                 .name("proto")
@@ -779,10 +778,9 @@ impl ComposerRepository {
 
         if self.has_providers()? || self.lazy_providers_url.is_some() {
             // optimize search for "^foo/bar" where at least "^foo/" is present by loading this directly from the listUrl if present
-            if let Some(match_groups) = preg_match2(
+            if let Some(match_groups) = preg_match(
                 php_regex!(r"{^\^(?P<query>(?P<vendor>[a-z0-9_.-]+)/[a-z0-9_.-]*)\*?$}i"),
                 &query,
-                0,
             ) && let Some(list_url) = self.list_url.as_ref()
             {
                 let q = match_groups.name("query").unwrap_or_default().to_string();
@@ -2421,7 +2419,7 @@ impl ComposerRepository {
         }
 
         if url.starts_with('/') {
-            if let Some(matches) = preg_match2(php_regex!(r"{^[^:]++://[^/]*+}"), &self.url, 0) {
+            if let Some(matches) = preg_match(php_regex!(r"{^[^:]++://[^/]*+}"), &self.url) {
                 return Ok(format!("{}{}", matches.get(0).unwrap_or_default(), url));
             }
 
@@ -2710,7 +2708,7 @@ impl ComposerRepository {
         // url-encode $ signs in URLs as bad proxies choke on them
         if let Some(pos) = filename.find('$')
             && pos > 0
-            && preg_match2(php_regex!(r"{^https?://}i"), &filename, 0).is_some()
+            && preg_match(php_regex!(r"{^https?://}i"), &filename).is_some()
         {
             filename = format!("{}%24{}", &filename[..pos], &filename[pos + 1..]);
         }
@@ -3309,7 +3307,7 @@ impl ComposerRepository {
 
         if let Some(ref patterns) = self.available_package_patterns {
             for provider_regex in patterns.iter() {
-                if preg_match2(provider_regex, name, 0).is_some() {
+                if preg_match(provider_regex, name).is_some() {
                     return Ok(true);
                 }
             }

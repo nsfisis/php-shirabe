@@ -13,7 +13,7 @@ use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     PhpMixed, PregMatches, RuntimeException, UnexpectedValueException, dirname, file_exists,
     file_get_contents, file_put_contents, is_dir, is_file, json_decode_assoc, json_decode_obj,
-    json_encode_ex, mkdir, php_regex, preg_match2, preg_replace_callback, preg_replace2, realpath,
+    json_encode_ex, mkdir, php_regex, preg_match, preg_replace_callback, preg_replace2, realpath,
     str_repeat, strlen, strpos, usleep,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
@@ -107,9 +107,7 @@ impl JsonFile {
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<Self> {
-        if http_downloader.is_none()
-            && preg_match2(php_regex!(r"{^https?://}i"), &path, 0).is_some()
-        {
+        if http_downloader.is_none() && preg_match(php_regex!(r"{^https?://}i"), &path).is_some() {
             return Err(InvalidArgumentException::new(
                 "http urls require a HttpDownloader instance to be passed".to_string(),
             )
@@ -554,7 +552,7 @@ impl JsonFile {
     }
 
     pub fn detect_indenting(json: Option<&str>) -> String {
-        if let Some(m) = preg_match2(php_regex!(r##"#^([ \t]+)"#m"##), json.unwrap_or(""), 0) {
+        if let Some(m) = preg_match(php_regex!(r##"#^([ \t]+)"#m"##), json.unwrap_or("")) {
             return m.get(1).unwrap_or_default().to_string();
         }
 

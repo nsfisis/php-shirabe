@@ -18,7 +18,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_map,
     array_search_mixed, base64_decode, basename, empty, explode, extension_loaded, in_array_loose,
-    parse_url, php_regex, preg_match2, preg_replace, preg_split, strpos, strtolower, substr, trim,
+    parse_url, php_regex, preg_match, preg_replace, preg_split, strpos, strtolower, substr, trim,
     urlencode,
 };
 
@@ -70,12 +70,11 @@ impl GitHubDriver {
     }
 
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        let Some(match_) = preg_match2(
+        let Some(match_) = preg_match(
             php_regex!(
                 r"#^(?:(?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$#"
             ),
             &self.inner.url,
-            0,
         ) else {
             return Err(InvalidArgumentException::new(format!(
                 "The GitHub repository URL {} is invalid.",
@@ -483,14 +482,14 @@ impl GitHubDriver {
         let mut key: Option<String> = None;
         for line in preg_split(php_regex!(r"{\r?\n}"), &funding) {
             let line = trim(&line, None);
-            if let Some(m) = preg_match2(php_regex!(r"{^(\w+)\s*:\s*(.+)$}"), &line, 0) {
+            if let Some(m) = preg_match(php_regex!(r"{^(\w+)\s*:\s*(.+)$}"), &line) {
                 let g1 = m.get(1).unwrap_or_default().to_string();
                 let g2 = m.get(2).unwrap_or_default().to_string();
                 if g2 == "[" {
                     key = Some(g1);
                     continue;
                 }
-                if let Some(m2) = preg_match2(php_regex!(r"{^\[(.*?)\](?:\s*#.*)?$}"), &g2, 0) {
+                if let Some(m2) = preg_match(php_regex!(r"{^\[(.*?)\](?:\s*#.*)?$}"), &g2) {
                     let inner = m2.get(1).unwrap_or_default().to_string();
                     for item in array_map(
                         |s: &String| trim(s, None),
@@ -504,9 +503,7 @@ impl GitHubDriver {
                         );
                         result.push(entry);
                     }
-                } else if let Some(m2) =
-                    preg_match2(php_regex!(r"{^([^#].*?)(?:\s+#.*)?$}"), &g2, 0)
-                {
+                } else if let Some(m2) = preg_match(php_regex!(r"{^([^#].*?)(?:\s+#.*)?$}"), &g2) {
                     let mut entry = IndexMap::new();
                     entry.insert("type".to_string(), PhpMixed::String(g1.clone()));
                     entry.insert(
@@ -516,11 +513,11 @@ impl GitHubDriver {
                     result.push(entry);
                 }
                 key = None;
-            } else if let Some(m) = preg_match2(php_regex!(r"{^(\w+)\s*:\s*#\s*$}"), &line, 0) {
+            } else if let Some(m) = preg_match(php_regex!(r"{^(\w+)\s*:\s*#\s*$}"), &line) {
                 key = Some(m.get(1).unwrap_or_default().to_string());
             } else if key.is_some()
-                && let Some(m) = preg_match2(php_regex!(r"{^-\s*(.+)(?:\s+#.*)?$}"), &line, 0)
-                    .or_else(|| preg_match2(php_regex!(r"{^(.+),(?:\s*#.*)?$}"), &line, 0))
+                && let Some(m) = preg_match(php_regex!(r"{^-\s*(.+)(?:\s+#.*)?$}"), &line)
+                    .or_else(|| preg_match(php_regex!(r"{^(.+),(?:\s*#.*)?$}"), &line))
             {
                 let mut entry = IndexMap::new();
                 entry.insert(
@@ -645,7 +642,7 @@ impl GitHubDriver {
                     };
 
                     if bits.scheme.is_none() && bits.host.is_none() {
-                        if preg_match2(php_regex!(r"{^[a-z0-9-]++\.[a-z]{2,3}$}"), &item_url, 0)
+                        if preg_match(php_regex!(r"{^[a-z0-9-]++\.[a-z]{2,3}$}"), &item_url)
                             .is_some()
                         {
                             result[key_idx].insert(
@@ -911,12 +908,11 @@ impl GitHubDriver {
         url: &str,
         _deep: bool,
     ) -> anyhow::Result<bool> {
-        let Some(matches) = preg_match2(
+        let Some(matches) = preg_match(
             php_regex!(
                 r"#^((?:https?|git)://([^/]+)/|git@([^:]+):/?)([^/]+)/([^/]+?)(?:\.git|/)?$#"
             ),
             url,
-            0,
         ) else {
             return Ok(false);
         };
@@ -1253,7 +1249,7 @@ impl GitHubDriver {
 
         let links = explode(",", &header);
         for link in &links {
-            if let Some(m) = preg_match2(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link, 0) {
+            if let Some(m) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
                 return Some(m.get(1).unwrap_or_default().to_string());
             }
         }

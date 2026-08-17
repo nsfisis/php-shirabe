@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
     array_reverse, empty, explode, implode, in_array_loose, is_array, is_int, is_numeric,
-    json_decode_assoc, json_decode_obj, php_regex, php_truthy, preg_match2, preg_quote,
+    json_decode_assoc, json_decode_obj, php_regex, php_truthy, preg_match, preg_quote,
     preg_replace, preg_replace2, rtrim, str_repeat, str_replace, strlen, strnatcmp, strpos, substr,
     trim, uksort,
 };
@@ -35,7 +35,7 @@ impl JsonManipulator {
         if contents.is_empty() {
             contents = "{}".to_string();
         }
-        if preg_match2(php_regex!("#^\\{(.*)\\}$#s"), &contents, 0).is_none() {
+        if preg_match(php_regex!("#^\\{(.*)\\}$#s"), &contents).is_none() {
             return Err(InvalidArgumentException::new(
                 "The json file must be an object ({})".to_string(),
             )
@@ -112,11 +112,9 @@ impl JsonManipulator {
                 &links[value_end..]
             );
         } else {
-            if let Some(groups) = preg_match2(
-                php_regex!("#^\\s*\\{\\s*\\S+.*?(\\s*\\}\\s*)$#s"),
-                &links,
-                0,
-            ) {
+            if let Some(groups) =
+                preg_match(php_regex!("#^\\s*\\{\\s*\\S+.*?(\\s*\\}\\s*)$#s"), &links)
+            {
                 let groups_1 = groups.get(1).unwrap_or_default().to_string();
                 // link missing but non empty links
                 links = preg_replace(
@@ -735,12 +733,11 @@ impl JsonManipulator {
                 &children[cm.value_end..]
             );
         } else {
-            if let Some(leading_match) = preg_match2(
+            if let Some(leading_match) = preg_match(
                 php_regex!(
                     "#^\\{(?P<leadingspace>\\s*?)(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\}$#s"
                 ),
                 &children,
-                0,
             ) {
                 let mut whitespace = leading_match
                     .name("trailingspace")
@@ -893,7 +890,7 @@ impl JsonManipulator {
         // try and find a match for the subkey
         let key_regex = str_replace("/", "\\\\?/", &preg_quote(&name_owned, None));
         let mut children_clean: Option<String> = None;
-        if preg_match2(format!("{{\"{}\"\\s*:}}i", key_regex), &children, 0).is_some() {
+        if preg_match(format!("{{\"{}\"\\s*:}}i", key_regex), &children).is_some() {
             // find best match for the value of "name". The PHP pattern `"name"\s*:\s*(?&json)` is
             // not anchored, so it can match the key at several nesting levels; collect every such
             // occurrence and keep the longest, reproducing PHP's behaviour.
@@ -936,10 +933,9 @@ impl JsonManipulator {
         let children_clean = children_clean.ok_or_else(|| InvalidArgumentException::new("JsonManipulator: $childrenClean is not defined. Please report at https://github.com/nsfisis/php-shirabe/issues/new.".to_string()))?;
 
         // no child data left, $name was the only key in
-        if let Some(empty_match) = preg_match2(
+        if let Some(empty_match) = preg_match(
             php_regex!("#^\\{\\s*?(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\}$#s"),
             &children_clean,
-            0,
         ) && empty_match.name("content").is_none()
         {
             self.contents = format!(
@@ -1032,12 +1028,11 @@ impl JsonManipulator {
             return Ok(false);
         }
 
-        if let Some(leading_match) = preg_match2(
+        if let Some(leading_match) = preg_match(
             php_regex!(
                 "#^\\[(?P<leadingspace>\\s*?)(?P<content>\\S+.*?)?(?P<trailingspace>\\s*)\\]$#s"
             ),
             &children,
-            0,
         ) {
             let leading_whitespace = leading_match
                 .name("leadingspace")
@@ -1322,8 +1317,7 @@ impl JsonManipulator {
         }
 
         // append at the end of the file and keep whitespace
-        if let Some(tail_match) = preg_match2(php_regex!("#[^{\\s](\\s*)\\}$#"), &self.contents, 0)
-        {
+        if let Some(tail_match) = preg_match(php_regex!("#[^{\\s](\\s*)\\}$#"), &self.contents) {
             let tail_match_1 = tail_match.get(1).unwrap_or_default().to_string();
             self.contents = preg_replace(
                 format!("#{}\\}}$#", tail_match_1),
@@ -1396,8 +1390,8 @@ impl JsonManipulator {
             // check that we are not leaving a dangling comma on the previous line if the last line was removed
             let mut start = self.contents[..m.key_pos].to_string();
             let end = self.contents[e..].to_string();
-            if preg_match2(php_regex!("#,\\s*$#"), &start, 0).is_some()
-                && preg_match2(php_regex!("#^\\}$#"), &end, 0).is_some()
+            if preg_match(php_regex!("#,\\s*$#"), &start).is_some()
+                && preg_match(php_regex!("#^\\}$#"), &end).is_some()
             {
                 start = rtrim(
                     &preg_replace(php_regex!("#,(\\s*)$#"), "$1", &start),
@@ -1406,7 +1400,7 @@ impl JsonManipulator {
             }
 
             self.contents = format!("{}{}", start, end);
-            if preg_match2(php_regex!("#^\\{\\s*\\}\\s*$#"), &self.contents, 0).is_some() {
+            if preg_match(php_regex!("#^\\{\\s*\\}\\s*$#"), &self.contents).is_some() {
                 self.contents = "{\n}".to_string();
             }
 

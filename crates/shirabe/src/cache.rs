@@ -9,7 +9,7 @@ use chrono::Utc;
 use shirabe_php_shim::{
     ErrorException, bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space,
     file_exists, file_get_contents, file_put_contents, filemtime, function_exists, hash_file,
-    is_dir, is_writable, mkdir, php_regex, preg_match2, preg_replace, random_bytes, random_int,
+    is_dir, is_writable, mkdir, php_regex, preg_match, preg_replace, random_bytes, random_int,
     rename, time, unlink,
 };
 use shirabe_symfony_finder::Finder;
@@ -94,10 +94,9 @@ impl Cache {
     }
 
     pub fn is_usable(path: &str) -> bool {
-        preg_match2(
+        preg_match(
             php_regex!(r"{(^|[\\\\/])(\$null|nul|NUL|/dev/null)([\\\\/]|$)}"),
             path,
-            0,
         )
         .is_none()
     }
@@ -188,12 +187,11 @@ impl Cache {
                         true,
                         crate::io::DEBUG,
                     );
-                    if let Some(m) = preg_match2(
+                    if let Some(m) = preg_match(
                         php_regex!(
                             r"{^file_put_contents\(\): Only ([0-9]+) of ([0-9]+) bytes written}"
                         ),
                         e.get_message(),
-                        0,
                     ) {
                         // Remove partial file.
                         unlink(&temp_file_name);

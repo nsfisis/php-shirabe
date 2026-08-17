@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/class-map-generator/src/ClassMap.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{OutOfBoundsException, preg_match2, rtrim, strpos, strtr};
+use shirabe_php_shim::{OutOfBoundsException, preg_match, rtrim, strpos, strtr};
 
 #[derive(Debug, Clone)]
 pub struct PsrViolationEntry {
@@ -66,7 +66,7 @@ impl ClassMap {
         for (class, paths) in &self.ambiguous_classes {
             let paths: Vec<String> = paths
                 .iter()
-                .filter(|path| preg_match2(duplicates_filter, &strtr(path, "\\", "/"), 0).is_none())
+                .filter(|path| preg_match(duplicates_filter, &strtr(path, "\\", "/")).is_none())
                 .cloned()
                 .collect();
             if !paths.is_empty() {

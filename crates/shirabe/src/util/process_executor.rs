@@ -11,7 +11,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect, array_map,
     escapeshellarg, explode, implode, in_array_strict, is_array, is_dir, is_numeric, is_string,
-    php_regex, preg_match2, preg_replace, preg_replace_callback, preg_replace2, preg_split, rtrim,
+    php_regex, preg_match, preg_replace, preg_replace_callback, preg_replace2, preg_split, rtrim,
     str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
 };
 use shirabe_symfony_process::ExecutableFinder;
@@ -216,7 +216,7 @@ impl ProcessExecutor {
         if is_string(&command) {
             let mut command_str = command.as_string().unwrap_or("").to_string();
             if Platform::is_windows()
-                && let Some(m) = preg_match2(php_regex!(r"{^([^:/\\]++) }"), &command_str, 0)
+                && let Some(m) = preg_match(php_regex!(r"{^([^:/\\]++) }"), &command_str)
             {
                 let m1 = m.get(1).unwrap_or_default().to_string();
                 command_str = substr_replace(
@@ -832,18 +832,15 @@ impl ProcessExecutor {
             php_regex!(r"{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i"),
             |m: &PregMatches| -> anyhow::Result<String> {
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
-                if preg_match2(
+                if preg_match(
                     GitHub::GITHUB_TOKEN_REGEX,
                     m.name("user").unwrap_or_default(),
-                    0,
                 )
                 .is_some()
                 {
                     return Ok("://***:***@".to_string());
                 }
-                if preg_match2(r"{^[a-f0-9]{12,}$}", m.name("user").unwrap_or_default(), 0)
-                    .is_some()
-                {
+                if preg_match(r"{^[a-f0-9]{12,}$}", m.name("user").unwrap_or_default()).is_some() {
                     return Ok("://***:***@".to_string());
                 }
 
@@ -906,8 +903,7 @@ impl ProcessExecutor {
             -1,
             Some(&mut dquotes),
         );
-        let meta =
-            dquotes > 0 || preg_match2(php_regex!(r"/%[^%]+%|![^!]+!/"), &argument, 0).is_some();
+        let meta = dquotes > 0 || preg_match(php_regex!(r"/%[^%]+%|![^!]+!/"), &argument).is_some();
 
         if !meta && !quote {
             quote = strpbrk(&argument, "^&|<>()").is_some();

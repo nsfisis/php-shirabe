@@ -10,7 +10,7 @@ use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use shirabe_php_shim::{
     PhpMixed, basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
-    file_get_contents5, file_put_contents, fopen, is_dir, is_file, is_link, php_regex, preg_match2,
+    file_get_contents5, file_put_contents, fopen, is_dir, is_file, is_link, php_regex, preg_match,
     realpath, rmdir, substr, trim, umask,
 };
 
@@ -200,10 +200,9 @@ impl BinaryInstaller {
             }
             Err(_) => String::new(),
         };
-        if let Some(m) = preg_match2(
+        if let Some(m) = preg_match(
             php_regex!(r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m"),
             &line,
-            0,
         ) {
             return trim(m.get(1).unwrap_or(""), None);
         }
@@ -316,10 +315,9 @@ impl BinaryInstaller {
             file_get_contents5(bin, false, PhpMixed::Null, 0, Some(500)).unwrap_or_default();
         // For php files, we generate a PHP proxy instead of a shell one,
         // which allows calling the proxy with a custom php process
-        if let Some(m) = preg_match2(
+        if let Some(m) = preg_match(
             php_regex!(r"{^(#!.*\r?\n)?[\r\n\t ]*<\?php}"),
             &bin_contents,
-            0,
         ) {
             // carry over the existing shebang if present, otherwise add our own
             let proxy_code = match m.get(1) {

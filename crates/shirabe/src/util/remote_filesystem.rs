@@ -19,7 +19,7 @@ use shirabe_php_shim::{
     STREAM_NOTIFY_PROGRESS, array_replace_recursive, base64_encode, explode, extension_loaded,
     file_get_contents, file_get_contents5, file_put_contents, filter_var_boolean, gethostbyname,
     http_clear_last_response_headers, http_get_last_response_headers, ini_get, json_decode_assoc,
-    parse_url, php_regex, preg_match2, preg_quote, preg_replace, strpos, strtolower, strtr, substr,
+    parse_url, php_regex, preg_match, preg_quote, preg_replace, strpos, strtolower, strtr, substr,
     trim, zlib_decode,
 };
 
@@ -148,7 +148,7 @@ impl RemoteFilesystem {
     pub fn find_status_code(headers: &[String]) -> Option<i64> {
         let mut value: Option<i64> = None;
         for header in headers {
-            if let Some(m) = preg_match2(php_regex!("{^HTTP/\\S+ (\\d+)}i"), header, 0) {
+            if let Some(m) = preg_match(php_regex!("{^HTTP/\\S+ (\\d+)}i"), header) {
                 value = m.get(1).and_then(|s| s.parse().ok()).or(Some(0));
             }
         }
@@ -159,7 +159,7 @@ impl RemoteFilesystem {
     pub fn find_status_message(&self, headers: &[String]) -> Option<String> {
         let mut value: Option<String> = None;
         for header in headers {
-            if preg_match2(php_regex!("{^HTTP/\\S+ \\d+}i"), header, 0).is_some() {
+            if preg_match(php_regex!("{^HTTP/\\S+ \\d+}i"), header).is_some() {
                 value = Some(header.clone());
             }
         }
@@ -285,10 +285,9 @@ impl RemoteFilesystem {
             crate::io::DEBUG,
         );
 
-        if (preg_match2(
+        if (preg_match(
             php_regex!("{^http://(repo\\.)?packagist\\.org/p/}"),
             &file_url,
-            0,
         )
         .is_none()
             || (strpos(&file_url, "$").is_none() && strpos(&file_url, "%24").is_none()))
@@ -475,10 +474,9 @@ impl RemoteFilesystem {
                     None,
                 ) != ".zip")
             && content_type.is_some()
-            && preg_match2(
+            && preg_match(
                 php_regex!("{^text/html\\b}i"),
                 content_type.as_deref().unwrap_or(""),
-                0,
             )
             .is_some();
         if bitbucket_login_match {

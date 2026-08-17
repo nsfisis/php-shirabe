@@ -16,8 +16,8 @@ use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, preg_match2,
-    preg_replace, preg_split, version_compare,
+    CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, preg_match, preg_replace,
+    preg_split, version_compare,
 };
 
 #[derive(Debug)]
@@ -353,8 +353,8 @@ impl VcsDownloader for SvnDownloader {
         to_reference: &str,
         path: &str,
     ) -> anyhow::Result<String> {
-        if preg_match2(php_regex!(r"{@(\d+)$}"), from_reference, 0).is_some()
-            && preg_match2(php_regex!(r"{@(\d+)$}"), to_reference, 0).is_some()
+        if preg_match(php_regex!(r"{@(\d+)$}"), from_reference).is_some()
+            && preg_match(php_regex!(r"{@(\d+)$}"), to_reference).is_some()
         {
             // retrieve the svn base url from the checkout folder
             let command = vec![
@@ -382,7 +382,7 @@ impl VcsDownloader for SvnDownloader {
             }
 
             let url_pattern = "#<url>(.*)</url>#";
-            let base_url = if let Some(matches) = preg_match2(url_pattern, &output, 0) {
+            let base_url = if let Some(matches) = preg_match(url_pattern, &output) {
                 matches.get(1).unwrap_or_default().to_string()
             } else {
                 return Err(RuntimeException::new(format!(
@@ -453,7 +453,7 @@ impl ChangeReportInterface for SvnDownloader {
         );
 
         Ok(
-            if preg_match2(php_regex!("{^ *[^X ] +}m"), &output, 0).is_some() {
+            if preg_match(php_regex!("{^ *[^X ] +}m"), &output).is_some() {
                 Some(output)
             } else {
                 None

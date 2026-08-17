@@ -29,7 +29,7 @@ use crate::util::HttpDownloader;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_keys, array_merge_map, array_search_in_vec, impl_php_class, php_regex, preg_match2,
+    array_keys, array_merge_map, array_search_in_vec, impl_php_class, php_regex, preg_match,
     preg_replace, strtolower,
 };
 use shirabe_semver::Intervals;
@@ -115,7 +115,7 @@ impl UpdateCommand {
         let mut version_selector = self.create_version_selector(composer)?;
         for package in &installed_packages {
             if let Some(filter) = &filter
-                && preg_match2(filter, &package.get_name(), 0).is_none()
+                && preg_match(filter, &package.get_name()).is_none()
             {
                 continue;
             }
@@ -378,7 +378,7 @@ impl Command for UpdateCommand {
         if !packages.is_empty() {
             let allowlist_packages_with_requirements: Vec<String> =
                 array_filter(&packages, |pkg: &String| -> bool {
-                    preg_match2(php_regex!(r"{\S+[ =:]\S+}"), pkg, 0).is_some()
+                    preg_match(php_regex!(r"{\S+[ =:]\S+}"), pkg).is_some()
                 });
             for (package, constraint) in
                 self.format_requirements(allowlist_packages_with_requirements.clone())?
@@ -459,7 +459,7 @@ impl Command for UpdateCommand {
                     continue;
                 }
                 let version = package.get_version();
-                let matches = preg_match2(php_regex!(r"{^(\d+\.\d+\.\d+)}"), &version, 0);
+                let matches = preg_match(php_regex!(r"{^(\d+\.\d+\.\d+)}"), &version);
                 let Some(matches) = matches else {
                     continue;
                 };

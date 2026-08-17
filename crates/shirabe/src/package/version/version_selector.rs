@@ -16,7 +16,7 @@ use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySetInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, php_regex, preg_match2, preg_replace, strtolower, version_compare};
+use shirabe_php_shim::{CmpOp, php_regex, preg_match, preg_replace, strtolower, version_compare};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -302,7 +302,7 @@ impl VersionSelector {
         let semantic_version_parts: Vec<&str> = version.split('.').collect();
 
         if semantic_version_parts.len() == 4
-            && preg_match2(php_regex!(r"{^\d+\D?}"), semantic_version_parts[3], 0).is_some()
+            && preg_match(php_regex!(r"{^\d+\D?}"), semantic_version_parts[3]).is_some()
         {
             let mut parts: Vec<String> = semantic_version_parts
                 .iter()

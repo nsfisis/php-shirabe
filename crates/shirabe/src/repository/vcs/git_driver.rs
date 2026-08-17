@@ -16,7 +16,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, preg_match2,
+    InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, preg_match,
     preg_replace, realpath, sys_get_temp_dir,
 };
 use shirabe_php_shim::{PhpMixed, php_regex};
@@ -98,13 +98,7 @@ impl GitDriver {
                 .into());
             }
 
-            if preg_match2(
-                php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"),
-                &self.inner.url,
-                0,
-            )
-            .is_some()
-            {
+            if preg_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), &self.inner.url).is_some() {
                 return Err(InvalidArgumentException::new(format!(
                     "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
                     self.inner.url
@@ -204,7 +198,7 @@ impl GitDriver {
             if !branches.contains(&"* master".to_string()) {
                 for branch in &branches {
                     if !branch.is_empty()
-                        && let Some(caps) = preg_match2(php_regex!(r"{^\* +(\S+)}"), branch, 0)
+                        && let Some(caps) = preg_match(php_regex!(r"{^\* +(\S+)}"), branch)
                         && let Some(name) = caps.get(1)
                     {
                         self.root_identifier = Some(name.to_string());
@@ -314,10 +308,9 @@ impl GitDriver {
             );
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty()
-                    && let Some(caps) = preg_match2(
+                    && let Some(caps) = preg_match(
                         php_regex!(r"{^([a-f0-9]{40}) refs/tags/(\S+?)(\^\{\})?$}"),
                         &tag,
-                        0,
                     )
                     && let (Some(hash), Some(name)) = (caps.get(1), caps.get(2))
                 {
@@ -350,11 +343,10 @@ impl GitDriver {
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
-                    && preg_match2(php_regex!(r"{^ *[^/]+/HEAD }"), &branch, 0).is_none()
-                    && let Some(caps) = preg_match2(
+                    && preg_match(php_regex!(r"{^ *[^/]+/HEAD }"), &branch).is_none()
+                    && let Some(caps) = preg_match(
                         php_regex!(r"{^(?:\* )? *(\S+) *([a-f0-9]+)(?: .*)?$}"),
                         &branch,
-                        0,
                     )
                     && let (Some(name), Some(hash)) = (caps.get(1), caps.get(2))
                     && !name.starts_with('-')
@@ -375,10 +367,9 @@ impl GitDriver {
         url: &str,
         deep: bool,
     ) -> anyhow::Result<bool> {
-        if preg_match2(
+        if preg_match(
             php_regex!(r"#(^git://|\.git/?$|git(?:olite)?@|//git\.|//github.com/)#i"),
             url,
-            0,
         )
         .is_some()
         {

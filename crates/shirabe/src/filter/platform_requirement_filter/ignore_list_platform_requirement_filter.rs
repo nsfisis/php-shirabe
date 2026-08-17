@@ -3,7 +3,7 @@
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::package::base_package::{self};
 use crate::repository::PlatformRepository;
-use shirabe_php_shim::preg_match2;
+use shirabe_php_shim::preg_match;
 use shirabe_semver::Interval;
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
@@ -47,13 +47,12 @@ impl IgnoreListPlatformRequirementFilter {
             return Ok(constraint);
         }
 
-        if !allow_upper_bound_override
-            || preg_match2(&self.ignore_upper_bound_regex, req, 0).is_none()
+        if !allow_upper_bound_override || preg_match(&self.ignore_upper_bound_regex, req).is_none()
         {
             return Ok(constraint);
         }
 
-        if preg_match2(&self.ignore_regex, req, 0).is_some() {
+        if preg_match(&self.ignore_regex, req).is_some() {
             return Ok(MatchAllConstraint::new(None).into());
         }
 
@@ -87,14 +86,14 @@ impl PlatformRequirementFilterInterface for IgnoreListPlatformRequirementFilter 
         if !PlatformRepository::is_platform_package(req) {
             return false;
         }
-        preg_match2(&self.ignore_regex, req, 0).is_some()
+        preg_match(&self.ignore_regex, req).is_some()
     }
 
     fn is_upper_bound_ignored(&self, req: &str) -> bool {
         if !PlatformRepository::is_platform_package(req) {
             return false;
         }
-        self.is_ignored(req) || preg_match2(&self.ignore_upper_bound_regex, req, 0).is_some()
+        self.is_ignored(req) || preg_match(&self.ignore_upper_bound_regex, req).is_some()
     }
 
     fn as_any(&self) -> &dyn std::any::Any {

@@ -5,7 +5,7 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
-use shirabe_php_shim::{php_regex, preg_match2, rawurlencode};
+use shirabe_php_shim::{php_regex, preg_match, rawurlencode};
 use std::sync::OnceLock;
 
 static VERSION: OnceLock<Option<String>> = OnceLock::new();
@@ -55,12 +55,11 @@ impl Hg {
         }
 
         // Try with the authentication information available
-        let matched = preg_match2(
+        let matched = preg_match(
             php_regex!(
                 r"{^(?P<proto>ssh|https?)://(?:(?P<user>[^:@]+)(?::(?P<pass>[^:@]+))?@)?(?P<host>[^/]+)(?P<path>/.*)?}mi"
             ),
             &url,
-            0,
         );
 
         if let Some(matches) = matched
@@ -151,10 +150,9 @@ impl Hg {
                     &mut output,
                     None,
                 ) == 0
-                    && let Some(matches) = preg_match2(
+                    && let Some(matches) = preg_match(
                         php_regex!(r"/^.+? (\d+(?:\.\d+)+)(?:\+.*?)?\)?\r?\n/"),
                         &output,
-                        0,
                     )
                 {
                     return matches.get(1).map(str::to_string);

@@ -151,18 +151,9 @@ pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
 
 // Returns None if the pattern did not match; otherwise the match's capture groups.
 pub fn preg_match<'h>(pattern: impl PregPattern, subject: &'h str) -> Option<PregMatches<'h>> {
-    preg_match2(pattern, subject, 0)
-}
-
-// `preg_match` with PHP's `$offset` argument: the search starts at byte offset `offset`.
-pub fn preg_match2<'h>(
-    pattern: impl PregPattern,
-    subject: &'h str,
-    offset: usize,
-) -> Option<PregMatches<'h>> {
     let __resolved = pattern.resolve();
     let re = __resolved.regex();
-    let caps = re.captures_at(subject, offset)?;
+    let caps = re.captures(subject)?;
 
     Some(PregMatches::new(caps))
 }

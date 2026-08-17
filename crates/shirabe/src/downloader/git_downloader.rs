@@ -19,7 +19,7 @@ use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CaptureKey, CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class,
-    implode, in_array_strict, is_dir, php_regex, preg_match_all, preg_match2, preg_quote,
+    implode, in_array_strict, is_dir, php_regex, preg_match, preg_match_all, preg_quote,
     preg_replace, preg_split, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
 };
 
@@ -94,7 +94,7 @@ impl GitDownloader {
         }
 
         let mut refs = trim(&output, None);
-        let Some(head_match) = preg_match2(php_regex!(r"{^([a-f0-9]+) HEAD$}mi"), &refs, 0) else {
+        let Some(head_match) = preg_match(php_regex!(r"{^([a-f0-9]+) HEAD$}mi"), &refs) else {
             // could not match the HEAD for some reason
             return Ok(None);
         };
@@ -298,12 +298,11 @@ impl GitDownloader {
 
         // check whether non-commitish are branches or tags, and fetch branches with the remote name
         let git_ref = reference.to_string();
-        if preg_match2(php_regex!(r"{^[a-f0-9]{40}$}"), reference, 0).is_none()
+        if preg_match(php_regex!(r"{^[a-f0-9]{40}$}"), reference).is_none()
             && branches.is_some()
-            && preg_match2(
+            && preg_match(
                 format!("{{^\\s+composer/{}$}}m", preg_quote(reference, None)),
                 branches.as_deref().unwrap_or(""),
-                0,
             )
             .is_some()
         {
@@ -346,19 +345,17 @@ impl GitDownloader {
         }
 
         // try to checkout branch by name and then reset it so it's on the proper branch name
-        if preg_match2(php_regex!(r"{^[a-f0-9]{40}$}"), reference, 0).is_some() {
+        if preg_match(php_regex!(r"{^[a-f0-9]{40}$}"), reference).is_some() {
             // add 'v' in front of the branch if it was stripped when generating the pretty name
             if branches.is_some()
-                && preg_match2(
+                && preg_match(
                     format!("{{^\\s+composer/{}$}}m", preg_quote(&branch, None)),
                     branches.as_deref().unwrap_or(""),
-                    0,
                 )
                 .is_none()
-                && preg_match2(
+                && preg_match(
                     format!("{{^\\s+composer/v{}$}}m", preg_quote(&branch, None)),
                     branches.as_deref().unwrap_or(""),
-                    0,
                 )
                 .is_some()
             {
@@ -505,13 +502,12 @@ impl GitDownloader {
 
     fn set_push_url(&self, path: &str, url: &str) {
         // set push url for github projects
-        if let Some(match_) = preg_match2(
+        if let Some(match_) = preg_match(
             format!(
                 "{{^(?:https?|git)://{}/([^/]+)/([^/]+?)(?:\\.git)?$}}",
                 GitUtil::get_github_domains_regex(&self.inner.config.borrow())
             ),
             url,
-            0,
         ) {
             let protocols = self.inner.config.borrow_mut().get("github-protocols");
             let m1 = match_.get(1).unwrap_or_default().to_string();
@@ -647,7 +643,7 @@ impl GitDownloader {
 
     fn get_short_hash(&self, reference: &str) -> String {
         if !self.inner.io.is_verbose()
-            && preg_match2(php_regex!(r"{^[0-9a-f]{40}$}"), reference, 0).is_some()
+            && preg_match(php_regex!(r"{^[0-9a-f]{40}$}"), reference).is_some()
         {
             return substr(reference, 0, Some(10));
         }
@@ -1101,9 +1097,9 @@ impl VcsDownloader for GitDownloader {
             Some(&path),
         ) == 0
             && let Some(origin_match) =
-                preg_match2(php_regex!(r"{^origin\s+(?P<url>\S+)}m"), &output, 0)
+                preg_match(php_regex!(r"{^origin\s+(?P<url>\S+)}m"), &output)
             && let Some(composer_match) =
-                preg_match2(php_regex!(r"{^composer\s+(?P<url>\S+)}m"), &output, 0)
+                preg_match(php_regex!(r"{^composer\s+(?P<url>\S+)}m"), &output)
         {
             let origin_url = origin_match.name("url").unwrap_or_default().to_string();
             let composer_url = composer_match.name("url").unwrap_or_default().to_string();

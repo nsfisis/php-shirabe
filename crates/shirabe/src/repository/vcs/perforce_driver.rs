@@ -9,9 +9,7 @@ use crate::util::PerforceInterface;
 use crate::util::ProcessExecutor;
 use crate::util::http::Response;
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    BadMethodCallException, PhpMixed, RuntimeException, php_regex, preg_match2,
-};
+use shirabe_php_shim::{BadMethodCallException, PhpMixed, RuntimeException, php_regex, preg_match};
 
 #[derive(Debug)]
 pub struct PerforceDriver {
@@ -190,7 +188,7 @@ impl PerforceDriver {
         url: &str,
         deep: bool,
     ) -> anyhow::Result<bool> {
-        if deep || preg_match2(php_regex!(r"#\b(perforce|p4)\b#i"), url, 0).is_some() {
+        if deep || preg_match(php_regex!(r"#\b(perforce|p4)\b#i"), url).is_some() {
             return Ok(Perforce::check_server_exists(
                 url,
                 &mut ProcessExecutor::new(Some(io)),

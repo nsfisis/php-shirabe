@@ -13,7 +13,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable, php_regex, preg_match2,
+    PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable, php_regex, preg_match,
     preg_replace,
 };
 
@@ -301,17 +301,16 @@ impl FossilDriver {
         url: &str,
         deep: bool,
     ) -> anyhow::Result<bool> {
-        if preg_match2(
+        if preg_match(
             php_regex!(r"#(^(?:https?|ssh)://(?:[^@]@)?(?:chiselapp\.com|fossil\.))#i"),
             url,
-            0,
         )
         .is_some()
         {
             return Ok(true);
         }
 
-        if preg_match2(php_regex!(r"!/fossil/|\.fossil!"), url, 0).is_some() {
+        if preg_match(php_regex!(r"!/fossil/|\.fossil!"), url).is_some() {
             return Ok(true);
         }
 

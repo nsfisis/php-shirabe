@@ -7,8 +7,8 @@ use crate::io::io_interface;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, implode, parse_url, php_regex, preg_match2,
-    stripos, strpos, trim,
+    LogicException, PhpMixed, RuntimeException, implode, parse_url, php_regex, preg_match, stripos,
+    strpos, trim,
 };
 use std::sync::Mutex;
 
@@ -404,7 +404,7 @@ impl Svn {
                 &["svn".to_string(), "--version".to_string()],
                 &mut output,
                 None,
-            ) && let Some(matches) = preg_match2(php_regex!(r"{(\d+(?:\.\d+)+)}"), &output, 0)
+            ) && let Some(matches) = preg_match(php_regex!(r"{(\d+(?:\.\d+)+)}"), &output)
             {
                 *cached = Some(matches.get(1).unwrap_or_default().to_string());
             }

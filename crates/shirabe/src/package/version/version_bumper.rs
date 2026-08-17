@@ -6,7 +6,7 @@ use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::util::Platform;
 use shirabe_php_shim::{
-    CaptureKey, php_regex, preg_match_all_offset_capture, preg_match2, preg_replace,
+    CaptureKey, php_regex, preg_match, preg_match_all_offset_capture, preg_replace,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
@@ -51,7 +51,7 @@ impl VersionBumper {
             preg_replace(php_regex!(r"{(?:\.(?:0|9999999))+(-dev)?$}"), "", &version);
         let new_pretty_constraint = format!("^{}", version_without_suffix);
 
-        if preg_match2(php_regex!(r"{^\^\d+(\.\d+)*$}"), &new_pretty_constraint, 0).is_none() {
+        if preg_match(php_regex!(r"{^\^\d+(\.\d+)*$}"), &new_pretty_constraint).is_none() {
             return Ok(pretty_constraint);
         }
 

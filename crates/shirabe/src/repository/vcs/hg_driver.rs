@@ -13,7 +13,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, dirname, is_dir, is_writable, php_regex, preg_match2, preg_replace,
+    PhpMixed, RuntimeException, dirname, is_dir, is_writable, php_regex, preg_match, preg_replace,
 };
 
 #[derive(Debug)]
@@ -234,7 +234,7 @@ impl HgDriver {
             );
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty()
-                    && let Some(m) = preg_match2(php_regex!(r"(^([^\s]+)\s+\d+:(.*)$)"), &tag, 0)
+                    && let Some(m) = preg_match(php_regex!(r"(^([^\s]+)\s+\d+:(.*)$)"), &tag)
                 {
                     tags.insert(
                         m.get(1).unwrap_or_default().to_string(),
@@ -264,7 +264,7 @@ impl HgDriver {
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
                     && let Some(m) =
-                        preg_match2(php_regex!(r"(^([^\s]+)\s+\d+:([a-f0-9]+))"), &branch, 0)
+                        preg_match(php_regex!(r"(^([^\s]+)\s+\d+:([a-f0-9]+))"), &branch)
                 {
                     let name = m.get(1).unwrap_or_default().to_string();
                     if !name.starts_with('-') {
@@ -282,7 +282,7 @@ impl HgDriver {
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
                     && let Some(m) =
-                        preg_match2(php_regex!(r"(^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$)"), &branch, 0)
+                        preg_match(php_regex!(r"(^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$)"), &branch)
                 {
                     let name = m.get(1).unwrap_or_default().to_string();
                     if !name.starts_with('-') {
@@ -305,12 +305,11 @@ impl HgDriver {
         url: &str,
         deep: bool,
     ) -> anyhow::Result<bool> {
-        if preg_match2(
+        if preg_match(
             php_regex!(
                 r"#(^(?:https?|ssh)://(?:[^@]+@)?bitbucket.org|https://(?:.*?)\.kilnhg.com)#i"
             ),
             url,
-            0,
         )
         .is_some()
         {

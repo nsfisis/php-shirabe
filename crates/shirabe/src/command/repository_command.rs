@@ -12,7 +12,7 @@ use crate::json::JsonFile;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class, parse_url, php_regex,
-    preg_match2, strtolower,
+    preg_match, strtolower,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -368,7 +368,7 @@ impl Command for RepositoryCommand {
                     .into());
                 }
                 let arg1_str = arg1.as_deref().unwrap();
-                let repo_config: PhpMixed = if preg_match2(php_regex!(r"{^\s*\{}"), arg1_str, 0)
+                let repo_config: PhpMixed = if preg_match(php_regex!(r"{^\s*\{}"), arg1_str)
                     .is_some()
                 {
                     JsonFile::parse_json(Some(arg1_str), None)?

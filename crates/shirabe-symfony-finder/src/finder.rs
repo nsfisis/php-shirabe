@@ -9,7 +9,7 @@
 use crate::glob::Glob;
 use chrono::{NaiveDate, NaiveDateTime};
 use indexmap::IndexSet;
-use shirabe_php_shim::{file_exists, glob, is_dir, php_regex, preg_match2, preg_quote, rtrim};
+use shirabe_php_shim::{file_exists, glob, is_dir, php_regex, preg_match, preg_quote, rtrim};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -310,7 +310,7 @@ impl Finder {
 
         let dir = rtrim(dir, Some("/"));
 
-        if preg_match2(php_regex!("#^(ssh2\\.)?s?ftp://#"), &dir, 0).is_some() {
+        if preg_match(php_regex!("#^(ssh2\\.)?s?ftp://#"), &dir).is_some() {
             format!("{dir}/")
         } else {
             dir
@@ -591,7 +591,7 @@ fn exclude_accept(
         };
         let path = path.replace('\\', "/");
 
-        return preg_match2(pattern, &path, 0).is_none();
+        return preg_match(pattern, &path).is_none();
     }
 
     true
@@ -618,14 +618,14 @@ fn to_regex_path(pattern: &str) -> String {
 /// `MultiplePcreFilterIterator::isAccepted`.
 fn is_accepted(string: &str, match_regexps: &[String], nomatch_regexps: &[String]) -> bool {
     for regex in nomatch_regexps {
-        if preg_match2(regex, string, 0).is_some() {
+        if preg_match(regex, string).is_some() {
             return false;
         }
     }
 
     if !match_regexps.is_empty() {
         for regex in match_regexps {
-            if preg_match2(regex, string, 0).is_some() {
+            if preg_match(regex, string).is_some() {
                 return true;
             }
         }
@@ -642,7 +642,7 @@ fn is_regex(str: &str) -> bool {
     let available_modifiers = "imsxuADUn";
 
     let pattern = format!("/^(.{{3,}}?)[{available_modifiers}]*$/");
-    if let Some(matches) = preg_match2(&pattern, str, 0) {
+    if let Some(matches) = preg_match(&pattern, str) {
         let group = matches.get(1).unwrap_or_default().to_string();
         let bytes = group.as_bytes();
         let start = bytes
@@ -655,7 +655,7 @@ fn is_regex(str: &str) -> bool {
             .unwrap_or_default();
 
         if start == end {
-            return preg_match2(php_regex!("/[*?[:alnum:] \\\\]/"), &start, 0).is_none();
+            return preg_match(php_regex!("/[*?[:alnum:] \\\\]/"), &start).is_none();
         }
 
         for (open, close) in [("{", "}"), ("(", ")"), ("[", "]"), ("<", ">")] {
@@ -683,7 +683,7 @@ fn comparator_test(operator: &str, test: i64, target: i64) -> bool {
 /// `DateComparator::__construct`, returning `(operator, target unix timestamp)`.
 fn parse_date_comparator(test: &str) -> (String, i64) {
     let pattern = "#^\\s*(==|!=|[<>]=?|after|since|before|until)?\\s*(.+?)\\s*$#i";
-    let Some(matches) = preg_match2(pattern, test, 0) else {
+    let Some(matches) = preg_match(pattern, test) else {
         panic!("Don't understand \"{test}\" as a date test.");
     };
 

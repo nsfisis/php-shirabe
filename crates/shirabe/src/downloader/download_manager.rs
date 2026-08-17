@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
-    array_reverse, array_shift, dirname, implode, in_array_strict, preg_match2, preg_quote, rtrim,
+    array_reverse, array_shift, dirname, implode, in_array_strict, preg_match, preg_quote, rtrim,
     str_replace, strtolower, usort,
 };
 
@@ -430,7 +430,7 @@ impl DownloadManager {
                 "{{^{}$}}i",
                 str_replace("\\*", ".*", &preg_quote(pattern, None)),
             );
-            if preg_match2(&pattern_regex, &package.get_name(), 0).is_some() {
+            if preg_match(&pattern_regex, &package.get_name()).is_some() {
                 if "dist" == preference || (!package.is_dev() && "auto" == preference) {
                     return "dist".to_string();
                 }

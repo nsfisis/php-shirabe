@@ -19,7 +19,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_search_mixed,
     array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array_loose, is_array,
-    is_string, ord, php_regex, preg_match2, preg_replace, strpos, strtolower,
+    is_string, ord, php_regex, preg_match, preg_replace, strpos, strtolower,
 };
 
 /// Driver for GitLab API, use the Git driver for local checkouts.
@@ -80,7 +80,7 @@ impl GitLabDriver {
     ///
     /// SSH urls use https by default. Set "secure-http": false on the repository config to use http instead.
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        let Some(match_) = preg_match2(Self::URL_REGEX, &self.inner.url, 0) else {
+        let Some(match_) = preg_match(Self::URL_REGEX, &self.inner.url) else {
             return Err(InvalidArgumentException::new(format!(
                 "The GitLab repository URL {} is invalid. It must be the HTTP URL of a GitLab project.",
                 self.inner.url.clone(),
@@ -382,7 +382,7 @@ impl GitLabDriver {
 
         // Convert the root identifier to a cacheable commit id
         let mut identifier = identifier.to_string();
-        if preg_match2(php_regex!(r"{[a-f0-9]{40}}i"), &identifier, 0).is_none() {
+        if preg_match(php_regex!(r"{[a-f0-9]{40}}i"), &identifier).is_none() {
             let branches = self.get_branches()?;
             if let Some(sha) = branches.get(&identifier) {
                 identifier = sha.clone();
@@ -926,7 +926,7 @@ impl GitLabDriver {
         url: &str,
         _deep: bool,
     ) -> anyhow::Result<bool> {
-        let Some(match_) = preg_match2(Self::URL_REGEX, url, 0) else {
+        let Some(match_) = preg_match(Self::URL_REGEX, url) else {
             return Ok(false);
         };
 
@@ -977,7 +977,7 @@ impl GitLabDriver {
 
         let links = explode(",", &header);
         for link in &links {
-            if let Some(match_) = preg_match2(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link, 0) {
+            if let Some(match_) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
                 return Some(match_.get(1).unwrap_or_default().to_string());
             }
         }

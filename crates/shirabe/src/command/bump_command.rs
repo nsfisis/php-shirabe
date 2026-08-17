@@ -18,7 +18,7 @@ use crate::util::Filesystem;
 use crate::util::Silencer;
 use shirabe_php_shim::{
     PhpMixed, file_get_contents, file_put_contents, impl_php_class, is_writable, php_regex,
-    preg_match2, preg_replace, strtolower,
+    preg_match, preg_replace, strtolower,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -186,7 +186,7 @@ impl BumpCommand {
                 .collect();
             let pattern = base_package::package_names_to_regexp(&unique_lower, "{^(?:%s)$}iD");
             for (key, reqs) in tasks.iter_mut() {
-                reqs.retain(|pkg_name, _| preg_match2(&pattern, pkg_name, 0).is_some());
+                reqs.retain(|pkg_name, _| preg_match(&pattern, pkg_name).is_some());
             }
             packages_filter
         } else {

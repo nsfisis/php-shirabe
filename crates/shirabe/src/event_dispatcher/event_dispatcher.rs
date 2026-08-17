@@ -29,7 +29,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, file_exists, get_class, hash, implode, ini_get, is_array,
-    is_callable, is_object, is_string, krsort, php_regex, preg_match2, preg_quote, preg_replace,
+    is_callable, is_object, is_string, krsort, php_regex, preg_match, preg_quote, preg_replace,
     preg_replace_callback, realpath, spl_autoload_functions, spl_autoload_register,
     spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos, strtoupper, substr,
     trim,
@@ -922,10 +922,9 @@ try {{
                             .get_binaries();
                         if !possible_local_binaries.is_empty() {
                             for local_exec in &possible_local_binaries {
-                                if preg_match2(
+                                if preg_match(
                                     format!("{{\\b{}$}}", preg_quote(&callable_str, None)),
                                     local_exec,
-                                    0,
                                 )
                                 .is_some()
                                 {
@@ -967,7 +966,7 @@ try {{
                             // match somename (not in quote, and not a qualified path) and if it is not a valid path from CWD then try to find it
                             // in $PATH. This allows support for `@php foo` where foo is a binary name found in PATH but not an actual relative path
                             if let Some(m) =
-                                preg_match2(php_regex!("{^[^\\'\"\\s/\\\\]+}"), &path_and_args, 0)
+                                preg_match(php_regex!("{^[^\\'\"\\s/\\\\]+}"), &path_and_args)
                             {
                                 let m0 = m.get(0).unwrap_or_default().to_string();
                                 if !file_exists(&m0) {

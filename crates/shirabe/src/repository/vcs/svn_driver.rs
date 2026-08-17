@@ -15,7 +15,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, php_regex, preg_match2, preg_replace, stripos, strrpos, strtr,
+    PhpMixed, RuntimeException, php_regex, preg_match, preg_replace, stripos, strrpos, strtr,
     substr, trim,
 };
 
@@ -153,7 +153,7 @@ impl SvnDriver {
     }
 
     fn should_cache(&self, identifier: &str) -> bool {
-        self.inner.cache.is_some() && preg_match2(php_regex!(r"{@\d+$}"), identifier, 0).is_some()
+        self.inner.cache.is_some() && preg_match(php_regex!(r"{@\d+$}"), identifier).is_some()
     }
 
     pub fn get_composer_information(
@@ -257,8 +257,7 @@ impl SvnDriver {
     ) -> anyhow::Result<Option<String>> {
         let identifier = format!("/{}/", trim(identifier, Some("/")));
 
-        let (path, rev) = if let Some(m) =
-            preg_match2(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier, 0)
+        let (path, rev) = if let Some(m) = preg_match(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
             && let Some(rev) = m.get(2)
         {
             (m.get(1).unwrap_or_default().to_string(), rev.to_string())
@@ -291,8 +290,7 @@ impl SvnDriver {
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         let identifier = format!("/{}/", trim(identifier, Some("/")));
 
-        let (path, rev) = if let Some(m) =
-            preg_match2(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier, 0)
+        let (path, rev) = if let Some(m) = preg_match(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
             && let Some(rev) = m.get(2)
         {
             (m.get(1).unwrap_or_default().to_string(), rev.to_string())
@@ -306,7 +304,7 @@ impl SvnDriver {
         )?;
         for line in self.inner.process.borrow().split_lines(&output) {
             if !line.is_empty()
-                && let Some(m) = preg_match2(php_regex!(r"{^Last Changed Date: ([^(]+)}"), &line, 0)
+                && let Some(m) = preg_match(php_regex!(r"{^Last Changed Date: ([^(]+)}"), &line)
             {
                 let date_str = m.get(1).unwrap_or_default().to_string();
                 return Ok(shirabe_php_shim::date_create::<Utc>(date_str.trim())
@@ -334,7 +332,7 @@ impl SvnDriver {
                         let line = trim(&line, None);
                         if !line.is_empty()
                             && let Some(m) =
-                                preg_match2(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line, 0)
+                                preg_match(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                         {
                             let rev: i64 = m.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
                             let path = m.get(2).unwrap_or_default().to_string();
@@ -376,8 +374,7 @@ impl SvnDriver {
                 for line in self.inner.process.borrow().split_lines(&output) {
                     let line = trim(&line, None);
                     if !line.is_empty()
-                        && let Some(m) =
-                            preg_match2(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line, 0)
+                        && let Some(m) = preg_match(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                     {
                         let rev: i64 = m.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
                         let path = m.get(2).unwrap_or_default().to_string();
@@ -412,7 +409,7 @@ impl SvnDriver {
                         let line = trim(&line, None);
                         if !line.is_empty()
                             && let Some(m) =
-                                preg_match2(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line, 0)
+                                preg_match(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                         {
                             let rev: i64 = m.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
                             let path = m.get(2).unwrap_or_default().to_string();
@@ -443,7 +440,7 @@ impl SvnDriver {
         deep: bool,
     ) -> anyhow::Result<bool> {
         let url = Self::normalize_url(url);
-        if preg_match2(php_regex!(r"#(^svn://|^svn\+ssh://|svn\.)#i"), &url, 0).is_some() {
+        if preg_match(php_regex!(r"#(^svn://|^svn\+ssh://|svn\.)#i"), &url).is_some() {
             return Ok(true);
         }
 

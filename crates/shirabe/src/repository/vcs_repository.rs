@@ -29,8 +29,8 @@ use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpClass, PhpMixed, php_regex, preg_match2, preg_replace,
-    str_replace, strpos,
+    InvalidArgumentException, PhpClass, PhpMixed, php_regex, preg_match, preg_replace, str_replace,
+    strpos,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -510,9 +510,7 @@ impl VcsRepository {
                 // broken package, version doesn't match tag
                 if version_normalized != parsed_tag {
                     if is_very_verbose {
-                        if preg_match2(php_regex!(r"{(^dev-|[.-]?dev$)}i"), &parsed_tag, 0)
-                            .is_some()
-                        {
+                        if preg_match(php_regex!(r"{(^dev-|[.-]?dev$)}i"), &parsed_tag).is_some() {
                             self.io.write_error(&format!(
                                 "<warning>Skipped tag {}, invalid tag name, tags can not use dev prefixes or suffixes</warning>",
                                 tag

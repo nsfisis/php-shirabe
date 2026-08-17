@@ -17,7 +17,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
     RuntimeException, array_map, clearstatcache, explode, implode, in_array_loose, in_array_strict,
-    is_dir, php_regex, preg_match2, preg_quote, preg_replace, rawurldecode, rawurlencode,
+    is_dir, php_regex, preg_match, preg_quote, preg_replace, rawurldecode, rawurlencode,
     str_replace_array, strlen, strpos, substr, trim, version_compare,
 };
 use std::sync::Mutex;
@@ -209,7 +209,7 @@ impl Git {
             status
         };
 
-        if preg_match2(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), url, 0).is_some() {
+        if preg_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), url).is_some() {
             return Err(InvalidArgumentException::new(format!(
                 "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
                 url
@@ -225,10 +225,9 @@ impl Git {
                 &mut output,
                 cwd,
             )?;
-            if let Some(m) = preg_match2(
+            if let Some(m) = preg_match(
                 php_regex!(r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im"),
                 &output,
-                0,
             ) {
                 let m3 = m.get(3).unwrap_or_default().to_string();
                 if !self.io.has_authentication(&m3) {
@@ -244,13 +243,12 @@ impl Git {
         let protocols = self.config.borrow_mut().get("github-protocols");
         // public github, autoswitch protocols
         // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
-        if let Some(m) = preg_match2(
+        if let Some(m) = preg_match(
             format!(
                 "{{^(?:https?|git)://{}/(.*)}}",
                 Self::get_github_domains_regex(&self.config.borrow())
             ),
             url,
-            0,
         ) {
             let mut messages: Vec<String> = vec![];
             let protocols_list: Vec<String> = match &protocols {
@@ -312,13 +310,12 @@ impl Git {
                 .collect(),
             _ => vec![],
         };
-        let bypass_ssh_for_github = preg_match2(
+        let bypass_ssh_for_github = preg_match(
             format!(
                 "{{^git@{}:(.+?)\\.git$}}i",
                 Self::get_github_domains_regex(&self.config.borrow())
             ),
             url,
-            0,
         )
         .is_some()
             && !in_array_strict(
@@ -342,22 +339,20 @@ impl Git {
             let mut error_msg = self.process.borrow().get_error_output().to_string();
             // private github repository without ssh key access, try https with auth
             // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
-            let github_matched = preg_match2(
+            let github_matched = preg_match(
                 format!(
                     "{{^git@{}:(.+?)\\.git$}}i",
                     Self::get_github_domains_regex(&self.config.borrow())
                 ),
                 url,
-                0,
             )
             .or_else(|| {
-                preg_match2(
+                preg_match(
                     format!(
                         "{{^https?://{}/(.*?)(?:\\.git)?$}}i",
                         Self::get_github_domains_regex(&self.config.borrow())
                     ),
                     url,
-                    0,
                 )
             });
             if let Some(m) = github_matched {
@@ -410,18 +405,12 @@ impl Git {
                     credentials = vec![rawurlencode(&username), rawurlencode(&password)];
                     error_msg = self.process.borrow().get_error_output().to_string();
                 }
-            } else if let Some(m) = preg_match2(
+            } else if let Some(m) = preg_match(
                 php_regex!(r"{^(https?)://(bitbucket\.org)/(.*?)(?:\.git)?$}i"),
                 url,
-                0,
             )
-            .or_else(|| {
-                preg_match2(
-                    php_regex!(r"{^(git)@(bitbucket\.org):(.+?\.git)$}i"),
-                    url,
-                    0,
-                )
-            }) {
+            .or_else(|| preg_match(php_regex!(r"{^(git)@(bitbucket\.org):(.+?\.git)$}i"), url))
+            {
                 // bitbucket either through oauth or app password, with fallback to ssh.
                 let mut bitbucket_util = Bitbucket::new(
                     self.io.clone(),
@@ -558,22 +547,20 @@ impl Git {
                 }
 
                 error_msg = self.process.borrow().get_error_output().to_string();
-            } else if let Some(m) = preg_match2(
+            } else if let Some(m) = preg_match(
                 format!(
                     "{{^(git)@{}:(.+?\\.git)$}}i",
                     Self::get_gitlab_domains_regex(&self.config.borrow())
                 ),
                 url,
-                0,
             )
             .or_else(|| {
-                preg_match2(
+                preg_match(
                     format!(
                         "{{^(https?)://{}/(.*)}}i",
                         Self::get_gitlab_domains_regex(&self.config.borrow())
                     ),
                     url,
-                    0,
                 )
             }) {
                 let mut m1 = m.get(1).unwrap_or_default().to_string();
@@ -928,7 +915,7 @@ impl Git {
         pretty_version: Option<&str>,
     ) -> anyhow::Result<bool> {
         if self.check_ref_is_in_mirror(dir, r#ref)? {
-            if preg_match2(php_regex!(r"{^[a-f0-9]{40}$}"), r#ref, 0).is_some()
+            if preg_match(php_regex!(r"{^[a-f0-9]{40}$}"), r#ref).is_some()
                 && let Some(pretty_version) = pretty_version
             {
                 let branch = preg_replace(
@@ -962,17 +949,15 @@ impl Git {
                 // this can occur if a git tag gets created *after* the reference is already put into the cache, as the ref check above will then not sync the new tags
                 // see https://github.com/composer/composer/discussions/11002
                 if branches.is_some()
-                    && preg_match2(
+                    && preg_match(
                         format!(r"{{^[\s*]*v?{}$}}m", preg_quote(&branch, None)),
                         branches.as_deref().unwrap_or(""),
-                        0,
                     )
                     .is_none()
                     && tags.is_some()
-                    && preg_match2(
+                    && preg_match(
                         format!(r"{{^[\s*]*{}$}}m", preg_quote(&branch, None)),
                         tags.as_deref().unwrap_or(""),
-                        0,
                     )
                     .is_none()
                 {
@@ -1099,7 +1084,7 @@ impl Git {
     }
 
     fn get_authentication_failure<'u>(&self, url: &'u str) -> Option<PregMatches<'u>> {
-        let m = preg_match2(php_regex!(r"{^(https?://)([^/]+)(.*)$}i"), url, 0)?;
+        let m = preg_match(php_regex!(r"{^(https?://)([^/]+)(.*)$}i"), url)?;
 
         let auth_failures = [
             "fatal: Authentication failed",
@@ -1182,7 +1167,7 @@ impl Git {
                 .split_lines(output_mixed.as_string().unwrap_or(""));
             for line in lines {
                 if let Some(matches) =
-                    preg_match2(php_regex!(r"{^\s*HEAD branch:\s(.+)\s*$}m"), &line, 0)
+                    preg_match(php_regex!(r"{^\s*HEAD branch:\s(.+)\s*$}m"), &line)
                 {
                     return Ok(Some(matches.get(1).unwrap_or_default().to_string()));
                 }
@@ -1303,7 +1288,7 @@ impl Git {
             );
             if exit_code == 0
                 && let Some(matches) =
-                    preg_match2(php_regex!(r"/^git version (\d+(?:\.\d+)+)/m"), &output, 0)
+                    preg_match(php_regex!(r"/^git version (\d+(?:\.\d+)+)/m"), &output)
             {
                 *version = Some(matches.get(1).map(str::to_string));
             }

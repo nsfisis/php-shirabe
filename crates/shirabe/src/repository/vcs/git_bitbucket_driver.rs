@@ -19,7 +19,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
     array_search_mixed, extension_loaded, http_build_query, implode, is_array, php_regex,
-    preg_match2, preg_replace, strpos,
+    preg_match, preg_replace, strpos,
 };
 
 #[derive(Debug)]
@@ -84,10 +84,9 @@ impl GitBitbucketDriver {
 
     /// @inheritDoc
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        let Some(m) = preg_match2(
+        let Some(m) = preg_match(
             php_regex!(r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i"),
             &self.inner.url,
-            0,
         ) else {
             return Err(InvalidArgumentException::new(format!(
                 "The Bitbucket repository URL {} is invalid. It must be the HTTPS URL of a Bitbucket repository.",
@@ -798,10 +797,9 @@ impl GitBitbucketDriver {
         url: &str,
         _deep: bool,
     ) -> anyhow::Result<bool> {
-        if preg_match2(
+        if preg_match(
             php_regex!(r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(\.git|/?)?$#i"),
             url,
-            0,
         )
         .is_none()
         {

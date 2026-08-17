@@ -61,7 +61,7 @@ use shirabe_php_shim::{
     dirname, disk_free_space, extension_loaded, file_exists, file_get_contents, file_put_contents,
     function_exists, getcwd, getmypid, glob, ini_set, is_array, is_dir, is_file, is_string,
     json_decode_assoc, memory_get_peak_usage, memory_get_usage, microtime, php_regex, php_uname,
-    posix_getuid, preg_grep, preg_match2, preg_quote, preg_split, random_bytes, realpath,
+    posix_getuid, preg_grep, preg_match, preg_quote, preg_split, random_bytes, realpath,
     restore_error_handler, round, str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
@@ -1789,11 +1789,10 @@ impl Application {
         let mut lines: Vec<String> = Vec::new();
         let mut line = String::new();
 
-        let mut offset = 0i64;
-        while let Some(m) = preg_match2(php_regex!(r"/.{1,10000}/u"), &utf8_string, offset as usize)
-        {
+        let mut offset = 0usize;
+        while let Some(m) = preg_match(php_regex!(r"/.{1,10000}/u"), &utf8_string[offset..]) {
             let m0 = m.get(0).unwrap_or("");
-            offset += shirabe_php_shim::strlen(m0);
+            offset += shirabe_php_shim::strlen(m0) as usize;
 
             let chunk = m0;
             for char in chunk

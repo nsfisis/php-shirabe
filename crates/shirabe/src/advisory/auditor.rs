@@ -14,7 +14,7 @@ use crate::util::PackageInfo;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
-    array_keys, array_reduce, get_class, preg_match2,
+    array_keys, array_reduce, get_class, preg_match,
 };
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::helper::Cell;
@@ -290,7 +290,7 @@ impl Auditor {
             };
             if pkg.is_abandoned()
                 && (filter.is_none()
-                    || preg_match2(filter.as_ref().unwrap(), &pkg.get_name(), 0).is_none())
+                    || preg_match(filter.as_ref().unwrap(), &pkg.get_name()).is_none())
             {
                 result.push(pkg);
             }

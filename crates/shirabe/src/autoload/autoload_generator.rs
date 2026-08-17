@@ -26,7 +26,7 @@ use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, PregMatches, array_keys, array_map, array_merge_map,
     array_merge_recursive, array_shift, array_slice_strs, array_unique, bin2hex, explode,
-    file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, php_regex, preg_match2,
+    file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, php_regex, preg_match,
     preg_quote, preg_replace, preg_replace_callback, random_bytes, realpath, str_replace, strlen,
     strpos, strtr, substr, substr_count, trim, unlink, var_export,
 };
@@ -558,11 +558,9 @@ return array(
             {
                 let content =
                     file_get_contents(format!("{}/autoload.php", vendor_path)).unwrap_or_default();
-                if let Some(matches) = preg_match2(
-                    php_regex!("{ComposerAutoloaderInit([^:\\s]+)::}"),
-                    &content,
-                    0,
-                ) {
+                if let Some(matches) =
+                    preg_match(php_regex!("{ComposerAutoloaderInit([^:\\s]+)::}"), &content)
+                {
                     suffix = matches.get(1).map(str::to_string);
                 }
             }
@@ -1128,7 +1126,7 @@ return array(
             }
         }
 
-        if preg_match2(php_regex!("{\\.phar([\\\\/]|$)}"), &path, 0).is_some() {
+        if preg_match(php_regex!("{\\.phar([\\\\/]|$)}"), &path).is_some() {
             base_dir = format!("'phar://' . {}", base_dir);
         }
 
@@ -1153,8 +1151,7 @@ return array(
             let package = &item.0;
             let links = array_merge_map(package.get_replaces(), package.get_provides());
             for (_k, link) in &links {
-                if let Some(matches) =
-                    preg_match2(php_regex!("{^ext-(.+)$}iD"), link.get_target(), 0)
+                if let Some(matches) = preg_match(php_regex!("{^ext-(.+)$}iD"), link.get_target())
                     && let Some(ext) = matches.get(1).map(str::to_string)
                 {
                     extension_providers
@@ -1198,7 +1195,7 @@ return array(
 
                 if check_platform.as_bool() == Some(true)
                     && let Some(matches) =
-                        preg_match2(php_regex!("{^ext-(.+)$}iD"), link.get_target(), 0)
+                        preg_match(php_regex!("{^ext-(.+)$}iD"), link.get_target())
                 {
                     let ext_key = matches.get(1).unwrap_or_default().to_string();
                     // skip extension checks if they have a valid provider/replacer

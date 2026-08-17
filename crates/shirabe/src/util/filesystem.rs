@@ -8,7 +8,7 @@ use shirabe_php_shim::{
     chdir, clearstatcache, clearstatcache2, copy, dirname, explode, fclose, feof, file_exists,
     file_get_contents, file_put_contents, fileatime, filemtime, filesize, fopen, fread,
     function_exists, fwrite, implode, is_dir, is_file, is_link, is_readable, lstat, mkdir,
-    php_regex, preg_match2, preg_replace, preg_replace_callback, rename, rmdir, rtrim, str_repeat,
+    php_regex, preg_match, preg_replace, preg_replace_callback, rename, rmdir, rtrim, str_repeat,
     str_replace, strlen, strpos, strtoupper, strtr, substr, substr_count, symlink, touch, unlink,
     usleep, var_export,
 };
@@ -246,7 +246,7 @@ impl Filesystem {
             return Ok(Some(true));
         }
 
-        if preg_match2(php_regex!("{^(?:[a-z]:)?[/\\\\]+$}i"), directory, 0).is_some() {
+        if preg_match(php_regex!("{^(?:[a-z]:)?[/\\\\]+$}i"), directory).is_some() {
             return Err(RuntimeException::new(format!("Aborting an attempted deletion of {}, this was probably not intended, if it is a real use case please report it.", directory))
             .into());
         }
@@ -578,7 +578,7 @@ impl Filesystem {
         let mut common_path = to.clone();
         while strpos(&format!("{}/", from), &format!("{}/", common_path)) != Some(0)
             && "/" != common_path
-            && preg_match2(php_regex!("{^[A-Z]:/?$}i"), &common_path, 0).is_none()
+            && preg_match(php_regex!("{^[A-Z]:/?$}i"), &common_path).is_none()
         {
             common_path = strtr(&dirname(&common_path), "\\", "/");
         }
@@ -635,7 +635,7 @@ impl Filesystem {
         let mut common_path = to.clone();
         while strpos(&format!("{}/", from), &format!("{}/", common_path)) != Some(0)
             && "/" != common_path
-            && preg_match2(php_regex!("{^[A-Z]:/?$}i"), &common_path, 0).is_none()
+            && preg_match(php_regex!("{^[A-Z]:/?$}i"), &common_path).is_none()
             && "." != common_path
         {
             common_path = strtr(&dirname(&common_path), "\\", "/");
@@ -735,10 +735,9 @@ impl Filesystem {
         }
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
-        if let Some(prefix_match) = preg_match2(
+        if let Some(prefix_match) = preg_match(
             php_regex!("{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
             &path,
-            0,
         ) {
             prefix = prefix_match.get(1).unwrap_or_default().to_string();
             path = substr(&path, strlen(&prefix), None);
@@ -779,7 +778,7 @@ impl Filesystem {
     /// And other possible unforeseen disasters, see https://github.com/composer/composer/pull/9422
     pub fn trim_trailing_slash(path: &str) -> String {
         let mut path = path.to_string();
-        if preg_match2(php_regex!("{^[/\\\\]+$}"), &path, 0).is_none() {
+        if preg_match(php_regex!("{^[/\\\\]+$}"), &path).is_none() {
             path = rtrim(&path, Some("/\\"));
         }
 
@@ -791,20 +790,18 @@ impl Filesystem {
         // on windows, \\foo indicates network paths so we exclude those from local paths, however it is unsafe
         // on linux as file:////foo (which would be a network path \\foo on windows) will resolve to /foo which could be a local path
         if Platform::is_windows() {
-            return preg_match2(
+            return preg_match(
                 php_regex!(
                     "{^(file://(?!//)|/(?!/)|/?[a-z]:[\\\\/]|\\.\\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i"
                 ),
                 path,
-                0,
             )
             .is_some();
         }
 
-        preg_match2(
+        preg_match(
             php_regex!("{^(file://|/|/?[a-z]:[\\\\/]|\\.\\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i"),
             path,
-            0,
         )
         .is_some()
     }
