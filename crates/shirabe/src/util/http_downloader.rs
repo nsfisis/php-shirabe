@@ -246,14 +246,14 @@ impl HttpDownloader {
                 origin.clone(),
                 rawurldecode(
                     m.get(&CaptureKey::ByIndex(1))
-                        .cloned()
                         .unwrap_or_default()
+                        .to_string()
                         .as_str(),
                 ),
                 Some(rawurldecode(
                     m.get(&CaptureKey::ByIndex(2))
-                        .cloned()
                         .unwrap_or_default()
+                        .to_string()
                         .as_str(),
                 )),
             );

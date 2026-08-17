@@ -236,8 +236,14 @@ impl VersionGuesser {
                         &branch,
                     )
                 {
-                    let g1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                    let g2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                    let g1 = m
+                        .get(&CaptureKey::ByIndex(1))
+                        .unwrap_or_default()
+                        .to_string();
+                    let g2 = m
+                        .get(&CaptureKey::ByIndex(2))
+                        .unwrap_or_default()
+                        .to_string();
                     if g1 == "(no branch)"
                         || strpos(&g1, "(detached ") == Some(0)
                         || strpos(&g1, "(HEAD detached at") == Some(0)
@@ -264,7 +270,11 @@ impl VersionGuesser {
                         &branch,
                     )
                 {
-                    branches.push(m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default());
+                    branches.push(
+                        m.get(&CaptureKey::ByIndex(1))
+                            .unwrap_or_default()
+                            .to_string(),
+                    );
                 }
             }
 
@@ -753,7 +763,7 @@ impl VersionGuesser {
         if let Some(m) = Preg::is_match3(php_regex!(r"{^(\d+(?:\.\d+)*)-dev$}i"), &version) {
             return Ok(format!(
                 "{}.x-dev",
-                m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default()
+                m.get(&CaptureKey::ByIndex(1)).unwrap_or_default()
             ));
         }
 

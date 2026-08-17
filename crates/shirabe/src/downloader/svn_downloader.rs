@@ -386,8 +386,8 @@ impl VcsDownloader for SvnDownloader {
             let base_url = if let Some(matches) = Preg::match3(url_pattern, &output) {
                 matches
                     .get(&CaptureKey::ByIndex(1))
-                    .cloned()
                     .unwrap_or_default()
+                    .to_string()
             } else {
                 return Err(RuntimeException::new(format!(
                     "Unable to determine svn url for path {}",

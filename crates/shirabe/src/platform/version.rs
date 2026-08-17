@@ -18,16 +18,16 @@ impl Version {
 
         let version = matches
             .get(&CaptureKey::ByName("version".to_string()))
-            .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_string();
         let patch_str = matches
             .get(&CaptureKey::ByName("patch".to_string()))
-            .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_string();
         let suffix_str = matches
             .get(&CaptureKey::ByName("suffix".to_string()))
-            .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_string();
 
         let patch = if version_compare(&version, "3.0.0", CmpOp::Lt) {
             format!(
@@ -58,12 +58,12 @@ impl Version {
 
         let major = matches
             .get(&CaptureKey::ByName("major".to_string()))
-            .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_string();
         let minor = matches
             .get(&CaptureKey::ByName("minor".to_string()))
-            .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_string();
         Some(format!(
             "{}.{}",
             major,
@@ -79,12 +79,12 @@ impl Version {
 
         let year = matches
             .get(&CaptureKey::ByName("year".to_string()))
-            .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_string();
         let revision = matches
             .get(&CaptureKey::ByName("revision".to_string()))
-            .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_string();
         Some(format!(
             "{}.{}",
             year,

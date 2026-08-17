@@ -1380,12 +1380,12 @@ impl ShowCommand {
             {
                 let zero_major = groups
                     .get(&CaptureKey::ByName("zero_major".to_string()))
-                    .cloned()
-                    .unwrap_or_default();
+                    .unwrap_or_default()
+                    .to_string();
                 let first_meaningful = groups
                     .get(&CaptureKey::ByName("first_meaningful".to_string()))
-                    .cloned()
                     .unwrap_or_default()
+                    .to_string()
                     .parse::<i64>()
                     .unwrap_or(0);
                 target_version = Some(format!(

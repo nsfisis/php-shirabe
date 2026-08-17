@@ -321,7 +321,10 @@ impl SvnDriver {
                 && let Some(m) =
                     Preg::is_match3(php_regex!(r"{^Last Changed Date: ([^(]+)}"), &line)
             {
-                let date_str = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let date_str = m
+                    .get(&CaptureKey::ByIndex(1))
+                    .unwrap_or_default()
+                    .to_string();
                 return Ok(shirabe_php_shim::date_create::<Utc>(date_str.trim())
                     .ok()
                     .map(|d| d.fixed_offset()));
@@ -353,7 +356,10 @@ impl SvnDriver {
                                 .get(&CaptureKey::ByIndex(1))
                                 .and_then(|s| s.parse().ok())
                                 .unwrap_or(0);
-                            let path = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                            let path = m
+                                .get(&CaptureKey::ByIndex(2))
+                                .unwrap_or_default()
+                                .to_string();
                             if path == "./" {
                                 last_rev = rev;
                             } else {
@@ -399,7 +405,10 @@ impl SvnDriver {
                             .get(&CaptureKey::ByIndex(1))
                             .and_then(|s| s.parse().ok())
                             .unwrap_or(0);
-                        let path = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                        let path = m
+                            .get(&CaptureKey::ByIndex(2))
+                            .unwrap_or_default()
+                            .to_string();
                         if path == "./" {
                             let identifier = self.build_identifier(
                                 &format!("/{}", self.trunk_path.clone().unwrap_or_default()),
@@ -437,7 +446,10 @@ impl SvnDriver {
                                 .get(&CaptureKey::ByIndex(1))
                                 .and_then(|s| s.parse().ok())
                                 .unwrap_or(0);
-                            let path = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                            let path = m
+                                .get(&CaptureKey::ByIndex(2))
+                                .unwrap_or_default()
+                                .to_string();
                             if path == "./" {
                                 last_rev = rev;
                             } else {

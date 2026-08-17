@@ -353,8 +353,8 @@ impl ClassMapGenerator {
         ) {
             prefix = r#match
                 .get(&CaptureKey::ByIndex(1))
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             path = substr(&path, strlen(&prefix), None);
         }
 
@@ -379,8 +379,8 @@ impl ClassMapGenerator {
             php_regex!(r"{(?:^|://)[a-z]:$}i"),
             |m| {
                 m.get(&CaptureKey::ByIndex(0))
-                    .cloned()
                     .unwrap_or_default()
+                    .to_string()
                     .to_uppercase()
             },
             &prefix,

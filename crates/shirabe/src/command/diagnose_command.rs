@@ -868,8 +868,8 @@ impl DiagnoseCommand {
         ) {
             let configure = phpinfo_match
                 .get(&CaptureKey::ByIndex(1))
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             let configure = configure.as_str();
 
             if configure.contains("--enable-sigchild") {

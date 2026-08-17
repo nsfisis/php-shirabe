@@ -334,8 +334,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                 php_regex!(r"{^\s*(?P<name>[\S/]+)(?:\s+(?P<version>\S+))?\s*$}"),
                                 &selection,
                             ) {
-                                if let Some(v) =
-                                    m.get(&CaptureKey::ByName("version".to_string())).cloned()
+                                if let Some(v) = m
+                                    .get(&CaptureKey::ByName("version".to_string()))
+                                    .map(str::to_string)
                                 {
                                     // parsing `acme/example ~2.3`
                                     // validate version constraint
@@ -344,7 +345,6 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                     return Ok(PhpMixed::String(format!(
                                         "{} {}",
                                         m.get(&CaptureKey::ByName("name".to_string()))
-                                            .cloned()
                                             .unwrap_or_default(),
                                         v,
                                     )));
@@ -353,8 +353,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                 // parsing `acme/example`
                                 return Ok(PhpMixed::String(
                                     m.get(&CaptureKey::ByName("name".to_string()))
-                                        .cloned()
-                                        .unwrap_or_default(),
+                                        .unwrap_or_default()
+                                        .to_string(),
                                 ));
                             }
 

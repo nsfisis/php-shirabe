@@ -205,12 +205,7 @@ impl BinaryInstaller {
             php_regex!(r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m"),
             &line,
         ) {
-            return trim(
-                m.get(&CaptureKey::ByIndex(1))
-                    .map(|s| s.as_str())
-                    .unwrap_or(""),
-                None,
-            );
+            return trim(m.get(&CaptureKey::ByIndex(1)).unwrap_or(""), None);
         }
 
         "php".to_string()

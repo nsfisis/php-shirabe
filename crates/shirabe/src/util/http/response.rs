@@ -68,7 +68,7 @@ impl Response {
             if let Some(matches) = Preg::match3(&pattern, header)
                 && let Some(s) = matches.get(&shirabe_pcre::CaptureKey::ByIndex(1))
             {
-                value = Some(s.clone());
+                value = Some(s.to_string());
             }
         }
         value

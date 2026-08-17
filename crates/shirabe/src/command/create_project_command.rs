@@ -543,8 +543,8 @@ impl CreateProjectCommand {
                     stability = Some(
                         matched
                             .get(&CaptureKey::ByIndex(1))
-                            .cloned()
-                            .unwrap_or_default(),
+                            .unwrap_or_default()
+                            .to_string(),
                     );
                 } else {
                     stability = Some(VersionParser::parse_stability(

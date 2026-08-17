@@ -971,8 +971,10 @@ try {{
                             if let Some(m) =
                                 Preg::is_match3(php_regex!("{^[^\\'\"\\s/\\\\]+}"), &path_and_args)
                             {
-                                let m0 =
-                                    m.get(&CaptureKey::ByIndex(0)).cloned().unwrap_or_default();
+                                let m0 = m
+                                    .get(&CaptureKey::ByIndex(0))
+                                    .unwrap_or_default()
+                                    .to_string();
                                 if !file_exists(&m0) {
                                     let finder = ExecutableFinder::new();
                                     if let Some(path_to_exec) = finder.find(&m0, None, &[]) {

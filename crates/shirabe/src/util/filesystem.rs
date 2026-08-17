@@ -741,8 +741,8 @@ impl Filesystem {
         ) {
             prefix = prefix_match
                 .get(&shirabe_pcre::CaptureKey::ByIndex(1))
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             path = substr(&path, strlen(&prefix), None);
         }
 
@@ -765,11 +765,11 @@ impl Filesystem {
         // ensure c: is normalized to C:
         prefix = Preg::replace_callback(
             php_regex!("{(^|://)[a-z]:$}i"),
-            |m: &shirabe_pcre::PregMatchedGroups| -> String {
+            |m: &shirabe_pcre::PregMatches| -> String {
                 let s = m
                     .get(&shirabe_pcre::CaptureKey::ByIndex(0))
-                    .cloned()
-                    .unwrap_or_default();
+                    .unwrap_or_default()
+                    .to_string();
                 strtoupper(&s)
             },
             &prefix,

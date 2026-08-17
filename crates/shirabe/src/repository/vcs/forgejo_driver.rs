@@ -587,7 +587,7 @@ impl ForgejoDriver {
             if let Some(m) = Preg::match3(php_regex!(r#"{<(.+?)>; *rel="next"}"#), &link)
                 && let Some(url) = m.get(&CaptureKey::ByIndex(1))
             {
-                return Some(url.clone());
+                return Some(url.to_string());
             }
         }
 

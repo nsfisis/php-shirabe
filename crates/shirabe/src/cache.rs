@@ -205,8 +205,8 @@ impl Cache {
                         let message = format!(
                             "<warning>Writing {} into cache failed after {} of {} bytes written, only {} bytes of free space available</warning>",
                             temp_file_name,
-                            m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
-                            m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                            m.get(&CaptureKey::ByIndex(1)).unwrap_or_default(),
+                            m.get(&CaptureKey::ByIndex(2)).unwrap_or_default(),
                             free_space,
                         );
 

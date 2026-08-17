@@ -7,7 +7,7 @@ use crate::signal::SignalSubscription;
 use crate::util::GitHub;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg, PregMatches};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     LogicException, PHP_EOL, PhpMixed, RuntimeException, array_intersect, array_map,
@@ -219,7 +219,10 @@ impl ProcessExecutor {
             if Platform::is_windows()
                 && let Some(m) = Preg::is_match3(php_regex!(r"{^([^:/\\]++) }"), &command_str)
             {
-                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let m1 = m
+                    .get(&CaptureKey::ByIndex(1))
+                    .unwrap_or_default()
+                    .to_string();
                 command_str = substr_replace(
                     &command_str,
                     &Self::escape(&Self::get_executable(&m1)),
@@ -831,23 +834,20 @@ impl ProcessExecutor {
         };
         let safe_command = Preg::replace_callback(
             php_regex!(r"{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i"),
-            |m: &PregMatchedGroups| -> String {
+            |m: &PregMatches| -> String {
                 let user_key = CaptureKey::ByName("user".to_string());
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
                 if Preg::is_match(
                     GitHub::GITHUB_TOKEN_REGEX,
-                    m.get(&user_key).cloned().unwrap_or_default().as_str(),
+                    m.get(&user_key).unwrap_or_default(),
                 ) {
                     return "://***:***@".to_string();
                 }
-                if Preg::is_match(
-                    r"{^[a-f0-9]{12,}$}",
-                    m.get(&user_key).cloned().unwrap_or_default().as_str(),
-                ) {
+                if Preg::is_match(r"{^[a-f0-9]{12,}$}", m.get(&user_key).unwrap_or_default()) {
                     return "://***:***@".to_string();
                 }
 
-                format!("://{}:***@", m.get(&user_key).cloned().unwrap_or_default())
+                format!("://{}:***@", m.get(&user_key).unwrap_or_default())
             },
             &command_string,
         );

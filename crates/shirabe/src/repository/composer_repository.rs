@@ -251,8 +251,8 @@ impl ComposerRepository {
         ) {
             let proto = match_packagist
                 .get(&CaptureKey::ByName("proto".to_string()))
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             url = format!("{}://repo.packagist.org", proto);
         }
 
@@ -786,12 +786,12 @@ impl ComposerRepository {
             {
                 let q = match_groups
                     .get(&CaptureKey::ByName("query".to_string()))
-                    .cloned()
-                    .unwrap_or_default();
+                    .unwrap_or_default()
+                    .to_string();
                 let vendor = match_groups
                     .get(&CaptureKey::ByName("vendor".to_string()))
-                    .cloned()
-                    .unwrap_or_default();
+                    .unwrap_or_default()
+                    .to_string();
                 let url = format!(
                     "{}?vendor={}&filter={}",
                     list_url,
@@ -2429,10 +2429,7 @@ impl ComposerRepository {
             if let Some(matches) = Preg::is_match3(php_regex!(r"{^[^:]++://[^/]*+}"), &self.url) {
                 return Ok(format!(
                     "{}{}",
-                    matches
-                        .get(&CaptureKey::ByIndex(0))
-                        .cloned()
-                        .unwrap_or_default(),
+                    matches.get(&CaptureKey::ByIndex(0)).unwrap_or_default(),
                     url
                 ));
             }

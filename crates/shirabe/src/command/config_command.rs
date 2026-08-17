@@ -713,8 +713,8 @@ impl Command for ConfigCommand {
                 } else {
                     let repo_key = matches
                         .get(&CaptureKey::ByIndex(1))
-                        .cloned()
-                        .unwrap_or_default();
+                        .unwrap_or_default()
+                        .to_string();
                     let repos = data.get("repositories").cloned();
                     value = match repos
                         .as_ref()
@@ -1401,7 +1401,7 @@ impl Command for ConfigCommand {
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::Array(obj));
             } else if matches!(
-                matches.get(&CaptureKey::ByIndex(1)).unwrap().as_str(),
+                matches.get(&CaptureKey::ByIndex(1)).unwrap(),
                 "github-oauth" | "gitlab-oauth" | "gitlab-token" | "bearer"
             ) {
                 if 1 != values.len() {

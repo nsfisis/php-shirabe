@@ -849,8 +849,8 @@ impl Locker {
                     ) {
                         let ts = m
                             .get(&CaptureKey::ByIndex(1))
-                            .cloned()
                             .unwrap_or_default()
+                            .to_string()
                             .parse::<i64>()
                             .unwrap_or(0);
                         datetime = chrono::DateTime::from_timestamp(ts, 0);

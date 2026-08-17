@@ -116,7 +116,10 @@ impl ZipDownloader {
                 && let Some(m) =
                     Preg::is_match3(php_regex!(r"{^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)}"), &output)
             {
-                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                let m1 = m
+                    .get(&CaptureKey::ByIndex(1))
+                    .unwrap_or_default()
+                    .to_string();
                 if version_compare(&m1, "21.01", CmpOp::Lt) {
                     self.inner.io.borrow().write_error(&format!(
                         "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",

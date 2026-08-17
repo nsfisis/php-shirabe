@@ -117,8 +117,8 @@ impl JsonManipulator {
             {
                 let groups_1 = groups
                     .get(&CaptureKey::ByIndex(1))
-                    .cloned()
-                    .unwrap_or_default();
+                    .unwrap_or_default()
+                    .to_string();
                 // link missing but non empty links
                 links = Preg::replace(
                     format!("{{{}$}}", preg_quote(&groups_1, None)),
@@ -1325,8 +1325,8 @@ impl JsonManipulator {
         {
             let tail_match_1 = tail_match
                 .get(&CaptureKey::ByIndex(1))
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             self.contents = Preg::replace(
                 format!("#{}\\}}$#", tail_match_1),
                 &addcslashes(

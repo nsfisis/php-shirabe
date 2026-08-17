@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileCleaner.php
 
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg, PregMatches};
 use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
@@ -105,16 +105,20 @@ impl PhpFileCleaner {
                     if let Some(r#match) = self.r#match(
                         r#"{<<<[ \t]*(?:"([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)"|'([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*)'|([a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*))(?:\r\n|\n|\r)}A"#,
                     ) {
-                        self.index += r#match.get(&CaptureKey::ByIndex(0)).map(|s| s.len()).unwrap_or(0);
+                        let matched_len = r#match
+                            .get(&CaptureKey::ByIndex(0))
+                            .map(|s| s.len())
+                            .unwrap_or(0);
                         let delimiter = [1, 2, 3]
                             .iter()
                             .find_map(|i| {
                                 r#match
                                     .get(&CaptureKey::ByIndex(*i))
                                     .filter(|s| !s.is_empty())
-                                    .cloned()
+                                    .map(str::to_string)
                             })
                             .unwrap_or_default();
+                        self.index += matched_len;
                         self.skip_heredoc(&delimiter);
                         clean.push_str("null");
                         continue;
@@ -145,11 +149,7 @@ impl PhpFileCleaner {
                             if let Some(r#match) =
                                 Preg::is_match4(&entry.pattern, &self.contents, offset)
                             {
-                                return clean
-                                    + r#match
-                                        .get(&CaptureKey::ByIndex(0))
-                                        .map(|s| s.as_str())
-                                        .unwrap_or("");
+                                return clean + r#match.get(&CaptureKey::ByIndex(0)).unwrap_or("");
                             }
                         }
                     }
@@ -161,8 +161,8 @@ impl PhpFileCleaner {
                     if let Some(r#match) = self.r#match(&rest_pattern) {
                         let m0 = r#match
                             .get(&CaptureKey::ByIndex(0))
-                            .cloned()
-                            .unwrap_or_default();
+                            .unwrap_or_default()
+                            .to_string();
                         clean.push(char);
                         clean.push_str(&m0);
                         self.index += m0.len();
@@ -285,7 +285,7 @@ impl PhpFileCleaner {
         self.index + 1 < self.len && self.contents.as_bytes()[self.index + 1] as char == char
     }
 
-    fn r#match(&self, regex: &str) -> Option<PregMatchedGroups> {
+    fn r#match(&self, regex: &str) -> Option<PregMatches<'_>> {
         Preg::is_match4(regex, &self.contents, self.index)
     }
 }

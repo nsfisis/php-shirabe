@@ -85,22 +85,22 @@ impl GitHubDriver {
 
         self.owner = match_
             .get(&CaptureKey::ByIndex(3))
-            .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_string();
         self.repository = match_
             .get(&CaptureKey::ByIndex(4))
-            .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_string();
         self.inner.origin_url = strtolower(
             &match_
                 .get(&CaptureKey::ByIndex(1))
-                .cloned()
                 .filter(|s| !s.is_empty())
+                .map(str::to_string)
                 .unwrap_or_else(|| {
                     match_
                         .get(&CaptureKey::ByIndex(2))
-                        .cloned()
                         .unwrap_or_default()
+                        .to_string()
                 }),
         );
         if self.inner.origin_url == "www.github.com" {
@@ -494,14 +494,23 @@ impl GitHubDriver {
         for line in preg_split(php_regex!(r"{\r?\n}"), &funding) {
             let line = trim(&line, None);
             if let Some(m) = Preg::is_match3(php_regex!(r"{^(\w+)\s*:\s*(.+)$}"), &line) {
-                let g1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                let g2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                let g1 = m
+                    .get(&CaptureKey::ByIndex(1))
+                    .unwrap_or_default()
+                    .to_string();
+                let g2 = m
+                    .get(&CaptureKey::ByIndex(2))
+                    .unwrap_or_default()
+                    .to_string();
                 if g2 == "[" {
                     key = Some(g1);
                     continue;
                 }
                 if let Some(m2) = Preg::is_match3(php_regex!(r"{^\[(.*?)\](?:\s*#.*)?$}"), &g2) {
-                    let inner = m2.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                    let inner = m2
+                        .get(&CaptureKey::ByIndex(1))
+                        .unwrap_or_default()
+                        .to_string();
                     for item in array_map(
                         |s: &String| trim(s, None),
                         &preg_split(php_regex!(r#"{[\'\"]?\s*,\s*[\'\"]?}"#), &inner),
@@ -522,7 +531,7 @@ impl GitHubDriver {
                     entry.insert(
                         "url".to_string(),
                         PhpMixed::String(trim(
-                            &m2.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                            m2.get(&CaptureKey::ByIndex(1)).unwrap_or_default(),
                             Some("\"' "),
                         )),
                     );
@@ -530,7 +539,11 @@ impl GitHubDriver {
                 }
                 key = None;
             } else if let Some(m) = Preg::is_match3(php_regex!(r"{^(\w+)\s*:\s*#\s*$}"), &line) {
-                key = Some(m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default());
+                key = Some(
+                    m.get(&CaptureKey::ByIndex(1))
+                        .unwrap_or_default()
+                        .to_string(),
+                );
             } else if key.is_some()
                 && let Some(m) = Preg::is_match3(php_regex!(r"{^-\s*(.+)(?:\s+#.*)?$}"), &line)
                     .or_else(|| Preg::is_match3(php_regex!(r"{^(.+),(?:\s*#.*)?$}"), &line))
@@ -543,7 +556,7 @@ impl GitHubDriver {
                 entry.insert(
                     "url".to_string(),
                     PhpMixed::String(trim(
-                        &m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
+                        m.get(&CaptureKey::ByIndex(1)).unwrap_or_default(),
                         Some("\"' "),
                     )),
                 );
@@ -936,13 +949,13 @@ impl GitHubDriver {
 
         let origin_url = matches
             .get(&CaptureKey::ByIndex(2))
-            .cloned()
             .filter(|s| !s.is_empty())
+            .map(str::to_string)
             .unwrap_or_else(|| {
                 matches
                     .get(&CaptureKey::ByIndex(3))
-                    .cloned()
                     .unwrap_or_default()
+                    .to_string()
             });
         if !in_array_loose(
             strtolower(&Preg::replace(php_regex!(r"{^www\.}i"), "", &origin_url)),
@@ -1272,7 +1285,11 @@ impl GitHubDriver {
         let links = explode(",", &header);
         for link in &links {
             if let Some(m) = Preg::is_match3(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
-                return Some(m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default());
+                return Some(
+                    m.get(&CaptureKey::ByIndex(1))
+                        .unwrap_or_default()
+                        .to_string(),
+                );
             }
         }
 

@@ -202,7 +202,7 @@ impl GitDriver {
                         && let Some(caps) = Preg::match3(php_regex!(r"{^\* +(\S+)}"), branch)
                         && let Some(name) = caps.get(&CaptureKey::ByIndex(1))
                     {
-                        self.root_identifier = Some(name.clone());
+                        self.root_identifier = Some(name.to_string());
                         break;
                     }
                 }
@@ -321,7 +321,7 @@ impl GitDriver {
                     self.tags
                         .as_mut()
                         .unwrap()
-                        .insert(name.clone(), hash.clone());
+                        .insert(name.to_string(), hash.to_string());
                 }
             }
         }
@@ -358,7 +358,7 @@ impl GitDriver {
                     )
                     && !name.starts_with('-')
                 {
-                    branches.insert(name.clone(), hash.clone());
+                    branches.insert(name.to_string(), hash.to_string());
                 }
             }
 

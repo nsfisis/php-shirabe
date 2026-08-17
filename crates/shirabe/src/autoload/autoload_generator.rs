@@ -23,7 +23,7 @@ use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg, PregMatches};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_keys, array_map, array_merge_map,
     array_merge_recursive, array_shift, array_slice_strs, array_unique, bin2hex, explode,
@@ -562,7 +562,7 @@ return array(
                 if let Some(matches) =
                     Preg::match3(php_regex!("{ComposerAutoloaderInit([^:\\s]+)::}"), &content)
                 {
-                    suffix = matches.get(&CaptureKey::ByIndex(1)).cloned();
+                    suffix = matches.get(&CaptureKey::ByIndex(1)).map(str::to_string);
                 }
             }
 
@@ -1153,7 +1153,7 @@ return array(
             let links = array_merge_map(package.get_replaces(), package.get_provides());
             for (_k, link) in &links {
                 if let Some(matches) = Preg::match3(php_regex!("{^ext-(.+)$}iD"), link.get_target())
-                    && let Some(ext) = matches.get(&CaptureKey::ByIndex(1)).cloned()
+                    && let Some(ext) = matches.get(&CaptureKey::ByIndex(1)).map(str::to_string)
                 {
                     extension_providers
                         .entry(ext)
@@ -1200,8 +1200,8 @@ return array(
                 {
                     let ext_key = matches
                         .get(&CaptureKey::ByIndex(1))
-                        .cloned()
-                        .unwrap_or_default();
+                        .unwrap_or_default()
+                        .to_string();
                     // skip extension checks if they have a valid provider/replacer
                     if let Some(provided_list) = extension_providers.get(&ext_key) {
                         for provided in provided_list {
@@ -1939,15 +1939,12 @@ class ComposerStaticInit{}
                             std::cell::RefCell::new(None);
                         let p = Preg::replace_callback(
                             php_regex!("{^((?:(?:\\\\\\.){1,2}+/)+)}"),
-                            |matches: &PregMatchedGroups| -> String {
+                            |matches: &PregMatches| -> String {
                                 // undo preg_quote for the matched string
                                 *updir_cell.borrow_mut() = Some(str_replace(
                                     "\\.",
                                     ".",
-                                    matches
-                                        .get(&CaptureKey::ByIndex(1))
-                                        .map(|s| s.as_str())
-                                        .unwrap_or(""),
+                                    matches.get(&CaptureKey::ByIndex(1)).unwrap_or(""),
                                 ));
 
                                 String::new()

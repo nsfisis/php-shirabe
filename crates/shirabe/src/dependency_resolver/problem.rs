@@ -234,11 +234,17 @@ impl Problem {
                 None
             };
             if let Some(m) = matched {
+                let pkg_key = m
+                    .get(&CaptureKey::ByIndex(1))
+                    .unwrap_or_default()
+                    .to_string();
+                let m2 = m
+                    .get(&CaptureKey::ByIndex(2))
+                    .unwrap_or_default()
+                    .to_string();
                 message = str_replace("%", "%%", &message);
                 let template = Preg::replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &message);
                 messages.push(template.clone());
-                let pkg_key = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
                 let version_key = parser.normalize(&m2, Some("")).unwrap_or_default();
                 templates
                     .entry(template.clone())

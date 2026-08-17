@@ -236,8 +236,12 @@ impl HgDriver {
                     && let Some(m) = Preg::match3(php_regex!(r"(^([^\s]+)\s+\d+:(.*)$)"), &tag)
                 {
                     tags.insert(
-                        m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default(),
-                        m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                        m.get(&CaptureKey::ByIndex(1))
+                            .unwrap_or_default()
+                            .to_string(),
+                        m.get(&CaptureKey::ByIndex(2))
+                            .unwrap_or_default()
+                            .to_string(),
                     );
                 }
             }
@@ -265,11 +269,16 @@ impl HgDriver {
                     && let Some(m) =
                         Preg::match3(php_regex!(r"(^([^\s]+)\s+\d+:([a-f0-9]+))"), &branch)
                 {
-                    let name = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                    let name = m
+                        .get(&CaptureKey::ByIndex(1))
+                        .unwrap_or_default()
+                        .to_string();
                     if !name.starts_with('-') {
                         branches.insert(
                             name,
-                            m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                            m.get(&CaptureKey::ByIndex(2))
+                                .unwrap_or_default()
+                                .to_string(),
                         );
                     }
                 }
@@ -286,11 +295,16 @@ impl HgDriver {
                     && let Some(m) =
                         Preg::match3(php_regex!(r"(^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$)"), &branch)
                 {
-                    let name = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+                    let name = m
+                        .get(&CaptureKey::ByIndex(1))
+                        .unwrap_or_default()
+                        .to_string();
                     if !name.starts_with('-') {
                         bookmarks.insert(
                             name,
-                            m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                            m.get(&CaptureKey::ByIndex(2))
+                                .unwrap_or_default()
+                                .to_string(),
                         );
                     }
                 }

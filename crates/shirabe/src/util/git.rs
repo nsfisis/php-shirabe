@@ -14,7 +14,7 @@ use crate::util::ProcessExecutor;
 use crate::util::Url;
 use crate::util::{AuthHelper, StoreAuth};
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg, PregMatches};
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException, array_map,
     clearstatcache, explode, implode, in_array_loose, in_array_strict, is_dir, php_regex,
@@ -230,13 +230,16 @@ impl Git {
                 php_regex!(r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im"),
                 &output,
             ) {
-                let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
+                let m3 = m
+                    .get(&CaptureKey::ByIndex(3))
+                    .unwrap_or_default()
+                    .to_string();
                 if !self.io.has_authentication(&m3) {
                     self.io.borrow_mut().set_authentication(
                         m3,
-                        rawurldecode(&m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default()),
+                        rawurldecode(m.get(&CaptureKey::ByIndex(1)).unwrap_or_default()),
                         Some(rawurldecode(
-                            &m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default(),
+                            m.get(&CaptureKey::ByIndex(2)).unwrap_or_default(),
                         )),
                     );
                 }
@@ -262,8 +265,14 @@ impl Git {
                 _ => vec![],
             };
             for protocol in &protocols_list {
-                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                let m1 = m
+                    .get(&CaptureKey::ByIndex(1))
+                    .unwrap_or_default()
+                    .to_string();
+                let m2 = m
+                    .get(&CaptureKey::ByIndex(2))
+                    .unwrap_or_default()
+                    .to_string();
                 let proto_url = if protocol == "ssh" {
                     format!("git@{}:{}", m1, m2)
                 } else {
@@ -291,7 +300,10 @@ impl Git {
             }
 
             // failed to checkout, first check git accessibility
-            let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+            let m1 = m
+                .get(&CaptureKey::ByIndex(1))
+                .unwrap_or_default()
+                .to_string();
             if !self.io.has_authentication(&m1) && !self.io.is_interactive() {
                 self.throw_exception(
                     &format!(
@@ -357,8 +369,14 @@ impl Git {
                 )
             });
             if let Some(m) = github_matched {
-                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+                let m1 = m
+                    .get(&CaptureKey::ByIndex(1))
+                    .unwrap_or_default()
+                    .to_string();
+                let m2 = m
+                    .get(&CaptureKey::ByIndex(2))
+                    .unwrap_or_default()
+                    .to_string();
                 if !self.io.has_authentication(&m1) {
                     let mut git_hub_util = GitHub::new(
                         self.io.clone(),
@@ -421,9 +439,14 @@ impl Git {
                     None,
                 )?;
 
-                let domain = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
-                let mut repo_with_git_part =
-                    m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
+                let domain = m
+                    .get(&CaptureKey::ByIndex(2))
+                    .unwrap_or_default()
+                    .to_string();
+                let mut repo_with_git_part = m
+                    .get(&CaptureKey::ByIndex(3))
+                    .unwrap_or_default()
+                    .to_string();
                 if !repo_with_git_part.ends_with(".git") {
                     repo_with_git_part.push_str(".git");
                 }
@@ -565,9 +588,18 @@ impl Git {
                     url,
                 )
             }) {
-                let mut m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                let m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
-                let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
+                let mut m1 = m
+                    .get(&CaptureKey::ByIndex(1))
+                    .unwrap_or_default()
+                    .to_string();
+                let m2 = m
+                    .get(&CaptureKey::ByIndex(2))
+                    .unwrap_or_default()
+                    .to_string();
+                let m3 = m
+                    .get(&CaptureKey::ByIndex(3))
+                    .unwrap_or_default()
+                    .to_string();
                 if m1 == "git" {
                     m1 = "https".to_string();
                 }
@@ -641,9 +673,18 @@ impl Git {
                 }
             } else if let Some(m) = self.get_authentication_failure(url) {
                 // private non-github/gitlab/bitbucket repo that failed to authenticate
-                let m1 = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-                let mut m2 = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
-                let m3 = m.get(&CaptureKey::ByIndex(3)).cloned().unwrap_or_default();
+                let m1 = m
+                    .get(&CaptureKey::ByIndex(1))
+                    .unwrap_or_default()
+                    .to_string();
+                let mut m2 = m
+                    .get(&CaptureKey::ByIndex(2))
+                    .unwrap_or_default()
+                    .to_string();
+                let m3 = m
+                    .get(&CaptureKey::ByIndex(3))
+                    .unwrap_or_default()
+                    .to_string();
                 let mut auth_parts: Option<String> = None;
                 if m2.contains("@") {
                     let parts = explode("@", &m2);
@@ -1083,7 +1124,7 @@ impl Git {
         Ok(false)
     }
 
-    fn get_authentication_failure(&self, url: &str) -> Option<PregMatchedGroups> {
+    fn get_authentication_failure<'u>(&self, url: &'u str) -> Option<PregMatches<'u>> {
         let m = Preg::is_match3(php_regex!(r"{^(https?://)([^/]+)(.*)$}i"), url)?;
 
         let auth_failures = [
@@ -1172,8 +1213,8 @@ impl Git {
                     return Ok(Some(
                         matches
                             .get(&CaptureKey::ByIndex(1))
-                            .cloned()
-                            .unwrap_or_default(),
+                            .unwrap_or_default()
+                            .to_string(),
                     ));
                 }
             }
@@ -1295,7 +1336,7 @@ impl Git {
                 && let Some(matches) =
                     Preg::is_match3(php_regex!(r"/^git version (\d+(?:\.\d+)+)/m"), &output)
             {
-                *version = Some(matches.get(&CaptureKey::ByIndex(1)).cloned());
+                *version = Some(matches.get(&CaptureKey::ByIndex(1)).map(str::to_string));
             }
         }
         version.clone().unwrap_or(None)

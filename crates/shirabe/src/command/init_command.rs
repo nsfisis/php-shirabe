@@ -94,7 +94,9 @@ impl InitCommand {
             php_regex!(r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#),
             author,
         ) {
-            let email = m.get(&CaptureKey::ByName("email".to_string())).cloned();
+            let email = m
+                .get(&CaptureKey::ByName("email".to_string()))
+                .map(str::to_string);
             if let Some(ref email) = email
                 && !self.is_valid_email(email)
             {
@@ -107,8 +109,7 @@ impl InitCommand {
             result.insert(
                 "name".to_string(),
                 Some(trim(
-                    &m.get(&CaptureKey::ByName("name".to_string()))
-                        .cloned()
+                    m.get(&CaptureKey::ByName("name".to_string()))
                         .unwrap_or_default(),
                     None,
                 )),

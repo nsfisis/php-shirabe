@@ -8,7 +8,7 @@ pub use json_config_source::*;
 
 use crate::io::io_interface;
 use indexmap::IndexMap;
-use shirabe_pcre::{CaptureKey, Preg, PregMatchedGroups};
+use shirabe_pcre::{CaptureKey, Preg, PregMatches};
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, array_key_exists, array_merge,
     array_search_mixed, array_unique, empty, filter_var_url, implode, in_array_loose,
@@ -659,11 +659,11 @@ impl Config {
                 };
                 let mut size = matches
                     .get(&CaptureKey::ByIndex(1))
-                    .cloned()
                     .unwrap_or_default()
+                    .to_string()
                     .parse::<f64>()
                     .unwrap_or(0.0);
-                let unit = matches.get(&CaptureKey::ByIndex(2)).cloned();
+                let unit = matches.get(&CaptureKey::ByIndex(2)).map(str::to_string);
                 if let Some(unit) = unit {
                     match strtolower(&unit).as_str() {
                         "g" => {
@@ -959,8 +959,11 @@ impl Config {
         let mut error = None;
         let result = Preg::replace_callback(
             php_regex!(r"#\{\$(.+)\}#"),
-            |m: &PregMatchedGroups| -> String {
-                let key_match = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+            |m: &PregMatches| -> String {
+                let key_match = m
+                    .get(&CaptureKey::ByIndex(1))
+                    .unwrap_or_default()
+                    .to_string();
                 match self.get_with_flags(&key_match, flags) {
                     Ok(v) => php_to_string(&v),
                     Err(e) => {

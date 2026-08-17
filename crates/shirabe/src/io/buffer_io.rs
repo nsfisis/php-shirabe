@@ -76,21 +76,20 @@ impl BufferIO {
         loop {
             let next = Preg::replace_callback(
                 php_regex!(r"{(^|\n|\x08)(.+?)(\x08+)}"),
-                |matches: &shirabe_pcre::PregMatchedGroups| -> String {
-                    let empty = String::new();
+                |matches: &shirabe_pcre::PregMatches| -> String {
                     let g1 = matches
                         .get(&shirabe_pcre::CaptureKey::ByIndex(1))
-                        .unwrap_or(&empty);
+                        .unwrap_or("");
                     let g2 = matches
                         .get(&shirabe_pcre::CaptureKey::ByIndex(2))
-                        .unwrap_or(&empty);
+                        .unwrap_or("");
                     let g3 = matches
                         .get(&shirabe_pcre::CaptureKey::ByIndex(3))
-                        .unwrap_or(&empty);
+                        .unwrap_or("");
                     let pre = strip_tags(g2);
 
                     if pre.len() == g3.len() {
-                        return g1.clone();
+                        return g1.to_string();
                     }
 
                     // TODO reverse parse the string, skipping span tags and \033\[([0-9;]+)m(.*?)\033\[0m style blobs

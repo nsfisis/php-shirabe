@@ -43,8 +43,8 @@ impl ForgejoUrl {
             .map(|i| {
                 matches
                     .get(&CaptureKey::ByIndex(i))
-                    .cloned()
                     .unwrap_or_default()
+                    .to_string()
             })
             .collect();
 

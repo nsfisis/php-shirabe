@@ -91,27 +91,26 @@ impl GitLabDriver {
 
         let guessed_domain = match_
             .get(&CaptureKey::ByName("domain".to_string()))
-            .cloned()
             .filter(|s| !s.is_empty())
+            .map(str::to_string)
             .unwrap_or_else(|| {
                 match_
                     .get(&CaptureKey::ByName("domain2".to_string()))
-                    .cloned()
                     .unwrap_or_default()
+                    .to_string()
             });
         let configured_domains = self.inner.config.borrow_mut().get("gitlab-domains");
         let mut url_parts: Vec<String> = explode(
             "/",
-            &match_
+            match_
                 .get(&CaptureKey::ByName("parts".to_string()))
-                .cloned()
                 .unwrap_or_default(),
         );
 
         let scheme_match = match_
             .get(&CaptureKey::ByName("scheme".to_string()))
-            .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_string();
         self.scheme = if matches!(scheme_match.as_str(), "https" | "http") {
             scheme_match
         } else if self
@@ -125,7 +124,9 @@ impl GitLabDriver {
         } else {
             "https".to_string()
         };
-        let port = match_.get(&CaptureKey::ByName("port".to_string())).cloned();
+        let port = match_
+            .get(&CaptureKey::ByName("port".to_string()))
+            .map(str::to_string);
         let origin =
             Self::determine_origin(&configured_domains, guessed_domain, &mut url_parts, port);
         let origin = match origin {
@@ -169,9 +170,8 @@ impl GitLabDriver {
         self.repository = Preg::replace(
             php_regex!(r"#(\.git)$#"),
             "",
-            &match_
+            match_
                 .get(&CaptureKey::ByName("repo".to_string()))
-                .cloned()
                 .unwrap_or_default(),
         );
 
@@ -950,23 +950,22 @@ impl GitLabDriver {
 
         let scheme = match_
             .get(&CaptureKey::ByName("scheme".to_string()))
-            .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_string();
         let guessed_domain = match_
             .get(&CaptureKey::ByName("domain".to_string()))
-            .cloned()
             .filter(|s| !s.is_empty())
+            .map(str::to_string)
             .unwrap_or_else(|| {
                 match_
                     .get(&CaptureKey::ByName("domain2".to_string()))
-                    .cloned()
                     .unwrap_or_default()
+                    .to_string()
             });
         let mut url_parts: Vec<String> = explode(
             "/",
-            &match_
+            match_
                 .get(&CaptureKey::ByName("parts".to_string()))
-                .cloned()
                 .unwrap_or_default(),
         );
 
@@ -974,7 +973,9 @@ impl GitLabDriver {
             &config.borrow().get("gitlab-domains"),
             guessed_domain,
             &mut url_parts,
-            match_.get(&CaptureKey::ByName("port".to_string())).cloned(),
+            match_
+                .get(&CaptureKey::ByName("port".to_string()))
+                .map(str::to_string),
         )
         .is_none()
         {
@@ -1013,8 +1014,8 @@ impl GitLabDriver {
                 return Some(
                     match_
                         .get(&CaptureKey::ByIndex(1))
-                        .cloned()
-                        .unwrap_or_default(),
+                        .unwrap_or_default()
+                        .to_string(),
                 );
             }
         }

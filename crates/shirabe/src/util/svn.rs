@@ -410,8 +410,8 @@ impl Svn {
                 *cached = Some(
                     matches
                         .get(&CaptureKey::ByIndex(1))
-                        .cloned()
-                        .unwrap_or_default(),
+                        .unwrap_or_default()
+                        .to_string(),
                 );
             }
         }

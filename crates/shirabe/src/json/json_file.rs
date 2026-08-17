@@ -450,11 +450,8 @@ impl JsonFile {
             let indent_owned = options.indent;
             return Ok(Preg::replace_callback(
                 php_regex!(r"#^ {4,}#m"),
-                move |m: &shirabe_pcre::PregMatchedGroups| -> String {
-                    let whole = m
-                        .get(&shirabe_pcre::CaptureKey::ByIndex(0))
-                        .map(|s| s.as_str())
-                        .unwrap_or("");
+                move |m: &shirabe_pcre::PregMatches| -> String {
+                    let whole = m.get(&shirabe_pcre::CaptureKey::ByIndex(0)).unwrap_or("");
                     str_repeat(&indent_owned, (strlen(whole) / 4) as usize)
                 },
                 &json,
@@ -555,7 +552,10 @@ impl JsonFile {
 
     pub fn detect_indenting(json: Option<&str>) -> String {
         if let Some(m) = Preg::is_match3(php_regex!(r##"#^([ \t]+)"#m"##), json.unwrap_or("")) {
-            return m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
+            return m
+                .get(&CaptureKey::ByIndex(1))
+                .unwrap_or_default()
+                .to_string();
         }
 
         Self::INDENT_DEFAULT.to_string()

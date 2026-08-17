@@ -144,11 +144,11 @@ fn expect_matches(expected: &str, output: &str) {
             let Some(m) = Preg::is_match3(php_regex!("{%(.+?)%}"), &expected[i..]) else {
                 panic!("Failed to match %...% in {}", &expected[i..]);
             };
-            let regex = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap();
+            let regex = m.get(&CaptureKey::ByIndex(1)).map(str::to_string).unwrap();
 
             let pattern = format!("{{{}}}", regex);
             if let Some(m) = Preg::is_match3(&pattern, &output[j..]) {
-                let full = m.get(&CaptureKey::ByIndex(0)).cloned().unwrap();
+                let full = m.get(&CaptureKey::ByIndex(0)).map(str::to_string).unwrap();
                 i += regex.len() + 2;
                 j += full.len();
                 continue;

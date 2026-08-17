@@ -326,7 +326,9 @@ impl GitHub {
                 continue;
             }
             if let Some(caps) = Preg::match3(php_regex!(r"{\burl=(?P<url>[^\s;]+)}"), header) {
-                return caps.get(&CaptureKey::ByName("url".to_string())).cloned();
+                return caps
+                    .get(&CaptureKey::ByName("url".to_string()))
+                    .map(str::to_string);
             }
         }
 

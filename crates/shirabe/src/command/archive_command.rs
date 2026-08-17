@@ -234,12 +234,12 @@ impl ArchiveCommand {
         {
             let m1 = matches
                 .get(&CaptureKey::ByIndex(1))
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             let m0 = matches
                 .get(&CaptureKey::ByIndex(0))
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             min_stability = VersionParser::normalize_stability(&m1)?;
             let full_match_len = m0.len();
             version = Some(version_str[..version_str.len() - full_match_len].to_string());

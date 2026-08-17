@@ -18,12 +18,6 @@ use shirabe_php_shim::{
 };
 
 preg_match_map! {
-    /// A single match's `$matches` as `Preg` hands it to callers: an unmatched capture group is
-    /// absent rather than held as a null value.
-    pub struct PregMatchedGroups(CaptureKey => String);
-}
-
-preg_match_map! {
     /// The named capture groups of a single match, keyed by group name alone.
     pub struct PregNamedGroups(String => String);
 }
@@ -32,16 +26,16 @@ preg_match_map! {
 pub struct Preg;
 
 impl Preg {
-    pub fn match3(pattern: impl PregPattern, subject: &str) -> Option<PregMatchedGroups> {
+    pub fn match3<'h>(pattern: impl PregPattern, subject: &'h str) -> Option<PregMatches<'h>> {
         Self::match4(pattern, subject, 0)
     }
 
-    pub fn match4(
+    pub fn match4<'h>(
         pattern: impl PregPattern,
-        subject: &str,
+        subject: &'h str,
         offset: usize,
-    ) -> Option<PregMatchedGroups> {
-        preg_match2(pattern, subject, offset).map(|internal| drop_null_matches(&internal))
+    ) -> Option<PregMatches<'h>> {
+        preg_match2(pattern, subject, offset)
     }
 
     pub fn match_all(pattern: impl PregPattern, subject: &str) -> usize {
@@ -82,12 +76,12 @@ impl Preg {
         preg_replace2(pattern, replacement, subject, limit, Some(count))
     }
 
-    pub fn replace_callback<F: FnMut(&PregMatchedGroups) -> String>(
+    pub fn replace_callback<'h, F: FnMut(&PregMatches<'h>) -> String>(
         pattern: impl PregPattern,
         mut replacement: F,
-        subject: &str,
+        subject: &'h str,
     ) -> String {
-        let adapter = |internal: &PregMatches| Ok(replacement(&drop_null_matches(internal)));
+        let adapter = |matches: &PregMatches<'h>| Ok(replacement(matches));
 
         preg_replace_callback(pattern, adapter, subject).expect("$replacement cannot fail")
     }
@@ -103,15 +97,15 @@ impl Preg {
         Self::match4(pattern, subject, 0).is_some()
     }
 
-    pub fn is_match3(pattern: impl PregPattern, subject: &str) -> Option<PregMatchedGroups> {
+    pub fn is_match3<'h>(pattern: impl PregPattern, subject: &'h str) -> Option<PregMatches<'h>> {
         Self::match4(pattern, subject, 0)
     }
 
-    pub fn is_match4(
+    pub fn is_match4<'h>(
         pattern: impl PregPattern,
-        subject: &str,
+        subject: &'h str,
         offset: usize,
-    ) -> Option<PregMatchedGroups> {
+    ) -> Option<PregMatches<'h>> {
         Self::match4(pattern, subject, offset)
     }
 
@@ -154,13 +148,4 @@ impl Preg {
     ) -> PregMatchesAllWithOffsets {
         Self::match_all_with_offsets5(pattern, subject)
     }
-}
-
-// Drops `null` (unmatched) groups, mirroring how the public `string`-valued
-// `matches` map represents PHP's `string|null` entries by their absence.
-fn drop_null_matches(matches: &PregMatches) -> PregMatchedGroups {
-    matches
-        .iter()
-        .filter_map(|(key, value)| value.map(|value| (key, value.to_string())))
-        .collect()
 }

@@ -95,8 +95,14 @@ impl GitBitbucketDriver {
             .into());
         };
 
-        self.owner = m.get(&CaptureKey::ByIndex(1)).cloned().unwrap_or_default();
-        self.repository = m.get(&CaptureKey::ByIndex(2)).cloned().unwrap_or_default();
+        self.owner = m
+            .get(&CaptureKey::ByIndex(1))
+            .unwrap_or_default()
+            .to_string();
+        self.repository = m
+            .get(&CaptureKey::ByIndex(2))
+            .unwrap_or_default()
+            .to_string();
         self.inner.origin_url = "bitbucket.org".to_string();
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),

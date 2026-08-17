@@ -101,8 +101,8 @@ impl GitDownloader {
         };
         let head_ref = head_match
             .get(&CaptureKey::ByIndex(1))
-            .cloned()
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .to_string();
 
         let branches_match = Preg::is_match_all(
             format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
@@ -513,16 +513,16 @@ impl GitDownloader {
             let protocols = self.inner.config.borrow_mut().get("github-protocols");
             let m1 = match_
                 .get(&CaptureKey::ByIndex(1))
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             let m2 = match_
                 .get(&CaptureKey::ByIndex(2))
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             let m3 = match_
                 .get(&CaptureKey::ByIndex(3))
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             let mut push_url = format!("git@{}:{}/{}.git", m1, m2, m3);
             if !in_array_strict("ssh".to_string(), protocols.values()) {
                 push_url = format!("https://{}/{}/{}.git", m1, m2, m3);
@@ -1112,12 +1112,12 @@ impl VcsDownloader for GitDownloader {
         {
             let origin_url = origin_match
                 .get(&CaptureKey::ByName("url".to_string()))
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             let composer_url = composer_match
                 .get(&CaptureKey::ByName("url".to_string()))
-                .cloned()
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .to_string();
             if origin_url == composer_url
                 && Some(composer_url.as_str()) != target.get_source_url().as_deref()
             {

@@ -2,7 +2,7 @@
 
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
-use shirabe_pcre::{Preg, PregMatchedGroups};
+use shirabe_pcre::{Preg, PregMatches};
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, RuntimeException, defined, file_exists,
     file_get_contents, fstat, function_exists, getcwd, getenv, ini_get, is_readable, mb_strlen,
@@ -98,15 +98,13 @@ impl Platform {
         // two forms are written as an explicit alternation: `$VAR` or `%VAR%`.
         Preg::replace_callback(
             php_regex!(r"#^(?:\$(?P<dvar>\w+)|%(?P<pvar>\w+)%)(?P<path>.*)#"),
-            |matches: &PregMatchedGroups| -> String {
+            |matches: &PregMatches| -> String {
                 let var = matches
                     .get(&CaptureKey::ByName("dvar".to_string()))
                     .or_else(|| matches.get(&CaptureKey::ByName("pvar".to_string())))
-                    .map(|s| s.as_str())
                     .unwrap_or("");
                 let path_part = matches
                     .get(&CaptureKey::ByName("path".to_string()))
-                    .map(|s| s.as_str())
                     .unwrap_or("");
                 // Treat HOME as an alias for USERPROFILE on Windows for legacy reasons
                 if Platform::is_windows() && var == "HOME" {
