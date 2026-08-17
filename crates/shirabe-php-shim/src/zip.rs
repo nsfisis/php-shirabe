@@ -1,7 +1,5 @@
 use crate::ErrorException;
-use crate::PhpMixed;
 use crate::{StreamBacking, StreamState};
-use indexmap::IndexMap;
 use zip::write::SimpleFileOptions;
 
 /// Test-only behaviour mirroring PHPUnit's `getMockBuilder('ZipArchive')->getMock()`, where
@@ -30,6 +28,14 @@ enum ZipState {
         path: std::path::PathBuf,
         status: String,
     },
+}
+
+/// One entry of an archive, as returned by [`ZipArchive::stat_index`]. Only fields that Composer
+/// accesses are ported.
+#[derive(Debug, Clone)]
+pub struct ZipEntryStat {
+    pub size: i64,
+    pub comp_size: i64,
 }
 
 #[derive(Debug)]
@@ -113,35 +119,16 @@ impl ZipArchive {
         self.num_files
     }
 
-    pub fn stat_index(&self, index: i64) -> Option<IndexMap<String, PhpMixed>> {
+    pub fn stat_index(&self, index: i64) -> Option<ZipEntryStat> {
         let mut state = self.state.borrow_mut();
         let ZipState::Reader(archive) = &mut *state else {
             return None;
         };
         let file = archive.by_index(index as usize).ok()?;
-        let mut stat = IndexMap::new();
-        stat.insert(
-            "name".to_string(),
-            PhpMixed::String(file.name().to_string()),
-        );
-        stat.insert("index".to_string(), PhpMixed::Int(index));
-        stat.insert("crc".to_string(), PhpMixed::Int(file.crc32() as i64));
-        stat.insert("size".to_string(), PhpMixed::Int(file.size() as i64));
-        // PHP exposes the last-modified time as a Unix timestamp. The `zip` crate
-        // only surfaces a 2-second-precision MS-DOS datetime; no consumer reads
-        // this field, so it is reported as 0 rather than reconstructing it.
-        stat.insert("mtime".to_string(), PhpMixed::Int(0));
-        stat.insert(
-            "comp_size".to_string(),
-            PhpMixed::Int(file.compressed_size() as i64),
-        );
-        let comp_method = match file.compression() {
-            zip::CompressionMethod::Stored => 0,
-            zip::CompressionMethod::Deflated => 8,
-            _ => -1,
-        };
-        stat.insert("comp_method".to_string(), PhpMixed::Int(comp_method));
-        Some(stat)
+        Some(ZipEntryStat {
+            size: file.size() as i64,
+            comp_size: file.compressed_size() as i64,
+        })
     }
 
     pub fn extract_to(&self, path: impl AsRef<std::path::Path>) -> Result<bool, ErrorException> {
