@@ -15,10 +15,9 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, preg_split,
-    version_compare,
+    CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, preg_match2,
+    preg_replace, preg_split, version_compare,
 };
 
 #[derive(Debug)]
@@ -354,8 +353,8 @@ impl VcsDownloader for SvnDownloader {
         to_reference: &str,
         path: &str,
     ) -> anyhow::Result<String> {
-        if Preg::is_match(php_regex!(r"{@(\d+)$}"), from_reference)
-            && Preg::is_match(php_regex!(r"{@(\d+)$}"), to_reference)
+        if preg_match2(php_regex!(r"{@(\d+)$}"), from_reference, 0).is_some()
+            && preg_match2(php_regex!(r"{@(\d+)$}"), to_reference, 0).is_some()
         {
             // retrieve the svn base url from the checkout folder
             let command = vec![
@@ -383,7 +382,7 @@ impl VcsDownloader for SvnDownloader {
             }
 
             let url_pattern = "#<url>(.*)</url>#";
-            let base_url = if let Some(matches) = Preg::match3(url_pattern, &output) {
+            let base_url = if let Some(matches) = preg_match2(url_pattern, &output, 0) {
                 matches.get(1).unwrap_or_default().to_string()
             } else {
                 return Err(RuntimeException::new(format!(
@@ -394,8 +393,8 @@ impl VcsDownloader for SvnDownloader {
             };
 
             // strip paths from references and only keep the actual revision
-            let from_revision = Preg::replace(php_regex!(r"{.*@(\d+)$}"), "$1", from_reference);
-            let to_revision = Preg::replace(php_regex!(r"{.*@(\d+)$}"), "$1", to_reference);
+            let from_revision = preg_replace(php_regex!(r"{.*@(\d+)$}"), "$1", from_reference);
+            let to_revision = preg_replace(php_regex!(r"{.*@(\d+)$}"), "$1", to_reference);
 
             let command = vec![
                 "svn".to_string(),
@@ -453,11 +452,13 @@ impl ChangeReportInterface for SvnDownloader {
             Some(path),
         );
 
-        Ok(if Preg::is_match(php_regex!("{^ *[^X ] +}m"), &output) {
-            Some(output)
-        } else {
-            None
-        })
+        Ok(
+            if preg_match2(php_regex!("{^ *[^X ] +}m"), &output, 0).is_some() {
+                Some(output)
+            } else {
+                None
+            },
+        )
     }
 }
 

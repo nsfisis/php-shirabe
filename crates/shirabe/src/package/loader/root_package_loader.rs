@@ -15,9 +15,9 @@ use crate::repository::RepositoryManager;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, php_regex, preg_split, strtolower,
+    PhpMixed, RuntimeException, UnexpectedValueException, php_regex, preg_match2, preg_replace,
+    preg_split, strtolower,
 };
 
 #[derive(Debug)]
@@ -252,9 +252,10 @@ impl RootPackageLoader {
         mut aliases: Vec<IndexMap<String, String>>,
     ) -> Vec<IndexMap<String, String>> {
         for (req_name, req_version) in requires {
-            if let Some(m) = Preg::is_match3(
+            if let Some(m) = preg_match2(
                 php_regex!(r"{(?:^|\| *|, *)([^,\s#|]+)(?:#[^ ]+)? +as +([^,\s|]+)(?:$| *\|| *,)}"),
                 req_version,
+                0,
             ) {
                 let m1 = m.get(1).unwrap_or_default().to_string();
                 let m2 = m.get(2).unwrap_or_default().to_string();
@@ -316,7 +317,7 @@ impl RootPackageLoader {
 
             let mut matched = false;
             for constraint in &constraints {
-                if let Some(m) = Preg::is_match3(&pattern, constraint) {
+                if let Some(m) = preg_match2(&pattern, constraint, 0) {
                     let name = strtolower(req_name);
                     let m1 = m.get(1).unwrap_or_default().to_string();
                     let normalized_m1 = VersionParser::normalize_stability(&m1).unwrap_or_default();
@@ -336,8 +337,8 @@ impl RootPackageLoader {
 
             for constraint in &constraints {
                 let req_version_stripped =
-                    Preg::replace(php_regex!(r"{^([^,\s@]+) as .+$}"), "$1", constraint);
-                if Preg::is_match(php_regex!(r"{^[^,\s@]+$}"), &req_version_stripped) {
+                    preg_replace(php_regex!(r"{^([^,\s@]+) as .+$}"), "$1", constraint);
+                if preg_match2(php_regex!(r"{^[^,\s@]+$}"), &req_version_stripped, 0).is_some() {
                     let stability_name = VersionParser::parse_stability(&req_version_stripped);
                     if stability_name != "stable" {
                         let name = strtolower(req_name);
@@ -361,8 +362,8 @@ impl RootPackageLoader {
         mut references: IndexMap<String, String>,
     ) -> IndexMap<String, String> {
         for (req_name, req_version) in requires {
-            let req_version = Preg::replace(php_regex!(r"{^([^,\s@]+) as .+$}"), "$1", req_version);
-            if let Some(m) = Preg::is_match3(php_regex!(r"{^[^,\s@]+?#([a-f0-9]+)$}"), &req_version)
+            let req_version = preg_replace(php_regex!(r"{^([^,\s@]+) as .+$}"), "$1", req_version);
+            if let Some(m) = preg_match2(php_regex!(r"{^[^,\s@]+?#([a-f0-9]+)$}"), &req_version, 0)
                 && VersionParser::parse_stability(&req_version) == "dev"
             {
                 let name = strtolower(req_name);

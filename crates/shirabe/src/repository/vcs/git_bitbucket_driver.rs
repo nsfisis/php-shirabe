@@ -15,11 +15,11 @@ use crate::util::Bitbucket;
 use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
-    array_search_mixed, extension_loaded, http_build_query, implode, is_array, php_regex, strpos,
+    array_search_mixed, extension_loaded, http_build_query, implode, is_array, php_regex,
+    preg_match2, preg_replace, strpos,
 };
 
 #[derive(Debug)]
@@ -84,9 +84,10 @@ impl GitBitbucketDriver {
 
     /// @inheritDoc
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        let Some(m) = Preg::is_match3(
+        let Some(m) = preg_match2(
             php_regex!(r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i"),
             &self.inner.url,
+            0,
         ) else {
             return Err(InvalidArgumentException::new(format!(
                 "The Bitbucket repository URL {} is invalid. It must be the HTTPS URL of a Bitbucket repository.",
@@ -739,7 +740,7 @@ impl GitBitbucketDriver {
             {
                 // Format: https://(user@)bitbucket.org/{user}/{repo}
                 // Strip username from URL (only present in clone URL's for private repositories)
-                self.clone_https_url = Preg::replace(
+                self.clone_https_url = preg_replace(
                     php_regex!(r"/https:\/\/([^@]+@)?/"),
                     "https://",
                     m.get("href").and_then(|v| v.as_string()).unwrap_or(""),
@@ -797,10 +798,13 @@ impl GitBitbucketDriver {
         url: &str,
         _deep: bool,
     ) -> anyhow::Result<bool> {
-        if !Preg::is_match(
+        if preg_match2(
             php_regex!(r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(\.git|/?)?$#i"),
             url,
-        ) {
+            0,
+        )
+        .is_none()
+        {
             return Ok(false);
         }
 

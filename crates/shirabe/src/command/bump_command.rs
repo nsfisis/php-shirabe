@@ -16,10 +16,9 @@ use crate::package::version::VersionBumper;
 use crate::repository::PlatformRepository;
 use crate::util::Filesystem;
 use crate::util::Silencer;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, file_get_contents, file_put_contents, impl_php_class, is_writable, php_regex,
-    strtolower,
+    preg_match2, preg_replace, strtolower,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -177,7 +176,7 @@ impl BumpCommand {
         let packages_filter = if !packages_filter.is_empty() {
             let packages_filter: Vec<String> = packages_filter
                 .iter()
-                .map(|constraint| Preg::replace(php_regex!(r"{[:= ].+}"), "", constraint))
+                .map(|constraint| preg_replace(php_regex!(r"{[:= ].+}"), "", constraint))
                 .collect();
             let unique_lower: Vec<String> = packages_filter
                 .iter()
@@ -187,7 +186,7 @@ impl BumpCommand {
                 .collect();
             let pattern = base_package::package_names_to_regexp(&unique_lower, "{^(?:%s)$}iD");
             for (key, reqs) in tasks.iter_mut() {
-                reqs.retain(|pkg_name, _| Preg::is_match(&pattern, pkg_name));
+                reqs.retain(|pkg_name, _| preg_match2(&pattern, pkg_name, 0).is_some());
             }
             packages_filter
         } else {

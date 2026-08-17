@@ -13,14 +13,14 @@ use crate::util::Url;
 use crate::util::http::ProxyManager;
 use crate::util::http::Response;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS,
     STREAM_NOTIFY_PROGRESS, array_replace_recursive, base64_encode, explode, extension_loaded,
     file_get_contents, file_get_contents5, file_put_contents, filter_var_boolean, gethostbyname,
     http_clear_last_response_headers, http_get_last_response_headers, ini_get, json_decode_assoc,
-    parse_url, php_regex, preg_quote, strpos, strtolower, strtr, substr, trim, zlib_decode,
+    parse_url, php_regex, preg_match2, preg_quote, preg_replace, strpos, strtolower, strtr, substr,
+    trim, zlib_decode,
 };
 
 /// Result of `RemoteFilesystem::get` — string content, `true` (for copy), or `false`.
@@ -148,7 +148,7 @@ impl RemoteFilesystem {
     pub fn find_status_code(headers: &[String]) -> Option<i64> {
         let mut value: Option<i64> = None;
         for header in headers {
-            if let Some(m) = Preg::is_match3(php_regex!("{^HTTP/\\S+ (\\d+)}i"), header) {
+            if let Some(m) = preg_match2(php_regex!("{^HTTP/\\S+ (\\d+)}i"), header, 0) {
                 value = m.get(1).and_then(|s| s.parse().ok()).or(Some(0));
             }
         }
@@ -159,7 +159,7 @@ impl RemoteFilesystem {
     pub fn find_status_message(&self, headers: &[String]) -> Option<String> {
         let mut value: Option<String> = None;
         for header in headers {
-            if Preg::is_match(php_regex!("{^HTTP/\\S+ \\d+}i"), header) {
+            if preg_match2(php_regex!("{^HTTP/\\S+ \\d+}i"), header, 0).is_some() {
                 value = Some(header.clone());
             }
         }
@@ -285,10 +285,13 @@ impl RemoteFilesystem {
             crate::io::DEBUG,
         );
 
-        if (!Preg::is_match(
+        if (preg_match2(
             php_regex!("{^http://(repo\\.)?packagist\\.org/p/}"),
             &file_url,
-        ) || (strpos(&file_url, "$").is_none() && strpos(&file_url, "%24").is_none()))
+            0,
+        )
+        .is_none()
+            || (strpos(&file_url, "$").is_none() && strpos(&file_url, "%24").is_none()))
             && !degraded_packagist
         {
             let _ = self.config.borrow_mut().prohibit_url_by_config(
@@ -472,10 +475,12 @@ impl RemoteFilesystem {
                     None,
                 ) != ".zip")
             && content_type.is_some()
-            && Preg::is_match(
+            && preg_match2(
                 php_regex!("{^text/html\\b}i"),
                 content_type.as_deref().unwrap_or(""),
-            );
+                0,
+            )
+            .is_some();
         if bitbucket_login_match {
             result = None;
             if retry_auth_failure {
@@ -941,7 +946,7 @@ impl RemoteFilesystem {
                     .and_then(|parsed| parsed.host)
                     .unwrap_or_default();
 
-                target_url = Some(Preg::replace(
+                target_url = Some(preg_replace(
                     format!(
                         "{{^(.+(?://|@){}(?::\\d+)?)(?:[/\\?].*)?$}}",
                         preg_quote(&url_host, None)
@@ -950,7 +955,7 @@ impl RemoteFilesystem {
                     &self.file_url,
                 ));
             } else {
-                target_url = Some(Preg::replace(
+                target_url = Some(preg_replace(
                     php_regex!("{^(.+/)[^/?]*(?:\\?.*)?$}"),
                     &format!("\\1{}", location_header),
                     &self.file_url,

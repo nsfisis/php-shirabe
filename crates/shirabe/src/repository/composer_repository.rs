@@ -37,14 +37,13 @@ use futures::StreamExt;
 use futures::stream::FuturesOrdered;
 use indexmap::IndexMap;
 use shirabe_metadata_minifier::MetadataMinifier;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
     RuntimeException, UnexpectedValueException, extension_loaded, hash, http_build_query_mixed,
     json_decode_assoc, parse_url, php_regex, preg_split, realpath, strtolower, strtr, urlencode,
     var_export,
 };
+use shirabe_php_shim::{Catch as _, preg_grep, preg_match2, preg_replace};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
@@ -162,7 +161,7 @@ impl ComposerRepository {
             .and_then(|v| v.as_string())
             .unwrap_or("")
             .to_string();
-        if !Preg::is_match(php_regex!(r"{^[\w.]+\??://}"), &url_str) {
+        if preg_match2(php_regex!(r"{^[\w.]+\??://}"), &url_str, 0).is_none() {
             if let Some(local_file_path) = realpath(&url_str) {
                 // it is a local path, add file scheme
                 repo_config.insert(
@@ -245,9 +244,10 @@ impl ComposerRepository {
             .to_string();
 
         // force url for packagist.org to repo.packagist.org
-        if let Some(match_packagist) = Preg::is_match3(
+        if let Some(match_packagist) = preg_match2(
             php_regex!(r"{^(?P<proto>https?)://packagist\.org/?$}i"),
             &url,
+            0,
         ) {
             let proto = match_packagist
                 .name("proto")
@@ -257,14 +257,14 @@ impl ComposerRepository {
         }
 
         let base_url_trimmed =
-            Preg::replace(php_regex!(r"{(?:/[^/\\]+\.json)?(?:[?#].*)?$}"), "", &url);
+            preg_replace(php_regex!(r"{(?:/[^/\\]+\.json)?(?:[?#].*)?$}"), "", &url);
         let base_url = base_url_trimmed.trim_end_matches('/').to_string();
         assert!(!base_url.is_empty());
 
         let cache_dir = format!(
             "{}/{}",
             config.get("cache-repo-dir").as_string().unwrap_or(""),
-            Preg::replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.clone())),
+            preg_replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.clone())),
         );
         let cache = Cache::new(io.clone(), &cache_dir, Some("a-z0-9.$~"), None, false);
         let version_parser = VersionParser::new();
@@ -429,7 +429,7 @@ impl ComposerRepository {
         };
         let filter_results = |results: Vec<String>| -> anyhow::Result<Vec<String>> {
             match &package_filter_regex {
-                Some(regex) => Ok(Preg::grep(regex, results).collect()),
+                Some(regex) => Ok(preg_grep(regex, results).collect()),
                 None => Ok(results),
             }
         };
@@ -767,7 +767,7 @@ impl ComposerRepository {
             let regex = format!("{{(?:{})}}i", parts.join("|"));
 
             let vendor_names = self.get_vendor_names()?;
-            for name in Preg::grep(&regex, vendor_names) {
+            for name in preg_grep(&regex, vendor_names) {
                 let mut entry = IndexMap::new();
                 entry.insert("name".to_string(), PhpMixed::String(name));
                 entry.insert("description".to_string(), PhpMixed::String(String::new()));
@@ -779,9 +779,10 @@ impl ComposerRepository {
 
         if self.has_providers()? || self.lazy_providers_url.is_some() {
             // optimize search for "^foo/bar" where at least "^foo/" is present by loading this directly from the listUrl if present
-            if let Some(match_groups) = Preg::is_match3(
+            if let Some(match_groups) = preg_match2(
                 php_regex!(r"{^\^(?P<query>(?P<vendor>[a-z0-9_.-]+)/[a-z0-9_.-]*)\*?$}i"),
                 &query,
+                0,
             ) && let Some(list_url) = self.list_url.as_ref()
             {
                 let q = match_groups.name("query").unwrap_or_default().to_string();
@@ -823,7 +824,7 @@ impl ComposerRepository {
             let regex = format!("{{(?:{})}}i", parts.join("|"));
 
             let package_names = self.get_package_names(None)?;
-            for name in Preg::grep(&regex, package_names) {
+            for name in preg_grep(&regex, package_names) {
                 let mut entry = IndexMap::new();
                 entry.insert("name".to_string(), PhpMixed::String(name));
                 entry.insert("description".to_string(), PhpMixed::String(String::new()));
@@ -1735,7 +1736,7 @@ impl ComposerRepository {
             .into_iter()
             .filter_map(|(name, constraint)| {
                 let name = strtolower(&name);
-                let real_name = Preg::replace(php_regex!(r"{~dev$}"), "", &name);
+                let real_name = preg_replace(php_regex!(r"{~dev$}"), "", &name);
                 // skip platform packages, root package and composer-plugin-api
                 if PlatformRepository::is_platform_package(&real_name) || real_name == "__root__" {
                     None
@@ -2420,7 +2421,7 @@ impl ComposerRepository {
         }
 
         if url.starts_with('/') {
-            if let Some(matches) = Preg::is_match3(php_regex!(r"{^[^:]++://[^/]*+}"), &self.url) {
+            if let Some(matches) = preg_match2(php_regex!(r"{^[^:]++://[^/]*+}"), &self.url, 0) {
                 return Ok(format!("{}{}", matches.get(0).unwrap_or_default(), url));
             }
 
@@ -2709,7 +2710,7 @@ impl ComposerRepository {
         // url-encode $ signs in URLs as bad proxies choke on them
         if let Some(pos) = filename.find('$')
             && pos > 0
-            && Preg::is_match(php_regex!(r"{^https?://}i"), &filename)
+            && preg_match2(php_regex!(r"{^https?://}i"), &filename, 0).is_some()
         {
             filename = format!("{}%24{}", &filename[..pos], &filename[pos + 1..]);
         }
@@ -3308,7 +3309,7 @@ impl ComposerRepository {
 
         if let Some(ref patterns) = self.available_package_patterns {
             for provider_regex in patterns.iter() {
-                if Preg::is_match(provider_regex, name) {
+                if preg_match2(provider_regex, name, 0).is_some() {
                     return Ok(true);
                 }
             }

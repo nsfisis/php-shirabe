@@ -19,12 +19,11 @@ use crate::repository::RepositorySet;
 use crate::repository::{RepositoryInterface, SearchResult};
 use crate::util::Filesystem;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
     array_slice, asort, explode, file_get_contents, implode, in_array_strict, is_array, is_file,
-    is_numeric, json_decode_assoc, levenshtein, php_regex, strlen, strpos, trim,
+    is_numeric, json_decode_assoc, levenshtein, php_regex, preg_match2, strlen, strpos, trim,
 };
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -144,10 +143,12 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
             for mut requirement in requires_norm {
                 if requirement.contains_key("version")
-                    && Preg::is_match(
+                    && preg_match2(
                         php_regex!(r"{^\d+(\.\d+)?$}"),
                         requirement.get("version").map(|s| s.as_str()).unwrap_or(""),
+                        0,
                     )
+                    .is_some()
                 {
                     io.write_error3(
                         &format!(
@@ -330,9 +331,10 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                 }
                             }
 
-                            if let Some(m) = Preg::is_match3(
+                            if let Some(m) = preg_match2(
                                 php_regex!(r"{^\s*(?P<name>[\S/]+)(?:\s+(?P<version>\S+))?\s*$}"),
                                 &selection,
+                                0,
                             ) {
                                 if let Some(v) = m.name("version").map(str::to_string) {
                                     // parsing `acme/example ~2.3`

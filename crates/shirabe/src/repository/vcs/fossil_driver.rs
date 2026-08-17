@@ -11,10 +11,10 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable, php_regex,
+    PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable, php_regex, preg_match2,
+    preg_replace,
 };
 
 #[derive(Debug)]
@@ -82,7 +82,7 @@ impl FossilDriver {
                 .into());
             }
 
-            let local_name = Preg::replace(php_regex!(r"{[^a-z0-9]}i"), "-", &self.inner.url);
+            let local_name = preg_replace(php_regex!(r"{[^a-z0-9]}i"), "-", &self.inner.url);
             self.repo_file = Some(format!("{}/{}.fossil", cache_repo_dir, local_name));
             self.checkout_dir = format!("{}/{}/", cache_vcs_dir, local_name);
 
@@ -286,7 +286,7 @@ impl FossilDriver {
                 Some(&self.checkout_dir),
             );
             for branch in self.inner.process.borrow().split_lines(&output) {
-                let branch = Preg::replace(php_regex!(r"/^\*/"), "", branch.trim());
+                let branch = preg_replace(php_regex!(r"/^\*/"), "", branch.trim());
                 let branch = branch.trim().to_string();
                 branches.insert(branch.clone(), branch);
             }
@@ -301,14 +301,17 @@ impl FossilDriver {
         url: &str,
         deep: bool,
     ) -> anyhow::Result<bool> {
-        if Preg::is_match(
+        if preg_match2(
             php_regex!(r"#(^(?:https?|ssh)://(?:[^@]@)?(?:chiselapp\.com|fossil\.))#i"),
             url,
-        ) {
+            0,
+        )
+        .is_some()
+        {
             return Ok(true);
         }
 
-        if Preg::is_match(php_regex!(r"!/fossil/|\.fossil!"), url) {
+        if preg_match2(php_regex!(r"!/fossil/|\.fossil!"), url, 0).is_some() {
             return Ok(true);
         }
 

@@ -3,11 +3,11 @@
 use crate::class_map::ClassMap;
 use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, explode,
-    getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_quote, realpath, str_replace,
-    stream_get_wrappers, strlen, strpos, strrpos, strtr, substr,
+    getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_match2, preg_quote, preg_replace,
+    preg_replace_callback, realpath, str_replace, stream_get_wrappers, strlen, strpos, strrpos,
+    strtr, substr,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::PathBuf;
@@ -134,7 +134,8 @@ impl ClassMapGenerator {
                 continue;
             }
 
-            let is_stream_wrapper_path = Preg::is_match(&self.stream_wrappers_regex, &file_path);
+            let is_stream_wrapper_path =
+                preg_match2(&self.stream_wrappers_regex, &file_path, 0).is_some();
             if !Self::is_absolute_path(&file_path) && !is_stream_wrapper_path {
                 file_path = format!("{}/{}", cwd, file_path);
                 file_path = Self::normalize_path(&file_path);
@@ -146,7 +147,7 @@ impl ClassMapGenerator {
                 // optional leading group `(^|[^:])` that is re-emitted in the replacement. Slash runs
                 // are always separated by path-segment characters, so consuming the single preceding
                 // char never prevents an adjacent run from matching.
-                file_path = Preg::replace(php_regex!(r"{(^|[^:])[\\/]{2,}}"), "${1}/", &file_path);
+                file_path = preg_replace(php_regex!(r"{(^|[^:])[\\/]{2,}}"), "${1}/", &file_path);
             }
 
             if file_path.is_empty() {
@@ -182,11 +183,11 @@ impl ClassMapGenerator {
 
             // check the realpath of the file against the excluded paths as the path might be a symlink and the excluded path is realpath'd so symlink are resolved
             if let Some(ref excluded) = excluded {
-                if Preg::is_match(excluded, &strtr(&real_path, "\\", "/")) {
+                if preg_match2(excluded, &strtr(&real_path, "\\", "/"), 0).is_some() {
                     continue;
                 }
                 // check non-realpath of file for directories symlink in project dir
-                if Preg::is_match(excluded, &strtr(&file_path, "\\", "/")) {
+                if preg_match2(excluded, &strtr(&file_path, "\\", "/"), 0).is_some() {
                     continue;
                 }
             }
@@ -297,12 +298,12 @@ impl ClassMapGenerator {
                 None => cwd_str,
             };
             let cwd = Self::normalize_path(&cwd);
-            let short_path = Preg::replace(
+            let short_path = preg_replace(
                 format!("{{^{}}}", preg_quote(&cwd, None)),
                 ".",
                 &Self::normalize_path(file_path),
             );
-            let short_base_path = Preg::replace(
+            let short_base_path = preg_replace(
                 format!("{{^{}}}", preg_quote(&cwd, None)),
                 ".",
                 &Self::normalize_path(base_path),
@@ -347,9 +348,10 @@ impl ClassMapGenerator {
         }
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
-        if let Some(r#match) = Preg::is_match3(
+        if let Some(r#match) = preg_match2(
             php_regex!(r"{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
             &path,
+            0,
         ) {
             prefix = r#match.get(1).unwrap_or_default().to_string();
             path = substr(&path, strlen(&prefix), None);
@@ -372,11 +374,12 @@ impl ClassMapGenerator {
         }
 
         // ensure c: is normalized to C:
-        let prefix = Preg::replace_callback(
+        let prefix = preg_replace_callback(
             php_regex!(r"{(?:^|://)[a-z]:$}i"),
-            |m| m.get(0).unwrap_or_default().to_string().to_uppercase(),
+            |m| Ok(m.get(0).unwrap_or_default().to_string().to_uppercase()),
             &prefix,
-        );
+        )
+        .expect("the replacement callback cannot fail");
 
         format!("{}{}{}", prefix, absolute, parts.join("/"))
     }

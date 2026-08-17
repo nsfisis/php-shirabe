@@ -27,10 +27,10 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpClass, PhpMixed, php_regex, str_replace, strpos,
+    InvalidArgumentException, PhpClass, PhpMixed, php_regex, preg_match2, preg_replace,
+    str_replace, strpos,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -479,7 +479,7 @@ impl VcsRepository {
                 // make sure tag packages have no -dev flag
                 data.insert(
                     "version".to_string(),
-                    PhpMixed::String(Preg::replace(
+                    PhpMixed::String(preg_replace(
                         php_regex!(r"{[.-]?dev$}i"),
                         "",
                         data.get("version")
@@ -489,7 +489,7 @@ impl VcsRepository {
                 );
                 data.insert(
                     "version_normalized".to_string(),
-                    PhpMixed::String(Preg::replace(
+                    PhpMixed::String(preg_replace(
                         php_regex!(r"{(^dev-|[.-]?dev$)}i"),
                         "",
                         data.get("version_normalized")
@@ -510,7 +510,9 @@ impl VcsRepository {
                 // broken package, version doesn't match tag
                 if version_normalized != parsed_tag {
                     if is_very_verbose {
-                        if Preg::is_match(php_regex!(r"{(^dev-|[.-]?dev$)}i"), &parsed_tag) {
+                        if preg_match2(php_regex!(r"{(^dev-|[.-]?dev$)}i"), &parsed_tag, 0)
+                            .is_some()
+                        {
                             self.io.write_error(&format!(
                                 "<warning>Skipped tag {}, invalid tag name, tags can not use dev prefixes or suffixes</warning>",
                                 tag
@@ -678,7 +680,7 @@ impl VcsRepository {
                 version = format!(
                     "{}{}",
                     prefix,
-                    Preg::replace(r"{(\.9{7})+}", ".x", &parsed_branch)
+                    preg_replace(r"{(\.9{7})+}", ".x", &parsed_branch)
                 );
             }
 

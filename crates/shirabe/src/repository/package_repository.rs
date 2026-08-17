@@ -15,8 +15,7 @@ use crate::repository::{
     RepositoryInterface, SearchResult, SecurityAdvisoryResult,
 };
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::{PhpMixed, RuntimeException, php_regex, var_export};
+use shirabe_php_shim::{PhpMixed, RuntimeException, php_regex, preg_replace, var_export};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -85,7 +84,7 @@ impl PackageRepository {
         // PHP: parent::getRepoName() counts through the late-bound $this->initialize(),
         // which resolves to PackageRepository::initialize (loading the config packages).
         self.ensure_initialized()?;
-        Ok(Preg::replace(
+        Ok(preg_replace(
             php_regex!(r"{^array }"),
             "package ",
             &self.inner.get_repo_name()?,

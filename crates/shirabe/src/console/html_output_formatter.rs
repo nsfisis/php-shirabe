@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Console/HtmlOutputFormatter.php
 
 use indexmap::IndexMap;
-use shirabe_pcre::{Preg, PregMatches};
+use shirabe_php_shim::{PregMatches, preg_replace_callback};
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::formatter::OutputFormatterInterface;
 use shirabe_symfony_console::formatter::OutputFormatterStyleInterface;
@@ -65,11 +65,14 @@ impl HtmlOutputFormatter {
             clear_escape_codes, clear_escape_codes
         );
 
-        Ok(Some(Preg::replace_callback(
-            &pattern,
-            |matches| self.format_html(matches),
-            &formatted,
-        )))
+        Ok(Some(
+            preg_replace_callback(
+                &pattern,
+                |matches| Ok(self.format_html(matches)),
+                &formatted,
+            )
+            .expect("the replacement callback cannot fail"),
+        ))
     }
 
     fn format_html(&self, matches: &PregMatches) -> String {

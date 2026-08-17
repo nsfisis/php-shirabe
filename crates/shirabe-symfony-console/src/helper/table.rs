@@ -8,8 +8,7 @@ use crate::helper::{
 };
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_pcre::preg::Preg;
-use shirabe_php_shim::{PhpMixed, php_regex};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_match2};
 
 /// A single cell within a table row.
 ///
@@ -656,10 +655,12 @@ impl Table {
         let mut cell_format = cell_format;
         let mut pad_type = style.get_pad_type();
         if cell.is_table_cell() && cell.style().is_some() {
-            let is_not_styled_by_tag = !Preg::is_match(
+            let is_not_styled_by_tag = preg_match2(
                 php_regex!("/^<(\\w+|(\\w+=[\\w,]+;?)*)>.+<\\/(\\w+|(\\w+=\\w+;?)*)?>$/"),
                 &cell_str,
-            );
+                0,
+            )
+            .is_none();
             if is_not_styled_by_tag {
                 let cell_style = cell.style().unwrap();
                 match cell_style.get_cell_format() {

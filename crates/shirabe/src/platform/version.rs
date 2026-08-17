@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Platform/Version.php
 
-use shirabe_pcre::Preg;
-use shirabe_php_shim::{CmpOp, php_regex, version_compare};
+use shirabe_php_shim::{CmpOp, php_regex, preg_match2, version_compare};
 
 pub struct Version;
 
@@ -9,11 +8,12 @@ impl Version {
     pub fn parse_openssl(openssl_version: &str, is_fips: &mut bool) -> Option<String> {
         *is_fips = false;
 
-        let matches = Preg::match3(
+        let matches = preg_match2(
             php_regex!(
                 r"/^(?P<version>[0-9.]+)(?P<patch>[a-z]{0,2})(?P<suffix>(?:-?(?:dev|pre|alpha|beta|rc|fips)[\d]*)*)(?:-\w+)?(?: \(.+?\))?$/"
             ),
             openssl_version,
+            0,
         )?;
 
         let version = matches.name("version").unwrap_or_default().to_string();
@@ -42,9 +42,10 @@ impl Version {
     }
 
     pub fn parse_libjpeg(libjpeg_version: &str) -> Option<String> {
-        let matches = Preg::match3(
+        let matches = preg_match2(
             php_regex!(r"/^(?P<major>\d+)(?P<minor>[a-z]*)$/"),
             libjpeg_version,
+            0,
         )?;
 
         let major = matches.name("major").unwrap_or_default().to_string();
@@ -57,9 +58,10 @@ impl Version {
     }
 
     pub fn parse_zoneinfo_version(zoneinfo_version: &str) -> Option<String> {
-        let matches = Preg::match3(
+        let matches = preg_match2(
             php_regex!(r"/^(?P<year>\d{4})(?P<revision>[a-z]*)$/"),
             zoneinfo_version,
+            0,
         )?;
 
         let year = matches.name("year").unwrap_or_default().to_string();

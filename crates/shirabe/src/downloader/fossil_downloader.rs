@@ -12,8 +12,9 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class, php_regex, preg_split};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, impl_php_class, php_regex, preg_match2, preg_split,
+};
 
 #[derive(Debug)]
 pub struct FossilDownloader {
@@ -227,7 +228,7 @@ impl VcsDownloader for FossilDownloader {
         };
 
         for line in lines {
-            if Preg::is_match(&match_pattern, &line) {
+            if preg_match2(&match_pattern, &line, 0).is_some() {
                 break;
             }
             log.push_str(&line);

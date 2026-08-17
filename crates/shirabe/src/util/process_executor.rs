@@ -7,13 +7,12 @@ use crate::signal::SignalSubscription;
 use crate::util::GitHub;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_pcre::{Preg, PregMatches};
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    LogicException, PHP_EOL, PhpMixed, RuntimeException, array_intersect, array_map,
+    LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect, array_map,
     escapeshellarg, explode, implode, in_array_strict, is_array, is_dir, is_numeric, is_string,
-    php_regex, preg_split, rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array,
-    substr_replace, trim,
+    php_regex, preg_match2, preg_replace, preg_replace_callback, preg_replace2, preg_split, rtrim,
+    str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use shirabe_symfony_process::Process;
@@ -217,7 +216,7 @@ impl ProcessExecutor {
         if is_string(&command) {
             let mut command_str = command.as_string().unwrap_or("").to_string();
             if Platform::is_windows()
-                && let Some(m) = Preg::is_match3(php_regex!(r"{^([^:/\\]++) }"), &command_str)
+                && let Some(m) = preg_match2(php_regex!(r"{^([^:/\\]++) }"), &command_str, 0)
             {
                 let m1 = m.get(1).unwrap_or_default().to_string();
                 command_str = substr_replace(
@@ -829,25 +828,31 @@ impl ProcessExecutor {
         } else {
             String::new()
         };
-        let safe_command = Preg::replace_callback(
+        let safe_command = preg_replace_callback(
             php_regex!(r"{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i"),
-            |m: &PregMatches| -> String {
+            |m: &PregMatches| -> anyhow::Result<String> {
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
-                if Preg::is_match(
+                if preg_match2(
                     GitHub::GITHUB_TOKEN_REGEX,
                     m.name("user").unwrap_or_default(),
-                ) {
-                    return "://***:***@".to_string();
+                    0,
+                )
+                .is_some()
+                {
+                    return Ok("://***:***@".to_string());
                 }
-                if Preg::is_match(r"{^[a-f0-9]{12,}$}", m.name("user").unwrap_or_default()) {
-                    return "://***:***@".to_string();
+                if preg_match2(r"{^[a-f0-9]{12,}$}", m.name("user").unwrap_or_default(), 0)
+                    .is_some()
+                {
+                    return Ok("://***:***@".to_string());
                 }
 
-                format!("://{}:***@", m.name("user").unwrap_or_default())
+                Ok(format!("://{}:***@", m.name("user").unwrap_or_default()))
             },
             &command_string,
-        );
-        let safe_command = Preg::replace(
+        )
+        .expect("the replacement callback cannot fail");
+        let safe_command = preg_replace(
             php_regex!(r"{--password (.*[^\\]') }"),
             "--password '***' ",
             &safe_command,
@@ -894,26 +899,27 @@ impl ProcessExecutor {
         let mut quote = strpbrk(&argument, " \t,").is_some();
         let mut dquotes: usize = 0;
         // PHP: Preg::replace('/(\\\\*)"/', '$1$1\\"', $argument, -1, $dquotes)
-        argument = Preg::replace5(
+        argument = preg_replace2(
             php_regex!(r#"/(\\*)"/"#),
             r#"$1$1\""#,
             &argument,
             -1,
-            &mut dquotes,
+            Some(&mut dquotes),
         );
-        let meta = dquotes > 0 || Preg::is_match(php_regex!(r"/%[^%]+%|![^!]+!/"), &argument);
+        let meta =
+            dquotes > 0 || preg_match2(php_regex!(r"/%[^%]+%|![^!]+!/"), &argument, 0).is_some();
 
         if !meta && !quote {
             quote = strpbrk(&argument, "^&|<>()").is_some();
         }
 
         if quote {
-            argument = format!("\"{}\"", Preg::replace(r"/(\\*)$/", "$1$1", &argument));
+            argument = format!("\"{}\"", preg_replace(r"/(\\*)$/", "$1$1", &argument));
         }
 
         if meta {
-            argument = Preg::replace(php_regex!(r#"/(["^&|<>()%])/"#), "^$1", &argument);
-            argument = Preg::replace(php_regex!(r"/(!)/"), "^^$1", &argument);
+            argument = preg_replace(php_regex!(r#"/(["^&|<>()%])/"#), "^$1", &argument);
+            argument = preg_replace(php_regex!(r"/(!)/"), "^^$1", &argument);
         }
 
         argument

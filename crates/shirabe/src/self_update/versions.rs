@@ -5,9 +5,8 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::util::HttpDownloader;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    InvalidArgumentException, PHP_EOL, PhpMixed, UnexpectedValueException, php_regex,
+    InvalidArgumentException, PHP_EOL, PhpMixed, UnexpectedValueException, php_regex, preg_match2,
 };
 
 pub struct Versions {
@@ -90,7 +89,7 @@ impl Versions {
         self.channel = Some(channel.clone());
 
         // rewrite '2' and '1' channels to stable for future self-updates, but LTS ones like '2.2' remain pinned
-        let stored_channel = if Preg::is_match(php_regex!(r"{^\d+$}D"), &channel) {
+        let stored_channel = if preg_match2(php_regex!(r"{^\d+$}D"), &channel, 0).is_some() {
             "stable".to_string()
         } else {
             channel

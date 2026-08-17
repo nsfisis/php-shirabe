@@ -42,8 +42,7 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_pcre::preg::Preg;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_split_delim_capture};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_match2, preg_replace, preg_split_delim_capture};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_symfony_console::command::Command as SymfonyCommand;
@@ -692,7 +691,7 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
                     return;
                 }
                 if let Some(url) = repo.get("url").and_then(|u| u.as_str())
-                    && Preg::is_match(php_regex!(r"{^file://[^/]}"), url)
+                    && preg_match2(php_regex!(r"{^file://[^/]}"), url, 0).is_some()
                 {
                     let new_url = format!("file://{}/{}", fixtures_str, &url[7..]);
                     repo["url"] = serde_json::Value::String(new_url);
@@ -1138,7 +1137,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         .unwrap();
 
     assert!(
-        Preg::is_match(r"{^(install|update)\b}", &case.run),
+        preg_match2(r"{^(install|update)\b}", &case.run, 0).is_some(),
         "The run command only supports install and update"
     );
 
@@ -1276,12 +1275,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     if let Some(expect_output) = expect_output
         && !expect_output.is_empty()
     {
-        let output = Preg::replace(
+        let output = preg_replace(
             php_regex!(r"{^    - .*?\.ini$}m"),
             "__inilist__",
             &output_string,
         );
-        let output = Preg::replace(
+        let output = preg_replace(
             php_regex!(r"{(__inilist__\r?\n)+}"),
             "__inilist__\n",
             &output,

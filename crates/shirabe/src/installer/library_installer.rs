@@ -12,10 +12,9 @@ use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, dirname, is_dir, is_link, preg_quote,
-    realpath, rmdir, rtrim, strpos,
+    preg_replace, realpath, rmdir, rtrim, strpos,
 };
 
 /// Package installation manager.
@@ -127,7 +126,7 @@ impl LibraryInstaller {
         if let Some(target_dir) = target_dir
             && !target_dir.is_empty()
         {
-            let replaced = Preg::replace(
+            let replaced = preg_replace(
                 format!(
                     "{{/*{}/?$}}",
                     preg_quote(&target_dir, None).replace('/', "/+")

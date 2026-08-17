@@ -6,11 +6,10 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, chdir, date_local, explode, fclose, feof, fgets,
-    file_get_contents, fopen, fwrite, gethostname, json_decode_assoc, php_regex, str_replace_array,
-    strcmp, strlen, strpos, strrpos, substr, time, trim,
+    file_get_contents, fopen, fwrite, gethostname, json_decode_assoc, php_regex, preg_replace,
+    str_replace_array, strcmp, strlen, strpos, strrpos, substr, time, trim,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use shirabe_symfony_process::Process;
@@ -660,7 +659,7 @@ impl Perforce {
             for line in &res_array {
                 let res_bits = explode(" ", line);
                 if res_bits.len() > 4 {
-                    let branch = Preg::replace(
+                    let branch = preg_replace(
                         php_regex!(r"/[^A-Za-z0-9 ]/"),
                         "",
                         &res_bits.get(4).cloned().unwrap_or_default(),

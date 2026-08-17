@@ -11,8 +11,7 @@ use crate::input::InputDefinition;
 use crate::input::InputOption;
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_pcre::preg::Preg;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, preg_replace};
 
 /// Markdown descriptor.
 ///
@@ -55,7 +54,7 @@ impl MarkdownDescriptor {
                 if !argument.get_description().is_empty() {
                     format!(
                         "{}\n\n",
-                        Preg::replace("/\\s*[\\r\\n]\\s*/", "\n", argument.get_description())
+                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", argument.get_description())
                     )
                 } else {
                     String::new()
@@ -93,7 +92,7 @@ impl MarkdownDescriptor {
                 if !option.get_description().is_empty() {
                     format!(
                         "{}\n\n",
-                        Preg::replace("/\\s*[\\r\\n]\\s*/", "\n", option.get_description())
+                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", option.get_description())
                     )
                 } else {
                     String::new()

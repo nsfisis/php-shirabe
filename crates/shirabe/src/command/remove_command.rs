@@ -17,8 +17,7 @@ use crate::json::JsonFile;
 use crate::package::base_package;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::{PhpMixed, UnexpectedValueException, impl_php_class, strtolower};
+use shirabe_php_shim::{PhpMixed, UnexpectedValueException, impl_php_class, preg_grep, strtolower};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::InvalidArgumentException;
 use shirabe_symfony_console::input::InputInterface;
@@ -393,7 +392,7 @@ impl Command for RemoveCommand {
                     .and_then(|v| v.as_array())
                     .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
-                let matches_in_type: Vec<&String> = Preg::grep(
+                let matches_in_type: Vec<&String> = preg_grep(
                     base_package::package_name_to_regexp(package),
                     type_keys.iter(),
                 )
@@ -405,7 +404,7 @@ impl Command for RemoveCommand {
                     .and_then(|v| v.as_array())
                     .map(|m| m.keys().cloned().collect())
                     .unwrap_or_default();
-                let matches_in_alt_type: Vec<&String> = Preg::grep(
+                let matches_in_alt_type: Vec<&String> = preg_grep(
                     base_package::package_name_to_regexp(package),
                     alt_type_keys.iter(),
                 )

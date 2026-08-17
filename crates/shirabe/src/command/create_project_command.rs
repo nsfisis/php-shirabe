@@ -37,12 +37,11 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException, array_pop,
     chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode, is_dir, is_file,
-    mkdir, realpath, rtrim, strtolower, unlink,
+    mkdir, preg_match2, realpath, rtrim, strtolower, unlink,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -526,7 +525,7 @@ impl CreateProjectCommand {
             if package_version.is_none() {
                 stability = Some("stable".to_string());
             } else {
-                let matched = Preg::is_match3(
+                let matched = preg_match2(
                     format!(
                         "{{^[^,\\s]*?@({})$}}i",
                         implode(
@@ -538,6 +537,7 @@ impl CreateProjectCommand {
                         )
                     ),
                     package_version.as_deref().unwrap_or(""),
+                    0,
                 );
                 if let Some(matched) = matched {
                     stability = Some(matched.get(1).unwrap_or_default().to_string());

@@ -17,11 +17,10 @@ use crate::package::loader::LoaderInterface;
 use crate::package::version::VersionParser;
 use chrono::Utc;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     AnyThrowable, E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, is_scalar, is_string,
-    json_encode, ltrim, php_regex, stripos, strpos, strtolower, strval, substr, trigger_error,
-    trim,
+    json_encode, ltrim, php_regex, preg_match2, preg_replace, stripos, strpos, strtolower, strval,
+    substr, trigger_error, trim,
 };
 
 #[derive(Debug)]
@@ -340,7 +339,7 @@ impl ArrayLoader {
             && !shirabe_php_shim::empty(time_value)
         {
             let time_str = time_value.as_string().unwrap_or("");
-            let time = if Preg::is_match(php_regex!(r"/^\d++$/D"), time_str) {
+            let time = if preg_match2(php_regex!(r"/^\d++$/D"), time_str, 0).is_some() {
                 format!("@{}", time_str)
             } else {
                 time_str.to_string()
@@ -510,7 +509,7 @@ impl ArrayLoader {
         if let Some(alias_normalized) = alias_normalized
             && !alias_normalized.is_empty()
         {
-            let pretty_alias = Preg::replace(php_regex!(r"{(\.9{7})+}"), ".x", &alias_normalized);
+            let pretty_alias = preg_replace(php_regex!(r"{(\.9{7})+}"), ".x", &alias_normalized);
 
             return Ok(match package {
                 CompleteOrRootPackage::Root(root) => RootAliasPackageHandle::new(
@@ -771,7 +770,7 @@ impl ArrayLoader {
             && default_branch_is_true
             && self
                 .version_parser
-                .parse_numeric_alias_prefix(&Preg::replace(php_regex!(r"{^v}"), "", &version_str))
+                .parse_numeric_alias_prefix(&preg_replace(php_regex!(r"{^v}"), "", &version_str))
                 .is_none()
         {
             return Ok(Some(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()));

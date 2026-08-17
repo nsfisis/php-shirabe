@@ -19,10 +19,9 @@ use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, array_flip_strings, array_map, in_array_strict, microtime,
-    number_format, round, strpos,
+    number_format, preg_match2, round, strpos,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::Intervals;
@@ -786,7 +785,7 @@ impl PoolBuilder {
     fn is_update_allowed(&self, package: PackageInterfaceHandle) -> bool {
         for pattern in &self.update_allow_list {
             let pattern_regexp = base_package::package_name_to_regexp(pattern);
-            if Preg::is_match3(&pattern_regexp, &package.get_name()).is_some() {
+            if preg_match2(&pattern_regexp, &package.get_name(), 0).is_some() {
                 return true;
             }
         }
@@ -813,13 +812,13 @@ impl PoolBuilder {
                 .borrow_mut()
                 .get_packages()?
             {
-                if Preg::is_match3(&pattern_regexp, &package.get_name()).is_some() {
+                if preg_match2(&pattern_regexp, &package.get_name(), 0).is_some() {
                     continue 'outer;
                 }
             }
             // update pattern matches a root require? => all good, probably a new package
             for (package_name, _constraint) in request.get_requires() {
-                if Preg::is_match3(&pattern_regexp, package_name).is_some() {
+                if preg_match2(&pattern_regexp, package_name, 0).is_some() {
                     if PlatformRepository::is_platform_package(package_name) {
                         matched_platform_package = true;
                         continue;

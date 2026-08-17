@@ -30,7 +30,6 @@ license of the package it is ported from:
 | [`shirabe-ca-bundle`](crates/shirabe-ca-bundle/LICENSE)                     | composer/ca-bundle                          |
 | [`shirabe-class-map-generator`](crates/shirabe-class-map-generator/LICENSE) | composer/class-map-generator                |
 | [`shirabe-metadata-minifier`](crates/shirabe-metadata-minifier/LICENSE)     | composer/metadata-minifier                  |
-| [`shirabe-pcre`](crates/shirabe-pcre/LICENSE)                               | composer/pcre                               |
 | [`shirabe-php-rpc`](crates/shirabe-php-rpc/LICENSE)                         | composer/xdebug-handler                     |
 | [`shirabe-seld-json-lint`](crates/shirabe-seld-json-lint/LICENSE)           | seld/jsonlint                               |
 | [`shirabe-seld-signal`](crates/shirabe-seld-signal/LICENSE)                 | seld/signal-handler                         |

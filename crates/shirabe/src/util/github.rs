@@ -8,9 +8,10 @@ use crate::io::io_interface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{PhpMixed, date_local, in_array_loose, php_regex, stripos, strtolower};
+use shirabe_php_shim::{
+    PhpMixed, date_local, in_array_loose, php_regex, preg_match2, stripos, strtolower,
+};
 
 #[derive(Debug)]
 pub struct GitHub {
@@ -325,7 +326,7 @@ impl GitHub {
             if stripos(header, "x-github-sso: required").is_none() {
                 continue;
             }
-            if let Some(caps) = Preg::match3(php_regex!(r"{\burl=(?P<url>[^\s;]+)}"), header) {
+            if let Some(caps) = preg_match2(php_regex!(r"{\burl=(?P<url>[^\s;]+)}"), header, 0) {
                 return caps.name("url").map(str::to_string);
             }
         }
@@ -335,7 +336,13 @@ impl GitHub {
 
     pub fn is_rate_limited(&self, headers: &[String]) -> bool {
         for header in headers {
-            if Preg::is_match(php_regex!(r"{^x-ratelimit-remaining: *0$}i"), header.trim()) {
+            if preg_match2(
+                php_regex!(r"{^x-ratelimit-remaining: *0$}i"),
+                header.trim(),
+                0,
+            )
+            .is_some()
+            {
                 return true;
             }
         }
@@ -345,7 +352,7 @@ impl GitHub {
 
     pub fn requires_sso(&self, headers: &[String]) -> bool {
         for header in headers {
-            if Preg::is_match(php_regex!(r"{^x-github-sso: required}i"), header.trim()) {
+            if preg_match2(php_regex!(r"{^x-github-sso: required}i"), header.trim(), 0).is_some() {
                 return true;
             }
         }

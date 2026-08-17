@@ -21,7 +21,6 @@ use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
     call_function_with_dispatcher, call_php_method, call_static_method,
@@ -30,9 +29,10 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, file_exists, get_class, hash, implode, ini_get, is_array,
-    is_callable, is_object, is_string, krsort, php_regex, preg_quote, realpath,
-    spl_autoload_functions, spl_autoload_register, spl_autoload_unregister, spl_object_hash,
-    str_replace, strlen, strpos, strtoupper, substr, trim,
+    is_callable, is_object, is_string, krsort, php_regex, preg_match2, preg_quote, preg_replace,
+    preg_replace_callback, realpath, spl_autoload_functions, spl_autoload_register,
+    spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos, strtoupper, substr,
+    trim,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::ExecutableFinder;
@@ -372,7 +372,7 @@ impl EventDispatcher {
             if let Callable::String(ref s) = callable
                 && s.contains("@no_additional_args")
             {
-                let replaced = Preg::replace(php_regex!("{ ?@no_additional_args}"), "", s);
+                let replaced = preg_replace(php_regex!("{ ?@no_additional_args}"), "", s);
                 callable = Callable::String(replaced);
                 additional_args = Vec::new();
             }
@@ -922,13 +922,16 @@ try {{
                             .get_binaries();
                         if !possible_local_binaries.is_empty() {
                             for local_exec in &possible_local_binaries {
-                                if Preg::is_match(
+                                if preg_match2(
                                     format!("{{\\b{}$}}", preg_quote(&callable_str, None)),
                                     local_exec,
-                                ) {
+                                    0,
+                                )
+                                .is_some()
+                                {
                                     let caller =
                                         BinaryInstaller::determine_binary_caller(local_exec);
-                                    exec = Preg::replace(
+                                    exec = preg_replace(
                                         format!("{{^{}}}", preg_quote(&callable_str, None)),
                                         &format!("{} {}", caller, local_exec),
                                         &exec,
@@ -954,16 +957,17 @@ try {{
                         if strpos(&exec, "@php ") == Some(0) {
                             let mut path_and_args = substr(&exec, 5, None);
                             if Platform::is_windows() {
-                                path_and_args = Preg::replace_callback(
+                                path_and_args = preg_replace_callback(
                                     php_regex!("{^\\S+}"),
-                                    |m| str_replace("/", "\\", m.get(0).unwrap()),
+                                    |m| Ok(str_replace("/", "\\", m.get(0).unwrap())),
                                     &path_and_args,
-                                );
+                                )
+                                .expect("the replacement callback cannot fail");
                             }
                             // match somename (not in quote, and not a qualified path) and if it is not a valid path from CWD then try to find it
                             // in $PATH. This allows support for `@php foo` where foo is a binary name found in PATH but not an actual relative path
                             if let Some(m) =
-                                Preg::is_match3(php_regex!("{^[^\\'\"\\s/\\\\]+}"), &path_and_args)
+                                preg_match2(php_regex!("{^[^\\'\"\\s/\\\\]+}"), &path_and_args, 0)
                             {
                                 let m0 = m.get(0).unwrap_or_default().to_string();
                                 if !file_exists(&m0) {
@@ -971,7 +975,7 @@ try {{
                                     if let Some(path_to_exec) = finder.find(&m0, None, &[]) {
                                         let mut path_to_exec = path_to_exec;
                                         if Platform::is_windows() {
-                                            let exec_without_ext = Preg::replace(
+                                            let exec_without_ext = preg_replace(
                                                 php_regex!("{\\.(exe|bat|cmd|com)$}i"),
                                                 "",
                                                 &path_to_exec,
@@ -998,11 +1002,12 @@ try {{
                             }
 
                             if Platform::is_windows() {
-                                exec = Preg::replace_callback(
+                                exec = preg_replace_callback(
                                     php_regex!("{^\\S+}"),
-                                    |m| str_replace("/", "\\", m.get(0).unwrap()),
+                                    |m| Ok(str_replace("/", "\\", m.get(0).unwrap())),
                                     &exec,
-                                );
+                                )
+                                .expect("the replacement callback cannot fail");
                             }
                         }
 

@@ -2,12 +2,12 @@
 
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
-use shirabe_pcre::{Preg, PregMatches};
 use shirabe_php_shim::{
-    PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, RuntimeException, defined, file_exists,
-    file_get_contents, fstat, function_exists, getcwd, getenv, ini_get, is_readable, mb_strlen,
-    php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid, posix_isatty, putenv,
-    putenv_clear, realpath, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
+    PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, defined,
+    file_exists, file_get_contents, fstat, function_exists, getcwd, getenv, ini_get, is_readable,
+    mb_strlen, php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid, posix_isatty,
+    preg_match2, preg_replace_callback, putenv, putenv_clear, realpath, stream_isatty, stripos,
+    strlen, strtoupper, substr, usleep,
 };
 use std::sync::Mutex;
 
@@ -83,7 +83,7 @@ impl Platform {
 
     /// Parses tildes and environment variables in paths.
     pub fn expand_path(path: &str) -> String {
-        if Preg::is_match(php_regex!(r"#^~[\\/]#"), path) {
+        if preg_match2(php_regex!(r"#^~[\\/]#"), path, 0).is_some() {
             return format!(
                 "{}{}",
                 Self::get_user_directory().unwrap(),
@@ -95,9 +95,9 @@ impl Platform {
         // The original pattern uses a conditional subpattern to make the trailing `%` required
         // only for the `%VAR%` form. The Rust regex crate does not support conditionals, so the
         // two forms are written as an explicit alternation: `$VAR` or `%VAR%`.
-        Preg::replace_callback(
+        preg_replace_callback(
             php_regex!(r"#^(?:\$(?P<dvar>\w+)|%(?P<pvar>\w+)%)(?P<path>.*)#"),
-            |matches: &PregMatches| -> String {
+            |matches: &PregMatches| -> anyhow::Result<String> {
                 let var = matches
                     .name("dvar")
                     .or_else(|| matches.name("pvar"))
@@ -108,24 +108,25 @@ impl Platform {
                     let home =
                         Platform::get_env("HOME").filter(|v| PhpMixed::String(v.clone()).to_bool());
                     if let Some(home) = home {
-                        return format!("{}{}", home, path_part);
+                        return Ok(format!("{}{}", home, path_part));
                     }
 
-                    return format!(
+                    return Ok(format!(
                         "{}{}",
                         Platform::get_env("USERPROFILE").unwrap_or_default(),
                         path_part,
-                    );
+                    ));
                 }
 
-                format!(
+                Ok(format!(
                     "{}{}",
                     Platform::get_env(var).unwrap_or_default(),
                     path_part,
-                )
+                ))
             },
             path,
         )
+        .expect("the replacement callback cannot fail")
     }
 
     /// @throws \RuntimeException If the user home could not reliably be determined

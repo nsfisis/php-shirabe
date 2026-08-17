@@ -5,8 +5,7 @@ use crate::dependency_resolver::Pool;
 use crate::dependency_resolver::Transaction;
 use crate::package::PackageInterfaceHandle;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::php_regex;
+use shirabe_php_shim::{PregMatches, php_regex, preg_match2, preg_replace_callback};
 
 #[derive(Debug)]
 pub struct LockTransaction {
@@ -159,12 +158,9 @@ impl LockTransaction {
 
             if package.get_dist_url().is_some()
                 && present_package.get_dist_reference().is_some()
-                && Preg::is_match(
-                    php_regex!(
-                        r"{^https?://(?:(?:www\.)?bitbucket\.org|(api\.)?github\.com|(?:www\.)?gitlab\.com)/}i"
-                    ),
-                    &package.get_dist_url().unwrap(),
-                )
+                && preg_match2(php_regex!(
+                    r"{^https?://(?:(?:www\.)?bitbucket\.org|(api\.)?github\.com|(?:www\.)?gitlab\.com)/}i"
+                ), &package.get_dist_url().unwrap(), 0).is_some()
             {
                 // Regex pattern compatibility:
                 // The `regex` crate has no look-around, so `(?<=/|sha=)[a-f0-9]{40}(?=/|$)` is
@@ -174,14 +170,15 @@ impl LockTransaction {
                 // 40-hex SHAs sharing a single `/` between them would not both match; harmless
                 // here since a dist URL never carries more than one SHA reference.
                 let dist_reference = present_package.get_dist_reference().unwrap();
-                let new_dist_url = Preg::replace_callback(
+                let new_dist_url = preg_replace_callback(
                     php_regex!(r"{(/|sha=)[a-f0-9]{40}(/|$)}i"),
-                    |m: &shirabe_pcre::PregMatches| -> String {
+                    |m: &PregMatches| -> anyhow::Result<String> {
                         let get = |i: usize| -> String { m.get(i).unwrap_or_default().to_string() };
-                        format!("{}{}{}", get(1), dist_reference, get(2))
+                        Ok(format!("{}{}{}", get(1), dist_reference, get(2)))
                     },
                     &package.get_dist_url().unwrap(),
-                );
+                )
+                .expect("the replacement callback cannot fail");
                 present_package.set_dist_url(Some(new_dist_url));
             }
             present_package.set_dist_mirrors(package.get_dist_mirrors());

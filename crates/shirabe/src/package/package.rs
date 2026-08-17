@@ -10,9 +10,9 @@ use crate::repository::RepositoryInterfaceWeakHandle;
 use crate::util::ComposerMirror;
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, LogicException, PhpMixed, php_regex, strpos, trigger_error,
+    E_USER_DEPRECATED, LogicException, PhpMixed, PregMatches, php_regex, preg_match2, preg_replace,
+    preg_replace_callback, strpos, trigger_error,
 };
 
 /// Mirror entry, e.g. `['url' => 'https://...', 'preferred' => true]`.
@@ -139,7 +139,7 @@ impl Package {
     pub fn get_target_dir(&self) -> Option<String> {
         let target_dir = self.target_dir.as_ref()?;
 
-        let replaced = Preg::replace(
+        let replaced = preg_replace(
             php_regex!("{ (?:^|[\\\\/]+) \\.\\.? (?:[\\\\/]+|$) (?:\\.\\.? (?:[\\\\/]+|$) )*}x"),
             "/",
             target_dir,
@@ -416,12 +416,14 @@ impl Package {
         // only bitbucket, github and gitlab have auto generated dist URLs that easily allow replacing the reference in the dist URL
         // TODO generalize this a bit for self-managed/on-prem versions? Some kind of replace token in dist urls which allow this?
         if self.get_dist_url().is_some()
-            && Preg::is_match(
+            && preg_match2(
                 php_regex!(
                     "{^https?://(?:(?:www\\.)?bitbucket\\.org|(api\\.)?github\\.com|(?:www\\.)?gitlab\\.com)/}i"
                 ),
                 &self.get_dist_url().unwrap_or_default(),
+                0,
             )
+            .is_some()
         {
             self.set_dist_reference(Some(reference.clone()));
             // Regex pattern compatibility:
@@ -431,14 +433,17 @@ impl Package {
             // lookaround, the capturing version consumes its boundary delimiter, so two 40-hex
             // SHAs sharing a single `/` between them would not both match; harmless here since a
             // dist URL never carries more than one SHA reference.
-            self.set_dist_url(Some(Preg::replace_callback(
-                php_regex!("{(/|sha=)[a-f0-9]{40}(/|$)}i"),
-                |m: &shirabe_pcre::PregMatches| -> String {
-                    let get = |i: usize| -> String { m.get(i).unwrap_or_default().to_string() };
-                    format!("{}{}{}", get(1), reference, get(2))
-                },
-                &self.get_dist_url().unwrap_or_default(),
-            )));
+            self.set_dist_url(Some(
+                preg_replace_callback(
+                    php_regex!("{(/|sha=)[a-f0-9]{40}(/|$)}i"),
+                    |m: &PregMatches| -> anyhow::Result<String> {
+                        let get = |i: usize| -> String { m.get(i).unwrap_or_default().to_string() };
+                        Ok(format!("{}{}{}", get(1), reference, get(2)))
+                    },
+                    &self.get_dist_url().unwrap_or_default(),
+                )
+                .expect("the replacement callback cannot fail"),
+            ));
         } else if self.get_dist_reference().is_some() {
             // update the dist reference if there was one, but if none was provided ignore it
             self.set_dist_reference(Some(reference));

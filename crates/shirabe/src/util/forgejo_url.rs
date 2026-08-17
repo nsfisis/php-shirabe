@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Util/ForgejoUrl.php
 
-use shirabe_pcre::Preg;
-use shirabe_php_shim::InvalidArgumentException;
+use shirabe_php_shim::{InvalidArgumentException, preg_match2};
 
 #[derive(Debug)]
 pub struct ForgejoUrl {
@@ -37,7 +36,7 @@ impl ForgejoUrl {
 
     pub fn try_from(repo_url: Option<&str>) -> Option<Self> {
         let repo_url = repo_url?;
-        let matches = Preg::match3(Self::URL_REGEX, repo_url)?;
+        let matches = preg_match2(Self::URL_REGEX, repo_url, 0)?;
 
         let m: Vec<String> = (0..5)
             .map(|i| matches.get(i).unwrap_or_default().to_string())

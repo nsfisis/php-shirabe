@@ -9,9 +9,8 @@ use crate::package::loader::LoaderInterface;
 use crate::package::loader::ValidatingArrayLoader;
 use indexmap::IndexMap;
 use serde::de::Error as _;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{PhpMixed, php_regex};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_match2, preg_replace};
 use shirabe_spdx_licenses::SpdxLicenses;
 
 #[derive(Debug)]
@@ -118,13 +117,17 @@ impl ConfigValidator {
             for license in &licenses {
                 let spdx_license = license_validator.get_license_by_identifier(license);
                 if spdx_license.is_some_and(|l| l.is_deprecated_license_id) {
-                    if Preg::is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?\+$}i"), license) {
+                    if preg_match2(php_regex!(r"{^[AL]?GPL-[123](\.[01])?\+$}i"), license, 0)
+                        .is_some()
+                    {
                         warnings.push(format!(
                             "License \"{}\" is a deprecated SPDX license identifier, use \"{}-or-later\" instead",
                             license,
                             license.replace('+', "")
                         ));
-                    } else if Preg::is_match(php_regex!(r"{^[AL]?GPL-[123](\.[01])?$}i"), license) {
+                    } else if preg_match2(php_regex!(r"{^[AL]?GPL-[123](\.[01])?$}i"), license, 0)
+                        .is_some()
+                    {
                         warnings.push(format!(
                             "License \"{}\" is a deprecated SPDX license identifier, use \"{}-only\" or \"{}-or-later\" instead",
                             license, license, license
@@ -145,9 +148,9 @@ impl ConfigValidator {
 
         if let Some(PhpMixed::String(name)) = manifest.get("name")
             && !name.is_empty()
-            && Preg::is_match(php_regex!(r"{[A-Z]}"), name)
+            && preg_match2(php_regex!(r"{[A-Z]}"), name, 0).is_some()
         {
-            let suggest_name = Preg::replace(
+            let suggest_name = preg_replace(
                 php_regex!(r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
                 r"\1\3-\2\4",
                 name,
@@ -222,7 +225,7 @@ impl ConfigValidator {
         packages.extend(require_dev);
         for (package, version) in &packages {
             if let PhpMixed::String(version_str) = version
-                && Preg::is_match(php_regex!(r"{#}"), version_str)
+                && preg_match2(php_regex!(r"{#}"), version_str, 0).is_some()
             {
                 warnings.push(format!(
                         "The package \"{}\" is pointing to a commit-ref, this is bad practice and can cause unforeseen issues.",

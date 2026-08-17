@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Package/Archiver/BaseExcludeFilter.php
 
-use shirabe_pcre::Preg;
+use shirabe_php_shim::preg_match2;
 use shirabe_symfony_finder::Glob;
 
 #[derive(Debug)]
@@ -86,7 +86,7 @@ pub trait BaseExcludeFilter {
                 relative_path
             };
 
-            if Preg::is_match(pattern, path) {
+            if preg_match2(pattern, path, 0).is_some() {
                 exclude = !negate;
             }
         }

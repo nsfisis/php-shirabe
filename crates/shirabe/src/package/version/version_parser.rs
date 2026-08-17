@@ -2,8 +2,7 @@
 
 use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::php_regex;
+use shirabe_php_shim::{php_regex, preg_match2, preg_replace};
 use shirabe_semver::Semver;
 use shirabe_semver::VersionParser as SemverVersionParser;
 use shirabe_semver::constraint::AnyConstraint;
@@ -50,7 +49,7 @@ impl VersionParser {
         let count = pairs.len();
         let mut i = 0_usize;
         while i < count {
-            let mut pair = Preg::replace(
+            let mut pair = preg_replace(
                 php_regex!(r"{^([^=: ]+)[=: ](.*)$}"),
                 "$1 $2",
                 pairs[i].trim(),
@@ -58,10 +57,12 @@ impl VersionParser {
             if !pair.contains(' ')
                 && i + 1 < count
                 && !pairs[i + 1].contains('/')
-                && !Preg::is_match(
+                && preg_match2(
                     php_regex!(r"{(?<=[a-z0-9_/-])\*|\*(?=[a-z0-9_/-])}i"),
                     &pairs[i + 1],
+                    0,
                 )
+                .is_none()
                 && !PlatformRepository::is_platform_package(&pairs[i + 1])
             {
                 pair += &format!(" {}", pairs[i + 1]);

@@ -10,11 +10,10 @@ use crate::repository::LockArrayRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositorySet;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, extension_loaded, implode, loosely_compare, php_regex,
-    spl_object_hash, sprintf, str_replace, stripos, strpos, strtolower, substr, substr_count,
-    version_compare,
+    preg_match2, preg_replace, spl_object_hash, sprintf, str_replace, stripos, strpos, strtolower,
+    substr, substr_count, version_compare,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MultiConstraint;
@@ -224,11 +223,12 @@ impl Problem {
                 rule_ref.get_reason(),
                 rule::RULE_PACKAGE_REQUIRES | rule::RULE_PACKAGE_CONFLICT
             ) {
-                Preg::is_match3(
+                preg_match2(
                     php_regex!(
                         r"{^(?P<package>\S+) (?P<version>\S+) (?P<type>requires|conflicts)}"
                     ),
                     &message,
+                    0,
                 )
             } else {
                 None
@@ -237,7 +237,7 @@ impl Problem {
                 let pkg_key = m.get(1).unwrap_or_default().to_string();
                 let m2 = m.get(2).unwrap_or_default().to_string();
                 message = str_replace("%", "%%", &message);
-                let template = Preg::replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &message);
+                let template = preg_replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &message);
                 messages.push(template.clone());
                 let version_key = parser.normalize(&m2, Some("")).unwrap_or_default();
                 templates
@@ -302,7 +302,7 @@ impl Problem {
                     };
                     if versions_list.len() > 1 {
                         // remove the s from requires/conflicts to correct grammar
-                        let message_var = Preg::replace(
+                        let message_var = preg_replace(
                             php_regex!(r"{^(%s%s (?:require|conflict))s}"),
                             "$1",
                             message,
@@ -557,9 +557,9 @@ impl Problem {
         if let Some(c) = constraint
             && c.is_constraint()
             && c.get_operator() == Some(CmpOp::Eq)
-            && Preg::is_match3(php_regex!(r"{^dev-.*#.*}"), &c.get_pretty_string()).is_some()
+            && preg_match2(php_regex!(r"{^dev-.*#.*}"), &c.get_pretty_string(), 0).is_some()
         {
-            let new_constraint = Preg::replace(
+            let new_constraint = preg_replace(
                 php_regex!(r"{ +as +([^,\s|]+)$}"),
                 "",
                 &c.get_pretty_string(),
@@ -991,8 +991,8 @@ impl Problem {
             ));
         }
 
-        if Preg::is_match3(php_regex!(r"{^[A-Za-z0-9_./-]+$}"), package_name).is_none() {
-            let illegal_chars = Preg::replace(php_regex!(r"{[A-Za-z0-9_./-]+}"), "", package_name);
+        if preg_match2(php_regex!(r"{^[A-Za-z0-9_./-]+$}"), package_name, 0).is_none() {
+            let illegal_chars = preg_replace(php_regex!(r"{[A-Za-z0-9_./-]+}"), "", package_name);
 
             return Ok((
                 format!("- Root composer.json requires {}, it ", package_name),
@@ -1203,7 +1203,7 @@ impl Problem {
                     .or_default()
                     .push(pretty.clone());
             } else {
-                let key = Preg::replace(php_regex!(r"{^(\d+)\..*}"), "$1", version);
+                let key = preg_replace(php_regex!(r"{^(\d+)\..*}"), "$1", version);
                 by_major.entry(key).or_default().push(pretty.clone());
             }
         }
@@ -1381,7 +1381,7 @@ impl Problem {
             && c.get_operator() == Some(CmpOp::Eq)
             && !c.get_version().starts_with("dev-")
         {
-            if Preg::is_match3(php_regex!(r"{^\d+(?:\.\d+)*$}"), &c.get_pretty_string()).is_none() {
+            if preg_match2(php_regex!(r"{^\d+(?:\.\d+)*$}"), &c.get_pretty_string(), 0).is_none() {
                 return format!(" {} (exact version match)", c.get_pretty_string());
             }
 

@@ -8,12 +8,11 @@ pub use json_config_source::*;
 
 use crate::io::io_interface;
 use indexmap::IndexMap;
-use shirabe_pcre::{Preg, PregMatches};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, array_key_exists, array_merge,
+    E_USER_DEPRECATED, PhpMixed, PregMatches, RuntimeException, array_key_exists, array_merge,
     array_search_mixed, array_unique, empty, filter_var_url, implode, in_array_loose,
-    in_array_strict, intval, is_array, is_string, parse_url, php_regex, php_to_string, rtrim,
-    strtolower, strtoupper, strtr, substr, trigger_error,
+    in_array_strict, intval, is_array, is_string, parse_url, php_regex, php_to_string, preg_match2,
+    preg_replace_callback, rtrim, strtolower, strtoupper, strtr, substr, trigger_error,
 };
 
 use crate::advisory::Auditor;
@@ -482,10 +481,12 @@ impl Config {
                     .unwrap_or("")
                     .to_string();
                 if is_composer
-                    && Preg::is_match(
+                    && preg_match2(
                         php_regex!(r"{^https?://(?:[a-z0-9-.]+\.)?packagist.org(/|$)}"),
                         &repo_url,
+                        0,
                     )
+                    .is_some()
                 {
                     self.disable_repo_by_name("packagist.org");
                 }
@@ -647,9 +648,10 @@ impl Config {
             // numbers with kb/mb/gb support, without env var support
             "cache-files-maxsize" => {
                 let raw = self.config.get(key).map(php_to_string).unwrap_or_default();
-                let Some(matches) = Preg::is_match3(
+                let Some(matches) = preg_match2(
                     php_regex!(r"/^\s*([0-9.]+)\s*(?:([kmg])(?:i?b)?)?\s*$/i"),
                     &raw,
+                    0,
                 ) else {
                     return Err(RuntimeException::new(format!(
                         "Could not parse the value of '{}': {}",
@@ -956,24 +958,14 @@ impl Config {
         }
 
         let value_str = value.as_string().unwrap_or("").to_string();
-        let mut error = None;
-        let result = Preg::replace_callback(
+        let result = preg_replace_callback(
             php_regex!(r"#\{\$(.+)\}#"),
-            |m: &PregMatches| -> String {
+            |m: &PregMatches| -> anyhow::Result<String> {
                 let key_match = m.get(1).unwrap_or_default().to_string();
-                match self.get_with_flags(&key_match, flags) {
-                    Ok(v) => php_to_string(&v),
-                    Err(e) => {
-                        error = Some(e);
-                        String::new()
-                    }
-                }
+                Ok(php_to_string(&self.get_with_flags(&key_match, flags)?))
             },
             &value_str,
-        );
-        if let Some(e) = error {
-            return Err(e);
-        }
+        )?;
         Ok(PhpMixed::String(result))
     }
 
@@ -981,7 +973,13 @@ impl Config {
     ///
     /// Since the dirs might not exist yet we can not call realpath or it will fail.
     fn realpath(&self, path: &str) -> String {
-        if Preg::is_match(php_regex!(r"{^(?:/|[a-z]:|[a-z0-9.]+://|\\\\\\\\)}i"), path) {
+        if preg_match2(
+            php_regex!(r"{^(?:/|[a-z]:|[a-z0-9.]+://|\\\\\\\\)}i"),
+            path,
+            0,
+        )
+        .is_some()
+        {
             return path.to_string();
         }
 
@@ -1023,7 +1021,7 @@ impl Config {
         repo_options: &IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         // Return right away if the URL is malformed or custom (see issue #5173), but only for non-HTTP(S) URLs
-        if !filter_var_url(url) && !Preg::is_match(php_regex!(r"{^https?://}"), url) {
+        if !filter_var_url(url) && preg_match2(php_regex!(r"{^https?://}"), url, 0).is_none() {
             return Ok(());
         }
 

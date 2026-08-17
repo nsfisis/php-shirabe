@@ -15,8 +15,7 @@ use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
 use crate::script::ScriptEvents;
 use crate::util::Platform;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::{InvalidArgumentException, impl_php_class};
+use shirabe_php_shim::{InvalidArgumentException, impl_php_class, preg_match2};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -137,7 +136,7 @@ impl Command for ReinstallCommand {
                 let pattern_regexp = base_package::package_name_to_regexp(pattern);
                 let mut matched = false;
                 for package in local_repo.get_canonical_packages()? {
-                    if Preg::is_match(&pattern_regexp, &package.get_name()) {
+                    if preg_match2(&pattern_regexp, &package.get_name(), 0).is_some() {
                         matched = true;
                         package_names_to_reinstall.push(package.get_name());
                         packages_to_reinstall.push(package);

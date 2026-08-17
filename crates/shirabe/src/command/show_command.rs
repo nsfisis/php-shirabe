@@ -36,11 +36,11 @@ use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
 use crate::util::PackageInfo;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
     array_search, date_format_to_strftime, date_local, extension_loaded, impl_php_class,
-    in_array_loose, in_array_strict, php_regex, preg_quote, realpath, strtolower, version_compare,
+    in_array_loose, in_array_strict, php_regex, preg_match2, preg_quote, preg_replace, realpath,
+    strtolower, version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -1373,9 +1373,10 @@ impl ShowCommand {
 
         if target_version.is_none() {
             if major_only
-                && let Some(groups) = Preg::is_match3(
+                && let Some(groups) = preg_match2(
                     php_regex!(r"{^(?P<zero_major>(?:0\.)+)?(?P<first_meaningful>\d+)\.}"),
                     &package.get_version(),
+                    0,
                 )
             {
                 let zero_major = groups.name("zero_major").unwrap_or_default().to_string();
@@ -1398,7 +1399,7 @@ impl ShowCommand {
 
             if patch_only {
                 let trimmed_version =
-                    Preg::replace(php_regex!(r"{(\.0)+$}D"), "", &package.get_version());
+                    preg_replace(php_regex!(r"{(\.0)+$}D"), "", &package.get_version());
                 let parts_needed = if trimmed_version.starts_with('0') {
                     4
                 } else {
@@ -2341,7 +2342,7 @@ impl Command for ShowCommand {
                         }
                         let matches_filter = match &package_filter_regex {
                             None => true,
-                            Some(r) => Preg::is_match(r, &p.get_name()),
+                            Some(r) => preg_match2(r, &p.get_name(), 0).is_some(),
                         };
                         if matches_filter {
                             let matches_list = match &package_list_filter {
@@ -2420,7 +2421,8 @@ impl Command for ShowCommand {
                 if show_latest && *show_version {
                     for package_or_name in type_packages.values() {
                         if let PackageOrName::Pkg(package) = package_or_name
-                            && !Preg::is_match(&ignored_packages_regex, &package.get_pretty_name())
+                            && preg_match2(&ignored_packages_regex, &package.get_pretty_name(), 0)
+                                .is_none()
                         {
                             let latest = self.find_latest_package(
                                 package.clone(),
@@ -2491,7 +2493,8 @@ impl Command for ShowCommand {
                         package_is_up_to_date =
                             package_is_up_to_date || (latest_package.is_none() && show_major_only);
                         let package_is_ignored =
-                            Preg::is_match(&ignored_packages_regex, &package.get_pretty_name());
+                            preg_match2(&ignored_packages_regex, &package.get_pretty_name(), 0)
+                                .is_some();
                         if input.borrow().get_option("outdated")?.as_bool() == Some(true)
                             && (package_is_up_to_date || package_is_ignored)
                         {

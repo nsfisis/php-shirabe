@@ -33,13 +33,12 @@ use crate::util::ProcessExecutor;
 use crate::util::http::ProxyManager;
 use crate::util::http::RequestProxy;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::PhpClass as _;
 use shirabe_php_shim::{
-    AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpClass as _, PhpMixed,
-    RuntimeException, disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class,
-    implode, is_array, is_string, php_regex, rtrim, str_replace, strpos, strstr, strstr3,
-    strtolower, trim, version_compare,
+    AnyThrowable, Catch as _, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException,
+    disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class, implode, is_array,
+    is_string, php_regex, preg_match2, rtrim, str_replace, strpos, strstr, strstr3, strtolower,
+    trim, version_compare,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -862,9 +861,10 @@ impl DiagnoseCommand {
             warnings.insert("zlib".to_string(), PhpMixed::Bool(true));
         }
 
-        if let Some(phpinfo_match) = Preg::is_match3(
+        if let Some(phpinfo_match) = preg_match2(
             php_regex!("{Configure Command(?: *</td><td class=\"v\">| *=> *)(.*?)(?:</td>|$)}m"),
             &diagnostics.phpinfo_general,
+            0,
         ) {
             let configure = phpinfo_match.get(1).unwrap_or_default().to_string();
             let configure = configure.as_str();

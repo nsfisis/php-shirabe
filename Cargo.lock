@@ -2106,7 +2106,6 @@ dependencies = [
  "shirabe-ca-bundle",
  "shirabe-class-map-generator",
  "shirabe-metadata-minifier",
- "shirabe-pcre",
  "shirabe-php-rpc",
  "shirabe-php-shim",
  "shirabe-seld-json-lint",
@@ -2136,7 +2135,6 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "indexmap",
- "shirabe-pcre",
  "shirabe-php-rpc",
  "shirabe-php-shim",
  "shirabe-symfony-finder",
@@ -2147,15 +2145,6 @@ name = "shirabe-metadata-minifier"
 version = "0.0.1"
 dependencies = [
  "indexmap",
- "shirabe-php-shim",
-]
-
-[[package]]
-name = "shirabe-pcre"
-version = "0.0.1"
-dependencies = [
- "indexmap",
- "regex",
  "shirabe-php-shim",
 ]
 
@@ -2239,7 +2228,6 @@ dependencies = [
  "anyhow",
  "indexmap",
  "regex",
- "shirabe-pcre",
  "shirabe-php-shim",
  "shirabe-symfony-process",
  "shirabe-symfony-string",
@@ -2262,7 +2250,6 @@ dependencies = [
  "chrono",
  "indexmap",
  "regex",
- "shirabe-pcre",
  "shirabe-php-shim",
 ]
 

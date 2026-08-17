@@ -23,10 +23,9 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined, file_exists,
-    file_get_contents, glob_with_flags, hash, php_regex, realpath, serialize,
+    file_get_contents, glob_with_flags, hash, php_regex, preg_match2, realpath, serialize,
 };
 
 #[derive(Debug)]
@@ -159,9 +158,9 @@ impl PathRepository {
         let url_matches = self.get_url_matches()?;
 
         if url_matches.is_empty() {
-            if Preg::is_match(php_regex!(r"{[*{}]}"), &self.url) {
+            if preg_match2(php_regex!(r"{[*{}]}"), &self.url, 0).is_some() {
                 let mut url = self.url.clone();
-                while Preg::is_match(php_regex!(r"{[*{}]}"), &url) {
+                while preg_match2(php_regex!(r"{[*{}]}"), &url, 0).is_some() {
                     url = shirabe_php_shim::dirname(&url);
                 }
                 // the parent directory before any wildcard exists, so we assume it is correctly configured but simply empty

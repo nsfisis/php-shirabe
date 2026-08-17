@@ -4,8 +4,7 @@ use crate::package::archiver::BaseExcludeFilter;
 use crate::package::archiver::ComposerExcludeFilter;
 use crate::package::archiver::GitExcludeFilter;
 use crate::util::Filesystem;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::{RuntimeException, preg_quote, realpath};
+use shirabe_php_shim::{RuntimeException, preg_quote, preg_replace, realpath};
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
 
@@ -56,7 +55,7 @@ impl ArchivableFilesFinder {
                 return false;
             }
 
-            let relative_path = Preg::replace(
+            let relative_path = preg_replace(
                 format!("#^{}#", preg_quote(&sources_clone, Some('#'))),
                 "",
                 &fs.normalize_path(&realpath.to_string_lossy()),

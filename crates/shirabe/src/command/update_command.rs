@@ -27,10 +27,10 @@ use crate::repository::PlatformRepository;
 use crate::repository::RepositorySet;
 use crate::util::HttpDownloader;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_keys, array_merge_map, array_search_in_vec, impl_php_class, php_regex, strtolower,
+    array_keys, array_merge_map, array_search_in_vec, impl_php_class, php_regex, preg_match2,
+    preg_replace, strtolower,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::MultiConstraint;
@@ -115,7 +115,7 @@ impl UpdateCommand {
         let mut version_selector = self.create_version_selector(composer)?;
         for package in &installed_packages {
             if let Some(filter) = &filter
-                && !Preg::is_match(filter, &package.get_name())
+                && preg_match2(filter, &package.get_name(), 0).is_none()
             {
                 continue;
             }
@@ -378,7 +378,7 @@ impl Command for UpdateCommand {
         if !packages.is_empty() {
             let allowlist_packages_with_requirements: Vec<String> =
                 array_filter(&packages, |pkg: &String| -> bool {
-                    Preg::is_match(php_regex!(r"{\S+[ =:]\S+}"), pkg)
+                    preg_match2(php_regex!(r"{\S+[ =:]\S+}"), pkg, 0).is_some()
                 });
             for (package, constraint) in
                 self.format_requirements(allowlist_packages_with_requirements.clone())?
@@ -388,8 +388,7 @@ impl Command for UpdateCommand {
 
             // replace the foo/bar:req by foo/bar in the allowlist
             for package in &allowlist_packages_with_requirements {
-                let package_name =
-                    Preg::replace(php_regex!(r"{^([^ =:]+)[ =:].*$}"), "$1", package);
+                let package_name = preg_replace(php_regex!(r"{^([^ =:]+)[ =:].*$}"), "$1", package);
                 if let Some(idx) = array_search_in_vec(package, &packages) {
                     packages[idx] = package_name;
                 }
@@ -460,7 +459,7 @@ impl Command for UpdateCommand {
                     continue;
                 }
                 let version = package.get_version();
-                let matches = Preg::is_match3(php_regex!(r"{^(\d+\.\d+\.\d+)}"), &version);
+                let matches = preg_match2(php_regex!(r"{^(\d+\.\d+\.\d+)}"), &version, 0);
                 let Some(matches) = matches else {
                     continue;
                 };

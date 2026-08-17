@@ -8,7 +8,6 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-shirabe-pcre.workspace = true
 shirabe-php-rpc.workspace = true
 shirabe-php-shim.workspace = true
 shirabe-symfony-finder.workspace = true

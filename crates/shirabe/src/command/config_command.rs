@@ -18,12 +18,12 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
     escapeshellcmd, exec, explode, file_exists, impl_php_class, implode, in_array_loose,
     in_array_strict, is_array, is_bool, is_dir, is_numeric, is_object, is_string, json_encode,
-    php_regex, str_replace, strpos, strtolower, system, touch, var_export,
+    php_regex, preg_match2, preg_replace, str_replace, strpos, strtolower, system, touch,
+    var_export,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
@@ -206,7 +206,7 @@ impl ConfigCommand {
                     || (key == "repositories" && k.is_none()))
             {
                 let mut new_k = k.clone().unwrap_or_default();
-                new_k.push_str(&Preg::replace(
+                new_k.push_str(&preg_replace(
                     php_regex!("{^config\\.}"),
                     "",
                     &format!("{}.", key),
@@ -269,13 +269,13 @@ impl ConfigCommand {
                     } else {
                         k.clone().unwrap()
                     };
-                    let id = Preg::replace(php_regex!("{\\..*$}"), "", &id_source);
-                    let id = Preg::replace(
+                    let id = preg_replace(php_regex!("{\\..*$}"), "", &id_source);
+                    let id = preg_replace(
                         php_regex!("{[^a-z0-9]}i"),
                         "-",
                         &strtolower(&shirabe_php_shim::trim(&id, Some(" \t\n\r\0\u{0B}"))),
                     );
-                    let id = Preg::replace(php_regex!("{-+}"), "-", &id);
+                    let id = preg_replace(php_regex!("{-+}"), "-", &id);
                     format!("https://getcomposer.org/doc/06-config.md#{}", id)
                 };
             if is_string(&raw_val)
@@ -701,9 +701,10 @@ impl Command for ConfigCommand {
             let mut source = config.borrow_mut().get_source_of_value(&setting_key);
 
             let mut value: PhpMixed;
-            if let Some(matches) = Preg::is_match3(
+            if let Some(matches) = preg_match2(
                 php_regex!("/^repos?(?:itories)?(?:\\.(.+))?/"),
                 &setting_key,
+                0,
             ) {
                 if matches.get(1).is_none() {
                     value = data
@@ -925,7 +926,7 @@ impl Command for ConfigCommand {
         }
         // handle preferred-install per-package config
         if let Some(matches) =
-            Preg::is_match3(php_regex!("/^preferred-install\\.(.+)/"), &setting_key)
+            preg_match2(php_regex!("/^preferred-install\\.(.+)/"), &setting_key, 0)
         {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
@@ -959,9 +960,10 @@ impl Command for ConfigCommand {
         }
 
         // handle allow-plugins config setting elements true or false to add/remove
-        if let Some(matches) = Preg::is_match3(
+        if let Some(matches) = preg_match2(
             php_regex!("{^allow-plugins\\.([a-zA-Z0-9/*-]+)}"),
             &setting_key,
+            0,
         ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
@@ -1028,7 +1030,7 @@ impl Command for ConfigCommand {
 
         // handle repositories
         if let Some(matches) =
-            Preg::is_match3(php_regex!("/^repos?(?:itories)?\\.(.+)/"), &setting_key)
+            preg_match2(php_regex!("/^repos?(?:itories)?\\.(.+)/"), &setting_key, 0)
         {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
@@ -1097,7 +1099,7 @@ impl Command for ConfigCommand {
         }
 
         // handle extra
-        if let Some(matches) = Preg::is_match3(php_regex!("/^extra\\.(.+)/"), &setting_key) {
+        if let Some(matches) = preg_match2(php_regex!("/^extra\\.(.+)/"), &setting_key, 0) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -1169,7 +1171,7 @@ impl Command for ConfigCommand {
         }
 
         // handle suggest
-        if let Some(matches) = Preg::is_match3(php_regex!("/^suggest\\.(.+)/"), &setting_key) {
+        if let Some(matches) = preg_match2(php_regex!("/^suggest\\.(.+)/"), &setting_key, 0) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -1203,7 +1205,7 @@ impl Command for ConfigCommand {
         }
 
         // handle platform
-        if let Some(matches) = Preg::is_match3(php_regex!("/^platform\\.(.+)/"), &setting_key) {
+        if let Some(matches) = preg_match2(php_regex!("/^platform\\.(.+)/"), &setting_key, 0) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -1320,11 +1322,12 @@ impl Command for ConfigCommand {
         }
 
         // handle auth
-        if let Some(matches) = Preg::is_match3(
+        if let Some(matches) = preg_match2(
             php_regex!(
                 "/^(bitbucket-oauth|github-oauth|gitlab-oauth|gitlab-token|http-basic|custom-headers|bearer|forgejo-token)\\.(.+)/"
             ),
             &setting_key,
+            0,
         ) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.auth_config_source
@@ -1452,7 +1455,7 @@ impl Command for ConfigCommand {
                     }
 
                     // Check if the header is in correct "Name: Value" format
-                    if Preg::is_match3(php_regex!("/^[^:]+:\\s*.+$/"), header).is_none() {
+                    if preg_match2(php_regex!("/^[^:]+:\\s*.+$/"), header, 0).is_none() {
                         return Err(RuntimeException::new(format!(
                             "Header \"{}\" is not in \"Header-Name: Header-Value\" format",
                             header
@@ -1500,7 +1503,7 @@ impl Command for ConfigCommand {
         }
 
         // handle script
-        if let Some(matches) = Preg::is_match3(php_regex!("/^scripts\\.(.+)/"), &setting_key) {
+        if let Some(matches) = preg_match2(php_regex!("/^scripts\\.(.+)/"), &setting_key, 0) {
             if input.borrow().get_option("unset")?.as_bool() == Some(true) {
                 self.config_source
                     .borrow_mut()
@@ -1739,9 +1742,10 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         (
             Box::new(|val| {
                 PhpMixed::Bool(
-                    Preg::is_match3(
+                    preg_match2(
                         php_regex!("/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i"),
                         val.as_string().unwrap_or(""),
+                        0,
                     )
                     .is_some(),
                 )

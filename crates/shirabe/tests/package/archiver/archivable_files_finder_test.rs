@@ -3,8 +3,9 @@
 use indexmap::IndexMap;
 use shirabe::package::archiver::ArchivableFilesFinder;
 use shirabe::util::Filesystem;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::{PhpMixed, ZipArchive, dirname, file_put_contents, preg_quote};
+use shirabe_php_shim::{
+    PhpMixed, ZipArchive, dirname, file_put_contents, preg_quote, preg_replace,
+};
 use shirabe_symfony_process::Process;
 use tempfile::TempDir;
 
@@ -85,7 +86,7 @@ fn get_archivable_files(set_up: &SetUp, finder: ArchivableFilesFinder) -> Vec<St
     for file in finder {
         if !file.is_dir() {
             let real_path = file.canonicalize().unwrap();
-            files.push(Preg::replace(
+            files.push(preg_replace(
                 format!("#^{}#", preg_quote(&set_up.sources, Some('#'))),
                 "",
                 &set_up.fs.normalize_path(&real_path.to_string_lossy()),
@@ -196,7 +197,7 @@ fn get_archived_files(set_up: &SetUp, command: &str) -> Vec<String> {
             continue;
         }
         let virtual_path = format!("phar://{}/archive.zip/{}", set_up.sources, name);
-        files.push(Preg::replace(
+        files.push(preg_replace(
             &prefix,
             "",
             &set_up.fs.normalize_path(&virtual_path),

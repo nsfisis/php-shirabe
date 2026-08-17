@@ -11,9 +11,10 @@ use crate::util::Hg as HgUtils;
 use crate::util::Url;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{PhpMixed, RuntimeException, dirname, is_dir, is_writable, php_regex};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, dirname, is_dir, is_writable, php_regex, preg_match2, preg_replace,
+};
 
 #[derive(Debug)]
 pub struct HgDriver {
@@ -57,7 +58,7 @@ impl HgDriver {
                 return Err(RuntimeException::new("HgDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string()).into());
             }
 
-            let sanitized = Preg::replace(
+            let sanitized = preg_replace(
                 php_regex!(r"{[^a-z0-9]}i"),
                 "-",
                 &Url::sanitize(self.inner.url.clone()),
@@ -233,7 +234,7 @@ impl HgDriver {
             );
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty()
-                    && let Some(m) = Preg::match3(php_regex!(r"(^([^\s]+)\s+\d+:(.*)$)"), &tag)
+                    && let Some(m) = preg_match2(php_regex!(r"(^([^\s]+)\s+\d+:(.*)$)"), &tag, 0)
                 {
                     tags.insert(
                         m.get(1).unwrap_or_default().to_string(),
@@ -263,7 +264,7 @@ impl HgDriver {
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
                     && let Some(m) =
-                        Preg::match3(php_regex!(r"(^([^\s]+)\s+\d+:([a-f0-9]+))"), &branch)
+                        preg_match2(php_regex!(r"(^([^\s]+)\s+\d+:([a-f0-9]+))"), &branch, 0)
                 {
                     let name = m.get(1).unwrap_or_default().to_string();
                     if !name.starts_with('-') {
@@ -281,7 +282,7 @@ impl HgDriver {
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
                     && let Some(m) =
-                        Preg::match3(php_regex!(r"(^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$)"), &branch)
+                        preg_match2(php_regex!(r"(^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$)"), &branch, 0)
                 {
                     let name = m.get(1).unwrap_or_default().to_string();
                     if !name.starts_with('-') {
@@ -304,12 +305,15 @@ impl HgDriver {
         url: &str,
         deep: bool,
     ) -> anyhow::Result<bool> {
-        if Preg::is_match(
+        if preg_match2(
             php_regex!(
                 r"#(^(?:https?|ssh)://(?:[^@]+@)?bitbucket.org|https://(?:.*?)\.kilnhg.com)#i"
             ),
             url,
-        ) {
+            0,
+        )
+        .is_some()
+        {
             return Ok(true);
         }
 

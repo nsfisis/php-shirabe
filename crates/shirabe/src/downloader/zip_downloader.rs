@@ -8,13 +8,12 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::IniHelper;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException, ZipArchive,
     bin2hex, class_exists, file_exists, file_get_contents, filesize, function_exists, hash_file,
-    impl_php_class, is_file, json_encode, php_regex, random_int, str_replace, strlen, substr,
-    version_compare,
+    impl_php_class, is_file, json_encode, php_regex, preg_match2, random_int, str_replace, strlen,
+    substr, version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
@@ -113,8 +112,11 @@ impl ZipDownloader {
                 .execute(&[command_spec[1].as_str()], &mut output, None::<&str>)
                 .unwrap_or(1)
                 == 0
-                && let Some(m) =
-                    Preg::is_match3(php_regex!(r"{^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)}"), &output)
+                && let Some(m) = preg_match2(
+                    php_regex!(r"{^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)}"),
+                    &output,
+                    0,
+                )
             {
                 let m1 = m.get(1).unwrap_or_default().to_string();
                 if version_compare(&m1, "21.01", CmpOp::Lt) {

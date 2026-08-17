@@ -7,12 +7,11 @@ use crate::package::version::VersionParser;
 use crate::package::{STABILITIES, SUPPORTED_LINK_TYPES};
 use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values,
     filter_var_email, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar, is_string,
-    json_encode, parse_url, php_regex, php_to_string, str_replace, strcasecmp, strtolower,
-    strtotime, substr, trigger_error, trim, var_export,
+    json_encode, parse_url, php_regex, php_to_string, preg_match2, preg_replace, str_replace,
+    strcasecmp, strtolower, strtotime, substr, trigger_error, trim, var_export,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
@@ -74,12 +73,15 @@ impl ValidatingArrayLoader {
             return None;
         }
 
-        if !Preg::is_match(
+        if preg_match2(
             php_regex!(
                 "{^[a-z0-9](?:[_.-]?[a-z0-9]++)*+/[a-z0-9](?:(?:[_.]|-{1,2})?[a-z0-9]++)*+$}iD"
             ),
             name,
-        ) {
+            0,
+        )
+        .is_none()
+        {
             return Some(format!(
                 "{} is invalid, it should have a vendor name, a forward slash, and a package name. The vendor and package name can be words separated by -, . or _. The complete name should match \"^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]?|-{{0,2}})[a-z0-9]+)*$\".",
                 name
@@ -100,14 +102,14 @@ impl ValidatingArrayLoader {
             ));
         }
 
-        if Preg::is_match(php_regex!("{\\.json$}"), name) {
+        if preg_match2(php_regex!("{\\.json$}"), name, 0).is_some() {
             return Some(format!(
                 "{} is invalid, package names can not end in .json, consider renaming it or perhaps using a -json suffix instead.",
                 name
             ));
         }
 
-        if Preg::is_match(php_regex!("{[A-Z]}"), name) {
+        if preg_match2(php_regex!("{[A-Z]}"), name, 0).is_some() {
             if is_link {
                 return Some(format!(
                     "{} is invalid, it should not contain uppercase characters. Please use {} instead.",
@@ -116,7 +118,7 @@ impl ValidatingArrayLoader {
                 ));
             }
 
-            let suggest_name = Preg::replace(
+            let suggest_name = preg_replace(
                 php_regex!("{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
                 "\\1\\3-\\2\\4",
                 name,
@@ -141,7 +143,7 @@ impl ValidatingArrayLoader {
             .as_string()
             .unwrap_or("")
             .to_string();
-        if !Preg::is_match(format!("{{^{}$}}u", regex), &value) {
+        if preg_match2(format!("{{^{}$}}u", regex), &value, 0).is_none() {
             let message = format!(
                 "{} : invalid value ({}), must match {}",
                 property, value, regex
@@ -256,7 +258,7 @@ impl ValidatingArrayLoader {
 
             if let Some(regex_str) = regex {
                 let value_str = php_to_string(&value);
-                if !Preg::is_match(format!("{{^{}$}}u", regex_str), &value_str) {
+                if preg_match2(format!("{{^{}$}}u", regex_str), &value_str, 0).is_none() {
                     self.warnings.borrow_mut().push(format!(
                         "{}.{} : invalid value ({}), must match {}",
                         property, key, value_str, regex_str
@@ -1185,7 +1187,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                         self.warnings
                             .borrow_mut()
                             .push(format!("{}.{}", link_type, err));
-                    } else if !Preg::is_match(php_regex!("{^[A-Za-z0-9_./-]+$}"), &package) {
+                    } else if preg_match2(php_regex!("{^[A-Za-z0-9_./-]+$}"), &package, 0).is_none()
+                    {
                         self.errors.borrow_mut().push(format!(
                             "{}.{} : invalid key, package names must be strings containing only [A-Za-z0-9_./-]",
                             link_type, package
@@ -1448,7 +1451,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 }
                 if let Some(ref_val) = section.get("reference").filter(|_| isset("reference")) {
                     let ref_str = php_to_string(ref_val);
-                    if Preg::is_match(php_regex!("{^\\s*-}"), &ref_str) {
+                    if preg_match2(php_regex!("{^\\s*-}"), &ref_str, 0).is_some() {
                         self.errors.borrow_mut().push(format!(
                             "{}.reference : must not start with a \"-\", \"{}\" given",
                             src_type, ref_str
@@ -1457,7 +1460,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 }
                 if let Some(url_val) = section.get("url").filter(|_| isset("url")) {
                     let url_str = php_to_string(url_val);
-                    if Preg::is_match(php_regex!("{^\\s*-}"), &url_str) {
+                    if preg_match2(php_regex!("{^\\s*-}"), &url_str, 0).is_some() {
                         self.errors.borrow_mut().push(format!(
                             "{}.url : must not start with a \"-\", \"{}\" given",
                             src_type, url_str

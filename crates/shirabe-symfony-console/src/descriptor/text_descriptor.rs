@@ -12,8 +12,7 @@ use crate::input::InputDefinition;
 use crate::input::InputOption;
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_pcre::preg::Preg;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, preg_replace};
 
 /// Text descriptor.
 ///
@@ -63,7 +62,7 @@ impl TextDescriptor {
                 argument.get_name(),
                 shirabe_php_shim::str_repeat(" ", spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
-                Preg::replace(
+                preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
                     &format!(
                         "\n{}",
@@ -131,7 +130,7 @@ impl TextDescriptor {
                 synopsis,
                 shirabe_php_shim::str_repeat(" ", spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
-                Preg::replace(
+                preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
                     &format!(
                         "\n{}",

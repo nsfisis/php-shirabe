@@ -9,8 +9,7 @@ use crate::repository::{
     RepositoryInterfaceHandle, SearchResult,
 };
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, preg_match2};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -124,14 +123,14 @@ impl FilterRepository {
         }
 
         if let Some(only) = &self.only {
-            return Preg::is_match(only, name);
+            return preg_match2(only, name, 0).is_some();
         }
 
         if self.exclude.is_none() {
             return true;
         }
 
-        !Preg::is_match(self.exclude.as_ref().unwrap(), name)
+        preg_match2(self.exclude.as_ref().unwrap(), name, 0).is_none()
     }
 }
 

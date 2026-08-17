@@ -5,8 +5,7 @@ use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::io_interface;
 use shirabe::io::{IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
 use shirabe::util::platform::Platform;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::{PHP_EOL, PhpMixed, php_regex, preg_quote, preg_split};
+use shirabe_php_shim::{PHP_EOL, PhpMixed, php_regex, preg_match2, preg_quote, preg_split};
 use shirabe_symfony_console::output::output_interface;
 use std::collections::VecDeque;
 
@@ -167,7 +166,7 @@ impl IOMock {
                 };
 
                 while let Some(line) = lines.pop_front() {
-                    if Preg::is_match(&pattern, &line) {
+                    if preg_match2(&pattern, &line, 0).is_some() {
                         continue 'expects;
                     }
 

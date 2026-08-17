@@ -8,13 +8,13 @@ use crate::json::JsonValidationException;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Silencer;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
-    PhpMixed, RuntimeException, UnexpectedValueException, dirname, file_exists, file_get_contents,
-    file_put_contents, is_dir, is_file, json_decode_assoc, json_decode_obj, json_encode_ex, mkdir,
-    php_regex, realpath, str_repeat, strlen, strpos, usleep,
+    PhpMixed, PregMatches, RuntimeException, UnexpectedValueException, dirname, file_exists,
+    file_get_contents, file_put_contents, is_dir, is_file, json_decode_assoc, json_decode_obj,
+    json_encode_ex, mkdir, php_regex, preg_match2, preg_replace_callback, preg_replace2, realpath,
+    str_repeat, strlen, strpos, usleep,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
 
@@ -107,7 +107,9 @@ impl JsonFile {
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<Self> {
-        if http_downloader.is_none() && Preg::is_match(php_regex!(r"{^https?://}i"), &path) {
+        if http_downloader.is_none()
+            && preg_match2(php_regex!(r"{^https?://}i"), &path, 0).is_some()
+        {
             return Err(InvalidArgumentException::new(
                 "http urls require a HttpDownloader instance to be passed".to_string(),
             )
@@ -448,14 +450,15 @@ impl JsonFile {
         if options.pretty_print && options.indent != Self::INDENT_DEFAULT {
             // Pretty printing and not using default indentation
             let indent_owned = options.indent;
-            return Ok(Preg::replace_callback(
+            return Ok(preg_replace_callback(
                 php_regex!(r"#^ {4,}#m"),
-                move |m: &shirabe_pcre::PregMatches| -> String {
+                move |m: &PregMatches| -> anyhow::Result<String> {
                     let whole = m.get(0).unwrap_or("");
-                    str_repeat(&indent_owned, (strlen(whole) / 4) as usize)
+                    Ok(str_repeat(&indent_owned, (strlen(whole) / 4) as usize))
                 },
                 &json,
-            ));
+            )
+            .expect("the replacement callback cannot fail"));
         }
 
         Ok(json)
@@ -485,14 +488,14 @@ impl JsonFile {
                 && json.contains("\"content-hash\"")
             {
                 let mut count: usize = 0;
-                let replaced = Preg::replace5(
+                let replaced = preg_replace2(
                     php_regex!(
                         r#"{\r?\n<<<<<<< [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n(?:\|{7} [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n)?=======\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n>>>>>>> [^\r\n]+(\r?\n)}"#
                     ),
                     "    \"content-hash\": \"VCS merge conflict detected. Please run `composer update --lock`.\",$1",
                     json,
                     -1,
-                    &mut count,
+                    Some(&mut count),
                 );
                 if count == 1 {
                     data = json_decode_assoc(&replaced)?;
@@ -551,7 +554,7 @@ impl JsonFile {
     }
 
     pub fn detect_indenting(json: Option<&str>) -> String {
-        if let Some(m) = Preg::is_match3(php_regex!(r##"#^([ \t]+)"#m"##), json.unwrap_or("")) {
+        if let Some(m) = preg_match2(php_regex!(r##"#^([ \t]+)"#m"##), json.unwrap_or(""), 0) {
             return m.get(1).unwrap_or_default().to_string();
         }
 

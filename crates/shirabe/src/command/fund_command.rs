@@ -10,8 +10,7 @@ use crate::package::base_package::{self};
 use crate::repository::CompositeRepository;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::{PhpMixed, impl_php_class, php_regex};
+use shirabe_php_shim::{PhpMixed, impl_php_class, php_regex, preg_match2};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::MatchAllConstraint;
 use shirabe_symfony_console::command::Command;
@@ -64,7 +63,7 @@ impl FundCommand {
                 .unwrap_or("");
             if r#type == "github"
                 && let Some(matches) =
-                    Preg::is_match3(php_regex!(r"{^https://github.com/([^/]+)$}"), &url)
+                    preg_match2(php_regex!(r"{^https://github.com/([^/]+)$}"), &url, 0)
                 && let Some(sponsor) = matches.get(1).map(str::to_string)
             {
                 url = format!("https://github.com/sponsors/{}", sponsor);

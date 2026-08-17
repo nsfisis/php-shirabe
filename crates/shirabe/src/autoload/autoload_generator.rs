@@ -23,13 +23,12 @@ use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
-use shirabe_pcre::{Preg, PregMatches};
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, array_keys, array_map, array_merge_map,
+    InvalidArgumentException, PhpMixed, PregMatches, array_keys, array_map, array_merge_map,
     array_merge_recursive, array_shift, array_slice_strs, array_unique, bin2hex, explode,
-    file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, php_regex, preg_quote,
-    random_bytes, realpath, str_replace, strlen, strpos, strtr, substr, substr_count, trim, unlink,
-    var_export,
+    file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, php_regex, preg_match2,
+    preg_quote, preg_replace, preg_replace_callback, random_bytes, realpath, str_replace, strlen,
+    strpos, strtr, substr, substr_count, trim, unlink, var_export,
 };
 use shirabe_semver::constraint::Bound;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -559,9 +558,11 @@ return array(
             {
                 let content =
                     file_get_contents(format!("{}/autoload.php", vendor_path)).unwrap_or_default();
-                if let Some(matches) =
-                    Preg::match3(php_regex!("{ComposerAutoloaderInit([^:\\s]+)::}"), &content)
-                {
+                if let Some(matches) = preg_match2(
+                    php_regex!("{ComposerAutoloaderInit([^:\\s]+)::}"),
+                    &content,
+                    0,
+                ) {
                     suffix = matches.get(1).map(str::to_string);
                 }
             }
@@ -745,7 +746,7 @@ return array(
             let mut new_excluded: Vec<String> = vec![];
             for pattern in &excluded {
                 // extract the constant string prefix of the pattern here, until we reach a non-escaped regex special character
-                let pattern_processed = Preg::replace(
+                let pattern_processed = preg_replace(
                     php_regex!(
                         "{^(([^.+*?\\[^\\]$(){}=!<>|:\\\\#-]+|\\\\[.+*?\\[^\\]$(){}=!<>|:#-])*).*}"
                     ),
@@ -1127,7 +1128,7 @@ return array(
             }
         }
 
-        if Preg::is_match(php_regex!("{\\.phar([\\\\/]|$)}"), &path) {
+        if preg_match2(php_regex!("{\\.phar([\\\\/]|$)}"), &path, 0).is_some() {
             base_dir = format!("'phar://' . {}", base_dir);
         }
 
@@ -1152,7 +1153,8 @@ return array(
             let package = &item.0;
             let links = array_merge_map(package.get_replaces(), package.get_provides());
             for (_k, link) in &links {
-                if let Some(matches) = Preg::match3(php_regex!("{^ext-(.+)$}iD"), link.get_target())
+                if let Some(matches) =
+                    preg_match2(php_regex!("{^ext-(.+)$}iD"), link.get_target(), 0)
                     && let Some(ext) = matches.get(1).map(str::to_string)
                 {
                     extension_providers
@@ -1196,7 +1198,7 @@ return array(
 
                 if check_platform.as_bool() == Some(true)
                     && let Some(matches) =
-                        Preg::match3(php_regex!("{^ext-(.+)$}iD"), link.get_target())
+                        preg_match2(php_regex!("{^ext-(.+)$}iD"), link.get_target(), 0)
                 {
                     let ext_key = matches.get(1).unwrap_or_default().to_string();
                     // skip extension checks if they have a valid provider/replacer
@@ -1770,10 +1772,10 @@ class ComposerStaticInit{}
                 m
             });
             let value = shirabe_php_shim::ltrim(
-                &Preg::replace(php_regex!("/^ */m"), "    $0$0", &value),
+                &preg_replace(php_regex!("/^ */m"), "    $0$0", &value),
                 None,
             );
-            let value = Preg::replace(php_regex!("/ +$/m"), "", &value);
+            let value = preg_replace(php_regex!("/ +$/m"), "", &value);
 
             file.push_str(&format!(
                 "    public static ${} = {};\n\n",
@@ -1898,7 +1900,7 @@ class ComposerStaticInit{}
                                 .collect::<Vec<String>>()
                                 .join("[\\\\/]");
                             path_str = ltrim(
-                                &Preg::replace(
+                                &preg_replace(
                                     format!("{{^{}}}", target_dir),
                                     "",
                                     &ltrim(&path_str, Some("\\/")),
@@ -1917,7 +1919,7 @@ class ComposerStaticInit{}
 
                     if r#type == "exclude-from-classmap" {
                         // first escape user input
-                        let p = Preg::replace(
+                        let p = preg_replace(
                             php_regex!("{/+}"),
                             "/",
                             &preg_quote(&trim(&strtr(&path_str, "\\", "/"), Some("/")), None),
@@ -1934,17 +1936,18 @@ class ComposerStaticInit{}
                         // add support for up-level relative paths
                         let updir_cell: std::cell::RefCell<Option<String>> =
                             std::cell::RefCell::new(None);
-                        let p = Preg::replace_callback(
+                        let p = preg_replace_callback(
                             php_regex!("{^((?:(?:\\\\\\.){1,2}+/)+)}"),
-                            |matches: &PregMatches| -> String {
+                            |matches: &PregMatches| -> anyhow::Result<String> {
                                 // undo preg_quote for the matched string
                                 *updir_cell.borrow_mut() =
                                     Some(str_replace("\\.", ".", matches.get(1).unwrap_or("")));
 
-                                String::new()
+                                Ok(String::new())
                             },
                             &p,
-                        );
+                        )
+                        .expect("the replacement callback cannot fail");
                         let updir: Option<String> = updir_cell.into_inner();
                         let install_path_for_resolve = if install_path.is_empty() {
                             strtr(&Platform::get_cwd(false).unwrap_or_default(), "\\", "/")

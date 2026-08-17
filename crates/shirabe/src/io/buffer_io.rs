@@ -1,10 +1,9 @@
 //! ref: composer/src/Composer/IO/BufferIO.php
 
 use crate::io::ConsoleIO;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, PhpResource, RuntimeException, SEEK_SET, fopen, fseek, fwrite, php_regex,
-    rewind, stream_get_contents, strip_tags,
+    PHP_EOL, PhpMixed, PhpResource, PregMatches, RuntimeException, SEEK_SET, fopen, fseek, fwrite,
+    php_regex, preg_replace_callback, rewind, stream_get_contents, strip_tags,
 };
 use shirabe_symfony_console::formatter::OutputFormatterInterface;
 use shirabe_symfony_console::helper::QuestionHelper;
@@ -74,23 +73,24 @@ impl BufferIO {
         // pass, so the replacement is applied to a fixpoint (each pass strictly shrinks the string).
         let mut output = output;
         loop {
-            let next = Preg::replace_callback(
+            let next = preg_replace_callback(
                 php_regex!(r"{(^|\n|\x08)(.+?)(\x08+)}"),
-                |matches: &shirabe_pcre::PregMatches| -> String {
+                |matches: &PregMatches| -> anyhow::Result<String> {
                     let g1 = matches.get(1).unwrap_or("");
                     let g2 = matches.get(2).unwrap_or("");
                     let g3 = matches.get(3).unwrap_or("");
                     let pre = strip_tags(g2);
 
                     if pre.len() == g3.len() {
-                        return g1.to_string();
+                        return Ok(g1.to_string());
                     }
 
                     // TODO reverse parse the string, skipping span tags and \033\[([0-9;]+)m(.*?)\033\[0m style blobs
-                    format!("{}{}\n", g1, g2.trim_end())
+                    Ok(format!("{}{}\n", g1, g2.trim_end()))
                 },
                 &output,
-            );
+            )
+            .expect("the replacement callback cannot fail");
             if next == output {
                 break;
             }

@@ -16,12 +16,11 @@ use crate::util::http::CurlDownloader;
 use crate::util::http::Response;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, extension_loaded,
-    file_get_contents, function_exists, implode, is_numeric, php_regex, rawurldecode,
-    stream_context_create, stripos, strpos, substr, ucfirst,
+    file_get_contents, function_exists, implode, is_numeric, php_regex, preg_match2, preg_replace,
+    rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -240,8 +239,11 @@ impl HttpDownloader {
         let origin = Url::get_origin(&self.config.borrow(), url);
 
         // capture username/password from URL if there is one
-        if let Some(m) = Preg::is_match3(php_regex!(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i"), url)
-        {
+        if let Some(m) = preg_match2(
+            php_regex!(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i"),
+            url,
+            0,
+        ) {
             self.io.borrow_mut().set_authentication(
                 origin.clone(),
                 rawurldecode(m.get(1).unwrap_or_default().to_string().as_str()),
@@ -355,7 +357,7 @@ impl HttpDownloader {
     ) -> anyhow::Result<()> {
         let clean_message = |msg: &str| -> anyhow::Result<String> {
             if !io.is_decorated() {
-                return Ok(Preg::replace("{\x1b\\[[;\\d]*m}u", "", msg));
+                return Ok(preg_replace("{\x1b\\[[;\\d]*m}u", "", msg));
             }
 
             Ok(msg.to_string())
@@ -487,7 +489,7 @@ impl HttpDownloader {
             return false;
         }
 
-        if !Preg::is_match(php_regex!(r"{^https?://}i"), url) {
+        if preg_match2(php_regex!(r"{^https?://}i"), url, 0).is_none() {
             return false;
         }
 

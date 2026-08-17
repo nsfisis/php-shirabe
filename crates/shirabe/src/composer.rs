@@ -11,8 +11,7 @@ use crate::package::{LockerInterface, RootPackageInterfaceHandle};
 use crate::plugin::PluginManager;
 use crate::repository::RepositoryManagerInterface;
 use crate::util::r#loop::Loop;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::php_regex;
+use shirabe_php_shim::{php_regex, preg_match2};
 
 /// The Composer version this port tracks. Kept as-is so `Composer::VERSION`, the `composer`
 /// platform package and the HTTP User-Agent keep reporting a value plugins and servers can
@@ -43,7 +42,9 @@ pub fn get_version() -> String {
     if VERSION == "@package_version@" {
         return SOURCE_VERSION.to_string();
     }
-    if !BRANCH_ALIAS_VERSION.is_empty() && Preg::is_match(php_regex!("{^[a-f0-9]{40}$}"), VERSION) {
+    if !BRANCH_ALIAS_VERSION.is_empty()
+        && preg_match2(php_regex!("{^[a-f0-9]{40}$}"), VERSION, 0).is_some()
+    {
         return format!("{}+{}", BRANCH_ALIAS_VERSION, VERSION);
     }
     VERSION.to_string()

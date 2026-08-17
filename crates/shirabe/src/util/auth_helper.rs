@@ -9,11 +9,10 @@ use crate::util::Bitbucket;
 use crate::util::GitHub;
 use crate::util::GitLab;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, base64_encode, explode, in_array_loose, in_array_strict, is_array,
-    is_string, json_decode_assoc, parse_url, php_regex, str_replace, strpos, strtolower, substr,
-    trim,
+    is_string, json_decode_assoc, parse_url, php_regex, preg_match2, str_replace, strpos,
+    strtolower, substr, trim,
 };
 
 #[derive(Debug)]
@@ -537,7 +536,7 @@ impl AuthHelper {
                 }
             } else if origin == "github.com" && password == "x-oauth-basic" {
                 // only add the access_token if it is actually a github API URL
-                if Preg::is_match(php_regex!(r"{^https?://api\.github\.com/}"), url) {
+                if preg_match2(php_regex!(r"{^https?://api\.github\.com/}"), url, 0).is_some() {
                     headers.push(PhpMixed::String(format!(
                         "Authorization: token {}",
                         username,

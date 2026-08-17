@@ -6,8 +6,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepository;
 use crate::repository::RepositoryInterface;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::php_regex;
+use shirabe_php_shim::{php_regex, preg_replace};
 use shirabe_symfony_console::formatter::OutputFormatter;
 
 #[derive(Debug)]
@@ -207,6 +206,6 @@ impl SuggestedPackagesReporter {
     }
 
     fn remove_control_characters(&self, string: &str) -> String {
-        Preg::replace(php_regex!("/[[:cntrl:]]/"), "", &string.replace('\n', " "))
+        preg_replace(php_regex!("/[[:cntrl:]]/"), "", &string.replace('\n', " "))
     }
 }

@@ -8,8 +8,7 @@
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::util::filesystem::Filesystem;
-use shirabe_pcre::preg::Preg;
-use shirabe_php_shim::{PhpMixed, intval, php_regex, preg_split_delim_capture};
+use shirabe_php_shim::{PhpMixed, intval, php_regex, preg_match2, preg_split_delim_capture};
 use std::path::{Path, PathBuf};
 
 /// ref: AllFunctionalTest's `$oldcwd` / `$testDir` instance state plus its `setUp`/`tearDown`.
@@ -141,13 +140,13 @@ fn expect_matches(expected: &str, output: &str) {
             line += 1;
         }
         if eb[i] == b'%' {
-            let Some(m) = Preg::is_match3(php_regex!("{%(.+?)%}"), &expected[i..]) else {
+            let Some(m) = preg_match2(php_regex!("{%(.+?)%}"), &expected[i..], 0) else {
                 panic!("Failed to match %...% in {}", &expected[i..]);
             };
             let regex = m.get(1).map(str::to_string).unwrap();
 
             let pattern = format!("{{{}}}", regex);
-            if let Some(m) = Preg::is_match3(&pattern, &output[j..]) {
+            if let Some(m) = preg_match2(&pattern, &output[j..], 0) {
                 let full = m.get(0).map(str::to_string).unwrap();
                 i += regex.len() + 2;
                 j += full.len();
@@ -222,12 +221,16 @@ fn run_integration(test_filename: &str) {
         expect_matches(expected, output);
     }
     if let Some(expect_regex) = test_data.get("EXPECT-REGEX") {
-        assert!(Preg::is_match(expect_regex, &clean_output(&raw_output)));
+        assert!(preg_match2(expect_regex, &clean_output(&raw_output), 0).is_some());
     }
     if let Some(expect_regexes) = test_data.get("EXPECT-REGEXES") {
         let clean = clean_output(&raw_output);
         for regex in expect_regexes.split('\n') {
-            assert!(Preg::is_match(regex, &clean), "Output: {}", raw_output);
+            assert!(
+                preg_match2(regex, &clean, 0).is_some(),
+                "Output: {}",
+                raw_output
+            );
         }
     }
     if let Some(expect_exit_code) = test_data.get("EXPECT-EXIT-CODE") {

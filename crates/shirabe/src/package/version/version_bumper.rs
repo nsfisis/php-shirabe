@@ -5,8 +5,9 @@ use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::util::Platform;
-use shirabe_pcre::{CaptureKey, Preg};
-use shirabe_php_shim::php_regex;
+use shirabe_php_shim::{
+    CaptureKey, php_regex, preg_match_all_offset_capture, preg_match2, preg_replace,
+};
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -45,12 +46,12 @@ impl VersionBumper {
             return Ok(pretty_constraint);
         }
 
-        let major = Preg::replace(php_regex!(r"{^([1-9][0-9]*|0\.\d+).*}"), "$1", &version);
+        let major = preg_replace(php_regex!(r"{^([1-9][0-9]*|0\.\d+).*}"), "$1", &version);
         let version_without_suffix =
-            Preg::replace(php_regex!(r"{(?:\.(?:0|9999999))+(-dev)?$}"), "", &version);
+            preg_replace(php_regex!(r"{(?:\.(?:0|9999999))+(-dev)?$}"), "", &version);
         let new_pretty_constraint = format!("^{}", version_without_suffix);
 
-        if !Preg::is_match(php_regex!(r"{^\^\d+(\.\d+)*$}"), &new_pretty_constraint) {
+        if preg_match2(php_regex!(r"{^\^\d+(\.\d+)*$}"), &new_pretty_constraint, 0).is_none() {
             return Ok(pretty_constraint);
         }
 
@@ -77,7 +78,7 @@ impl VersionBumper {
             major = major
         );
 
-        let matches = Preg::is_match_all_with_offsets3(&pattern, &pretty_constraint);
+        let matches = preg_match_all_offset_capture(&pattern, &pretty_constraint);
         if matches.occurrence_count() > 0 {
             let mut modified = pretty_constraint.clone();
             let constraint_matches = matches

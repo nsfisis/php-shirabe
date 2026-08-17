@@ -12,11 +12,10 @@ use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, function_exists,
-    implode, is_string, json_encode, php_regex, preg_quote, str_replace, strlen, strnatcasecmp,
-    strpos, substr, trim, usort,
+    implode, is_string, json_encode, php_regex, preg_match2, preg_quote, preg_replace, str_replace,
+    strlen, strnatcasecmp, strpos, substr, trim, usort,
 };
 
 /// Seam over the parts of [`VersionGuesser`] that consumers depend on, so they can be exercised
@@ -157,12 +156,14 @@ impl VersionGuesser {
         }
 
         if "-dev" == substr(version_data.version.as_deref().unwrap_or(""), -4, None)
-            && Preg::is_match(
+            && preg_match2(
                 php_regex!(r"{\.9{7}}"),
                 version_data.version.as_deref().unwrap_or(""),
+                0,
             )
+            .is_some()
         {
-            version_data.pretty_version = Some(Preg::replace(
+            version_data.pretty_version = Some(preg_replace(
                 php_regex!(r"{(\.9{7})+}"),
                 ".x",
                 version_data.version.as_deref().unwrap_or(""),
@@ -181,12 +182,14 @@ impl VersionGuesser {
                     -4,
                     None,
                 )
-            && Preg::is_match(
+            && preg_match2(
                 php_regex!(r"{\.9{7}}"),
                 version_data.feature_version.as_deref().unwrap_or(""),
+                0,
             )
+            .is_some()
         {
-            version_data.feature_pretty_version = Some(Preg::replace(
+            version_data.feature_pretty_version = Some(preg_replace(
                 php_regex!(r"{(\.9{7})+}"),
                 ".x",
                 version_data.feature_version.as_deref().unwrap_or(""),
@@ -229,11 +232,12 @@ impl VersionGuesser {
             // find current branch and collect all branch names
             for branch in self.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
-                    && let Some(m) = Preg::is_match3(
+                    && let Some(m) = preg_match2(
                         php_regex!(
                             r"{^(?:\* ) *(\(no branch\)|\(detached from \S+\)|\(HEAD detached at \S+\)|\S+) *([a-f0-9]+) .*$}"
                         ),
                         &branch,
+                        0,
                     )
                 {
                     let g1 = m.get(1).unwrap_or_default().to_string();
@@ -256,12 +260,13 @@ impl VersionGuesser {
                 }
 
                 if !branch.is_empty()
-                    && Preg::is_match3(php_regex!(r"{^ *.+/HEAD }"), &branch).is_none()
-                    && let Some(m) = Preg::is_match3(
+                    && preg_match2(php_regex!(r"{^ *.+/HEAD }"), &branch, 0).is_none()
+                    && let Some(m) = preg_match2(
                         php_regex!(
                             r"{^(?:\* )? *((?:remotes/(?:origin|upstream)/)?[^\s/]+) *([a-f0-9]+) .*$}"
                         ),
                         &branch,
+                        0,
                     )
                 {
                     branches.push(m.get(1).unwrap_or_default().to_string());
@@ -499,8 +504,7 @@ impl VersionGuesser {
         )
         .is_some();
         if !has_branch_alias || has_self_version {
-            let branch =
-                Preg::replace(php_regex!(r"{^dev-}"), "", version.as_deref().unwrap_or(""));
+            let branch = preg_replace(php_regex!(r"{^dev-}"), "", version.as_deref().unwrap_or(""));
             let mut length = i64::MAX;
 
             // return directly, if branch is configured to be non-feature branch
@@ -534,7 +538,7 @@ impl VersionGuesser {
                 for (index, candidate) in branches.iter().enumerate() {
                     let index = index as i64;
                     let candidate_version =
-                        Preg::replace(php_regex!(r"{^remotes/\S+/}"), "", candidate);
+                        preg_replace(php_regex!(r"{^remotes/\S+/}"), "", candidate);
 
                     // do not compare against itself or other feature branches
                     if candidate == &branch
@@ -608,13 +612,10 @@ impl VersionGuesser {
             non_feature_branches = implode("|", &names);
         }
 
-        !Preg::is_match(
-            format!(
-                r"{{^({}|master|main|latest|next|current|support|tip|trunk|default|develop|\d+\..+)$}}",
-                non_feature_branches,
-            ),
-            branch_name.unwrap_or(""),
-        )
+        preg_match2(format!(
+            r"{{^({}|master|main|latest|next|current|support|tip|trunk|default|develop|\d+\..+)$}}",
+            non_feature_branches,
+        ), branch_name.unwrap_or(""), 0).is_none()
     }
 
     fn guess_fossil_version(&mut self, path: &str) -> anyhow::Result<VersionData> {
@@ -697,7 +698,7 @@ impl VersionGuesser {
                 trunk_path, branches_path, tags_path,
             );
 
-            if let Some(matches) = Preg::is_match3(&url_pattern, &output) {
+            if let Some(matches) = preg_match2(&url_pattern, &output, 0) {
                 let m1 = matches.get(1).unwrap_or_default();
                 let m2 = matches.get(2);
                 let m3 = matches.get(3);
@@ -750,7 +751,7 @@ impl VersionGuesser {
                 .into());
             }
         };
-        if let Some(m) = Preg::is_match3(php_regex!(r"{^(\d+(?:\.\d+)*)-dev$}i"), &version) {
+        if let Some(m) = preg_match2(php_regex!(r"{^(\d+(?:\.\d+)*)-dev$}i"), &version, 0) {
             return Ok(format!("{}.x-dev", m.get(1).unwrap_or_default()));
         }
 

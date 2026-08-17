@@ -2,8 +2,10 @@
 
 use crate::config::Config;
 use crate::util::GitHub;
-use shirabe_pcre::Preg;
-use shirabe_php_shim::{PhpMixed, in_array_strict, parse_url, php_regex};
+use shirabe_php_shim::{
+    PhpMixed, in_array_strict, parse_url, php_regex, preg_match2, preg_replace,
+    preg_replace_callback,
+};
 
 pub struct Url;
 
@@ -14,11 +16,12 @@ impl Url {
             .unwrap_or_default();
 
         if host == "api.github.com" || host == "github.com" || host == "www.github.com" {
-            if let Some(m) = Preg::match3(
+            if let Some(m) = preg_match2(
                 php_regex!(
                     r"{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/(zip|tar)ball/(.+)$}i"
                 ),
                 &url,
+                0,
             ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
@@ -27,11 +30,12 @@ impl Url {
                     m.get(3).unwrap_or_default(),
                     r#ref
                 );
-            } else if let Some(m) = Preg::match3(
+            } else if let Some(m) = preg_match2(
                 php_regex!(
                     r"{^https?://(?:www\.)?github\.com/([^/]+)/([^/]+)/archive/.+\.(zip|tar)(?:\.gz)?$}i"
                 ),
                 &url,
+                0,
             ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
@@ -40,11 +44,12 @@ impl Url {
                     m.get(3).unwrap_or_default(),
                     r#ref
                 );
-            } else if let Some(m) = Preg::match3(
+            } else if let Some(m) = preg_match2(
                 php_regex!(
                     r"{^https?://api\.github\.com/repos/([^/]+)/([^/]+)/(zip|tar)ball(?:/.+)?$}i"
                 ),
                 &url,
+                0,
             ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
@@ -55,11 +60,12 @@ impl Url {
                 );
             }
         } else if host == "bitbucket.org" || host == "www.bitbucket.org" {
-            if let Some(m) = Preg::match3(
+            if let Some(m) = preg_match2(
                 php_regex!(
                     r"{^https?://(?:www\.)?bitbucket\.org/([^/]+)/([^/]+)/get/(.+)\.(zip|tar\.gz|tar\.bz2)$}i"
                 ),
                 &url,
+                0,
             ) {
                 url = format!(
                     "https://bitbucket.org/{}/{}/get/{}.{}",
@@ -70,11 +76,12 @@ impl Url {
                 );
             }
         } else if host == "gitlab.com" || host == "www.gitlab.com" {
-            if let Some(m) = Preg::match3(
+            if let Some(m) = preg_match2(
                 php_regex!(
                     r"{^https?://(?:www\.)?gitlab\.com/api/v[34]/projects/([^/]+)/repository/archive\.(zip|tar\.gz|tar\.bz2|tar)\?sha=.+$}i"
                 ),
                 &url,
+                0,
             ) {
                 url = format!(
                     "https://gitlab.com/api/v4/projects/{}/repository/archive.{}?sha={}",
@@ -84,13 +91,13 @@ impl Url {
                 );
             }
         } else if in_array_strict(host.clone(), config.get("github-domains").values()) {
-            url = Preg::replace(
+            url = preg_replace(
                 php_regex!(r"{(/repos/[^/]+/[^/]+/(zip|tar)ball)(?:/.+)?$}i"),
                 &format!("$1/{}", r#ref),
                 &url,
             );
         } else if in_array_strict(host, config.get("gitlab-domains").values()) {
-            url = Preg::replace(
+            url = preg_replace(
                 php_regex!(
                     r"{(/api/v[34]/projects/[^/]+/repository/archive\.(?:zip|tar\.gz|tar\.bz2|tar)\?sha=).+$}i"
                 ),
@@ -158,21 +165,24 @@ impl Url {
     pub fn sanitize(url: String) -> String {
         // GitHub repository rename result in redirect locations containing the access_token as GET parameter
         // e.g. https://api.github.com/repositories/9999999999?access_token=github_token
-        let url = Preg::replace(php_regex!(r"{([&?]access_token=)[^&]+}"), "$1***", &url);
+        let url = preg_replace(php_regex!(r"{([&?]access_token=)[^&]+}"), "$1***", &url);
 
-        Preg::replace_callback(
+        preg_replace_callback(
             php_regex!(r"{^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@}i"),
             |m| {
                 let user = m.name("user").unwrap_or_default().to_string();
                 let prefix = m.name("prefix").unwrap_or_default().to_string();
                 // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
-                if Preg::is_match(GitHub::GITHUB_TOKEN_REGEX, &user) {
-                    format!("{}***:***@", prefix)
-                } else {
-                    format!("{}{}:***@", prefix, user)
-                }
+                Ok(
+                    if preg_match2(GitHub::GITHUB_TOKEN_REGEX, &user, 0).is_some() {
+                        format!("{}***:***@", prefix)
+                    } else {
+                        format!("{}{}:***@", prefix, user)
+                    },
+                )
             },
             &url,
         )
+        .expect("the replacement callback cannot fail")
     }
 }

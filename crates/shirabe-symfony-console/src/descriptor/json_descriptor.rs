@@ -10,8 +10,7 @@ use crate::input::InputDefinition;
 use crate::input::InputOption;
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_pcre::preg::Preg;
-use shirabe_php_shim::{PhpMixed, php_regex};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_replace};
 
 /// JSON descriptor.
 ///
@@ -160,7 +159,7 @@ impl JsonDescriptor {
         data.insert("is_array".to_string(), PhpMixed::Bool(argument.is_array()));
         data.insert(
             "description".to_string(),
-            PhpMixed::String(Preg::replace(
+            PhpMixed::String(preg_replace(
                 php_regex!("/\\s*[\\r\\n]\\s*/"),
                 " ",
                 argument.get_description(),
@@ -221,7 +220,7 @@ impl JsonDescriptor {
             data.insert("is_multiple".to_string(), PhpMixed::Bool(option.is_array()));
             data.insert(
                 "description".to_string(),
-                PhpMixed::String(Preg::replace(
+                PhpMixed::String(preg_replace(
                     php_regex!("/\\s*[\\r\\n]\\s*/"),
                     " ",
                     option.get_description(),

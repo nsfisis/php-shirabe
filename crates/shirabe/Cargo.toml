@@ -11,7 +11,6 @@ license.workspace = true
 shirabe-ca-bundle.workspace = true
 shirabe-class-map-generator.workspace = true
 shirabe-metadata-minifier.workspace = true
-shirabe-pcre.workspace = true
 shirabe-php-rpc.workspace = true
 shirabe-php-shim.workspace = true
 shirabe-seld-json-lint.workspace = true

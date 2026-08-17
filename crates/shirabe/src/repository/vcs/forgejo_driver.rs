@@ -15,10 +15,10 @@ use crate::util::ForgejoRepositoryData;
 use crate::util::ForgejoUrl;
 use crate::util::http::Response;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, php_regex, urlencode,
+    PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, php_regex, preg_match2,
+    urlencode,
 };
 
 #[derive(Debug)]
@@ -584,7 +584,7 @@ impl ForgejoDriver {
 
         let links = explode(",", &header);
         for link in links {
-            if let Some(m) = Preg::match3(php_regex!(r#"{<(.+?)>; *rel="next"}"#), &link)
+            if let Some(m) = preg_match2(php_regex!(r#"{<(.+?)>; *rel="next"}"#), &link, 0)
                 && let Some(url) = m.get(1)
             {
                 return Some(url.to_string());

@@ -15,12 +15,11 @@ use crate::util::HttpDownloader;
 use crate::util::http::Response;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_search_mixed,
     array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array_loose, is_array,
-    is_string, ord, php_regex, strpos, strtolower,
+    is_string, ord, php_regex, preg_match2, preg_replace, strpos, strtolower,
 };
 
 /// Driver for GitLab API, use the Git driver for local checkouts.
@@ -81,7 +80,7 @@ impl GitLabDriver {
     ///
     /// SSH urls use https by default. Set "secure-http": false on the repository config to use http instead.
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        let Some(match_) = Preg::is_match3(Self::URL_REGEX, &self.inner.url) else {
+        let Some(match_) = preg_match2(Self::URL_REGEX, &self.inner.url, 0) else {
             return Err(InvalidArgumentException::new(format!(
                 "The GitLab repository URL {} is invalid. It must be the HTTP URL of a GitLab project.",
                 self.inner.url.clone(),
@@ -152,7 +151,7 @@ impl GitLabDriver {
         }
 
         self.namespace = implode("/", &url_parts);
-        self.repository = Preg::replace(
+        self.repository = preg_replace(
             php_regex!(r"#(\.git)$#"),
             "",
             match_.name("repo").unwrap_or_default(),
@@ -383,7 +382,7 @@ impl GitLabDriver {
 
         // Convert the root identifier to a cacheable commit id
         let mut identifier = identifier.to_string();
-        if !Preg::is_match(php_regex!(r"{[a-f0-9]{40}}i"), &identifier) {
+        if preg_match2(php_regex!(r"{[a-f0-9]{40}}i"), &identifier, 0).is_none() {
             let branches = self.get_branches()?;
             if let Some(sha) = branches.get(&identifier) {
                 identifier = sha.clone();
@@ -927,7 +926,7 @@ impl GitLabDriver {
         url: &str,
         _deep: bool,
     ) -> anyhow::Result<bool> {
-        let Some(match_) = Preg::is_match3(Self::URL_REGEX, url) else {
+        let Some(match_) = preg_match2(Self::URL_REGEX, url, 0) else {
             return Ok(false);
         };
 
@@ -978,7 +977,7 @@ impl GitLabDriver {
 
         let links = explode(",", &header);
         for link in &links {
-            if let Some(match_) = Preg::is_match3(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
+            if let Some(match_) = preg_match2(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link, 0) {
                 return Some(match_.get(1).unwrap_or_default().to_string());
             }
         }
@@ -1022,7 +1021,7 @@ impl GitLabDriver {
             if in_array_loose(guessed_domain.clone(), configured_domains.values())
                 || (port_number.is_some()
                     && in_array_loose(
-                        Preg::replace(php_regex!(r"{:\d+}"), "", &guessed_domain),
+                        preg_replace(php_regex!(r"{:\d+}"), "", &guessed_domain),
                         configured_domains.values(),
                     ))
             {

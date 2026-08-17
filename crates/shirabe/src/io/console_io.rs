@@ -9,10 +9,9 @@ use crate::io::io_interface;
 use crate::question::StrictConfirmationQuestion;
 use indexmap::IndexMap;
 use indexmap::indexmap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    PhpMixed, array_search, in_array_strict, is_array, is_string, microtime, str_repeat,
-    strip_tags, strlen,
+    PhpMixed, array_search, in_array_strict, is_array, is_string, microtime, preg_replace,
+    str_repeat, strip_tags, strlen,
 };
 use shirabe_symfony_console::helper::ProgressBar;
 use shirabe_symfony_console::helper::QuestionHelper;
@@ -237,7 +236,7 @@ impl ConsoleIO {
         };
         let messages = Self::ensure_valid_utf8(messages);
 
-        Preg::replace(&pattern, replacement, &messages)
+        preg_replace(&pattern, replacement, &messages)
     }
 
     /// Ensures a string is valid UTF-8, replacing invalid byte sequences with '?'

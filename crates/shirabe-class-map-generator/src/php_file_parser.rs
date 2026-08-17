@@ -1,10 +1,10 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileParser.php
 
 use crate::php_file_cleaner::PhpFileCleaner;
-use shirabe_pcre::{CaptureKey, Preg};
 use shirabe_php_shim::{
-    PHP_EOL, RuntimeException, file_exists, file_get_contents, function_exists, is_file,
-    is_readable, ltrim, php_strip_whitespace, str_replace_array, strrpos, substr, trim,
+    CaptureKey, PHP_EOL, RuntimeException, file_exists, file_get_contents, function_exists,
+    is_file, is_readable, ltrim, php_strip_whitespace, preg_match_all2, str_replace_array, strrpos,
+    substr, trim,
 };
 use std::sync::OnceLock;
 
@@ -58,7 +58,7 @@ impl PhpFileParser {
 
         // return early if there is no chance of matching anything in this file
         let pattern = format!("{{\\b(?:class|interface|trait{})\\s}}i", extra_types);
-        let max_matches = Preg::match_all(&pattern, &contents);
+        let max_matches = preg_match_all2(&pattern, &contents).occurrence_count();
         if max_matches == 0 {
             return Ok(vec![]);
         }
@@ -84,7 +84,7 @@ impl PhpFileParser {
         }}ix",
             et = extra_types
         );
-        let matches = Preg::match_all2(&pattern2, &contents);
+        let matches = preg_match_all2(&pattern2, &contents);
 
         let mut classes = vec![];
         let mut namespace = String::new();

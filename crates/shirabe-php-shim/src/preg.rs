@@ -1,3 +1,18 @@
+//! PHP's `preg_*` functions. Composer reaches PCRE through the `Composer\Pcre\Preg` wrapper; its
+//! call sites are ported straight onto these functions. `Preg`'s `*StrictGroups()` variants have no
+//! counterpart here because `Option` already tells a non-participating capture group from an empty
+//! one, and a pattern that fails to compile panics instead of raising `PcreException`: Composer
+//! never assembles a pattern that PCRE rejects, so such a failure is a programming error.
+//!
+//! This module's functions do not mirror the PHP signatures for two reasons.
+//!
+//! * Typing: the shape of the `$matches` out parameter of `preg_*()` functions depends on the
+//!   `PREG_*` flags, which is hard to represent in a type-safe way.
+//! * Performance: pattern matching is performed in Composer's hot loops such as dependency
+//!   resolution. Allocating a PHP-compatible `$matches` array is expensive.
+//!
+//! See docs/dev/regex-porting.md for the regex porting rules.
+
 use indexmap::IndexMap;
 use std::sync::{Arc, LazyLock, Mutex};
 

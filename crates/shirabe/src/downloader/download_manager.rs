@@ -8,12 +8,11 @@ use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
-    array_reverse, array_shift, dirname, implode, in_array_strict, preg_quote, rtrim, str_replace,
-    strtolower, usort,
+    array_reverse, array_shift, dirname, implode, in_array_strict, preg_match2, preg_quote, rtrim,
+    str_replace, strtolower, usort,
 };
 
 /// Downloaders manager.
@@ -431,7 +430,7 @@ impl DownloadManager {
                 "{{^{}$}}i",
                 str_replace("\\*", ".*", &preg_quote(pattern, None)),
             );
-            if Preg::is_match(&pattern_regex, &package.get_name()) {
+            if preg_match2(&pattern_regex, &package.get_name(), 0).is_some() {
                 if "dist" == preference || (!package.is_dev() && "auto" == preference) {
                     return "dist".to_string();
                 }

@@ -25,12 +25,11 @@ use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
 use crate::util::PackageSorter;
 use indexmap::IndexMap;
-use shirabe_pcre::Preg;
 use shirabe_php_rpc::{PluginValue, call_function_with_dispatcher};
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, dirname, empty,
-    file_get_contents, implode, ksort, php_regex, preg_quote, strrpos, strtr_array, substr,
-    trigger_error, trim, var_export, var_export_str, version_compare,
+    file_get_contents, implode, ksort, php_regex, preg_match2, preg_quote, preg_replace2, strrpos,
+    strtr_array, substr, trigger_error, trim, var_export, var_export_str, version_compare,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -260,7 +259,7 @@ impl PluginManager {
             }
 
             if package.get_name() == "symfony/flex"
-                && Preg::is_match3(php_regex!("{^[0-9.]+$}"), &package.get_version()).is_some()
+                && preg_match2(php_regex!("{^[0-9.]+$}"), &package.get_version(), 0).is_some()
                 && version_compare(&package.get_version(), "1.9.8", CmpOp::Lt)
             {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it is not compatible with Composer 2+. Make sure to update it to version 1.9.8 or greater.</warning>",
@@ -448,7 +447,7 @@ impl PluginManager {
                 {
                     class_name = substr(&class, (separator_pos + 1) as i64, None);
                 }
-                let code = Preg::replace4(
+                let code = preg_replace2(
                     format!(
                         "{{^((?:(?:final|readonly)\\s+)*(?:\\s*))class\\s+({})}}mi",
                         preg_quote(&class_name, None)
@@ -456,13 +455,14 @@ impl PluginManager {
                     &format!("$1class $2_composer_tmp{}", class_counter),
                     &code,
                     1,
+                    None,
                 );
                 let mut replacements: IndexMap<String, String> = IndexMap::new();
                 replacements.insert("__FILE__".to_string(), var_export_str(&path, true));
                 replacements.insert("__DIR__".to_string(), var_export_str(&dirname(&path), true));
                 replacements.insert("__CLASS__".to_string(), var_export_str(&class, true));
                 let code = strtr_array(&code, &replacements);
-                let code = Preg::replace4(r"/^\s*<\?(php)?/i", "", &code, 1);
+                let code = preg_replace2(r"/^\s*<\?(php)?/i", "", &code, 1, None);
                 self.php_runtime_eval(&code)?;
                 class = format!("{}_composer_tmp{}", class, class_counter);
                 CLASS_COUNTER.store(class_counter + 1, std::sync::atomic::Ordering::Relaxed);
@@ -1242,7 +1242,7 @@ impl PluginManager {
             .map(|(k, v)| (k.clone(), *v))
             .collect();
         for (pattern, allow) in &rules_snapshot {
-            if Preg::is_match3(pattern, package).is_some() {
+            if preg_match2(pattern, package, 0).is_some() {
                 return Ok(*allow);
             }
         }

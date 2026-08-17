@@ -6,9 +6,9 @@ use crate::command::base_command::base_command_initialize;
 use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::util::Platform;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, impl_php_class, is_string, php_regex,
+    preg_replace2,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -134,7 +134,8 @@ impl Command for ScriptAliasCommand {
         // TODO(symfony): InputInterface lacks to_string; use a placeholder until it is modeled.
         let input_as_string = String::new();
         let _ = input;
-        let script_alias_input = Preg::replace4(php_regex!(r"{^\S+ ?}"), "", &input_as_string, 1);
+        let script_alias_input =
+            preg_replace2(php_regex!(r"{^\S+ ?}"), "", &input_as_string, 1, None);
         let mut flags = indexmap::IndexMap::new();
         flags.insert(
             "script-alias-input".to_string(),

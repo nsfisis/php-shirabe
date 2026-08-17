@@ -8,9 +8,8 @@ use crate::console::input::InputArgument;
 use crate::factory::Factory;
 use crate::util::Filesystem;
 use crate::util::Platform;
-use shirabe_pcre::Preg;
 use shirabe_php_shim::{
-    LogicException, RuntimeException, chdir, impl_php_class, php_regex, preg_split,
+    LogicException, RuntimeException, chdir, impl_php_class, php_regex, preg_replace2, preg_split,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::completion::CompletionInput;
@@ -105,11 +104,12 @@ impl GlobalCommand {
             ));
         }
 
-        let new_input_str = Preg::replace4(
+        let new_input_str = preg_replace2(
             php_regex!(r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}"),
             "",
             &Self::input_to_string(&*input.borrow())?,
             1,
+            None,
         );
         self.reset_composer()?;
 
