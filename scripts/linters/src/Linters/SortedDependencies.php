@@ -62,7 +62,7 @@ final class SortedDependencies implements Linter
         foreach (explode("\n", $content) as $line) {
             $stripped = rtrim($line, "\r\n");
 
-            if (preg_match('/\A\s*\[([^\]]+)\]\s*\z/', $stripped, $m)) {
+            if (preg_match('/\A\s*\[\[?([^\[\]]+)\]\]?\s*\z/', $stripped, $m)) {
                 $current = $m[1];
                 $sections[$current] ??= [];
                 continue;

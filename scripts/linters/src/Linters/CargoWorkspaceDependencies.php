@@ -48,7 +48,7 @@ final class CargoWorkspaceDependencies implements Linter
         foreach (file($path) as $idx => $rawLine) {
             $stripped = trim($rawLine);
 
-            if (preg_match('/\A\[([^\]]+)\]\z/', $stripped, $m)) {
+            if (preg_match('/\A\[\[?([^\[\]]+)\]\]?\z/', $stripped, $m)) {
                 $currentSection = $m[1];
                 continue;
             }
