@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description = "A Rust port of Composer, the dependency manager for PHP"
+autobenches = false
 repository.workspace = true
 license.workspace = true
 
@@ -47,6 +48,14 @@ tempfile.workspace = true
 
 [[bench]]
 name = "process_executor"
+harness = false
+
+[[bench]]
+name = "metadata_minifier"
+harness = false
+
+[[bench]]
+name = "composer_repository"
 harness = false
 
 [lints]

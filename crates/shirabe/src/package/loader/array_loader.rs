@@ -23,6 +23,27 @@ use shirabe_php_shim::{
     strval, substr, trigger_error, trim,
 };
 
+/// The fields of one package version, read without regard for how they are stored. A version
+/// array decoded from a repository response implements this, and so does one still held as a view
+/// into minified metadata.
+pub trait VersionFields {
+    fn get(&self, key: &str) -> Option<&PhpMixed>;
+
+    fn contains_key(&self, key: &str) -> bool {
+        self.get(key).is_some()
+    }
+}
+
+impl VersionFields for IndexMap<String, PhpMixed> {
+    fn get(&self, key: &str) -> Option<&PhpMixed> {
+        IndexMap::get(self, key)
+    }
+
+    fn contains_key(&self, key: &str) -> bool {
+        IndexMap::contains_key(self, key)
+    }
+}
+
 #[derive(Debug)]
 pub struct ArrayLoader {
     /// @var VersionParser
@@ -689,10 +710,7 @@ impl ArrayLoader {
     /// @param mixed[] $config the entire package config
     ///
     /// @return string|null normalized version of the branch alias or null if there is none
-    pub fn get_branch_alias(
-        &self,
-        config: &IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<Option<String>> {
+    pub fn get_branch_alias(&self, config: &impl VersionFields) -> anyhow::Result<Option<String>> {
         if !config.contains_key("version") || !is_scalar(config.get("version").unwrap()) {
             return Err(
                 UnexpectedValueException::new("no/invalid version defined".to_string()).into(),

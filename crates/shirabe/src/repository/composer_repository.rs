@@ -13,6 +13,7 @@ use crate::package::BasePackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::loader::ArrayLoader;
+use crate::package::loader::VersionFields;
 use crate::package::version::StabilityFilter;
 use crate::package::version::VersionParser;
 use crate::plugin::PluginEvents;
@@ -36,6 +37,8 @@ use crate::util::sync_executor;
 use futures::StreamExt;
 use futures::stream::FuturesOrdered;
 use indexmap::IndexMap;
+use shirabe_metadata_minifier::ExpandedVersion;
+use shirabe_metadata_minifier::ExpandedVersions;
 use shirabe_metadata_minifier::MetadataMinifier;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
@@ -137,6 +140,84 @@ pub enum FindPackageReturn {
 pub struct LoadAsyncPackagesResult {
     pub names_found: IndexMap<String, bool>,
     pub packages: IndexMap<String, BasePackageHandle>,
+}
+
+/// The version list `load_async_packages` walks. A response in the minified format is expanded
+/// lazily, so a version is copied out only once the filters accept it; any other response is
+/// walked as it was decoded.
+#[derive(Debug)]
+enum VersionList {
+    Plain(Vec<IndexMap<String, PhpMixed>>),
+    Minified(ExpandedVersions),
+}
+
+impl VersionList {
+    fn len(&self) -> usize {
+        match self {
+            Self::Plain(versions) => versions.len(),
+            Self::Minified(expanded) => expanded.len(),
+        }
+    }
+
+    fn version(&self, index: usize) -> Version<'_> {
+        match self {
+            Self::Plain(versions) => Version::Plain(&versions[index]),
+            Self::Minified(expanded) => Version::Minified(expanded.version(index)),
+        }
+    }
+
+    fn set(&mut self, index: usize, key: &str, val: PhpMixed) {
+        match self {
+            Self::Plain(versions) => {
+                versions[index].insert(key.to_string(), val);
+            }
+            Self::Minified(expanded) => expanded.set(index, key, val),
+        }
+    }
+
+    /// Copies the version out for `create_packages`. It is not read again afterwards.
+    fn take(&mut self, index: usize) -> IndexMap<String, PhpMixed> {
+        match self {
+            Self::Plain(versions) => std::mem::take(&mut versions[index]),
+            Self::Minified(expanded) => expanded.materialize(index),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Version<'a> {
+    Plain(&'a IndexMap<String, PhpMixed>),
+    Minified(ExpandedVersion<'a>),
+}
+
+impl<'a> Version<'a> {
+    fn get(&self, key: &str) -> Option<&'a PhpMixed> {
+        match self {
+            Self::Plain(version) => version.get(key),
+            Self::Minified(version) => version.get(key),
+        }
+    }
+
+    fn get_string(&self, key: &str) -> Option<&'a str> {
+        self.get(key).and_then(|v| v.as_string())
+    }
+
+    fn contains_key(&self, key: &str) -> bool {
+        match self {
+            Self::Plain(version) => version.contains_key(key),
+            Self::Minified(version) => version.contains_key(key),
+        }
+    }
+}
+
+impl VersionFields for Version<'_> {
+    fn get(&self, key: &str) -> Option<&PhpMixed> {
+        Version::get(self, key)
+    }
+
+    fn contains_key(&self, key: &str) -> bool {
+        Version::contains_key(self, key)
+    }
 }
 
 impl ConfigurableRepositoryInterface for ComposerRepository {
@@ -1810,7 +1891,7 @@ impl ComposerRepository {
                     None => continue,
                 };
 
-            let mut versions: Vec<IndexMap<String, PhpMixed>> = match versions_mixed {
+            let versions: Vec<IndexMap<String, PhpMixed>> = match versions_mixed {
                 PhpMixed::List(l) => l
                     .into_iter()
                     .filter_map(|v| match v {
@@ -1830,47 +1911,40 @@ impl ComposerRepository {
 
             let minified =
                 response_arr.get("minified").and_then(|v| v.as_string()) == Some("composer/2.0");
-            if minified {
-                versions = MetadataMinifier::expand(versions);
-            }
+            let mut versions = if minified {
+                VersionList::Minified(MetadataMinifier::expand(versions))
+            } else {
+                VersionList::Plain(versions)
+            };
 
             names_found.insert(real_name.clone(), true);
             let mut versions_to_load: Vec<IndexMap<String, PhpMixed>> = Vec::new();
-            for version in versions.into_iter() {
-                let mut version = version;
-                let has_vn = version.contains_key("version_normalized");
+            for index in 0..versions.len() {
+                let has_vn = versions.version(index).contains_key("version_normalized");
                 if !has_vn {
-                    let v = version
-                        .get("version")
-                        .and_then(|v| v.as_string())
+                    let v = versions
+                        .version(index)
+                        .get_string("version")
                         .unwrap_or("")
                         .to_string();
                     let normalized = version_parser.normalize(&v, None)?;
-                    version.insert(
-                        "version_normalized".to_string(),
-                        PhpMixed::String(normalized),
-                    );
-                } else if version
-                    .get("version_normalized")
-                    .and_then(|v| v.as_string())
+                    versions.set(index, "version_normalized", PhpMixed::String(normalized));
+                } else if versions.version(index).get_string("version_normalized")
                     == Some(VersionParser::DEFAULT_BRANCH_ALIAS)
                 {
                     // handling of existing repos which need to remain composer v1 compatible, in case the version_normalized contained VersionParser::DEFAULT_BRANCH_ALIAS, we renormalize it
-                    let v = version
-                        .get("version")
-                        .and_then(|v| v.as_string())
+                    let v = versions
+                        .version(index)
+                        .get_string("version")
                         .unwrap_or("")
                         .to_string();
                     let normalized = version_parser.normalize(&v, None)?;
-                    version.insert(
-                        "version_normalized".to_string(),
-                        PhpMixed::String(normalized),
-                    );
+                    versions.set(index, "version_normalized", PhpMixed::String(normalized));
                 }
 
-                let version_normalized = version
-                    .get("version_normalized")
-                    .and_then(|v| v.as_string())
+                let version_normalized = versions
+                    .version(index)
+                    .get_string("version_normalized")
                     .unwrap_or("")
                     .to_string();
                 // avoid loading packages which have already been loaded
@@ -1884,12 +1958,12 @@ impl ComposerRepository {
                 let acceptable = ComposerRepository::is_version_acceptable_static(
                     constraint.as_ref(),
                     &real_name,
-                    &version,
+                    &versions.version(index),
                     acceptable_stabilities,
                     stability_flags,
                 )?;
                 if acceptable {
-                    versions_to_load.push(version);
+                    versions_to_load.push(versions.take(index));
                 }
             }
 
@@ -2007,7 +2081,7 @@ impl ComposerRepository {
         &self,
         constraint: Option<&AnyConstraint>,
         name: &str,
-        version_data: &IndexMap<String, PhpMixed>,
+        version_data: &impl VersionFields,
         acceptable_stabilities: Option<&IndexMap<String, i64>>,
         stability_flags: Option<&IndexMap<String, i64>>,
     ) -> anyhow::Result<bool> {
@@ -2024,7 +2098,7 @@ impl ComposerRepository {
     fn is_version_acceptable_static(
         constraint: Option<&AnyConstraint>,
         name: &str,
-        version_data: &IndexMap<String, PhpMixed>,
+        version_data: &impl VersionFields,
         acceptable_stabilities: Option<&IndexMap<String, i64>>,
         stability_flags: Option<&IndexMap<String, i64>>,
     ) -> anyhow::Result<bool> {
@@ -2042,7 +2116,7 @@ impl ComposerRepository {
         loader: &ArrayLoader,
         constraint: Option<&AnyConstraint>,
         name: &str,
-        version_data: &IndexMap<String, PhpMixed>,
+        version_data: &impl VersionFields,
         acceptable_stabilities: Option<&IndexMap<String, i64>>,
         stability_flags: Option<&IndexMap<String, i64>>,
     ) -> anyhow::Result<bool> {

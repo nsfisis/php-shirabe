@@ -66,5 +66,5 @@ fn test_minify_expand() {
         dumper.dump(package3.into()),
     ];
 
-    assert_eq!(source, MetadataMinifier::expand(minified));
+    assert_eq!(source, MetadataMinifier::expand(minified).into_vec());
 }
