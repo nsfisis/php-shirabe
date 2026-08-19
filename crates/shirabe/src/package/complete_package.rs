@@ -279,24 +279,24 @@ impl PackageInterface for CompletePackage {
         self.inner.get_stability()
     }
 
-    fn get_requires(&self) -> IndexMap<String, super::Link> {
-        self.inner.get_requires().clone()
+    fn get_requires(&self) -> std::rc::Rc<IndexMap<String, super::Link>> {
+        PackageInterface::get_requires(&self.inner)
     }
 
-    fn get_conflicts(&self) -> IndexMap<String, super::Link> {
-        self.inner.get_conflicts().clone()
+    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<String, super::Link>> {
+        PackageInterface::get_conflicts(&self.inner)
     }
 
-    fn get_provides(&self) -> IndexMap<String, super::Link> {
-        self.inner.get_provides().clone()
+    fn get_provides(&self) -> std::rc::Rc<IndexMap<String, super::Link>> {
+        PackageInterface::get_provides(&self.inner)
     }
 
-    fn get_replaces(&self) -> IndexMap<String, super::Link> {
-        self.inner.get_replaces().clone()
+    fn get_replaces(&self) -> std::rc::Rc<IndexMap<String, super::Link>> {
+        PackageInterface::get_replaces(&self.inner)
     }
 
-    fn get_dev_requires(&self) -> IndexMap<String, super::Link> {
-        self.inner.get_dev_requires().clone()
+    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<String, super::Link>> {
+        PackageInterface::get_dev_requires(&self.inner)
     }
 
     fn get_suggests(&self) -> IndexMap<String, String> {

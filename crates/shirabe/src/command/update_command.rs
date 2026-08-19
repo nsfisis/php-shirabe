@@ -83,8 +83,8 @@ impl UpdateCommand {
         let platform_req_filter = self.get_platform_requirement_filter(input);
         let stability_flags = composer_ref.get_package().get_stability_flags();
         let requires = array_merge_map(
-            composer_ref.get_package().get_requires(),
-            composer_ref.get_package().get_dev_requires(),
+            (*composer_ref.get_package().get_requires()).clone(),
+            (*composer_ref.get_package().get_dev_requires()).clone(),
         );
 
         let filter: Option<String> = if !packages.is_empty() {
@@ -156,7 +156,7 @@ impl UpdateCommand {
             }
         }
         if installed_packages.is_empty() {
-            for (req, _constraint) in &requires {
+            for (req, _constraint) in requires.iter() {
                 if PlatformRepository::is_platform_package(req) {
                     continue;
                 }
@@ -401,9 +401,11 @@ impl Command for UpdateCommand {
 
         let parser = VersionParser::new();
         let mut temporary_constraints: IndexMap<String, _> = IndexMap::new();
-        let root_requirements =
-            array_merge_map(root_package.get_requires(), root_package.get_dev_requires());
-        for (package, constraint) in &reqs {
+        let root_requirements = array_merge_map(
+            (*root_package.get_requires()).clone(),
+            (*root_package.get_dev_requires()).clone(),
+        );
+        for (package, constraint) in reqs.iter() {
             let package = strtolower(package);
             let parsed_constraint = parser.parse_constraints(constraint)?;
             temporary_constraints.insert(package.clone(), parsed_constraint.clone());

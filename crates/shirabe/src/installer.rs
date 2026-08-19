@@ -1082,13 +1082,13 @@ impl Installer {
                 request.fix_locked_package(package.clone());
             }
 
-            let mut root_requires = self.package.get_requires();
+            let mut root_requires = (*self.package.get_requires()).clone();
             if self.dev_mode {
-                for (k, v) in self.package.get_dev_requires() {
-                    root_requires.insert(k, v);
+                for (k, v) in self.package.get_dev_requires().iter() {
+                    root_requires.insert(k.clone(), v.clone());
                 }
             }
-            for (_key, link) in &root_requires {
+            for (_key, link) in root_requires.iter() {
                 if PlatformRepository::is_platform_package(link.get_target()) {
                     request.require_name(link.get_target(), Some(link.get_constraint().clone()))?;
                 }
@@ -1331,11 +1331,11 @@ impl Installer {
 
             // Convert Link map merge into ConstraintInterface map for use later
             let mut req_links: IndexMap<String, Link> = IndexMap::new();
-            for (k, v) in self.package.get_requires() {
-                req_links.insert(k, v);
+            for (k, v) in self.package.get_requires().iter() {
+                req_links.insert(k.clone(), v.clone());
             }
-            for (k, v) in self.package.get_dev_requires() {
-                req_links.insert(k, v);
+            for (k, v) in self.package.get_dev_requires().iter() {
+                req_links.insert(k.clone(), v.clone());
             }
             // Translate to constraint map for downstream uniform handling.
             let mut tmp: IndexMap<String, AnyConstraint> = IndexMap::new();
@@ -1579,13 +1579,13 @@ impl Installer {
                 }
             }
         } else {
-            let mut links = self.package.get_requires();
+            let mut links = (*self.package.get_requires()).clone();
             if include_dev_requires {
-                for (k, v) in self.package.get_dev_requires() {
-                    links.insert(k, v);
+                for (k, v) in self.package.get_dev_requires().iter() {
+                    links.insert(k.clone(), v.clone());
                 }
             }
-            for (_key, link) in &links {
+            for (_key, link) in links.iter() {
                 request.require_name(link.get_target(), Some(link.get_constraint().clone()))?;
             }
         }

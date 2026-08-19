@@ -939,7 +939,7 @@ impl ShowCommand {
         remote_repos: &RepositoryInterfaceHandle,
     ) -> PackageTree {
         let requires = {
-            let mut r: IndexMap<String, Link> = package.get_requires();
+            let mut r: IndexMap<String, Link> = (*package.get_requires()).clone();
             r.sort_keys();
             r
         };
@@ -1055,7 +1055,7 @@ impl ShowCommand {
         };
         let (package, _) = self.get_package(installed_repo, remote_repos, name, version_arg)?;
         if let Some(package) = package {
-            let mut requires = package.get_requires();
+            let mut requires = (*package.get_requires()).clone();
             requires.sort_keys();
             for (require_name, require) in requires.iter() {
                 let mut current_tree = packages_in_tree.to_vec();

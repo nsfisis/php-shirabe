@@ -54,11 +54,11 @@ pub struct Package {
     stability: String,
     notification_url: Option<String>,
 
-    requires: IndexMap<String, Link>,
-    conflicts: IndexMap<String, Link>,
-    provides: IndexMap<String, Link>,
-    replaces: IndexMap<String, Link>,
-    dev_requires: IndexMap<String, Link>,
+    requires: std::rc::Rc<IndexMap<String, Link>>,
+    conflicts: std::rc::Rc<IndexMap<String, Link>>,
+    provides: std::rc::Rc<IndexMap<String, Link>>,
+    replaces: std::rc::Rc<IndexMap<String, Link>>,
+    dev_requires: std::rc::Rc<IndexMap<String, Link>>,
     suggests: IndexMap<String, String>,
     autoload: IndexMap<String, PhpMixed>,
     dev_autoload: IndexMap<String, PhpMixed>,
@@ -98,11 +98,11 @@ impl Package {
             dev,
             stability,
             notification_url: None,
-            requires: IndexMap::new(),
-            conflicts: IndexMap::new(),
-            provides: IndexMap::new(),
-            replaces: IndexMap::new(),
-            dev_requires: IndexMap::new(),
+            requires: std::rc::Rc::new(IndexMap::new()),
+            conflicts: std::rc::Rc::new(IndexMap::new()),
+            provides: std::rc::Rc::new(IndexMap::new()),
+            replaces: std::rc::Rc::new(IndexMap::new()),
+            dev_requires: std::rc::Rc::new(IndexMap::new()),
             suggests: IndexMap::new(),
             autoload: IndexMap::new(),
             dev_autoload: IndexMap::new(),
@@ -299,7 +299,7 @@ impl Package {
             requires = self.convert_links_to_map(requires, "setRequires");
         }
 
-        self.requires = requires;
+        self.requires = std::rc::Rc::new(requires);
     }
 
     pub fn get_requires(&self) -> &IndexMap<String, Link> {
@@ -311,7 +311,7 @@ impl Package {
             conflicts = self.convert_links_to_map(conflicts, "setConflicts");
         }
 
-        self.conflicts = conflicts;
+        self.conflicts = std::rc::Rc::new(conflicts);
     }
 
     pub fn get_conflicts(&self) -> &IndexMap<String, Link> {
@@ -323,7 +323,7 @@ impl Package {
             provides = self.convert_links_to_map(provides, "setProvides");
         }
 
-        self.provides = provides;
+        self.provides = std::rc::Rc::new(provides);
     }
 
     pub fn get_provides(&self) -> &IndexMap<String, Link> {
@@ -335,7 +335,7 @@ impl Package {
             replaces = self.convert_links_to_map(replaces, "setReplaces");
         }
 
-        self.replaces = replaces;
+        self.replaces = std::rc::Rc::new(replaces);
     }
 
     pub fn get_replaces(&self) -> &IndexMap<String, Link> {
@@ -347,7 +347,7 @@ impl Package {
             dev_requires = self.convert_links_to_map(dev_requires, "setDevRequires");
         }
 
-        self.dev_requires = dev_requires;
+        self.dev_requires = std::rc::Rc::new(dev_requires);
     }
 
     pub fn get_dev_requires(&self) -> &IndexMap<String, Link> {
@@ -604,12 +604,12 @@ impl PackageInterface for Package {
         names.insert(self.get_name().to_string());
 
         if provides {
-            for (_, link) in self.get_provides() {
+            for (_, link) in self.get_provides().iter() {
                 names.insert(link.get_target().to_string());
             }
         }
 
-        for (_, link) in self.get_replaces() {
+        for (_, link) in self.get_replaces().iter() {
             names.insert(link.get_target().to_string());
         }
 
@@ -693,20 +693,20 @@ impl PackageInterface for Package {
     fn get_stability(&self) -> &str {
         &self.stability
     }
-    fn get_requires(&self) -> IndexMap<String, Link> {
-        self.requires.clone()
+    fn get_requires(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+        std::rc::Rc::clone(&self.requires)
     }
-    fn get_conflicts(&self) -> IndexMap<String, Link> {
-        self.conflicts.clone()
+    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+        std::rc::Rc::clone(&self.conflicts)
     }
-    fn get_provides(&self) -> IndexMap<String, Link> {
-        self.provides.clone()
+    fn get_provides(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+        std::rc::Rc::clone(&self.provides)
     }
-    fn get_replaces(&self) -> IndexMap<String, Link> {
-        self.replaces.clone()
+    fn get_replaces(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+        std::rc::Rc::clone(&self.replaces)
     }
-    fn get_dev_requires(&self) -> IndexMap<String, Link> {
-        self.dev_requires.clone()
+    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+        std::rc::Rc::clone(&self.dev_requires)
     }
     fn get_suggests(&self) -> IndexMap<String, String> {
         self.suggests.clone()

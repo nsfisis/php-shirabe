@@ -159,31 +159,31 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// this package can be installed
     ///
     /// @return array<string, Link> A map of package links defining required packages, indexed by the require package's name
-    fn get_requires(&self) -> IndexMap<String, Link>;
+    fn get_requires(&self) -> std::rc::Rc<IndexMap<String, Link>>;
 
     /// Returns a set of links to packages which must not be installed at the
     /// same time as this package
     ///
     /// @return array<string, Link> A map of package links defining conflicting packages
-    fn get_conflicts(&self) -> IndexMap<String, Link>;
+    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<String, Link>>;
 
     /// Returns a set of links to virtual packages that are provided through
     /// this package
     ///
     /// @return array<string, Link> A map of package links defining provided packages
-    fn get_provides(&self) -> IndexMap<String, Link>;
+    fn get_provides(&self) -> std::rc::Rc<IndexMap<String, Link>>;
 
     /// Returns a set of links to packages which can alternatively be
     /// satisfied by installing this package
     ///
     /// @return array<string, Link> A map of package links defining replaced packages
-    fn get_replaces(&self) -> IndexMap<String, Link>;
+    fn get_replaces(&self) -> std::rc::Rc<IndexMap<String, Link>>;
 
     /// Returns a set of links to packages which are required to develop
     /// this package. These are installed if in dev mode.
     ///
     /// @return array<string, Link> A map of package links defining packages required for development, indexed by the require package's name
-    fn get_dev_requires(&self) -> IndexMap<String, Link>;
+    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<String, Link>>;
 
     /// Returns a set of package names and reasons why they are useful in
     /// combination with this package.
@@ -192,14 +192,17 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn get_suggests(&self) -> IndexMap<String, String>;
 
     /// PHP helper that switches on the link kind (require/require-dev/conflict/etc.).
-    fn get_links_for_type(&self, link_type: &str) -> IndexMap<String, crate::package::Link> {
+    fn get_links_for_type(
+        &self,
+        link_type: &str,
+    ) -> std::rc::Rc<IndexMap<String, crate::package::Link>> {
         match link_type {
             "require" => self.get_requires(),
             "require-dev" => self.get_dev_requires(),
             "conflict" => self.get_conflicts(),
             "provide" => self.get_provides(),
             "replace" => self.get_replaces(),
-            _ => IndexMap::new(),
+            _ => std::rc::Rc::new(IndexMap::new()),
         }
     }
 

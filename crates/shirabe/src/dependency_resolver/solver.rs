@@ -178,7 +178,7 @@ impl Solver {
         request: &Request,
         platform_requirement_filter: &dyn PlatformRequirementFilterInterface,
     ) -> anyhow::Result<()> {
-        for (package_name, constraint) in request.get_requires() {
+        for (package_name, constraint) in request.get_requires().iter() {
             let mut filtered: Option<AnyConstraint> = None;
             let constraint_ref: &AnyConstraint = constraint;
             if platform_requirement_filter.is_ignored(package_name) {

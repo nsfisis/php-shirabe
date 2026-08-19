@@ -167,10 +167,13 @@ impl BumpCommand {
         let bumper = VersionBumper;
         let mut tasks = indexmap::IndexMap::new();
         if !dev_only {
-            tasks.insert("require", composer.get_package().get_requires());
+            tasks.insert("require", (*composer.get_package().get_requires()).clone());
         }
         if !no_dev_only {
-            tasks.insert("require-dev", composer.get_package().get_dev_requires());
+            tasks.insert(
+                "require-dev",
+                (*composer.get_package().get_dev_requires()).clone(),
+            );
         }
 
         let packages_filter = if !packages_filter.is_empty() {
@@ -196,7 +199,7 @@ impl BumpCommand {
         let mut updates: indexmap::IndexMap<&str, indexmap::IndexMap<String, String>> =
             indexmap::IndexMap::new();
         for (key, reqs) in &tasks {
-            for (pkg_name, link) in reqs {
+            for (pkg_name, link) in reqs.iter() {
                 if PlatformRepository::is_platform_package(pkg_name) {
                     continue;
                 }

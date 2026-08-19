@@ -39,15 +39,15 @@ pub struct AliasPackage {
     /// @var BasePackage
     pub(crate) alias_of: PackageHandle,
     /// @var Link[]
-    pub(crate) requires: IndexMap<String, Link>,
+    pub(crate) requires: std::rc::Rc<IndexMap<String, Link>>,
     /// @var Link[]
-    pub(crate) dev_requires: IndexMap<String, Link>,
+    pub(crate) dev_requires: std::rc::Rc<IndexMap<String, Link>>,
     /// @var array<string, Link>
-    pub(crate) conflicts: IndexMap<String, Link>,
+    pub(crate) conflicts: std::rc::Rc<IndexMap<String, Link>>,
     /// @var array<string, Link>
-    pub(crate) provides: IndexMap<String, Link>,
+    pub(crate) provides: std::rc::Rc<IndexMap<String, Link>>,
     /// @var array<string, Link>
-    pub(crate) replaces: IndexMap<String, Link>,
+    pub(crate) replaces: std::rc::Rc<IndexMap<String, Link>>,
 }
 
 impl AliasPackage {
@@ -74,15 +74,15 @@ impl AliasPackage {
             stability,
             has_self_version_requires: false,
             alias_of,
-            requires: IndexMap::new(),
-            dev_requires: IndexMap::new(),
-            conflicts: IndexMap::new(),
-            provides: IndexMap::new(),
-            replaces: IndexMap::new(),
+            requires: std::rc::Rc::new(IndexMap::new()),
+            dev_requires: std::rc::Rc::new(IndexMap::new()),
+            conflicts: std::rc::Rc::new(IndexMap::new()),
+            provides: std::rc::Rc::new(IndexMap::new()),
+            replaces: std::rc::Rc::new(IndexMap::new()),
         };
 
         for r#type in Link::types() {
-            let links: IndexMap<String, Link> = match r#type {
+            let links: std::rc::Rc<IndexMap<String, Link>> = match r#type {
                 Link::TYPE_REQUIRE => this.alias_of.get_requires(),
                 Link::TYPE_DEV_REQUIRE => this.alias_of.get_dev_requires(),
                 Link::TYPE_PROVIDE => this.alias_of.get_provides(),
@@ -90,7 +90,8 @@ impl AliasPackage {
                 Link::TYPE_REPLACE => this.alias_of.get_replaces(),
                 _ => unreachable!(),
             };
-            let replaced = this.replace_self_version_dependencies(links, r#type);
+            let replaced =
+                std::rc::Rc::new(this.replace_self_version_dependencies((*links).clone(), r#type));
             match r#type {
                 Link::TYPE_REQUIRE => this.requires = replaced,
                 Link::TYPE_DEV_REQUIRE => this.dev_requires = replaced,
@@ -252,27 +253,27 @@ impl PackageInterface for AliasPackage {
         &self.pretty_version
     }
 
-    fn get_requires(&self) -> IndexMap<String, Link> {
-        self.requires.clone()
+    fn get_requires(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+        std::rc::Rc::clone(&self.requires)
     }
 
     /// @inheritDoc
-    fn get_conflicts(&self) -> IndexMap<String, Link> {
-        self.conflicts.clone()
+    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+        std::rc::Rc::clone(&self.conflicts)
     }
 
     /// @inheritDoc
-    fn get_provides(&self) -> IndexMap<String, Link> {
-        self.provides.clone()
+    fn get_provides(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+        std::rc::Rc::clone(&self.provides)
     }
 
     /// @inheritDoc
-    fn get_replaces(&self) -> IndexMap<String, Link> {
-        self.replaces.clone()
+    fn get_replaces(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+        std::rc::Rc::clone(&self.replaces)
     }
 
-    fn get_dev_requires(&self) -> IndexMap<String, Link> {
-        self.dev_requires.clone()
+    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+        std::rc::Rc::clone(&self.dev_requires)
     }
 
     fn get_type(&self) -> String {

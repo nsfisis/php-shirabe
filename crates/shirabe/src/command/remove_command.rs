@@ -479,8 +479,14 @@ impl Command for RemoveCommand {
         if dry_run {
             let root_package = composer.get_package();
             let mut links: IndexMap<String, IndexMap<String, _>> = IndexMap::new();
-            links.insert("require".to_string(), root_package.get_requires());
-            links.insert("require-dev".to_string(), root_package.get_dev_requires());
+            links.insert(
+                "require".to_string(),
+                (*root_package.get_requires()).clone(),
+            );
+            links.insert(
+                "require-dev".to_string(),
+                (*root_package.get_dev_requires()).clone(),
+            );
             for (link_type, names) in &to_remove {
                 for name in names {
                     if let Some(section) = links.get_mut(link_type.as_str()) {

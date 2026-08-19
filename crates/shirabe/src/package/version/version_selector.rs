@@ -142,7 +142,7 @@ impl VersionSelector {
             for pkg in candidates.iter() {
                 let reqs = pkg.get_requires();
                 let mut skip = false;
-                'reqs: for (name, link) in &reqs {
+                'reqs: for (name, link) in reqs.iter() {
                     if !PlatformRepository::is_platform_package(name)
                         || platform_requirement_filter.is_ignored(name)
                     {

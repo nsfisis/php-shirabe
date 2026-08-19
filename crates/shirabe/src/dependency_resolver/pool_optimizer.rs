@@ -103,7 +103,7 @@ impl PoolOptimizer {
         }
 
         // Extract requested package requirements
-        for (require, constraint) in request.get_requires() {
+        for (require, constraint) in request.get_requires().iter() {
             self.extract_require_constraints_per_package(require, constraint.clone());
         }
 
@@ -258,7 +258,7 @@ impl PoolOptimizer {
                     }
 
                     if !package.get_replaces().is_empty() {
-                        for (_, link) in package.get_replaces() {
+                        for (_, link) in package.get_replaces().iter() {
                             if CompilingMatcher::r#match(
                                 link.get_constraint(),
                                 CmpOp::Eq,

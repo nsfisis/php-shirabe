@@ -972,7 +972,7 @@ impl GitLabDriver {
         let header = response.get_header("link").unwrap_or_default();
 
         let links = explode(",", &header);
-        for link in &links {
+        for link in links.iter() {
             if let Some(match_) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
                 return Some(match_.get(1).unwrap_or_default().to_string());
             }

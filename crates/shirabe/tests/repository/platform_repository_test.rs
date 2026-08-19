@@ -1587,7 +1587,7 @@ fn assert_package_links(
     context: &str,
     expected_links: &[&str],
     source_package: &BasePackageHandle,
-    links: IndexMap<String, Link>,
+    links: &IndexMap<String, Link>,
 ) {
     assert_eq!(
         expected_links.len(),
@@ -1707,13 +1707,13 @@ fn test_library_information() {
                         "replaces",
                         expected_replaces,
                         &package,
-                        package.get_replaces(),
+                        &package.get_replaces(),
                     );
                     assert_package_links(
                         "provides",
                         expected_provides,
                         &package,
-                        package.get_provides(),
+                        &package.get_provides(),
                     );
                 }
             }

@@ -84,8 +84,10 @@ impl InstalledRepository {
                     continue;
                 }
 
-                let provides_and_replaces =
-                    array_merge_map(candidate.get_provides(), candidate.get_replaces());
+                let provides_and_replaces = array_merge_map(
+                    (*candidate.get_provides()).clone(),
+                    (*candidate.get_replaces()).clone(),
+                );
                 for link in provides_and_replaces.values() {
                     if name == link.get_target()
                         && (constraint.is_none()
@@ -126,12 +128,12 @@ impl InstalledRepository {
         }
 
         for package in self.inner.get_packages()? {
-            let mut links: IndexMap<String, Link> = package.get_requires();
+            let mut links: IndexMap<String, Link> = (*package.get_requires()).clone();
             let mut packages_in_tree = packages_found.clone();
 
             if !invert {
-                for (k, v) in package.get_replaces() {
-                    links.entry(k).or_insert(v);
+                for (k, v) in package.get_replaces().iter() {
+                    links.entry(k.clone()).or_insert(v.clone());
                 }
 
                 let needles_snapshot = needles.clone();
@@ -169,8 +171,8 @@ impl InstalledRepository {
             }
 
             if package.as_root().is_some() {
-                for (k, v) in package.get_dev_requires() {
-                    links.entry(k).or_insert(v);
+                for (k, v) in package.get_dev_requires().iter() {
+                    links.entry(k.clone()).or_insert(v.clone());
                 }
             }
 
@@ -297,8 +299,10 @@ impl InstalledRepository {
                         .into();
 
                         if link.get_target() != pkg.get_name().as_str() {
-                            let replaces_and_provides =
-                                array_merge_map(pkg.get_replaces(), pkg.get_provides());
+                            let replaces_and_provides = array_merge_map(
+                                (*pkg.get_replaces()).clone(),
+                                (*pkg.get_provides()).clone(),
+                            );
                             for prov in replaces_and_provides.values() {
                                 if link.get_target() == prov.get_target() {
                                     version = prov.get_constraint().clone();
@@ -309,9 +313,10 @@ impl InstalledRepository {
 
                         if !link.get_constraint().matches(&version) {
                             if let Some(root_pkg) = root_package.as_ref() {
-                                let mut root_reqs: IndexMap<String, Link> = root_pkg.get_requires();
-                                for (k, v) in root_pkg.get_dev_requires() {
-                                    root_reqs.entry(k).or_insert(v);
+                                let mut root_reqs: IndexMap<String, Link> =
+                                    (*root_pkg.get_requires()).clone();
+                                for (k, v) in root_pkg.get_dev_requires().iter() {
+                                    root_reqs.entry(k.clone()).or_insert(v.clone());
                                 }
                                 for root_req in root_reqs.values() {
                                     if pkg

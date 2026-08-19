@@ -224,7 +224,7 @@ impl PluginManager {
         if package.get_type() == "composer-plugin" {
             let requires_map = package.get_requires();
             let mut requires_composer: Option<&shirabe_semver::constraint::AnyConstraint> = None;
-            for (_k, link) in &requires_map {
+            for (_k, link) in requires_map.iter() {
                 if "composer-plugin-api" == link.get_target() {
                     requires_composer = Some(link.get_constraint());
                     break;
@@ -951,7 +951,7 @@ impl PluginManager {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<IndexMap<String, PackageInterfaceHandle>> {
         // TODO(plugin): used by registerPackage to assemble plugin dependency autoload map
-        for (_k, require_link) in &package.get_requires() {
+        for (_k, require_link) in package.get_requires().iter() {
             for required_package in installed_repo
                 .find_packages_with_replacers_and_providers(require_link.get_target(), None)?
             {

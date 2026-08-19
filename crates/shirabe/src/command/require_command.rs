@@ -200,8 +200,14 @@ impl RequireCommand {
             let root_package = composer.get_package();
             let mut links: IndexMap<String, IndexMap<String, crate::package::Link>> =
                 IndexMap::new();
-            links.insert("require".to_string(), root_package.get_requires());
-            links.insert("require-dev".to_string(), root_package.get_dev_requires());
+            links.insert(
+                "require".to_string(),
+                (*root_package.get_requires()).clone(),
+            );
+            links.insert(
+                "require-dev".to_string(),
+                (*root_package.get_dev_requires()).clone(),
+            );
             let loader = ArrayLoader::new(None, false);
             let requirements_mixed: IndexMap<String, PhpMixed> = requirements
                 .iter()

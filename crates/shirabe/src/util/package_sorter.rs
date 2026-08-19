@@ -43,9 +43,14 @@ impl PackageSorter {
         let mut usage_list: IndexMap<String, Vec<String>> = IndexMap::new();
 
         for package in &packages {
-            let mut links: IndexMap<String, Link> = package.get_requires();
+            let mut links: IndexMap<String, Link> = (*package.get_requires()).clone();
             if let Some(root_package) = package.as_root() {
-                links.extend(root_package.get_dev_requires());
+                links.extend(
+                    root_package
+                        .get_dev_requires()
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.clone())),
+                );
             }
             for link in links.values() {
                 let target = link.get_target().to_string();

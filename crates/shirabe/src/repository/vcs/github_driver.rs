@@ -1230,7 +1230,7 @@ impl GitHubDriver {
         }
 
         let links = explode(",", &header);
-        for link in &links {
+        for link in links.iter() {
             if let Some(m) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
                 return Some(m.get(1).unwrap_or_default().to_string());
             }

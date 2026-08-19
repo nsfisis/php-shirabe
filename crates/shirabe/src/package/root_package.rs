@@ -338,19 +338,19 @@ impl PackageInterface for RootPackage {
     fn get_stability(&self) -> &str {
         self.inner.get_stability()
     }
-    fn get_requires(&self) -> IndexMap<String, Link> {
+    fn get_requires(&self) -> std::rc::Rc<IndexMap<String, Link>> {
         self.inner.get_requires()
     }
-    fn get_conflicts(&self) -> IndexMap<String, Link> {
+    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<String, Link>> {
         self.inner.get_conflicts()
     }
-    fn get_provides(&self) -> IndexMap<String, Link> {
+    fn get_provides(&self) -> std::rc::Rc<IndexMap<String, Link>> {
         self.inner.get_provides()
     }
-    fn get_replaces(&self) -> IndexMap<String, Link> {
+    fn get_replaces(&self) -> std::rc::Rc<IndexMap<String, Link>> {
         self.inner.get_replaces()
     }
-    fn get_dev_requires(&self) -> IndexMap<String, Link> {
+    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<String, Link>> {
         self.inner.get_dev_requires()
     }
     fn get_suggests(&self) -> IndexMap<String, String> {

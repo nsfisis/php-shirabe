@@ -510,7 +510,7 @@ impl FilesystemRepository {
                 .as_array()
                 .map(|m| m.contains_key(&package.get_name()))
                 .unwrap_or(false);
-            for (_, replace) in package.get_replaces() {
+            for (_, replace) in package.get_replaces().iter() {
                 // exclude platform replaces as when they are really there we can not check for their presence
                 if PlatformRepository::is_platform_package(replace.get_target()) {
                     continue;
@@ -527,7 +527,7 @@ impl FilesystemRepository {
                     is_dev_package,
                 );
             }
-            for (_, provide) in package.get_provides() {
+            for (_, provide) in package.get_provides().iter() {
                 // exclude platform provides as when they are really there we can not check for their presence
                 if PlatformRepository::is_platform_package(provide.get_target()) {
                     continue;

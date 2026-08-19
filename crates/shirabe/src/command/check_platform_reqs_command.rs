@@ -243,7 +243,7 @@ impl Command for CheckPlatformReqsCommand {
         };
 
         if !no_dev {
-            for (require, link) in composer.get_package().get_dev_requires() {
+            for (require, link) in composer.get_package().get_dev_requires().iter() {
                 requires
                     .entry(require.to_string())
                     .or_default()
@@ -263,7 +263,7 @@ impl Command for CheckPlatformReqsCommand {
             if remove_packages.contains(&package.get_name().to_string()) {
                 continue;
             }
-            for (require, link) in package.get_requires() {
+            for (require, link) in package.get_requires().iter() {
                 requires
                     .entry(require.to_string())
                     .or_default()
@@ -289,27 +289,28 @@ impl Command for CheckPlatformReqsCommand {
                 if !candidates.is_empty() {
                     let mut req_results: Vec<CheckResult> = vec![];
                     'candidates: for candidate in &candidates {
-                        let candidate_constraint: Option<AnyConstraint> = if candidate.get_name()
-                            == *require
-                        {
-                            let c = SimpleConstraint::new(
-                                "=".to_string(),
-                                candidate.get_version().to_string(),
-                                Some(candidate.get_pretty_version().to_string()),
-                            );
-                            Some(c.into())
-                        } else {
-                            let mut found: Option<AnyConstraint> = None;
-                            let provides_and_replaces =
-                                array_merge_map(candidate.get_provides(), candidate.get_replaces());
-                            for (_, link) in &provides_and_replaces {
-                                if link.get_target() == require {
-                                    found = Some(link.get_constraint().clone());
-                                    break;
+                        let candidate_constraint: Option<AnyConstraint> =
+                            if candidate.get_name() == *require {
+                                let c = SimpleConstraint::new(
+                                    "=".to_string(),
+                                    candidate.get_version().to_string(),
+                                    Some(candidate.get_pretty_version().to_string()),
+                                );
+                                Some(c.into())
+                            } else {
+                                let mut found: Option<AnyConstraint> = None;
+                                let provides_and_replaces = array_merge_map(
+                                    (*candidate.get_provides()).clone(),
+                                    (*candidate.get_replaces()).clone(),
+                                );
+                                for (_, link) in &provides_and_replaces {
+                                    if link.get_target() == require {
+                                        found = Some(link.get_constraint().clone());
+                                        break;
+                                    }
                                 }
-                            }
-                            found
-                        };
+                                found
+                            };
 
                         let candidate_constraint = match candidate_constraint {
                             Some(c) => c,

@@ -2005,11 +2005,11 @@ fn dispatch_package_method(
             ))
         }
         "getStability" => Ok(PluginValue::string(package.get_stability().to_string())),
-        "getRequires" => Ok(links(package.get_requires())),
-        "getConflicts" => Ok(links(package.get_conflicts())),
-        "getProvides" => Ok(links(package.get_provides())),
-        "getReplaces" => Ok(links(package.get_replaces())),
-        "getDevRequires" => Ok(links(package.get_dev_requires())),
+        "getRequires" => Ok(links((*package.get_requires()).clone())),
+        "getConflicts" => Ok(links((*package.get_conflicts()).clone())),
+        "getProvides" => Ok(links((*package.get_provides()).clone())),
+        "getReplaces" => Ok(links((*package.get_replaces()).clone())),
+        "getDevRequires" => Ok(links((*package.get_dev_requires()).clone())),
         "getSuggests" => {
             let suggests = package.get_suggests();
             if suggests.is_empty() {

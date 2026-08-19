@@ -254,7 +254,7 @@ impl RuleSetGenerator {
                     .into_iter()
                     .collect();
 
-                for conflict in &conflicts {
+                for conflict in conflicts.iter() {
                     // define the conflict rule for regular packages, for alias packages it's only needed if the name
                     // matches the conflict exactly, otherwise the name match is by provide/replace which means the
                     // package which this is an alias of will conflict anyway, so no need to create additional rules
@@ -328,7 +328,7 @@ impl RuleSetGenerator {
             self.add_rule(RuleSet::TYPE_REQUEST, Some(Rule::Generic(rule)));
         }
 
-        for (package_name, constraint) in request.get_requires() {
+        for (package_name, constraint) in request.get_requires().iter() {
             let mut constraint = constraint.clone();
             if platform_requirement_filter.is_ignored(package_name) {
                 continue;

@@ -322,19 +322,29 @@ macro_rules! delegate_package_interface_to_inner {
             fn get_stability(&self) -> &str {
                 self.$field.get_stability()
             }
-            fn get_requires(&self) -> indexmap::IndexMap<String, crate::package::Link> {
+            fn get_requires(
+                &self,
+            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
                 self.$field.get_requires()
             }
-            fn get_conflicts(&self) -> indexmap::IndexMap<String, crate::package::Link> {
+            fn get_conflicts(
+                &self,
+            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
                 self.$field.get_conflicts()
             }
-            fn get_provides(&self) -> indexmap::IndexMap<String, crate::package::Link> {
+            fn get_provides(
+                &self,
+            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
                 self.$field.get_provides()
             }
-            fn get_replaces(&self) -> indexmap::IndexMap<String, crate::package::Link> {
+            fn get_replaces(
+                &self,
+            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
                 self.$field.get_replaces()
             }
-            fn get_dev_requires(&self) -> indexmap::IndexMap<String, crate::package::Link> {
+            fn get_dev_requires(
+                &self,
+            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
                 self.$field.get_dev_requires()
             }
             fn get_suggests(&self) -> indexmap::IndexMap<String, String> {
@@ -585,23 +595,33 @@ macro_rules! impl_package_interface_handle {
                     .to_string()
             }
 
-            pub fn get_requires(&self) -> indexmap::IndexMap<String, crate::package::Link> {
+            pub fn get_requires(
+                &self,
+            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
                 self.0.borrow().as_package_interface().get_requires()
             }
 
-            pub fn get_conflicts(&self) -> indexmap::IndexMap<String, crate::package::Link> {
+            pub fn get_conflicts(
+                &self,
+            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
                 self.0.borrow().as_package_interface().get_conflicts()
             }
 
-            pub fn get_provides(&self) -> indexmap::IndexMap<String, crate::package::Link> {
+            pub fn get_provides(
+                &self,
+            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
                 self.0.borrow().as_package_interface().get_provides()
             }
 
-            pub fn get_replaces(&self) -> indexmap::IndexMap<String, crate::package::Link> {
+            pub fn get_replaces(
+                &self,
+            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
                 self.0.borrow().as_package_interface().get_replaces()
             }
 
-            pub fn get_dev_requires(&self) -> indexmap::IndexMap<String, crate::package::Link> {
+            pub fn get_dev_requires(
+                &self,
+            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
                 self.0.borrow().as_package_interface().get_dev_requires()
             }
 
@@ -612,7 +632,7 @@ macro_rules! impl_package_interface_handle {
             pub fn get_links_for_type(
                 &self,
                 link_type: &str,
-            ) -> indexmap::IndexMap<String, crate::package::Link> {
+            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
                 self.0
                     .borrow()
                     .as_package_interface()

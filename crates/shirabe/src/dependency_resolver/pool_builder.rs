@@ -164,7 +164,7 @@ impl PoolBuilder {
                         .entry(locked_package.get_name())
                         .or_default()
                         .push(locked_package.clone());
-                    for (_k, link) in &locked_package.get_replaces() {
+                    for (_k, link) in locked_package.get_replaces().iter() {
                         self.skipped_load
                             .entry(link.get_target().to_string())
                             .or_default()
@@ -202,7 +202,7 @@ impl PoolBuilder {
             );
 
             // replace means conflict, so if a fixed package replaces a name, no need to load that one, packages would conflict anyways
-            for (_k, link) in &package.get_replaces() {
+            for (_k, link) in package.get_replaces().iter() {
                 self.loaded_packages.insert(
                     link.get_target().to_string(),
                     MatchAllConstraint::new(None).into(),
@@ -229,7 +229,7 @@ impl PoolBuilder {
             }
         }
 
-        for (package_name, constraint) in request.get_requires() {
+        for (package_name, constraint) in request.get_requires().iter() {
             // fixed and locked packages have already been added, so if a root require needs one of them, no need to do anything
             if self.loaded_packages.contains_key(package_name) {
                 continue;
@@ -662,7 +662,7 @@ impl PoolBuilder {
         }
 
         let requires = package.get_requires();
-        for (_k, link) in &requires {
+        for (_k, link) in requires.iter() {
             let require = link.get_target().to_string();
             let link_constraint = link.get_constraint();
 
@@ -702,7 +702,7 @@ impl PoolBuilder {
         // if we're doing a partial update with deps we also need to unlock packages which are being replaced in case
         // they are currently locked and thus prevent this updateable package from being installable/updateable
         if propagate_update && request.get_update_allow_transitive_dependencies() {
-            for (_k, link) in &package.get_replaces() {
+            for (_k, link) in package.get_replaces().iter() {
                 let replace = link.get_target().to_string();
                 if self.loaded_packages.contains_key(&replace)
                     && self.skipped_load.contains_key(&replace)
@@ -762,7 +762,7 @@ impl PoolBuilder {
             if root_requires.contains_key(&package_or_replacer.get_name()) {
                 matches.push(package_or_replacer.get_name());
             }
-            for (_k, link) in &package_or_replacer.get_replaces() {
+            for (_k, link) in package_or_replacer.get_replaces().iter() {
                 if root_requires.contains_key(link.get_target()) {
                     if name != package_or_replacer.get_name() {
                         matches.push(format!(
@@ -817,7 +817,7 @@ impl PoolBuilder {
                 }
             }
             // update pattern matches a root require? => all good, probably a new package
-            for (package_name, _constraint) in request.get_requires() {
+            for (package_name, _constraint) in request.get_requires().iter() {
                 if preg_is_match(&pattern_regexp, package_name) {
                     if PlatformRepository::is_platform_package(package_name) {
                         matched_platform_package = true;
@@ -964,7 +964,7 @@ impl PoolBuilder {
                                 );
                             }
 
-                            for (_k, replace) in &locked_package.get_replaces() {
+                            for (_k, replace) in locked_package.get_replaces().iter() {
                                 if requires.contains_key(replace.get_target())
                                     && self.skipped_load.contains_key(replace.get_target())
                                 {
@@ -997,7 +997,7 @@ impl PoolBuilder {
 
         let pkgs: Vec<BasePackageHandle> = self.packages.values().cloned().collect();
         for package in &pkgs {
-            for (_k, link) in &package.get_requires() {
+            for (_k, link) in package.get_requires().iter() {
                 if name == link.get_target() {
                     self.mark_package_name_for_loading(
                         request,

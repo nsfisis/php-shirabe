@@ -1149,8 +1149,11 @@ return array(
 
         for item in package_map {
             let package = &item.0;
-            let links = array_merge_map(package.get_replaces(), package.get_provides());
-            for (_k, link) in &links {
+            let links = array_merge_map(
+                (*package.get_replaces()).clone(),
+                (*package.get_provides()).clone(),
+            );
+            for (_k, link) in links.iter() {
                 if let Some(matches) = preg_match(php_regex!("{^ext-(.+)$}iD"), link.get_target())
                     && let Some(ext) = matches.get(1).map(str::to_string)
                 {
@@ -1169,7 +1172,7 @@ return array(
                 continue;
             }
 
-            for (_k, link) in &package.get_requires() {
+            for (_k, link) in package.get_requires().iter() {
                 if self
                     .platform_requirement_filter
                     .borrow()
@@ -2028,7 +2031,7 @@ class ComposerStaticInit{}
             let package = &item.0;
             let name = package.get_name();
             packages.insert(name.clone(), package.clone());
-            for (_k, replace) in &package.get_replaces() {
+            for (_k, replace) in package.get_replaces().iter() {
                 replaced_by.insert(replace.get_target().to_string(), name.clone());
             }
         }
@@ -2040,7 +2043,7 @@ class ComposerStaticInit{}
             include: &mut IndexMap<String, bool>,
             replaced_by: &IndexMap<String, String>,
         ) {
-            for (_k, link) in &package.get_requires() {
+            for (_k, link) in package.get_requires().iter() {
                 let mut target = link.get_target().to_string();
                 if let Some(rep) = replaced_by.get(&target) {
                     target = rep.clone();

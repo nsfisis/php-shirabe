@@ -16,9 +16,14 @@ impl RepositoryUtils {
         include_require_dev: bool,
         mut bucket: Vec<crate::package::BasePackageHandle>,
     ) -> Vec<crate::package::BasePackageHandle> {
-        let mut requires: IndexMap<String, Link> = requirer.get_requires();
+        let mut requires: IndexMap<String, Link> = (*requirer.get_requires()).clone();
         if include_require_dev {
-            requires.extend(requirer.get_dev_requires());
+            requires.extend(
+                requirer
+                    .get_dev_requires()
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone())),
+            );
         }
 
         for candidate in packages {
