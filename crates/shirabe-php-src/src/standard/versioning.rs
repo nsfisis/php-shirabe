@@ -1,7 +1,7 @@
 /// php-src: ext/standard/versioning.c `php_version_compare` (PHP 8.5.2)
 ///
 /// Returns -1, 0 or 1. The original walks the canonicalized strings with destructive `.` splits
-/// and moving pointers; this splits into a `Vec<&str>` and indexes instead.
+/// and moving pointers; this walks a `split('.')` iterator over each instead.
 pub fn php_version_compare(v1: &str, v2: &str) -> i32 {
     if v1.is_empty() || v2.is_empty() {
         return match (v1.is_empty(), v2.is_empty()) {
@@ -12,27 +12,29 @@ pub fn php_version_compare(v1: &str, v2: &str) -> i32 {
     }
     let c1 = canonicalize_version(v1);
     let c2 = canonicalize_version(v2);
-    let t1: Vec<&str> = c1.split('.').filter(|s| !s.is_empty()).collect();
-    let t2: Vec<&str> = c2.split('.').filter(|s| !s.is_empty()).collect();
+    let mut t1 = c1.split('.').filter(|s| !s.is_empty());
+    let mut t2 = c2.split('.').filter(|s| !s.is_empty());
 
     let mut compare = 0;
-    let mut i = 0;
-    while i < t1.len() && i < t2.len() && compare == 0 {
-        compare = version_token_compare(t1[i], t2[i]);
-        i += 1;
+    let mut p1 = t1.next();
+    let mut p2 = t2.next();
+    while compare == 0
+        && let (Some(a), Some(b)) = (p1, p2)
+    {
+        compare = version_token_compare(a, b);
+        p1 = t1.next();
+        p2 = t2.next();
     }
     if compare == 0 {
         // A leftover numeric token wins; a leftover special form is compared against the implicit
         // release baseline ("#", order 4).
-        if i < t1.len() {
-            let p = t1[i];
+        if let Some(p) = p1 {
             compare = if p.as_bytes()[0].is_ascii_digit() {
                 1
             } else {
                 special_form_order(p).cmp(&4) as i32
             };
-        } else if i < t2.len() {
-            let p = t2[i];
+        } else if let Some(p) = p2 {
             compare = if p.as_bytes()[0].is_ascii_digit() {
                 -1
             } else {
@@ -72,7 +74,9 @@ fn canonicalize_version(version: &str) -> String {
             q.push(ch);
         }
     }
-    String::from_utf8_lossy(&q).into_owned()
+    // Splits are only ever inserted at ASCII digit <-> non-digit boundaries, which are always
+    // char boundaries, so a valid UTF-8 input stays valid.
+    String::from_utf8(q).expect("canonicalized version is valid UTF-8")
 }
 
 /// php-src: ext/standard/versioning.c `php_version_compare` loop body (PHP 8.5.2)
