@@ -45,6 +45,7 @@ use shirabe_php_shim::{
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_finder::Finder;
 use std::path::PathBuf;
@@ -834,7 +835,7 @@ impl Command for CreateProjectCommand {
                 InputArgument::new5("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None, self.suggest_available_package(99)).unwrap().into(),
                 InputArgument::new("directory", Some(InputArgument::OPTIONAL), "Directory where the files should be created", None).unwrap().into(),
                 InputArgument::new("version", Some(InputArgument::OPTIONAL), "Version, will default to latest", None).unwrap().into(),
-                InputOption::new("stability", Some(PhpMixed::String("s".to_string())), Some(InputOption::VALUE_REQUIRED), "Minimum-stability allowed (unless a version is specified).", None).unwrap().into(),
+                InputOption::new("stability", Some("s"), Some(InputOption::VALUE_REQUIRED), "Minimum-stability allowed (unless a version is specified).", None).unwrap().into(),
                 InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
                 InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
                 InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
@@ -851,7 +852,7 @@ impl Command for CreateProjectCommand {
                 InputOption::new("remove-vcs", None, Some(InputOption::VALUE_NONE), "Whether to force deletion of the vcs folder without prompting.", None).unwrap().into(),
                 InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Whether to skip installation of the package dependencies.", None).unwrap().into(),
                 InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Whether to skip auditing of the installed package dependencies (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-                InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\" or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+                InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\" or \"summary\".", Some(InputValue::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
                 InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
                 InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
                 InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
@@ -900,7 +901,7 @@ impl Command for CreateProjectCommand {
             io.write_error("<warning>You are using the deprecated option \"no-custom-installers\". Use \"no-plugins\" instead.</warning>");
             input
                 .borrow_mut()
-                .set_option("no-plugins", PhpMixed::Bool(true));
+                .set_option("no-plugins", InputValue::Bool(true));
         }
 
         if input.borrow().is_interactive()
@@ -919,9 +920,10 @@ impl Command for CreateProjectCommand {
                 "New project directory [<comment>{}</comment>]: ",
                 array_pop(&mut parts).unwrap_or_default()
             );
-            input
-                .borrow_mut()
-                .set_argument("directory", io.ask(prompt, PhpMixed::Null)?);
+            input.borrow_mut().set_argument(
+                "directory",
+                InputValue::from_php_mixed(&io.ask(prompt, PhpMixed::Null)?),
+            );
         }
 
         let repository_opt = input.borrow().get_option("repository")?;

@@ -3,7 +3,8 @@
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use regex::Regex;
 use serial_test::serial;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 /// ref: DumpAutoloadCommandTest::testDumpAutoload
 #[test]
@@ -14,7 +15,10 @@ fn test_dump_autoload() {
     let mut app_tester = get_application_tester();
     let status_code = app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("dump-autoload"))],
+            vec![(
+                ParameterName::of("command"),
+                InputValue::from("dump-autoload"),
+            )],
             RunOptions::default(),
         )
         .unwrap();
@@ -37,8 +41,11 @@ fn test_dump_dev_autoload() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("dump-autoload")),
-                (PhpMixed::from("--dev"), PhpMixed::from(true)),
+                (
+                    ParameterName::of("command"),
+                    InputValue::from("dump-autoload"),
+                ),
+                (ParameterName::of("--dev"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -62,8 +69,11 @@ fn test_dump_no_dev_autoload() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("dump-autoload")),
-                (PhpMixed::from("--dev"), PhpMixed::from(true)),
+                (
+                    ParameterName::of("command"),
+                    InputValue::from("dump-autoload"),
+                ),
+                (ParameterName::of("--dev"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -87,9 +97,12 @@ fn test_using_optimize_and_strict_psr() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("dump-autoload")),
-                (PhpMixed::from("--optimize"), PhpMixed::from(true)),
-                (PhpMixed::from("--strict-psr"), PhpMixed::from(true)),
+                (
+                    ParameterName::of("command"),
+                    InputValue::from("dump-autoload"),
+                ),
+                (ParameterName::of("--optimize"), InputValue::from(true)),
+                (ParameterName::of("--strict-psr"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -132,9 +145,12 @@ fn test_fails_using_strict_psr_if_class_map_violations_are_found() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("dump-autoload")),
-                (PhpMixed::from("--optimize"), PhpMixed::from(true)),
-                (PhpMixed::from("--strict-psr"), PhpMixed::from(true)),
+                (
+                    ParameterName::of("command"),
+                    InputValue::from("dump-autoload"),
+                ),
+                (ParameterName::of("--optimize"), InputValue::from(true)),
+                (ParameterName::of("--strict-psr"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -161,10 +177,13 @@ fn test_using_classmap_authoritative() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("dump-autoload")),
                 (
-                    PhpMixed::from("--classmap-authoritative"),
-                    PhpMixed::from(true),
+                    ParameterName::of("command"),
+                    InputValue::from("dump-autoload"),
+                ),
+                (
+                    ParameterName::of("--classmap-authoritative"),
+                    InputValue::from(true),
                 ),
             ],
             RunOptions::default(),
@@ -192,12 +211,15 @@ fn test_using_classmap_authoritative_and_strict_psr() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("dump-autoload")),
                 (
-                    PhpMixed::from("--classmap-authoritative"),
-                    PhpMixed::from(true),
+                    ParameterName::of("command"),
+                    InputValue::from("dump-autoload"),
                 ),
-                (PhpMixed::from("--strict-psr"), PhpMixed::from(true)),
+                (
+                    ParameterName::of("--classmap-authoritative"),
+                    InputValue::from(true),
+                ),
+                (ParameterName::of("--strict-psr"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -224,8 +246,11 @@ fn test_strict_psr_does_not_work_without_optimized_autoloader() {
     let err = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("dump-autoload")),
-                (PhpMixed::from("--strict-psr"), PhpMixed::from(true)),
+                (
+                    ParameterName::of("command"),
+                    InputValue::from("dump-autoload"),
+                ),
+                (ParameterName::of("--strict-psr"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -247,9 +272,12 @@ fn test_dev_and_no_dev_cannot_be_combined() {
     let err = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("dump-autoload")),
-                (PhpMixed::from("--dev"), PhpMixed::from(true)),
-                (PhpMixed::from("--no-dev"), PhpMixed::from(true)),
+                (
+                    ParameterName::of("command"),
+                    InputValue::from("dump-autoload"),
+                ),
+                (ParameterName::of("--dev"), InputValue::from(true)),
+                (ParameterName::of("--no-dev"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -281,7 +309,10 @@ fn test_with_custom_autoloader_suffix() {
     let mut app_tester = get_application_tester();
     let status_code = app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("dump-autoload"))],
+            vec![(
+                ParameterName::of("command"),
+                InputValue::from("dump-autoload"),
+            )],
             RunOptions::default(),
         )
         .unwrap();
@@ -329,7 +360,10 @@ fn test_with_existing_composer_lock_and_autoloader_suffix() {
     let mut app_tester = get_application_tester();
     let status_code = app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("dump-autoload"))],
+            vec![(
+                ParameterName::of("command"),
+                InputValue::from("dump-autoload"),
+            )],
             RunOptions::default(),
         )
         .unwrap();
@@ -375,7 +409,10 @@ fn test_with_existing_composer_lock_without_autoloader_suffix() {
     let mut app_tester = get_application_tester();
     let status_code = app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("dump-autoload"))],
+            vec![(
+                ParameterName::of("command"),
+                InputValue::from("dump-autoload"),
+            )],
             RunOptions::default(),
         )
         .unwrap();

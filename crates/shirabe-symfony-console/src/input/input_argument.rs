@@ -2,13 +2,13 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::exception::LogicException;
-use shirabe_php_shim::PhpMixed;
+use crate::input::InputValue;
 
 #[derive(Debug, Clone)]
 pub struct InputArgument {
     name: String,
     mode: i64,
-    default: PhpMixed,
+    default: InputValue,
     description: String,
 }
 
@@ -21,7 +21,7 @@ impl InputArgument {
         name: String,
         mode: Option<i64>,
         description: String,
-        default: PhpMixed,
+        default: InputValue,
     ) -> anyhow::Result<Self> {
         let mode = match mode {
             None => Self::OPTIONAL,
@@ -39,7 +39,7 @@ impl InputArgument {
             name,
             mode,
             description,
-            default: PhpMixed::Null,
+            default: InputValue::Null,
         };
 
         argument.set_default(default)?;
@@ -59,8 +59,8 @@ impl InputArgument {
         Self::IS_ARRAY == (Self::IS_ARRAY & self.mode)
     }
 
-    pub fn set_default(&mut self, default: PhpMixed) -> anyhow::Result<()> {
-        if self.is_required() && !matches!(default, PhpMixed::Null) {
+    pub fn set_default(&mut self, default: InputValue) -> anyhow::Result<()> {
+        if self.is_required() && !default.is_null() {
             return Err(LogicException::new(
                 "Cannot set a default value except for InputArgument::OPTIONAL mode.".to_string(),
             )
@@ -69,8 +69,8 @@ impl InputArgument {
 
         let default = if self.is_array() {
             match default {
-                PhpMixed::Null => PhpMixed::List(vec![]),
-                PhpMixed::List(_) => default,
+                InputValue::Null => InputValue::Array(vec![]),
+                InputValue::Array(_) => default,
                 _ => {
                     return Err(LogicException::new(
                         "A default value for an array argument must be an array.".to_string(),
@@ -86,7 +86,7 @@ impl InputArgument {
         Ok(())
     }
 
-    pub fn get_default(&self) -> &PhpMixed {
+    pub fn get_default(&self) -> &InputValue {
         &self.default
     }
 

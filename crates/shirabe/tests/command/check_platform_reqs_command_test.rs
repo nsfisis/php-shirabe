@@ -6,12 +6,13 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 /// ref: CheckPlatformReqsCommandTest::testPlatformReqsAreSatisfied (data provider rolled into one body).
 fn run_platform_reqs_are_satisfied_case(
     composer_json: serde_json::Value,
-    command: &[(&str, PhpMixed)],
+    command: &[(&str, InputValue)],
     expected: &str,
     lock: bool,
 ) {
@@ -28,12 +29,12 @@ fn run_platform_reqs_are_satisfied_case(
         create_composer_lock(&packages, &dev_packages);
     }
 
-    let mut input: Vec<(PhpMixed, PhpMixed)> = vec![(
-        PhpMixed::from("command"),
-        PhpMixed::from("check-platform-reqs"),
+    let mut input: Vec<(ParameterName, InputValue)> = vec![(
+        ParameterName::of("command"),
+        InputValue::from("check-platform-reqs"),
     )];
     for (k, v) in command {
-        input.push((PhpMixed::from(*k), v.clone()));
+        input.push((ParameterName::of(k), v.clone()));
     }
 
     let mut app_tester = get_application_tester();
@@ -55,7 +56,7 @@ fn test_platform_reqs_are_satisfied() {
             "require": { "ext-foobar": "^2.0" },
             "require-dev": { "ext-barbaz": "~4.0" },
         }),
-        &[("--no-dev", PhpMixed::from(true))],
+        &[("--no-dev", InputValue::from(true))],
         "Checking non-dev platform requirements for packages in the vendor dir
 ext-foobar 2.3.4   success",
         true,
@@ -67,7 +68,7 @@ ext-foobar 2.3.4   success",
             "require": { "ext-foobar": "^2.3" },
             "require-dev": { "ext-barbaz": "~2.0" },
         }),
-        &[("--lock", PhpMixed::from(true))],
+        &[("--lock", InputValue::from(true))],
         "Checking platform requirements using the lock file\next-barbaz 2.3.4.5   success \next-foobar 2.3.4     success",
         true,
     );
@@ -82,8 +83,8 @@ fn test_exception_thrown_if_no_lockfile_found() {
     let err = app_tester
         .run(
             vec![(
-                PhpMixed::from("command"),
-                PhpMixed::from("check-platform-reqs"),
+                ParameterName::of("command"),
+                InputValue::from("check-platform-reqs"),
             )],
             RunOptions::default(),
         )
@@ -125,10 +126,10 @@ fn test_failed_platform_requirement() {
         .run(
             vec![
                 (
-                    PhpMixed::from("command"),
-                    PhpMixed::from("check-platform-reqs"),
+                    ParameterName::of("command"),
+                    InputValue::from("check-platform-reqs"),
                 ),
-                (PhpMixed::from("--format"), PhpMixed::from("json")),
+                (ParameterName::of("--format"), InputValue::from("json")),
             ],
             RunOptions::default(),
         )

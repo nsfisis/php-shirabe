@@ -6,7 +6,8 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 /// ref: LicensesCommandTest::setUp
 fn set_up() -> TearDown {
@@ -85,7 +86,7 @@ fn test_basic_run() {
     let mut app_tester = get_application_tester();
     let status_code = app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("license"))],
+            vec![(ParameterName::of("command"), InputValue::from("license"))],
             RunOptions::default(),
         )
         .unwrap();
@@ -115,8 +116,8 @@ fn test_no_dev() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("license")),
-                (PhpMixed::from("--no-dev"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("license")),
+                (ParameterName::of("--no-dev"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -146,8 +147,8 @@ fn test_format_json() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("license")),
-                (PhpMixed::from("--format"), PhpMixed::from("json")),
+                (ParameterName::of("command"), InputValue::from("license")),
+                (ParameterName::of("--format"), InputValue::from("json")),
             ],
             RunOptions {
                 capture_stderr_separately: true,
@@ -182,8 +183,8 @@ fn test_format_summary() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("license")),
-                (PhpMixed::from("--format"), PhpMixed::from("summary")),
+                (ParameterName::of("command"), InputValue::from("license")),
+                (ParameterName::of("--format"), InputValue::from("summary")),
             ],
             RunOptions::default(),
         )
@@ -223,8 +224,8 @@ fn test_format_unknown() {
     let mut app_tester = get_application_tester();
     let result = app_tester.run(
         vec![
-            (PhpMixed::from("command"), PhpMixed::from("license")),
-            (PhpMixed::from("--format"), PhpMixed::from("unknown")),
+            (ParameterName::of("command"), InputValue::from("license")),
+            (ParameterName::of("--format"), InputValue::from("unknown")),
         ],
         RunOptions::default(),
     );
@@ -244,8 +245,8 @@ fn test_locked() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("license")),
-                (PhpMixed::from("--locked"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("license")),
+                (ParameterName::of("--locked"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -276,9 +277,9 @@ fn test_locked_no_dev() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("license")),
-                (PhpMixed::from("--locked"), PhpMixed::from(true)),
-                (PhpMixed::from("--no-dev"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("license")),
+                (ParameterName::of("--locked"), InputValue::from(true)),
+                (ParameterName::of("--no-dev"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -310,8 +311,8 @@ fn test_locked_without_lock_file() {
     let mut app_tester = get_application_tester();
     let result = app_tester.run(
         vec![
-            (PhpMixed::from("command"), PhpMixed::from("license")),
-            (PhpMixed::from("--locked"), PhpMixed::from(true)),
+            (ParameterName::of("command"), InputValue::from("license")),
+            (ParameterName::of("--locked"), InputValue::from(true)),
         ],
         RunOptions::default(),
     );

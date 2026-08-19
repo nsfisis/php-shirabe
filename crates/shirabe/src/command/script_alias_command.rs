@@ -144,12 +144,8 @@ impl Command for ScriptAliasCommand {
 
         let args_value: Vec<String> = args
             .get("args")
-            .and_then(|v| v.as_list())
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
+            .and_then(|v| v.as_array())
+            .map(<[String]>::to_vec)
             .unwrap_or_default();
 
         dispatcher

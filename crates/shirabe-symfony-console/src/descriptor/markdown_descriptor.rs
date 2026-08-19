@@ -64,7 +64,7 @@ impl MarkdownDescriptor {
                 shirabe_php_shim::str_replace(
                     "\n",
                     "",
-                    &shirabe_php_shim::var_export(argument.get_default(), true),
+                    &shirabe_php_shim::var_export(&argument.get_default().to_php_mixed(), true),
                 ),
             ),
             true,
@@ -104,7 +104,7 @@ impl MarkdownDescriptor {
                 shirabe_php_shim::str_replace(
                     "\n",
                     "",
-                    &shirabe_php_shim::var_export(option.get_default(), true),
+                    &shirabe_php_shim::var_export(&option.get_default().to_php_mixed(), true),
                 ),
             ),
             true,

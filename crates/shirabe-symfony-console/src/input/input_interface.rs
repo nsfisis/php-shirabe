@@ -1,9 +1,8 @@
 //! ref: composer/vendor/symfony/console/Input/InputInterface.php
 
 use crate::input::InputDefinition;
-use crate::input::InputOptionValue;
+use crate::input::InputValue;
 use crate::input::StreamableInputInterface;
-use shirabe_php_shim::PhpMixed;
 
 pub trait InputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
     /// Models PHP's `clone` operatior.
@@ -11,32 +10,32 @@ pub trait InputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
 
     fn get_first_argument(&self) -> Option<String>;
 
-    fn has_parameter_option(&self, values: PhpMixed, only_params: bool) -> bool;
+    fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool;
 
     fn get_parameter_option(
         &self,
-        values: PhpMixed,
-        default: PhpMixed,
+        values: &[&str],
+        default: InputValue,
         only_params: bool,
-    ) -> PhpMixed;
+    ) -> InputValue;
 
     fn bind(&mut self, definition: &InputDefinition) -> anyhow::Result<()>;
 
     fn validate(&mut self) -> anyhow::Result<()>;
 
-    fn get_arguments(&self) -> indexmap::IndexMap<String, PhpMixed>;
+    fn get_arguments(&self) -> indexmap::IndexMap<String, InputValue>;
 
-    fn get_argument(&self, name: &str) -> anyhow::Result<PhpMixed>;
+    fn get_argument(&self, name: &str) -> anyhow::Result<InputValue>;
 
-    fn set_argument(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
+    fn set_argument(&mut self, name: &str, value: InputValue) -> anyhow::Result<()>;
 
     fn has_argument(&self, name: &str) -> bool;
 
-    fn get_options(&self) -> indexmap::IndexMap<String, PhpMixed>;
+    fn get_options(&self) -> indexmap::IndexMap<String, InputValue>;
 
-    fn get_option(&self, name: &str) -> anyhow::Result<InputOptionValue>;
+    fn get_option(&self, name: &str) -> anyhow::Result<InputValue>;
 
-    fn set_option(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()>;
+    fn set_option(&mut self, name: &str, value: InputValue) -> anyhow::Result<()>;
 
     fn has_option(&self, name: &str) -> bool;
 

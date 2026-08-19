@@ -8,7 +8,8 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::package::Link;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 /// ref: SuggestsCommandTest::getPackageWithSuggestAndRequires
 fn get_package_with_suggest_and_requires(
@@ -82,7 +83,7 @@ fn test_installed_packages_with_no_suggestions() {
     let mut app_tester = get_application_tester();
     let status_code = app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("suggest"))],
+            vec![(ParameterName::of("command"), InputValue::from("suggest"))],
             RunOptions::default(),
         )
         .unwrap();
@@ -171,7 +172,7 @@ fn suggest_packages() -> (Vec<PackageInterfaceHandle>, Vec<PackageInterfaceHandl
     (packages, dev_packages)
 }
 
-fn run_suggest_case(has_lock_file: bool, command: &[(&str, PhpMixed)], expected: &str) {
+fn run_suggest_case(has_lock_file: bool, command: &[(&str, InputValue)], expected: &str) {
     let tear_down = init_temp_composer(
         Some(&serde_json::json!({
             "repositories": {
@@ -199,10 +200,10 @@ fn run_suggest_case(has_lock_file: bool, command: &[(&str, PhpMixed)], expected:
         create_composer_lock(&packages, &dev_packages);
     }
 
-    let mut input: Vec<(PhpMixed, PhpMixed)> =
-        vec![(PhpMixed::from("command"), PhpMixed::from("suggest"))];
+    let mut input: Vec<(ParameterName, InputValue)> =
+        vec![(ParameterName::of("command"), InputValue::from("suggest"))];
     for (k, v) in command {
-        input.push((PhpMixed::from(*k), v.clone()));
+        input.push((ParameterName::of(k), v.clone()));
     }
 
     let mut app_tester = get_application_tester();
@@ -216,7 +217,7 @@ fn run_suggest_case(has_lock_file: bool, command: &[(&str, PhpMixed)], expected:
 #[test]
 #[serial]
 fn test_suggest() {
-    let t = PhpMixed::from(true);
+    let t = InputValue::from(true);
     let by_package = ("--by-package", t.clone());
     let by_suggestion = ("--by-suggestion", t.clone());
     let no_dev = ("--no-dev", t.clone());
@@ -359,7 +360,7 @@ vendor3/suggested is suggested by:
         true,
         &[(
             "packages",
-            PhpMixed::List(vec![PhpMixed::from("vendor2/package2")]),
+            InputValue::Array(vec!["vendor2/package2".to_string()]),
         )],
         for_pkg,
     );
@@ -367,7 +368,7 @@ vendor3/suggested is suggested by:
         false,
         &[(
             "packages",
-            PhpMixed::List(vec![PhpMixed::from("vendor2/package2")]),
+            InputValue::Array(vec!["vendor2/package2".to_string()]),
         )],
         for_pkg,
     );

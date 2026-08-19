@@ -5,12 +5,13 @@ use crate::test_case::{
     init_temp_composer,
 };
 use serial_test::serial;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
-fn input(pairs: Vec<(&str, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
+fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
-        .map(|(k, v)| (PhpMixed::from(k), v))
+        .map(|(k, v)| (ParameterName::of(k), v))
         .collect()
 }
 
@@ -18,14 +19,14 @@ fn input(pairs: Vec<(&str, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
 fn error_cases() -> Vec<(
     &'static str,
     serde_json::Value,
-    Vec<(&'static str, PhpMixed)>,
+    Vec<(&'static str, InputValue)>,
     &'static str,
 )> {
     vec![
         (
             "it writes an error when the dev flag is passed",
             serde_json::json!({ "repositories": [] }),
-            vec![("--dev", PhpMixed::from(true))],
+            vec![("--dev", InputValue::from(true))],
             r#"<warning>You are using the deprecated option "--dev". It has no effect and will break in Composer 3.</warning>
 Installing dependencies from lock file (including require-dev)
 Verifying lock file contents can be installed on current platform.
@@ -35,7 +36,7 @@ Generating autoload files"#,
         (
             "it writes an error when no-suggest flag passed",
             serde_json::json!({ "repositories": [] }),
-            vec![("--no-suggest", PhpMixed::from(true))],
+            vec![("--no-suggest", InputValue::from(true))],
             r#"<warning>You are using the deprecated option "--no-suggest". It has no effect and will break in Composer 3.</warning>
 Installing dependencies from lock file (including require-dev)
 Verifying lock file contents can be installed on current platform.
@@ -47,14 +48,14 @@ Generating autoload files"#,
             serde_json::json!({ "repositories": [] }),
             vec![(
                 "packages",
-                PhpMixed::List(vec![PhpMixed::from("vendor/package")]),
+                InputValue::Array(vec!["vendor/package".to_string()]),
             )],
             r#"Invalid argument vendor/package. Use "composer require vendor/package" instead to add packages to your composer.json."#,
         ),
         (
             "it writes an error when no-install flag is passed",
             serde_json::json!({ "repositories": [] }),
-            vec![("--no-install", PhpMixed::from(true))],
+            vec![("--no-install", InputValue::from(true))],
             r#"Invalid option "--no-install". Use "composer update --no-install" instead if you are trying to update the composer.lock file."#,
         ),
     ]
@@ -73,7 +74,7 @@ fn test_install_command_errors() {
         create_installed_json(&packages, &dev_packages, true);
 
         let mut app_tester = get_application_tester();
-        let mut args = vec![("command", PhpMixed::from("install"))];
+        let mut args = vec![("command", InputValue::from("install"))];
         args.extend(command);
         let _ = app_tester.run(input(args), RunOptions::default());
 
@@ -107,8 +108,8 @@ fn test_install_from_empty_vendor() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("install")),
-                ("--no-progress", PhpMixed::from(true)),
+                ("command", InputValue::from("install")),
+                ("--no-progress", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -147,9 +148,9 @@ fn test_install_from_empty_vendor_no_dev() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("install")),
-                ("--no-progress", PhpMixed::from(true)),
-                ("--no-dev", PhpMixed::from(true)),
+                ("command", InputValue::from("install")),
+                ("--no-progress", InputValue::from(true)),
+                ("--no-dev", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -190,8 +191,8 @@ fn test_install_new_packages_with_existing_partial_vendor() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("install")),
-                ("--no-progress", PhpMixed::from(true)),
+                ("command", InputValue::from("install")),
+                ("--no-progress", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )

@@ -21,11 +21,13 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
-use shirabe_php_shim::{PhpMixed, PhpResource};
+use shirabe_php_shim::PhpResource;
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::input::ArrayInput;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 use shirabe_symfony_console::input::StreamableInputInterface;
 use shirabe_symfony_console::output::ConsoleOutput;
 use shirabe_symfony_console::output::ConsoleOutputInterface;
@@ -355,7 +357,7 @@ impl ApplicationTester {
 
     pub fn run(
         &mut self,
-        input: Vec<(PhpMixed, PhpMixed)>,
+        input: Vec<(ParameterName, InputValue)>,
         options: RunOptions,
     ) -> anyhow::Result<i32> {
         let prev_shell_verbosity = shirabe_php_shim::getenv("SHELL_VERBOSITY");

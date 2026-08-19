@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Console/Input/InputArgument.php
 
 use crate::console::input::SuggestedValues;
-use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_console::completion::CompletionInput;
 use shirabe_symfony_console::completion::CompletionSuggestions;
 use shirabe_symfony_console::input::InputArgument as BaseInputArgument;
+use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct InputArgument {
@@ -21,7 +21,7 @@ impl InputArgument {
         name: &str,
         mode: Option<i64>,
         description: &str,
-        default: Option<PhpMixed>,
+        default: Option<InputValue>,
     ) -> anyhow::Result<Self> {
         Self::new5(
             name,
@@ -37,14 +37,14 @@ impl InputArgument {
         name: &str,
         mode: Option<i64>,
         description: &str,
-        default: Option<PhpMixed>,
+        default: Option<InputValue>,
         suggested_values: SuggestedValues,
     ) -> anyhow::Result<Self> {
         let inner = BaseInputArgument::new(
             name.to_string(),
             mode,
             description.to_string(),
-            default.unwrap_or(PhpMixed::Null),
+            default.unwrap_or(InputValue::Null),
         )?;
         Ok(Self {
             inner,

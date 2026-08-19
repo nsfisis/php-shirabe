@@ -83,12 +83,15 @@ use shirabe_symfony_console::helper::Helper;
 use shirabe_symfony_console::helper::HelperSet;
 use shirabe_symfony_console::helper::QuestionHelper;
 use shirabe_symfony_console::helper::{FormatBlockMessages, FormatterHelper};
+use shirabe_symfony_console::input::ArgumentName;
 use shirabe_symfony_console::input::ArgvInput;
 use shirabe_symfony_console::input::ArrayInput;
 use shirabe_symfony_console::input::InputArgument;
 use shirabe_symfony_console::input::InputDefinition;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::input::InputOption;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 use shirabe_symfony_console::output::ConsoleOutput;
 use shirabe_symfony_console::output::ConsoleOutputInterface;
 use shirabe_symfony_console::output::{OutputInterface, output_interface};
@@ -207,11 +210,7 @@ impl Application {
     ) -> anyhow::Result<Option<String>> {
         let working_dir = input
             .borrow()
-            .get_parameter_option(
-                PhpMixed::from(vec!["--working-dir", "-d"]),
-                PhpMixed::Null,
-                true,
-            )
+            .get_parameter_option(&["--working-dir", "-d"], InputValue::Null, true)
             .as_string()
             .map(|s| s.to_string());
         if let Some(ref wd) = working_dir
@@ -527,38 +526,38 @@ impl Application {
         let mut definition = self.base_get_default_input_definition();
         definition.add_option(InputOption::new(
             "--profile",
-            PhpMixed::Null,
+            None,
             Some(InputOption::VALUE_NONE),
             "Display timing and memory usage information".to_string(),
-            PhpMixed::Null,
+            InputValue::Null,
         )?)?;
         definition.add_option(InputOption::new(
             "--no-plugins",
-            PhpMixed::Null,
+            None,
             Some(InputOption::VALUE_NONE),
             "Whether to disable plugins.".to_string(),
-            PhpMixed::Null,
+            InputValue::Null,
         )?)?;
         definition.add_option(InputOption::new(
             "--no-scripts",
-            PhpMixed::Null,
+            None,
             Some(InputOption::VALUE_NONE),
             "Skips the execution of all scripts defined in composer.json file.".to_string(),
-            PhpMixed::Null,
+            InputValue::Null,
         )?)?;
         definition.add_option(InputOption::new(
             "--working-dir",
-            PhpMixed::from("-d"),
+            Some("-d"),
             Some(InputOption::VALUE_REQUIRED),
             "If specified, use the given directory as working directory.".to_string(),
-            PhpMixed::Null,
+            InputValue::Null,
         )?)?;
         definition.add_option(InputOption::new(
             "--no-cache",
-            PhpMixed::Null,
+            None,
             Some(InputOption::VALUE_NONE),
             "Prevent use of the cache".to_string(),
-            PhpMixed::Null,
+            InputValue::Null,
         )?)?;
 
         Ok(definition)
@@ -1414,25 +1413,16 @@ impl Application {
         input: &std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
-        if input.borrow().has_parameter_option(
-            PhpMixed::from(vec![PhpMixed::from("--ansi".to_string())]),
-            true,
-        ) {
+        if input.borrow().has_parameter_option(&["--ansi"], true) {
             output.borrow().set_decorated(true);
-        } else if input.borrow().has_parameter_option(
-            PhpMixed::from(vec![PhpMixed::from("--no-ansi".to_string())]),
-            true,
-        ) {
+        } else if input.borrow().has_parameter_option(&["--no-ansi"], true) {
             output.borrow().set_decorated(false);
         }
 
-        if input.borrow().has_parameter_option(
-            PhpMixed::from(vec![
-                PhpMixed::from("--no-interaction".to_string()),
-                PhpMixed::from("-n".to_string()),
-            ]),
-            true,
-        ) {
+        if input
+            .borrow()
+            .has_parameter_option(&["--no-interaction", "-n"], true)
+        {
             input.borrow_mut().set_interactive(false);
         }
 
@@ -1468,63 +1458,39 @@ impl Application {
             }
         }
 
-        if input.borrow().has_parameter_option(
-            PhpMixed::from(vec![
-                PhpMixed::from("--quiet".to_string()),
-                PhpMixed::from("-q".to_string()),
-            ]),
-            true,
-        ) {
+        if input
+            .borrow()
+            .has_parameter_option(&["--quiet", "-q"], true)
+        {
             output
                 .borrow()
                 .set_verbosity(output_interface::VERBOSITY_QUIET);
             shell_verbosity = -1;
-        } else if input
-            .borrow()
-            .has_parameter_option(PhpMixed::from("-vvv".to_string()), true)
-            || input
-                .borrow()
-                .has_parameter_option(PhpMixed::from("--verbose=3".to_string()), true)
-            || input.borrow().get_parameter_option(
-                PhpMixed::from("--verbose".to_string()),
-                PhpMixed::Bool(false),
-                true,
-            ) == PhpMixed::from(3i64)
+        } else if input.borrow().has_parameter_option(&["-vvv"], true)
+            || input.borrow().has_parameter_option(&["--verbose=3"], true)
+        // TODO(type-model): PHP also matches when `--verbose` carries the int 3;
+        // `InputValue` has no int variant, so only the flag spellings above are checked.
         {
             output
                 .borrow()
                 .set_verbosity(output_interface::VERBOSITY_DEBUG);
             shell_verbosity = 3;
-        } else if input
-            .borrow()
-            .has_parameter_option(PhpMixed::from("-vv".to_string()), true)
-            || input
-                .borrow()
-                .has_parameter_option(PhpMixed::from("--verbose=2".to_string()), true)
-            || input.borrow().get_parameter_option(
-                PhpMixed::from("--verbose".to_string()),
-                PhpMixed::Bool(false),
-                true,
-            ) == PhpMixed::from(2i64)
+        } else if input.borrow().has_parameter_option(&["-vv"], true)
+            || input.borrow().has_parameter_option(&["--verbose=2"], true)
+        // TODO(type-model): PHP also matches when `--verbose` carries the int 2;
+        // `InputValue` has no int variant, so only the flag spellings above are checked.
         {
             output
                 .borrow()
                 .set_verbosity(output_interface::VERBOSITY_VERY_VERBOSE);
             shell_verbosity = 2;
-        } else if input
-            .borrow()
-            .has_parameter_option(PhpMixed::from("-v".to_string()), true)
+        } else if input.borrow().has_parameter_option(&["-v"], true)
+            || input.borrow().has_parameter_option(&["--verbose=1"], true)
+            || input.borrow().has_parameter_option(&["--verbose"], true)
             || input
                 .borrow()
-                .has_parameter_option(PhpMixed::from("--verbose=1".to_string()), true)
-            || input
-                .borrow()
-                .has_parameter_option(PhpMixed::from("--verbose".to_string()), true)
-            || shirabe_php_shim::php_truthy(&input.borrow().get_parameter_option(
-                PhpMixed::from("--verbose".to_string()),
-                PhpMixed::Bool(false),
-                true,
-            ))
+                .get_parameter_option(&["--verbose"], InputValue::Bool(false), true)
+                .to_bool()
         {
             output
                 .borrow()
@@ -1569,70 +1535,70 @@ impl Application {
                     "command".to_string(),
                     Some(InputArgument::REQUIRED),
                     "The command to execute".to_string(),
-                    PhpMixed::Null,
+                    InputValue::Null,
                 )
                 .unwrap(),
             ),
             DefinitionItem::InputOption(
                 InputOption::new(
                     "--help",
-                    PhpMixed::from("-h".to_string()),
+                    Some("-h"),
                     Some(InputOption::VALUE_NONE),
                     format!(
                         "Display help for the given command. When no command is given display help for the <info>{}</info> command",
                         self.default_command
                     ),
-                    PhpMixed::Null,
+                    InputValue::Null,
                 )
                 .unwrap(),
             ),
             DefinitionItem::InputOption(
                 InputOption::new(
                     "--quiet",
-                    PhpMixed::from("-q".to_string()),
+                    Some("-q"),
                     Some(InputOption::VALUE_NONE),
                     "Do not output any message".to_string(),
-                    PhpMixed::Null,
+                    InputValue::Null,
                 )
                 .unwrap(),
             ),
             DefinitionItem::InputOption(
                 InputOption::new(
                     "--verbose",
-                    PhpMixed::from("-v|vv|vvv".to_string()),
+                    Some("-v|vv|vvv"),
                     Some(InputOption::VALUE_NONE),
                     "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug".to_string(),
-                    PhpMixed::Null,
+                    InputValue::Null,
                 )
                 .unwrap(),
             ),
             DefinitionItem::InputOption(
                 InputOption::new(
                     "--version",
-                    PhpMixed::from("-V".to_string()),
+                    Some("-V"),
                     Some(InputOption::VALUE_NONE),
                     "Display this application version".to_string(),
-                    PhpMixed::Null,
+                    InputValue::Null,
                 )
                 .unwrap(),
             ),
             DefinitionItem::InputOption(
                 InputOption::new(
                     "--ansi",
-                    PhpMixed::from("".to_string()),
+                    Some(""),
                     Some(InputOption::VALUE_NEGATABLE),
                     "Force (or disable --no-ansi) ANSI output".to_string(),
-                    PhpMixed::Null,
+                    InputValue::Null,
                 )
                 .unwrap(),
             ),
             DefinitionItem::InputOption(
                 InputOption::new(
                     "--no-interaction",
-                    PhpMixed::from("-n".to_string()),
+                    Some("-n"),
                     Some(InputOption::VALUE_NONE),
                     "Do not ask any interactive question".to_string(),
-                    PhpMixed::Null,
+                    InputValue::Null,
                 )
                 .unwrap(),
             ),
@@ -1955,10 +1921,10 @@ impl ApplicationHandle {
         let application = &self.0;
         application.borrow_mut().disable_plugins_by_default = input
             .borrow()
-            .has_parameter_option(PhpMixed::from(vec!["--no-plugins"]), false);
+            .has_parameter_option(&["--no-plugins"], false);
         application.borrow_mut().disable_scripts_by_default = input
             .borrow()
-            .has_parameter_option(PhpMixed::from(vec!["--no-scripts"]), false);
+            .has_parameter_option(&["--no-scripts"], false);
 
         let stdin = shirabe_php_shim::STDIN;
         if Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").as_deref() != Some("1")
@@ -1980,10 +1946,7 @@ impl ApplicationHandle {
         // Register error handler again to pass it the IO instance
         ErrorHandler::register(Some(io.clone()));
 
-        if input
-            .borrow()
-            .has_parameter_option(PhpMixed::from(vec!["--no-cache"]), false)
-        {
+        if input.borrow().has_parameter_option(&["--no-cache"], false) {
             io.write_error3("Disabling cache usage", true, io_interface::DEBUG);
             Platform::put_env(
                 "COMPOSER_CACHE_DIR",
@@ -2053,18 +2016,10 @@ impl ApplicationHandle {
             && !file_exists(Factory::get_composer_file().unwrap_or_default())
             && use_parent_dir_if_no_json_available.as_bool() != Some(false)
             && (command_name.as_deref() != Some("config")
-                || (!input
-                    .borrow()
-                    .has_parameter_option(PhpMixed::from(vec!["--file"]), true)
-                    && !input
-                        .borrow()
-                        .has_parameter_option(PhpMixed::from(vec!["-f"]), true)))
-            && !input
-                .borrow()
-                .has_parameter_option(PhpMixed::from(vec!["--help"]), true)
-            && !input
-                .borrow()
-                .has_parameter_option(PhpMixed::from(vec!["-h"]), true)
+                || (!input.borrow().has_parameter_option(&["--file"], true)
+                    && !input.borrow().has_parameter_option(&["-f"], true)))
+            && !input.borrow().has_parameter_option(&["--help"], true)
+            && !input.borrow().has_parameter_option(&["-h"], true)
         {
             let mut dir = dirname(&Platform::get_cwd(true).unwrap_or_default());
             let home_value = Platform::get_env("HOME")
@@ -2141,7 +2096,7 @@ impl ApplicationHandle {
         // if showing the version, we never need plugin commands
         let may_need_plugin_command = !input
             .borrow()
-            .has_parameter_option(PhpMixed::from(vec!["--version", "-V"]), false)
+            .has_parameter_option(&["--version", "-V"], false)
             && (command_name.is_none()
                 || matches!(command_name.as_deref().unwrap_or(""), "" | "list" | "help")
                 || (command_name.as_deref() == Some("_complete") && !is_non_allowed_root));
@@ -2547,10 +2502,7 @@ impl ApplicationHandle {
 
         let mut start_time: Option<f64> = None;
         let result_outcome: anyhow::Result<i32> = (|| -> anyhow::Result<i32> {
-            if input
-                .borrow()
-                .has_parameter_option(PhpMixed::from(vec!["--profile"]), false)
-            {
+            if input.borrow().has_parameter_option(&["--profile"], false) {
                 start_time = Some(microtime());
                 io.borrow_mut().enable_debugging(start_time.unwrap());
             }
@@ -2559,7 +2511,7 @@ impl ApplicationHandle {
 
             if input
                 .borrow()
-                .has_parameter_option(PhpMixed::from(vec!["--version", "-V"]), true)
+                .has_parameter_option(&["--version", "-V"], true)
             {
                 io.write_error(&format!(
                     "<info>PHP</info> version <comment>{}</comment> ({})",
@@ -2764,13 +2716,10 @@ impl ApplicationHandle {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i32> {
         let application = &self.0;
-        if input.borrow().has_parameter_option(
-            PhpMixed::from(vec![
-                PhpMixed::from("--version".to_string()),
-                PhpMixed::from("-V".to_string()),
-            ]),
-            true,
-        ) {
+        if input
+            .borrow()
+            .has_parameter_option(&["--version", "-V"], true)
+        {
             let long_version = application.borrow().get_long_version();
             output
                 .borrow()
@@ -2793,20 +2742,14 @@ impl ApplicationHandle {
 
         let mut input = input;
         let mut name = application.borrow().get_command_name(&*input.borrow());
-        if input.borrow().has_parameter_option(
-            PhpMixed::from(vec![
-                PhpMixed::from("--help".to_string()),
-                PhpMixed::from("-h".to_string()),
-            ]),
-            true,
-        ) {
+        if input.borrow().has_parameter_option(&["--help", "-h"], true) {
             if name.is_none() {
                 name = Some("help".to_string());
                 let default_command = application.borrow().default_command.clone();
                 input = std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(
                     vec![(
-                        PhpMixed::from("command_name".to_string()),
-                        PhpMixed::from(default_command),
+                        ParameterName::of("command_name"),
+                        InputValue::from(default_command),
                     )],
                     None,
                 )?));
@@ -2822,14 +2765,14 @@ impl ApplicationHandle {
                 let definition = application.borrow_mut().get_definition();
                 let command_description = definition
                     .borrow()
-                    .get_argument(&PhpMixed::from("command".to_string()))?
+                    .get_argument(&ArgumentName::Name("command".to_string()))?
                     .get_description()
                     .to_string();
                 let new_command_argument = InputArgument::new(
                     "command".to_string(),
                     Some(InputArgument::OPTIONAL),
                     command_description,
-                    PhpMixed::from(name.clone()),
+                    InputValue::from(name.clone()),
                 )?;
                 // $definition->setArguments(array_merge($definition->getArguments(),
                 //     ['command' => new InputArgument('command', InputArgument::OPTIONAL, ...)]))

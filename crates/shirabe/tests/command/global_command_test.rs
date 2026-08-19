@@ -6,7 +6,8 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -57,12 +58,15 @@ fn test_global() {
     let mut app_tester = get_application_tester();
     let _ = app_tester.run(
         vec![
-            (PhpMixed::from("command"), PhpMixed::from("global")),
+            (ParameterName::of("command"), InputValue::from("global")),
             (
-                PhpMixed::from("command-name"),
-                PhpMixed::from("test-script"),
+                ParameterName::of("command-name"),
+                InputValue::from("test-script"),
             ),
-            (PhpMixed::from("--no-interaction"), PhpMixed::from(true)),
+            (
+                ParameterName::of("--no-interaction"),
+                InputValue::from(true),
+            ),
         ],
         RunOptions::default(),
     );
@@ -96,12 +100,15 @@ fn test_cannot_create_home() {
     let err = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("global")),
+                (ParameterName::of("command"), InputValue::from("global")),
                 (
-                    PhpMixed::from("command-name"),
-                    PhpMixed::from("test-script"),
+                    ParameterName::of("command-name"),
+                    InputValue::from("test-script"),
                 ),
-                (PhpMixed::from("--no-interaction"), PhpMixed::from(true)),
+                (
+                    ParameterName::of("--no-interaction"),
+                    InputValue::from(true),
+                ),
             ],
             RunOptions::default(),
         )
@@ -154,8 +161,8 @@ fn test_global_show() {
     app_tester.set_inputs(vec!["".to_string()]);
     let _ = app_tester.run(
         vec![
-            (PhpMixed::from("command"), PhpMixed::from("global")),
-            (PhpMixed::from("command-name"), PhpMixed::from("show")),
+            (ParameterName::of("command"), InputValue::from("global")),
+            (ParameterName::of("command-name"), InputValue::from("show")),
         ],
         RunOptions::default(),
     );
@@ -186,8 +193,8 @@ fn test_global_show_without_packages() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("global")),
-                (PhpMixed::from("command-name"), PhpMixed::from("show")),
+                (ParameterName::of("command"), InputValue::from("global")),
+                (ParameterName::of("command-name"), InputValue::from("show")),
             ],
             RunOptions::default(),
         )
@@ -234,11 +241,14 @@ fn test_global_require() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("global")),
-                (PhpMixed::from("command-name"), PhpMixed::from("require")),
+                (ParameterName::of("command"), InputValue::from("global")),
                 (
-                    PhpMixed::from("packages"),
-                    PhpMixed::List(vec![PhpMixed::from("vendor/required-pkg:2.0.0")]),
+                    ParameterName::of("command-name"),
+                    InputValue::from("require"),
+                ),
+                (
+                    ParameterName::of("packages"),
+                    InputValue::Array(vec!["vendor/required-pkg:2.0.0".to_string()]),
                 ),
             ],
             RunOptions::default(),
@@ -295,8 +305,11 @@ fn test_global_update() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("global")),
-                (PhpMixed::from("command-name"), PhpMixed::from("update")),
+                (ParameterName::of("command"), InputValue::from("global")),
+                (
+                    ParameterName::of("command-name"),
+                    InputValue::from("update"),
+                ),
             ],
             RunOptions::default(),
         )
@@ -330,9 +343,12 @@ fn test_global_changes_directory() {
     app_tester.set_inputs(vec!["".to_string()]);
     let _ = app_tester.run(
         vec![
-            (PhpMixed::from("command"), PhpMixed::from("global")),
-            (PhpMixed::from("command-name"), PhpMixed::from("config")),
-            (PhpMixed::from("setting-key"), PhpMixed::from("name")),
+            (ParameterName::of("command"), InputValue::from("global")),
+            (
+                ParameterName::of("command-name"),
+                InputValue::from("config"),
+            ),
+            (ParameterName::of("setting-key"), InputValue::from("name")),
         ],
         RunOptions::default(),
     );
@@ -364,7 +380,7 @@ fn test_global_missing_command_name() {
     app_tester.set_inputs(vec!["".to_string()]);
     let err = app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("global"))],
+            vec![(ParameterName::of("command"), InputValue::from("global"))],
             RunOptions::default(),
         )
         .expect_err("expected a RuntimeException for the missing command-name argument");

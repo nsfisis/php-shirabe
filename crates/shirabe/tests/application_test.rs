@@ -6,13 +6,15 @@ mod bootstrap;
 mod test_case;
 
 use serial_test::serial;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 use test_case::init_temp_composer;
 
 use shirabe::command::about_command::AboutCommand;
 use shirabe::command::self_update_command::SelfUpdateCommand;
 use shirabe::console::application::ApplicationHandle;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::{PHP_EOL, PHP_SERVER, PhpMixed, time};
+use shirabe_php_shim::{PHP_EOL, PHP_SERVER, time};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::ArrayInput;
 use shirabe_symfony_console::input::InputInterface;
@@ -50,7 +52,7 @@ fn test_dev_warning() {
     let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
             ArrayInput::new(
-                vec![(PhpMixed::from("command"), PhpMixed::from("about"))],
+                vec![(ParameterName::of("command"), InputValue::from("about"))],
                 None,
             )
             .unwrap(),
@@ -93,7 +95,10 @@ fn test_dev_warning_suppressed_for_self_update() {
     let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
             ArrayInput::new(
-                vec![(PhpMixed::from("command"), PhpMixed::from("self-update"))],
+                vec![(
+                    ParameterName::of("command"),
+                    InputValue::from("self-update"),
+                )],
                 None,
             )
             .unwrap(),
@@ -121,7 +126,7 @@ fn test_process_isolation_works_multiple_times() {
     let input1: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
             ArrayInput::new(
-                vec![(PhpMixed::from("command"), PhpMixed::from("about"))],
+                vec![(ParameterName::of("command"), InputValue::from("about"))],
                 None,
             )
             .unwrap(),
@@ -134,7 +139,7 @@ fn test_process_isolation_works_multiple_times() {
     let input2: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
             ArrayInput::new(
-                vec![(PhpMixed::from("command"), PhpMixed::from("about"))],
+                vec![(ParameterName::of("command"), InputValue::from("about"))],
                 None,
             )
             .unwrap(),
@@ -175,8 +180,8 @@ fn test_no_plugins_disables_plugins_when_script_commands_exist() {
         std::rc::Rc::new(std::cell::RefCell::new(
             ArrayInput::new(
                 vec![
-                    (PhpMixed::from("command"), PhpMixed::from("list")),
-                    (PhpMixed::from("--no-plugins"), PhpMixed::from(true)),
+                    (ParameterName::of("command"), InputValue::from("list")),
+                    (ParameterName::of("--no-plugins"), InputValue::from(true)),
                 ],
                 None,
             )
@@ -240,7 +245,7 @@ fn test_script_command_takes_priority_over_abbreviated_builtin_command() {
     let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
             ArrayInput::new(
-                vec![(PhpMixed::from("command"), PhpMixed::from("check"))],
+                vec![(ParameterName::of("command"), InputValue::from("check"))],
                 None,
             )
             .unwrap(),

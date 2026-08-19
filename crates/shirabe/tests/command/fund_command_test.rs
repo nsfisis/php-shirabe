@@ -8,6 +8,8 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 fn funding_entry(r#type: &str, url: &str) -> IndexMap<String, PhpMixed> {
     let mut m = IndexMap::new();
@@ -19,7 +21,7 @@ fn funding_entry(r#type: &str, url: &str) -> IndexMap<String, PhpMixed> {
 /// Runs one `useCaseProvider` case.
 fn run_fund_case(
     composer_json: serde_json::Value,
-    command: &[(&str, PhpMixed)],
+    command: &[(&str, InputValue)],
     funding: &[(&str, IndexMap<String, PhpMixed>)],
     expected: &str,
 ) {
@@ -48,10 +50,10 @@ fn run_fund_case(
 
     create_installed_json(&packages, &dev_packages, true);
 
-    let mut input: Vec<(PhpMixed, PhpMixed)> =
-        vec![(PhpMixed::from("command"), PhpMixed::from("fund"))];
+    let mut input: Vec<(ParameterName, InputValue)> =
+        vec![(ParameterName::of("command"), InputValue::from("fund"))];
     for (k, v) in command {
-        input.push((PhpMixed::from(*k), v.clone()));
+        input.push((ParameterName::of(k), v.clone()));
     }
 
     let mut app_tester = get_application_tester();
@@ -163,7 +165,7 @@ Thank you!",
             "require": { "first/pkg": "^2.0" },
             "require-dev": { "dev/pkg": "~4.0" },
         }),
-        &[("--format", PhpMixed::from("json"))],
+        &[("--format", InputValue::from("json"))],
         &[
             (
                 "first/pkg",

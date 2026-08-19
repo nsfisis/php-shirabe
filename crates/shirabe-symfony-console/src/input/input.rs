@@ -2,10 +2,11 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::exception::RuntimeException;
+use crate::input::ArgumentName;
 use crate::input::InputDefinition;
-use crate::input::InputOptionValue;
+use crate::input::InputValue;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, PhpResource, php_regex, preg_is_match};
+use shirabe_php_shim::{PhpResource, php_regex, preg_is_match};
 
 /// Input is the base class for all concrete Input classes.
 ///
@@ -18,8 +19,8 @@ use shirabe_php_shim::{PhpMixed, PhpResource, php_regex, preg_is_match};
 pub struct Input {
     pub(crate) definition: InputDefinition,
     stream: Option<PhpResource>,
-    pub(crate) options: IndexMap<String, PhpMixed>,
-    pub(crate) arguments: IndexMap<String, PhpMixed>,
+    pub(crate) options: IndexMap<String, InputValue>,
+    pub(crate) arguments: IndexMap<String, InputValue>,
     interactive: bool,
 }
 
@@ -74,7 +75,7 @@ impl Input {
             |argument: &String| {
                 !given_arguments.contains_key(argument)
                     && definition
-                        .get_argument(&PhpMixed::String(argument.clone()))
+                        .get_argument(&ArgumentName::of(argument))
                         .map(|a| a.is_required())
                         .unwrap_or(false)
             },
@@ -99,18 +100,15 @@ impl Input {
         self.interactive = interactive;
     }
 
-    pub fn get_arguments(&self) -> IndexMap<String, PhpMixed> {
+    pub fn get_arguments(&self) -> IndexMap<String, InputValue> {
         shirabe_php_shim::array_merge_map(
             self.definition.get_argument_defaults(),
             self.arguments.clone(),
         )
     }
 
-    pub fn get_argument(&self, name: &str) -> anyhow::Result<PhpMixed> {
-        if !self
-            .definition
-            .has_argument(&PhpMixed::String(name.to_string()))
-        {
+    pub fn get_argument(&self, name: &str) -> anyhow::Result<InputValue> {
+        if !self.definition.has_argument(&ArgumentName::of(name)) {
             return Err(InvalidArgumentException::new(format!(
                 "The \"{}\" argument does not exist.",
                 name
@@ -122,17 +120,14 @@ impl Input {
             Some(value) => value.clone(),
             None => self
                 .definition
-                .get_argument(&PhpMixed::String(name.to_string()))?
+                .get_argument(&ArgumentName::of(name))?
                 .get_default()
                 .clone(),
         })
     }
 
-    pub fn set_argument(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
-        if !self
-            .definition
-            .has_argument(&PhpMixed::String(name.to_string()))
-        {
+    pub fn set_argument(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
+        if !self.definition.has_argument(&ArgumentName::of(name)) {
             return Err(InvalidArgumentException::new(format!(
                 "The \"{}\" argument does not exist.",
                 name
@@ -146,25 +141,24 @@ impl Input {
     }
 
     pub fn has_argument(&self, name: &str) -> bool {
-        self.definition
-            .has_argument(&PhpMixed::String(name.to_string()))
+        self.definition.has_argument(&ArgumentName::of(name))
     }
 
-    pub fn get_options(&self) -> IndexMap<String, PhpMixed> {
+    pub fn get_options(&self) -> IndexMap<String, InputValue> {
         shirabe_php_shim::array_merge_map(
             self.definition.get_option_defaults(),
             self.options.clone(),
         )
     }
 
-    pub fn get_option(&self, name: &str) -> anyhow::Result<InputOptionValue> {
+    pub fn get_option(&self, name: &str) -> anyhow::Result<InputValue> {
         if self.definition.has_negation(name) {
             let value = self.get_option(&self.definition.negation_to_name(name)?)?;
             if value.is_null() {
                 return Ok(value);
             }
 
-            return Ok(InputOptionValue::Bool(!value.to_bool()));
+            return Ok(InputValue::Bool(!value.to_bool()));
         }
 
         if !self.definition.has_option(name) {
@@ -176,18 +170,17 @@ impl Input {
         }
 
         Ok(if let Some(value) = self.options.get(name) {
-            InputOptionValue::from_php_mixed(value)
+            value.clone()
         } else {
-            let option = self.definition.get_option(name)?;
-            InputOptionValue::from_php_mixed(option.get_default())
+            self.definition.get_option(name)?.get_default().clone()
         })
     }
 
-    pub fn set_option(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+    pub fn set_option(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
         if self.definition.has_negation(name) {
             let negated = self.definition.negation_to_name(name)?;
             self.options
-                .insert(negated, PhpMixed::Bool(!value.as_bool().unwrap_or(false)));
+                .insert(negated, InputValue::Bool(!value.to_bool()));
 
             return Ok(());
         } else if !self.definition.has_option(name) {

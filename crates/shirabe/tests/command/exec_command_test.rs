@@ -2,7 +2,8 @@
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 /// ref: ExecCommandTest::testListThrowsIfNoBinariesExist
 #[test]
@@ -17,8 +18,8 @@ fn test_list_throws_if_no_binaries_exist() {
     let err = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("exec")),
-                (PhpMixed::from("--list"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("exec")),
+                (ParameterName::of("--list"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -62,8 +63,8 @@ fn test_list() {
     app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("exec")),
-                (PhpMixed::from("--list"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("exec")),
+                (ParameterName::of("--list"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )

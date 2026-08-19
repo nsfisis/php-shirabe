@@ -55,8 +55,8 @@ impl Command for ReinstallCommand {
             InputOption::new6("prefer-install", None, Some(InputOption::VALUE_REQUIRED), "Forces installation from package dist|source|auto (auto chooses source for dev versions, dist for the rest).", None, self.suggest_prefer_install()).unwrap().into(),
             InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
-            InputOption::new("optimize-autoloader", Some(shirabe_php_shim::PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
-            InputOption::new("classmap-authoritative", Some(shirabe_php_shim::PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
+            InputOption::new("optimize-autoloader", Some("o"), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
+            InputOption::new("classmap-authoritative", Some("a"), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
             InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
             InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
             InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
@@ -93,7 +93,7 @@ impl Command for ReinstallCommand {
         let type_option = input.borrow().get_option("type")?;
         let type_count = type_option.as_array().map_or(0, <[String]>::len);
         let packages_arg = input.borrow().get_argument("packages")?;
-        let packages_count = packages_arg.as_list().map_or(0, |l| l.len());
+        let packages_count = packages_arg.as_array().map_or(0, <[String]>::len);
 
         if type_count > 0 {
             if packages_count > 0 {
@@ -121,12 +121,8 @@ impl Command for ReinstallCommand {
                 .into());
             }
             let patterns: Vec<String> = packages_arg
-                .as_list()
-                .map(|l| {
-                    l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect()
-                })
+                .as_array()
+                .map(<[String]>::to_vec)
                 .unwrap_or_default();
             for pattern in &patterns {
                 let pattern_regexp = base_package::package_name_to_regexp(pattern);

@@ -6,12 +6,13 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
-fn input(pairs: Vec<(&str, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
+fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
-        .map(|(k, v)| (PhpMixed::from(k), v))
+        .map(|(k, v)| (ParameterName::of(k), v))
         .collect()
 }
 
@@ -36,7 +37,7 @@ fn test_no_local_changes() {
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("status"))],
+            vec![(ParameterName::of("command"), InputValue::from("status"))],
             RunOptions::default(),
         )
         .unwrap();
@@ -59,7 +60,7 @@ struct LocallyModifiedPackageData {
 /// ref: StatusCommandTest::testLocallyModifiedPackages (data provider rolled into a helper).
 fn run_locally_modified_packages_case(
     composer_json: serde_json::Value,
-    command_flags: Vec<(&str, PhpMixed)>,
+    command_flags: Vec<(&str, InputValue)>,
     package_data: LocallyModifiedPackageData,
 ) {
     let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);
@@ -84,7 +85,7 @@ fn run_locally_modified_packages_case(
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            input(vec![("command", PhpMixed::from("install"))]),
+            input(vec![("command", InputValue::from("install"))]),
             RunOptions::default(),
         )
         .unwrap();
@@ -99,7 +100,7 @@ fn run_locally_modified_packages_case(
     )
     .unwrap();
 
-    let mut status_input = vec![("command", PhpMixed::from("status"))];
+    let mut status_input = vec![("command", InputValue::from("status"))];
     status_input.extend(command_flags);
     app_tester
         .run(input(status_input), RunOptions::default())
@@ -135,7 +136,7 @@ fn test_locally_modified_packages_from_source() {
 fn test_locally_modified_packages_from_dist() {
     run_locally_modified_packages_case(
         serde_json::json!({ "require": { "smarty/smarty": "^3.1" } }),
-        vec![("--verbose", PhpMixed::from(true))],
+        vec![("--verbose", InputValue::from(true))],
         LocallyModifiedPackageData {
             name: "smarty/smarty",
             version: "3.1.7",

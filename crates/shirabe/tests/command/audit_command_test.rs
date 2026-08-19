@@ -6,7 +6,8 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 #[test]
 #[serial]
@@ -16,7 +17,7 @@ fn test_successful_response_code_when_no_packages_are_required() {
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("audit"))],
+            vec![(ParameterName::of("command"), InputValue::from("audit"))],
             RunOptions::default(),
         )
         .unwrap();
@@ -41,8 +42,8 @@ fn test_error_auditing_lock_file_when_it_is_missing() {
     let err = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("audit")),
-                (PhpMixed::from("--locked"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("audit")),
+                (ParameterName::of("--locked"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -69,8 +70,8 @@ fn test_audit_package_with_no_security_vulnerabilities() {
     app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("audit")),
-                (PhpMixed::from("--locked"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("audit")),
+                (ParameterName::of("--locked"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -100,8 +101,8 @@ fn test_audit_package_with_no_dev_option_passed() {
     app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("audit")),
-                (PhpMixed::from("--no-dev"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("audit")),
+                (ParameterName::of("--no-dev"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )

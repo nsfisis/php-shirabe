@@ -3,7 +3,8 @@
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 #[test]
 #[serial]
@@ -18,7 +19,7 @@ fn test_cmd_fail() {
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("diagnose"))],
+            vec![(ParameterName::of("command"), InputValue::from("diagnose"))],
             RunOptions::default(),
         )
         .unwrap();
@@ -65,7 +66,7 @@ fn test_cmd_success() {
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("diagnose"))],
+            vec![(ParameterName::of("command"), InputValue::from("diagnose"))],
             RunOptions::default(),
         )
         .unwrap();

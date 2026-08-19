@@ -36,15 +36,14 @@ impl TextDescriptor {
         argument: &InputArgument,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let default = if !argument.get_default().is_null()
-            && (!matches!(
-                argument.get_default(),
-                PhpMixed::List(_) | PhpMixed::Array(_)
-            ) || shirabe_php_shim::count(argument.get_default()) != 0)
+        let default_value = argument.get_default().to_php_mixed();
+        let default = if !default_value.is_null()
+            && (!matches!(default_value, PhpMixed::List(_) | PhpMixed::Array(_))
+                || shirabe_php_shim::count(&default_value) != 0)
         {
             format!(
                 "<comment> [default: {}]</comment>",
-                self.format_default_value(argument.get_default())?
+                self.format_default_value(&default_value)?
             )
         } else {
             String::new()
@@ -82,14 +81,15 @@ impl TextDescriptor {
         option: &InputOption,
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
+        let default_value = option.get_default().to_php_mixed();
         let default = if option.accept_value()
-            && !option.get_default().is_null()
-            && (!matches!(option.get_default(), PhpMixed::List(_) | PhpMixed::Array(_))
-                || shirabe_php_shim::count(option.get_default()) != 0)
+            && !default_value.is_null()
+            && (!matches!(default_value, PhpMixed::List(_) | PhpMixed::Array(_))
+                || shirabe_php_shim::count(&default_value) != 0)
         {
             format!(
                 "<comment> [default: {}]</comment>",
-                self.format_default_value(option.get_default())?
+                self.format_default_value(&default_value)?
             )
         } else {
             String::new()

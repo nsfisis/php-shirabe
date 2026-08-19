@@ -4,6 +4,8 @@ use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe_php_shim::{PHP_BINARY, PhpMixed};
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 use shirabe_symfony_process::Process;
 
 /// ref: SelfUpdateCommandTest::setUp. The `composer-test.phar` copy PHP also performs here lives in
@@ -108,8 +110,11 @@ fn test_update_with_invalid_option_throws_exception() {
     let err = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("self-update")),
-                (PhpMixed::from("invalid-option"), PhpMixed::from(true)),
+                (
+                    ParameterName::of("command"),
+                    InputValue::from("self-update"),
+                ),
+                (ParameterName::of("invalid-option"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )

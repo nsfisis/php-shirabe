@@ -67,7 +67,7 @@ impl Command for DependsCommand {
             .into(),
             InputOption::new(
                 crate::command::OPTION_RECURSIVE,
-                Some(shirabe_php_shim::PhpMixed::String("r".to_string())),
+                Some("r"),
                 Some(InputOption::VALUE_NONE),
                 "Recursively resolves up to the root package",
                 None,
@@ -76,7 +76,7 @@ impl Command for DependsCommand {
             .into(),
             InputOption::new(
                 crate::command::OPTION_TREE,
-                Some(shirabe_php_shim::PhpMixed::String("t".to_string())),
+                Some("t"),
                 Some(InputOption::VALUE_NONE),
                 "Prints the results as a nested tree",
                 None,

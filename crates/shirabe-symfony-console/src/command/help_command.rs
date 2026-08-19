@@ -10,8 +10,9 @@ use crate::input::DefinitionItem;
 use crate::input::InputArgument;
 use crate::input::InputInterface;
 use crate::input::InputOption;
+use crate::input::InputValue;
 use crate::output::OutputInterface;
-use shirabe_php_shim::{PhpMixed, impl_php_class};
+use shirabe_php_shim::impl_php_class;
 use std::ops::{Deref, DerefMut};
 
 /// HelpCommand displays the help for a given command.
@@ -101,21 +102,21 @@ impl Command for HelpCommand {
                 "command_name".to_string(),
                 Some(InputArgument::OPTIONAL),
                 "The command name".to_string(),
-                PhpMixed::from("help".to_string()),
+                InputValue::from("help".to_string()),
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "format",
-                PhpMixed::Null,
+                None,
                 Some(InputOption::VALUE_REQUIRED),
                 "The output format (txt, xml, json, or md)".to_string(),
-                PhpMixed::from("txt".to_string()),
+                InputValue::from("txt".to_string()),
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "raw",
-                PhpMixed::Null,
+                None,
                 Some(InputOption::VALUE_NONE),
                 "To output raw command help".to_string(),
-                PhpMixed::Null,
+                InputValue::Null,
             )?),
         ]));
         self.inner.set_description("Display help for a command");
@@ -141,7 +142,7 @@ impl Command for HelpCommand {
     ) -> anyhow::Result<i64> {
         if self.command.borrow().is_none() {
             let application = self.get_application().unwrap();
-            let command_name = input.borrow().get_argument("command_name")?.to_string();
+            let command_name = input.borrow().get_argument("command_name")?.to_php_string();
             let found = application.borrow_mut().find(&command_name)?;
             *self.command.borrow_mut() = Some(found);
         }

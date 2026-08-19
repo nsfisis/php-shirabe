@@ -7,7 +7,7 @@ use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
-use shirabe_php_shim::{PhpMixed, impl_php_class};
+use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -43,7 +43,7 @@ impl Command for SelfUpdateCommand {
         self.set_aliases(vec!["selfupdate".to_string()])?;
         self.set_description("Updates composer.phar to the latest version");
         self.set_definition(&[
-            InputOption::new("rollback", Some(PhpMixed::String("r".to_string())), Some(InputOption::VALUE_NONE), "Revert to an older installation of composer", None).unwrap().into(),
+            InputOption::new("rollback", Some("r"), Some(InputOption::VALUE_NONE), "Revert to an older installation of composer", None).unwrap().into(),
             InputOption::new("clean-backups", None, Some(InputOption::VALUE_NONE), "Delete old backups during an update. This makes the current version of composer the only backup available after the update", None).unwrap().into(),
             InputArgument::new("version", Some(InputArgument::OPTIONAL), "The version to update to", None).unwrap().into(),
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),

@@ -20,6 +20,8 @@ use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::ArrayInput;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 use shirabe_symfony_console::output::BufferedOutput;
 use shirabe_symfony_console::output::OutputInterface;
 
@@ -202,7 +204,7 @@ fn test_uses_config_from_composer_object_with_package_name() {
     let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
             ArrayInput::new(
-                vec![(PhpMixed::from("package"), PhpMixed::from("foo/bar"))],
+                vec![(ParameterName::of("package"), InputValue::from("foo/bar"))],
                 None,
             )
             .unwrap(),

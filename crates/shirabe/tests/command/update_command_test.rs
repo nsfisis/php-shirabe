@@ -6,13 +6,14 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::package::Link;
-use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
-fn input(pairs: Vec<(&str, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
+fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
-        .map(|(k, v)| (PhpMixed::from(k), v))
+        .map(|(k, v)| (ParameterName::of(k), v))
         .collect()
 }
 
@@ -75,7 +76,7 @@ fn root_dep_and_transitive_dep() -> serde_json::Value {
 fn provide_updates() -> Vec<(
     &'static str,
     serde_json::Value,
-    Vec<(&'static str, PhpMixed)>,
+    Vec<(&'static str, InputValue)>,
     &'static str,
     bool,
 )> {
@@ -98,7 +99,7 @@ Package operations: 2 installs, 0 updates, 0 removals
         (
             "simple update with very verbose output",
             root_dep_and_transitive_dep(),
-            vec![("-vv", PhpMixed::from(true))],
+            vec![("-vv", InputValue::from(true))],
             "Loading composer repositories with package information
 Updating dependencies
 Dependency resolution completed in %f seconds
@@ -119,8 +120,8 @@ Installs: dep/pkg:1.0.2, root/req:1.0.0
             "update with temporary constraint + --no-install",
             root_dep_and_transitive_dep(),
             vec![
-                ("--with", PhpMixed::List(vec![PhpMixed::from("dep/pkg:1.0.0")])),
-                ("--no-install", PhpMixed::from(true)),
+                ("--with", InputValue::Array(vec!["dep/pkg:1.0.0".to_string()])),
+                ("--no-install", InputValue::from(true)),
             ],
             "Loading composer repositories with package information
 Updating dependencies
@@ -132,7 +133,7 @@ Lock file operations: 2 installs, 0 updates, 0 removals
         (
             "update with temporary constraint failing resolution",
             root_dep_and_transitive_dep(),
-            vec![("--with", PhpMixed::List(vec![PhpMixed::from("dep/pkg:^2")]))],
+            vec![("--with", InputValue::Array(vec!["dep/pkg:^2".to_string()]))],
             "Loading composer repositories with package information
 Updating dependencies
 Your requirements could not be resolved to an installable set of packages.
@@ -145,7 +146,7 @@ Your requirements could not be resolved to an installable set of packages.
         (
             "update with temporary constraint failing resolution on root package",
             root_dep_and_transitive_dep(),
-            vec![("--with", PhpMixed::List(vec![PhpMixed::from("root/req:^2")]))],
+            vec![("--with", InputValue::Array(vec!["root/req:^2".to_string()]))],
             "The temporary constraint \"^2\" for \"root/req\" must be a subset of the constraint in your composer.json (1.*)
 Run `composer require root/req` or `composer require root/req:^2` instead to replace the constraint",
             false,
@@ -153,7 +154,7 @@ Run `composer require root/req` or `composer require root/req:^2` instead to rep
         (
             "update & bump",
             root_dep_and_transitive_dep(),
-            vec![("--bump-after-update", PhpMixed::from(true))],
+            vec![("--bump-after-update", InputValue::from(true))],
             "Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 2 installs, 0 updates, 0 removals
@@ -174,8 +175,8 @@ No requirements to update in ./composer.json.",
             "update & bump with lock",
             root_dep_and_transitive_dep(),
             vec![
-                ("--bump-after-update", PhpMixed::from(true)),
-                ("--lock", PhpMixed::from(true)),
+                ("--bump-after-update", InputValue::from(true)),
+                ("--lock", InputValue::from(true)),
             ],
             "Loading composer repositories with package information
 Updating dependencies
@@ -187,7 +188,7 @@ Nothing to install, update or remove",
         (
             "update & bump dev only",
             root_dep_and_transitive_dep(),
-            vec![("--bump-after-update", PhpMixed::from("dev"))],
+            vec![("--bump-after-update", InputValue::from("dev"))],
             "Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 2 installs, 0 updates, 0 removals
@@ -205,8 +206,8 @@ No requirements to update in ./composer.json.",
             "update & dump with failing update",
             root_dep_and_transitive_dep(),
             vec![
-                ("--with", PhpMixed::List(vec![PhpMixed::from("dep/pkg:^2")])),
-                ("--bump-after-update", PhpMixed::from(true)),
+                ("--with", InputValue::Array(vec!["dep/pkg:^2".to_string()])),
+                ("--bump-after-update", InputValue::from(true)),
             ],
             "Loading composer repositories with package information
 Updating dependencies
@@ -220,7 +221,7 @@ Your requirements could not be resolved to an installable set of packages.
         (
             "update with replaced name filter fails to resolve",
             root_dep_and_transitive_dep(),
-            vec![("--with", PhpMixed::List(vec![PhpMixed::from("replaced/pkg:^2")]))],
+            vec![("--with", InputValue::Array(vec!["replaced/pkg:^2".to_string()]))],
             "Loading composer repositories with package information
 Updating dependencies
 Your requirements could not be resolved to an installable set of packages.
@@ -245,9 +246,9 @@ fn test_update() {
 
         let mut app_tester = get_application_tester();
         let mut args = vec![
-            ("command", PhpMixed::from("update")),
-            ("--dry-run", PhpMixed::from(true)),
-            ("--no-audit", PhpMixed::from(true)),
+            ("command", InputValue::from("update")),
+            ("--dry-run", InputValue::from(true)),
+            ("--no-audit", InputValue::from(true)),
         ];
         args.extend(command);
         app_tester.run(input(args), RunOptions::default()).unwrap();
@@ -286,14 +287,14 @@ fn test_update_with_patch_only() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("update")),
-                ("--dry-run", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-install", PhpMixed::from(true)),
-                ("--patch-only", PhpMixed::from(true)),
+                ("command", InputValue::from("update")),
+                ("--dry-run", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-install", InputValue::from(true)),
+                ("--patch-only", InputValue::from(true)),
                 (
                     "--with",
-                    PhpMixed::List(vec![PhpMixed::from("root/req:^1.1")]),
+                    InputValue::Array(vec!["root/req:^1.1".to_string()]),
                 ),
             ]),
             RunOptions::default(),
@@ -317,21 +318,18 @@ Your requirements could not be resolved to an installable set of packages.
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("update")),
-                ("--dry-run", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-install", PhpMixed::from(true)),
-                ("--patch-only", PhpMixed::from(true)),
+                ("command", InputValue::from("update")),
+                ("--dry-run", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-install", InputValue::from(true)),
+                ("--patch-only", InputValue::from(true)),
                 (
                     "--with",
-                    PhpMixed::List(vec![PhpMixed::from("root/req:^1.0.1")]),
+                    InputValue::Array(vec!["root/req:^1.0.1".to_string()]),
                 ),
                 (
                     "packages",
-                    PhpMixed::List(vec![
-                        PhpMixed::from("root/req"),
-                        PhpMixed::from("root/req2"),
-                    ]),
+                    InputValue::Array(vec!["root/req".to_string(), "root/req2".to_string()]),
                 ),
             ]),
             RunOptions::default(),
@@ -365,8 +363,8 @@ fn test_interactive_mode_throws_if_no_package_to_update() {
     let err = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("update")),
-                ("--interactive", PhpMixed::from(true)),
+                ("command", InputValue::from("update")),
+                ("--interactive", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -396,8 +394,8 @@ fn test_interactive_mode_throws_if_no_package_entered() {
     let err = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("update")),
-                ("--interactive", PhpMixed::from(true)),
+                ("command", InputValue::from("update")),
+                ("--interactive", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -492,10 +490,10 @@ fn test_interactive_tmp() {
         app_tester
             .run(
                 input(vec![
-                    ("command", PhpMixed::from("update")),
-                    ("--interactive", PhpMixed::from(true)),
-                    ("--no-audit", PhpMixed::from(true)),
-                    ("--dry-run", PhpMixed::from(true)),
+                    ("command", InputValue::from("update")),
+                    ("--interactive", InputValue::from(true)),
+                    ("--no-audit", InputValue::from(true)),
+                    ("--dry-run", InputValue::from(true)),
                 ]),
                 RunOptions {
                     interactive: Some(true),
@@ -550,10 +548,10 @@ fn test_no_security_blocking_allows_insecure_packages() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("update")),
-                ("--dry-run", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-install", PhpMixed::from(true)),
+                ("command", InputValue::from("update")),
+                ("--dry-run", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-install", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -573,11 +571,11 @@ fn test_no_security_blocking_allows_insecure_packages() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("update")),
-                ("--dry-run", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-install", PhpMixed::from(true)),
-                ("--no-security-blocking", PhpMixed::from(true)),
+                ("command", InputValue::from("update")),
+                ("--dry-run", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-install", InputValue::from(true)),
+                ("--no-security-blocking", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -610,10 +608,10 @@ fn test_bump_after_update_without_lockfile() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("update")),
-                ("--dry-run", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--bump-after-update", PhpMixed::from("dev")),
+                ("command", InputValue::from("update")),
+                ("--dry-run", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
+                ("--bump-after-update", InputValue::from("dev")),
             ]),
             RunOptions::default(),
         )

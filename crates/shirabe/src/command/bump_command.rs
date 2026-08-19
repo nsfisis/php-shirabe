@@ -349,7 +349,7 @@ impl Command for BumpCommand {
             .into(),
             InputOption::new(
                 "dev-only",
-                Some(PhpMixed::String("D".to_string())),
+                Some("D"),
                 Some(InputOption::VALUE_NONE),
                 "Only bump requirements in \"require-dev\".",
                 None,
@@ -358,7 +358,7 @@ impl Command for BumpCommand {
             .into(),
             InputOption::new(
                 "no-dev-only",
-                Some(PhpMixed::String("R".to_string())),
+                Some("R"),
                 Some(InputOption::VALUE_NONE),
                 "Only bump requirements in \"require\".",
                 None,
@@ -397,12 +397,8 @@ impl Command for BumpCommand {
         let packages_filter: Vec<String> = input
             .borrow()
             .get_argument("packages")?
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
+            .as_array()
+            .map(<[String]>::to_vec)
             .unwrap_or_default();
 
         let dev_only = input

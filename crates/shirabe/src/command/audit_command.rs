@@ -19,6 +19,7 @@ use shirabe_php_shim::{
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -113,10 +114,10 @@ impl Command for AuditCommand {
             .into(),
             InputOption::new6(
                 "format",
-                Some(PhpMixed::String("f".to_string())),
+                Some("f"),
                 Some(InputOption::VALUE_REQUIRED),
                 "Output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
-                Some(PhpMixed::String(Auditor::FORMAT_TABLE.to_string())),
+                Some(InputValue::String(Auditor::FORMAT_TABLE.to_string())),
                 SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect()),
             )
             .unwrap()
@@ -145,7 +146,7 @@ impl Command for AuditCommand {
                 None,
                 Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED),
                 "Ignore advisories of a certain severity level.",
-                Some(PhpMixed::Array(indexmap::IndexMap::new())),
+                Some(InputValue::Array(vec![])),
                 SuggestedValues::List(vec![
                     "low".to_string(),
                     "medium".to_string(),

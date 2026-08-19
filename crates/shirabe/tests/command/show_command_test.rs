@@ -8,13 +8,13 @@ use serial_test::serial;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::repository::PlatformRepository;
-use shirabe_php_shim::{PhpMixed, date_local};
+use shirabe_php_shim::date_local;
 
-/// Build a `Vec<(PhpMixed, PhpMixed)>` command input from `(key, value)` pairs.
-fn input(pairs: Vec<(&str, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
+/// Build a `Vec<(ParameterName, InputValue)>` command input from `(key, value)` pairs.
+fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
-        .map(|(k, v)| (PhpMixed::from(k), v))
+        .map(|(k, v)| (ParameterName::of(k), v))
         .collect()
 }
 
@@ -50,7 +50,11 @@ fn show_composer_json(requires: serde_json::Value) -> serde_json::Value {
 }
 
 /// ref: ShowCommandTest::testShow (one data-provider case).
-fn run_show_case(command: Vec<(PhpMixed, PhpMixed)>, expected: &str, requires: serde_json::Value) {
+fn run_show_case(
+    command: Vec<(ParameterName, InputValue)>,
+    expected: &str,
+    requires: serde_json::Value,
+) {
     let _tear_down = init_temp_composer(Some(&show_composer_json(requires)), None, None, true);
 
     let pkg = get_complete_package("vendor/package", "v1.0.0");
@@ -76,12 +80,14 @@ fn run_show_case(command: Vec<(PhpMixed, PhpMixed)>, expected: &str, requires: s
 }
 
 use crate::test_case::{create_composer_lock, create_installed_json};
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 #[test]
 #[serial]
 fn test_show_default_shows_installed_with_version_and_description() {
     run_show_case(
-        input(vec![("command", PhpMixed::from("show"))]),
+        input(vec![("command", InputValue::from("show"))]),
         "outdated/major 1.0.0
 outdated/minor 1.0.0
 outdated/patch 1.0.0
@@ -95,9 +101,9 @@ vendor/package 1.0.0 description of installed package",
 fn test_show_with_installed_and_self() {
     run_show_case(
         input(vec![
-            ("command", PhpMixed::from("show")),
-            ("--installed", PhpMixed::from(true)),
-            ("--self", PhpMixed::from(true)),
+            ("command", InputValue::from("show")),
+            ("--installed", InputValue::from(true)),
+            ("--self", InputValue::from(true)),
         ]),
         "outdated/major 1.0.0
 outdated/minor 1.0.0
@@ -113,9 +119,9 @@ vendor/package 1.0.0 description of installed package",
 fn test_show_with_locked_and_self() {
     run_show_case(
         input(vec![
-            ("command", PhpMixed::from("show")),
-            ("--locked", PhpMixed::from(true)),
-            ("--self", PhpMixed::from(true)),
+            ("command", InputValue::from("show")),
+            ("--locked", InputValue::from(true)),
+            ("--self", InputValue::from(true)),
         ]),
         "root/pkg      1.2.3
 vendor/locked 3.0.0 description of locked package",
@@ -128,8 +134,8 @@ vendor/locked 3.0.0 description of locked package",
 fn test_show_with_available() {
     run_show_case(
         input(vec![
-            ("command", PhpMixed::from("show")),
-            ("-a", PhpMixed::from(true)),
+            ("command", InputValue::from("show")),
+            ("-a", InputValue::from(true)),
         ]),
         "outdated/major outdated/major v2.0.0 description
 outdated/minor outdated/minor v1.1.1 description
@@ -144,8 +150,8 @@ vendor/package generic description",
 fn test_show_with_direct_shows_nothing_if_no_deps() {
     run_show_case(
         input(vec![
-            ("command", PhpMixed::from("show")),
-            ("--direct", PhpMixed::from(true)),
+            ("command", InputValue::from("show")),
+            ("--direct", InputValue::from(true)),
         ]),
         "",
         serde_json::json!({}),
@@ -157,8 +163,8 @@ fn test_show_with_direct_shows_nothing_if_no_deps() {
 fn test_show_with_direct_shows_only_root_deps() {
     run_show_case(
         input(vec![
-            ("command", PhpMixed::from("show")),
-            ("--direct", PhpMixed::from(true)),
+            ("command", InputValue::from("show")),
+            ("--direct", InputValue::from(true)),
         ]),
         "outdated/major 1.0.0",
         serde_json::json!({"outdated/major": "*"}),
@@ -169,7 +175,7 @@ fn test_show_with_direct_shows_only_root_deps() {
 #[serial]
 fn test_show_outdated_deps() {
     run_show_case(
-        input(vec![("command", PhpMixed::from("outdated"))]),
+        input(vec![("command", InputValue::from("outdated"))]),
         "Legend:
 ! patch or minor release available - update recommended
 ~ major release available - update possible
@@ -191,8 +197,8 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
 fn test_show_outdated_deps_sorting_by_age() {
     run_show_case(
         input(vec![
-            ("command", PhpMixed::from("outdated")),
-            ("--sort-by-age", PhpMixed::from(true)),
+            ("command", InputValue::from("outdated")),
+            ("--sort-by-age", InputValue::from(true)),
         ]),
         "Legend:
 ! patch or minor release available - update recommended
@@ -214,8 +220,8 @@ outdated/major 1.0.0 ~ 2.0.0 from today",
 fn test_show_outdated_deps_with_direct_only_show_direct_deps_with_updated() {
     run_show_case(
         input(vec![
-            ("command", PhpMixed::from("outdated")),
-            ("--direct", PhpMixed::from(true)),
+            ("command", InputValue::from("outdated")),
+            ("--direct", InputValue::from(true)),
         ]),
         "Legend:
 ! patch or minor release available - update recommended
@@ -233,8 +239,8 @@ outdated/major 1.0.0 ~ 2.0.0",
 fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
     run_show_case(
         input(vec![
-            ("command", PhpMixed::from("outdated")),
-            ("--direct", PhpMixed::from(true)),
+            ("command", InputValue::from("outdated")),
+            ("--direct", InputValue::from(true)),
         ]),
         "All your direct dependencies are up to date",
         serde_json::json!({"vendor/package": "*"}),
@@ -246,8 +252,8 @@ fn test_show_outdated_deps_with_direct_show_msg_if_all_up_to_date() {
 fn test_show_outdated_deps_with_major_only() {
     run_show_case(
         input(vec![
-            ("command", PhpMixed::from("outdated")),
-            ("--major-only", PhpMixed::from(true)),
+            ("command", InputValue::from("outdated")),
+            ("--major-only", InputValue::from(true)),
         ]),
         "Legend:
 ! patch or minor release available - update recommended
@@ -267,8 +273,8 @@ outdated/major 1.0.0 ~ 2.0.0",
 fn test_show_outdated_deps_with_minor_only() {
     run_show_case(
         input(vec![
-            ("command", PhpMixed::from("outdated")),
-            ("--minor-only", PhpMixed::from(true)),
+            ("command", InputValue::from("outdated")),
+            ("--minor-only", InputValue::from(true)),
         ]),
         "Legend:
 ! patch or minor release available - update recommended
@@ -289,8 +295,8 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
 fn test_show_outdated_deps_with_patch_only() {
     run_show_case(
         input(vec![
-            ("command", PhpMixed::from("outdated")),
-            ("--patch-only", PhpMixed::from(true)),
+            ("command", InputValue::from("outdated")),
+            ("--patch-only", InputValue::from(true)),
         ]),
         "Legend:
 ! patch or minor release available - update recommended
@@ -334,7 +340,7 @@ fn test_outdated_filters_according_to_platform_reqs_and_warns() {
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            input(vec![("command", PhpMixed::from("outdated"))]),
+            input(vec![("command", InputValue::from("outdated"))]),
             RunOptions::default(),
         )
         .unwrap();
@@ -356,8 +362,8 @@ vendor/package 1.1.0 ~ 1.0.0",
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("outdated")),
-                ("--verbose", PhpMixed::from(true)),
+                ("command", InputValue::from("outdated")),
+                ("--verbose", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -406,7 +412,7 @@ fn test_outdated_filters_according_to_platform_reqs_without_warning_for_higher_v
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            input(vec![("command", PhpMixed::from("outdated"))]),
+            input(vec![("command", InputValue::from("outdated"))]),
             RunOptions::default(),
         )
         .unwrap();
@@ -455,9 +461,9 @@ fn test_show_direct_with_name_does_not_show_transient_dependencies() {
     let err = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("--direct", PhpMixed::from(true)),
-                ("package", PhpMixed::from("vendor/package")),
+                ("command", InputValue::from("show")),
+                ("--direct", InputValue::from(true)),
+                ("package", InputValue::from("vendor/package")),
             ]),
             RunOptions::default(),
         )
@@ -502,9 +508,9 @@ fn test_show_direct_with_name_only_shows_direct_dependents() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("--direct", PhpMixed::from(true)),
-                ("package", PhpMixed::from("direct/dependent")),
+                ("command", InputValue::from("show")),
+                ("--direct", InputValue::from(true)),
+                ("package", InputValue::from("direct/dependent")),
             ]),
             RunOptions::default(),
         )
@@ -520,9 +526,9 @@ fn test_show_direct_with_name_only_shows_direct_dependents() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("--direct", PhpMixed::from(true)),
-                ("package", PhpMixed::from("direct/dependent2")),
+                ("command", InputValue::from("show")),
+                ("--direct", InputValue::from(true)),
+                ("package", InputValue::from("direct/dependent2")),
             ]),
             RunOptions::default(),
         )
@@ -583,8 +589,8 @@ fn test_show_platform_only_shows_platform_packages() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("-p", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("-p", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -605,8 +611,8 @@ fn test_show_platform_works_without_composer_json() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("-p", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("-p", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -618,9 +624,9 @@ fn test_show_platform_works_without_composer_json() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("-p", PhpMixed::from(true)),
-                ("package", PhpMixed::from("php")),
+                ("command", InputValue::from("show")),
+                ("-p", InputValue::from(true)),
+                ("package", InputValue::from("php")),
             ]),
             RunOptions::default(),
         )
@@ -630,10 +636,10 @@ fn test_show_platform_works_without_composer_json() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("-p", PhpMixed::from(true)),
-                ("-f", PhpMixed::from("json")),
-                ("package", PhpMixed::from("php")),
+                ("command", InputValue::from("show")),
+                ("-p", InputValue::from(true)),
+                ("-f", InputValue::from("json")),
+                ("package", InputValue::from("php")),
             ]),
             RunOptions::default(),
         )
@@ -688,9 +694,9 @@ fn test_outdated_with_zero_major() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("outdated")),
-                ("--direct", PhpMixed::from(true)),
-                ("--patch-only", PhpMixed::from(true)),
+                ("command", InputValue::from("outdated")),
+                ("--direct", InputValue::from(true)),
+                ("--patch-only", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -707,9 +713,9 @@ zero/patch 0.1.2 <highlight>! 0.1.2.1</highlight>",
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("outdated")),
-                ("--direct", PhpMixed::from(true)),
-                ("--minor-only", PhpMixed::from(true)),
+                ("command", InputValue::from("outdated")),
+                ("--direct", InputValue::from(true)),
+                ("--minor-only", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -727,9 +733,9 @@ zero/patch 0.1.2 <highlight>! 0.1.2.1</highlight>",
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("outdated")),
-                ("--direct", PhpMixed::from(true)),
-                ("--major-only", PhpMixed::from(true)),
+                ("command", InputValue::from("outdated")),
+                ("--direct", InputValue::from(true)),
+                ("--major-only", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -775,8 +781,8 @@ fn test_show_all_shows_all_sections() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("--all", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("--all", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -810,8 +816,8 @@ fn test_locked_requires_valid_lock_file() {
     let err = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("--locked", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("--locked", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -838,8 +844,8 @@ fn test_locked_shows_all_locked() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("--locked", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("--locked", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -857,8 +863,8 @@ fn test_locked_shows_all_locked() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("--locked", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("--locked", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -873,57 +879,57 @@ vendor/locked2 2.0.0 description of locked2 package",
 #[test]
 #[serial]
 fn test_invalid_option_combinations() {
-    let combos: Vec<Vec<(&str, PhpMixed)>> = vec![
+    let combos: Vec<Vec<(&str, InputValue)>> = vec![
         vec![
-            ("--direct", PhpMixed::from(true)),
-            ("--all", PhpMixed::from(true)),
+            ("--direct", InputValue::from(true)),
+            ("--all", InputValue::from(true)),
         ],
         vec![
-            ("--direct", PhpMixed::from(true)),
-            ("--available", PhpMixed::from(true)),
+            ("--direct", InputValue::from(true)),
+            ("--available", InputValue::from(true)),
         ],
         vec![
-            ("--direct", PhpMixed::from(true)),
-            ("--platform", PhpMixed::from(true)),
+            ("--direct", InputValue::from(true)),
+            ("--platform", InputValue::from(true)),
         ],
         vec![
-            ("--tree", PhpMixed::from(true)),
-            ("--all", PhpMixed::from(true)),
+            ("--tree", InputValue::from(true)),
+            ("--all", InputValue::from(true)),
         ],
         vec![
-            ("--tree", PhpMixed::from(true)),
-            ("--available", PhpMixed::from(true)),
+            ("--tree", InputValue::from(true)),
+            ("--available", InputValue::from(true)),
         ],
         vec![
-            ("--tree", PhpMixed::from(true)),
-            ("--latest", PhpMixed::from(true)),
+            ("--tree", InputValue::from(true)),
+            ("--latest", InputValue::from(true)),
         ],
         vec![
-            ("--tree", PhpMixed::from(true)),
-            ("--path", PhpMixed::from(true)),
+            ("--tree", InputValue::from(true)),
+            ("--path", InputValue::from(true)),
         ],
         vec![
-            ("--patch-only", PhpMixed::from(true)),
-            ("--minor-only", PhpMixed::from(true)),
+            ("--patch-only", InputValue::from(true)),
+            ("--minor-only", InputValue::from(true)),
         ],
         vec![
-            ("--patch-only", PhpMixed::from(true)),
-            ("--major-only", PhpMixed::from(true)),
+            ("--patch-only", InputValue::from(true)),
+            ("--major-only", InputValue::from(true)),
         ],
         vec![
-            ("--minor-only", PhpMixed::from(true)),
-            ("--major-only", PhpMixed::from(true)),
+            ("--minor-only", InputValue::from(true)),
+            ("--major-only", InputValue::from(true)),
         ],
         vec![
-            ("--minor-only", PhpMixed::from(true)),
-            ("--major-only", PhpMixed::from(true)),
-            ("--patch-only", PhpMixed::from(true)),
+            ("--minor-only", InputValue::from(true)),
+            ("--major-only", InputValue::from(true)),
+            ("--patch-only", InputValue::from(true)),
         ],
-        vec![("--format", PhpMixed::from("test"))],
+        vec![("--format", InputValue::from("test"))],
     ];
 
     for combo in combos {
-        let mut pairs = vec![("command", PhpMixed::from("show"))];
+        let mut pairs = vec![("command", InputValue::from("show"))];
         pairs.extend(combo.clone());
         let mut app_tester = get_application_tester();
         let status_code = app_tester.run(input(pairs), RunOptions::default()).unwrap();
@@ -940,8 +946,8 @@ fn test_ignored_option_combinations() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("--installed", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("--installed", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -956,10 +962,10 @@ fn test_ignored_option_combinations() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
+                ("command", InputValue::from("show")),
                 (
                     "--ignore",
-                    PhpMixed::List(vec![PhpMixed::from("vendor/package")]),
+                    InputValue::Array(vec!["vendor/package".to_string()]),
                 ),
             ]),
             RunOptions::default(),
@@ -986,9 +992,9 @@ fn test_self_and_name_only() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("--self", PhpMixed::from(true)),
-                ("--name-only", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("--self", InputValue::from(true)),
+                ("--name-only", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -1009,9 +1015,9 @@ fn test_self_and_package_combination() {
     let mut app_tester = get_application_tester();
     let result = app_tester.run(
         input(vec![
-            ("command", PhpMixed::from("show")),
-            ("--self", PhpMixed::from(true)),
-            ("package", PhpMixed::from("vendor/package")),
+            ("command", InputValue::from("show")),
+            ("--self", InputValue::from(true)),
+            ("package", InputValue::from("vendor/package")),
         ]),
         RunOptions::default(),
     );
@@ -1045,8 +1051,8 @@ fn test_self() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("--self", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("--self", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -1091,7 +1097,7 @@ fn test_not_installed_error() {
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            input(vec![("command", PhpMixed::from("show"))]),
+            input(vec![("command", InputValue::from("show"))]),
             RunOptions::default(),
         )
         .unwrap();
@@ -1129,8 +1135,8 @@ fn test_no_dev_option() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("--no-dev", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("--no-dev", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -1169,8 +1175,8 @@ fn test_package_filter() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("package", PhpMixed::from("vendor/package")),
+                ("command", InputValue::from("show")),
+                ("package", InputValue::from("vendor/package")),
             ]),
             RunOptions::default(),
         )
@@ -1186,9 +1192,9 @@ fn test_package_filter() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("package", PhpMixed::from("company/*")),
-                ("--name-only", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("package", InputValue::from("company/*")),
+                ("--name-only", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -1202,7 +1208,7 @@ fn test_package_filter() {
 }
 
 /// ref: ShowCommandTest::testNotExistingPackage (one data-provider case).
-fn run_not_existing_package_case(package: &str, options: Vec<(&str, PhpMixed)>, expected: &str) {
+fn run_not_existing_package_case(package: &str, options: Vec<(&str, InputValue)>, expected: &str) {
     let _tear_down = init_temp_composer(
         Some(&serde_json::json!({
             "require": {"vendor/package": "1.0.0"},
@@ -1216,8 +1222,8 @@ fn run_not_existing_package_case(package: &str, options: Vec<(&str, PhpMixed)>, 
     create_composer_lock(&[pkg], &[]);
 
     let mut pairs = vec![
-        ("command", PhpMixed::from("show")),
-        ("package", PhpMixed::from(package)),
+        ("command", InputValue::from("show")),
+        ("package", InputValue::from(package)),
     ];
     pairs.extend(options);
 
@@ -1248,7 +1254,7 @@ fn test_not_existing_package_with_no_options() {
 fn test_not_existing_package_with_all_option() {
     run_not_existing_package_case(
         "not/existing",
-        vec![("--all", PhpMixed::from(true))],
+        vec![("--all", InputValue::from(true))],
         "Package \"not/existing\" not found.",
     );
 }
@@ -1258,7 +1264,7 @@ fn test_not_existing_package_with_all_option() {
 fn test_not_existing_package_with_locked_option() {
     run_not_existing_package_case(
         "not/existing",
-        vec![("--locked", PhpMixed::from(true))],
+        vec![("--locked", InputValue::from(true))],
         "Package \"not/existing\" not found in lock file, try using --available (-a) to show all available packages.",
     );
 }
@@ -1268,7 +1274,7 @@ fn test_not_existing_package_with_locked_option() {
 fn test_not_existing_platform_with_platform_option() {
     run_not_existing_package_case(
         "ext-nonexisting",
-        vec![("--platform", PhpMixed::from(true))],
+        vec![("--platform", InputValue::from(true))],
         "Package \"ext-nonexisting\" not found, try using --available (-a) to show all available packages.",
     );
 }
@@ -1306,11 +1312,11 @@ fn test_not_existing_package_with_working_dir() {
     let err = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("package", PhpMixed::from("not/existing")),
+                ("command", InputValue::from("show")),
+                ("package", InputValue::from("not/existing")),
                 (
                     "--working-dir",
-                    PhpMixed::from(dir.display().to_string().as_str()),
+                    InputValue::from(dir.display().to_string().as_str()),
                 ),
             ]),
             RunOptions::default(),
@@ -1329,7 +1335,7 @@ fn test_not_existing_package_with_working_dir() {
 /// ref: ShowCommandTest::testSpecificPackageAndTree (one data-provider case).
 fn run_specific_package_and_tree_case(
     packages: Vec<PackageInterfaceHandle>,
-    options: Vec<(&str, PhpMixed)>,
+    options: Vec<(&str, InputValue)>,
     expected: &str,
 ) {
     let _tear_down = init_temp_composer(
@@ -1344,9 +1350,9 @@ fn run_specific_package_and_tree_case(
     create_installed_json(&packages, &[], true);
 
     let mut pairs = vec![
-        ("command", PhpMixed::from("show")),
-        ("package", PhpMixed::from("vendor/package")),
-        ("--tree", PhpMixed::from(true)),
+        ("command", InputValue::from("show")),
+        ("package", InputValue::from("vendor/package")),
+        ("--tree", InputValue::from(true)),
     ];
     pairs.extend(options);
 
@@ -1416,7 +1422,7 @@ fn test_specific_package_and_tree_with_json_format() {
     let pkg = get_package("vendor/package", "1.0.0");
     run_specific_package_and_tree_case(
         vec![pkg],
-        vec![("--format", PhpMixed::from("json"))],
+        vec![("--format", InputValue::from("json"))],
         "{
     \"installed\": [
         {
@@ -1467,8 +1473,8 @@ fn test_name_only_prints_no_trailing_whitespace() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("-N", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("-N", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -1484,9 +1490,9 @@ vendor/somepackage",
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("show")),
-                ("--outdated", PhpMixed::from(true)),
-                ("-N", PhpMixed::from(true)),
+                ("command", InputValue::from("show")),
+                ("--outdated", InputValue::from(true)),
+                ("-N", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )

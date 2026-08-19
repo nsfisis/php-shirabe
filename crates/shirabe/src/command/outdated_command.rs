@@ -8,10 +8,12 @@ use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::console::input::SuggestedValues;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, impl_php_class};
+use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::ArrayInput;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -45,16 +47,16 @@ impl Command for OutdatedCommand {
         self.set_description("Shows a list of installed packages that have updates available, including their latest version");
         self.set_definition(&[
             InputArgument::new5("package", Some(InputArgument::OPTIONAL), "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.", None, self.suggest_installed_package(false, false)).unwrap().into(),
-        InputOption::new("outdated", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that are outdated (this is the default, but present here for compat with `show`", None).unwrap().into(),
-        InputOption::new("all", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Show all installed packages with their latest versions", None).unwrap().into(),
+        InputOption::new("outdated", Some("o"), Some(InputOption::VALUE_NONE), "Show only packages that are outdated (this is the default, but present here for compat with `show`", None).unwrap().into(),
+        InputOption::new("all", Some("a"), Some(InputOption::VALUE_NONE), "Show all installed packages with their latest versions", None).unwrap().into(),
         InputOption::new("locked", None, Some(InputOption::VALUE_NONE), "Shows updates for packages from the lock file, regardless of what is currently in vendor dir", None).unwrap().into(),
-        InputOption::new("direct", Some(PhpMixed::String("D".to_string())), Some(InputOption::VALUE_NONE), "Shows only packages that are directly required by the root package", None).unwrap().into(),
+        InputOption::new("direct", Some("D"), Some(InputOption::VALUE_NONE), "Shows only packages that are directly required by the root package", None).unwrap().into(),
         InputOption::new("strict", None, Some(InputOption::VALUE_NONE), "Return a non-zero exit code when there are outdated packages", None).unwrap().into(),
-        InputOption::new("major-only", Some(PhpMixed::String("M".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that have major SemVer-compatible updates.", None).unwrap().into(),
-        InputOption::new("minor-only", Some(PhpMixed::String("m".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that have minor SemVer-compatible updates.", None).unwrap().into(),
-        InputOption::new("patch-only", Some(PhpMixed::String("p".to_string())), Some(InputOption::VALUE_NONE), "Show only packages that have patch SemVer-compatible updates.", None).unwrap().into(),
-        InputOption::new("sort-by-age", Some(PhpMixed::String("A".to_string())), Some(InputOption::VALUE_NONE), "Displays the installed version's age, and sorts packages oldest first.", None).unwrap().into(),
-        InputOption::new6("format", Some(PhpMixed::String("f".to_string())), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(PhpMixed::String("text".to_string())), SuggestedValues::List(vec!["json".to_string(), "text".to_string()])).unwrap().into(),
+        InputOption::new("major-only", Some("M"), Some(InputOption::VALUE_NONE), "Show only packages that have major SemVer-compatible updates.", None).unwrap().into(),
+        InputOption::new("minor-only", Some("m"), Some(InputOption::VALUE_NONE), "Show only packages that have minor SemVer-compatible updates.", None).unwrap().into(),
+        InputOption::new("patch-only", Some("p"), Some(InputOption::VALUE_NONE), "Show only packages that have patch SemVer-compatible updates.", None).unwrap().into(),
+        InputOption::new("sort-by-age", Some("A"), Some(InputOption::VALUE_NONE), "Displays the installed version's age, and sorts packages oldest first.", None).unwrap().into(),
+        InputOption::new6("format", Some("f"), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(InputValue::String("text".to_string())), SuggestedValues::List(vec!["json".to_string(), "text".to_string()])).unwrap().into(),
         InputOption::new6("ignore", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore specified package(s). Can contain wildcards (*). Use it if you don't want to be informed about new versions of some packages.", None, self.suggest_installed_package(false, false)).unwrap().into(),
         InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables search in require-dev packages.", None).unwrap().into(),
         InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages). Use with the --outdated option", None).unwrap().into(),
@@ -78,9 +80,12 @@ impl Command for OutdatedCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let mut args: IndexMap<String, PhpMixed> = IndexMap::new();
-        args.insert("command".to_string(), PhpMixed::String("show".to_string()));
-        args.insert("--latest".to_string(), PhpMixed::Bool(true));
+        let mut args: IndexMap<String, InputValue> = IndexMap::new();
+        args.insert(
+            "command".to_string(),
+            InputValue::String("show".to_string()),
+        );
+        args.insert("--latest".to_string(), InputValue::Bool(true));
 
         if input
             .borrow()
@@ -88,7 +93,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--no-interaction".to_string(), PhpMixed::Bool(true));
+            args.insert("--no-interaction".to_string(), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -96,7 +101,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--no-plugins".to_string(), PhpMixed::Bool(true));
+            args.insert("--no-plugins".to_string(), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -104,7 +109,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--no-scripts".to_string(), PhpMixed::Bool(true));
+            args.insert("--no-scripts".to_string(), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -112,10 +117,10 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--no-cache".to_string(), PhpMixed::Bool(true));
+            args.insert("--no-cache".to_string(), InputValue::Bool(true));
         }
         if !input.borrow().get_option("all")?.as_bool().unwrap_or(false) {
-            args.insert("--outdated".to_string(), PhpMixed::Bool(true));
+            args.insert("--outdated".to_string(), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -123,10 +128,10 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--direct".to_string(), PhpMixed::Bool(true));
+            args.insert("--direct".to_string(), InputValue::Bool(true));
         }
         let package_arg = input.borrow().get_argument("package")?;
-        if !matches!(package_arg, PhpMixed::Null) {
+        if !package_arg.is_null() {
             args.insert("package".to_string(), package_arg);
         }
         if input
@@ -135,7 +140,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--strict".to_string(), PhpMixed::Bool(true));
+            args.insert("--strict".to_string(), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -143,7 +148,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--major-only".to_string(), PhpMixed::Bool(true));
+            args.insert("--major-only".to_string(), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -151,7 +156,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--minor-only".to_string(), PhpMixed::Bool(true));
+            args.insert("--minor-only".to_string(), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -159,7 +164,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--patch-only".to_string(), PhpMixed::Bool(true));
+            args.insert("--patch-only".to_string(), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -167,7 +172,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--locked".to_string(), PhpMixed::Bool(true));
+            args.insert("--locked".to_string(), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -175,7 +180,7 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--no-dev".to_string(), PhpMixed::Bool(true));
+            args.insert("--no-dev".to_string(), InputValue::Bool(true));
         }
         if input
             .borrow()
@@ -183,11 +188,11 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--sort-by-age".to_string(), PhpMixed::Bool(true));
+            args.insert("--sort-by-age".to_string(), InputValue::Bool(true));
         }
         args.insert(
             "--ignore-platform-req".to_string(),
-            input.borrow().get_option("ignore-platform-req")?.into(),
+            input.borrow().get_option("ignore-platform-req")?,
         );
         if input
             .borrow()
@@ -195,20 +200,14 @@ impl Command for OutdatedCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            args.insert("--ignore-platform-reqs".to_string(), PhpMixed::Bool(true));
+            args.insert("--ignore-platform-reqs".to_string(), InputValue::Bool(true));
         }
-        args.insert(
-            "--format".to_string(),
-            input.borrow().get_option("format")?.into(),
-        );
-        args.insert(
-            "--ignore".to_string(),
-            input.borrow().get_option("ignore")?.into(),
-        );
+        args.insert("--format".to_string(), input.borrow().get_option("format")?);
+        args.insert("--ignore".to_string(), input.borrow().get_option("ignore")?);
 
         let input = ArrayInput::new(
             args.into_iter()
-                .map(|(k, v)| (PhpMixed::String(k), v))
+                .map(|(k, v)| (ParameterName::Name(k), v))
                 .collect(),
             None,
         )?;

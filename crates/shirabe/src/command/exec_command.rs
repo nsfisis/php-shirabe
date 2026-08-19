@@ -10,6 +10,7 @@ use crate::io::IOInterfaceImmutable;
 use shirabe_php_shim::{PhpMixed, RuntimeException, basename, chdir, getcwd, glob, impl_php_class};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -78,7 +79,7 @@ impl Command for ExecCommand {
         self.set_name("exec")?;
         self.set_description("Executes a vendored binary/script");
         self.set_definition(&[
-            InputOption::new("list", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_NONE), "", None).unwrap().into(),
+            InputOption::new("list", Some("l"), Some(InputOption::VALUE_NONE), "", None).unwrap().into(),
             // PHP passes an inline closure here (it takes no arguments; PHP tolerates the
             // extra ones the caller passes).
             InputArgument::new5("binary",
@@ -141,10 +142,9 @@ impl Command for ExecCommand {
             )?;
 
             if let Some(idx) = binary.as_int() {
-                input.borrow_mut().set_argument(
-                    "binary",
-                    shirabe_php_shim::PhpMixed::String(binaries[idx as usize].clone()),
-                );
+                input
+                    .borrow_mut()
+                    .set_argument("binary", InputValue::String(binaries[idx as usize].clone()));
             }
 
             Ok(())
@@ -230,12 +230,8 @@ impl Command for ExecCommand {
         let args = input
             .borrow()
             .get_argument("args")?
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect::<Vec<_>>()
-            })
+            .as_array()
+            .map(<[String]>::to_vec)
             .unwrap_or_default();
 
         dispatcher.borrow_mut().dispatch_script(

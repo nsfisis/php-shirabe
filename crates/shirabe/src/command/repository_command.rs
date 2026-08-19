@@ -16,6 +16,7 @@ use shirabe_php_shim::{
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -128,7 +129,7 @@ impl RepositoryCommand {
     /// PHP: private function suggestTypeForAdd(): \Closure (a static closure — `this` unused)
     fn suggest_type_for_add(&self) -> crate::console::input::SuggestedValues {
         crate::console::input::SuggestedValues::Closure(Box::new(|_this, input, _suggestions| {
-            if input.get_argument("action")?.to_string() == "add" {
+            if input.get_argument("action")?.to_php_string() == "add" {
                 return Ok(vec![
                     "composer".to_string(),
                     "vcs".to_string(),
@@ -143,7 +144,7 @@ impl RepositoryCommand {
 
     fn suggest_repo_names(&self) -> crate::console::input::SuggestedValues {
         crate::console::input::SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
-            let action = input.get_argument("action")?.to_string();
+            let action = input.get_argument("action")?.to_php_string();
             if ["enable", "disable"].contains(&action.as_str()) {
                 return Ok(vec!["packagist.org".to_string()]);
             }
@@ -202,7 +203,7 @@ impl Command for RepositoryCommand {
         self.set_definition(&[
             InputOption::new(
                 "global",
-                Some(PhpMixed::String("g".to_string())),
+                Some("g"),
                 Some(InputOption::VALUE_NONE),
                 "Apply command to the global config file",
                 None,
@@ -211,7 +212,7 @@ impl Command for RepositoryCommand {
             .into(),
             InputOption::new(
                 "file",
-                Some(PhpMixed::String("f".to_string())),
+                Some("f"),
                 Some(InputOption::VALUE_REQUIRED),
                 "If you want to choose a different composer.json or config.json",
                 None,
@@ -251,7 +252,7 @@ impl Command for RepositoryCommand {
                 "action",
                 Some(InputArgument::OPTIONAL),
                 "Action to perform: list, add, remove, set-url, get-url, enable, disable",
-                Some(PhpMixed::String("list".to_string())),
+                Some(InputValue::String("list".to_string())),
                 crate::console::input::SuggestedValues::List(vec![
                     "list".to_string(),
                     "add".to_string(),

@@ -3,7 +3,8 @@
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
 use shirabe::json::JsonFile;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 /// Read the composer.json in the CWD and decode it.
 fn read_composer_json() -> serde_json::Value {
@@ -21,8 +22,8 @@ fn test_list_with_no_repositories() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("list")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("list")),
             ],
             RunOptions::default(),
         )
@@ -59,8 +60,8 @@ fn test_list_with_repositories_as_list() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("list")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("list")),
             ],
             RunOptions::default(),
         )
@@ -98,8 +99,8 @@ fn test_list_with_repositories_as_assoc() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("list")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("list")),
             ],
             RunOptions::default(),
         )
@@ -126,13 +127,13 @@ fn test_add_repository_with_type_and_url() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("add")),
-                (PhpMixed::from("name"), PhpMixed::from("foo")),
-                (PhpMixed::from("arg1"), PhpMixed::from("vcs")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("add")),
+                (ParameterName::of("name"), InputValue::from("foo")),
+                (ParameterName::of("arg1"), InputValue::from("vcs")),
                 (
-                    PhpMixed::from("arg2"),
-                    PhpMixed::from("https://example.org/foo.git"),
+                    ParameterName::of("arg2"),
+                    InputValue::from("https://example.org/foo.git"),
                 ),
             ],
             RunOptions::default(),
@@ -161,12 +162,12 @@ fn test_add_repository_with_json() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("add")),
-                (PhpMixed::from("name"), PhpMixed::from("bar")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("add")),
+                (ParameterName::of("name"), InputValue::from("bar")),
                 (
-                    PhpMixed::from("arg1"),
-                    PhpMixed::from(r#"{"type":"composer","url":"https://repo.example.org"}"#),
+                    ParameterName::of("arg1"),
+                    InputValue::from(r#"{"type":"composer","url":"https://repo.example.org"}"#),
                 ),
             ],
             RunOptions::default(),
@@ -202,9 +203,9 @@ fn test_remove_repository() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("remove")),
-                (PhpMixed::from("name"), PhpMixed::from("foo")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("remove")),
+                (ParameterName::of("name"), InputValue::from("foo")),
             ],
             RunOptions::default(),
         )
@@ -240,10 +241,10 @@ fn run_set_and_get_url_assoc_case(name: &str, index: &str, new_url: &str) {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("set-url")),
-                (PhpMixed::from("name"), PhpMixed::from(name)),
-                (PhpMixed::from("arg1"), PhpMixed::from(new_url)),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("set-url")),
+                (ParameterName::of("name"), InputValue::from(name)),
+                (ParameterName::of("arg1"), InputValue::from(new_url)),
             ],
             RunOptions::default(),
         )
@@ -263,9 +264,9 @@ fn run_set_and_get_url_assoc_case(name: &str, index: &str, new_url: &str) {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("get-url")),
-                (PhpMixed::from("name"), PhpMixed::from(name)),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("get-url")),
+                (ParameterName::of("name"), InputValue::from(name)),
             ],
             RunOptions::default(),
         )
@@ -305,10 +306,10 @@ fn run_set_and_get_url_list_case(name: &str, index: usize, new_url: &str) {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("set-url")),
-                (PhpMixed::from("name"), PhpMixed::from(name)),
-                (PhpMixed::from("arg1"), PhpMixed::from(new_url)),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("set-url")),
+                (ParameterName::of("name"), InputValue::from(name)),
+                (ParameterName::of("arg1"), InputValue::from(new_url)),
             ],
             RunOptions::default(),
         )
@@ -333,9 +334,9 @@ fn run_set_and_get_url_list_case(name: &str, index: usize, new_url: &str) {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("get-url")),
-                (PhpMixed::from("name"), PhpMixed::from(name)),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("get-url")),
+                (ParameterName::of("name"), InputValue::from(name)),
             ],
             RunOptions::default(),
         )
@@ -366,9 +367,9 @@ fn test_disable_and_enable_packagist() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("disable")),
-                (PhpMixed::from("name"), PhpMixed::from("packagist")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("disable")),
+                (ParameterName::of("name"), InputValue::from("packagist")),
             ],
             RunOptions::default(),
         )
@@ -384,9 +385,9 @@ fn test_disable_and_enable_packagist() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("enable")),
-                (PhpMixed::from("name"), PhpMixed::from("packagist")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("enable")),
+                (ParameterName::of("name"), InputValue::from("packagist")),
             ],
             RunOptions::default(),
         )
@@ -404,12 +405,12 @@ fn test_invalid_arg_combination_throws() {
     let err = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
+                (ParameterName::of("command"), InputValue::from("repo")),
                 (
-                    PhpMixed::from("--file"),
-                    PhpMixed::from("alt.composer.json"),
+                    ParameterName::of("--file"),
+                    InputValue::from("alt.composer.json"),
                 ),
-                (PhpMixed::from("--global"), PhpMixed::from(true)),
+                (ParameterName::of("--global"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -438,11 +439,11 @@ fn test_prepend_repository_by_name_list_to_assoc() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("add")),
-                (PhpMixed::from("name"), PhpMixed::from("foo")),
-                (PhpMixed::from("arg1"), PhpMixed::from("path")),
-                (PhpMixed::from("arg2"), PhpMixed::from("foo/bar")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("add")),
+                (ParameterName::of("name"), InputValue::from("foo")),
+                (ParameterName::of("arg1"), InputValue::from("path")),
+                (ParameterName::of("arg2"), InputValue::from("foo/bar")),
             ],
             RunOptions::default(),
         )
@@ -478,12 +479,12 @@ fn test_append_repository_by_name_list_to_assoc() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("add")),
-                (PhpMixed::from("name"), PhpMixed::from("foo")),
-                (PhpMixed::from("arg1"), PhpMixed::from("path")),
-                (PhpMixed::from("arg2"), PhpMixed::from("foo/bar")),
-                (PhpMixed::from("--append"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("add")),
+                (ParameterName::of("name"), InputValue::from("foo")),
+                (ParameterName::of("arg1"), InputValue::from("path")),
+                (ParameterName::of("arg2"), InputValue::from("foo/bar")),
+                (ParameterName::of("--append"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -519,11 +520,11 @@ fn test_prepend_repository_assoc_with_packagist_disabled() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("add")),
-                (PhpMixed::from("name"), PhpMixed::from("foo")),
-                (PhpMixed::from("arg1"), PhpMixed::from("path")),
-                (PhpMixed::from("arg2"), PhpMixed::from("foo/bar")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("add")),
+                (ParameterName::of("name"), InputValue::from("foo")),
+                (ParameterName::of("arg1"), InputValue::from("path")),
+                (ParameterName::of("arg2"), InputValue::from("foo/bar")),
             ],
             RunOptions::default(),
         )
@@ -560,12 +561,12 @@ fn test_append_repository_assoc_with_packagist_disabled() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("add")),
-                (PhpMixed::from("name"), PhpMixed::from("foo")),
-                (PhpMixed::from("arg1"), PhpMixed::from("path")),
-                (PhpMixed::from("arg2"), PhpMixed::from("foo/bar")),
-                (PhpMixed::from("--append"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("add")),
+                (ParameterName::of("name"), InputValue::from("foo")),
+                (ParameterName::of("arg1"), InputValue::from("path")),
+                (ParameterName::of("arg2"), InputValue::from("foo/bar")),
+                (ParameterName::of("--append"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -608,15 +609,15 @@ fn test_add_before_and_after_by_name() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("add")),
-                (PhpMixed::from("name"), PhpMixed::from("beta")),
-                (PhpMixed::from("arg1"), PhpMixed::from("vcs")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("add")),
+                (ParameterName::of("name"), InputValue::from("beta")),
+                (ParameterName::of("arg1"), InputValue::from("vcs")),
                 (
-                    PhpMixed::from("arg2"),
-                    PhpMixed::from("https://example.org/b"),
+                    ParameterName::of("arg2"),
+                    InputValue::from("https://example.org/b"),
                 ),
-                (PhpMixed::from("--before"), PhpMixed::from("omega")),
+                (ParameterName::of("--before"), InputValue::from("omega")),
             ],
             RunOptions::default(),
         )
@@ -628,15 +629,15 @@ fn test_add_before_and_after_by_name() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("add")),
-                (PhpMixed::from("name"), PhpMixed::from("gamma")),
-                (PhpMixed::from("arg1"), PhpMixed::from("vcs")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("add")),
+                (ParameterName::of("name"), InputValue::from("gamma")),
+                (ParameterName::of("arg1"), InputValue::from("vcs")),
                 (
-                    PhpMixed::from("arg2"),
-                    PhpMixed::from("https://example.org/g"),
+                    ParameterName::of("arg2"),
+                    InputValue::from("https://example.org/g"),
                 ),
-                (PhpMixed::from("--after"), PhpMixed::from("alpha")),
+                (ParameterName::of("--after"), InputValue::from("alpha")),
             ],
             RunOptions::default(),
         )
@@ -670,13 +671,13 @@ fn test_add_same_name_replaces_existing() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("add")),
-                (PhpMixed::from("name"), PhpMixed::from("foo")),
-                (PhpMixed::from("arg1"), PhpMixed::from("vcs")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("add")),
+                (ParameterName::of("name"), InputValue::from("foo")),
+                (ParameterName::of("arg1"), InputValue::from("vcs")),
                 (
-                    PhpMixed::from("arg2"),
-                    PhpMixed::from("https://example.org/old"),
+                    ParameterName::of("arg2"),
+                    InputValue::from("https://example.org/old"),
                 ),
             ],
             RunOptions::default(),
@@ -689,15 +690,15 @@ fn test_add_same_name_replaces_existing() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("repo")),
-                (PhpMixed::from("action"), PhpMixed::from("add")),
-                (PhpMixed::from("name"), PhpMixed::from("foo")),
-                (PhpMixed::from("arg1"), PhpMixed::from("vcs")),
+                (ParameterName::of("command"), InputValue::from("repo")),
+                (ParameterName::of("action"), InputValue::from("add")),
+                (ParameterName::of("name"), InputValue::from("foo")),
+                (ParameterName::of("arg1"), InputValue::from("vcs")),
                 (
-                    PhpMixed::from("arg2"),
-                    PhpMixed::from("https://example.org/new"),
+                    ParameterName::of("arg2"),
+                    InputValue::from("https://example.org/new"),
                 ),
-                (PhpMixed::from("--append"), PhpMixed::from(true)),
+                (ParameterName::of("--append"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )

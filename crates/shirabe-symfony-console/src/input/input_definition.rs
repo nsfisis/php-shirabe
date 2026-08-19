@@ -4,8 +4,8 @@ use crate::exception::InvalidArgumentException;
 use crate::exception::LogicException;
 use crate::input::InputArgument;
 use crate::input::InputOption;
+use crate::input::InputValue;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
 
 /// A InputDefinition represents a set of valid command line arguments and options.
 ///
@@ -154,40 +154,32 @@ impl InputDefinition {
     }
 
     /// Returns an InputArgument by name or by position.
-    pub fn get_argument(&self, name: &PhpMixed) -> anyhow::Result<std::rc::Rc<InputArgument>> {
+    pub fn get_argument(&self, name: &ArgumentName) -> anyhow::Result<std::rc::Rc<InputArgument>> {
         if !self.has_argument(name) {
             return Err(InvalidArgumentException::new(format!(
                 "The \"{}\" argument does not exist.",
-                name.clone()
+                name
             ))
             .into());
         }
 
         match name {
-            PhpMixed::Int(index) => {
+            ArgumentName::Position(index) => {
                 let arguments: Vec<std::rc::Rc<InputArgument>> =
                     self.arguments.values().cloned().collect();
                 Ok(std::rc::Rc::clone(&arguments[*index as usize]))
             }
-            _ => {
-                let key = shirabe_php_shim::php_to_string(name);
-                Ok(std::rc::Rc::clone(&self.arguments[&key]))
-            }
+            ArgumentName::Name(name) => Ok(std::rc::Rc::clone(&self.arguments[name])),
         }
     }
 
     /// Returns true if an InputArgument object exists by name or position.
-    pub fn has_argument(&self, name: &PhpMixed) -> bool {
+    pub fn has_argument(&self, name: &ArgumentName) -> bool {
         match name {
-            PhpMixed::Int(index) => {
-                let arguments: Vec<std::rc::Rc<InputArgument>> =
-                    self.arguments.values().cloned().collect();
-                *index >= 0 && (*index as usize) < arguments.len()
+            ArgumentName::Position(index) => {
+                *index >= 0 && (*index as usize) < self.arguments.len()
             }
-            _ => {
-                let key = shirabe_php_shim::php_to_string(name);
-                self.arguments.contains_key(&key)
-            }
+            ArgumentName::Name(name) => self.arguments.contains_key(name),
         }
     }
 
@@ -210,7 +202,7 @@ impl InputDefinition {
         self.required_count
     }
 
-    pub fn get_argument_defaults(&self) -> IndexMap<String, PhpMixed> {
+    pub fn get_argument_defaults(&self) -> IndexMap<String, InputValue> {
         let mut values = IndexMap::new();
         for argument in self.arguments.values() {
             values.insert(
@@ -346,7 +338,7 @@ impl InputDefinition {
         self.get_option(&self.shortcut_to_name(shortcut)?)
     }
 
-    pub fn get_option_defaults(&self) -> IndexMap<String, PhpMixed> {
+    pub fn get_option_defaults(&self) -> IndexMap<String, InputValue> {
         let mut values = IndexMap::new();
         for option in self.options.values() {
             values.insert(option.get_name().to_string(), option.get_default().clone());
@@ -446,5 +438,28 @@ impl InputDefinition {
         }
 
         format!("{}{}", shirabe_php_shim::implode(" ", &elements), tail)
+    }
+}
+
+/// The `string|int` selector [`InputDefinition::get_argument`] and
+/// [`InputDefinition::has_argument`] accept.
+#[derive(Debug, Clone)]
+pub enum ArgumentName {
+    Name(String),
+    Position(i64),
+}
+
+impl ArgumentName {
+    pub fn of(name: &str) -> Self {
+        Self::Name(name.to_string())
+    }
+}
+
+impl std::fmt::Display for ArgumentName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Name(name) => write!(f, "{}", name),
+            Self::Position(index) => write!(f, "{}", index),
+        }
     }
 }

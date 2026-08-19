@@ -32,6 +32,7 @@ use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::helper::FormatBlockMessages;
 use shirabe_symfony_console::input::ArrayInput;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -444,10 +445,10 @@ impl Command for InitCommand {
         InputOption::new("homepage", None, Some(InputOption::VALUE_REQUIRED), "Homepage of package", None).unwrap().into(),
         InputOption::new6("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
         InputOption::new6("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
-        InputOption::new("stability", Some(PhpMixed::String("s".to_string())), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", implode(", ", &base_package::STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>())), None).unwrap().into(),
-        InputOption::new("license", Some(PhpMixed::String("l".to_string())), Some(InputOption::VALUE_REQUIRED), "License of package", None).unwrap().into(),
+        InputOption::new("stability", Some("s"), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", implode(", ", &base_package::STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>())), None).unwrap().into(),
+        InputOption::new("license", Some("l"), Some(InputOption::VALUE_REQUIRED), "License of package", None).unwrap().into(),
         InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None).unwrap().into(),
-        InputOption::new("autoload", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None).unwrap().into(),
+        InputOption::new("autoload", Some("a"), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None).unwrap().into(),
             ]);
         self.set_help(
             "The <info>init</info> command creates a basic composer.json file\n\
@@ -480,12 +481,16 @@ impl Command for InitCommand {
             "license".to_string(),
             "autoload".to_string(),
         ];
-        let filtered_input: IndexMap<String, PhpMixed> = array_intersect_key(
-            &input.borrow().get_options(),
-            &array_flip_strings(&allowlist),
-        )
-        .into_iter()
-        .collect();
+        let options: IndexMap<String, PhpMixed> = input
+            .borrow()
+            .get_options()
+            .into_iter()
+            .map(|(key, value)| (key, value.to_php_mixed()))
+            .collect();
+        let filtered_input: IndexMap<String, PhpMixed> =
+            array_intersect_key(&options, &array_flip_strings(&allowlist))
+                .into_iter()
+                .collect();
         let mut options = shirabe_php_shim::array_filter_map(&filtered_input, |val: &PhpMixed| {
             !matches!(val, PhpMixed::Null) && !matches!(val, PhpMixed::List(l) if l.is_empty())
         });
@@ -752,7 +757,7 @@ impl Command for InitCommand {
                 let name = self.get_default_package_name()?;
                 input
                     .borrow_mut()
-                    .set_option("name", PhpMixed::from(name))
+                    .set_option("name", InputValue::from(name))
                     .expect("name option is defined");
             }
 
@@ -760,7 +765,7 @@ impl Command for InitCommand {
                 let author = self.get_default_author()?;
                 input
                     .borrow_mut()
-                    .set_option("author", PhpMixed::from(author))
+                    .set_option("author", InputValue::from(author))
                     .expect("author option is defined");
             }
         }
@@ -919,7 +924,7 @@ impl Command for InitCommand {
             .to_string();
             input
                 .borrow_mut()
-                .set_option("name", PhpMixed::String(name));
+                .set_option("name", InputValue::String(name));
 
             let description = input
                 .borrow()
@@ -936,7 +941,9 @@ impl Command for InitCommand {
                     .map(PhpMixed::String)
                     .unwrap_or(PhpMixed::Null),
             )?;
-            input.borrow_mut().set_option("description", description);
+            input
+                .borrow_mut()
+                .set_option("description", InputValue::from_php_mixed(&description));
 
             let author_option = input
                 .borrow()
@@ -984,7 +991,9 @@ impl Command for InitCommand {
                 None,
                 PhpMixed::String(author_default),
             )?;
-            input.borrow_mut().set_option("author", author_value);
+            input
+                .borrow_mut()
+                .set_option("author", InputValue::from_php_mixed(&author_value));
 
             let minimum_stability = input
                 .borrow()
@@ -1029,9 +1038,10 @@ impl Command for InitCommand {
                     .map(PhpMixed::String)
                     .unwrap_or(PhpMixed::Null),
             )?;
-            input
-                .borrow_mut()
-                .set_option("stability", minimum_stability_value);
+            input.borrow_mut().set_option(
+                "stability",
+                InputValue::from_php_mixed(&minimum_stability_value),
+            );
 
             let type_val = input.borrow().get_option("type")?;
             let type_str = type_val.as_string().unwrap_or("").to_string();
@@ -1045,7 +1055,9 @@ impl Command for InitCommand {
             if type_value.as_string() == Some("") || matches!(type_value, PhpMixed::Bool(false)) {
                 type_value = PhpMixed::Null;
             }
-            input.borrow_mut().set_option("type", type_value);
+            input
+                .borrow_mut()
+                .set_option("type", InputValue::from_php_mixed(&type_value));
 
             let mut license = input
                 .borrow()
@@ -1086,7 +1098,9 @@ impl Command for InitCommand {
                 ))
             .into());
             }
-            input.borrow_mut().set_option("license", license);
+            input
+                .borrow_mut()
+                .set_option("license", InputValue::from_php_mixed(&license));
 
             io.write_error3("\nDefine your dependencies.\n", true, io_interface::NORMAL);
 
@@ -1135,10 +1149,9 @@ impl Command for InitCommand {
             } else {
                 vec![]
             };
-            input.borrow_mut().set_option(
-                "require",
-                PhpMixed::List(requirements.into_iter().map(PhpMixed::String).collect()),
-            );
+            input
+                .borrow_mut()
+                .set_option("require", InputValue::Array(requirements));
 
             let question = "Would you like to define your dev dependencies (require-dev) interactively [<comment>yes</comment>]? ".to_string();
             let require_dev: Vec<String> = input
@@ -1161,10 +1174,9 @@ impl Command for InitCommand {
                 } else {
                     vec![]
                 };
-            input.borrow_mut().set_option(
-                "require-dev",
-                PhpMixed::List(dev_requirements.into_iter().map(PhpMixed::String).collect()),
-            );
+            input
+                .borrow_mut()
+                .set_option("require-dev", InputValue::Array(dev_requirements));
 
             // --autoload - input and validation
             let autoload = input
@@ -1220,7 +1232,9 @@ impl Command for InitCommand {
             None,
             PhpMixed::String(autoload_default),
         )?;
-            input.borrow_mut().set_option("autoload", autoload_value);
+            input
+                .borrow_mut()
+                .set_option("autoload", InputValue::from_php_mixed(&autoload_value));
 
             Ok(())
         })();

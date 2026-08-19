@@ -185,7 +185,7 @@ impl Command for GlobalCommand {
             return Ok(());
         }
 
-        let command_name = input.get_argument("command-name")?.to_string();
+        let command_name = input.get_argument("command-name")?.to_php_string();
         let has = {
             let mut app_ref = application.borrow_mut();
             let app = app_ref

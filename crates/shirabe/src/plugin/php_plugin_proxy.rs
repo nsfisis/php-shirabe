@@ -35,6 +35,7 @@ use shirabe_php_rpc::{
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::OutputInterface;
 
 /// A Rust-side entity a PHP proxy stub points back to.
@@ -3295,7 +3296,7 @@ impl PhpCommandProxy {
             if is_array {
                 mode |= InputArgument::IS_ARRAY;
             }
-            let default = field(&mut row, "default").to_php_mixed()?;
+            let default = InputValue::from_php_mixed(&field(&mut row, "default").to_php_mixed()?);
             items.push(DefinitionItem::InputArgument(InputArgument::new(
                 name,
                 Some(mode),
@@ -3334,17 +3335,20 @@ impl PhpCommandProxy {
             if matches!(field(&mut row, "isNegatable"), PluginValue::Bool(true)) {
                 mode |= InputOption::VALUE_NEGATABLE;
             }
-            let shortcut = field(&mut row, "shortcut").to_php_mixed()?;
+            let shortcut = match field(&mut row, "shortcut").to_php_mixed()? {
+                PhpMixed::String(shortcut) => Some(shortcut),
+                _ => None,
+            };
             // `getDefault()` exposes the stored representation (`false` for VALUE_NONE), while
             // the constructor only accepts null there; mirror the constructor's normalization.
             let default = if accept_value {
-                field(&mut row, "default").to_php_mixed()?
+                InputValue::from_php_mixed(&field(&mut row, "default").to_php_mixed()?)
             } else {
-                PhpMixed::Null
+                InputValue::Null
             };
             items.push(DefinitionItem::InputOption(InputOption::new(
                 &name,
-                shortcut,
+                shortcut.as_deref(),
                 Some(mode),
                 description,
                 default,

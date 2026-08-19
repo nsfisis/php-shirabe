@@ -2,14 +2,15 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::exception::LogicException;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_split};
+use crate::input::InputValue;
+use shirabe_php_shim::{php_regex, preg_split};
 
 #[derive(Debug, Clone)]
 pub struct InputOption {
     name: String,
     shortcut: Option<String>,
     mode: i64,
-    default: PhpMixed,
+    default: InputValue,
     description: String,
 }
 
@@ -22,10 +23,10 @@ impl InputOption {
 
     pub fn new(
         name: &str,
-        shortcut: PhpMixed,
+        shortcut: Option<&str>,
         mode: Option<i64>,
         description: String,
-        default: PhpMixed,
+        default: InputValue,
     ) -> anyhow::Result<Self> {
         let name = if let Some(stripped) = name.strip_prefix("--") {
             stripped.to_string()
@@ -41,26 +42,8 @@ impl InputOption {
         }
 
         let shortcut = match shortcut {
-            PhpMixed::String(ref s) if s.is_empty() => None,
-            PhpMixed::List(ref v) if v.is_empty() => None,
-            PhpMixed::Bool(false) => None,
-            PhpMixed::Null => None,
-            PhpMixed::List(ref arr) => {
-                let parts: Vec<String> = arr
-                    .iter()
-                    .filter_map(|v| {
-                        if let PhpMixed::String(s) = v {
-                            Some(s.clone())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-                let joined = shirabe_php_shim::implode("|", &parts);
-                Self::normalize_shortcut(joined)?
-            }
-            PhpMixed::String(s) => Self::normalize_shortcut(s)?,
-            _ => None,
+            None | Some("") => None,
+            Some(shortcut) => Self::normalize_shortcut(shortcut)?,
         };
 
         let mode = match mode {
@@ -80,7 +63,7 @@ impl InputOption {
             shortcut,
             mode,
             description,
-            default: PhpMixed::Null,
+            default: InputValue::Null,
         };
 
         if option.is_array() && !option.accept_value() {
@@ -97,8 +80,8 @@ impl InputOption {
         Ok(option)
     }
 
-    fn normalize_shortcut(s: String) -> anyhow::Result<Option<String>> {
-        let stripped = shirabe_php_shim::ltrim(&s, Some("-"));
+    fn normalize_shortcut(s: &str) -> anyhow::Result<Option<String>> {
+        let stripped = shirabe_php_shim::ltrim(s, Some("-"));
         let parts = preg_split(php_regex!(r"{(\|)-?}"), &stripped);
         let filtered: Vec<String> =
             shirabe_php_shim::array_filter(&parts, |s: &String| !s.is_empty());
@@ -140,9 +123,8 @@ impl InputOption {
         Self::VALUE_NEGATABLE == (Self::VALUE_NEGATABLE & self.mode)
     }
 
-    pub fn set_default(&mut self, default: PhpMixed) -> anyhow::Result<()> {
-        if Self::VALUE_NONE == (Self::VALUE_NONE & self.mode) && !matches!(default, PhpMixed::Null)
-        {
+    pub fn set_default(&mut self, default: InputValue) -> anyhow::Result<()> {
+        if Self::VALUE_NONE == (Self::VALUE_NONE & self.mode) && !default.is_null() {
             return Err(LogicException::new(
                 "Cannot set a default value when using InputOption::VALUE_NONE mode.".to_string(),
             )
@@ -151,9 +133,8 @@ impl InputOption {
 
         let default = if self.is_array() {
             match default {
-                PhpMixed::Null => PhpMixed::List(vec![]),
-                // PHP `is_array()` accepts both list-style and associative arrays.
-                PhpMixed::List(_) | PhpMixed::Array(_) => default,
+                InputValue::Null => InputValue::Array(vec![]),
+                InputValue::Array(_) => default,
                 _ => {
                     return Err(LogicException::new(
                         "A default value for an array option must be an array.".to_string(),
@@ -168,12 +149,12 @@ impl InputOption {
         self.default = if self.accept_value() || self.is_negatable() {
             default
         } else {
-            PhpMixed::Bool(false)
+            InputValue::Bool(false)
         };
         Ok(())
     }
 
-    pub fn get_default(&self) -> &PhpMixed {
+    pub fn get_default(&self) -> &InputValue {
         &self.default
     }
 
@@ -189,92 +170,5 @@ impl InputOption {
             && option.is_array() == self.is_array()
             && option.is_value_required() == self.is_value_required()
             && option.is_value_optional() == self.is_value_optional()
-    }
-}
-
-/// The `bool|string|string[]|null` domain of a parsed option value, as returned by
-/// [`InputInterface::get_option`](crate::input::InputInterface::get_option).
-#[derive(Debug, Clone, PartialEq)]
-pub enum InputOptionValue {
-    Null,
-    Bool(bool),
-    String(String),
-    Array(Vec<String>),
-}
-
-impl InputOptionValue {
-    /// Narrows a raw option value to this domain.
-    ///
-    /// TODO(type-model): `Input` keeps parsed options and `InputOption` defaults as `PhpMixed`, so
-    /// a value outside this domain — an int, a float, or an array holding one — can only be
-    /// rejected here.
-    pub(crate) fn from_php_mixed(value: &PhpMixed) -> Self {
-        match value {
-            PhpMixed::Null => Self::Null,
-            PhpMixed::Bool(b) => Self::Bool(*b),
-            PhpMixed::String(s) => Self::String(s.clone()),
-            PhpMixed::List(_) | PhpMixed::Array(_) => Self::Array(
-                value
-                    .values()
-                    .into_iter()
-                    .map(|item| match item {
-                        PhpMixed::String(s) => s.clone(),
-                        other => panic!("an option array holds {:?}, not a string", other),
-                    })
-                    .collect(),
-            ),
-            other => panic!(
-                "an option holds {:?}, not a bool, string, array or null",
-                other
-            ),
-        }
-    }
-
-    pub fn is_null(&self) -> bool {
-        matches!(self, Self::Null)
-    }
-
-    pub fn as_bool(&self) -> Option<bool> {
-        match self {
-            Self::Bool(b) => Some(*b),
-            _ => None,
-        }
-    }
-
-    pub fn as_string(&self) -> Option<&str> {
-        match self {
-            Self::String(s) => Some(s.as_str()),
-            _ => None,
-        }
-    }
-
-    pub fn as_array(&self) -> Option<&[String]> {
-        match self {
-            Self::Array(items) => Some(items),
-            _ => None,
-        }
-    }
-
-    /// PHP loose boolean cast `(bool) $value`.
-    pub fn to_bool(&self) -> bool {
-        match self {
-            Self::Null => false,
-            Self::Bool(b) => *b,
-            Self::String(s) => !s.is_empty() && s != "0",
-            Self::Array(items) => !items.is_empty(),
-        }
-    }
-}
-
-impl From<InputOptionValue> for PhpMixed {
-    fn from(value: InputOptionValue) -> Self {
-        match value {
-            InputOptionValue::Null => PhpMixed::Null,
-            InputOptionValue::Bool(b) => PhpMixed::Bool(b),
-            InputOptionValue::String(s) => PhpMixed::String(s),
-            InputOptionValue::Array(items) => {
-                PhpMixed::List(items.into_iter().map(PhpMixed::String).collect())
-            }
-        }
     }
 }

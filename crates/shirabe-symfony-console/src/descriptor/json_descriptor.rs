@@ -165,14 +165,9 @@ impl JsonDescriptor {
                 argument.get_description(),
             )),
         );
-        data.insert(
-            "default".to_string(),
-            if matches!(argument.get_default(), PhpMixed::Float(f) if f.is_infinite() && *f > 0.0) {
-                PhpMixed::String("INF".to_string())
-            } else {
-                argument.get_default().clone()
-            },
-        );
+        // TODO(type-model): PHP compares the default against `INF` and serializes it as the
+        // string "INF"; `InputValue` has no float variant to hold one.
+        data.insert("default".to_string(), argument.get_default().clone().into());
         Ok(data)
     }
 
@@ -226,15 +221,9 @@ impl JsonDescriptor {
                     option.get_description(),
                 )),
             );
-            data.insert(
-                "default".to_string(),
-                if matches!(option.get_default(), PhpMixed::Float(f) if f.is_infinite() && *f > 0.0)
-                {
-                    PhpMixed::String("INF".to_string())
-                } else {
-                    option.get_default().clone()
-                },
-            );
+            // TODO(type-model): PHP compares the default against `INF` and serializes it as the
+            // string "INF"; `InputValue` has no float variant to hold one.
+            data.insert("default".to_string(), option.get_default().clone().into());
         }
         Ok(data)
     }

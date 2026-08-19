@@ -49,6 +49,7 @@ use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::formatter::OutputFormatterStyle;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -1345,7 +1346,7 @@ impl Command for ShowCommand {
         let opt_none = |name: &str, shortcut: Option<&str>, description: &str| {
             InputOption::new(
                 name,
-                shortcut.map(|s| PhpMixed::String(s.to_string())),
+                shortcut,
                 Some(InputOption::VALUE_NONE),
                 description,
                 None,
@@ -1432,10 +1433,10 @@ impl Command for ShowCommand {
             ),
             InputOption::new6(
                 "format",
-                Some(PhpMixed::String("f".to_string())),
+                Some("f"),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
-                Some(PhpMixed::String("text".to_string())),
+                Some(InputValue::String("text".to_string())),
                 SuggestedValues::List(vec!["json".to_string(), "text".to_string()]),
             )
             .unwrap()
@@ -1485,7 +1486,7 @@ impl Command for ShowCommand {
         if input.borrow().get_option("outdated")?.as_bool() == Some(true) {
             input
                 .borrow_mut()
-                .set_option("latest", PhpMixed::Bool(true));
+                .set_option("latest", InputValue::Bool(true));
         } else if input
             .borrow()
             .get_option("ignore")?
@@ -1857,7 +1858,7 @@ impl Command for ShowCommand {
             );
             input
                 .borrow_mut()
-                .set_option("latest", PhpMixed::Bool(false));
+                .set_option("latest", InputValue::Bool(false));
         }
 
         let package_filter: Option<String> = input
@@ -1876,7 +1877,7 @@ impl Command for ShowCommand {
                 &installed_repo,
                 &repos,
                 pf,
-                input.borrow().get_argument("version")?,
+                input.borrow().get_argument("version")?.to_php_mixed(),
             )?;
 
             if let Some(ref pkg) = matched_package
@@ -2084,7 +2085,9 @@ impl Command for ShowCommand {
             self.get_io().write_error(
                 "No composer.json found in the current directory, disabling \"path\" option",
             );
-            input.borrow_mut().set_option("path", PhpMixed::Bool(false));
+            input
+                .borrow_mut()
+                .set_option("path", InputValue::Bool(false));
         }
 
         for repo in RepositoryUtils::flatten_repositories(repos, true) {

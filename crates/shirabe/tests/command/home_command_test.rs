@@ -6,12 +6,13 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 /// ref: HomeCommandTest::testHomeCommandWithShowFlag
 fn run_use_case(
     composer_json: serde_json::Value,
-    command: Vec<(PhpMixed, PhpMixed)>,
+    command: Vec<(ParameterName, InputValue)>,
     expected: &str,
     urls: &[(&str, &str)],
 ) {
@@ -36,8 +37,8 @@ fn run_use_case(
 
     let mut app_tester = get_application_tester();
     let mut input = vec![
-        (PhpMixed::from("command"), PhpMixed::from("home")),
-        (PhpMixed::from("--show"), PhpMixed::from(true)),
+        (ParameterName::of("command"), InputValue::from("home")),
+        (ParameterName::of("--show"), InputValue::from(true)),
     ];
     input.extend(command);
     app_tester.run(input, RunOptions::default()).unwrap();
@@ -64,8 +65,8 @@ fn test_home_command_with_show_flag_invalid_or_missing_repository_url() {
             },
         }),
         vec![(
-            PhpMixed::from("packages"),
-            PhpMixed::List(vec![PhpMixed::from("vendor/package")]),
+            ParameterName::of("packages"),
+            InputValue::Array(vec!["vendor/package".to_string()]),
         )],
         "<warning>Invalid or missing repository URL for vendor/package</warning>",
         &[],
@@ -92,8 +93,8 @@ fn test_home_command_with_show_flag_package_not_found() {
     run_use_case(
         serde_json::json!({ "repositories": [] }),
         vec![(
-            PhpMixed::from("packages"),
-            PhpMixed::List(vec![PhpMixed::from("vendor/anotherpackage")]),
+            ParameterName::of("packages"),
+            InputValue::Array(vec!["vendor/anotherpackage".to_string()]),
         )],
         "<warning>Package vendor/anotherpackage not found</warning>\n\
          <warning>Invalid or missing repository URL for vendor/anotherpackage</warning>",
@@ -108,8 +109,8 @@ fn test_home_command_with_show_flag_a_valid_package_url() {
     run_use_case(
         serde_json::json!({ "repositories": [] }),
         vec![(
-            PhpMixed::from("packages"),
-            PhpMixed::List(vec![PhpMixed::from("vendor/package")]),
+            ParameterName::of("packages"),
+            InputValue::Array(vec!["vendor/package".to_string()]),
         )],
         "https://example.org",
         &[("vendor/package", "https://example.org")],
@@ -123,8 +124,8 @@ fn test_home_command_with_show_flag_a_valid_dev_package_url() {
     run_use_case(
         serde_json::json!({ "repositories": [] }),
         vec![(
-            PhpMixed::from("packages"),
-            PhpMixed::List(vec![PhpMixed::from("vendor/devpackage")]),
+            ParameterName::of("packages"),
+            InputValue::Array(vec!["vendor/devpackage".to_string()]),
         )],
         "https://example.org/dev",
         &[("vendor/devpackage", "https://example.org/dev")],

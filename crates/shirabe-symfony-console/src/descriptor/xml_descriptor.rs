@@ -233,13 +233,14 @@ impl XmlDescriptor {
         description_xml.append_child(dom.create_text_node(argument.get_description()));
 
         let defaults_xml = object_xml.append_child(dom.create_element("defaults"));
-        let defaults: Vec<String> = match argument.get_default() {
+        let default_value = argument.get_default().to_php_mixed();
+        let defaults: Vec<String> = match &default_value {
             PhpMixed::List(_) | PhpMixed::Array(_) => {
-                self.default_values_as_strings(argument.get_default())
+                self.default_values_as_strings(&default_value)
             }
-            PhpMixed::Bool(_) => vec![shirabe_php_shim::var_export(argument.get_default(), true)],
+            PhpMixed::Bool(_) => vec![shirabe_php_shim::var_export(&default_value, true)],
             d if shirabe_php_shim::php_truthy(d) => {
-                vec![shirabe_php_shim::php_to_string(argument.get_default())]
+                vec![shirabe_php_shim::php_to_string(&default_value)]
             }
             _ => vec![],
         };
@@ -294,13 +295,14 @@ impl XmlDescriptor {
         description_xml.append_child(dom.create_text_node(option.get_description()));
 
         if option.accept_value() {
-            let defaults: Vec<String> = match option.get_default() {
+            let default_value = option.get_default().to_php_mixed();
+            let defaults: Vec<String> = match &default_value {
                 PhpMixed::List(_) | PhpMixed::Array(_) => {
-                    self.default_values_as_strings(option.get_default())
+                    self.default_values_as_strings(&default_value)
                 }
-                PhpMixed::Bool(_) => vec![shirabe_php_shim::var_export(option.get_default(), true)],
+                PhpMixed::Bool(_) => vec![shirabe_php_shim::var_export(&default_value, true)],
                 d if shirabe_php_shim::php_truthy(d) => {
-                    vec![shirabe_php_shim::php_to_string(option.get_default())]
+                    vec![shirabe_php_shim::php_to_string(&default_value)]
                 }
                 _ => vec![],
             };

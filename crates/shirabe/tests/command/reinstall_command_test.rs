@@ -5,26 +5,24 @@ use crate::test_case::{
     init_temp_composer,
 };
 use serial_test::serial;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
-fn input(pairs: Vec<(&str, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
+fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
-        .map(|(k, v)| (PhpMixed::from(k), v))
+        .map(|(k, v)| (ParameterName::of(k), v))
         .collect()
 }
 
 /// ref: ReinstallCommandTest::caseProvider
-fn cases() -> Vec<(&'static str, Vec<(&'static str, PhpMixed)>, &'static str)> {
+fn cases() -> Vec<(&'static str, Vec<(&'static str, InputValue)>, &'static str)> {
     vec![
         (
             "reinstall a package by name",
             vec![(
                 "packages",
-                PhpMixed::List(vec![
-                    PhpMixed::from("root/req"),
-                    PhpMixed::from("root/anotherreq*"),
-                ]),
+                InputValue::Array(vec!["root/req".to_string(), "root/anotherreq*".to_string()]),
             )],
             "- Removing root/req (1.0.0)
   - Removing root/anotherreq2 (1.0.0)
@@ -35,10 +33,7 @@ fn cases() -> Vec<(&'static str, Vec<(&'static str, PhpMixed)>, &'static str)> {
         ),
         (
             "reinstall packages by type",
-            vec![(
-                "--type",
-                PhpMixed::List(vec![PhpMixed::from("metapackage")]),
-            )],
+            vec![("--type", InputValue::Array(vec!["metapackage".to_string()]))],
             "- Removing root/req (1.0.0)
   - Removing root/lala (1.0.0)
   - Removing root/anotherreq2 (1.0.0)
@@ -52,7 +47,7 @@ fn cases() -> Vec<(&'static str, Vec<(&'static str, PhpMixed)>, &'static str)> {
             "reinstall a package that is not installed",
             vec![(
                 "packages",
-                PhpMixed::List(vec![PhpMixed::from("root/unknownreq")]),
+                InputValue::Array(vec!["root/unknownreq".to_string()]),
             )],
             r#"<warning>Pattern "root/unknownreq" does not match any currently installed packages.</warning>
 <warning>Found no packages to reinstall, aborting.</warning>"#,
@@ -93,9 +88,9 @@ fn test_reinstall_command() {
 
         let mut app_tester = get_application_tester();
         let mut args = vec![
-            ("command", PhpMixed::from("reinstall")),
-            ("--no-progress", PhpMixed::from(true)),
-            ("--no-plugins", PhpMixed::from(true)),
+            ("command", InputValue::from("reinstall")),
+            ("--no-progress", InputValue::from(true)),
+            ("--no-plugins", InputValue::from(true)),
         ];
         args.extend(options);
         app_tester.run(input(args), RunOptions::default()).unwrap();

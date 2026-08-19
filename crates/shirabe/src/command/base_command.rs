@@ -26,7 +26,9 @@ use shirabe_symfony_console::Terminal;
 use shirabe_symfony_console::command::{Command, CommandData, SetDefinitionArg};
 use shirabe_symfony_console::helper::Table;
 use shirabe_symfony_console::helper::TableSeparator;
+use shirabe_symfony_console::input::ArgumentName;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::OutputInterface;
 
 pub const SUCCESS: i64 = 0;
@@ -122,7 +124,7 @@ pub trait BaseCommand: Command {
         name: &str,
         mode: Option<i64>,
         description: &str,
-        default: PhpMixed,
+        default: InputValue,
     ) -> &Self
     where
         Self: Sized,
@@ -139,14 +141,11 @@ pub trait BaseCommand: Command {
         shortcut: Option<&str>,
         mode: Option<i64>,
         description: &str,
-        default: PhpMixed,
+        default: InputValue,
     ) -> &Self
     where
         Self: Sized,
     {
-        let shortcut = shortcut
-            .map(|s| PhpMixed::from(s.to_string()))
-            .unwrap_or(PhpMixed::Null);
         self.command_data()
             .add_option(name, shortcut, mode, description, default)
             .expect("command option definitions in configure() are statically valid");
@@ -400,11 +399,11 @@ impl BaseCommand for BaseCommandData {
         let disable_plugins = disable_plugins
             || input
                 .borrow()
-                .has_parameter_option(PhpMixed::from(vec!["--no-plugins"]), false);
+                .has_parameter_option(&["--no-plugins"], false);
         let disable_scripts = disable_scripts.unwrap_or(false)
             || input
                 .borrow()
-                .has_parameter_option(PhpMixed::from(vec!["--no-scripts"]), false);
+                .has_parameter_option(&["--no-scripts"], false);
 
         let (disable_plugins, disable_scripts) =
             apply_application_defaults(self.get_application(), disable_plugins, disable_scripts);
@@ -478,12 +477,12 @@ impl BaseCommand for BaseCommandData {
                 "dist" => {
                     input
                         .borrow_mut()
-                        .set_option("prefer-dist", PhpMixed::Bool(true))?;
+                        .set_option("prefer-dist", InputValue::Bool(true))?;
                 }
                 "source" => {
                     input
                         .borrow_mut()
-                        .set_option("prefer-source", PhpMixed::Bool(true))?;
+                        .set_option("prefer-source", InputValue::Bool(true))?;
                 }
                 "auto" => {
                     prefer_dist = false;
@@ -771,7 +770,7 @@ pub fn base_command_complete(
     } else if CompletionInput::TYPE_ARGUMENT_VALUE == input.get_completion_type()
         && cmd
             .get_definition()
-            .has_argument(&PhpMixed::String(name.clone()))
+            .has_argument(&ArgumentName::Name(name.clone()))
     {
         let argument = cmd
             .base_command_data()
@@ -799,10 +798,10 @@ pub fn base_command_initialize(
     // initialize a plugin-enabled Composer instance, either local or global
     let disable_plugins = input
         .borrow()
-        .has_parameter_option(PhpMixed::from(vec!["--no-plugins"]), false);
+        .has_parameter_option(&["--no-plugins"], false);
     let disable_scripts = input
         .borrow()
-        .has_parameter_option(PhpMixed::from(vec!["--no-scripts"]), false);
+        .has_parameter_option(&["--no-scripts"], false);
     let (mut disable_plugins, mut disable_scripts) =
         apply_application_defaults(cmd.get_application(), disable_plugins, disable_scripts);
 
@@ -839,14 +838,12 @@ pub fn base_command_initialize(
         )?;
     }
 
-    if input
-        .borrow()
-        .has_parameter_option(PhpMixed::from(vec!["--no-ansi"]), false)
+    if input.borrow().has_parameter_option(&["--no-ansi"], false)
         && input.borrow().has_option("no-progress")
     {
         input
             .borrow_mut()
-            .set_option("no-progress", PhpMixed::Bool(true));
+            .set_option("no-progress", InputValue::Bool(true));
     }
 
     let env_options: IndexMap<&str, Vec<&str>> = [
@@ -879,7 +876,7 @@ pub fn base_command_initialize(
             {
                 input
                     .borrow_mut()
-                    .set_option(option_name, PhpMixed::Bool(true));
+                    .set_option(option_name, InputValue::Bool(true));
             }
         }
     }
@@ -895,7 +892,7 @@ pub fn base_command_initialize(
     {
         input
             .borrow_mut()
-            .set_option("ignore-platform-reqs", PhpMixed::Bool(true));
+            .set_option("ignore-platform-reqs", InputValue::Bool(true));
 
         io.write_error("<warning>COMPOSER_IGNORE_PLATFORM_REQS is set. You may experience unexpected errors.</warning>");
     }
@@ -917,12 +914,7 @@ pub fn base_command_initialize(
         {
             input.borrow_mut().set_option(
                 "ignore-platform-req",
-                PhpMixed::List(
-                    explode(",", &ignore_str)
-                        .into_iter()
-                        .map(PhpMixed::String)
-                        .collect(),
-                ),
+                InputValue::Array(explode(",", &ignore_str)),
             );
 
             io.write_error(&format!(

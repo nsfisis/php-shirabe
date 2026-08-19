@@ -321,7 +321,7 @@ impl Command for StatusCommand {
         self.set_description("Shows a list of locally modified packages");
         self.set_definition(&[InputOption::new(
             "verbose",
-            Some(shirabe_php_shim::PhpMixed::String("v|vv|vvv".to_string())),
+            Some("v|vv|vvv"),
             Some(InputOption::VALUE_NONE),
             "Show modified files for each directory that contains changes.",
             None,

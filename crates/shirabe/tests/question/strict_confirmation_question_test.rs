@@ -4,6 +4,8 @@ use shirabe::question::StrictConfirmationQuestion;
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_console::helper::{QuestionHelper, QuestionHelperInterface};
 use shirabe_symfony_console::input::ArrayInput;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 use shirabe_symfony_console::input::StreamableInputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_console::output::StreamOutput;
@@ -117,8 +119,8 @@ fn create_output_interface() -> std::rc::Rc<std::cell::RefCell<dyn OutputInterfa
 fn create_input(entry: &str) -> (ArrayInput, QuestionHelper) {
     let mut input = ArrayInput::new(
         vec![(
-            PhpMixed::Int(0),
-            PhpMixed::String("--no-interaction".to_string()),
+            ParameterName::Index(0),
+            InputValue::String("--no-interaction".to_string()),
         )],
         None,
     )

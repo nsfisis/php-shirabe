@@ -74,7 +74,7 @@ impl Command for ProhibitsCommand {
             .into(),
             InputOption::new(
                 <Self as BaseDependencyCommand>::OPTION_RECURSIVE,
-                Some(shirabe_php_shim::PhpMixed::String("r".to_string())),
+                Some("r"),
                 Some(InputOption::VALUE_NONE),
                 "Recursively resolves up to the root package",
                 None,
@@ -83,7 +83,7 @@ impl Command for ProhibitsCommand {
             .into(),
             InputOption::new(
                 <Self as BaseDependencyCommand>::OPTION_TREE,
-                Some(shirabe_php_shim::PhpMixed::String("t".to_string())),
+                Some("t"),
                 Some(InputOption::VALUE_NONE),
                 "Prints the results as a nested tree",
                 None,

@@ -18,6 +18,7 @@ use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::CommandNotFoundException;
 use shirabe_symfony_console::exception::NamespaceNotFoundException;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -182,7 +183,7 @@ impl Command for RunScriptCommand {
             .into(),
             InputOption::new(
                 "list",
-                Some(PhpMixed::String("l".to_string())),
+                Some("l"),
                 Some(InputOption::VALUE_NONE),
                 "List scripts.",
                 None,
@@ -234,7 +235,9 @@ impl Command for RunScriptCommand {
                 false,
             )?;
 
-            input.borrow_mut().set_argument("script", script)?;
+            input
+                .borrow_mut()
+                .set_argument("script", InputValue::from_php_mixed(&script))?;
 
             Ok(())
         })();
@@ -309,12 +312,8 @@ impl Command for RunScriptCommand {
         let args: Vec<String> = input
             .borrow()
             .get_argument("args")?
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
+            .as_array()
+            .map(<[String]>::to_vec)
             .unwrap_or_default();
 
         if let Some(timeout_val) = input.borrow().get_option("timeout")?.as_string() {

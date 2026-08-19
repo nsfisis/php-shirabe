@@ -6,12 +6,13 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::json::JsonFile;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
-fn input(pairs: Vec<(&str, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
+fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
-        .map(|(k, v)| (PhpMixed::from(k), v))
+        .map(|(k, v)| (ParameterName::of(k), v))
         .collect()
 }
 
@@ -34,12 +35,12 @@ fn test_require_throws_if_none_matches() {
     let err = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("require")),
-                ("--dry-run", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
+                ("command", InputValue::from("require")),
+                ("--dry-run", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
                 (
                     "packages",
-                    PhpMixed::List(vec![PhpMixed::from("required/pkg")]),
+                    InputValue::Array(vec!["required/pkg".to_string()]),
                 ),
             ]),
             RunOptions::default(),
@@ -81,12 +82,12 @@ fn test_require_warns_if_resolved_to_feature_branch() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("require")),
-                ("--dry-run", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
+                ("command", InputValue::from("require")),
+                ("--dry-run", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
                 (
                     "packages",
-                    PhpMixed::List(vec![PhpMixed::from("required/pkg")]),
+                    InputValue::Array(vec!["required/pkg".to_string()]),
                 ),
             ]),
             RunOptions {
@@ -121,7 +122,7 @@ Are you sure you want to use this constraint (y) or would you rather abort (n) t
 fn provide_require() -> Vec<(
     &'static str,
     serde_json::Value,
-    Vec<(&'static str, PhpMixed)>,
+    Vec<(&'static str, InputValue)>,
     &'static str,
 )> {
     vec![
@@ -134,7 +135,7 @@ fn provide_require() -> Vec<(
                     { "name": "required/pkg", "version": "1.0.0" },
                 ] } },
             }),
-            vec![("packages", PhpMixed::List(vec![PhpMixed::from("required/pkg")]))],
+            vec![("packages", InputValue::Array(vec!["required/pkg".to_string()]))],
             "<warning>Cannot use required/pkg's latest version 1.2.0 as it requires ext-foobar ^1 which is missing from your platform.
 ./composer.json has been updated
 Running composer update required/pkg
@@ -157,9 +158,9 @@ Using version ^1.0 for required/pkg",
                 ] } },
             }),
             vec![
-                ("packages", PhpMixed::List(vec![PhpMixed::from("required/pkg")])),
-                ("--no-install", PhpMixed::from(true)),
-                ("-v", PhpMixed::from(true)),
+                ("packages", InputValue::Array(vec!["required/pkg".to_string()])),
+                ("--no-install", InputValue::from(true)),
+                ("-v", InputValue::from(true)),
             ],
             "<warning>Cannot use required/pkg's latest version 1.2.0 as it requires ext-foobar ^1 which is missing from your platform.
 <warning>Cannot use required/pkg 1.1.0 as it requires ext-foobar ^1 which is missing from your platform.
@@ -184,8 +185,8 @@ Using version ^1.0 for required/pkg",
                 ] } },
             }),
             vec![
-                ("packages", PhpMixed::List(vec![PhpMixed::from("required/pkg")])),
-                ("--no-install", PhpMixed::from(true)),
+                ("packages", InputValue::Array(vec!["required/pkg".to_string()])),
+                ("--no-install", InputValue::from(true)),
             ],
             "<warning>Cannot use required/pkg's latest version 1.1.0 as it requires php ^20 which is not satisfied by your platform.
 ./composer.json has been updated
@@ -205,8 +206,8 @@ Using version ^1.0 for required/pkg",
                 ] } },
             }),
             vec![
-                ("packages", PhpMixed::List(vec![PhpMixed::from("required/pkg")])),
-                ("--no-update", PhpMixed::from(true)),
+                ("packages", InputValue::Array(vec!["required/pkg".to_string()])),
+                ("--no-update", InputValue::from(true)),
             ],
             "<warning>Cannot use required/pkg's latest version 1.1.0 as it requires php ^20 which is not satisfied by your platform.
 Using version ^1.0 for required/pkg
@@ -224,8 +225,8 @@ Using version ^1.0 for required/pkg
                 "require": { "existing/dep": "^1" },
             }),
             vec![
-                ("packages", PhpMixed::List(vec![PhpMixed::from("required/pkg")])),
-                ("--no-install", PhpMixed::from(true)),
+                ("packages", InputValue::Array(vec!["required/pkg".to_string()])),
+                ("--no-install", InputValue::from(true)),
             ],
             "./composer.json has been updated
 Running composer update required/pkg
@@ -245,9 +246,9 @@ Using version ^1.1 for required/pkg",
                 ] } },
             }),
             vec![
-                ("packages", PhpMixed::List(vec![PhpMixed::from("required/pkg")])),
-                ("--no-install", PhpMixed::from(true)),
-                ("--fixed", PhpMixed::from(true)),
+                ("packages", InputValue::Array(vec!["required/pkg".to_string()])),
+                ("--no-install", InputValue::from(true)),
+                ("--fixed", InputValue::from(true)),
             ],
             "./composer.json has been updated
 Running composer update required/pkg
@@ -268,9 +269,9 @@ fn test_require() {
 
         let mut app_tester = get_application_tester();
         let mut args = vec![
-            ("command", PhpMixed::from("require")),
-            ("--dry-run", PhpMixed::from(true)),
-            ("--no-audit", PhpMixed::from(true)),
+            ("command", InputValue::from("require")),
+            ("--dry-run", InputValue::from(true)),
+            ("--no-audit", InputValue::from(true)),
         ];
         args.extend(command);
         app_tester.run(input(args), RunOptions::default()).unwrap();
@@ -357,19 +358,19 @@ fn test_inconsistent_require_keys() {
 
         let mut app_tester = get_application_tester();
         let mut command = vec![
-            ("command", PhpMixed::from("require")),
-            ("--no-audit", PhpMixed::from(true)),
-            ("--dev", PhpMixed::from(is_dev)),
-            ("--no-install", PhpMixed::from(true)),
+            ("command", InputValue::from("require")),
+            ("--no-audit", InputValue::from(true)),
+            ("--dev", InputValue::from(is_dev)),
+            ("--no-install", InputValue::from(true)),
             (
                 "packages",
-                PhpMixed::List(vec![PhpMixed::from("required/pkg")]),
+                InputValue::Array(vec!["required/pkg".to_string()]),
             ),
         ];
         if is_interactive {
             app_tester.set_inputs(vec!["yes".to_string()]);
         } else {
-            command.push(("--no-interaction", PhpMixed::from(true)));
+            command.push(("--no-interaction", InputValue::from(true)));
         }
 
         app_tester

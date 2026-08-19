@@ -5,7 +5,8 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 /// ref: ValidateCommandTest::MINIMAL_VALID_CONFIGURATION
 fn minimal_valid_configuration() -> serde_json::Value {
@@ -31,8 +32,8 @@ fn minimal_valid_configuration() -> serde_json::Value {
     })
 }
 
-fn validate_input(command: Vec<(PhpMixed, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
-    let mut input = vec![(PhpMixed::from("command"), PhpMixed::from("validate"))];
+fn validate_input(command: Vec<(ParameterName, InputValue)>) -> Vec<(ParameterName, InputValue)> {
+    let mut input = vec![(ParameterName::of("command"), InputValue::from("validate"))];
     input.extend(command);
     input
 }
@@ -40,7 +41,7 @@ fn validate_input(command: Vec<(PhpMixed, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed
 struct ValidateCase {
     name: &'static str,
     composer_json: serde_json::Value,
-    command: Vec<(PhpMixed, PhpMixed)>,
+    command: Vec<(ParameterName, InputValue)>,
     expected: &'static str,
 }
 
@@ -86,7 +87,10 @@ fn provide_validate_tests() -> Vec<ValidateCase> {
         ValidateCase {
             name: "passing without publish-check",
             composer_json: publish_data_stripped,
-            command: vec![(PhpMixed::from("--no-check-publish"), PhpMixed::Bool(true))],
+            command: vec![(
+                ParameterName::of("--no-check-publish"),
+                InputValue::Bool(true),
+            )],
             expected: "./composer.json is valid, but with a few warnings\n<warning>See https://getcomposer.org/doc/04-schema.md for details on the schema</warning>\n<warning># General warnings</warning>\n- No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.",
         },
     ]

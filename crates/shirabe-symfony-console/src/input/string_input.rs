@@ -4,10 +4,10 @@ use crate::exception::InvalidArgumentException;
 use crate::input::ArgvInput;
 use crate::input::InputDefinition;
 use crate::input::InputInterface;
-use crate::input::InputOptionValue;
+use crate::input::InputValue;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match};
+use shirabe_php_shim::{php_regex, preg_match};
 
 /// StringInput represents an input provided as a string.
 ///
@@ -137,16 +137,16 @@ impl InputInterface for StringInput {
         self.inner.get_first_argument()
     }
 
-    fn has_parameter_option(&self, values: PhpMixed, only_params: bool) -> bool {
+    fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
         InputInterface::has_parameter_option(&self.inner, values, only_params)
     }
 
     fn get_parameter_option(
         &self,
-        values: PhpMixed,
-        default: PhpMixed,
+        values: &[&str],
+        default: InputValue,
         only_params: bool,
-    ) -> PhpMixed {
+    ) -> InputValue {
         InputInterface::get_parameter_option(&self.inner, values, default, only_params)
     }
 
@@ -158,15 +158,15 @@ impl InputInterface for StringInput {
         self.inner.validate()
     }
 
-    fn get_arguments(&self) -> IndexMap<String, PhpMixed> {
+    fn get_arguments(&self) -> IndexMap<String, InputValue> {
         InputInterface::get_arguments(&self.inner)
     }
 
-    fn get_argument(&self, name: &str) -> anyhow::Result<PhpMixed> {
+    fn get_argument(&self, name: &str) -> anyhow::Result<InputValue> {
         self.inner.get_argument(name)
     }
 
-    fn set_argument(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+    fn set_argument(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_argument(name, value)
     }
 
@@ -174,15 +174,15 @@ impl InputInterface for StringInput {
         self.inner.has_argument(name)
     }
 
-    fn get_options(&self) -> IndexMap<String, PhpMixed> {
+    fn get_options(&self) -> IndexMap<String, InputValue> {
         InputInterface::get_options(&self.inner)
     }
 
-    fn get_option(&self, name: &str) -> anyhow::Result<InputOptionValue> {
+    fn get_option(&self, name: &str) -> anyhow::Result<InputValue> {
         self.inner.get_option(name)
     }
 
-    fn set_option(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+    fn set_option(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_option(name, value)
     }
 

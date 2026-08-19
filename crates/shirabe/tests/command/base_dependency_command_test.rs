@@ -7,8 +7,9 @@ use crate::test_case::{
 use serial_test::serial;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 /// ref: TestCase::trimLines — strip trailing spaces from each line, then trim the whole string.
 fn trim_lines(s: &str) -> String {
@@ -29,7 +30,7 @@ fn match_all() -> AnyConstraint {
 #[serial]
 fn test_exception_when_no_required_parameters() {
     // noParametersCaseProvider
-    let cases: Vec<(&str, Vec<(&str, PhpMixed)>, &str)> = vec![
+    let cases: Vec<(&str, Vec<(&str, InputValue)>, &str)> = vec![
         (
             "why",
             vec![],
@@ -42,21 +43,21 @@ fn test_exception_when_no_required_parameters() {
         ),
         (
             "why-not",
-            vec![("version", PhpMixed::from("*"))],
+            vec![("version", InputValue::from("*"))],
             "Not enough arguments (missing: \"package\").",
         ),
         (
             "why-not",
-            vec![("package", PhpMixed::from("vendor1/package1"))],
+            vec![("package", InputValue::from("vendor1/package1"))],
             "Not enough arguments (missing: \"version\").",
         ),
     ];
 
     for (command, parameters, expected_message) in cases {
-        let mut input: Vec<(PhpMixed, PhpMixed)> =
-            vec![(PhpMixed::from("command"), PhpMixed::from(command))];
+        let mut input: Vec<(ParameterName, InputValue)> =
+            vec![(ParameterName::of("command"), InputValue::from(command))];
         for (k, v) in parameters {
-            input.push((PhpMixed::from(k), v));
+            input.push((ParameterName::of(k), v));
         }
 
         let mut app_tester = get_application_tester();
@@ -77,13 +78,16 @@ fn test_exception_when_no_required_parameters() {
 #[serial]
 fn test_exception_when_running_locked_without_lock_file() {
     // caseProvider
-    let cases: Vec<(&str, Vec<(&str, PhpMixed)>)> = vec![
-        ("why", vec![("package", PhpMixed::from("vendor1/package1"))]),
+    let cases: Vec<(&str, Vec<(&str, InputValue)>)> = vec![
+        (
+            "why",
+            vec![("package", InputValue::from("vendor1/package1"))],
+        ),
         (
             "why-not",
             vec![
-                ("package", PhpMixed::from("vendor1/package1")),
-                ("version", PhpMixed::from("1.*")),
+                ("package", InputValue::from("vendor1/package1")),
+                ("version", InputValue::from("1.*")),
             ],
         ),
     ];
@@ -91,12 +95,12 @@ fn test_exception_when_running_locked_without_lock_file() {
     for (command, parameters) in cases {
         let tear_down = init_temp_composer(None, None, None, true);
 
-        let mut input: Vec<(PhpMixed, PhpMixed)> =
-            vec![(PhpMixed::from("command"), PhpMixed::from(command))];
+        let mut input: Vec<(ParameterName, InputValue)> =
+            vec![(ParameterName::of("command"), InputValue::from(command))];
         for (k, v) in parameters {
-            input.push((PhpMixed::from(k), v));
+            input.push((ParameterName::of(k), v));
         }
-        input.push((PhpMixed::from("--locked"), PhpMixed::from(true)));
+        input.push((ParameterName::of("--locked"), InputValue::from(true)));
 
         let mut app_tester = get_application_tester();
         let err = app_tester
@@ -119,13 +123,16 @@ fn test_exception_when_running_locked_without_lock_file() {
 #[serial]
 fn test_exception_when_it_could_not_found_the_package() {
     // caseProvider
-    let cases: Vec<(&str, Vec<(&str, PhpMixed)>)> = vec![
-        ("why", vec![("package", PhpMixed::from("vendor1/package1"))]),
+    let cases: Vec<(&str, Vec<(&str, InputValue)>)> = vec![
+        (
+            "why",
+            vec![("package", InputValue::from("vendor1/package1"))],
+        ),
         (
             "why-not",
             vec![
-                ("package", PhpMixed::from("vendor1/package1")),
-                ("version", PhpMixed::from("1.*")),
+                ("package", InputValue::from("vendor1/package1")),
+                ("version", InputValue::from("1.*")),
             ],
         ),
     ];
@@ -135,10 +142,10 @@ fn test_exception_when_it_could_not_found_the_package() {
 
         let tear_down = init_temp_composer(None, None, None, true);
 
-        let mut input: Vec<(PhpMixed, PhpMixed)> =
-            vec![(PhpMixed::from("command"), PhpMixed::from(command))];
+        let mut input: Vec<(ParameterName, InputValue)> =
+            vec![(ParameterName::of("command"), InputValue::from(command))];
         for (k, v) in parameters {
-            input.push((PhpMixed::from(k), v));
+            input.push((ParameterName::of(k), v));
         }
 
         let mut app_tester = get_application_tester();
@@ -165,13 +172,16 @@ fn test_exception_when_it_could_not_found_the_package() {
 #[serial]
 fn test_exception_when_package_was_not_found_in_project() {
     // caseProvider
-    let cases: Vec<(&str, Vec<(&str, PhpMixed)>)> = vec![
-        ("why", vec![("package", PhpMixed::from("vendor1/package1"))]),
+    let cases: Vec<(&str, Vec<(&str, InputValue)>)> = vec![
+        (
+            "why",
+            vec![("package", InputValue::from("vendor1/package1"))],
+        ),
         (
             "why-not",
             vec![
-                ("package", PhpMixed::from("vendor1/package1")),
-                ("version", PhpMixed::from("1.*")),
+                ("package", InputValue::from("vendor1/package1")),
+                ("version", InputValue::from("1.*")),
             ],
         ),
     ];
@@ -201,10 +211,10 @@ fn test_exception_when_package_was_not_found_in_project() {
         create_installed_json(&packages, &[], false);
         create_composer_lock(&packages, &[]);
 
-        let mut input: Vec<(PhpMixed, PhpMixed)> =
-            vec![(PhpMixed::from("command"), PhpMixed::from(command))];
+        let mut input: Vec<(ParameterName, InputValue)> =
+            vec![(ParameterName::of("command"), InputValue::from(command))];
         for (k, v) in parameters {
-            input.push((PhpMixed::from(k), v));
+            input.push((ParameterName::of(k), v));
         }
 
         let mut app_tester = get_application_tester();
@@ -233,13 +243,16 @@ fn test_warning_when_dependencies_are_not_installed() {
     let expected_warning_message = "<warning>No dependencies installed. Try running composer install or update, or use --locked.</warning>";
 
     // caseProvider
-    let cases: Vec<(&str, Vec<(&str, PhpMixed)>)> = vec![
-        ("why", vec![("package", PhpMixed::from("vendor1/package1"))]),
+    let cases: Vec<(&str, Vec<(&str, InputValue)>)> = vec![
+        (
+            "why",
+            vec![("package", InputValue::from("vendor1/package1"))],
+        ),
         (
             "why-not",
             vec![
-                ("package", PhpMixed::from("vendor1/package1")),
-                ("version", PhpMixed::from("1.*")),
+                ("package", InputValue::from("vendor1/package1")),
+                ("version", InputValue::from("1.*")),
             ],
         ),
     ];
@@ -267,10 +280,10 @@ fn test_warning_when_dependencies_are_not_installed() {
             std::slice::from_ref(&some_dev_required_package),
         );
 
-        let mut input: Vec<(PhpMixed, PhpMixed)> =
-            vec![(PhpMixed::from("command"), PhpMixed::from(command))];
+        let mut input: Vec<(ParameterName, InputValue)> =
+            vec![(ParameterName::of("command"), InputValue::from(command))];
         for (k, v) in parameters {
-            input.push((PhpMixed::from(k), v));
+            input.push((ParameterName::of(k), v));
         }
 
         let mut app_tester = get_application_tester();
@@ -415,18 +428,21 @@ fn test_why_command_outputs() {
             true,
         );
 
-        let input: Vec<(PhpMixed, PhpMixed)> = vec![
-            (PhpMixed::from("command"), PhpMixed::from("why")),
+        let input: Vec<(ParameterName, InputValue)> = vec![
+            (ParameterName::of("command"), InputValue::from("why")),
             (
-                PhpMixed::from("package"),
-                PhpMixed::from(package_to_be_inspected),
+                ParameterName::of("package"),
+                InputValue::from(package_to_be_inspected),
             ),
-            (PhpMixed::from("--tree"), PhpMixed::from(render_as_tree)),
             (
-                PhpMixed::from("--recursive"),
-                PhpMixed::from(render_recursively),
+                ParameterName::of("--tree"),
+                InputValue::from(render_as_tree),
             ),
-            (PhpMixed::from("--locked"), PhpMixed::from(true)),
+            (
+                ParameterName::of("--recursive"),
+                InputValue::from(render_recursively),
+            ),
+            (ParameterName::of("--locked"), InputValue::from(true)),
         ];
 
         let mut app_tester = get_application_tester();
@@ -586,15 +602,15 @@ fn test_why_not_command_outputs() {
             true,
         );
 
-        let input: Vec<(PhpMixed, PhpMixed)> = vec![
-            (PhpMixed::from("command"), PhpMixed::from("why-not")),
+        let input: Vec<(ParameterName, InputValue)> = vec![
+            (ParameterName::of("command"), InputValue::from("why-not")),
             (
-                PhpMixed::from("package"),
-                PhpMixed::from(package_to_be_inspected),
+                ParameterName::of("package"),
+                InputValue::from(package_to_be_inspected),
             ),
             (
-                PhpMixed::from("version"),
-                PhpMixed::from(package_version_to_be_inspected),
+                ParameterName::of("version"),
+                InputValue::from(package_version_to_be_inspected),
             ),
         ];
 

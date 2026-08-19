@@ -2,7 +2,8 @@
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 /// ref: RunScriptCommandTest::testDetectAndPassDevModeToEventAndToDispatching
 ///
@@ -49,8 +50,8 @@ fn test_can_list_scripts() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("run-script")),
-                (PhpMixed::from("--list"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("run-script")),
+                (ParameterName::of("--list"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -95,9 +96,9 @@ fn test_can_define_aliases() {
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("test")),
-                (PhpMixed::from("--help"), PhpMixed::from(true)),
-                (PhpMixed::from("--format"), PhpMixed::from("json")),
+                (ParameterName::of("command"), InputValue::from("test")),
+                (ParameterName::of("--help"), InputValue::from(true)),
+                (ParameterName::of("--format"), InputValue::from("json")),
             ],
             RunOptions::default(),
         )
@@ -193,9 +194,12 @@ class MyCommand extends Command
     app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("test-direct")),
-                (PhpMixed::from("--outeropt"), PhpMixed::from(true)),
-                (PhpMixed::from("req-arg"), PhpMixed::from("lala")),
+                (
+                    ParameterName::of("command"),
+                    InputValue::from("test-direct"),
+                ),
+                (ParameterName::of("--outeropt"), InputValue::from(true)),
+                (ParameterName::of("req-arg"), InputValue::from("lala")),
             ],
             RunOptions::default(),
         )
@@ -211,9 +215,9 @@ class MyCommand extends Command
     app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("test-ref")),
-                (PhpMixed::from("--outeropt"), PhpMixed::from(true)),
-                (PhpMixed::from("req-arg"), PhpMixed::from("lala")),
+                (ParameterName::of("command"), InputValue::from("test-ref")),
+                (ParameterName::of("--outeropt"), InputValue::from(true)),
+                (ParameterName::of("req-arg"), InputValue::from("lala")),
             ],
             RunOptions::default(),
         )
@@ -230,8 +234,8 @@ class MyCommand extends Command
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("run-script")),
-                (PhpMixed::from("--list"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("run-script")),
+                (ParameterName::of("--list"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )
@@ -317,8 +321,8 @@ class MyCommandWithDefinitions extends Command
     app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from(cmd_name)),
-                (PhpMixed::from("req-arg"), PhpMixed::from("lala")),
+                (ParameterName::of("command"), InputValue::from(cmd_name)),
+                (ParameterName::of("req-arg"), InputValue::from("lala")),
             ],
             RunOptions::default(),
         )
@@ -331,10 +335,10 @@ class MyCommandWithDefinitions extends Command
         .run(
             vec![
                 (
-                    PhpMixed::from("command"),
-                    PhpMixed::from(cmd_alias.as_str()),
+                    ParameterName::of("command"),
+                    InputValue::from(cmd_alias.as_str()),
                 ),
-                (PhpMixed::from("req-arg"), PhpMixed::from("lala")),
+                (ParameterName::of("req-arg"), InputValue::from("lala")),
             ],
             RunOptions::default(),
         )
@@ -346,8 +350,8 @@ class MyCommandWithDefinitions extends Command
     let status_code = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("run-script")),
-                (PhpMixed::from("--list"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("run-script")),
+                (ParameterName::of("--list"), InputValue::from(true)),
             ],
             RunOptions::default(),
         )

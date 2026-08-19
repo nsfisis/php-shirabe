@@ -9,6 +9,7 @@ use crate::input::InputArgument;
 use crate::input::InputDefinition;
 use crate::input::InputInterface;
 use crate::input::InputOption;
+use crate::input::InputValue;
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match};
@@ -148,7 +149,7 @@ impl CommandData {
         name: &str,
         mode: Option<i64>,
         description: &str,
-        default: PhpMixed,
+        default: InputValue,
     ) -> anyhow::Result<&Self> {
         self.definition
             .borrow_mut()
@@ -178,10 +179,10 @@ impl CommandData {
     pub fn add_option(
         &self,
         name: &str,
-        shortcut: PhpMixed,
+        shortcut: Option<&str>,
         mode: Option<i64>,
         description: &str,
-        default: PhpMixed,
+        default: InputValue,
     ) -> anyhow::Result<&Self> {
         self.definition
             .borrow_mut()
@@ -189,7 +190,7 @@ impl CommandData {
             .unwrap()
             .add_option(InputOption::new(
                 name,
-                shortcut.clone(),
+                shortcut,
                 mode,
                 description.to_string(),
                 default.clone(),
@@ -403,12 +404,12 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim:
         // It would fail the validation if we didn't make sure the command argument is present,
         // since it's required by the application.
         if input.borrow().has_argument("command")
-            && matches!(input.borrow().get_argument("command")?, PhpMixed::Null)
+            && input.borrow().get_argument("command")?.is_null()
         {
             let name = self.get_name();
             input
                 .borrow_mut()
-                .set_argument("command", PhpMixed::from(name))?;
+                .set_argument("command", InputValue::from(name))?;
         }
 
         input.borrow_mut().validate()?;

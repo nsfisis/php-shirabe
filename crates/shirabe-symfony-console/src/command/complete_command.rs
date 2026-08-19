@@ -7,6 +7,7 @@ use crate::completion::CompletionOutputInterface;
 use crate::completion::{CompletionSuggestions, StringOrSuggestion};
 use crate::input::InputInterface;
 use crate::input::InputOption;
+use crate::input::InputValue;
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, impl_php_class};
@@ -191,31 +192,31 @@ impl Command for CompleteCommand {
         self.inner
             .add_option(
                 "shell",
-                PhpMixed::from("s".to_string()),
+                Some("s"),
                 Some(InputOption::VALUE_REQUIRED),
                 &format!("The shell type (\"{}\")", shells),
-                PhpMixed::Null,
+                InputValue::Null,
             )?
             .add_option(
                 "input",
-                PhpMixed::from("i".to_string()),
+                Some("i"),
                 Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
                 "An array of input tokens (e.g. COMP_WORDS or argv)",
-                PhpMixed::Null,
+                InputValue::Null,
             )?
             .add_option(
                 "current",
-                PhpMixed::from("c".to_string()),
+                Some("c"),
                 Some(InputOption::VALUE_REQUIRED),
                 "The index of the \"input\" array that the cursor is in (e.g. COMP_CWORD)",
-                PhpMixed::Null,
+                InputValue::Null,
             )?
             .add_option(
                 "symfony",
-                PhpMixed::from("S".to_string()),
+                Some("S"),
                 Some(InputOption::VALUE_REQUIRED),
                 "The version of the completion script",
-                PhpMixed::Null,
+                InputValue::Null,
             )?;
 
         Ok(())

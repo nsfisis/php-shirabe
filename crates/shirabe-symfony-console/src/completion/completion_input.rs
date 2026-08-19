@@ -3,7 +3,8 @@
 use crate::input::ArgvInput;
 use crate::input::InputDefinition;
 use crate::input::InputOption;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match_all};
+use crate::input::InputValue;
+use shirabe_php_shim::{php_regex, preg_match_all};
 
 /// An input specialized for shell completion.
 ///
@@ -148,13 +149,10 @@ impl CompletionInput {
 
             let argument_value = self.inner.inner.arguments[&current_argument_name].clone();
             self.completion_name = Some(current_argument_name.clone());
-            if let PhpMixed::List(argument_value) = &argument_value {
-                self.completion_value = argument_value
-                    .last()
-                    .map(|v| v.to_string())
-                    .unwrap_or_default();
+            if let InputValue::Array(argument_value) = &argument_value {
+                self.completion_value = argument_value.last().cloned().unwrap_or_default();
             } else {
-                self.completion_value = argument_value.to_string();
+                self.completion_value = argument_value.to_php_string();
             }
         }
 
@@ -165,7 +163,7 @@ impl CompletionInput {
                     .inner
                     .inner
                     .definition
-                    .get_argument(&PhpMixed::String(argument_name.clone()))
+                    .get_argument(&crate::input::ArgumentName::of(&argument_name))
                     .unwrap()
                     .is_array()
             {
@@ -304,16 +302,16 @@ impl crate::input::InputInterface for CompletionInput {
         self.to_string()
     }
 
-    fn has_parameter_option(&self, values: PhpMixed, only_params: bool) -> bool {
+    fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
         crate::input::InputInterface::has_parameter_option(&self.inner, values, only_params)
     }
 
     fn get_parameter_option(
         &self,
-        values: PhpMixed,
-        default: PhpMixed,
+        values: &[&str],
+        default: InputValue,
         only_params: bool,
-    ) -> PhpMixed {
+    ) -> InputValue {
         crate::input::InputInterface::get_parameter_option(
             &self.inner,
             values,
@@ -330,15 +328,15 @@ impl crate::input::InputInterface for CompletionInput {
         crate::input::InputInterface::validate(&mut self.inner)
     }
 
-    fn get_arguments(&self) -> indexmap::IndexMap<String, PhpMixed> {
+    fn get_arguments(&self) -> indexmap::IndexMap<String, InputValue> {
         crate::input::InputInterface::get_arguments(&self.inner)
     }
 
-    fn get_argument(&self, name: &str) -> anyhow::Result<PhpMixed> {
+    fn get_argument(&self, name: &str) -> anyhow::Result<InputValue> {
         crate::input::InputInterface::get_argument(&self.inner, name)
     }
 
-    fn set_argument(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+    fn set_argument(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
         crate::input::InputInterface::set_argument(&mut self.inner, name, value)
     }
 
@@ -346,15 +344,15 @@ impl crate::input::InputInterface for CompletionInput {
         crate::input::InputInterface::has_argument(&self.inner, name)
     }
 
-    fn get_options(&self) -> indexmap::IndexMap<String, PhpMixed> {
+    fn get_options(&self) -> indexmap::IndexMap<String, InputValue> {
         crate::input::InputInterface::get_options(&self.inner)
     }
 
-    fn get_option(&self, name: &str) -> anyhow::Result<crate::input::InputOptionValue> {
+    fn get_option(&self, name: &str) -> anyhow::Result<InputValue> {
         crate::input::InputInterface::get_option(&self.inner, name)
     }
 
-    fn set_option(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+    fn set_option(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
         crate::input::InputInterface::set_option(&mut self.inner, name, value)
     }
 

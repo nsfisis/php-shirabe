@@ -20,6 +20,7 @@ use shirabe_php_shim::{
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -54,7 +55,7 @@ impl Command for SearchCommand {
         self.set_definition(&[
             InputOption::new(
                 "only-name",
-                Some(PhpMixed::String("N".to_string())),
+                Some("N"),
                 Some(InputOption::VALUE_NONE),
                 "Search only in package names",
                 None,
@@ -63,7 +64,7 @@ impl Command for SearchCommand {
             .into(),
             InputOption::new(
                 "only-vendor",
-                Some(PhpMixed::String("O".to_string())),
+                Some("O"),
                 Some(InputOption::VALUE_NONE),
                 "Search only for vendor / organization names, returns only \"vendor\" as result",
                 None,
@@ -72,7 +73,7 @@ impl Command for SearchCommand {
             .into(),
             InputOption::new(
                 "type",
-                Some(PhpMixed::String("t".to_string())),
+                Some("t"),
                 Some(InputOption::VALUE_REQUIRED),
                 "Search for a specific package type",
                 None,
@@ -81,10 +82,10 @@ impl Command for SearchCommand {
             .into(),
             InputOption::new6(
                 "format",
-                Some(PhpMixed::String("f".to_string())),
+                Some("f"),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
-                Some(PhpMixed::String("text".to_string())),
+                Some(InputValue::String("text".to_string())),
                 SuggestedValues::List(vec!["json".to_string(), "text".to_string()]),
             )
             .unwrap()
@@ -204,12 +205,8 @@ impl Command for SearchCommand {
 
         let tokens_arg = input.borrow().get_argument("tokens")?;
         let token_strings: Vec<String> = tokens_arg
-            .as_list()
-            .map(|list| {
-                list.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
+            .as_array()
+            .map(<[String]>::to_vec)
             .unwrap_or_default();
         let mut query = implode(" ", &token_strings);
         if mode != repository_interface::SEARCH_FULLTEXT {

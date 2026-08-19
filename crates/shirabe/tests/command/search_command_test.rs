@@ -2,7 +2,8 @@
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 fn repositories_json() -> serde_json::Value {
     serde_json::json!({
@@ -22,11 +23,11 @@ fn repositories_json() -> serde_json::Value {
 }
 
 /// ref: SearchCommandTest::testSearch (data provider rolled into one body).
-fn run_search_case(command: Vec<(PhpMixed, PhpMixed)>, expected: &str) {
+fn run_search_case(command: Vec<(ParameterName, InputValue)>, expected: &str) {
     let _tear_down = init_temp_composer(Some(&repositories_json()), None, None, true);
 
-    let mut input: Vec<(PhpMixed, PhpMixed)> =
-        vec![(PhpMixed::from("command"), PhpMixed::from("search"))];
+    let mut input: Vec<(ParameterName, InputValue)> =
+        vec![(ParameterName::of("command"), InputValue::from("search"))];
     input.extend(command);
 
     let mut app_tester = get_application_tester();
@@ -40,8 +41,8 @@ fn test_search() {
     // 'by name and description'
     run_search_case(
         vec![(
-            "tokens".into(),
-            PhpMixed::List(vec![PhpMixed::from("fancy")]),
+            ParameterName::of("tokens"),
+            InputValue::Array(vec!["fancy".to_string()]),
         )],
         "bar/baz                <warning>! Abandoned !</warning> fancy baz\nvendor-2/fancy-package",
     );
@@ -49,8 +50,8 @@ fn test_search() {
     // 'by name and description with multiple tokens'
     run_search_case(
         vec![(
-            "tokens".into(),
-            PhpMixed::List(vec![PhpMixed::from("fancy"), PhpMixed::from("vendor")]),
+            ParameterName::of("tokens"),
+            InputValue::Array(vec!["fancy".to_string(), "vendor".to_string()]),
         )],
         "vendor-1/package-1     generic description\nbar/baz                <warning>! Abandoned !</warning> fancy baz\nvendor-2/fancy-package",
     );
@@ -59,10 +60,10 @@ fn test_search() {
     run_search_case(
         vec![
             (
-                "tokens".into(),
-                PhpMixed::List(vec![PhpMixed::from("fancy")]),
+                ParameterName::of("tokens"),
+                InputValue::Array(vec!["fancy".to_string()]),
             ),
-            ("--only-name".into(), PhpMixed::from(true)),
+            (ParameterName::of("--only-name"), InputValue::from(true)),
         ],
         "vendor-2/fancy-package",
     );
@@ -70,8 +71,11 @@ fn test_search() {
     // 'by vendor only'
     run_search_case(
         vec![
-            ("tokens".into(), PhpMixed::List(vec![PhpMixed::from("bar")])),
-            ("--only-vendor".into(), PhpMixed::from(true)),
+            (
+                ParameterName::of("tokens"),
+                InputValue::Array(vec!["bar".to_string()]),
+            ),
+            (ParameterName::of("--only-vendor"), InputValue::from(true)),
         ],
         "bar",
     );
@@ -80,10 +84,10 @@ fn test_search() {
     run_search_case(
         vec![
             (
-                "tokens".into(),
-                PhpMixed::List(vec![PhpMixed::from("vendor")]),
+                ParameterName::of("tokens"),
+                InputValue::Array(vec!["vendor".to_string()]),
             ),
-            ("--type".into(), PhpMixed::from("foo")),
+            (ParameterName::of("--type"), InputValue::from("foo")),
         ],
         "vendor-2/fancy-package",
     );
@@ -92,10 +96,10 @@ fn test_search() {
     run_search_case(
         vec![
             (
-                "tokens".into(),
-                PhpMixed::List(vec![PhpMixed::from("vendor-2/fancy")]),
+                ParameterName::of("tokens"),
+                InputValue::Array(vec!["vendor-2/fancy".to_string()]),
             ),
-            ("--format".into(), PhpMixed::from("json")),
+            (ParameterName::of("--format"), InputValue::from("json")),
         ],
         "[\n    {\n        \"name\": \"vendor-2/fancy-package\",\n        \"description\": null\n    }\n]",
     );
@@ -103,8 +107,8 @@ fn test_search() {
     // 'no results'
     run_search_case(
         vec![(
-            "tokens".into(),
-            PhpMixed::List(vec![PhpMixed::from("invalid-package-name")]),
+            ParameterName::of("tokens"),
+            InputValue::Array(vec!["invalid-package-name".to_string()]),
         )],
         "",
     );
@@ -124,11 +128,14 @@ fn test_invalid_format() {
     let result = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("search")),
-                (PhpMixed::from("--format"), PhpMixed::from("test-format")),
+                (ParameterName::of("command"), InputValue::from("search")),
                 (
-                    PhpMixed::from("tokens"),
-                    PhpMixed::List(vec![PhpMixed::from("test")]),
+                    ParameterName::of("--format"),
+                    InputValue::from("test-format"),
+                ),
+                (
+                    ParameterName::of("tokens"),
+                    InputValue::Array(vec!["test".to_string()]),
                 ),
             ],
             RunOptions::default(),
@@ -155,12 +162,12 @@ fn test_invalid_flags() {
     let err = app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("search")),
-                (PhpMixed::from("--only-vendor"), PhpMixed::from(true)),
-                (PhpMixed::from("--only-name"), PhpMixed::from(true)),
+                (ParameterName::of("command"), InputValue::from("search")),
+                (ParameterName::of("--only-vendor"), InputValue::from(true)),
+                (ParameterName::of("--only-name"), InputValue::from(true)),
                 (
-                    PhpMixed::from("tokens"),
-                    PhpMixed::List(vec![PhpMixed::from("test")]),
+                    ParameterName::of("tokens"),
+                    InputValue::Array(vec!["test".to_string()]),
                 ),
             ],
             RunOptions::default(),

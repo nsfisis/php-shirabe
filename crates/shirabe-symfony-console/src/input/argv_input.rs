@@ -1,13 +1,14 @@
 //! ref: composer/vendor/symfony/console/Input/ArgvInput.php
 
 use crate::exception::RuntimeException;
+use crate::input::ArgumentName;
 use crate::input::Input;
 use crate::input::InputDefinition;
 use crate::input::InputInterface;
-use crate::input::InputOptionValue;
+use crate::input::InputValue;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match};
+use shirabe_php_shim::{php_regex, preg_match};
 
 /// ArgvInput represents an input coming from the CLI arguments.
 ///
@@ -144,13 +145,13 @@ impl ArgvInput {
                 // an option with a value (with no space)
                 self.add_short_option(
                     &first,
-                    PhpMixed::String(shirabe_php_shim::substr(&name, 1, None)),
+                    InputValue::String(shirabe_php_shim::substr(&name, 1, None)),
                 )?;
             } else {
                 self.parse_short_option_set(&name)?;
             }
         } else {
-            self.add_short_option(&name, PhpMixed::Null)?;
+            self.add_short_option(&name, InputValue::Null)?;
         }
 
         Ok(())
@@ -180,15 +181,15 @@ impl ArgvInput {
             let option = self.inner.definition.get_option_for_shortcut(&name_i)?;
             if option.accept_value() {
                 let value = if i == len - 1 {
-                    PhpMixed::Null
+                    InputValue::Null
                 } else {
-                    PhpMixed::String(shirabe_php_shim::substr(name, i + 1, None))
+                    InputValue::String(shirabe_php_shim::substr(name, i + 1, None))
                 };
                 self.add_long_option(option.get_name(), value)?;
 
                 break;
             } else {
-                self.add_long_option(option.get_name(), PhpMixed::Null)?;
+                self.add_long_option(option.get_name(), InputValue::Null)?;
             }
             i += 1;
         }
@@ -209,11 +210,11 @@ impl ArgvInput {
                 }
                 self.add_long_option(
                     &shirabe_php_shim::substr(&name, 0, Some(pos)),
-                    PhpMixed::String(value),
+                    InputValue::String(value),
                 )?;
             }
             None => {
-                self.add_long_option(&name, PhpMixed::Null)?;
+                self.add_long_option(&name, InputValue::Null)?;
             }
         }
 
@@ -225,34 +226,47 @@ impl ArgvInput {
         let c = self.inner.arguments.len() as i64;
 
         // if input is expecting another argument, add it
-        if self.inner.definition.has_argument(&PhpMixed::Int(c)) {
-            let arg = self.inner.definition.get_argument(&PhpMixed::Int(c))?;
+        if self
+            .inner
+            .definition
+            .has_argument(&ArgumentName::Position(c))
+        {
+            let arg = self
+                .inner
+                .definition
+                .get_argument(&ArgumentName::Position(c))?;
             let value = if arg.is_array() {
-                PhpMixed::List(vec![PhpMixed::String(token.to_string())])
+                InputValue::Array(vec![token.to_string()])
             } else {
-                PhpMixed::String(token.to_string())
+                InputValue::String(token.to_string())
             };
             self.inner
                 .arguments
                 .insert(arg.get_name().to_string(), value);
 
         // if last argument isArray(), append token to last argument
-        } else if self.inner.definition.has_argument(&PhpMixed::Int(c - 1))
+        } else if self
+            .inner
+            .definition
+            .has_argument(&ArgumentName::Position(c - 1))
             && self
                 .inner
                 .definition
-                .get_argument(&PhpMixed::Int(c - 1))?
+                .get_argument(&ArgumentName::Position(c - 1))?
                 .is_array()
         {
-            let arg = self.inner.definition.get_argument(&PhpMixed::Int(c - 1))?;
-            if let Some(PhpMixed::List(list)) = self.inner.arguments.get_mut(arg.get_name()) {
-                list.push(PhpMixed::String(token.to_string()));
+            let arg = self
+                .inner
+                .definition
+                .get_argument(&ArgumentName::Position(c - 1))?;
+            if let Some(InputValue::Array(list)) = self.inner.arguments.get_mut(arg.get_name()) {
+                list.push(token.to_string());
             }
 
         // unexpected argument
         } else {
             let mut all = self.inner.definition.get_arguments().clone();
-            let mut symfony_command_name: Option<PhpMixed> = None;
+            let mut symfony_command_name: Option<InputValue> = None;
             let first_key = all.keys().next().cloned();
             if let Some(key) = &first_key {
                 let input_argument = &all[key];
@@ -265,12 +279,10 @@ impl ArgvInput {
             let message = if !all.is_empty() {
                 let names: Vec<String> = all.keys().cloned().collect();
                 match &symfony_command_name {
-                    Some(symfony_command_name)
-                        if !matches!(symfony_command_name, PhpMixed::Null) =>
-                    {
+                    Some(symfony_command_name) if !symfony_command_name.is_null() => {
                         format!(
                             "Too many arguments to \"{}\" command, expected arguments \"{}\".",
-                            symfony_command_name.clone(),
+                            symfony_command_name.to_php_string(),
                             shirabe_php_shim::implode("\" \"", &names),
                         )
                     }
@@ -281,12 +293,12 @@ impl ArgvInput {
                 }
             } else if symfony_command_name
                 .as_ref()
-                .map(|n| !matches!(n, PhpMixed::Null))
+                .map(|n| !n.is_null())
                 .unwrap_or(false)
             {
                 format!(
                     "No arguments expected for \"{}\" command, got \"{}\".",
-                    symfony_command_name.unwrap(),
+                    symfony_command_name.unwrap().to_php_string(),
                     token,
                 )
             } else {
@@ -300,7 +312,7 @@ impl ArgvInput {
     }
 
     /// Adds a short option value.
-    fn add_short_option(&mut self, shortcut: &str, value: PhpMixed) -> anyhow::Result<()> {
+    fn add_short_option(&mut self, shortcut: &str, value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_shortcut(shortcut) {
             return Err(RuntimeException::new(format!(
                 "The \"-{}\" option does not exist.",
@@ -319,7 +331,7 @@ impl ArgvInput {
     }
 
     /// Adds a long option value.
-    fn add_long_option(&mut self, name: &str, mut value: PhpMixed) -> anyhow::Result<()> {
+    fn add_long_option(&mut self, name: &str, mut value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_option(name) {
             if !self.inner.definition.has_negation(name) {
                 return Err(RuntimeException::new(format!(
@@ -330,7 +342,7 @@ impl ArgvInput {
             }
 
             let option_name = self.inner.definition.negation_to_name(name)?;
-            if !matches!(value, PhpMixed::Null) {
+            if !value.is_null() {
                 return Err(RuntimeException::new(format!(
                     "The \"--{}\" option does not accept a value.",
                     name
@@ -339,14 +351,14 @@ impl ArgvInput {
             }
             self.inner
                 .options
-                .insert(option_name, PhpMixed::Bool(false));
+                .insert(option_name, InputValue::Bool(false));
 
             return Ok(());
         }
 
         let option = self.inner.definition.get_option(name)?;
 
-        if !matches!(value, PhpMixed::Null) && !option.accept_value() {
+        if !value.is_null() && !option.accept_value() {
             return Err(RuntimeException::new(format!(
                 "The \"--{}\" option does not accept a value.",
                 name
@@ -355,8 +367,8 @@ impl ArgvInput {
         }
 
         // in_array($value, ['', null], true)
-        let value_is_empty_or_null = matches!(&value, PhpMixed::String(s) if s.is_empty())
-            || matches!(value, PhpMixed::Null);
+        let value_is_empty_or_null =
+            matches!(&value, InputValue::String(s) if s.is_empty()) || value.is_null();
         if value_is_empty_or_null && option.accept_value() && !self.parsed.is_empty() {
             // if option accepts an optional or mandatory argument
             // let's see if there is one provided
@@ -364,13 +376,13 @@ impl ArgvInput {
             // (isset($next[0]) && '-' !== $next[0]) || in_array($next, ['', null], true)
             let next_first = next.as_bytes().first().copied();
             if (next_first.is_some() && next_first != Some(b'-')) || next.is_empty() {
-                value = PhpMixed::String(next);
+                value = InputValue::String(next);
             } else {
                 self.parsed.insert(0, next);
             }
         }
 
-        if matches!(value, PhpMixed::Null) {
+        if value.is_null() {
             if option.is_value_required() {
                 return Err(RuntimeException::new(format!(
                     "The \"--{}\" option requires a value.",
@@ -380,19 +392,25 @@ impl ArgvInput {
             }
 
             if !option.is_array() && !option.is_value_optional() {
-                value = PhpMixed::Bool(true);
+                value = InputValue::Bool(true);
             }
         }
 
         if option.is_array() {
+            // TODO(type-model): PHP appends the value as it stands, so a
+            // VALUE_OPTIONAL|VALUE_IS_ARRAY option given no value collects a null;
+            // `InputValue::Array` only holds strings.
+            let InputValue::String(value) = value else {
+                panic!("an array option cannot hold {:?}", value)
+            };
             match self.inner.options.get_mut(name) {
-                Some(PhpMixed::List(list)) => {
+                Some(InputValue::Array(list)) => {
                     list.push(value);
                 }
                 _ => {
                     self.inner
                         .options
-                        .insert(name.to_string(), PhpMixed::List(vec![value]));
+                        .insert(name.to_string(), InputValue::Array(vec![value]));
                 }
             }
         } else {
@@ -448,21 +466,19 @@ impl ArgvInput {
         None
     }
 
-    pub fn has_parameter_option(&self, values: PhpMixed, only_params: bool) -> bool {
-        let values = to_array(values);
-
+    pub fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
         for token in &self.tokens {
             if only_params && token == "--" {
                 return false;
             }
-            for value in &values {
+            for value in values {
                 // Options with values:
                 //   For long options, test for '--option=' at beginning
                 //   For short options, test for '-o' at beginning
                 let leading = if value.starts_with("--") {
                     format!("{}=", value)
                 } else {
-                    value.clone()
+                    value.to_string()
                 };
                 if token == value || (!leading.is_empty() && token.starts_with(&leading)) {
                     return true;
@@ -475,11 +491,10 @@ impl ArgvInput {
 
     pub fn get_parameter_option(
         &self,
-        values: PhpMixed,
-        default: PhpMixed,
+        values: &[&str],
+        default: InputValue,
         only_params: bool,
-    ) -> PhpMixed {
-        let values = to_array(values);
+    ) -> InputValue {
         let mut tokens = self.tokens.clone();
 
         while !tokens.is_empty() {
@@ -488,11 +503,11 @@ impl ArgvInput {
                 return default;
             }
 
-            for value in &values {
+            for value in values {
                 if &token == value {
                     return match tokens.first() {
-                        Some(_) => PhpMixed::String(tokens.remove(0)),
-                        None => PhpMixed::Null,
+                        Some(_) => InputValue::String(tokens.remove(0)),
+                        None => InputValue::Null,
                     };
                 }
                 // Options with values:
@@ -501,10 +516,10 @@ impl ArgvInput {
                 let leading = if value.starts_with("--") {
                     format!("{}=", value)
                 } else {
-                    value.clone()
+                    value.to_string()
                 };
                 if !leading.is_empty() && token.starts_with(&leading) {
-                    return PhpMixed::String(shirabe_php_shim::substr(
+                    return InputValue::String(shirabe_php_shim::substr(
                         &token,
                         shirabe_php_shim::strlen(&leading),
                         None,
@@ -553,16 +568,16 @@ impl InputInterface for ArgvInput {
         ArgvInput::get_first_argument(self)
     }
 
-    fn has_parameter_option(&self, values: PhpMixed, only_params: bool) -> bool {
+    fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
         ArgvInput::has_parameter_option(self, values, only_params)
     }
 
     fn get_parameter_option(
         &self,
-        values: PhpMixed,
-        default: PhpMixed,
+        values: &[&str],
+        default: InputValue,
         only_params: bool,
-    ) -> PhpMixed {
+    ) -> InputValue {
         ArgvInput::get_parameter_option(self, values, default, only_params)
     }
 
@@ -574,15 +589,15 @@ impl InputInterface for ArgvInput {
         self.inner.validate()
     }
 
-    fn get_arguments(&self) -> IndexMap<String, PhpMixed> {
+    fn get_arguments(&self) -> IndexMap<String, InputValue> {
         self.inner.get_arguments()
     }
 
-    fn get_argument(&self, name: &str) -> anyhow::Result<PhpMixed> {
+    fn get_argument(&self, name: &str) -> anyhow::Result<InputValue> {
         self.inner.get_argument(name)
     }
 
-    fn set_argument(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+    fn set_argument(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_argument(name, value)
     }
 
@@ -590,15 +605,15 @@ impl InputInterface for ArgvInput {
         self.inner.has_argument(name)
     }
 
-    fn get_options(&self) -> IndexMap<String, PhpMixed> {
+    fn get_options(&self) -> IndexMap<String, InputValue> {
         self.inner.get_options()
     }
 
-    fn get_option(&self, name: &str) -> anyhow::Result<InputOptionValue> {
+    fn get_option(&self, name: &str) -> anyhow::Result<InputValue> {
         self.inner.get_option(name)
     }
 
-    fn set_option(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+    fn set_option(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_option(name, value)
     }
 
@@ -634,21 +649,5 @@ impl StreamableInputInterface for ArgvInput {
 
     fn get_stream(&self) -> Option<shirabe_php_shim::PhpResource> {
         self.inner.get_stream()
-    }
-}
-
-/// PHP `(array) $values` cast: a string becomes a single-element array.
-fn to_array(values: PhpMixed) -> Vec<String> {
-    match values {
-        PhpMixed::List(list) => list
-            .into_iter()
-            .map(|v| shirabe_php_shim::php_to_string(&v))
-            .collect(),
-        PhpMixed::Array(array) => array
-            .into_iter()
-            .map(|(_, v)| shirabe_php_shim::php_to_string(&v))
-            .collect(),
-        PhpMixed::Null => vec![],
-        other => vec![shirabe_php_shim::php_to_string(&other)],
     }
 }

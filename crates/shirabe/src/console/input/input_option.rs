@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Console/Input/InputOption.php
 
 use crate::console::input::SuggestedValues;
-use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_console::completion::CompletionInput;
 use shirabe_symfony_console::completion::CompletionSuggestions;
 use shirabe_symfony_console::input::InputOption as BaseInputOption;
+use shirabe_symfony_console::input::InputValue;
 
 #[derive(Debug)]
 pub struct InputOption {
@@ -21,10 +21,10 @@ impl InputOption {
 
     pub fn new(
         name: &str,
-        shortcut: Option<PhpMixed>,
+        shortcut: Option<&str>,
         mode: Option<i64>,
         description: &str,
-        default: Option<PhpMixed>,
+        default: Option<InputValue>,
     ) -> anyhow::Result<Self> {
         Self::new6(
             name,
@@ -39,16 +39,14 @@ impl InputOption {
     /// PHP's constructor with the sixth parameter, `$suggestedValues`.
     pub fn new6(
         name: &str,
-        shortcut: Option<PhpMixed>,
+        shortcut: Option<&str>,
         mode: Option<i64>,
         description: &str,
-        default: Option<PhpMixed>,
+        default: Option<InputValue>,
         suggested_values: SuggestedValues,
     ) -> anyhow::Result<Self> {
-        let shortcut = shortcut.unwrap_or(PhpMixed::Null);
-        let default_mixed = default.unwrap_or(PhpMixed::Null);
-        let inner =
-            BaseInputOption::new(name, shortcut, mode, description.to_string(), default_mixed)?;
+        let default = default.unwrap_or(InputValue::Null);
+        let inner = BaseInputOption::new(name, shortcut, mode, description.to_string(), default)?;
         // PHP throws LogicException here; suggested values on a valueless option cannot happen
         // at runtime unless a configure() is wrong, so this is a programming error.
         assert!(

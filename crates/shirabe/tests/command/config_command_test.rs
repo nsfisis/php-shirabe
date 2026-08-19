@@ -2,28 +2,32 @@
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 /// `['command' => 'config'] + $command`, with the command name prepended.
-fn config_input(command: Vec<(PhpMixed, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
-    let mut input = vec![(PhpMixed::from("command"), PhpMixed::from("config"))];
+fn config_input(command: Vec<(ParameterName, InputValue)>) -> Vec<(ParameterName, InputValue)> {
+    let mut input = vec![(ParameterName::of("command"), InputValue::from("config"))];
     input.extend(command);
     input
 }
 
-fn key(setting_key: &str) -> (PhpMixed, PhpMixed) {
-    (PhpMixed::from("setting-key"), PhpMixed::from(setting_key))
-}
-
-fn value(values: &[&str]) -> (PhpMixed, PhpMixed) {
+fn key(setting_key: &str) -> (ParameterName, InputValue) {
     (
-        PhpMixed::from("setting-value"),
-        PhpMixed::List(values.iter().map(|v| PhpMixed::from(*v)).collect()),
+        ParameterName::of("setting-key"),
+        InputValue::from(setting_key),
     )
 }
 
-fn flag(name: &str) -> (PhpMixed, PhpMixed) {
-    (PhpMixed::from(name), PhpMixed::Bool(true))
+fn value(values: &[&str]) -> (ParameterName, InputValue) {
+    (
+        ParameterName::of("setting-value"),
+        InputValue::Array(values.iter().map(|v| v.to_string()).collect()),
+    )
+}
+
+fn flag(name: &str) -> (ParameterName, InputValue) {
+    (ParameterName::of(name), InputValue::Bool(true))
 }
 
 /// Reads CWD's composer.json as a `serde_json::Value` (mirrors PHP's `json_decode(..., true)`).
@@ -35,7 +39,7 @@ fn read_composer_json() -> serde_json::Value {
 struct UpdateCase {
     name: &'static str,
     before: serde_json::Value,
-    command: Vec<(PhpMixed, PhpMixed)>,
+    command: Vec<(ParameterName, InputValue)>,
     expected: serde_json::Value,
 }
 
@@ -325,7 +329,7 @@ fn test_config_updates() {
 struct ReadCase {
     name: &'static str,
     composer_json: serde_json::Value,
-    command: Vec<(PhpMixed, PhpMixed)>,
+    command: Vec<(ParameterName, InputValue)>,
     expected: &'static str,
 }
 
@@ -428,8 +432,8 @@ fn test_config_throws_for_invalid_arg_combination() {
     let result = app_tester.run(
         config_input(vec![
             (
-                PhpMixed::from("--file"),
-                PhpMixed::from("alt.composer.json"),
+                ParameterName::of("--file"),
+                InputValue::from("alt.composer.json"),
             ),
             flag("--global"),
         ]),

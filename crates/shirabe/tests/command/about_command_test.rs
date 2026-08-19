@@ -3,7 +3,8 @@
 use crate::test_case::{RunOptions, get_application_tester};
 use serial_test::serial;
 use shirabe::composer;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 #[test]
 #[serial]
@@ -13,7 +14,7 @@ fn test_about() {
     let mut app_tester = get_application_tester();
     let status_code = app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("about"))],
+            vec![(ParameterName::of("command"), InputValue::from("about"))],
             RunOptions::default(),
         )
         .unwrap();

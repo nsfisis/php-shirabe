@@ -3,7 +3,8 @@
 use crate::test_case::{RunOptions, get_application_tester};
 use serial_test::serial;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 fn tear_down() {
     // --no-cache triggers the env to change so make sure the env is cleaned up after these tests run
@@ -26,7 +27,10 @@ fn test_clear_cache_command_success() {
     let mut app_tester = get_application_tester();
     app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("clear-cache"))],
+            vec![(
+                ParameterName::of("command"),
+                InputValue::from("clear-cache"),
+            )],
             RunOptions::default(),
         )
         .unwrap();
@@ -50,8 +54,11 @@ fn test_clear_cache_command_with_option_garbage_collection() {
     app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("clear-cache")),
-                (PhpMixed::from("--gc"), PhpMixed::Bool(true)),
+                (
+                    ParameterName::of("command"),
+                    InputValue::from("clear-cache"),
+                ),
+                (ParameterName::of("--gc"), InputValue::Bool(true)),
             ],
             RunOptions::default(),
         )
@@ -76,8 +83,11 @@ fn test_clear_cache_command_with_option_no_cache() {
     app_tester
         .run(
             vec![
-                (PhpMixed::from("command"), PhpMixed::from("clear-cache")),
-                (PhpMixed::from("--no-cache"), PhpMixed::Bool(true)),
+                (
+                    ParameterName::of("command"),
+                    InputValue::from("clear-cache"),
+                ),
+                (ParameterName::of("--no-cache"), InputValue::Bool(true)),
             ],
             RunOptions::default(),
         )

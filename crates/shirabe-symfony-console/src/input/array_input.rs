@@ -2,13 +2,13 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::exception::InvalidOptionException;
+use crate::input::ArgumentName;
 use crate::input::Input;
 use crate::input::InputDefinition;
 use crate::input::InputInterface;
-use crate::input::InputOptionValue;
+use crate::input::InputValue;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
 
 /// ArrayInput represents an input provided as an array.
 ///
@@ -19,16 +19,16 @@ use shirabe_php_shim::PhpMixed;
 /// ```
 ///
 /// PHP arrays can mix integer and string keys; `parameters` preserves both the
-/// key type (`PhpMixed::Int` / `PhpMixed::String`) and the insertion order.
+/// key type and the insertion order.
 #[derive(Debug, Clone)]
 pub struct ArrayInput {
     inner: Input,
-    parameters: Vec<(PhpMixed, PhpMixed)>,
+    parameters: Vec<(ParameterName, InputValue)>,
 }
 
 impl ArrayInput {
     pub fn new(
-        parameters: Vec<(PhpMixed, PhpMixed)>,
+        parameters: Vec<(ParameterName, InputValue)>,
         definition: Option<InputDefinition>,
     ) -> anyhow::Result<Self> {
         let mut array_input = ArrayInput {
@@ -58,10 +58,10 @@ impl ArrayInput {
         Ok(())
     }
 
-    pub fn get_first_argument(&self) -> Option<PhpMixed> {
+    pub fn get_first_argument(&self) -> Option<InputValue> {
         for (param, value) in &self.parameters {
             // $param && \is_string($param) && '-' === $param[0]
-            if let PhpMixed::String(param) = param
+            if let ParameterName::Name(param) = param
                 && !param.is_empty()
                 && param.as_bytes()[0] == b'-'
             {
@@ -74,21 +74,19 @@ impl ArrayInput {
         None
     }
 
-    pub fn has_parameter_option(&self, values: PhpMixed, only_params: bool) -> bool {
-        let values = to_array(values);
-
+    pub fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
         for (k, v) in &self.parameters {
             // if (!\is_int($k)) { $v = $k; }
-            let v: PhpMixed = match k {
-                PhpMixed::Int(_) => v.clone(),
-                _ => k.clone(),
+            let v = match k {
+                ParameterName::Index(_) => v.as_string(),
+                ParameterName::Name(k) => Some(k.as_str()),
             };
 
-            if only_params && matches!(&v, PhpMixed::String(s) if s == "--") {
+            if only_params && v == Some("--") {
                 return false;
             }
 
-            if values.iter().any(|x| x == &v) {
+            if v.is_some_and(|v| values.contains(&v)) {
                 return true;
             }
         }
@@ -98,31 +96,29 @@ impl ArrayInput {
 
     pub fn get_parameter_option(
         &self,
-        values: PhpMixed,
-        default: PhpMixed,
+        values: &[&str],
+        default: InputValue,
         only_params: bool,
-    ) -> PhpMixed {
-        let values = to_array(values);
-
+    ) -> InputValue {
         for (k, v) in &self.parameters {
             // $onlyParams && ('--' === $k || (\is_int($k) && '--' === $v))
             if only_params {
-                let k_is_double_dash = matches!(k, PhpMixed::String(s) if s == "--");
+                let k_is_double_dash = matches!(k, ParameterName::Name(k) if k == "--");
                 let int_v_double_dash =
-                    matches!(k, PhpMixed::Int(_)) && matches!(v, PhpMixed::String(s) if s == "--");
+                    matches!(k, ParameterName::Index(_)) && v.as_string() == Some("--");
                 if k_is_double_dash || int_v_double_dash {
                     return default;
                 }
             }
 
             match k {
-                PhpMixed::Int(_) => {
-                    if values.iter().any(|x| x == v) {
-                        return PhpMixed::Bool(true);
+                ParameterName::Index(_) => {
+                    if v.as_string().is_some_and(|v| values.contains(&v)) {
+                        return InputValue::Bool(true);
                     }
                 }
-                _ => {
-                    if values.iter().any(|x| x == k) {
+                ParameterName::Name(k) => {
+                    if values.contains(&k.as_str()) {
                         return v.clone();
                     }
                 }
@@ -136,16 +132,17 @@ impl ArrayInput {
         // Clone to avoid borrowing self while mutating; PHP iterates over a copy semantically.
         let parameters = self.parameters.clone();
         for (key, value) in parameters {
-            let key = shirabe_php_shim::php_to_string(&key);
-            if key == "--" {
+            // PHP compares the key as a string even when it is an int.
+            let key_string = key.to_string();
+            if key_string == "--" {
                 return Ok(());
             }
-            if key.starts_with("--") {
-                self.add_long_option(&shirabe_php_shim::substr(&key, 2, None), value)?;
-            } else if key.starts_with("-") {
-                self.add_short_option(&shirabe_php_shim::substr(&key, 1, None), value)?;
+            if key_string.starts_with("--") {
+                self.add_long_option(&shirabe_php_shim::substr(&key_string, 2, None), value)?;
+            } else if key_string.starts_with("-") {
+                self.add_short_option(&shirabe_php_shim::substr(&key_string, 1, None), value)?;
             } else {
-                self.add_argument(&PhpMixed::String(key), value)?;
+                self.add_argument(&key.to_argument_name(), value)?;
             }
         }
 
@@ -153,7 +150,7 @@ impl ArrayInput {
     }
 
     /// Adds a short option value.
-    fn add_short_option(&mut self, shortcut: &str, value: PhpMixed) -> anyhow::Result<()> {
+    fn add_short_option(&mut self, shortcut: &str, value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_shortcut(shortcut) {
             return Err(InvalidOptionException::new(format!(
                 "The \"-{}\" option does not exist.",
@@ -172,7 +169,7 @@ impl ArrayInput {
     }
 
     /// Adds a long option value.
-    fn add_long_option(&mut self, name: &str, mut value: PhpMixed) -> anyhow::Result<()> {
+    fn add_long_option(&mut self, name: &str, mut value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_option(name) {
             if !self.inner.definition.has_negation(name) {
                 return Err(InvalidOptionException::new(format!(
@@ -185,14 +182,14 @@ impl ArrayInput {
             let option_name = self.inner.definition.negation_to_name(name)?;
             self.inner
                 .options
-                .insert(option_name, PhpMixed::Bool(false));
+                .insert(option_name, InputValue::Bool(false));
 
             return Ok(());
         }
 
         let option = self.inner.definition.get_option(name)?;
 
-        if matches!(value, PhpMixed::Null) {
+        if value.is_null() {
             if option.is_value_required() {
                 return Err(InvalidOptionException::new(format!(
                     "The \"--{}\" option requires a value.",
@@ -202,7 +199,7 @@ impl ArrayInput {
             }
 
             if !option.is_value_optional() {
-                value = PhpMixed::Bool(true);
+                value = InputValue::Bool(true);
             }
         }
 
@@ -212,18 +209,16 @@ impl ArrayInput {
     }
 
     /// Adds an argument value.
-    fn add_argument(&mut self, name: &PhpMixed, value: PhpMixed) -> anyhow::Result<()> {
+    fn add_argument(&mut self, name: &ArgumentName, value: InputValue) -> anyhow::Result<()> {
         if !self.inner.definition.has_argument(name) {
             return Err(InvalidArgumentException::new(format!(
                 "The \"{}\" argument does not exist.",
-                name.clone()
+                name
             ))
             .into());
         }
 
-        self.inner
-            .arguments
-            .insert(shirabe_php_shim::php_to_string(name), value);
+        self.inner.arguments.insert(name.to_string(), value);
 
         Ok(())
     }
@@ -235,30 +230,29 @@ impl std::fmt::Display for ArrayInput {
         let mut params: Vec<String> = vec![];
         for (param, val) in &self.parameters {
             // $param && \is_string($param) && '-' === $param[0]
-            let is_option_key =
-                matches!(param, PhpMixed::String(s) if !s.is_empty() && s.as_bytes()[0] == b'-');
-            if is_option_key {
-                let param = param.as_string().unwrap();
+            if let ParameterName::Name(param) = param
+                && !param.is_empty()
+                && param.as_bytes()[0] == b'-'
+            {
                 let glue = if param.as_bytes().get(1) == Some(&b'-') {
                     "="
                 } else {
                     " "
                 };
-                if let PhpMixed::List(list) = val {
+                if let InputValue::Array(list) = val {
                     for v in list {
-                        let v = shirabe_php_shim::php_to_string(v);
                         params.push(format!(
                             "{}{}",
                             param,
                             if !v.is_empty() {
-                                format!("{}{}", glue, self.inner.escape_token(&v))
+                                format!("{}{}", glue, self.inner.escape_token(v))
                             } else {
                                 String::new()
                             }
                         ));
                     }
                 } else {
-                    let val = shirabe_php_shim::php_to_string(val);
+                    let val = val.to_php_string();
                     params.push(format!(
                         "{}{}",
                         param,
@@ -269,17 +263,12 @@ impl std::fmt::Display for ArrayInput {
                         }
                     ));
                 }
-            } else if let PhpMixed::List(list) = val {
-                let escaped: Vec<String> = list
-                    .iter()
-                    .map(|v| self.inner.escape_token(&shirabe_php_shim::php_to_string(v)))
-                    .collect();
+            } else if let InputValue::Array(list) = val {
+                let escaped: Vec<String> =
+                    list.iter().map(|v| self.inner.escape_token(v)).collect();
                 params.push(shirabe_php_shim::implode(" ", &escaped));
             } else {
-                params.push(
-                    self.inner
-                        .escape_token(&shirabe_php_shim::php_to_string(val)),
-                );
+                params.push(self.inner.escape_token(&val.to_php_string()));
             }
         }
 
@@ -293,19 +282,19 @@ impl InputInterface for ArrayInput {
     }
 
     fn get_first_argument(&self) -> Option<String> {
-        ArrayInput::get_first_argument(self).map(|v| shirabe_php_shim::php_to_string(&v))
+        ArrayInput::get_first_argument(self).map(|v| v.to_php_string())
     }
 
-    fn has_parameter_option(&self, values: PhpMixed, only_params: bool) -> bool {
+    fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
         ArrayInput::has_parameter_option(self, values, only_params)
     }
 
     fn get_parameter_option(
         &self,
-        values: PhpMixed,
-        default: PhpMixed,
+        values: &[&str],
+        default: InputValue,
         only_params: bool,
-    ) -> PhpMixed {
+    ) -> InputValue {
         ArrayInput::get_parameter_option(self, values, default, only_params)
     }
 
@@ -317,15 +306,15 @@ impl InputInterface for ArrayInput {
         self.inner.validate()
     }
 
-    fn get_arguments(&self) -> IndexMap<String, PhpMixed> {
+    fn get_arguments(&self) -> IndexMap<String, InputValue> {
         self.inner.get_arguments()
     }
 
-    fn get_argument(&self, name: &str) -> anyhow::Result<PhpMixed> {
+    fn get_argument(&self, name: &str) -> anyhow::Result<InputValue> {
         self.inner.get_argument(name)
     }
 
-    fn set_argument(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+    fn set_argument(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_argument(name, value)
     }
 
@@ -333,15 +322,15 @@ impl InputInterface for ArrayInput {
         self.inner.has_argument(name)
     }
 
-    fn get_options(&self) -> IndexMap<String, PhpMixed> {
+    fn get_options(&self) -> IndexMap<String, InputValue> {
         self.inner.get_options()
     }
 
-    fn get_option(&self, name: &str) -> anyhow::Result<InputOptionValue> {
+    fn get_option(&self, name: &str) -> anyhow::Result<InputValue> {
         self.inner.get_option(name)
     }
 
-    fn set_option(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+    fn set_option(&mut self, name: &str, value: InputValue) -> anyhow::Result<()> {
         self.inner.set_option(name, value)
     }
 
@@ -376,12 +365,32 @@ impl StreamableInputInterface for ArrayInput {
     }
 }
 
-/// PHP `(array) $values` cast: a string becomes a single-element array.
-fn to_array(values: PhpMixed) -> Vec<PhpMixed> {
-    match values {
-        PhpMixed::List(list) => list.into_iter().collect(),
-        PhpMixed::Array(array) => array.into_iter().map(|(_, v)| v).collect(),
-        PhpMixed::Null => vec![],
-        other => vec![other],
+/// The `string|int` key of an [`ArrayInput`] parameter: a named argument, a named option
+/// (`--foo` / `-f`), or the position of a bare token.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParameterName {
+    Name(String),
+    Index(i64),
+}
+
+impl ParameterName {
+    pub fn of(name: &str) -> Self {
+        Self::Name(name.to_string())
+    }
+
+    fn to_argument_name(&self) -> ArgumentName {
+        match self {
+            Self::Name(name) => ArgumentName::Name(name.clone()),
+            Self::Index(index) => ArgumentName::Position(*index),
+        }
+    }
+}
+
+impl std::fmt::Display for ParameterName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Name(name) => write!(f, "{}", name),
+            Self::Index(index) => write!(f, "{}", index),
+        }
     }
 }

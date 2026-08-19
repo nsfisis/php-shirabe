@@ -6,6 +6,7 @@ mod input_aware_interface;
 mod input_definition;
 mod input_interface;
 mod input_option;
+mod input_value;
 mod streamable_input_interface;
 mod string_input;
 
@@ -17,5 +18,6 @@ pub use input_aware_interface::*;
 pub use input_definition::*;
 pub use input_interface::*;
 pub use input_option::*;
+pub use input_value::*;
 pub use streamable_input_interface::*;
 pub use string_input::*;

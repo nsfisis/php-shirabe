@@ -6,6 +6,8 @@ use shirabe::command::init_command::InitCommand;
 use shirabe::json::JsonFile;
 use shirabe::util::platform::Platform;
 use shirabe_php_shim::{PHP_SERVER, PhpMixed};
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 use tempfile::TempDir;
 
 fn set_up() {
@@ -33,23 +35,28 @@ fn read_composer_json(dir: &std::path::Path) -> serde_json::Value {
 }
 
 /// `['command' => 'init', '--no-interaction' => true] + $arguments`.
-fn non_interactive_input(arguments: Vec<(PhpMixed, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
+fn non_interactive_input(
+    arguments: Vec<(ParameterName, InputValue)>,
+) -> Vec<(ParameterName, InputValue)> {
     let mut input = vec![
-        (PhpMixed::from("command"), PhpMixed::from("init")),
-        (PhpMixed::from("--no-interaction"), PhpMixed::Bool(true)),
+        (ParameterName::of("command"), InputValue::from("init")),
+        (
+            ParameterName::of("--no-interaction"),
+            InputValue::Bool(true),
+        ),
     ];
     input.extend(arguments);
     input
 }
 
-fn opt(name: &str, value: &str) -> (PhpMixed, PhpMixed) {
-    (PhpMixed::from(name), PhpMixed::from(value))
+fn opt(name: &str, value: &str) -> (ParameterName, InputValue) {
+    (ParameterName::of(name), InputValue::from(value))
 }
 
-fn opt_list(name: &str, values: &[&str]) -> (PhpMixed, PhpMixed) {
+fn opt_list(name: &str, values: &[&str]) -> (ParameterName, InputValue) {
     (
-        PhpMixed::from(name),
-        PhpMixed::List(values.iter().map(|v| PhpMixed::from(*v)).collect()),
+        ParameterName::of(name),
+        InputValue::Array(values.iter().map(|v| v.to_string()).collect()),
     )
 }
 
@@ -158,7 +165,7 @@ fn test_namespace_from_missing_package_name() {
     assert_eq!(None, namespace);
 }
 
-fn run_data_provider() -> Vec<(serde_json::Value, Vec<(PhpMixed, PhpMixed)>)> {
+fn run_data_provider() -> Vec<(serde_json::Value, Vec<(ParameterName, InputValue)>)> {
     vec![
         // name argument
         (
@@ -382,7 +389,7 @@ enum InvalidExpectation {
     StderrMatches(&'static str),
 }
 
-fn run_invalid_data_provider() -> Vec<(InvalidExpectation, Vec<(PhpMixed, PhpMixed)>)> {
+fn run_invalid_data_provider() -> Vec<(InvalidExpectation, Vec<(ParameterName, InputValue)>)> {
     vec![
         // invalid name argument
         (
@@ -547,7 +554,7 @@ fn test_interactive_run() {
 
     app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("init"))],
+            vec![(ParameterName::of("command"), InputValue::from("init"))],
             RunOptions::default(),
         )
         .unwrap();

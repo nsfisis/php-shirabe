@@ -144,7 +144,7 @@ impl Command for HomeCommand {
             .into(),
             InputOption::new(
                 "homepage",
-                Some(shirabe_php_shim::PhpMixed::String("H".to_string())),
+                Some("H"),
                 Some(InputOption::VALUE_NONE),
                 "Open the homepage instead of the repository URL.",
                 None,
@@ -153,7 +153,7 @@ impl Command for HomeCommand {
             .into(),
             InputOption::new(
                 "show",
-                Some(shirabe_php_shim::PhpMixed::String("s".to_string())),
+                Some("s"),
                 Some(InputOption::VALUE_NONE),
                 "Only show the homepage or repository URL.",
                 None,
@@ -183,12 +183,8 @@ impl Command for HomeCommand {
         let packages: Vec<String> = input
             .borrow()
             .get_argument("packages")?
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
+            .as_array()
+            .map(<[String]>::to_vec)
             .unwrap_or_default();
 
         let packages = if packages.is_empty() {

@@ -21,6 +21,7 @@ use shirabe_php_shim::{PhpMixed, UnexpectedValueException, impl_php_class, preg_
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::InvalidArgumentException;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -93,7 +94,7 @@ impl Command for RemoveCommand {
         None,
         Some(InputOption::VALUE_REQUIRED),
         "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
-        Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string())),
+        Some(InputValue::String(Auditor::FORMAT_SUMMARY.to_string())),
         SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
         InputOption::new("no-security-blocking",
         None,
@@ -106,12 +107,12 @@ impl Command for RemoveCommand {
         "Run the dependency update with the --no-dev option.",
         None).unwrap().into(),
         InputOption::new("update-with-dependencies",
-        Some(PhpMixed::String("w".to_string())),
+        Some("w"),
         Some(InputOption::VALUE_NONE),
         "Allows inherited dependencies to be updated with explicit dependencies (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var). (Deprecated, is now default behavior)",
         None).unwrap().into(),
         InputOption::new("update-with-all-dependencies",
-        Some(PhpMixed::String("W".to_string())),
+        Some("W"),
         Some(InputOption::VALUE_NONE),
         "Allows all inherited dependencies to be updated, including those that are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).",
         None).unwrap().into(),
@@ -126,7 +127,7 @@ impl Command for RemoveCommand {
         "Does not allow inherited dependencies to be updated with explicit dependencies.",
         None).unwrap().into(),
         InputOption::new("minimal-changes",
-        Some(PhpMixed::String("m".to_string())),
+        Some("m"),
         Some(InputOption::VALUE_NONE),
         "During an update with -w/-W, only perform absolutely necessary changes to transitive dependencies (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).",
         None).unwrap().into(),
@@ -146,12 +147,12 @@ impl Command for RemoveCommand {
         "Ignore all platform requirements (php & ext- packages).",
         None).unwrap().into(),
         InputOption::new("optimize-autoloader",
-        Some(PhpMixed::String("o".to_string())),
+        Some("o"),
         Some(InputOption::VALUE_NONE),
         "Optimize autoloader during autoloader dump",
         None).unwrap().into(),
         InputOption::new("classmap-authoritative",
-        Some(PhpMixed::String("a".to_string())),
+        Some("a"),
         Some(InputOption::VALUE_NONE),
         "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.",
         None).unwrap().into(),
@@ -183,8 +184,8 @@ impl Command for RemoveCommand {
         if input
             .borrow()
             .get_argument("packages")?
-            .as_list()
-            .map(|l| l.is_empty())
+            .as_array()
+            .map(<[String]>::is_empty)
             .unwrap_or(true)
             && !input
                 .borrow()
@@ -201,12 +202,8 @@ impl Command for RemoveCommand {
         let mut packages: Vec<String> = input
             .borrow()
             .get_argument("packages")?
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(strtolower))
-                    .collect()
-            })
+            .as_array()
+            .map(|l| l.iter().map(|v| strtolower(v)).collect())
             .unwrap_or_default();
 
         if input

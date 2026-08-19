@@ -189,7 +189,7 @@ impl Command for ValidateCommand {
             .into(),
             InputOption::new(
                 "with-dependencies",
-                Some(shirabe_php_shim::PhpMixed::String("A".to_string())),
+                Some("A"),
                 Some(InputOption::VALUE_NONE),
                 "Also validate the composer.json of all installed dependencies",
                 None,

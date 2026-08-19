@@ -9,6 +9,7 @@ mod test_case;
 
 use config_stub::ConfigStubBuilder;
 use serial_test::serial;
+use shirabe_symfony_console::input::InputValue;
 use test_case::{get_package, get_version_constraint};
 
 use indexmap::IndexMap;
@@ -52,7 +53,6 @@ use shirabe_symfony_console::command::CommandData;
 use shirabe_symfony_console::input::InputArgument;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::input::InputOption;
-use shirabe_symfony_console::input::InputOptionValue;
 use shirabe_symfony_console::input::StringInput;
 use shirabe_symfony_console::output::StreamOutput;
 use shirabe_symfony_console::output::{OutputInterface, VERBOSITY_NORMAL};
@@ -829,9 +829,9 @@ fn ignore_platform_reqs_value(input: &dyn InputInterface) -> PhpMixed {
     }
     let list = input
         .get_option("ignore-platform-req")
-        .unwrap_or(InputOptionValue::Bool(false));
+        .unwrap_or(InputValue::Bool(false));
     match &list {
-        InputOptionValue::Array(items) if !items.is_empty() => list.into(),
+        InputValue::Array(items) if !items.is_empty() => list.into(),
         _ => PhpMixed::Bool(false),
     }
 }
@@ -970,37 +970,37 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         install_ref
             .add_option(
                 "ignore-platform-reqs",
-                PhpMixed::Null,
+                None,
                 Some(InputOption::VALUE_NONE),
                 "",
-                PhpMixed::Null,
+                InputValue::Null,
             )
             .unwrap();
         install_ref
             .add_option(
                 "ignore-platform-req",
-                PhpMixed::Null,
+                None,
                 Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
                 "",
-                PhpMixed::Null,
+                InputValue::Null,
             )
             .unwrap();
         install_ref
             .add_option(
                 "no-dev",
-                PhpMixed::Null,
+                None,
                 Some(InputOption::VALUE_NONE),
                 "",
-                PhpMixed::Null,
+                InputValue::Null,
             )
             .unwrap();
         install_ref
             .add_option(
                 "dry-run",
-                PhpMixed::Null,
+                None,
                 Some(InputOption::VALUE_NONE),
                 "",
-                PhpMixed::Null,
+                InputValue::Null,
             )
             .unwrap();
         let installer_cl = installer.clone();
@@ -1053,16 +1053,16 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
             ("prefer-lowest", InputOption::VALUE_NONE),
         ] {
             update_ref
-                .add_option(name, PhpMixed::Null, Some(mode), "", PhpMixed::Null)
+                .add_option(name, None, Some(mode), "", InputValue::Null)
                 .unwrap();
         }
         update_ref
             .add_option(
                 "ignore-platform-req",
-                PhpMixed::Null,
+                None,
                 Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY),
                 "",
-                PhpMixed::Null,
+                InputValue::Null,
             )
             .unwrap();
         update_ref
@@ -1070,7 +1070,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
                 "packages",
                 Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL),
                 "",
-                PhpMixed::Null,
+                InputValue::Null,
             )
             .unwrap();
         let installer_cl = installer;
@@ -1078,11 +1078,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         let run_result_cl = run_result.clone();
         update_ref.set_code(Box::new(move |input, _output| {
             let packages: Vec<String> =
-                match input.get_argument("packages").unwrap_or(PhpMixed::Null) {
-                    PhpMixed::List(items) => items
-                        .into_iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                        .collect(),
+                match input.get_argument("packages").unwrap_or(InputValue::Null) {
+                    InputValue::Array(items) => items,
                     _ => vec![],
                 };
             let filtered: Vec<String> = packages

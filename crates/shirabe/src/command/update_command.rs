@@ -37,6 +37,7 @@ use shirabe_semver::constraint::MultiConstraint;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::helper::Table;
 use shirabe_symfony_console::input::InputInterface;
+use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
@@ -271,27 +272,27 @@ impl Command for UpdateCommand {
             InputOption::new("lock", None, Some(InputOption::VALUE_NONE), "Overwrites the lock file hash to suppress warning about the lock file being out of date without updating package versions. Package metadata like mirrors and URLs are updated if they changed.", None).unwrap().into(),
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Skip the install step after updating the composer.lock file.", None).unwrap().into(),
             InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(PhpMixed::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
             InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
             InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
             InputOption::new("no-suggest", None, Some(InputOption::VALUE_NONE), "DEPRECATED: This flag does not exist anymore.", None).unwrap().into(),
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
-            InputOption::new("with-dependencies", Some(PhpMixed::String("w".to_string())), Some(InputOption::VALUE_NONE), "Update also dependencies of packages in the argument list, except those which are root requirements (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var).", None).unwrap().into(),
-            InputOption::new("with-all-dependencies", Some(PhpMixed::String("W".to_string())), Some(InputOption::VALUE_NONE), "Update also dependencies of packages in the argument list, including those which are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).", None).unwrap().into(),
-            InputOption::new("verbose", Some(PhpMixed::String("v|vv|vvv".to_string())), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
-            InputOption::new("optimize-autoloader", Some(PhpMixed::String("o".to_string())), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump.", None).unwrap().into(),
-            InputOption::new("classmap-authoritative", Some(PhpMixed::String("a".to_string())), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
+            InputOption::new("with-dependencies", Some("w"), Some(InputOption::VALUE_NONE), "Update also dependencies of packages in the argument list, except those which are root requirements (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var).", None).unwrap().into(),
+            InputOption::new("with-all-dependencies", Some("W"), Some(InputOption::VALUE_NONE), "Update also dependencies of packages in the argument list, including those which are root requirements (can also be set via the COMPOSER_WITH_ALL_DEPENDENCIES=1 env var).", None).unwrap().into(),
+            InputOption::new("verbose", Some("v|vv|vvv"), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
+            InputOption::new("optimize-autoloader", Some("o"), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump.", None).unwrap().into(),
+            InputOption::new("classmap-authoritative", Some("a"), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
             InputOption::new("apcu-autoloader", None, Some(InputOption::VALUE_NONE), "Use APCu to cache found/not-found classes.", None).unwrap().into(),
             InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
             InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
             InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
             InputOption::new("prefer-stable", None, Some(InputOption::VALUE_NONE), "Prefer stable versions of dependencies (can also be set via the COMPOSER_PREFER_STABLE=1 env var).", None).unwrap().into(),
             InputOption::new("prefer-lowest", None, Some(InputOption::VALUE_NONE), "Prefer lowest versions of dependencies (can also be set via the COMPOSER_PREFER_LOWEST=1 env var).", None).unwrap().into(),
-            InputOption::new("minimal-changes", Some(PhpMixed::String("m".to_string())), Some(InputOption::VALUE_NONE), "Only perform absolutely necessary changes to dependencies. If packages cannot be kept at their currently locked version they are updated. For partial updates the allow-listed packages are always updated fully. (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).", None).unwrap().into(),
+            InputOption::new("minimal-changes", Some("m"), Some(InputOption::VALUE_NONE), "Only perform absolutely necessary changes to dependencies. If packages cannot be kept at their currently locked version they are updated. For partial updates the allow-listed packages are always updated fully. (can also be set via the COMPOSER_MINIMAL_CHANGES=1 env var).", None).unwrap().into(),
             InputOption::new("patch-only", None, Some(InputOption::VALUE_NONE), "Only allow patch version updates for currently installed dependencies.", None).unwrap().into(),
-            InputOption::new("interactive", Some(PhpMixed::String("i".to_string())), Some(InputOption::VALUE_NONE), "Interactive interface with autocompletion to select the packages to update.", None).unwrap().into(),
+            InputOption::new("interactive", Some("i"), Some(InputOption::VALUE_NONE), "Interactive interface with autocompletion to select the packages to update.", None).unwrap().into(),
             InputOption::new("root-reqs", None, Some(InputOption::VALUE_NONE), "Restricts the update to your first degree dependencies.", None).unwrap().into(),
-            InputOption::new6("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(PhpMixed::Bool(false)), crate::console::input::SuggestedValues::List(vec!["dev".to_string(), "no-dev".to_string(), "all".to_string()])).unwrap().into(),
+            InputOption::new6("bump-after-update", None, Some(InputOption::VALUE_OPTIONAL), "Runs bump after performing the update.", Some(InputValue::Bool(false)), crate::console::input::SuggestedValues::List(vec!["dev".to_string(), "no-dev".to_string(), "all".to_string()])).unwrap().into(),
         ]);
         self.set_help(
             "The <info>update</info> command reads the composer.json file from the\n\
@@ -354,12 +355,8 @@ impl Command for UpdateCommand {
         let mut packages: Vec<String> = input
             .borrow()
             .get_argument("packages")?
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
+            .as_array()
+            .map(<[String]>::to_vec)
             .unwrap_or_default();
         let mut reqs: IndexMap<String, String> = self.format_requirements(
             input
@@ -731,12 +728,8 @@ impl Command for UpdateCommand {
                     input
                         .borrow()
                         .get_argument("packages")?
-                        .as_list()
-                        .map(|l| {
-                            l.iter()
-                                .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                                .collect()
-                        })
+                        .as_array()
+                        .map(<[String]>::to_vec)
                         .unwrap_or_default(),
                     "--bump-after-update=dev".to_string(),
                 )?;

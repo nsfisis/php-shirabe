@@ -7,12 +7,13 @@ use crate::test_case::{
 use serial_test::serial;
 use shirabe::json::JsonFile;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::PhpMixed;
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 /// ref: BumpCommandTest::testBump (data provider rolled into one body).
 fn run_bump_case(
     composer_json: serde_json::Value,
-    command: &[(&str, PhpMixed)],
+    command: &[(&str, InputValue)],
     expected: serde_json::Value,
     lock: bool,
     exit_code: i32,
@@ -31,10 +32,10 @@ fn run_bump_case(
         create_composer_lock(&packages, &dev_packages);
     }
 
-    let mut input: Vec<(PhpMixed, PhpMixed)> =
-        vec![(PhpMixed::from("command"), PhpMixed::from("bump"))];
+    let mut input: Vec<(ParameterName, InputValue)> =
+        vec![(ParameterName::of("command"), InputValue::from("bump"))];
     for (k, v) in command {
-        input.push((PhpMixed::from(*k), v.clone()));
+        input.push((ParameterName::of(k), v.clone()));
     }
 
     let mut app_tester = get_application_tester();
@@ -74,7 +75,7 @@ fn test_bump() {
             "require": { "first/pkg": "^2.0", "second/pkg": "3.*" },
             "require-dev": { "dev/pkg": "~2.0" },
         }),
-        &[("--dev-only", PhpMixed::from(true))],
+        &[("--dev-only", InputValue::from(true))],
         serde_json::json!({
             "require": { "first/pkg": "^2.0", "second/pkg": "3.*" },
             "require-dev": { "dev/pkg": "^2.3.4.5" },
@@ -89,7 +90,7 @@ fn test_bump() {
             "require": { "first/pkg": "^2.0", "second/pkg": "3.*" },
             "require-dev": { "dev/pkg": "~2.0" },
         }),
-        &[("--no-dev-only", PhpMixed::from(true))],
+        &[("--no-dev-only", InputValue::from(true))],
         serde_json::json!({
             "require": { "first/pkg": "^2.3.4", "second/pkg": "^3.4" },
             "require-dev": { "dev/pkg": "~2.0" },
@@ -106,10 +107,7 @@ fn test_bump() {
         }),
         &[(
             "packages",
-            PhpMixed::List(vec![
-                PhpMixed::from("first/pkg:3.0.1"),
-                PhpMixed::from("dev/*"),
-            ]),
+            InputValue::Array(vec!["first/pkg:3.0.1".to_string(), "dev/*".to_string()]),
         )],
         serde_json::json!({
             "require": { "first/pkg": "^2.3.4", "second/pkg": "3.*" },
@@ -138,7 +136,7 @@ fn test_bump() {
             "require": { "first/pkg": "^2.0", "second/pkg": "3.*" },
             "require-dev": { "dev/pkg": "~2.0" },
         }),
-        &[("--dry-run", PhpMixed::from(true))],
+        &[("--dry-run", InputValue::from(true))],
         serde_json::json!({
             "require": { "first/pkg": "^2.0", "second/pkg": "3.*" },
             "require-dev": { "dev/pkg": "~2.0" },
@@ -153,7 +151,7 @@ fn test_bump() {
             "require": { "first/pkg": "^2.3.4", "second/pkg": "^3.4" },
             "require-dev": { "dev/pkg": "^2.3.4.5" },
         }),
-        &[("--dry-run", PhpMixed::from(true))],
+        &[("--dry-run", InputValue::from(true))],
         serde_json::json!({
             "require": { "first/pkg": "^2.3.4", "second/pkg": "^3.4" },
             "require-dev": { "dev/pkg": "^2.3.4.5" },
@@ -214,7 +212,7 @@ fn test_bump_fails_on_non_existing_composer_file() {
     let mut app_tester = get_application_tester();
     let status_code = app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("bump"))],
+            vec![(ParameterName::of("command"), InputValue::from("bump"))],
             RunOptions {
                 capture_stderr_separately: true,
                 ..RunOptions::default()
@@ -248,7 +246,7 @@ fn test_bump_fails_on_write_error_to_composer_file() {
     let mut app_tester = get_application_tester();
     let status_code = app_tester
         .run(
-            vec![(PhpMixed::from("command"), PhpMixed::from("bump"))],
+            vec![(ParameterName::of("command"), InputValue::from("bump"))],
             RunOptions {
                 capture_stderr_separately: true,
                 ..RunOptions::default()

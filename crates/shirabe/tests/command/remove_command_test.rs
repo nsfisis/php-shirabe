@@ -9,18 +9,19 @@ use serial_test::serial;
 use shirabe::json::JsonFile;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
+use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::ParameterName;
 
 // Symfony\Component\Console\Command\Command exit codes.
 const SUCCESS: i32 = 0;
 const FAILURE: i32 = 1;
 const INVALID: i32 = 2;
 
-fn input(pairs: Vec<(&str, PhpMixed)>) -> Vec<(PhpMixed, PhpMixed)> {
+fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs
         .into_iter()
-        .map(|(k, v)| (PhpMixed::from(k), v))
+        .map(|(k, v)| (ParameterName::of(k), v))
         .collect()
 }
 
@@ -47,7 +48,7 @@ fn test_exception_running_with_no_remove_packages() {
     let mut app_tester = get_application_tester();
     let err = app_tester
         .run(
-            input(vec![("command", PhpMixed::from("remove"))]),
+            input(vec![("command", InputValue::from("remove"))]),
             RunOptions::default(),
         )
         .expect_err("expected InvalidArgumentException for missing packages argument");
@@ -68,8 +69,8 @@ fn test_exception_when_running_unused_without_lock_file() {
     let err = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("--unused", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("--unused", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -94,10 +95,10 @@ fn test_warning_when_removing_non_existent_package() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
+                ("command", InputValue::from("remove")),
                 (
                     "packages",
-                    PhpMixed::List(vec![PhpMixed::from("vendor1/package1")]),
+                    InputValue::Array(vec!["vendor1/package1".to_string()]),
                 ),
             ]),
             RunOptions::default(),
@@ -131,11 +132,11 @@ fn test_warning_when_removing_package_from_wrong_type() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("packages", PhpMixed::List(vec![PhpMixed::from("root/req")])),
-                ("--dev", PhpMixed::from(true)),
-                ("--no-update", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("--dev", InputValue::from(true)),
+                ("--no-update", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -170,11 +171,11 @@ fn test_warning_when_removing_package_with_deprecated_dependencies_flag() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("packages", PhpMixed::List(vec![PhpMixed::from("root/req")])),
-                ("--update-with-dependencies", PhpMixed::from(true)),
-                ("--no-update", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("--update-with-dependencies", InputValue::from(true)),
+                ("--no-update", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -238,10 +239,10 @@ fn test_message_output_when_no_unused_packages_to_remove() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("--unused", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("--unused", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -286,10 +287,10 @@ fn test_remove_unused_package() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("--unused", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("--unused", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -355,10 +356,10 @@ fn test_remove_package_by_name() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("packages", PhpMixed::List(vec![PhpMixed::from("root/req")])),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -436,11 +437,11 @@ fn test_remove_package_by_name_with_dry_run() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("packages", PhpMixed::List(vec![PhpMixed::from("root/req")])),
-                ("--dry-run", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("--dry-run", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -522,10 +523,10 @@ fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("packages", PhpMixed::List(vec![PhpMixed::from("root/req")])),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -574,10 +575,10 @@ fn test_remove_allowed_plugin_package_with_other_allowed_plugins() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("packages", PhpMixed::List(vec![PhpMixed::from("root/req")])),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -629,11 +630,11 @@ fn test_remove_packages_by_vendor() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("packages", PhpMixed::List(vec![PhpMixed::from("root/*")])),
-                ("--no-install", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("packages", InputValue::Array(vec!["root/*".to_string()])),
+                ("--no-install", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -709,12 +710,12 @@ fn test_remove_packages_by_vendor_with_dry_run() {
     app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("packages", PhpMixed::List(vec![PhpMixed::from("root/*")])),
-                ("--dry-run", PhpMixed::from(true)),
-                ("--no-install", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("packages", InputValue::Array(vec!["root/*".to_string()])),
+                ("--dry-run", InputValue::from(true)),
+                ("--no-install", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -767,11 +768,11 @@ fn test_warning_when_removing_packages_by_vendor_from_wrong_type() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("packages", PhpMixed::List(vec![PhpMixed::from("root/*")])),
-                ("--dev", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
-                ("--no-update", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("packages", InputValue::Array(vec!["root/*".to_string()])),
+                ("--dev", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
+                ("--no-update", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -813,11 +814,11 @@ fn test_package_still_present_error_when_no_install_flag_used() {
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("packages", PhpMixed::List(vec![PhpMixed::from("root/req")])),
-                ("--no-install", PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("--no-install", InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )
@@ -903,11 +904,11 @@ fn run_update_inherited_dependencies_flag_case(
     let status_code = app_tester
         .run(
             input(vec![
-                ("command", PhpMixed::from("remove")),
-                ("packages", PhpMixed::List(vec![PhpMixed::from("root/req")])),
-                (install_flag_name, PhpMixed::from(true)),
-                ("--no-audit", PhpMixed::from(true)),
-                ("--no-interaction", PhpMixed::from(true)),
+                ("command", InputValue::from("remove")),
+                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                (install_flag_name, InputValue::from(true)),
+                ("--no-audit", InputValue::from(true)),
+                ("--no-interaction", InputValue::from(true)),
             ]),
             RunOptions::default(),
         )

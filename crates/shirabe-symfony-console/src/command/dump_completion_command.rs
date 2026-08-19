@@ -6,6 +6,7 @@ use crate::completion::{CompletionSuggestions, StringOrSuggestion};
 use crate::input::InputArgument;
 use crate::input::InputInterface;
 use crate::input::InputOption;
+use crate::input::InputValue;
 use crate::output::OutputInterface;
 use crate::output::output_interface;
 use shirabe_php_shim::{PhpMixed, impl_php_class};
@@ -189,14 +190,14 @@ impl Command for DumpCompletionCommand {
             "shell",
             Some(InputArgument::OPTIONAL),
             "The shell type (e.g. \"bash\"), the value of the \"$SHELL\" env var will be used if this is not given",
-            PhpMixed::Null,
+            InputValue::Null,
         )?;
         self.inner.add_option(
             "debug",
-            PhpMixed::Null,
+            None,
             Some(InputOption::VALUE_NONE),
             "Tail the completion debug log",
-            PhpMixed::Null,
+            InputValue::Null,
         )?;
 
         Ok(())

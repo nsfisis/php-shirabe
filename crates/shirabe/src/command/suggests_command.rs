@@ -12,7 +12,7 @@ use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, empty, impl_php_class, in_array_loose};
+use shirabe_php_shim::{PhpMixed, impl_php_class, in_array_loose};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -67,7 +67,7 @@ impl Command for SuggestsCommand {
             .into(),
             InputOption::new(
                 "all",
-                Some(PhpMixed::String("a".to_string())),
+                Some("a"),
                 Some(InputOption::VALUE_NONE),
                 "Show suggestions from all dependencies, including transitive ones",
                 None,
@@ -168,12 +168,18 @@ impl Command for SuggestsCommand {
         let mut reporter = SuggestedPackagesReporter::new(self.get_io().clone());
 
         let filter = input.borrow().get_argument("packages")?;
+        let filter_values: Vec<PhpMixed> = filter
+            .as_array()
+            .unwrap_or_default()
+            .iter()
+            .map(|value| PhpMixed::String(value.clone()))
+            .collect();
         let mut packages = RepositoryInterface::get_packages(&mut installed_repo)?;
         let root_pkg_as_base: crate::package::BasePackageHandle =
             composer.get_package().clone().into();
         packages.push(root_pkg_as_base);
         for package in &packages {
-            if !empty(&filter) && !in_array_loose(package.get_name(), filter.values()) {
+            if filter.to_bool() && !in_array_loose(package.get_name(), &filter_values) {
                 continue;
             }
             reporter.add_suggestions_from_package(package.clone());
@@ -207,7 +213,7 @@ impl Command for SuggestsCommand {
         }
 
         let only_dependents_of: Option<crate::package::PackageInterfaceHandle> =
-            if empty(&filter) && !input.borrow().get_option("all")?.as_bool().unwrap_or(false) {
+            if !filter.to_bool() && !input.borrow().get_option("all")?.as_bool().unwrap_or(false) {
                 Some(composer.get_package().clone().into())
             } else {
                 None

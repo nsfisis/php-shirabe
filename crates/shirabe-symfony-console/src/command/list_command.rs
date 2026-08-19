@@ -10,8 +10,9 @@ use crate::input::DefinitionItem;
 use crate::input::InputArgument;
 use crate::input::InputInterface;
 use crate::input::InputOption;
+use crate::input::InputValue;
 use crate::output::OutputInterface;
-use shirabe_php_shim::{PhpMixed, impl_php_class};
+use shirabe_php_shim::impl_php_class;
 use std::ops::{Deref, DerefMut};
 
 /// ListCommand displays the list of all available commands for the application.
@@ -93,28 +94,28 @@ impl Command for ListCommand {
                 "namespace".to_string(),
                 Some(InputArgument::OPTIONAL),
                 "The namespace name".to_string(),
-                PhpMixed::Null,
+                InputValue::Null,
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "raw",
-                PhpMixed::Null,
+                None,
                 Some(InputOption::VALUE_NONE),
                 "To output raw command list".to_string(),
-                PhpMixed::Null,
+                InputValue::Null,
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "format",
-                PhpMixed::Null,
+                None,
                 Some(InputOption::VALUE_REQUIRED),
                 "The output format (txt, xml, json, or md)".to_string(),
-                PhpMixed::from("txt".to_string()),
+                InputValue::from("txt".to_string()),
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "short",
-                PhpMixed::Null,
+                None,
                 Some(InputOption::VALUE_NONE),
                 "To skip describing commands' arguments".to_string(),
-                PhpMixed::Null,
+                InputValue::Null,
             )?),
         ]));
         self.inner.set_description("List commands");
@@ -157,7 +158,7 @@ impl Command for ListCommand {
         );
         options.insert(
             "namespace".to_string(),
-            input.borrow().get_argument("namespace")?,
+            input.borrow().get_argument("namespace")?.into(),
         );
         options.insert(
             "short".to_string(),
