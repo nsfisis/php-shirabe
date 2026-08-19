@@ -203,7 +203,7 @@ impl PolicyInterface for DefaultPolicy {
         CompilingMatcher::r#match(
             &SimpleConstraint::new(operator.to_string(), b.get_version(), None).into(),
             CmpOp::Eq,
-            a.get_version(),
+            &a.get_version(),
         )
     }
 

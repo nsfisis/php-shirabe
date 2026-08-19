@@ -4,8 +4,14 @@ use crate::constraint::AnyConstraint;
 use crate::constraint::SimpleConstraint;
 use indexmap::IndexMap;
 use shirabe_php_shim::CmpOp;
+use std::fmt::Write as _;
 use std::sync::Mutex;
 use std::sync::OnceLock;
+
+thread_local! {
+    static KEY_BUFFER: std::cell::RefCell<String> =
+        const { std::cell::RefCell::new(String::new()) };
+}
 
 // Rust does not support eval(), so the compiled checker path is always disabled.
 // The COMPILED_CHECKER_CACHE is retained structurally but never populated.
@@ -31,28 +37,41 @@ impl CompilingMatcher {
         Self::compiled_checker_cache().lock().unwrap().clear();
     }
 
-    pub fn r#match(constraint: &AnyConstraint, operator: CmpOp, version: String) -> bool {
-        let result_cache_key = format!(
-            "{}{};{}",
-            SimpleConstraint::get_operator_constant(operator),
-            constraint,
-            version
-        );
-
-        {
-            let cache = Self::result_cache().lock().unwrap();
-            if let Some(&result) = cache.get(&result_cache_key) {
-                return result;
-            }
+    pub fn r#match(constraint: &AnyConstraint, operator: CmpOp, version: &str) -> bool {
+        #[derive(Debug)]
+        enum CacheResult {
+            Hit(bool),
+            Miss(String),
         }
 
-        let result =
-            constraint.matches(&SimpleConstraint::new(operator.to_string(), version, None).into());
+        // The key is built into a reused buffer and only copied when it has to be stored, so a
+        // cache hit allocates nothing.
+        let cached = KEY_BUFFER.with_borrow_mut(|key| {
+            key.clear();
+            let _ = write!(
+                key,
+                "{}{};{}",
+                SimpleConstraint::get_operator_constant(operator),
+                constraint,
+                version
+            );
 
-        Self::result_cache()
-            .lock()
-            .unwrap()
-            .insert(result_cache_key, result);
+            let cache = Self::result_cache().lock().unwrap();
+            match cache.get(key.as_str()) {
+                Some(&result) => CacheResult::Hit(result),
+                None => CacheResult::Miss(key.clone()),
+            }
+        });
+        let key = match cached {
+            CacheResult::Hit(result) => return result,
+            CacheResult::Miss(key) => key,
+        };
+
+        let result = constraint.matches(
+            &SimpleConstraint::new(operator.to_string(), version.to_string(), None).into(),
+        );
+
+        Self::result_cache().lock().unwrap().insert(key, result);
         result
     }
 }

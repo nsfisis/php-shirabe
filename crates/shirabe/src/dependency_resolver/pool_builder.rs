@@ -286,7 +286,7 @@ impl PoolBuilder {
                         if CompilingMatcher::r#match(
                             &constraint,
                             CmpOp::Eq,
-                            package_or_alias.get_version(),
+                            &package_or_alias.get_version(),
                         ) {
                             found = true;
                         }

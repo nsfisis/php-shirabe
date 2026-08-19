@@ -305,7 +305,7 @@ impl Pool {
 
         if candidate_name == name {
             return constraint.is_none()
-                || CompilingMatcher::r#match(constraint.unwrap(), CmpOp::Eq, candidate_version);
+                || CompilingMatcher::r#match(constraint.unwrap(), CmpOp::Eq, &candidate_version);
         }
 
         let provides = candidate.get_provides();

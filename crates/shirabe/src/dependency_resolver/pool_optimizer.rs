@@ -156,7 +156,7 @@ impl PoolOptimizer {
             let constraint = irremovable_package_constraints
                 .get(&package.get_name())
                 .unwrap();
-            if CompilingMatcher::r#match(constraint, CmpOp::Eq, package.get_version().to_string()) {
+            if CompilingMatcher::r#match(constraint, CmpOp::Eq, &package.get_version()) {
                 self.mark_package_irremovable(package.clone());
             }
         }
@@ -249,7 +249,7 @@ impl PoolOptimizer {
                     if CompilingMatcher::r#match(
                         require_constraint,
                         CmpOp::Eq,
-                        package.get_version().to_string(),
+                        &package.get_version(),
                     ) {
                         group_hash_parts.push(format!(
                             "require:{}",
@@ -262,7 +262,7 @@ impl PoolOptimizer {
                             if CompilingMatcher::r#match(
                                 link.get_constraint(),
                                 CmpOp::Eq,
-                                package.get_version().to_string(),
+                                &package.get_version(),
                             ) {
                                 // Use the same hash part as the regular require hash because that's what the replacement does
                                 group_hash_parts.push(format!(
@@ -280,7 +280,7 @@ impl PoolOptimizer {
                             if CompilingMatcher::r#match(
                                 conflict_constraint,
                                 CmpOp::Eq,
-                                package.get_version().to_string(),
+                                &package.get_version(),
                             ) {
                                 group_hash_parts.push(format!(
                                     "conflict:{}",
@@ -601,7 +601,7 @@ impl PoolOptimizer {
                         .and_then(|m| m.get(&id))
                         .map(|p| p.get_version());
                     if let Some(version_str) = version_str
-                        && !CompilingMatcher::r#match(link_constraint, CmpOp::Eq, version_str)
+                        && !CompilingMatcher::r#match(link_constraint, CmpOp::Eq, &version_str)
                     {
                         self.mark_package_for_removal(id);
                         if let Some(map) = package_index.get_mut(require) {

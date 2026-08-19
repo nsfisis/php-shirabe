@@ -2133,7 +2133,7 @@ impl ComposerRepository {
             }
 
             if let Some(c) = constraint
-                && !CompilingMatcher::r#match(c, CmpOp::Eq, version.clone())
+                && !CompilingMatcher::r#match(c, CmpOp::Eq, version)
             {
                 continue;
             }
