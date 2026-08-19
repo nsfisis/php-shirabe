@@ -23,6 +23,12 @@ fn intervals_cache() -> &'static Mutex<IndexMap<String, Arc<IntervalCollection>>
     INTERVALS_CACHE.get_or_init(|| Mutex::new(IndexMap::new()))
 }
 
+static SUBSET_CACHE: OnceLock<Mutex<IndexMap<(String, String), bool>>> = OnceLock::new();
+
+fn subset_cache() -> &'static Mutex<IndexMap<(String, String), bool>> {
+    SUBSET_CACHE.get_or_init(|| Mutex::new(IndexMap::new()))
+}
+
 fn op_sort_order(op: &str) -> i64 {
     match op {
         ">=" => -3,
@@ -39,6 +45,7 @@ pub struct Intervals;
 impl Intervals {
     pub fn clear() {
         *intervals_cache().lock().unwrap() = IndexMap::new();
+        *subset_cache().lock().unwrap() = IndexMap::new();
     }
 
     pub fn is_subset_of(
@@ -53,6 +60,24 @@ impl Intervals {
             return Ok(false);
         }
 
+        // Keying on the two operands keeps the memoized string form of each long-lived constraint
+        // warm. Building the intersection first would instead stringify a throwaway
+        // MultiConstraint on every call.
+        let key = (candidate.to_string(), constraint.to_string());
+        if let Some(cached) = subset_cache().lock().unwrap().get(&key) {
+            return Ok(*cached);
+        }
+
+        let result = Self::compute_is_subset_of(candidate, constraint)?;
+        subset_cache().lock().unwrap().insert(key, result);
+
+        Ok(result)
+    }
+
+    fn compute_is_subset_of(
+        candidate: &AnyConstraint,
+        constraint: &AnyConstraint,
+    ) -> anyhow::Result<bool> {
         let multi =
             MultiConstraint::new(vec![candidate.clone(), constraint.clone()], true, None).into();
         let intersection_intervals = Self::get(&multi)?;
