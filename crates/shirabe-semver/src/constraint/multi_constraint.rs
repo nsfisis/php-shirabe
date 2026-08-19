@@ -4,11 +4,13 @@ use crate::constraint::AnyConstraint;
 use crate::constraint::Bound;
 use crate::constraint::MatchAllConstraint;
 use shirabe_php_shim::CmpOp;
+use std::sync::OnceLock;
 
 #[derive(Debug, Clone)]
 pub struct MultiConstraint {
     pub(crate) constraints: Vec<AnyConstraint>,
     pub(crate) pretty_string: Option<String>,
+    string: OnceLock<String>,
     pub(crate) conjunctive: bool,
 }
 
@@ -28,6 +30,7 @@ impl MultiConstraint {
         Self {
             constraints,
             pretty_string,
+            string: OnceLock::new(),
             conjunctive,
         }
     }
@@ -251,8 +254,11 @@ impl MultiConstraint {
 
 impl std::fmt::Display for MultiConstraint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let parts: Vec<String> = self.constraints.iter().map(|c| c.to_string()).collect();
-        let sep = if self.conjunctive { " " } else { " || " };
-        write!(f, "[{}]", parts.join(sep))
+        let string = self.string.get_or_init(|| {
+            let parts: Vec<String> = self.constraints.iter().map(|c| c.to_string()).collect();
+            let sep = if self.conjunctive { " " } else { " || " };
+            format!("[{}]", parts.join(sep))
+        });
+        f.write_str(string)
     }
 }
