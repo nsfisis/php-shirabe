@@ -8,7 +8,7 @@ use crate::constraint::SimpleConstraint;
 use crate::interval::{DevConstraintSet, Interval};
 use indexmap::IndexMap;
 use shirabe_php_shim::{CmpOp, array_unique, version_compare, version_compare_ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 #[derive(Debug, Clone)]
 pub struct IntervalCollection {
@@ -16,9 +16,10 @@ pub struct IntervalCollection {
     pub branches: DevConstraintSet,
 }
 
-static INTERVALS_CACHE: OnceLock<Mutex<IndexMap<String, IntervalCollection>>> = OnceLock::new();
+static INTERVALS_CACHE: OnceLock<Mutex<IndexMap<String, Arc<IntervalCollection>>>> =
+    OnceLock::new();
 
-fn intervals_cache() -> &'static Mutex<IndexMap<String, IntervalCollection>> {
+fn intervals_cache() -> &'static Mutex<IndexMap<String, Arc<IntervalCollection>>> {
     INTERVALS_CACHE.get_or_init(|| Mutex::new(IndexMap::new()))
 }
 
@@ -289,21 +290,21 @@ impl Intervals {
         Ok(MatchNoneConstraint::new(None).into())
     }
 
-    pub fn get(constraint: &AnyConstraint) -> anyhow::Result<IntervalCollection> {
+    pub fn get(constraint: &AnyConstraint) -> anyhow::Result<Arc<IntervalCollection>> {
         let key = constraint.to_string();
 
         {
             let cache = intervals_cache().lock().unwrap();
             if let Some(cached) = cache.get(&key) {
-                return Ok(cached.clone());
+                return Ok(Arc::clone(cached));
             }
         }
 
-        let result = Self::generate_intervals(constraint, false)?;
+        let result = Arc::new(Self::generate_intervals(constraint, false)?);
 
         {
             let mut cache = intervals_cache().lock().unwrap();
-            cache.insert(key, result.clone());
+            cache.insert(key, Arc::clone(&result));
         }
 
         Ok(result)
@@ -347,8 +348,8 @@ impl Intervals {
         let mut constraint_branches: Vec<DevConstraintSet> = Vec::new();
         for c in sub_constraints {
             let res = Self::get(c)?;
-            numeric_groups.push(res.numeric);
-            constraint_branches.push(res.branches);
+            numeric_groups.push(res.numeric.clone());
+            constraint_branches.push(res.branches.clone());
         }
 
         let mut branches = if multi.is_disjunctive_mc() {
