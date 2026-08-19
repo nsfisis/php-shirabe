@@ -62,6 +62,44 @@ enum Decision {
     Failed(anyhow::Error),
 }
 
+/// The reqwest Client to use on the calling thread's tokio runtime.
+///
+/// Nothing in `CurlDownloader::new` varies the Client (`options` and `disable_tls` are not applied
+/// to it; see the TODO in `send_once`), so one Client serves every CurlDownloader a run builds and
+/// its connection pool survives across them. PHP instead hands each CurlDownloader its own curl
+/// multi handle.
+///
+/// A pooled connection is driven by a task on the runtime that opened it and hangs if it is later
+/// handed to another one, so the Client is cached per runtime: `main.rs` enters one runtime for the
+/// whole process and gets a single Client, while the disposable per-call runtimes
+/// `sync_executor::block_on` falls back to outside `main` get one each.
+fn runtime_client() -> reqwest::Client {
+    fn build() -> reqwest::Client {
+        reqwest::Client::builder()
+            .pool_max_idle_per_host(8)
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            // The default builder cannot realistically fail; if the TLS backend is unavailable we
+            // cannot proceed, mirroring PHP aborting when curl is missing.
+            .expect("failed to build reqwest client for CurlDownloader")
+    }
+
+    let Ok(handle) = tokio::runtime::Handle::try_current() else {
+        return build();
+    };
+    static CACHED: std::sync::Mutex<Option<(tokio::runtime::Id, reqwest::Client)>> =
+        std::sync::Mutex::new(None);
+    let mut cached = CACHED.lock().unwrap();
+    match &*cached {
+        Some((id, client)) if *id == handle.id() => client.clone(),
+        _ => {
+            let client = build();
+            *cached = Some((handle.id(), client.clone()));
+            client
+        }
+    }
+}
+
 impl CurlDownloader {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -75,17 +113,9 @@ impl CurlDownloader {
         //   - cookie_store(true)        ~ CURL_LOCK_DATA_COOKIE
         //   - redirect(none)            ~ CURLOPT_FOLLOWLOCATION = false (we follow manually)
         // The libcurl version-specific multiplexing / accept-encoding workarounds are not needed.
-        // TODO(http): a brand-new reqwest client is created per CurlDownloader; that is acceptable here
-        // (one HttpDownloader owns one CurlDownloader) but not pooled across them.
         // TODO(http): cookie sharing (CURL_LOCK_DATA_COOKIE) would need reqwest's `cookies` feature
         // (.cookie_store(true)); omitted as it is not required for package downloads.
-        let client = reqwest::Client::builder()
-            .pool_max_idle_per_host(8)
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            // The default builder cannot realistically fail; if the TLS backend is unavailable we
-            // cannot proceed, mirroring PHP aborting when curl is missing.
-            .expect("failed to build reqwest client for CurlDownloader");
+        let client = runtime_client();
 
         let auth_helper = std::cell::RefCell::new(AuthHelper::new(io.clone(), config.clone()));
 
