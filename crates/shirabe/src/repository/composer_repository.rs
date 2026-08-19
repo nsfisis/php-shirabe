@@ -2704,7 +2704,7 @@ impl ComposerRepository {
                 }
             }
 
-            let package_instances = self.loader.load_packages(packages.clone())?;
+            let package_instances = self.loader.load_packages(packages)?;
 
             let mut results: Vec<BasePackageHandle> = Vec::new();
             for package in package_instances.into_iter() {
