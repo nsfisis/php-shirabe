@@ -1413,47 +1413,39 @@ impl ComposerRepository {
                 && hash_opt.is_some()
                 && self.cache.borrow_mut().sha256(&cache_key).as_deref() == hash_opt.as_deref()
             {
-                if let Some(raw) = self.cache.borrow_mut().read(&cache_key) {
-                    let decoded = json_decode_assoc(&raw)?;
-                    if let Some(arr) = decoded.as_array() {
-                        let map: IndexMap<String, PhpMixed> =
-                            arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                        packages_opt = Some(map);
+                if let Some(raw) = self.cache.borrow_mut().read(&cache_key)
+                    && let PhpMixed::Array(map) = json_decode_assoc(&raw)?
+                {
+                    packages_opt = Some(map);
+                    packages_source = Some(format!(
+                        "cached file ({} originating from {})",
+                        cache_key,
+                        Url::sanitize(url.clone())
+                    ));
+                }
+            } else if use_last_modified_check {
+                let contents_raw_opt = self.cache.borrow_mut().read(&cache_key);
+                if let Some(contents_raw) = contents_raw_opt
+                    && let PhpMixed::Array(contents) = json_decode_assoc(&contents_raw)?
+                {
+                    // we already loaded some packages from this file, so assume it is fresh and avoid fetching it again
+                    if already_loaded.contains_key(name) {
+                        packages_opt = Some(contents);
                         packages_source = Some(format!(
                             "cached file ({} originating from {})",
                             cache_key,
                             Url::sanitize(url.clone())
                         ));
-                    }
-                }
-            } else if use_last_modified_check {
-                let contents_raw_opt = self.cache.borrow_mut().read(&cache_key);
-                if let Some(contents_raw) = contents_raw_opt {
-                    let contents = json_decode_assoc(&contents_raw)?;
-                    let contents_arr = contents.as_array().cloned();
-                    // we already loaded some packages from this file, so assume it is fresh and avoid fetching it again
-                    if already_loaded.contains_key(name) {
-                        if let Some(arr) = &contents_arr {
-                            let map: IndexMap<String, PhpMixed> =
-                                arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                            packages_opt = Some(map);
-                            packages_source = Some(format!(
-                                "cached file ({} originating from {})",
-                                cache_key,
-                                Url::sanitize(url.clone())
-                            ));
-                        }
-                    } else if let Some(arr) = &contents_arr
-                        && let Some(last_modified) =
-                            arr.get("last-modified").and_then(|v| v.as_string())
+                    } else if let Some(last_modified) = contents
+                        .get("last-modified")
+                        .and_then(|v| v.as_string())
+                        .map(|s| s.to_string())
                     {
                         let response =
-                            self.fetch_file_if_last_modified(&url, &cache_key, last_modified)?;
+                            self.fetch_file_if_last_modified(&url, &cache_key, &last_modified)?;
                         match response {
                             FetchFileIfLastModifiedResult::NotModified => {
-                                let map: IndexMap<String, PhpMixed> =
-                                    arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                                packages_opt = Some(map);
+                                packages_opt = Some(contents);
                                 packages_source = Some(format!(
                                     "cached file ({} originating from {})",
                                     cache_key,
@@ -2021,10 +2013,7 @@ impl ComposerRepository {
         let mut last_modified: Option<String> = None;
         let contents_opt: Option<IndexMap<String, PhpMixed>>;
         if let Some(raw) = self.cache.borrow_mut().read(&cache_key) {
-            let decoded = json_decode_assoc(&raw)?;
-            if let Some(arr) = decoded.as_array() {
-                let map: IndexMap<String, PhpMixed> =
-                    arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+            if let PhpMixed::Array(map) = json_decode_assoc(&raw)? {
                 last_modified = map
                     .get("last-modified")
                     .and_then(|v| v.as_string())
@@ -2050,9 +2039,7 @@ impl ComposerRepository {
                 cache_key,
                 Url::sanitize(url.clone())
             );
-            contents_opt
-                .map(|m| PhpMixed::Array(m.into_iter().collect()))
-                .unwrap_or(PhpMixed::Null)
+            contents_opt.map(PhpMixed::Array).unwrap_or(PhpMixed::Null)
         } else {
             response
         };
@@ -2185,30 +2172,26 @@ impl ComposerRepository {
 
         let mut data: Option<IndexMap<String, PhpMixed>> = None;
         let cached_raw_opt = self.cache.borrow_mut().read("packages.json");
-        if let Some(cached_raw) = cached_raw_opt {
-            let cached_decoded = json_decode_assoc(&cached_raw)?;
-            if let Some(arr) = cached_decoded.as_array() {
-                let cached_data: IndexMap<String, PhpMixed> =
-                    arr.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
-                let age = self.cache.borrow_mut().get_age("packages.json");
-                if root_max_age.is_some() && age.is_some() && age.unwrap() <= root_max_age.unwrap()
-                {
-                    data = Some(cached_data);
-                } else if let Some(last_modified) = cached_data
-                    .get("last-modified")
-                    .and_then(|v| v.as_string())
-                    .map(|s| s.to_string())
-                {
-                    let response = self.fetch_file_if_last_modified(
-                        &self.get_packages_json_url(),
-                        "packages.json",
-                        &last_modified,
-                    )?;
-                    data = Some(match response {
-                        FetchFileIfLastModifiedResult::NotModified => cached_data,
-                        FetchFileIfLastModifiedResult::Data(d) => d,
-                    });
-                }
+        if let Some(cached_raw) = cached_raw_opt
+            && let PhpMixed::Array(cached_data) = json_decode_assoc(&cached_raw)?
+        {
+            let age = self.cache.borrow_mut().get_age("packages.json");
+            if root_max_age.is_some() && age.is_some() && age.unwrap() <= root_max_age.unwrap() {
+                data = Some(cached_data);
+            } else if let Some(last_modified) = cached_data
+                .get("last-modified")
+                .and_then(|v| v.as_string())
+                .map(|s| s.to_string())
+            {
+                let response = self.fetch_file_if_last_modified(
+                    &self.get_packages_json_url(),
+                    "packages.json",
+                    &last_modified,
+                )?;
+                data = Some(match response {
+                    FetchFileIfLastModifiedResult::NotModified => cached_data,
+                    FetchFileIfLastModifiedResult::Data(d) => d,
+                });
             }
         }
 
@@ -2569,11 +2552,10 @@ impl ComposerRepository {
                         == Some(sha256.as_str())
                     {
                         let raw = self.cache.borrow_mut().read(&cache_key).unwrap_or_default();
-                        let decoded = json_decode_assoc(&raw)?;
-                        decoded
-                            .as_array()
-                            .map(|a| a.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                            .unwrap_or_default()
+                        match json_decode_assoc(&raw)? {
+                            PhpMixed::Array(a) => a,
+                            _ => IndexMap::new(),
+                        }
                     } else {
                         self.fetch_file(&url, Some(&cache_key), Some(&sha256), false)?
                     };
@@ -2659,11 +2641,10 @@ impl ComposerRepository {
                 let included_data: IndexMap<String, PhpMixed> = if let Some(ref sha1) = sha1 {
                     if self.cache.borrow_mut().sha1(include).as_deref() == Some(sha1.as_str()) {
                         let raw = self.cache.borrow_mut().read(include).unwrap_or_default();
-                        let decoded = json_decode_assoc(&raw)?;
-                        decoded
-                            .as_array()
-                            .map(|a| a.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                            .unwrap_or_default()
+                        match json_decode_assoc(&raw)? {
+                            PhpMixed::Array(a) => a,
+                            _ => IndexMap::new(),
+                        }
                     } else {
                         self.fetch_file(include, None, None, false)?
                     }

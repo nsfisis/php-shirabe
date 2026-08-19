@@ -34,10 +34,14 @@ PACKAGE_SLUG="${PACKAGE//\//-}"
 
 PREPARE_SCRIPT="$OUTDIR/prepare.sh"
 cat > "$PREPARE_SCRIPT" <<EOF
-rm -rf '$TARGET_DIR-shirabe' '$TARGET_DIR-composer'
-mkdir -p '$TARGET_DIR-shirabe' '$TARGET_DIR-composer'
-printf '{"name": "shirabe-bench/require-test"}' > '$TARGET_DIR-shirabe/composer.json'
-printf '{"name": "shirabe-bench/require-test"}' > '$TARGET_DIR-composer/composer.json'
+for dir in '$TARGET_DIR-shirabe' '$TARGET_DIR-composer'; do
+  rm -rf "\$dir"
+  mkdir -p "\$dir"
+  git -C "\$dir" init .
+  git -C "\$dir" config user.name 'John Doe' && git config user.email john@example.com
+  git -C "\$dir" commit --allow-empty -m init
+  printf '{"name": "shirabe-bench/require-test"}' > "\$dir/composer.json"
+done
 EOF
 
 hyperfine \
@@ -45,7 +49,6 @@ hyperfine \
   --prepare "bash '$PREPARE_SCRIPT'" \
   --export-json "$OUTDIR/results-$PACKAGE_SLUG.json" \
   --export-markdown "$OUTDIR/results-$PACKAGE_SLUG.md" \
-  --ignore-failure \
   --command-name Shirabe "RUST_BACKTRACE=1 '$BIN' require --no-install --no-audit --no-interaction --working-dir='$TARGET_DIR-shirabe' '$PACKAGE'" \
   --command-name Composer "'$COMPOSER_BIN' require --no-install --no-audit --no-interaction --working-dir='$TARGET_DIR-composer' '$PACKAGE'"
 
