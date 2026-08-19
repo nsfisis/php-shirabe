@@ -29,6 +29,7 @@ futures.workspace = true
 indexmap.workspace = true
 jsonschema.workspace = true
 md5.workspace = true
+mimalloc.workspace = true
 nix.workspace = true
 regex.workspace = true
 reqwest.workspace = true

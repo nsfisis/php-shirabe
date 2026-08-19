@@ -25,6 +25,10 @@ pub mod self_update;
 pub mod signal;
 pub mod util;
 
+// Declared here to use this allocator in all binaries including tests and benches.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 // InstalledVersions is intentionally unported to Rust. It is a runtime API for plugins and project
 // code, never read by Composer itself. Its real state is stored in PHP's InstalledVersions class.
 // See also `__shirabe_installed_versions_reload` in crates/shirabe-php-rpc/php/worker.php.
