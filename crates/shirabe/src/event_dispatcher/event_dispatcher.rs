@@ -1150,6 +1150,16 @@ try {{
             .into()
         })?;
 
+        // The event stub the script receives hands out stubs of the Composer object graph, and
+        // those extend and implement the real Composer contracts (`PackageInterface` and the
+        // rest), which only the Composer PHP runtime carries.
+        let cache_dir = self
+            .composer()
+            .borrow_partial()
+            .get_config()
+            .borrow()
+            .get_str("cache-dir")?;
+        Self::ensure_composer_php_runtime(std::path::Path::new(&cache_dir))?;
         Self::ensure_script_autoloader()?;
         let rhandle = shirabe_php_rpc::alloc_rhandle();
         let mut dispatcher = ScriptRpcDispatcher {
@@ -1640,12 +1650,12 @@ try {{
 
 /// Serves `CallRustMethod` requests issued by the PHP worker while a script-related call is in
 /// flight: Rust handle 0 is the runtime service endpoint (autoload lookups against the
-/// Rust-side [`ClassLoader`]), and at most one live event handle is exposed per dispatched
-/// call.
+/// Rust-side [`ClassLoader`]), every other rhandle resolves through the R table, except the
+/// one live event handle exposed per dispatched call.
 ///
-/// TODO(plugin): this per-call scope stands in for persistent R-table registration; a stub
-/// retained by the script beyond the call observes an unknown handle error instead of the
-/// live object.
+/// TODO(plugin): a script that stores the event stub beyond its own call observes an unknown
+/// handle error afterwards; keeping events in the R table needs full proxying of the object
+/// graph an event exposes, which does not exist yet.
 struct ScriptRpcDispatcher<'a> {
     loader: Option<ClassLoader>,
     event: Option<(u64, &'a dyn EventInterface)>,
@@ -1691,10 +1701,11 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
             Some((event_rhandle, event)) if event_rhandle == rhandle => {
                 dispatch_event_method(event, method_name)
             }
-            _ => Err(runtime_throw(format!(
-                "unknown Rust handle {rhandle} (script-event handles are scoped to a single \
-                 dispatched call)"
-            ))),
+            _ => crate::plugin::php_plugin_proxy::dispatch_r_table_method(
+                rhandle,
+                method_name,
+                &args,
+            ),
         }
     }
 }

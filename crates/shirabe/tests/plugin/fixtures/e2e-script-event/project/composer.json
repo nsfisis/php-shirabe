@@ -1,0 +1,17 @@
+{
+    "name": "shirabe/e2e-script-event",
+    "description": "E2E fixture project: record what a post-autoload-dump PHP script sees on its Event.",
+    "repositories": [
+        {
+            "packagist.org": false
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Shirabe\\E2e\\": "src/"
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": "Shirabe\\E2e\\ScriptEventRecorder::postAutoloadDump"
+    }
+}

@@ -340,52 +340,59 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             return dispatch_event_method(event, method_name);
         }
 
-        // The entity is cloned out so no table borrow is held while the handler runs (a
-        // handler that re-enters register_*_entity would otherwise panic on the RefCell).
-        let entity = R_TABLE.with(|table| table.borrow().get(&rhandle).cloned());
-        if method_name == "__shirabeClone" {
-            return match entity {
-                Some(entity) => clone_entity(&entity),
-                None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
-            };
-        }
-        if matches!(method_name, "__get" | "__set" | "__isset" | "__unset") {
-            return match entity {
-                Some(entity) => dispatch_property_access(&entity, method_name, &args),
-                None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
-            };
-        }
-        match entity {
-            Some(RustEntity::Io(io)) => dispatch_io_method(&io, method_name, &args),
-            Some(RustEntity::Composer(composer)) => {
-                dispatch_composer_method(&composer, method_name)
-            }
-            Some(RustEntity::Config(config)) => dispatch_config_method(&config, method_name, &args),
-            Some(RustEntity::DownloadManager(dm)) => {
-                dispatch_download_manager_method(&dm, method_name, &args)
-            }
-            Some(RustEntity::Filesystem(fs)) => dispatch_filesystem_method(&fs, method_name, &args),
-            Some(RustEntity::InstallationManager(im)) => {
-                dispatch_installation_manager_method(&im, method_name, &args)
-            }
-            Some(RustEntity::RepositoryManager(rm)) => {
-                dispatch_repository_manager_method(&rm, method_name)
-            }
-            Some(RustEntity::Repository(repository)) => {
-                dispatch_repository_method(&repository, method_name, &args)
-            }
-            Some(RustEntity::Package(package)) => {
-                dispatch_package_method(&package, method_name, &args)
-            }
-            Some(RustEntity::EventDispatcher(dispatcher)) => {
-                dispatch_event_dispatcher_method(&dispatcher, method_name, &args)
-            }
-            Some(RustEntity::Operation(operation)) => {
-                dispatch_operation_method(&operation, method_name, &args)
-            }
-            Some(RustEntity::Plugin(plugin)) => dispatch_plugin_method(&plugin, method_name),
+        dispatch_r_table_method(rhandle, method_name, &args)
+    }
+}
+
+/// Serves a method call on an R-table entity, shared by every dispatcher: the child holds a
+/// stub for an entity registered by an earlier call, and the handle outlives the call that
+/// minted it.
+pub(crate) fn dispatch_r_table_method(
+    rhandle: u64,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    // The entity is cloned out so no table borrow is held while the handler runs (a
+    // handler that re-enters register_*_entity would otherwise panic on the RefCell).
+    let entity = R_TABLE.with(|table| table.borrow().get(&rhandle).cloned());
+    if method_name == "__shirabeClone" {
+        return match entity {
+            Some(entity) => clone_entity(&entity),
             None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
+        };
+    }
+    if matches!(method_name, "__get" | "__set" | "__isset" | "__unset") {
+        return match entity {
+            Some(entity) => dispatch_property_access(&entity, method_name, args),
+            None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
+        };
+    }
+    match entity {
+        Some(RustEntity::Io(io)) => dispatch_io_method(&io, method_name, args),
+        Some(RustEntity::Composer(composer)) => dispatch_composer_method(&composer, method_name),
+        Some(RustEntity::Config(config)) => dispatch_config_method(&config, method_name, args),
+        Some(RustEntity::DownloadManager(dm)) => {
+            dispatch_download_manager_method(&dm, method_name, args)
         }
+        Some(RustEntity::Filesystem(fs)) => dispatch_filesystem_method(&fs, method_name, args),
+        Some(RustEntity::InstallationManager(im)) => {
+            dispatch_installation_manager_method(&im, method_name, args)
+        }
+        Some(RustEntity::RepositoryManager(rm)) => {
+            dispatch_repository_manager_method(&rm, method_name)
+        }
+        Some(RustEntity::Repository(repository)) => {
+            dispatch_repository_method(&repository, method_name, args)
+        }
+        Some(RustEntity::Package(package)) => dispatch_package_method(&package, method_name, args),
+        Some(RustEntity::EventDispatcher(dispatcher)) => {
+            dispatch_event_dispatcher_method(&dispatcher, method_name, args)
+        }
+        Some(RustEntity::Operation(operation)) => {
+            dispatch_operation_method(&operation, method_name, args)
+        }
+        Some(RustEntity::Plugin(plugin)) => dispatch_plugin_method(&plugin, method_name),
+        None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
     }
 }
 
