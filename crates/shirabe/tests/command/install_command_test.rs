@@ -50,13 +50,13 @@ Generating autoload files"#,
                 "packages",
                 InputValue::Array(vec!["vendor/package".to_string()]),
             )],
-            r#"Invalid argument vendor/package. Use "composer require vendor/package" instead to add packages to your composer.json."#,
+            r#"Invalid argument vendor/package. Use "shirabe require vendor/package" instead to add packages to your composer.json."#,
         ),
         (
             "it writes an error when no-install flag is passed",
             serde_json::json!({ "repositories": [] }),
             vec![("--no-install", InputValue::from(true))],
-            r#"Invalid option "--no-install". Use "composer update --no-install" instead if you are trying to update the composer.lock file."#,
+            r#"Invalid option "--no-install". Use "shirabe update --no-install" instead if you are trying to update the composer.lock file."#,
         ),
     ]
 }

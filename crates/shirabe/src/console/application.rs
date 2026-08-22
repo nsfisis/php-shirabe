@@ -2046,7 +2046,7 @@ impl ApplicationHandle {
                         if use_parent_dir_if_no_json_available.as_bool() == Some(true) {
                             io.write_error(&format!("<info>No composer.json in current directory, changing working directory to {}</info>", dir));
                         } else {
-                            io.write_error("<info>Always want to use the parent dir? Use \"composer config --global use-parent-dir true\" to change the default.</info>");
+                            io.write_error("<info>Always want to use the parent dir? Use \"shirabe config --global use-parent-dir true\" to change the default.</info>");
                         }
                         old_working_dir = Some(Platform::get_cwd(true).unwrap_or_default());
                         chdir(&dir);

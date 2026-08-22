@@ -222,7 +222,7 @@ impl Auditor {
             }
 
             if format == Self::FORMAT_SUMMARY {
-                io.write_error("Run \"composer audit\" for a full list of advisories.");
+                io.write_error("Run \"shirabe audit\" for a full list of advisories.");
             }
         } else {
             io.write_error("<info>No security vulnerability advisories found.</info>");

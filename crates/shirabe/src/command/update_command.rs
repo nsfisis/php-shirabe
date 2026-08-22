@@ -423,7 +423,7 @@ impl Command for UpdateCommand {
                         io_interface::NORMAL,
                     );
                 io.write(&format!(
-                        "<info>Run `composer require {}` or `composer require {}:{}` instead to replace the constraint</info>",
+                        "<info>Run `shirabe require {}` or `shirabe require {}:{}` instead to replace the constraint</info>",
                         package, package, constraint,
                     ));
 

@@ -275,7 +275,7 @@ impl InitCommand {
 
         if result.is_err() {
             self.get_io().borrow().write_error(
-                "Could not update dependencies. Run `composer update` to see more information.",
+                "Could not update dependencies. Run `shirabe update` to see more information.",
             );
         }
     }

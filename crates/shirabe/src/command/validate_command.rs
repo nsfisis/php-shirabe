@@ -306,7 +306,7 @@ impl Command for ValidateCommand {
         let locker = composer.get_locker().clone();
         let mut locker = locker.borrow_mut();
         if locker.is_locked() && !locker.is_fresh()? {
-            lock_errors.push("- The lock file is not up to date with the latest changes in composer.json, it is recommended that you run `composer update` or `composer update <package name>`.".to_string());
+            lock_errors.push("- The lock file is not up to date with the latest changes in composer.json, it is recommended that you run `shirabe update` or `shirabe update <package name>`.".to_string());
         }
 
         if locker.is_locked() {

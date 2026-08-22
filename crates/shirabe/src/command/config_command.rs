@@ -995,7 +995,7 @@ impl Command for ConfigCommand {
                 || multi_props.contains_key(&setting_key)
                 || strpos(&setting_key, "extra.") == Some(0))
         {
-            return Err(InvalidArgumentException::new(format!("The {} property can not be set in the global config.json file. Use `composer global config` to apply changes to the global composer.json", setting_key))
+            return Err(InvalidArgumentException::new(format!("The {} property can not be set in the global config.json file. Use `shirabe global config` to apply changes to the global composer.json", setting_key))
             .into());
         }
         if input.borrow().get_option("unset")?.as_bool() == Some(true)

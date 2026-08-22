@@ -469,7 +469,7 @@ fn merge_conflict_simple_data() -> PhpMixed {
     data.insert(
         "content-hash".to_string(),
         PhpMixed::String(
-            "VCS merge conflict detected. Please run `composer update --lock`.".to_string(),
+            "VCS merge conflict detected. Please run `shirabe update --lock`.".to_string(),
         ),
     );
     data.insert("packages".to_string(), PhpMixed::List(vec![]));
@@ -542,7 +542,7 @@ fn test_composer_lock_file_merge_conflict_extended() {
 
     let json = JsonFile::parse_json(Some(&data), Some("/path/to/composer.lock")).unwrap();
     assert_eq!(
-        "VCS merge conflict detected. Please run `composer update --lock`.",
+        "VCS merge conflict detected. Please run `shirabe update --lock`.",
         json.as_array()
             .unwrap()
             .get("content-hash")

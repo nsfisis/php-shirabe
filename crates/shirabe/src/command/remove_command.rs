@@ -637,7 +637,7 @@ impl Command for RemoveCommand {
         }
 
         io.write_error(&format!(
-            "<info>Running composer update {}{}</info>",
+            "<info>Running shirabe update {}{}</info>",
             packages.join(" "),
             flags
         ));
@@ -695,7 +695,7 @@ impl Command for RemoveCommand {
                     .is_empty()
                 {
                     io.write_error(&format!(
-                        "<error>Removal failed, {} is still present, it may be required by another package. See `composer why {}`.</error>",
+                        "<error>Removal failed, {} is still present, it may be required by another package. See `shirabe why {}`.</error>",
                         package, package
                     ));
                     return Ok(2);

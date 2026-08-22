@@ -194,7 +194,7 @@ impl Locker {
             if let Some(packages_dev) = lock_data.get("packages-dev").cloned() {
                 locked_packages = array_merge(locked_packages, packages_dev);
             } else {
-                return Err(RuntimeException::new("The lock file does not contain require-dev information, run install with the --no-dev option or delete it and run composer update to generate a new lock file.".to_string())
+                return Err(RuntimeException::new("The lock file does not contain require-dev information, run install with the --no-dev option or delete it and run shirabe update to generate a new lock file.".to_string())
                 .into());
             }
         }
@@ -268,7 +268,7 @@ impl Locker {
         }
 
         Err(RuntimeException::new(
-            "Your composer.lock is invalid. Run \"composer update\" to generate a new one."
+            "Your composer.lock is invalid. Run \"shirabe update\" to generate a new one."
                 .to_string(),
         )
         .into())

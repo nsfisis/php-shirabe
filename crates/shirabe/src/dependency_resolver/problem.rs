@@ -414,7 +414,7 @@ impl Problem {
                     return Ok((
                         msg,
                         format!(
-                            "the {} package is disabled by your platform config. Enable it again with \"composer config platform.{} --unset\".",
+                            "the {} package is disabled by your platform config. Enable it again with \"shirabe config platform.{} --unset\".",
                             package_name, package_name
                         ),
                     ));
@@ -472,7 +472,7 @@ impl Problem {
                         return Ok((
                             msg,
                             format!(
-                                "the {} package is disabled by your platform config. Enable it again with \"composer config platform.{} --unset\".{}",
+                                "the {} package is disabled by your platform config. Enable it again with \"shirabe config platform.{} --unset\".{}",
                                 package_name, package_name, providers_str
                             ),
                         ));

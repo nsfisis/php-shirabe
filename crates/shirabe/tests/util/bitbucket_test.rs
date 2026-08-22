@@ -388,7 +388,7 @@ fn test_request_access_token_with_username_and_password_with_unauthorized_respon
                 Expectation::auth(ORIGIN, USERNAME, Some(PASSWORD.to_string())),
                 Expectation::text("Invalid OAuth consumer provided."),
                 Expectation::text(
-                    "You can also add it manually later by using \"composer config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
+                    "You can also add it manually later by using \"shirabe config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
                 ),
             ],
             true,

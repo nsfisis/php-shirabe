@@ -99,7 +99,7 @@ fn test_require_warns_if_resolved_to_feature_branch() {
 
     assert_eq!(
         "./composer.json has been updated
-Running composer update required/pkg
+Running shirabe update required/pkg
 Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 2 installs, 0 updates, 0 removals
@@ -138,7 +138,7 @@ fn provide_require() -> Vec<(
             vec![("packages", InputValue::Array(vec!["required/pkg".to_string()]))],
             "<warning>Cannot use required/pkg's latest version 1.2.0 as it requires ext-foobar ^1 which is missing from your platform.
 ./composer.json has been updated
-Running composer update required/pkg
+Running shirabe update required/pkg
 Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 1 install, 0 updates, 0 removals
@@ -165,7 +165,7 @@ Using version ^1.0 for required/pkg",
             "<warning>Cannot use required/pkg's latest version 1.2.0 as it requires ext-foobar ^1 which is missing from your platform.
 <warning>Cannot use required/pkg 1.1.0 as it requires ext-foobar ^1 which is missing from your platform.
 ./composer.json has been updated
-Running composer update required/pkg
+Running shirabe update required/pkg
 Loading composer repositories with package information
 Updating dependencies
 Dependency resolution completed in %d seconds
@@ -190,7 +190,7 @@ Using version ^1.0 for required/pkg",
             ],
             "<warning>Cannot use required/pkg's latest version 1.1.0 as it requires php ^20 which is not satisfied by your platform.
 ./composer.json has been updated
-Running composer update required/pkg
+Running shirabe update required/pkg
 Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 1 install, 0 updates, 0 removals
@@ -229,7 +229,7 @@ Using version ^1.0 for required/pkg
                 ("--no-install", InputValue::from(true)),
             ],
             "./composer.json has been updated
-Running composer update required/pkg
+Running shirabe update required/pkg
 Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 2 installs, 0 updates, 0 removals
@@ -251,7 +251,7 @@ Using version ^1.1 for required/pkg",
                 ("--fixed", InputValue::from(true)),
             ],
             "./composer.json has been updated
-Running composer update required/pkg
+Running shirabe update required/pkg
 Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 1 install, 0 updates, 0 removals

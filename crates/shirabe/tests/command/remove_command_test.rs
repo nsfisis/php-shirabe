@@ -306,7 +306,7 @@ fn test_remove_unused_package() {
     assert!(
         app_tester
             .get_display()
-            .contains("Running composer update not/req"),
+            .contains("Running shirabe update not/req"),
         "got: {}",
         app_tester.get_display()
     );
@@ -373,7 +373,7 @@ fn test_remove_package_by_name() {
         display
     );
     assert!(
-        trimmed.contains("Running composer update root/req"),
+        trimmed.contains("Running shirabe update root/req"),
         "got: {}",
         display
     );
@@ -455,7 +455,7 @@ fn test_remove_package_by_name_with_dry_run() {
         display
     );
     assert!(
-        trimmed.contains("Running composer update root/req"),
+        trimmed.contains("Running shirabe update root/req"),
         "got: {}",
         display
     );
@@ -649,7 +649,7 @@ fn test_remove_packages_by_vendor() {
         display
     );
     assert!(
-        display.contains("Running composer update root/*"),
+        display.contains("Running shirabe update root/*"),
         "got: {}",
         display
     );
@@ -723,7 +723,7 @@ fn test_remove_packages_by_vendor_with_dry_run() {
     assert_eq!(SUCCESS, app_tester.get_status_code());
     assert_eq!(
         "./composer.json has been updated
-Running composer update root/*
+Running shirabe update root/*
 Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 0 installs, 0 updates, 2 removals
@@ -843,7 +843,7 @@ fn test_package_still_present_error_when_no_install_flag_used() {
     assert!(display.contains("Writing lock file"), "got: {}", display);
     assert!(
         display.contains(
-            "Removal failed, root/req is still present, it may be required by another package. See `composer why root/req`"
+            "Removal failed, root/req is still present, it may be required by another package. See `shirabe why root/req`"
         ),
         "got: {}",
         display
@@ -956,16 +956,16 @@ fn test_update_inherited_dependencies_flag_is_passed_to_post_remove_installer() 
     // 'update with all dependencies'
     run_update_inherited_dependencies_flag_case(
         "--update-with-all-dependencies",
-        "Running composer update root/req --with-all-dependencies",
+        "Running shirabe update root/req --with-all-dependencies",
     );
     // 'with all dependencies'
     run_update_inherited_dependencies_flag_case(
         "--with-all-dependencies",
-        "Running composer update root/req --with-all-dependencies",
+        "Running shirabe update root/req --with-all-dependencies",
     );
     // 'no update with dependencies'
     run_update_inherited_dependencies_flag_case(
         "--no-update-with-dependencies",
-        "Running composer update root/req --with-dependencies",
+        "Running shirabe update root/req --with-dependencies",
     );
 }

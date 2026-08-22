@@ -461,7 +461,7 @@ impl GitDownloader {
                 io_interface::NORMAL,
             );
             exception_extra = format!(
-                "\nIt looks like the commit hash is not available in the repository, maybe {}? Run \"composer update {}\" to resolve this.",
+                "\nIt looks like the commit hash is not available in the repository, maybe {}? Run \"shirabe update {}\" to resolve this.",
                 if package.is_dev() {
                     "the commit was removed from the branch"
                 } else {

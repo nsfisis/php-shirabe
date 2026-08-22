@@ -569,6 +569,15 @@ struct IntegrationCase {
     expect_result: ExpectResult,
 }
 
+/// The fixtures come from Composer's tree and name the `composer` binary in the hints they expect
+/// on stdout; Shirabe prints its own name there.
+fn rename_binary_in_expected_output(expected: String) -> String {
+    regex::Regex::new(r"\bcomposer (?P<cmd>config|fund|suggest|update)\b")
+        .unwrap()
+        .replace_all(&expected, "shirabe $cmd")
+        .into_owned()
+}
+
 fn fixtures_dir(path: &str) -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Fixtures")
@@ -752,8 +761,14 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
             .filter(|s| !s.is_empty())
             .map(|s| serde_json::from_str(s).unwrap());
 
-        let expect_output = test_data.get("EXPECT-OUTPUT").cloned();
-        let expect_output_optimized = test_data.get("EXPECT-OUTPUT-OPTIMIZED").cloned();
+        let expect_output = test_data
+            .get("EXPECT-OUTPUT")
+            .cloned()
+            .map(rename_binary_in_expected_output);
+        let expect_output_optimized = test_data
+            .get("EXPECT-OUTPUT-OPTIMIZED")
+            .cloned()
+            .map(rename_binary_in_expected_output);
         let expect = test_data["EXPECT"].clone();
 
         let expect_result =

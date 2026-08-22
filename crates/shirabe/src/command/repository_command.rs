@@ -295,17 +295,17 @@ impl Command for RepositoryCommand {
         self.set_help(
             "This command lets you manage repositories in your composer.json.\n\n\
             Examples:\n  \
-            composer repo list\n  \
-            composer repo add foo vcs https://github.com/acme/foo\n  \
-            composer repo add bar composer https://repo.packagist.com/bar\n  \
-            composer repo add zips '{\"type\":\"artifact\",\"url\":\"/path/to/dir/with/zips\"}'\n  \
-            composer repo add baz vcs https://example.org --before foo\n  \
-            composer repo add qux vcs https://example.org --after bar\n  \
-            composer repo remove foo\n  \
-            composer repo set-url foo https://git.example.org/acme/foo\n  \
-            composer repo get-url foo\n  \
-            composer repo disable packagist.org\n  \
-            composer repo enable packagist.org\n\n\
+            shirabe repo list\n  \
+            shirabe repo add foo vcs https://github.com/acme/foo\n  \
+            shirabe repo add bar composer https://repo.packagist.com/bar\n  \
+            shirabe repo add zips '{\"type\":\"artifact\",\"url\":\"/path/to/dir/with/zips\"}'\n  \
+            shirabe repo add baz vcs https://example.org --before foo\n  \
+            shirabe repo add qux vcs https://example.org --after bar\n  \
+            shirabe repo remove foo\n  \
+            shirabe repo set-url foo https://git.example.org/acme/foo\n  \
+            shirabe repo get-url foo\n  \
+            shirabe repo disable packagist.org\n  \
+            shirabe repo enable packagist.org\n\n\
             Use --global/-g to alter the global config.json instead.\n\
             Use --file to alter a specific file.",
         );
@@ -360,7 +360,7 @@ impl Command for RepositoryCommand {
             }
             "add" => {
                 if name.is_none() {
-                    return Err(RuntimeException::new("You must pass a repository name. Example: composer repo add foo vcs https://example.org".to_string()).into());
+                    return Err(RuntimeException::new("You must pass a repository name. Example: shirabe repo add foo vcs https://example.org".to_string()).into());
                 }
                 if arg1.is_none() {
                     return Err(RuntimeException::new(
@@ -373,7 +373,7 @@ impl Command for RepositoryCommand {
                     JsonFile::parse_json(Some(arg1_str), None)?
                 } else {
                     if arg2.is_none() {
-                        return Err(RuntimeException::new("You must pass the type and a url. Example: composer repo add foo vcs https://example.org".to_string()).into());
+                        return Err(RuntimeException::new("You must pass the type and a url. Example: shirabe repo add foo vcs https://example.org".to_string()).into());
                     }
                     let mut m = IndexMap::new();
                     m.insert("type".to_string(), PhpMixed::String(arg1_str.to_string()));
@@ -458,7 +458,7 @@ impl Command for RepositoryCommand {
             "set-url" | "seturl" => {
                 if name.is_none() || arg1.is_none() {
                     return Err(RuntimeException::new(
-                        "Usage: composer repo set-url <name> <new-url>".to_string(),
+                        "Usage: shirabe repo set-url <name> <new-url>".to_string(),
                     )
                     .into());
                 }
@@ -472,7 +472,7 @@ impl Command for RepositoryCommand {
             "get-url" | "geturl" => {
                 if name.is_none() {
                     return Err(RuntimeException::new(
-                        "Usage: composer repo get-url <name>".to_string(),
+                        "Usage: shirabe repo get-url <name>".to_string(),
                     )
                     .into());
                 }
@@ -517,7 +517,7 @@ impl Command for RepositoryCommand {
             "disable" => {
                 if name.is_none() {
                     return Err(RuntimeException::new(
-                        "Usage: composer repo disable packagist.org".to_string(),
+                        "Usage: shirabe repo disable packagist.org".to_string(),
                     )
                     .into());
                 }
@@ -540,7 +540,7 @@ impl Command for RepositoryCommand {
             "enable" => {
                 if name.is_none() {
                     return Err(RuntimeException::new(
-                        "Usage: composer repo enable packagist.org".to_string(),
+                        "Usage: shirabe repo enable packagist.org".to_string(),
                     )
                     .into());
                 }

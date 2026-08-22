@@ -89,7 +89,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 && (!root_pkg.get_requires().is_empty() || !root_pkg.get_dev_requires().is_empty())
             {
                 output.borrow().writeln(
-                    &["<warning>No dependencies installed. Try running composer install or update, or use --locked.</warning>".to_string()],
+                    &["<warning>No dependencies installed. Try running shirabe install or update, or use --locked.</warning>".to_string()],
                     shirabe_symfony_console::output::OUTPUT_NORMAL,
                 );
 
@@ -214,7 +214,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             }
             Some(matched) if inverted => {
                 self.get_io().write(&format!(
-                    "<comment>Package \"{}\" {} is already installed! To find out why, run `composer why {}`</comment>",
+                    "<comment>Package \"{}\" {} is already installed! To find out why, run `shirabe why {}`</comment>",
                     needle,
                     matched.get_pretty_version(),
                     needle
@@ -320,7 +320,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             }
 
             self.get_io().write_error(&format!(
-                "Not finding what you were looking for? Try calling `composer {} \"{}:{}\" --dry-run` to get another view on the problem.",
+                "Not finding what you were looking for? Try calling `shirabe {} \"{}:{}\" --dry-run` to get another view on the problem.",
                 composer_command, needle, text_constraint
             ));
         }

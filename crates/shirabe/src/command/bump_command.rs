@@ -149,7 +149,7 @@ impl BumpCommand {
                 .is_some_and(|m| m.contains_key("type"))
             {
                 io.write_error3(
-                    "<warning>If your package is not a library, you can explicitly specify the \"type\" by using \"composer config type project\".</warning>",
+                    "<warning>If your package is not a library, you can explicitly specify the \"type\" by using \"shirabe config type project\".</warning>",
                     true,
                     io_interface::NORMAL,
                 );

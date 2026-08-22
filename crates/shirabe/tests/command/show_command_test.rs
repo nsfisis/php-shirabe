@@ -1105,7 +1105,7 @@ fn test_not_installed_error() {
         app_tester
             .get_display()
             .trim()
-            .contains("No dependencies installed. Try running composer install or update."),
+            .contains("No dependencies installed. Try running shirabe install or update."),
         "Should show error message when no dependencies are installed"
     );
 }

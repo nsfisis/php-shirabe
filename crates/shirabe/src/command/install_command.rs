@@ -71,7 +71,7 @@ impl Command for InstallCommand {
             InputOption::new("apcu-autoloader-prefix", None, Some(InputOption::VALUE_REQUIRED), "Use a custom prefix for the APCu autoloader cache. Implicitly enables --apcu-autoloader", None).unwrap().into(),
             InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages).", None).unwrap().into(),
             InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages).", None).unwrap().into(),
-            InputArgument::new("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Should not be provided, use composer require instead to add a given package to composer.json.", None).unwrap().into(),
+            InputArgument::new("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Should not be provided, use shirabe require instead to add a given package to composer.json.", None).unwrap().into(),
         ]);
         self.set_help(
             "The <info>install</info> command reads the composer.lock file from\n\
@@ -107,7 +107,7 @@ impl Command for InstallCommand {
         let args_vec: Vec<String> = args.as_array().map(<[String]>::to_vec).unwrap_or_default();
         if !args_vec.is_empty() {
             io.write_error(&format!(
-                "<error>Invalid argument {}. Use \"composer require {}\" instead to add packages to your composer.json.</error>",
+                "<error>Invalid argument {}. Use \"shirabe require {}\" instead to add packages to your composer.json.</error>",
                 args_vec.join(" "),
                 args_vec.join(" ")
             ));
@@ -120,7 +120,7 @@ impl Command for InstallCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            io.write_error("<error>Invalid option \"--no-install\". Use \"composer update --no-install\" instead if you are trying to update the composer.lock file.</error>");
+            io.write_error("<error>Invalid option \"--no-install\". Use \"shirabe update --no-install\" instead if you are trying to update the composer.lock file.</error>");
             return Ok(1);
         }
 

@@ -63,7 +63,7 @@ impl Command for OutdatedCommand {
         InputOption::new("ignore-platform-reqs", None, Some(InputOption::VALUE_NONE), "Ignore all platform requirements (php & ext- packages). Use with the --outdated option", None).unwrap().into(),
         ]);
         self.set_help(
-            "The outdated command is just a proxy for `composer show -l`\n\n\
+            "The outdated command is just a proxy for `shirabe show -l`\n\n\
             The color coding (or signage if you have ANSI colors disabled) for dependency versions is as such:\n\n\
             - <info>green</info> (=): Dependency is in the latest version and is up to date.\n\
             - <comment>yellow</comment> (~): Dependency has a new version available that includes backwards\n  \

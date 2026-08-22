@@ -1830,7 +1830,7 @@ impl Command for ShowCommand {
                 {
                     // Borrow is local; release composer_local borrow first.
                     let _ = root_pkg;
-                    self.get_io().write_error("<warning>No dependencies installed. Try running composer install or update.</warning>");
+                    self.get_io().write_error("<warning>No dependencies installed. Try running shirabe install or update.</warning>");
                 }
             }
         }

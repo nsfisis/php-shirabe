@@ -337,7 +337,7 @@ impl RequireCommand {
 
         io.write_error3(
             &format!(
-                "<info>Running composer update {}{}</info>",
+                "<info>Running shirabe update {}{}</info>",
                 implode(
                     " ",
                     &array_keys(requirements)
@@ -453,7 +453,7 @@ impl RequireCommand {
                 )? {
                     if !req.contains_key("version") {
                         io.write_error3(&format!(
-                            "You can also try re-running composer require with an explicit version constraint, e.g. \"composer require {}:*\" to figure out if any version is installable, or \"composer require {}:^2.1\" if you know which you need.",
+                            "You can also try re-running shirabe require with an explicit version constraint, e.g. \"shirabe require {}:*\" to figure out if any version is installable, or \"shirabe require {}:^2.1\" if you know which you need.",
                             req.get("name").cloned().unwrap_or_default(),
                             req.get("name").cloned().unwrap_or_default(),
                         ), true, io_interface::NORMAL);
@@ -891,7 +891,7 @@ impl Command for RequireCommand {
                 self.get_io().write_error3("<error>The \"--fixed\" option is only allowed for packages with a \"project\" type or for dev dependencies to prevent possible misuses.</error>", true, io_interface::NORMAL);
 
                 if config.get("type").is_none() {
-                    self.get_io().write_error3("<error>If your package is not a library, you can explicitly specify the \"type\" by using \"composer config type project\".</error>", true, io_interface::NORMAL);
+                    self.get_io().write_error3("<error>If your package is not a library, you can explicitly specify the \"type\" by using \"shirabe config type project\".</error>", true, io_interface::NORMAL);
                 }
 
                 return Ok(1);

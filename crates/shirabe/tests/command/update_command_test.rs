@@ -148,7 +148,7 @@ Your requirements could not be resolved to an installable set of packages.
             root_dep_and_transitive_dep(),
             vec![("--with", InputValue::Array(vec!["root/req:^2".to_string()]))],
             "The temporary constraint \"^2\" for \"root/req\" must be a subset of the constraint in your composer.json (1.*)
-Run `composer require root/req` or `composer require root/req:^2` instead to replace the constraint",
+Run `shirabe require root/req` or `shirabe require root/req:^2` instead to replace the constraint",
             false,
         ),
         (
@@ -166,7 +166,7 @@ Package operations: 2 installs, 0 updates, 0 removals
   - Installing root/req (1.0.0)
 Bumping dependencies
 <warning>Warning: Bumping dependency constraints is not recommended for libraries as it will narrow down your dependencies and may cause problems for your users.</warning>
-<warning>If your package is not a library, you can explicitly specify the \"type\" by using \"composer config type project\".</warning>
+<warning>If your package is not a library, you can explicitly specify the \"type\" by using \"shirabe config type project\".</warning>
 <warning>Alternatively you can use --bump-after-update=dev to only bump dependencies within \"require-dev\".</warning>
 No requirements to update in ./composer.json.",
             true,

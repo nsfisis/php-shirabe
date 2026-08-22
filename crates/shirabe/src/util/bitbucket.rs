@@ -149,7 +149,7 @@ impl Bitbucket {
                         io_interface::NORMAL,
                     );
                     self.io.write_error3(
-                        "You can also add it manually later by using \"composer config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
+                        "You can also add it manually later by using \"shirabe config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
                         true,
                         io_interface::NORMAL,
                     );
@@ -244,7 +244,7 @@ impl Bitbucket {
                 io_interface::NORMAL,
             );
             self.io.write_error3(
-                "You can also add it manually later by using \"composer config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
+                "You can also add it manually later by using \"shirabe config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
                 true,
                 io_interface::NORMAL,
             );
@@ -265,7 +265,7 @@ impl Bitbucket {
                 io_interface::NORMAL,
             );
             self.io.write_error3(
-                "You can also add it manually later by using \"composer config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
+                "You can also add it manually later by using \"shirabe config --global --auth bitbucket-oauth.bitbucket.org <consumer-key> <consumer-secret>\"",
                 true,
                 io_interface::NORMAL,
             );

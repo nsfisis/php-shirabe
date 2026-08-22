@@ -453,7 +453,7 @@ impl Installer {
                     (if 1 == funding_count { "is" } else { "are" }),
                 ));
                 self.io
-                    .write_error("<info>Use the `composer fund` command to find out more!</info>");
+                    .write_error("<info>Use the `shirabe fund` command to find out more!</info>");
             }
         }
 
@@ -590,7 +590,7 @@ impl Installer {
         {
             self.io.write_error3(
                 &format!(
-                    "<error>Cannot update {} without a lock file present. Run `composer update` to generate a lock file.</error>",
+                    "<error>Cannot update {} without a lock file present. Run `shirabe update` to generate a lock file.</error>",
                     if self.update_mirrors {
                         "lock file information"
                     } else {
@@ -1052,7 +1052,7 @@ impl Installer {
 
             if !self.locker.borrow_mut().is_fresh()? {
                 self.io.write_error3(
-                    "<warning>Warning: The lock file is not up to date with the latest changes in composer.json. You may be getting outdated dependencies. It is recommended that you run `composer update` or `composer update <package name>`.</warning>",
+                    "<warning>Warning: The lock file is not up to date with the latest changes in composer.json. You may be getting outdated dependencies. It is recommended that you run `shirabe update` or `shirabe update <package name>`.</warning>",
                     true,
                     io_interface::QUIET,
                 );
@@ -1129,7 +1129,7 @@ impl Installer {
                     // installing the locked packages on this platform resulted in lock modifying operations, there wasn't a conflict, but the lock file as-is seems to not work on this system
                     if !lock_transaction.get_operations().is_empty() {
                         self.io.write_error3(
-                            "<error>Your lock file cannot be installed on this system without changes. Please run composer update.</error>",
+                            "<error>Your lock file cannot be installed on this system without changes. Please run shirabe update.</error>",
                             true,
                             io_interface::QUIET,
                         );
@@ -1138,7 +1138,7 @@ impl Installer {
                     }
                 }
                 Err(e) => {
-                    let err = "Your lock file does not contain a compatible set of packages. Please run composer update.";
+                    let err = "Your lock file does not contain a compatible set of packages. Please run shirabe update.";
                     let pretty_problem = e.get_pretty_string(
                         &repository_set,
                         &request,

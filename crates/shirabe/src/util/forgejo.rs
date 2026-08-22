@@ -92,7 +92,7 @@ impl Forgejo {
             .unwrap_or_default();
 
         let add_token_manually = format!(
-            "You can also add it manually later by using \"composer config --global --auth forgejo-token.{} <username> <token>\"",
+            "You can also add it manually later by using \"shirabe config --global --auth forgejo-token.{} <username> <token>\"",
             origin_url
         );
         if token.is_empty() || username.is_empty() {

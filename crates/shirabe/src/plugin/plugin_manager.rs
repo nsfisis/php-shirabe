@@ -1221,7 +1221,7 @@ impl PluginManager {
         if rules.is_none() {
             if !self.io.is_interactive() {
                 self.io.write_error("<warning>For additional security you should declare the allow-plugins config with a list of packages names that are allowed to run code. See https://getcomposer.org/allow-plugins</warning>");
-                self.io.write_error("<warning>This warning will become an exception once you run composer update!</warning>");
+                self.io.write_error("<warning>This warning will become an exception once you run shirabe update!</warning>");
 
                 let mut m: IndexMap<String, bool> = IndexMap::new();
                 m.insert("{}".to_string(), true);

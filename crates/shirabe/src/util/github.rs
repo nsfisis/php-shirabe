@@ -205,7 +205,7 @@ impl GitHub {
                 io_interface::NORMAL,
             );
             self.io.write_error3(
-                "You can also add it manually later by using \"composer config --global --auth github-oauth.github.com <token>\"",
+                "You can also add it manually later by using \"shirabe config --global --auth github-oauth.github.com <token>\"",
                 true,
                 io_interface::NORMAL,
             );
@@ -245,7 +245,7 @@ impl GitHub {
                         io_interface::NORMAL,
                     );
                     self.io.write_error3(
-                        "You can also add it manually later by using \"composer config --global --auth github-oauth.github.com <token>\"",
+                        "You can also add it manually later by using \"shirabe config --global --auth github-oauth.github.com <token>\"",
                         true,
                         io_interface::NORMAL,
                     );

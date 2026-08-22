@@ -434,7 +434,7 @@ impl DiagnoseCommand {
                     && te.get_code() == 401
                 {
                     return Ok(CheckResult::Message(format!(
-                        "<comment>The oauth token for {} seems invalid, run \"composer config --global --unset github-oauth.{}\" to remove it</comment>",
+                        "<comment>The oauth token for {} seems invalid, run \"shirabe config --global --unset github-oauth.{}\" to remove it</comment>",
                         domain, domain
                     )));
                 }
@@ -559,7 +559,7 @@ impl DiagnoseCommand {
 
         if !errors.is_empty() {
             errors.push(
-                "<error>Run composer self-update --update-keys to set them up</error>".to_string(),
+                "<error>Run shirabe self-update --update-keys to set them up</error>".to_string(),
             );
         }
 
@@ -610,7 +610,7 @@ impl DiagnoseCommand {
             .to_string();
         if composer::VERSION != latest_version && composer::VERSION != "@package_version@" {
             return Ok(CheckResult::Message(format!(
-                "<comment>You are not running the latest {} version, run `composer self-update` to update ({} => {})</comment>",
+                "<comment>You are not running the latest {} version, run `shirabe self-update` to update ({} => {})</comment>",
                 versions_util.get_channel()?,
                 composer::VERSION,
                 latest_version
@@ -1489,7 +1489,7 @@ impl Command for DiagnoseCommand {
                 Err(e) => {
                     if let Some(te) = e.catch::<TransportException>() {
                         if te.get_code() == 401 {
-                            self.output_result(CheckResult::Message("<comment>The oauth token for github.com seems invalid, run \"composer config --global --unset github-oauth.github.com\" to remove it</comment>".to_string()));
+                            self.output_result(CheckResult::Message("<comment>The oauth token for github.com seems invalid, run \"shirabe config --global --unset github-oauth.github.com\" to remove it</comment>".to_string()));
                         } else {
                             self.output_result(CheckResult::Message(format!(
                                 "<error>[{}] {}</error>",

@@ -125,6 +125,15 @@ fn clean_output(output: &str) -> String {
     String::from_utf8_lossy(&processed).into_owned()
 }
 
+/// The fixtures come from Composer's tree and name the `composer` binary in the hints they expect
+/// on stdout; Shirabe prints its own name there.
+fn rename_binary_in_expected_output(expected: &str) -> String {
+    regex::Regex::new(r"\bcomposer (?P<cmd>config|fund|suggest|update)\b")
+        .unwrap()
+        .replace_all(expected, "shirabe $cmd")
+        .into_owned()
+}
+
 /// ref: the inline `--EXPECT--` matcher in AllFunctionalTest::testIntegration. Literal byte
 /// comparison, except `%regex%` spans in `expected` are matched as `{regex}` against the remaining
 /// output and consume whatever they match.
@@ -216,9 +225,10 @@ fn run_integration(test_filename: &str) {
     let raw_output = String::from_utf8_lossy(&proc.stdout).into_owned();
 
     if let Some(expected) = test_data.get("EXPECT") {
+        let expected = rename_binary_in_expected_output(expected);
         let output = clean_output(&raw_output);
         let output = output.trim();
-        expect_matches(expected, output);
+        expect_matches(&expected, output);
     }
     if let Some(expect_regex) = test_data.get("EXPECT-REGEX") {
         assert!(preg_match(expect_regex, &clean_output(&raw_output)).is_some());

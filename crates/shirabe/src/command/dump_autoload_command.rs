@@ -98,7 +98,7 @@ impl Command for DumpAutoloadCommand {
                     .get_install_path(local_pkg);
                 if install_path.as_deref().is_some_and(|p| !file_exists(p)) {
                     missing_dependencies = true;
-                    self.get_io().write("<warning>Not all dependencies are installed. Make sure to run a \"composer install\" to install missing dependencies</warning>");
+                    self.get_io().write("<warning>Not all dependencies are installed. Make sure to run a \"shirabe install\" to install missing dependencies</warning>");
                     break;
                 }
             }

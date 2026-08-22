@@ -240,7 +240,7 @@ fn test_exception_when_package_was_not_found_in_project() {
 #[test]
 #[serial]
 fn test_warning_when_dependencies_are_not_installed() {
-    let expected_warning_message = "<warning>No dependencies installed. Try running composer install or update, or use --locked.</warning>";
+    let expected_warning_message = "<warning>No dependencies installed. Try running shirabe install or update, or use --locked.</warning>";
 
     // caseProvider
     let cases: Vec<(&str, Vec<(&str, InputValue)>)> = vec![
@@ -469,7 +469,7 @@ fn test_why_not_command_outputs() {
             "3.*",
             "Package \"vendor1/package1\" could not be found with constraint \"3.*\", results below will most likely be incomplete.\n\
              __root__ - requires vendor1/package1 (1.*)\n\
-             Not finding what you were looking for? Try calling `composer require \"vendor1/package1:3.*\" --dry-run` to get another view on the problem.",
+             Not finding what you were looking for? Try calling `shirabe require \"vendor1/package1:3.*\" --dry-run` to get another view on the problem.",
             1,
         ),
         (
@@ -477,20 +477,20 @@ fn test_why_not_command_outputs() {
             "^1.4",
             "Package \"vendor1/package1\" could not be found with constraint \"^1.4\", results below will most likely be incomplete.\n\
              There is no installed package depending on \"vendor1/package1\" in versions not matching ^1.4\n\
-             Not finding what you were looking for? Try calling `composer require \"vendor1/package1:^1.4\" --dry-run` to get another view on the problem.",
+             Not finding what you were looking for? Try calling `shirabe require \"vendor1/package1:^1.4\" --dry-run` to get another view on the problem.",
             0,
         ),
         (
             "vendor1/package1",
             "^1.3",
-            "Package \"vendor1/package1\" 1.3.0 is already installed! To find out why, run `composer why vendor1/package1`",
+            "Package \"vendor1/package1\" 1.3.0 is already installed! To find out why, run `shirabe why vendor1/package1`",
             0,
         ),
         (
             "vendor2/package3",
             "1.5.0",
             "vendor2/package2 1.0.0 requires vendor2/package3 (1.4.*)\n\
-             Not finding what you were looking for? Try calling `composer update \"vendor2/package3:1.5.0\" --dry-run` to get another view on the problem.",
+             Not finding what you were looking for? Try calling `shirabe update \"vendor2/package3:1.5.0\" --dry-run` to get another view on the problem.",
             1,
         ),
         (

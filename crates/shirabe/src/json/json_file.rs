@@ -490,7 +490,7 @@ impl JsonFile {
                     php_regex!(
                         r#"{\r?\n<<<<<<< [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n(?:\|{7} [^\r\n]+\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n)?=======\r?\n\s+"content-hash": *"[0-9a-f]+", *\r?\n>>>>>>> [^\r\n]+(\r?\n)}"#
                     ),
-                    "    \"content-hash\": \"VCS merge conflict detected. Please run `composer update --lock`.\",$1",
+                    "    \"content-hash\": \"VCS merge conflict detected. Please run `shirabe update --lock`.\",$1",
                     json,
                     -1,
                     Some(&mut count),

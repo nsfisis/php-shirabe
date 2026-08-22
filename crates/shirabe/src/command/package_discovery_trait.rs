@@ -784,7 +784,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 None => {
                     if platform_repo.is_platform_package_disabled(link.get_target()) {
                         details.push(format!(
-                            "{} {} requires {} {} but it is disabled by your platform config. Enable it again with \"composer config platform.{} --unset\".",
+                            "{} {} requires {} {} but it is disabled by your platform config. Enable it again with \"shirabe config platform.{} --unset\".",
                             candidate.get_pretty_name(),
                             candidate.get_pretty_version(),
                             link.get_target(),

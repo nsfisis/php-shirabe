@@ -151,7 +151,7 @@ impl SuggestedPackagesReporter {
             self.get_filtered_suggestions(installed_repo, only_dependents_of)?;
         if !suggested_packages.is_empty() {
             self.io.write_error(&format!(
-                "<info>{} package suggestions were added by new dependencies, use `composer suggest` to see details.</info>",
+                "<info>{} package suggestions were added by new dependencies, use `shirabe suggest` to see details.</info>",
                 suggested_packages.len()
             ));
         }

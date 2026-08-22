@@ -293,7 +293,7 @@ impl GitLab {
                             );
                             self.io.write_error3(
                                 &format!(
-                                    "Add it using \"composer config --global --auth gitlab-token.{} <token>\"",
+                                    "Add it using \"shirabe config --global --auth gitlab-token.{} <token>\"",
                                     origin_url
                                 ),
                                 true,
