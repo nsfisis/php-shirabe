@@ -291,38 +291,17 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
     ) -> Result<PluginValue, PhpThrow> {
         if rhandle == 0 {
             if method_name == "__shirabe_find_file" {
-                let class = match args.first() {
-                    // TODO(bytes): lossy UTF-8; class names are bytes in PHP.
-                    Some(PluginValue::String(bytes)) => String::from_utf8_lossy(bytes).into_owned(),
-                    other => {
-                        return Err(runtime_throw(format!(
-                            "__shirabe_find_file expects a class name argument, got {other:?}"
-                        )));
-                    }
-                };
-                return Ok(match find_file_in_registered_loaders(&class) {
-                    Some(file) => PluginValue::string(file),
-                    None => PluginValue::Null,
-                });
+                let class = arg::<String>(method_name, &args, 0)?;
+                return Ok(find_file_in_registered_loaders(&class).to_plugin_value());
             }
             if method_name == "__shirabe_run_rust_command" {
-                let (name, input_line) = match (args.first(), args.get(1)) {
-                    (Some(PluginValue::String(name)), Some(PluginValue::String(line))) => (
-                        // TODO(bytes): lossy UTF-8; command lines are bytes in PHP.
-                        String::from_utf8_lossy(name).into_owned(),
-                        String::from_utf8_lossy(line).into_owned(),
-                    ),
-                    _ => {
-                        return Err(runtime_throw(format!(
-                            "__shirabe_run_rust_command expects a command name and an input line, got {args:?}"
-                        )));
-                    }
-                };
+                let name = arg::<String>(method_name, &args, 0)?;
+                let input_line = arg::<String>(method_name, &args, 1)?;
                 return match crate::console::application::run_worker_reverse_command(
                     &name,
                     &input_line,
                 ) {
-                    Ok(code) => Ok(PluginValue::Int(code)),
+                    Ok(code) => Ok(code.to_plugin_value()),
                     Err(e) => Err(runtime_throw(format!("{e:#}"))),
                 };
             }
@@ -416,17 +395,11 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             )));
         }
     };
-    let string_arg = |position: usize| -> Result<String, PhpThrow> {
-        match ctor_args.get(position) {
-            Some(PluginValue::String(bytes)) => Ok(String::from_utf8_lossy(bytes).into_owned()),
-            other => Err(runtime_throw(format!(
-                "{class} expects a string constructor argument at position {position}, got {other:?}"
-            ))),
-        }
-    };
+    let string_arg = |position: usize| arg::<String>(&class, ctor_args, position);
+    let package_arg = |position: usize| arg::<PackageInterfaceHandle>(&class, ctor_args, position);
     let alias_package_arg =
         |position: usize| -> Result<crate::package::AliasPackageHandle, PhpThrow> {
-            package_from_arg(&class, ctor_args.get(position))?
+            package_arg(position)?
                 .as_alias()
                 .ok_or_else(|| runtime_throw(format!("{class} expects an AliasPackage")))
         };
@@ -442,7 +415,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // The alias target has to be a package that already lives on the Rust side; an alias of
         // an alias has no Rust representation, so its narrowing is an explicit error too.
         "Composer\\Package\\AliasPackage" => {
-            let alias_of = package_from_arg(&class, ctor_args.first())?
+            let alias_of = package_arg(0)?
                 .as_package()
                 .ok_or_else(|| runtime_throw(format!("{class} expects a real Package to alias")))?;
             AnyPackage::AliasPackage(crate::package::AliasPackage::new(
@@ -452,11 +425,9 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             ))
         }
         "Composer\\Package\\CompleteAliasPackage" => {
-            let alias_of = package_from_arg(&class, ctor_args.first())?
-                .as_complete_package()
-                .ok_or_else(|| {
-                    runtime_throw(format!("{class} expects a real CompletePackage to alias"))
-                })?;
+            let alias_of = package_arg(0)?.as_complete_package().ok_or_else(|| {
+                runtime_throw(format!("{class} expects a real CompletePackage to alias"))
+            })?;
             AnyPackage::CompleteAliasPackage(crate::package::CompleteAliasPackage::new(
                 alias_of,
                 string_arg(1)?,
@@ -464,11 +435,9 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             ))
         }
         "Composer\\Package\\RootAliasPackage" => {
-            let alias_of = package_from_arg(&class, ctor_args.first())?
-                .as_root_package()
-                .ok_or_else(|| {
-                    runtime_throw(format!("{class} expects a real RootPackage to alias"))
-                })?;
+            let alias_of = package_arg(0)?.as_root_package().ok_or_else(|| {
+                runtime_throw(format!("{class} expects a real RootPackage to alias"))
+            })?;
             AnyPackage::RootAliasPackage(crate::package::RootAliasPackage::new(
                 alias_of,
                 string_arg(1)?,
@@ -479,26 +448,20 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // one is a complete instance rather than a second view on a Rust-side service.
         "Composer\\DependencyResolver\\Operation\\InstallOperation" => {
             return Ok(operation_construction_result(AnyOperation::Install(
-                crate::dependency_resolver::operation::InstallOperation::new(package_from_arg(
-                    &class,
-                    ctor_args.first(),
-                )?),
+                crate::dependency_resolver::operation::InstallOperation::new(package_arg(0)?),
             )));
         }
         "Composer\\DependencyResolver\\Operation\\UpdateOperation" => {
             return Ok(operation_construction_result(AnyOperation::Update(
                 crate::dependency_resolver::operation::UpdateOperation::new(
-                    package_from_arg(&class, ctor_args.first())?,
-                    package_from_arg(&class, ctor_args.get(1))?,
+                    package_arg(0)?,
+                    package_arg(1)?,
                 ),
             )));
         }
         "Composer\\DependencyResolver\\Operation\\UninstallOperation" => {
             return Ok(operation_construction_result(AnyOperation::Uninstall(
-                crate::dependency_resolver::operation::UninstallOperation::new(package_from_arg(
-                    &class,
-                    ctor_args.first(),
-                )?),
+                crate::dependency_resolver::operation::UninstallOperation::new(package_arg(0)?),
             )));
         }
         "Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation" => {
@@ -606,25 +569,20 @@ fn dispatch_property_access(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    let property = required_string_arg(method_name, args.first())?;
+    let property = arg::<String>(method_name, args, 0)?;
     // `BasePackage::$id` is the one instance property the entities expose so far.
     if let RustEntity::Package(package) = entity
         && property == "id"
     {
         return match method_name {
-            "__get" => Ok(PluginValue::Int(
-                package.borrow().as_package_interface().get_id(),
-            )),
+            "__get" => Ok(package
+                .borrow()
+                .as_package_interface()
+                .get_id()
+                .to_plugin_value()),
             "__isset" => Ok(PluginValue::Bool(true)),
             "__set" => {
-                let id = match args.get(1) {
-                    Some(PluginValue::Int(id)) => *id,
-                    other => {
-                        return Err(runtime_throw(format!(
-                            "the package property `id` takes an int, got {other:?}"
-                        )));
-                    }
-                };
+                let id = arg::<i64>(method_name, args, 1)?;
                 package.borrow_mut().as_package_interface_mut().set_id(id);
                 Ok(PluginValue::Null)
             }
@@ -657,7 +615,7 @@ fn dispatch_plugin_method(
             let capabilities = capable
                 .get_capabilities()
                 .map_err(|error| runtime_throw(format!("getCapabilities failed: {error:#}")))?;
-            Ok(PluginValue::from_php_mixed(&PhpMixed::Array(capabilities)))
+            Ok(capabilities.to_plugin_value())
         }
         // TODO(plugin): the lifecycle methods would have to turn the `$composer`/`$io` stubs the
         // child passes back into the Rust handles they stand for; nothing calls them, because
@@ -727,73 +685,38 @@ fn dispatch_config_method(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    let key = |position: usize| -> Result<String, PhpThrow> {
-        match args.get(position) {
-            // TODO(bytes): lossy UTF-8; config keys are bytes in PHP.
-            Some(PluginValue::String(bytes)) => Ok(String::from_utf8_lossy(bytes).into_owned()),
-            other => Err(runtime_throw(format!(
-                "{method_name} expects a string key, got {other:?}"
-            ))),
-        }
-    };
-    let flags = |position: usize| -> Result<i64, PhpThrow> {
-        match args.get(position) {
-            None | Some(PluginValue::Null) => Ok(0),
-            Some(PluginValue::Int(flags)) => Ok(*flags),
-            other => Err(runtime_throw(format!(
-                "{method_name} expects int flags, got {other:?}"
-            ))),
-        }
-    };
+    let key = |position: usize| arg::<String>(method_name, args, position);
+    let flags = |position: usize| arg_or::<i64>(method_name, args, position, 0);
     match method_name {
         "get" => {
             let value = config
                 .borrow()
                 .get_with_flags(&key(0)?, flags(1)?)
                 .map_err(|error| runtime_throw(format!("get failed over RPC: {error}")))?;
-            Ok(PluginValue::from_php_mixed(&value))
+            Ok(value.to_plugin_value())
         }
         "all" => {
             let all = config
                 .borrow_mut()
                 .all(flags(0)?)
                 .map_err(|error| runtime_throw(format!("all failed over RPC: {error}")))?;
-            Ok(PluginValue::from_php_mixed(&PhpMixed::Array(all)))
+            Ok(all.to_plugin_value())
         }
-        "raw" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
-            config.borrow().raw(),
-        ))),
-        "has" => Ok(PluginValue::Bool(config.borrow().has(&key(0)?))),
-        "getRepositories" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
-            config.borrow().get_repositories(),
-        ))),
-        "getSourceOfValue" => Ok(PluginValue::string(
-            config.borrow_mut().get_source_of_value(&key(0)?),
-        )),
+        "raw" => Ok(config.borrow().raw().to_plugin_value()),
+        "has" => Ok(config.borrow().has(&key(0)?).to_plugin_value()),
+        "getRepositories" => Ok(config.borrow().get_repositories().to_plugin_value()),
+        "getSourceOfValue" => Ok(config
+            .borrow_mut()
+            .get_source_of_value(&key(0)?)
+            .to_plugin_value()),
         "merge" => {
-            let values = match args.first().map(PluginValue::to_php_mixed).transpose() {
-                Ok(Some(PhpMixed::Array(values))) => values,
-                Ok(Some(PhpMixed::List(items))) if items.is_empty() => IndexMap::new(),
-                Ok(other) => {
-                    return Err(runtime_throw(format!(
-                        "merge expects a config array, got {other:?}"
-                    )));
-                }
-                Err(error) => {
-                    return Err(runtime_throw(format!(
-                        "merge could not decode its argument: {error:#}"
-                    )));
-                }
-            };
-            let source = match args.get(1) {
-                None => crate::config::Config::SOURCE_UNKNOWN.to_string(),
-                Some(PluginValue::String(bytes)) => String::from_utf8_lossy(bytes).into_owned(),
-                other => {
-                    return Err(runtime_throw(format!(
-                        "merge expects a string source, got {other:?}"
-                    )));
-                }
-            };
+            let values = arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?;
+            let source = arg_or::<String>(
+                method_name,
+                args,
+                1,
+                crate::config::Config::SOURCE_UNKNOWN.to_string(),
+            )?;
             config.borrow_mut().merge(&values, &source);
             Ok(PluginValue::Null)
         }
@@ -817,25 +740,10 @@ fn dispatch_download_manager_method(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    let string_arg = |position: usize| -> Result<String, PhpThrow> {
-        match args.get(position) {
-            // TODO(bytes): lossy UTF-8; paths and types are bytes in PHP.
-            Some(PluginValue::String(bytes)) => Ok(String::from_utf8_lossy(bytes).into_owned()),
-            other => Err(runtime_throw(format!(
-                "{method_name} expects a string argument at position {position}, got {other:?}"
-            ))),
-        }
-    };
+    let string_arg = |position: usize| arg::<String>(method_name, args, position);
     match method_name {
         "setPreferSource" | "setPreferDist" => {
-            let preferred = match args.first() {
-                Some(PluginValue::Bool(preferred)) => *preferred,
-                other => {
-                    return Err(runtime_throw(format!(
-                        "{method_name} expects a bool, got {other:?}"
-                    )));
-                }
-            };
+            let preferred = arg::<bool>(method_name, args, 0)?;
             if method_name == "setPreferSource" {
                 dm.borrow_mut().set_prefer_source(preferred);
             } else {
@@ -849,39 +757,39 @@ fn dispatch_download_manager_method(
                 match method_name {
                     "download" => {
                         dm.download(
-                            package_from_arg(method_name, args.first())?,
+                            arg::<PackageInterfaceHandle>(method_name, args, 0)?,
                             &string_arg(1)?,
-                            optional_package_from_arg(method_name, args.get(2))?,
+                            arg::<Option<PackageInterfaceHandle>>(method_name, args, 2)?,
                         )
                         .await
                     }
                     "prepare" => {
                         dm.prepare(
                             &string_arg(0)?,
-                            package_from_arg(method_name, args.get(1))?,
+                            arg::<PackageInterfaceHandle>(method_name, args, 1)?,
                             &string_arg(2)?,
-                            optional_package_from_arg(method_name, args.get(3))?,
+                            arg::<Option<PackageInterfaceHandle>>(method_name, args, 3)?,
                         )
                         .await
                     }
                     "install" => {
                         dm.install(
-                            package_from_arg(method_name, args.first())?,
+                            arg::<PackageInterfaceHandle>(method_name, args, 0)?,
                             &string_arg(1)?,
                         )
                         .await
                     }
                     "update" => {
                         dm.update(
-                            package_from_arg(method_name, args.first())?,
-                            package_from_arg(method_name, args.get(1))?,
+                            arg::<PackageInterfaceHandle>(method_name, args, 0)?,
+                            arg::<PackageInterfaceHandle>(method_name, args, 1)?,
                             &string_arg(2)?,
                         )
                         .await
                     }
                     "remove" => {
                         dm.remove(
-                            package_from_arg(method_name, args.first())?,
+                            arg::<PackageInterfaceHandle>(method_name, args, 0)?,
                             &string_arg(1)?,
                         )
                         .await
@@ -889,9 +797,9 @@ fn dispatch_download_manager_method(
                     _ => {
                         dm.cleanup(
                             &string_arg(0)?,
-                            package_from_arg(method_name, args.get(1))?,
+                            arg::<PackageInterfaceHandle>(method_name, args, 1)?,
                             &string_arg(2)?,
-                            optional_package_from_arg(method_name, args.get(3))?,
+                            arg::<Option<PackageInterfaceHandle>>(method_name, args, 3)?,
                         )
                         .await
                     }
@@ -902,11 +810,7 @@ fn dispatch_download_manager_method(
                     runtime_throw(format!("{method_name} failed over RPC: {error:#}"))
                 })
             })?;
-            let value = match resolved {
-                Some(value) => PluginValue::from_php_mixed(&value),
-                None => PluginValue::Null,
-            };
-            resolved_promise(value)
+            resolved_promise(resolved.to_plugin_value())
         }
         // TODO(plugin): the downloader-facing surface (getDownloader / setDownloader /
         // getDownloaderForPackage / getDownloaderType) needs proxy stubs for
@@ -938,70 +842,68 @@ fn dispatch_filesystem_method(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    let string_arg = |position: usize| -> Result<String, PhpThrow> {
-        match args.get(position) {
-            // TODO(bytes): lossy UTF-8; paths are bytes in PHP.
-            Some(PluginValue::String(bytes)) => Ok(String::from_utf8_lossy(bytes).into_owned()),
-            other => Err(runtime_throw(format!(
-                "{method_name} expects a string argument at position {position}, got {other:?}"
-            ))),
-        }
-    };
+    let string_arg = |position: usize| arg::<String>(method_name, args, position);
     // TODO(plugin): the exception class the real method throws (RuntimeException, IOException,
     // LogicException) is collapsed to RuntimeException on this side of the boundary.
     let failed = |error: anyhow::Error| runtime_throw(format!("{method_name} failed: {error:#}"));
     match method_name {
-        "remove" => Ok(PluginValue::Bool(
-            fs.borrow_mut().remove(string_arg(0)?).map_err(failed)?,
-        )),
-        "isDirEmpty" => Ok(PluginValue::Bool(fs.borrow().is_dir_empty(&string_arg(0)?))),
+        "remove" => Ok(fs
+            .borrow_mut()
+            .remove(string_arg(0)?)
+            .map_err(failed)?
+            .to_plugin_value()),
+        "isDirEmpty" => Ok(fs.borrow().is_dir_empty(&string_arg(0)?).to_plugin_value()),
         "emptyDirectory" => {
             fs.borrow_mut()
-                .empty_directory(&string_arg(0)?, bool_arg(method_name, args.get(1))?)
+                .empty_directory(&string_arg(0)?, arg::<bool>(method_name, args, 1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        "removeDirectory" => Ok(PluginValue::Bool(
-            fs.borrow_mut()
-                .remove_directory(string_arg(0)?)
-                .map_err(failed)?,
-        )),
+        "removeDirectory" => Ok(fs
+            .borrow_mut()
+            .remove_directory(string_arg(0)?)
+            .map_err(failed)?
+            .to_plugin_value()),
         "removeDirectoryAsync" => {
             let directory = string_arg(0)?;
             let removed = crate::util::sync_executor::block_on(async {
                 crate::util::Filesystem::remove_directory_async_via(fs, &directory).await
             })
             .map_err(failed)?;
-            resolved_promise(PluginValue::Bool(removed))
+            resolved_promise(removed.to_plugin_value())
         }
-        "removeDirectoryPhp" => Ok(PluginValue::Bool(
-            fs.borrow_mut()
-                .remove_directory_php(&string_arg(0)?)
-                .map_err(failed)?,
-        )),
+        "removeDirectoryPhp" => Ok(fs
+            .borrow_mut()
+            .remove_directory_php(&string_arg(0)?)
+            .map_err(failed)?
+            .to_plugin_value()),
         "ensureDirectoryExists" => {
             fs.borrow_mut()
                 .ensure_directory_exists(&string_arg(0)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        "unlink" => Ok(PluginValue::Bool(
-            fs.borrow().unlink(string_arg(0)?).map_err(failed)?,
-        )),
-        "rmdir" => Ok(PluginValue::Bool(
-            fs.borrow().rmdir(string_arg(0)?).map_err(failed)?,
-        )),
+        "unlink" => Ok(fs
+            .borrow()
+            .unlink(string_arg(0)?)
+            .map_err(failed)?
+            .to_plugin_value()),
+        "rmdir" => Ok(fs
+            .borrow()
+            .rmdir(string_arg(0)?)
+            .map_err(failed)?
+            .to_plugin_value()),
         "copyThenRemove" => {
             fs.borrow_mut()
                 .copy_then_remove(&string_arg(0)?, &string_arg(1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        "copy" => Ok(PluginValue::Bool(
-            fs.borrow_mut()
-                .copy(&string_arg(0)?, &string_arg(1)?)
-                .map_err(failed)?,
-        )),
+        "copy" => Ok(fs
+            .borrow_mut()
+            .copy(&string_arg(0)?, &string_arg(1)?)
+            .map_err(failed)?
+            .to_plugin_value()),
         "rename" => {
             fs.borrow_mut()
                 .rename(string_arg(0)?, string_arg(1)?)
@@ -1022,56 +924,62 @@ fn dispatch_filesystem_method(
                     code: 0,
                 });
             }
-            Ok(PluginValue::string(if method_name == "findShortestPath" {
+            Ok(if method_name == "findShortestPath" {
                 fs.find_shortest_path(
                     &from,
                     &to,
-                    bool_arg(method_name, args.get(2))?,
-                    bool_arg(method_name, args.get(3))?,
+                    arg::<bool>(method_name, args, 2)?,
+                    arg::<bool>(method_name, args, 3)?,
                 )
             } else {
                 fs.find_shortest_path_code(
                     &from,
                     &to,
-                    bool_arg(method_name, args.get(2))?,
-                    bool_arg(method_name, args.get(3))?,
-                    bool_arg(method_name, args.get(4))?,
+                    arg::<bool>(method_name, args, 2)?,
+                    arg::<bool>(method_name, args, 3)?,
+                    arg::<bool>(method_name, args, 4)?,
                 )
-            }))
+            }
+            .to_plugin_value())
         }
-        "isAbsolutePath" => Ok(PluginValue::Bool(
-            fs.borrow().is_absolute_path(&string_arg(0)?),
-        )),
-        "size" => Ok(PluginValue::Int(
-            fs.borrow().size(string_arg(0)?).map_err(failed)?,
-        )),
-        "normalizePath" => Ok(PluginValue::string(
-            fs.borrow().normalize_path(&string_arg(0)?),
-        )),
-        "relativeSymlink" => Ok(PluginValue::Bool(
-            fs.borrow()
-                .relative_symlink(&string_arg(0)?, &string_arg(1)?),
-        )),
-        "isSymlinkedDirectory" => Ok(PluginValue::Bool(
-            fs.borrow().is_symlinked_directory(&string_arg(0)?),
-        )),
+        "isAbsolutePath" => Ok(fs
+            .borrow()
+            .is_absolute_path(&string_arg(0)?)
+            .to_plugin_value()),
+        "size" => Ok(fs
+            .borrow()
+            .size(string_arg(0)?)
+            .map_err(failed)?
+            .to_plugin_value()),
+        "normalizePath" => Ok(fs
+            .borrow()
+            .normalize_path(&string_arg(0)?)
+            .to_plugin_value()),
+        "relativeSymlink" => Ok(fs
+            .borrow()
+            .relative_symlink(&string_arg(0)?, &string_arg(1)?)
+            .to_plugin_value()),
+        "isSymlinkedDirectory" => Ok(fs
+            .borrow()
+            .is_symlinked_directory(&string_arg(0)?)
+            .to_plugin_value()),
         "junction" => {
             fs.borrow_mut()
                 .junction(&string_arg(0)?, &string_arg(1)?)
                 .map_err(failed)?;
             Ok(PluginValue::Null)
         }
-        "isJunction" => Ok(PluginValue::Bool(fs.borrow().is_junction(&string_arg(0)?))),
-        "removeJunction" => Ok(PluginValue::Bool(
-            fs.borrow_mut()
-                .remove_junction(&string_arg(0)?)
-                .map_err(failed)?,
-        )),
-        "filePutContentsIfModified" => Ok(PluginValue::Int(
-            fs.borrow()
-                .file_put_contents_if_modified(&string_arg(0)?, &string_arg(1)?)
-                .map_err(failed)?,
-        )),
+        "isJunction" => Ok(fs.borrow().is_junction(&string_arg(0)?).to_plugin_value()),
+        "removeJunction" => Ok(fs
+            .borrow_mut()
+            .remove_junction(&string_arg(0)?)
+            .map_err(failed)?
+            .to_plugin_value()),
+        "filePutContentsIfModified" => Ok(fs
+            .borrow()
+            .file_put_contents_if_modified(&string_arg(0)?, &string_arg(1)?)
+            .map_err(failed)?
+            .to_plugin_value()),
         "safeCopy" => {
             fs.borrow()
                 .safe_copy(&string_arg(0)?, &string_arg(1)?)
@@ -1093,14 +1001,7 @@ fn dispatch_event_dispatcher_method(
 ) -> Result<PluginValue, PhpThrow> {
     match method_name {
         "dispatch" => {
-            let name = match args.first() {
-                Some(PluginValue::String(name)) => String::from_utf8_lossy(name).into_owned(),
-                other => {
-                    return Err(runtime_throw(format!(
-                        "dispatch expects an event name, got {other:?}"
-                    )));
-                }
-            };
+            let name = arg::<String>(method_name, args, 0)?;
             let probe = crate::event_dispatcher::Event::from_name(name.clone());
             if dispatcher.borrow_mut().has_event_listeners(&probe) {
                 // TODO(plugin): dispatching a worker-constructed event through the Rust-side
@@ -1140,16 +1041,16 @@ fn dispatch_repository_method(
 ) -> Result<PluginValue, PhpThrow> {
     match method_name {
         "hasPackage" => {
-            let package = package_from_arg(method_name, args.first())?;
+            let package = arg::<PackageInterfaceHandle>(method_name, args, 0)?;
             let has = repository.has_package(package).map_err(|error| {
                 // TODO(plugin): the original exception class is collapsed to RuntimeException
                 // on this side of the boundary.
                 runtime_throw(format!("hasPackage failed over RPC: {error}"))
             })?;
-            Ok(PluginValue::Bool(has))
+            Ok(has.to_plugin_value())
         }
         "addPackage" | "removePackage" => {
-            let package = package_from_arg(method_name, args.first())?;
+            let package = arg::<PackageInterfaceHandle>(method_name, args, 0)?;
             let mut borrowed = repository.borrow_mut();
             let writable = borrowed
                 .as_writable_repository_interface_mut()
@@ -1190,72 +1091,198 @@ fn dispatch_repository_method(
     }
 }
 
-/// A PHP string-or-null wire value.
-fn optional_string(value: Option<String>) -> PluginValue {
-    match value {
-        Some(value) => PluginValue::string(value),
-        None => PluginValue::Null,
-    }
+/// Decodes one positional argument of an RPC method call. A missing argument decodes the same
+/// way PHP's `null` does; a parameter's own default belongs to `arg_or`.
+trait FromPluginArg: Sized {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow>;
 }
 
-fn string_list(values: Vec<String>) -> PluginValue {
-    PluginValue::List(values.into_iter().map(PluginValue::string).collect())
+/// Encodes a Rust value as the PHP value the calling proxy stub declares.
+trait ToPluginValue {
+    fn to_plugin_value(self) -> PluginValue;
 }
 
-/// `?list<array{url: string, preferred: bool}>` as PHP shapes it.
-fn mirror_list(mirrors: Option<Vec<crate::package::Mirror>>) -> PluginValue {
-    match mirrors {
-        None => PluginValue::Null,
-        Some(mirrors) => PluginValue::List(
-            mirrors
-                .into_iter()
-                .map(|mirror| {
-                    PluginValue::Array(IndexMap::from([
-                        (b"url".to_vec(), PluginValue::string(mirror.url)),
-                        (b"preferred".to_vec(), PluginValue::Bool(mirror.preferred)),
-                    ]))
-                })
-                .collect(),
-        ),
-    }
-}
-
-/// An `array<string, mixed>` as PHP shapes it: empty maps cross as a list, since an empty PHP
-/// array is indistinguishable from an empty list on the wire.
-fn string_keyed_map(map: IndexMap<String, PhpMixed>) -> PluginValue {
-    if map.is_empty() {
-        PluginValue::List(Vec::new())
-    } else {
-        PluginValue::from_php_mixed(&PhpMixed::Array(map))
-    }
-}
-
-/// The inverse of `mirror_list`.
-fn decode_mirrors(
+/// Decodes the argument at `position`.
+fn arg<T: FromPluginArg>(
     method: &str,
+    args: &[PluginValue],
+    position: usize,
+) -> Result<T, PhpThrow> {
+    T::from_arg(method, position, args.get(position))
+}
+
+/// Decodes the argument at `position` for a parameter whose PHP declaration carries a default:
+/// an omitted argument, and the `null` PHP passes in its place, take `default`.
+fn arg_or<T: FromPluginArg>(
+    method: &str,
+    args: &[PluginValue],
+    position: usize,
+    default: T,
+) -> Result<T, PhpThrow> {
+    match args.get(position) {
+        None | Some(PluginValue::Null) => Ok(default),
+        value => T::from_arg(method, position, value),
+    }
+}
+
+fn arg_throw(
+    method: &str,
+    position: usize,
+    expected: &str,
     value: Option<&PluginValue>,
-) -> Result<Option<Vec<crate::package::Mirror>>, PhpThrow> {
-    let rows = match value {
-        None | Some(PluginValue::Null) => return Ok(None),
-        Some(PluginValue::List(rows)) => rows.clone(),
-        Some(PluginValue::Array(rows)) => rows.values().cloned().collect(),
-        other => {
-            return Err(runtime_throw(format!(
-                "{method} expects a list of mirrors or null, got {other:?}"
-            )));
+) -> PhpThrow {
+    runtime_throw(format!(
+        "{method} expects {expected} at position {position}, got {value:?}"
+    ))
+}
+
+impl FromPluginArg for bool {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::Bool(value)) => Ok(*value),
+            other => Err(arg_throw(method, position, "a bool", other)),
         }
-    };
-    let mut mirrors = Vec::with_capacity(rows.len());
-    for row in rows {
-        let row = match row {
-            PluginValue::Array(row) => row,
-            other => {
-                return Err(runtime_throw(format!(
-                    "{method} expects mirror maps, got {other:?}"
-                )));
-            }
+    }
+}
+
+impl FromPluginArg for i64 {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::Int(value)) => Ok(*value),
+            other => Err(arg_throw(method, position, "an int", other)),
+        }
+    }
+}
+
+impl FromPluginArg for String {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            // TODO(bytes): lossy UTF-8; every PHP string crossing the boundary is bytes.
+            Some(PluginValue::String(bytes)) => Ok(String::from_utf8_lossy(bytes).into_owned()),
+            other => Err(arg_throw(method, position, "a string", other)),
+        }
+    }
+}
+
+impl FromPluginArg for PhpMixed {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            None => Ok(PhpMixed::Null),
+            Some(value) => value.to_php_mixed().map_err(|error| {
+                runtime_throw(format!(
+                    "{method} could not decode its argument at position {position}: {error:#}"
+                ))
+            }),
+        }
+    }
+}
+
+impl<T: FromPluginArg> FromPluginArg for Option<T> {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            None | Some(PluginValue::Null) => Ok(None),
+            value => Ok(Some(T::from_arg(method, position, value)?)),
+        }
+    }
+}
+
+/// A PHP array argument as a list, accepting the keyed shape PHP allows anywhere a list is
+/// documented.
+impl<T: FromPluginArg> FromPluginArg for Vec<T> {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        let items: Vec<&PluginValue> = match value {
+            Some(PluginValue::List(items)) => items.iter().collect(),
+            Some(PluginValue::Array(map)) => map.values().collect(),
+            other => return Err(arg_throw(method, position, "an array", other)),
+        };
+        items
+            .into_iter()
+            .map(|item| T::from_arg(method, position, Some(item)))
+            .collect()
+    }
+}
+
+/// A PHP array argument as a map. An empty PHP array is indistinguishable from an empty list on
+/// the wire, so it decodes here as an empty map; a non-empty list decodes under its int keys.
+impl<T: FromPluginArg> FromPluginArg for IndexMap<String, T> {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        let entries: Vec<(String, &PluginValue)> = match value {
+            Some(PluginValue::Array(map)) => map
+                .iter()
+                // TODO(bytes): lossy UTF-8; PHP array keys are bytes.
+                .map(|(key, item)| (String::from_utf8_lossy(key).into_owned(), item))
+                .collect(),
+            Some(PluginValue::List(items)) => items
+                .iter()
+                .enumerate()
+                .map(|(index, item)| (index.to_string(), item))
+                .collect(),
+            other => return Err(arg_throw(method, position, "an array", other)),
+        };
+        entries
+            .into_iter()
+            .map(|(key, item)| Ok((key, T::from_arg(method, position, Some(item))?)))
+            .collect()
+    }
+}
+
+impl FromPluginArg for crate::package::Link {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(value) => link_from_wire(value),
+            other => Err(arg_throw(method, position, "a Link", other)),
+        }
+    }
+}
+
+impl FromPluginArg for crate::package::Mirror {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        let row = match value {
+            Some(PluginValue::Array(row)) => row,
+            other => return Err(arg_throw(method, position, "a mirror map", other)),
         };
         let url = match row.get(b"url".as_slice()) {
+            // TODO(bytes): lossy UTF-8; PHP strings are bytes.
             Some(PluginValue::String(url)) => String::from_utf8_lossy(url).into_owned(),
             other => {
                 return Err(runtime_throw(format!(
@@ -1267,273 +1294,186 @@ fn decode_mirrors(
             row.get(b"preferred".as_slice()),
             Some(PluginValue::Bool(true))
         );
-        mirrors.push(crate::package::Mirror { url, preferred });
+        Ok(crate::package::Mirror { url, preferred })
     }
-    Ok(Some(mirrors))
-}
-
-/// An `array<string, T>` of plain values as PHP shapes it, via the `PhpMixed` image of `T`.
-fn typed_map<T>(map: IndexMap<String, T>, to_mixed: impl Fn(T) -> PhpMixed) -> PluginValue {
-    string_keyed_map(
-        map.into_iter()
-            .map(|(key, value)| (key, to_mixed(value)))
-            .collect(),
-    )
-}
-
-/// A `list<array<string, T>>` as PHP shapes it.
-fn typed_map_list<T>(
-    rows: Vec<IndexMap<String, T>>,
-    to_mixed: impl Fn(T) -> PhpMixed + Copy,
-) -> PluginValue {
-    PluginValue::List(
-        rows.into_iter()
-            .map(|row| typed_map(row, to_mixed))
-            .collect(),
-    )
-}
-
-/// The `PhpMixed` image of an argument, as the wire codec decoded it.
-fn mixed_arg(method: &str, value: Option<&PluginValue>) -> Result<PhpMixed, PhpThrow> {
-    match value {
-        None => Ok(PhpMixed::Null),
-        Some(value) => value.to_php_mixed().map_err(|error| {
-            runtime_throw(format!("{method} could not decode its argument: {error:#}"))
-        }),
-    }
-}
-
-/// A PHP array argument as a map. An empty PHP array is indistinguishable from an empty list on
-/// the wire, so it decodes here as an empty map.
-fn map_arg(
-    method: &str,
-    value: Option<&PluginValue>,
-) -> Result<IndexMap<String, PhpMixed>, PhpThrow> {
-    match mixed_arg(method, value)? {
-        PhpMixed::Array(map) => Ok(map),
-        PhpMixed::List(items) if items.is_empty() => Ok(IndexMap::new()),
-        PhpMixed::List(items) => Ok(items
-            .into_iter()
-            .enumerate()
-            .map(|(index, item)| (index.to_string(), item))
-            .collect()),
-        other => Err(runtime_throw(format!(
-            "{method} expects an array, got {other:?}"
-        ))),
-    }
-}
-
-/// A PHP array argument as a list, accepting the keyed shape PHP allows anywhere a list is
-/// documented.
-fn list_arg(method: &str, value: Option<&PluginValue>) -> Result<Vec<PhpMixed>, PhpThrow> {
-    match mixed_arg(method, value)? {
-        PhpMixed::List(items) => Ok(items),
-        PhpMixed::Array(map) => Ok(map.into_values().collect()),
-        other => Err(runtime_throw(format!(
-            "{method} expects an array, got {other:?}"
-        ))),
-    }
-}
-
-fn as_string(method: &str, value: PhpMixed) -> Result<String, PhpThrow> {
-    match value {
-        PhpMixed::String(value) => Ok(value),
-        other => Err(runtime_throw(format!(
-            "{method} expects strings, got {other:?}"
-        ))),
-    }
-}
-
-fn as_int(method: &str, value: PhpMixed) -> Result<i64, PhpThrow> {
-    match value {
-        PhpMixed::Int(value) => Ok(value),
-        other => Err(runtime_throw(format!(
-            "{method} expects ints, got {other:?}"
-        ))),
-    }
-}
-
-fn string_map_arg(
-    method: &str,
-    value: Option<&PluginValue>,
-) -> Result<IndexMap<String, String>, PhpThrow> {
-    map_arg(method, value)?
-        .into_iter()
-        .map(|(key, value)| Ok((key, as_string(method, value)?)))
-        .collect()
-}
-
-fn int_map_arg(
-    method: &str,
-    value: Option<&PluginValue>,
-) -> Result<IndexMap<String, i64>, PhpThrow> {
-    map_arg(method, value)?
-        .into_iter()
-        .map(|(key, value)| Ok((key, as_int(method, value)?)))
-        .collect()
-}
-
-fn string_list_arg(method: &str, value: Option<&PluginValue>) -> Result<Vec<String>, PhpThrow> {
-    list_arg(method, value)?
-        .into_iter()
-        .map(|item| as_string(method, item))
-        .collect()
-}
-
-/// An `array<string, Link>` argument, keyed by the target package name as PHP keys it.
-fn link_map_arg(
-    method: &str,
-    value: Option<&PluginValue>,
-) -> Result<IndexMap<String, crate::package::Link>, PhpThrow> {
-    let entries: Vec<(Vec<u8>, &PluginValue)> = match value {
-        Some(PluginValue::Array(map)) => {
-            map.iter().map(|(key, item)| (key.clone(), item)).collect()
-        }
-        Some(PluginValue::List(items)) => items
-            .iter()
-            .enumerate()
-            .map(|(index, item)| (index.to_string().into_bytes(), item))
-            .collect(),
-        None | Some(PluginValue::Null) => Vec::new(),
-        other => {
-            return Err(runtime_throw(format!(
-                "{method} expects an array of Link values, got {other:?}"
-            )));
-        }
-    };
-    entries
-        .into_iter()
-        .map(|(key, item)| {
-            Ok((
-                String::from_utf8_lossy(&key).into_owned(),
-                link_from_wire(item)?,
-            ))
-        })
-        .collect()
-}
-
-/// A `list<array<string, string>>` argument (`authors`, `aliases`).
-fn string_map_list_arg(
-    method: &str,
-    value: Option<&PluginValue>,
-) -> Result<Vec<IndexMap<String, String>>, PhpThrow> {
-    list_arg(method, value)?
-        .into_iter()
-        .map(|row| match row {
-            PhpMixed::Array(row) => row
-                .into_iter()
-                .map(|(key, value)| Ok((key, as_string(method, value)?)))
-                .collect(),
-            PhpMixed::List(items) if items.is_empty() => Ok(IndexMap::new()),
-            other => Err(runtime_throw(format!(
-                "{method} expects arrays of strings, got {other:?}"
-            ))),
-        })
-        .collect()
-}
-
-/// A `list<array<string, mixed>>` argument (`funding`).
-fn mixed_map_list_arg(
-    method: &str,
-    value: Option<&PluginValue>,
-) -> Result<Vec<IndexMap<String, PhpMixed>>, PhpThrow> {
-    list_arg(method, value)?
-        .into_iter()
-        .map(|row| match row {
-            PhpMixed::Array(row) => Ok(row),
-            PhpMixed::List(items) if items.is_empty() => Ok(IndexMap::new()),
-            other => Err(runtime_throw(format!(
-                "{method} expects arrays, got {other:?}"
-            ))),
-        })
-        .collect()
-}
-
-/// An `array<string, list<string>>` argument (`scripts`).
-fn string_list_map_arg(
-    method: &str,
-    value: Option<&PluginValue>,
-) -> Result<IndexMap<String, Vec<String>>, PhpThrow> {
-    map_arg(method, value)?
-        .into_iter()
-        .map(|(key, value)| {
-            let items = match value {
-                PhpMixed::List(items) => items,
-                PhpMixed::Array(map) => map.into_values().collect(),
-                other => {
-                    return Err(runtime_throw(format!(
-                        "{method} expects arrays of strings, got {other:?}"
-                    )));
-                }
-            };
-            Ok((
-                key,
-                items
-                    .into_iter()
-                    .map(|item| as_string(method, item))
-                    .collect::<Result<_, _>>()?,
-            ))
-        })
-        .collect()
-}
-
-fn bool_arg(method: &str, value: Option<&PluginValue>) -> Result<bool, PhpThrow> {
-    match value {
-        Some(PluginValue::Bool(value)) => Ok(*value),
-        other => Err(runtime_throw(format!(
-            "{method} expects a bool, got {other:?}"
-        ))),
-    }
-}
-
-fn required_string_arg(method: &str, value: Option<&PluginValue>) -> Result<String, PhpThrow> {
-    decode_optional_string(method, value)?
-        .ok_or_else(|| runtime_throw(format!("{method} expects a string")))
 }
 
 /// Resolves a package argument back to the Rust-side entity its proxy stub stands for.
-fn package_from_arg(
-    method: &str,
-    value: Option<&PluginValue>,
-) -> Result<PackageInterfaceHandle, PhpThrow> {
-    match value {
-        Some(PluginValue::RustHandle(handle)) => {
-            match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
-                Some(RustEntity::Package(package)) => {
-                    Ok(PackageInterfaceHandle::from_rc_unchecked(package))
+impl FromPluginArg for PackageInterfaceHandle {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::RustHandle(handle)) => {
+                match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
+                    Some(RustEntity::Package(package)) => {
+                        Ok(PackageInterfaceHandle::from_rc_unchecked(package))
+                    }
+                    _ => Err(runtime_throw(format!(
+                        "{method} expects a package handle, got Rust handle {}",
+                        handle.rhandle
+                    ))),
                 }
-                _ => Err(runtime_throw(format!(
-                    "{method} expects a package handle, got Rust handle {}",
-                    handle.rhandle
-                ))),
             }
+            other => Err(arg_throw(method, position, "a package", other)),
         }
-        other => Err(runtime_throw(format!(
-            "{method} expects a package argument, got {other:?}"
-        ))),
     }
 }
 
-fn optional_package_from_arg(
-    method: &str,
-    value: Option<&PluginValue>,
-) -> Result<Option<PackageInterfaceHandle>, PhpThrow> {
-    match value {
-        None | Some(PluginValue::Null) => Ok(None),
-        other => Ok(Some(package_from_arg(method, other)?)),
+/// Resolves a repository argument back to the Rust-side entity its proxy stub stands for.
+impl FromPluginArg for RepositoryInterfaceHandle {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::RustHandle(handle)) => {
+                match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
+                    Some(RustEntity::Repository(repository)) => Ok(repository),
+                    _ => Err(runtime_throw(format!(
+                        "{method} expects a repository handle, got Rust handle {}",
+                        handle.rhandle
+                    ))),
+                }
+            }
+            other => Err(arg_throw(method, position, "a repository", other)),
+        }
     }
 }
 
-fn decode_optional_string(
-    method: &str,
-    value: Option<&PluginValue>,
-) -> Result<Option<String>, PhpThrow> {
-    match value {
-        None | Some(PluginValue::Null) => Ok(None),
-        Some(PluginValue::String(bytes)) => Ok(Some(String::from_utf8_lossy(bytes).into_owned())),
-        other => Err(runtime_throw(format!(
-            "{method} expects a string or null, got {other:?}"
-        ))),
+impl FromPluginArg for chrono::DateTime<chrono::Utc> {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(value) => date_time_from_wire(value),
+            other => Err(arg_throw(method, position, "a date", other)),
+        }
+    }
+}
+
+impl FromPluginArg for PhpObjHandle {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::PhpHandle(handle)) => Ok(handle.clone()),
+            other => Err(arg_throw(method, position, "a PHP object", other)),
+        }
+    }
+}
+
+impl FromPluginArg for DisplayMode {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::Int(0)) => Ok(DisplayMode::SourceRefIfDev),
+            Some(PluginValue::Int(1)) => Ok(DisplayMode::SourceRef),
+            Some(PluginValue::Int(2)) => Ok(DisplayMode::DistRef),
+            other => Err(arg_throw(
+                method,
+                position,
+                "a display mode of 0..=2",
+                other,
+            )),
+        }
+    }
+}
+
+impl ToPluginValue for bool {
+    fn to_plugin_value(self) -> PluginValue {
+        PluginValue::Bool(self)
+    }
+}
+
+impl ToPluginValue for i64 {
+    fn to_plugin_value(self) -> PluginValue {
+        PluginValue::Int(self)
+    }
+}
+
+impl ToPluginValue for String {
+    fn to_plugin_value(self) -> PluginValue {
+        PluginValue::string(self)
+    }
+}
+
+impl ToPluginValue for &str {
+    fn to_plugin_value(self) -> PluginValue {
+        PluginValue::string(self)
+    }
+}
+
+impl ToPluginValue for PhpMixed {
+    fn to_plugin_value(self) -> PluginValue {
+        PluginValue::from_php_mixed(&self)
+    }
+}
+
+impl<T: ToPluginValue> ToPluginValue for Option<T> {
+    fn to_plugin_value(self) -> PluginValue {
+        match self {
+            Some(value) => value.to_plugin_value(),
+            None => PluginValue::Null,
+        }
+    }
+}
+
+impl<T: ToPluginValue> ToPluginValue for Vec<T> {
+    fn to_plugin_value(self) -> PluginValue {
+        PluginValue::List(self.into_iter().map(T::to_plugin_value).collect())
+    }
+}
+
+/// An `array<string, T>` as PHP shapes it: an empty map crosses as a list, since an empty PHP
+/// array is indistinguishable from an empty list on the wire.
+impl<T: ToPluginValue> ToPluginValue for IndexMap<String, T> {
+    fn to_plugin_value(self) -> PluginValue {
+        if self.is_empty() {
+            PluginValue::List(Vec::new())
+        } else {
+            PluginValue::Array(
+                self.into_iter()
+                    .map(|(key, value)| (key.into_bytes(), value.to_plugin_value()))
+                    .collect(),
+            )
+        }
+    }
+}
+
+/// `array{url: string, preferred: bool}` as PHP shapes it.
+impl ToPluginValue for crate::package::Mirror {
+    fn to_plugin_value(self) -> PluginValue {
+        PluginValue::Array(IndexMap::from([
+            (b"url".to_vec(), PluginValue::string(self.url)),
+            (b"preferred".to_vec(), PluginValue::Bool(self.preferred)),
+        ]))
+    }
+}
+
+/// The child rebuilds a link as a real `Composer\Package\Link`, constraint included.
+///
+/// TODO(plugin): links have no entity to intern against, so two calls of the same getter answer
+/// with distinct child-side objects where upstream returns the identical one.
+impl ToPluginValue for crate::package::Link {
+    fn to_plugin_value(self) -> PluginValue {
+        link_to_wire(&self)
+    }
+}
+
+impl ToPluginValue for chrono::DateTime<chrono::Utc> {
+    fn to_plugin_value(self) -> PluginValue {
+        date_time_to_wire(&self)
     }
 }
 
@@ -1566,21 +1506,19 @@ fn dispatch_complete_package_getter(
                 .as_complete_package_interface()
                 .ok_or_else(unavailable)?;
             match method_name {
-                "getScripts" => typed_map(package.get_scripts(), |commands| {
-                    PhpMixed::List(commands.into_iter().map(PhpMixed::String).collect())
-                }),
-                "getRepositories" => string_keyed_map(package.get_repositories()),
-                "getLicense" => string_list(package.get_license()),
-                "getKeywords" => string_list(package.get_keywords()),
-                "getDescription" => optional_string(package.get_description()),
-                "getHomepage" => optional_string(package.get_homepage()),
-                "getAuthors" => typed_map_list(package.get_authors(), PhpMixed::String),
-                "getSupport" => typed_map(package.get_support(), PhpMixed::String),
-                "getFunding" => typed_map_list(package.get_funding(), |value| value),
+                "getScripts" => package.get_scripts().to_plugin_value(),
+                "getRepositories" => package.get_repositories().to_plugin_value(),
+                "getLicense" => package.get_license().to_plugin_value(),
+                "getKeywords" => package.get_keywords().to_plugin_value(),
+                "getDescription" => package.get_description().to_plugin_value(),
+                "getHomepage" => package.get_homepage().to_plugin_value(),
+                "getAuthors" => package.get_authors().to_plugin_value(),
+                "getSupport" => package.get_support().to_plugin_value(),
+                "getFunding" => package.get_funding().to_plugin_value(),
                 "isAbandoned" => PluginValue::Bool(package.is_abandoned()),
-                "getReplacementPackage" => optional_string(package.get_replacement_package()),
-                "getArchiveName" => optional_string(package.get_archive_name()),
-                _ => string_list(package.get_archive_excludes()),
+                "getReplacementPackage" => package.get_replacement_package().to_plugin_value(),
+                "getArchiveName" => package.get_archive_name().to_plugin_value(),
+                _ => package.get_archive_excludes().to_plugin_value(),
             }
         }
         "getAliases"
@@ -1593,12 +1531,12 @@ fn dispatch_complete_package_getter(
                 .as_root_package_interface()
                 .ok_or_else(unavailable)?;
             match method_name {
-                "getAliases" => typed_map_list(package.get_aliases(), PhpMixed::String),
+                "getAliases" => package.get_aliases().to_plugin_value(),
                 "getMinimumStability" => PluginValue::string(package.get_minimum_stability()),
-                "getStabilityFlags" => typed_map(package.get_stability_flags(), PhpMixed::Int),
-                "getReferences" => typed_map(package.get_references(), PhpMixed::String),
+                "getStabilityFlags" => package.get_stability_flags().to_plugin_value(),
+                "getReferences" => package.get_references().to_plugin_value(),
                 "getPreferStable" => PluginValue::Bool(package.get_prefer_stable()),
-                _ => string_keyed_map(package.get_config()),
+                _ => package.get_config().to_plugin_value(),
             }
         }
         _ => return Ok(None),
@@ -1611,36 +1549,10 @@ fn dispatch_package_method(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    // The link getters return `array<string, Link>`. Each link is rebuilt in the child as a
-    // real `Composer\Package\Link`, constraint included; an empty map crosses as a list, the
-    // wire image of an empty PHP array.
-    //
-    // TODO(plugin): links have no entity to intern against, so two calls of the same getter
-    // answer with distinct child-side objects where upstream returns the identical one.
-    let links = |links: IndexMap<String, crate::package::Link>| -> PluginValue {
-        if links.is_empty() {
-            PluginValue::List(Vec::new())
-        } else {
-            PluginValue::Array(
-                links
-                    .iter()
-                    .map(|(name, link)| (name.clone().into_bytes(), link_to_wire(link)))
-                    .collect(),
-            )
-        }
-    };
-
     // Mutators borrow mutably and must not hold the borrow across the shared-borrow arms.
     match method_name {
         "setId" => {
-            let id = match args.first() {
-                Some(PluginValue::Int(id)) => *id,
-                other => {
-                    return Err(runtime_throw(format!(
-                        "setId expects an int, got {other:?}"
-                    )));
-                }
-            };
+            let id = arg::<i64>(method_name, args, 0)?;
             package.borrow_mut().as_package_interface_mut().set_id(id);
             return Ok(PluginValue::Null);
         }
@@ -1651,7 +1563,7 @@ fn dispatch_package_method(
         | "setDistType"
         | "setDistReference"
         | "setSourceDistReferences" => {
-            let value = decode_optional_string(method_name, args.first())?;
+            let value = arg::<Option<String>>(method_name, args, 0)?;
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_interface_mut();
             match method_name {
@@ -1668,7 +1580,7 @@ fn dispatch_package_method(
             return Ok(PluginValue::Null);
         }
         "setSourceMirrors" | "setDistMirrors" => {
-            let mirrors = decode_mirrors(method_name, args.first())?;
+            let mirrors = arg::<Option<Vec<crate::package::Mirror>>>(method_name, args, 0)?;
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_interface_mut();
             if method_name == "setSourceMirrors" {
@@ -1679,24 +1591,7 @@ fn dispatch_package_method(
             return Ok(PluginValue::Null);
         }
         "setRepository" => {
-            let repository = match args.first() {
-                Some(PluginValue::RustHandle(handle)) => {
-                    match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
-                        Some(RustEntity::Repository(repository)) => repository,
-                        _ => {
-                            return Err(runtime_throw(format!(
-                                "setRepository expects a repository handle, got Rust handle {}",
-                                handle.rhandle
-                            )));
-                        }
-                    }
-                }
-                other => {
-                    return Err(runtime_throw(format!(
-                        "setRepository expects a repository argument, got {other:?}"
-                    )));
-                }
-            };
+            let repository = arg::<RepositoryInterfaceHandle>(method_name, args, 0)?;
             package
                 .borrow_mut()
                 .as_package_interface_mut()
@@ -1705,22 +1600,8 @@ fn dispatch_package_method(
             return Ok(PluginValue::Null);
         }
         "setTransportOptions" => {
-            let options = match args.first() {
-                Some(value) => match value.to_php_mixed().map_err(|error| {
-                    runtime_throw(format!(
-                        "setTransportOptions could not decode its argument: {error:#}"
-                    ))
-                })? {
-                    PhpMixed::Array(options) => options,
-                    PhpMixed::List(items) if items.is_empty() => IndexMap::new(),
-                    other => {
-                        return Err(runtime_throw(format!(
-                            "setTransportOptions expects an array, got {other:?}"
-                        )));
-                    }
-                },
-                None => IndexMap::new(),
-            };
+            let options =
+                arg_or::<IndexMap<String, PhpMixed>>(method_name, args, 0, IndexMap::new())?;
             package
                 .borrow_mut()
                 .as_package_interface_mut()
@@ -1738,17 +1619,46 @@ fn dispatch_package_method(
                 .as_root_package_interface_mut()
                 .expect("a root package exposes RootPackageInterface");
             match method_name {
-                "setRequires" => package.set_requires(link_map_arg(method_name, args.first())?),
+                "setRequires" => package.set_requires(arg_or::<
+                    IndexMap<String, crate::package::Link>,
+                >(
+                    method_name, args, 0, IndexMap::new()
+                )?),
                 "setDevRequires" => {
-                    package.set_dev_requires(link_map_arg(method_name, args.first())?)
+                    package.set_dev_requires(arg_or::<IndexMap<String, crate::package::Link>>(
+                        method_name,
+                        args,
+                        0,
+                        IndexMap::new(),
+                    )?)
                 }
-                "setConflicts" => package.set_conflicts(link_map_arg(method_name, args.first())?),
-                "setProvides" => package.set_provides(link_map_arg(method_name, args.first())?),
-                "setReplaces" => package.set_replaces(link_map_arg(method_name, args.first())?),
-                "setAutoload" => package.set_autoload(map_arg(method_name, args.first())?),
-                "setDevAutoload" => package.set_dev_autoload(map_arg(method_name, args.first())?),
-                "setSuggests" => package.set_suggests(string_map_arg(method_name, args.first())?),
-                _ => package.set_extra(map_arg(method_name, args.first())?),
+                "setConflicts" => package.set_conflicts(arg_or::<
+                    IndexMap<String, crate::package::Link>,
+                >(
+                    method_name, args, 0, IndexMap::new()
+                )?),
+                "setProvides" => package.set_provides(arg_or::<
+                    IndexMap<String, crate::package::Link>,
+                >(
+                    method_name, args, 0, IndexMap::new()
+                )?),
+                "setReplaces" => package.set_replaces(arg_or::<
+                    IndexMap<String, crate::package::Link>,
+                >(
+                    method_name, args, 0, IndexMap::new()
+                )?),
+                "setAutoload" => {
+                    package.set_autoload(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?)
+                }
+                "setDevAutoload" => package.set_dev_autoload(arg::<IndexMap<String, PhpMixed>>(
+                    method_name,
+                    args,
+                    0,
+                )?),
+                "setSuggests" => {
+                    package.set_suggests(arg::<IndexMap<String, String>>(method_name, args, 0)?)
+                }
+                _ => package.set_extra(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?),
             }
             return Ok(PluginValue::Null);
         }
@@ -1776,42 +1686,59 @@ fn dispatch_package_method(
                 ))
             })?;
             match method_name {
-                "setType" => package.set_type(required_string_arg(method_name, args.first())?),
+                "setType" => package.set_type(arg::<String>(method_name, args, 0)?),
                 "setTargetDir" => {
-                    package.set_target_dir(decode_optional_string(method_name, args.first())?)
+                    package.set_target_dir(arg::<Option<String>>(method_name, args, 0)?)
                 }
-                "setExtra" => package.set_extra(map_arg(method_name, args.first())?),
-                "setBinaries" => package.set_binaries(string_list_arg(method_name, args.first())?),
+                "setExtra" => {
+                    package.set_extra(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?)
+                }
+                "setBinaries" => package.set_binaries(arg::<Vec<String>>(method_name, args, 0)?),
                 "setSourceType" => {
-                    package.set_source_type(decode_optional_string(method_name, args.first())?)
+                    package.set_source_type(arg::<Option<String>>(method_name, args, 0)?)
                 }
-                "setDistSha1Checksum" => package
-                    .set_dist_sha1_checksum(decode_optional_string(method_name, args.first())?),
-                "setSuggests" => package.set_suggests(string_map_arg(method_name, args.first())?),
-                "setAutoload" => package.set_autoload(map_arg(method_name, args.first())?),
-                "setDevAutoload" => package.set_dev_autoload(map_arg(method_name, args.first())?),
+                "setDistSha1Checksum" => {
+                    package.set_dist_sha1_checksum(arg::<Option<String>>(method_name, args, 0)?)
+                }
+                "setSuggests" => {
+                    package.set_suggests(arg::<IndexMap<String, String>>(method_name, args, 0)?)
+                }
+                "setAutoload" => {
+                    package.set_autoload(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?)
+                }
+                "setDevAutoload" => package.set_dev_autoload(arg::<IndexMap<String, PhpMixed>>(
+                    method_name,
+                    args,
+                    0,
+                )?),
                 "setIncludePaths" => {
-                    package.set_include_paths(string_list_arg(method_name, args.first())?)
+                    package.set_include_paths(arg::<Vec<String>>(method_name, args, 0)?)
                 }
-                "setPhpExt" => package.set_php_ext(match args.first() {
-                    None | Some(PluginValue::Null) => None,
-                    value => Some(map_arg(method_name, value)?),
-                }),
+                "setPhpExt" => package.set_php_ext(arg::<Option<IndexMap<String, PhpMixed>>>(
+                    method_name,
+                    args,
+                    0,
+                )?),
                 "setNotificationUrl" => {
-                    package.set_notification_url(required_string_arg(method_name, args.first())?)
+                    package.set_notification_url(arg::<String>(method_name, args, 0)?)
                 }
                 "setIsDefaultBranch" => {
-                    package.set_is_default_branch(bool_arg(method_name, args.first())?)
+                    package.set_is_default_branch(arg::<bool>(method_name, args, 0)?)
                 }
                 _ => package.replace_version(
-                    required_string_arg(method_name, args.first())?,
-                    required_string_arg(method_name, args.get(1))?,
+                    arg::<String>(method_name, args, 0)?,
+                    arg::<String>(method_name, args, 1)?,
                 ),
             }
             return Ok(PluginValue::Null);
         }
         "setRequires" | "setConflicts" | "setProvides" | "setReplaces" | "setDevRequires" => {
-            let links = link_map_arg(method_name, args.first())?;
+            let links = arg_or::<IndexMap<String, crate::package::Link>>(
+                method_name,
+                args,
+                0,
+                IndexMap::new(),
+            )?;
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_mut().ok_or_else(|| {
                 runtime_throw(format!(
@@ -1828,10 +1755,7 @@ fn dispatch_package_method(
             return Ok(PluginValue::Null);
         }
         "setReleaseDate" => {
-            let date = match args.first() {
-                None | Some(PluginValue::Null) => None,
-                Some(value) => Some(date_time_from_wire(value)?),
-            };
+            let date = arg::<Option<chrono::DateTime<chrono::Utc>>>(method_name, args, 0)?;
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_mut().ok_or_else(|| {
                 runtime_throw(
@@ -1854,27 +1778,31 @@ fn dispatch_package_method(
                 })?;
             match method_name {
                 "setScripts" => {
-                    package.set_scripts(string_list_map_arg(method_name, args.first())?)
+                    package.set_scripts(arg::<IndexMap<String, Vec<String>>>(method_name, args, 0)?)
                 }
-                "setRepositories" => package.set_repositories(map_arg(method_name, args.first())?),
-                "setLicense" => package.set_license(string_list_arg(method_name, args.first())?),
-                "setKeywords" => package.set_keywords(string_list_arg(method_name, args.first())?),
-                "setDescription" => {
-                    package.set_description(required_string_arg(method_name, args.first())?)
-                }
-                "setHomepage" => {
-                    package.set_homepage(required_string_arg(method_name, args.first())?)
-                }
+                "setRepositories" => package.set_repositories(arg::<IndexMap<String, PhpMixed>>(
+                    method_name,
+                    args,
+                    0,
+                )?),
+                "setLicense" => package.set_license(arg::<Vec<String>>(method_name, args, 0)?),
+                "setKeywords" => package.set_keywords(arg::<Vec<String>>(method_name, args, 0)?),
+                "setDescription" => package.set_description(arg::<String>(method_name, args, 0)?),
+                "setHomepage" => package.set_homepage(arg::<String>(method_name, args, 0)?),
                 "setAuthors" => {
-                    package.set_authors(string_map_list_arg(method_name, args.first())?)
+                    package.set_authors(arg::<Vec<IndexMap<String, String>>>(method_name, args, 0)?)
                 }
-                "setSupport" => package.set_support(string_map_arg(method_name, args.first())?),
-                "setFunding" => package.set_funding(mixed_map_list_arg(method_name, args.first())?),
-                "setAbandoned" => package.set_abandoned(mixed_arg(method_name, args.first())?),
-                "setArchiveName" => {
-                    package.set_archive_name(required_string_arg(method_name, args.first())?)
+                "setSupport" => {
+                    package.set_support(arg::<IndexMap<String, String>>(method_name, args, 0)?)
                 }
-                _ => package.set_archive_excludes(string_list_arg(method_name, args.first())?),
+                "setFunding" => package.set_funding(arg::<Vec<IndexMap<String, PhpMixed>>>(
+                    method_name,
+                    args,
+                    0,
+                )?),
+                "setAbandoned" => package.set_abandoned(arg::<PhpMixed>(method_name, args, 0)?),
+                "setArchiveName" => package.set_archive_name(arg::<String>(method_name, args, 0)?),
+                _ => package.set_archive_excludes(arg::<Vec<String>>(method_name, args, 0)?),
             }
             return Ok(PluginValue::Null);
         }
@@ -1892,26 +1820,28 @@ fn dispatch_package_method(
             })?;
             match method_name {
                 "setStabilityFlags" => {
-                    package.set_stability_flags(int_map_arg(method_name, args.first())?)
+                    package.set_stability_flags(arg::<IndexMap<String, i64>>(method_name, args, 0)?)
                 }
                 "setMinimumStability" => {
-                    package.set_minimum_stability(required_string_arg(method_name, args.first())?)
+                    package.set_minimum_stability(arg::<String>(method_name, args, 0)?)
                 }
-                "setPreferStable" => {
-                    package.set_prefer_stable(bool_arg(method_name, args.first())?)
+                "setPreferStable" => package.set_prefer_stable(arg::<bool>(method_name, args, 0)?),
+                "setConfig" => {
+                    package.set_config(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?)
                 }
-                "setConfig" => package.set_config(map_arg(method_name, args.first())?),
                 "setReferences" => {
-                    package.set_references(string_map_arg(method_name, args.first())?)
+                    package.set_references(arg::<IndexMap<String, String>>(method_name, args, 0)?)
                 }
-                _ => package.set_aliases(string_map_list_arg(method_name, args.first())?),
+                _ => {
+                    package.set_aliases(arg::<Vec<IndexMap<String, String>>>(method_name, args, 0)?)
+                }
             }
             return Ok(PluginValue::Null);
         }
         "equals" => {
-            let other = package_from_arg(method_name, args.first())?;
+            let other = arg::<PackageInterfaceHandle>(method_name, args, 0)?;
             let this = PackageInterfaceHandle::from_rc_unchecked(package.clone());
-            return Ok(PluginValue::Bool(this.equals(&other)));
+            return Ok(this.equals(&other).to_plugin_value());
         }
         // The subclasses narrow `getAliasOf`'s return type to their own alias target, but every
         // variant holds the one entity.
@@ -1924,12 +1854,12 @@ fn dispatch_package_method(
             })?;
             return Ok(match method_name {
                 "getAliasOf" => package_handle_value(alias.get_alias_of().as_rc()),
-                "isRootPackageAlias" => PluginValue::Bool(alias.is_root_package_alias()),
-                _ => PluginValue::Bool(alias.has_self_version_requires()),
+                "isRootPackageAlias" => alias.is_root_package_alias().to_plugin_value(),
+                _ => alias.has_self_version_requires().to_plugin_value(),
             });
         }
         "setRootPackageAlias" => {
-            let value = bool_arg(method_name, args.first())?;
+            let value = arg::<bool>(method_name, args, 0)?;
             package
                 .borrow_mut()
                 .as_alias_package_mut()
@@ -1952,118 +1882,75 @@ fn dispatch_package_method(
     let borrowed = package.borrow();
     let package = borrowed.as_package_interface();
     match method_name {
-        "getName" => Ok(PluginValue::string(package.get_name().to_string())),
-        "getPrettyName" => Ok(PluginValue::string(package.get_pretty_name().to_string())),
+        "getName" => Ok(package.get_name().to_string().to_plugin_value()),
+        "getPrettyName" => Ok(package.get_pretty_name().to_string().to_plugin_value()),
         "getNames" => {
-            let provides = match args.first() {
-                None => true,
-                Some(PluginValue::Bool(provides)) => *provides,
-                other => {
-                    return Err(runtime_throw(format!(
-                        "getNames expects a bool provides flag, got {other:?}"
-                    )));
-                }
-            };
-            Ok(string_list(package.get_names(provides)))
+            let provides = arg_or::<bool>(method_name, args, 0, true)?;
+            Ok(package.get_names(provides).to_plugin_value())
         }
-        "getId" => Ok(PluginValue::Int(package.get_id())),
-        "isDev" => Ok(PluginValue::Bool(package.is_dev())),
-        "getType" => Ok(PluginValue::string(package.get_type())),
-        "getTargetDir" => Ok(optional_string(package.get_target_dir())),
-        "getExtra" => Ok(string_keyed_map(package.get_extra())),
-        "getInstallationSource" => Ok(optional_string(package.get_installation_source())),
-        "getSourceType" => Ok(optional_string(package.get_source_type())),
-        "getSourceUrl" => Ok(optional_string(package.get_source_url())),
-        "getSourceUrls" => Ok(string_list(package.get_source_urls())),
-        "getSourceReference" => Ok(optional_string(package.get_source_reference())),
-        "getSourceMirrors" => Ok(mirror_list(package.get_source_mirrors())),
-        "getDistType" => Ok(optional_string(package.get_dist_type())),
-        "getDistUrl" => Ok(optional_string(package.get_dist_url())),
-        "getDistUrls" => Ok(string_list(package.get_dist_urls())),
-        "getDistReference" => Ok(optional_string(package.get_dist_reference())),
-        "getDistSha1Checksum" => Ok(optional_string(package.get_dist_sha1_checksum())),
-        "getDistMirrors" => Ok(mirror_list(package.get_dist_mirrors())),
-        "getVersion" => Ok(PluginValue::string(package.get_version().to_string())),
-        "getPrettyVersion" => Ok(PluginValue::string(
-            package.get_pretty_version().to_string(),
-        )),
+        "getId" => Ok(package.get_id().to_plugin_value()),
+        "isDev" => Ok(package.is_dev().to_plugin_value()),
+        "getType" => Ok(package.get_type().to_plugin_value()),
+        "getTargetDir" => Ok(package.get_target_dir().to_plugin_value()),
+        "getExtra" => Ok(package.get_extra().to_plugin_value()),
+        "getInstallationSource" => Ok(package.get_installation_source().to_plugin_value()),
+        "getSourceType" => Ok(package.get_source_type().to_plugin_value()),
+        "getSourceUrl" => Ok(package.get_source_url().to_plugin_value()),
+        "getSourceUrls" => Ok(package.get_source_urls().to_plugin_value()),
+        "getSourceReference" => Ok(package.get_source_reference().to_plugin_value()),
+        "getSourceMirrors" => Ok(package.get_source_mirrors().to_plugin_value()),
+        "getDistType" => Ok(package.get_dist_type().to_plugin_value()),
+        "getDistUrl" => Ok(package.get_dist_url().to_plugin_value()),
+        "getDistUrls" => Ok(package.get_dist_urls().to_plugin_value()),
+        "getDistReference" => Ok(package.get_dist_reference().to_plugin_value()),
+        "getDistSha1Checksum" => Ok(package.get_dist_sha1_checksum().to_plugin_value()),
+        "getDistMirrors" => Ok(package.get_dist_mirrors().to_plugin_value()),
+        "getVersion" => Ok(package.get_version().to_string().to_plugin_value()),
+        "getPrettyVersion" => Ok(package.get_pretty_version().to_string().to_plugin_value()),
         "getFullPrettyVersion" => {
-            let truncate = match args.first() {
-                None => true,
-                Some(PluginValue::Bool(truncate)) => *truncate,
-                other => {
-                    return Err(runtime_throw(format!(
-                        "getFullPrettyVersion expects a bool truncate flag, got {other:?}"
-                    )));
-                }
-            };
-            let display_mode = match args.get(1) {
-                None | Some(PluginValue::Int(0)) => DisplayMode::SourceRefIfDev,
-                Some(PluginValue::Int(1)) => DisplayMode::SourceRef,
-                Some(PluginValue::Int(2)) => DisplayMode::DistRef,
-                other => {
-                    return Err(runtime_throw(format!(
-                        "getFullPrettyVersion expects a display mode of 0..=2, got {other:?}"
-                    )));
-                }
-            };
-            Ok(PluginValue::string(
-                package.get_full_pretty_version(truncate, display_mode),
-            ))
+            let truncate = arg_or::<bool>(method_name, args, 0, true)?;
+            let display_mode =
+                arg_or::<DisplayMode>(method_name, args, 1, DisplayMode::SourceRefIfDev)?;
+            Ok(package
+                .get_full_pretty_version(truncate, display_mode)
+                .to_plugin_value())
         }
-        "getStability" => Ok(PluginValue::string(package.get_stability().to_string())),
-        "getRequires" => Ok(links((*package.get_requires()).clone())),
-        "getConflicts" => Ok(links((*package.get_conflicts()).clone())),
-        "getProvides" => Ok(links((*package.get_provides()).clone())),
-        "getReplaces" => Ok(links((*package.get_replaces()).clone())),
-        "getDevRequires" => Ok(links((*package.get_dev_requires()).clone())),
-        "getSuggests" => {
-            let suggests = package.get_suggests();
-            if suggests.is_empty() {
-                Ok(PluginValue::List(Vec::new()))
-            } else {
-                Ok(PluginValue::Array(
-                    suggests
-                        .into_iter()
-                        .map(|(name, description)| {
-                            (name.into_bytes(), PluginValue::string(description))
-                        })
-                        .collect(),
-                ))
-            }
-        }
-        "getAutoload" => Ok(string_keyed_map(package.get_autoload())),
-        "getDevAutoload" => Ok(string_keyed_map(package.get_dev_autoload())),
-        "getIncludePaths" => Ok(string_list(package.get_include_paths())),
+        "getStability" => Ok(package.get_stability().to_string().to_plugin_value()),
+        "getRequires" => Ok((*package.get_requires()).clone().to_plugin_value()),
+        "getConflicts" => Ok((*package.get_conflicts()).clone().to_plugin_value()),
+        "getProvides" => Ok((*package.get_provides()).clone().to_plugin_value()),
+        "getReplaces" => Ok((*package.get_replaces()).clone().to_plugin_value()),
+        "getDevRequires" => Ok((*package.get_dev_requires()).clone().to_plugin_value()),
+        "getSuggests" => Ok(package.get_suggests().to_plugin_value()),
+        "getAutoload" => Ok(package.get_autoload().to_plugin_value()),
+        "getDevAutoload" => Ok(package.get_dev_autoload().to_plugin_value()),
+        "getIncludePaths" => Ok(package.get_include_paths().to_plugin_value()),
         "getPhpExt" => Ok(match package.get_php_ext() {
-            Some(config) => string_keyed_map(config),
+            Some(config) => config.to_plugin_value(),
             None => PluginValue::Null,
         }),
         "getRepository" => match package.get_repository() {
             Some(repository) => repository_handle_value(&repository),
             None => Ok(PluginValue::Null),
         },
-        "getBinaries" => Ok(string_list(package.get_binaries())),
-        "getUniqueName" => Ok(PluginValue::string(package.get_unique_name())),
-        "getNotificationUrl" => Ok(optional_string(package.get_notification_url())),
-        "__toString" => Ok(PluginValue::string(package.get_unique_name())),
-        "getPrettyString" => Ok(PluginValue::string(package.get_pretty_string())),
-        "isDefaultBranch" => Ok(PluginValue::Bool(package.is_default_branch())),
+        "getBinaries" => Ok(package.get_binaries().to_plugin_value()),
+        "getUniqueName" => Ok(package.get_unique_name().to_plugin_value()),
+        "getNotificationUrl" => Ok(package.get_notification_url().to_plugin_value()),
+        "__toString" => Ok(package.get_unique_name().to_plugin_value()),
+        "getPrettyString" => Ok(package.get_pretty_string().to_plugin_value()),
+        "isDefaultBranch" => Ok(package.is_default_branch().to_plugin_value()),
         // `BasePackage`'s concrete methods are not forwarded by `PackageInterface`, so both are
         // computed from the interface here, as `VersionSelector` already does for the second.
-        "isPlatform" => Ok(PluginValue::Bool(package.get_repository().is_some_and(
-            |repository| repository.is::<crate::repository::PlatformRepository>(),
-        ))),
-        "getStabilityPriority" => Ok(PluginValue::Int(
-            *crate::package::base_package::STABILITIES
-                .get(package.get_stability())
-                .unwrap_or(&crate::package::base_package::STABILITY_STABLE),
-        )),
-        "getTransportOptions" => Ok(string_keyed_map(package.get_transport_options())),
-        "getReleaseDate" => Ok(match package.get_release_date() {
-            None => PluginValue::Null,
-            Some(date) => date_time_to_wire(&date),
-        }),
+        "isPlatform" => Ok(package
+            .get_repository()
+            .is_some_and(|repository| repository.is::<crate::repository::PlatformRepository>())
+            .to_plugin_value()),
+        "getStabilityPriority" => Ok((*crate::package::base_package::STABILITIES
+            .get(package.get_stability())
+            .unwrap_or(&crate::package::base_package::STABILITY_STABLE))
+        .to_plugin_value()),
+        "getTransportOptions" => Ok(package.get_transport_options().to_plugin_value()),
+        "getReleaseDate" => Ok(package.get_release_date().to_plugin_value()),
         other => Err(runtime_throw(format!(
             "the package method `{other}` is not available over RPC yet"
         ))),
@@ -2076,11 +1963,11 @@ fn dispatch_operation_method(
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     match (method_name, operation) {
-        ("getOperationType", _) => Ok(PluginValue::string(operation.get_operation_type())),
-        ("show", _) => Ok(PluginValue::string(
-            operation.show(bool_arg(method_name, args.first())?),
-        )),
-        ("__toString", _) => Ok(PluginValue::string(operation.to_string())),
+        ("getOperationType", _) => Ok(operation.get_operation_type().to_plugin_value()),
+        ("show", _) => Ok(operation
+            .show(arg::<bool>(method_name, args, 0)?)
+            .to_plugin_value()),
+        ("__toString", _) => Ok(operation.to_string().to_plugin_value()),
         ("getPackage", AnyOperation::Install(op)) => {
             Ok(package_handle_value(op.get_package().as_rc()))
         }
@@ -2113,21 +2000,11 @@ fn dispatch_installation_manager_method(
 ) -> Result<PluginValue, PhpThrow> {
     match method_name {
         "getInstallPath" => {
-            let package = package_from_arg(method_name, args.first())?;
-            Ok(match im.borrow().get_install_path(package) {
-                Some(path) => PluginValue::string(path),
-                None => PluginValue::Null,
-            })
+            let package = arg::<PackageInterfaceHandle>(method_name, args, 0)?;
+            Ok(im.borrow().get_install_path(package).to_plugin_value())
         }
         "addInstaller" | "removeInstaller" => {
-            let handle = match args.first() {
-                Some(PluginValue::PhpHandle(handle)) => handle.clone(),
-                other => {
-                    return Err(runtime_throw(format!(
-                        "{method_name} expects an installer object, got {other:?}"
-                    )));
-                }
-            };
+            let handle = arg::<PhpObjHandle>(method_name, args, 0)?;
             if !php_is_a(&handle, "Composer\\Installer\\InstallerInterface").map_err(|error| {
                 runtime_throw(format!(
                     "{method_name} could not type-check its argument: {error:#}"
@@ -2174,11 +2051,11 @@ fn dispatch_io_method(
             }
             Ok(PluginValue::Null)
         }
-        "isInteractive" => Ok(PluginValue::Bool(io.borrow().is_interactive())),
-        "isVerbose" => Ok(PluginValue::Bool(io.borrow().is_verbose())),
-        "isVeryVerbose" => Ok(PluginValue::Bool(io.borrow().is_very_verbose())),
-        "isDebug" => Ok(PluginValue::Bool(io.borrow().is_debug())),
-        "isDecorated" => Ok(PluginValue::Bool(io.borrow().is_decorated())),
+        "isInteractive" => Ok(io.borrow().is_interactive().to_plugin_value()),
+        "isVerbose" => Ok(io.borrow().is_verbose().to_plugin_value()),
+        "isVeryVerbose" => Ok(io.borrow().is_very_verbose().to_plugin_value()),
+        "isDebug" => Ok(io.borrow().is_debug().to_plugin_value()),
+        "isDecorated" => Ok(io.borrow().is_decorated().to_plugin_value()),
         // TODO(plugin): the remaining IOInterface surface (ask*, authentications, ...) is
         // widened on demand, driven by explicit errors from real plugins.
         other => Err(runtime_throw(format!(
@@ -2193,49 +2070,12 @@ fn decode_write_args(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<(Vec<String>, bool, i64), PhpThrow> {
-    // TODO(bytes): lossy UTF-8; IO messages are bytes in PHP.
     let messages = match args.first() {
-        Some(PluginValue::String(bytes)) => vec![String::from_utf8_lossy(bytes).into_owned()],
-        Some(PluginValue::List(items)) => {
-            let mut messages = Vec::with_capacity(items.len());
-            for item in items {
-                match item {
-                    PluginValue::String(bytes) => {
-                        messages.push(String::from_utf8_lossy(bytes).into_owned());
-                    }
-                    other => {
-                        return Err(runtime_throw(format!(
-                            "{method_name} expects string messages, got {other:?}"
-                        )));
-                    }
-                }
-            }
-            messages
-        }
-        other => {
-            return Err(runtime_throw(format!(
-                "{method_name} expects a string or list of strings, got {other:?}"
-            )));
-        }
+        Some(PluginValue::String(_)) => vec![arg::<String>(method_name, args, 0)?],
+        _ => arg::<Vec<String>>(method_name, args, 0)?,
     };
-    let newline = match args.get(1) {
-        Some(PluginValue::Bool(b)) => *b,
-        None => true,
-        other => {
-            return Err(runtime_throw(format!(
-                "{method_name} expects a bool newline flag, got {other:?}"
-            )));
-        }
-    };
-    let verbosity = match args.get(2) {
-        Some(PluginValue::Int(v)) => *v,
-        None => crate::io::NORMAL,
-        other => {
-            return Err(runtime_throw(format!(
-                "{method_name} expects an int verbosity, got {other:?}"
-            )));
-        }
-    };
+    let newline = arg_or::<bool>(method_name, args, 1, true)?;
+    let verbosity = arg_or::<i64>(method_name, args, 2, crate::io::NORMAL)?;
     Ok((messages, newline, verbosity))
 }
 
