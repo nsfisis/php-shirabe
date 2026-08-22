@@ -489,7 +489,7 @@ impl Auditor {
                     .set_headers(headers.into_iter().map(|h| h.into()).collect());
                 table.add_row(
                     row.iter()
-                        .map(|cell| ConsoleIO::sanitize(cell, false).into())
+                        .map(|cell| ConsoleIO::sanitize(cell, true).into())
                         .collect::<Vec<Cell>>()
                         .into(),
                 );
@@ -614,9 +614,9 @@ impl Auditor {
                 "none".to_string()
             };
             let row: Vec<Cell> = vec![
-                ConsoleIO::sanitize(&self.get_package_name_with_link(pkg.clone().into()), false)
+                ConsoleIO::sanitize(&self.get_package_name_with_link(pkg.clone().into()), true)
                     .into(),
-                ConsoleIO::sanitize(&replacement, false).into(),
+                ConsoleIO::sanitize(&replacement, true).into(),
             ];
             table.add_row(row.into());
         }
