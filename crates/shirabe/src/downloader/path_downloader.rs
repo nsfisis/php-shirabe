@@ -163,19 +163,12 @@ impl PathDownloader {
 
     // Returns true if junctions can be created and safely used on Windows.
     //
-    // A PHP bug makes junction detection fragile, leading to possible data loss when removing a
-    // package. See https://bugs.php.net/bug.php?id=77552
-    //
-    // For safety we require a minimum version of Windows 7, so we can call the system rmdir which
-    // will preserve target content if given a junction.
-    //
-    // The PHP bug was fixed in 7.2.16 and 7.3.3 (requires at least Windows 7).
+    // Composer restricts this to Windows 7 or later with proc_open available, because a PHP bug
+    // (https://bugs.php.net/bug.php?id=77552) makes junction detection fragile and can lose the
+    // target content when removing a package. Junctions are created and removed here without
+    // going through PHP, so that bug does not apply.
     fn safe_junctions(&self) -> bool {
-        // We need to call mklink, and rmdir on Windows 7 (version 6.1)
-        // TODO(windows): PHP reads the Windows version off PHP_WINDOWS_VERSION_MAJOR and
-        // PHP_WINDOWS_VERSION_MINOR, which describe the host rather than PHP; this port has to
-        // ask the OS for it.
-        todo!()
+        true
     }
 }
 
