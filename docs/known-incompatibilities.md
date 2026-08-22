@@ -8,7 +8,7 @@ NOTE: This is not an exhaustive list. Shirabe is in early development and there 
 We plan to support all platforms that Composer does, but currently:
 
 * Linux: fully supported and tested
-* macOS: not well tested
+* macOS: unsupported
 * Windows: unsupported
 
 

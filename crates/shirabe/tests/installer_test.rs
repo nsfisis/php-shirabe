@@ -376,6 +376,7 @@ fn make_packages_comparable(
 #[test]
 #[serial]
 fn test_installer() {
+    bootstrap::bootstrap();
     let _tear_down = TearDown::new();
 
     for case in provide_installer() {
@@ -842,6 +843,8 @@ fn write_json(path: &std::path::Path, value: &serde_json::Value) {
 
 /// ref: InstallerTest::doTestIntegration
 fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
+    bootstrap::bootstrap();
+
     if let Some(condition) = &case.condition
         && !evaluate_condition(condition)
     {

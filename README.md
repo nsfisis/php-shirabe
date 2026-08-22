@@ -22,6 +22,7 @@ Building Shirabe requires:
 * Git
 * PHP
 * Composer
+* Just (optional)
 * Nix (optional)
 * Direnv (optional)
 

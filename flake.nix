@@ -4,7 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
-    systems.url = "github:nix-systems/x86_64-linux";
+    systems.url = "github:nix-systems/default";
 
     flake-utils = {
       url = "github:numtide/flake-utils";
@@ -50,6 +50,8 @@
           packages = [
             rustToolchain
             pkgs.php85
+            pkgs.php85Packages.composer
+            pkgs.just
 
             # The following softwares are used for testing.
             # VCSs

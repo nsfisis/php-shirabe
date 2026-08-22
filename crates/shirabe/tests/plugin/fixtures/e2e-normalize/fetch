@@ -16,7 +16,6 @@ tree_hash() {
 while read -r dir repo commit hash; do
     target="$base/$dir"
     if [ -d "$target" ]; then
-        echo "already fetched: $target"
         continue
     fi
     mkdir -p "$target"
