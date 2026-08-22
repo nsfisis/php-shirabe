@@ -191,17 +191,18 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// @return array An array of package suggestions with descriptions
     fn get_suggests(&self) -> IndexMap<String, String>;
 
-    /// PHP helper that switches on the link kind (require/require-dev/conflict/etc.).
+    /// Stands in for PHP's `$package->{'get'.ucfirst($linkType)}()`, so `link_type` is one of the
+    /// `Link::TYPE_*` values.
     fn get_links_for_type(
         &self,
         link_type: &str,
     ) -> std::rc::Rc<IndexMap<String, crate::package::Link>> {
         match link_type {
-            "require" => self.get_requires(),
-            "require-dev" => self.get_dev_requires(),
-            "conflict" => self.get_conflicts(),
-            "provide" => self.get_provides(),
-            "replace" => self.get_replaces(),
+            crate::package::Link::TYPE_REQUIRE => self.get_requires(),
+            crate::package::Link::TYPE_DEV_REQUIRE => self.get_dev_requires(),
+            crate::package::Link::TYPE_CONFLICT => self.get_conflicts(),
+            crate::package::Link::TYPE_PROVIDE => self.get_provides(),
+            crate::package::Link::TYPE_REPLACE => self.get_replaces(),
             _ => std::rc::Rc::new(IndexMap::new()),
         }
     }

@@ -1506,3 +1506,156 @@ vendor/longpackagename",
         app_tester.get_display().trim()
     );
 }
+
+/// A `vendor/package` fixture carrying one link of every type `show <package>` renders.
+fn package_with_every_link_type() -> PackageInterfaceHandle {
+    let link = |target: &str, operator: &str, version: &str, pretty: &str, r#type: &str| {
+        indexmap::IndexMap::from([(
+            target.to_string(),
+            Link::new(
+                "vendor/package".to_string(),
+                target.to_string(),
+                get_version_constraint(operator, version),
+                Some(r#type.to_string()),
+                pretty.to_string(),
+            ),
+        )])
+    };
+
+    let pkg = get_complete_package("vendor/package", "1.0.0");
+    pkg.__set_requires(link(
+        "vendor/required",
+        "=",
+        "1.0.0",
+        "1.0.0",
+        Link::TYPE_REQUIRE,
+    ));
+    pkg.__set_dev_requires(link(
+        "vendor/dev-required",
+        "=",
+        "2.0.0",
+        "2.0.0",
+        Link::TYPE_DEV_REQUIRE,
+    ));
+    pkg.__set_provides(link(
+        "vendor/provided",
+        "=",
+        "1.0.0",
+        "1.0.0",
+        Link::TYPE_PROVIDE,
+    ));
+    pkg.__set_conflicts(link(
+        "vendor/conflicted",
+        "<",
+        "1.0.0",
+        "<1.0.0",
+        Link::TYPE_CONFLICT,
+    ));
+    pkg.__set_replaces(link(
+        "vendor/replaced",
+        "=",
+        "3.0.0",
+        "3.0.0",
+        Link::TYPE_REPLACE,
+    ));
+    pkg.__set_suggests(indexmap::IndexMap::from([(
+        "vendor/suggested".to_string(),
+        "for testing".to_string(),
+    )]));
+    pkg.into()
+}
+
+fn init_temp_composer_with_linked_package() -> crate::test_case::TearDown {
+    let tear_down = init_temp_composer(
+        Some(&serde_json::json!({
+            "require": {"vendor/package": "1.0.0"},
+        })),
+        None,
+        None,
+        true,
+    );
+    create_installed_json(&[package_with_every_link_type()], &[], true);
+    tear_down
+}
+
+#[test]
+#[serial]
+fn test_show_package_prints_every_link_section() {
+    let _tear_down = init_temp_composer_with_linked_package();
+
+    let mut app_tester = get_application_tester();
+    app_tester
+        .run(
+            input(vec![
+                ("command", InputValue::from("show")),
+                ("package", InputValue::from("vendor/package")),
+            ]),
+            RunOptions::default(),
+        )
+        .unwrap();
+
+    let display = app_tester.get_display();
+    let expected = "requires
+vendor/required 1.0.0
+
+requires (dev)
+vendor/dev-required 2.0.0
+
+suggests
+vendor/suggested for testing
+
+provides
+vendor/provided 1.0.0
+
+conflicts
+vendor/conflicted <1.0.0
+
+replaces
+vendor/replaced 3.0.0";
+    assert!(
+        display.trim_end().ends_with(expected),
+        "expected link sections at the end of:\n{}",
+        display
+    );
+}
+
+#[test]
+#[serial]
+fn test_show_package_as_json_includes_every_link_type() {
+    let _tear_down = init_temp_composer_with_linked_package();
+
+    let mut app_tester = get_application_tester();
+    app_tester
+        .run(
+            input(vec![
+                ("command", InputValue::from("show")),
+                ("package", InputValue::from("vendor/package")),
+                ("--format", InputValue::from("json")),
+            ]),
+            RunOptions::default(),
+        )
+        .unwrap();
+
+    let display = app_tester.get_display();
+    let json: serde_json::Value = serde_json::from_str(display.trim()).unwrap();
+    assert_eq!(
+        serde_json::json!({"vendor/required": "1.0.0"}),
+        json["requires"]
+    );
+    assert_eq!(
+        serde_json::json!({"vendor/dev-required": "2.0.0"}),
+        json["devRequires"]
+    );
+    assert_eq!(
+        serde_json::json!({"vendor/provided": "1.0.0"}),
+        json["provides"]
+    );
+    assert_eq!(
+        serde_json::json!({"vendor/conflicted": "<1.0.0"}),
+        json["conflicts"]
+    );
+    assert_eq!(
+        serde_json::json!({"vendor/replaced": "3.0.0"}),
+        json["replaces"]
+    );
+}

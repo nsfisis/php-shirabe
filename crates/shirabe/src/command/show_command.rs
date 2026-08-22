@@ -594,9 +594,6 @@ impl ShowCommand {
     ) {
         let title = title.unwrap_or(link_type);
         let io = self.get_io();
-        // TODO(port): `get_links_for_type` matches the composer.json key names ("require",
-        // "require-dev", ...), not the `Link::TYPE_*` values passed here, so it always returns
-        // an empty map and these sections never print. PHP dispatches on `Link::$TYPES`.
         let links = package.get_links_for_type(link_type);
         if !links.is_empty() {
             io.write(&format!("\n<info>{}</info>", title));
@@ -844,9 +841,6 @@ impl ShowCommand {
         package: CompletePackageInterfaceHandle,
         link_type: &str,
     ) {
-        // TODO(port): `get_links_for_type` matches the composer.json key names ("require",
-        // "require-dev", ...), not the `Link::TYPE_*` values passed here, so it always returns
-        // an empty map and these keys never reach the JSON. PHP dispatches on `Link::$TYPES`.
         let links = package.get_links_for_type(link_type);
 
         if !links.is_empty() {

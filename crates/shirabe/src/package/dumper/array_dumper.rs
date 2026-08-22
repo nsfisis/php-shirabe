@@ -92,8 +92,8 @@ impl ArrayDumper {
             data.insert("dist".to_string(), PhpMixed::Array(dist));
         }
 
-        for type_name in SUPPORTED_LINK_TYPES.keys() {
-            let links = package.get_links_for_type(type_name);
+        for (type_name, opts) in SUPPORTED_LINK_TYPES.iter() {
+            let links = package.get_links_for_type(opts.method);
             if links.is_empty() {
                 continue;
             }
