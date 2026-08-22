@@ -135,16 +135,14 @@ impl Command for FundCommand {
 
         // collect funding data from default branches
         for (_, package) in &result.packages {
-            if package.as_alias().is_none() {
-                // TODO: check for CompleteAliasPackage as well
-                if let Some(complete_pkg) = package.as_complete()
-                    && complete_pkg.is_default_branch()
-                    && !complete_pkg.get_funding().is_empty()
-                    && packages_to_load_names.contains(&complete_pkg.get_name())
-                {
-                    Self::insert_funding_data(&mut fundings, &complete_pkg)?;
-                    packages_to_load_names.shift_remove(&complete_pkg.get_name());
-                }
+            if package.as_alias().is_none()
+                && let Some(complete_pkg) = package.as_complete()
+                && complete_pkg.is_default_branch()
+                && !complete_pkg.get_funding().is_empty()
+                && packages_to_load_names.contains(&complete_pkg.get_name())
+            {
+                Self::insert_funding_data(&mut fundings, &complete_pkg)?;
+                packages_to_load_names.shift_remove(&complete_pkg.get_name());
             }
         }
 
@@ -154,7 +152,6 @@ impl Command for FundCommand {
             {
                 continue;
             }
-            // TODO: check for CompleteAliasPackage as well
             if let Some(complete_pkg) = package.as_complete()
                 && !complete_pkg.get_funding().is_empty()
             {

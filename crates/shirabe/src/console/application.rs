@@ -1012,12 +1012,13 @@ impl Application {
         let commands_snapshot: Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> =
             self.commands.values().cloned().collect();
         for command in &commands_snapshot {
+            // TODO(port): Symfony registers the aliases of every command here, while this pass
+            // skips any command that cannot be borrowed.
             // A command's run() can re-enter find() (e.g. HelpCommand looks up the command it
             // describes). That command is mutably borrowed for the duration of its run(), so it
-            // cannot be borrowed here. It is safe to skip: find() always completes this alias pass
-            // before returning a command, so any command currently executing already had its
+            // cannot be borrowed here. Skipping it is safe: find() always completes this alias
+            // pass before returning a command, so any command currently executing already had its
             // aliases registered in the earlier find() call that located it.
-            // TODO: this work-around could be solved.
             let Ok(borrowed) = command.try_borrow() else {
                 continue;
             };
