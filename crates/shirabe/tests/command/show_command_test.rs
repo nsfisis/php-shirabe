@@ -193,7 +193,11 @@ outdated/patch 1.0.0 <highlight>! 1.0.1</highlight>",
 
 #[test]
 #[serial]
-#[ignore = "see test_self()"]
+// TODO(php-semantics): ShowCommand::get_relative_time formats the release date in UTC but takes
+// "today" from date(), which renders in the system default timezone, so a release date set to the
+// current instant is not recognised as today whenever the two dates differ.
+#[ignore = "get_relative_time renders \"from this week\" instead of \"from today\" for the \
+            just-released outdated/major whenever the local date differs from the UTC date"]
 fn test_show_outdated_deps_sorting_by_age() {
     run_show_case(
         input(vec![
@@ -1030,10 +1034,6 @@ fn test_self_and_package_combination() {
 
 #[test]
 #[serial]
-#[ignore = "the shim date() renders in UTC only (no timezone database) while PHP's date() uses \
-            the system default timezone, so ShowCommand::get_relative_time misses the \"today\" \
-            match and prints \"this week\" whenever the local date differs from the UTC date \
-            (e.g. daily 00:00-09:00 JST); see TODO(php-semantics) in shirabe-php-shim datetime.rs"]
 fn test_self() {
     let today = date_local("Y-m-d", None);
     let _tear_down = init_temp_composer(
