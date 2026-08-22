@@ -53,12 +53,19 @@
             pkgs.php85Packages.composer
             pkgs.just
 
-            # The following softwares are used for testing.
+            # The following softwares are used for testing:
+
             # VCSs
-            pkgs.fossil
             pkgs.git
-            pkgs.mercurial
-            pkgs.subversion
+            # VCSs (optional)
+            #   Neither Composer's test suite nor Shirabe's uses a real binary
+            #   for these commands: all tests for them mock a process executor.
+            #   They only slow the tests down.
+            #   Please uncomment to run those code paths by hand.
+            # pkgs.fossil
+            # pkgs.mercurial
+            # pkgs.subversion
+
             # Archivers
             pkgs.bzip2
             pkgs.gnutar
