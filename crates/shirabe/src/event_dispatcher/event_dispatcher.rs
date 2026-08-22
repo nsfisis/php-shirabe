@@ -563,9 +563,10 @@ impl EventDispatcher {
                             );
                         }
                         if strpos(callable_str, "@composer ") == Some(0) {
+                            // COMPOSER_BINARY is a native executable, so it is run directly instead
+                            // of being passed to a PHP interpreter.
                             let exec = format!(
-                                "{} {} {}",
-                                self.get_php_exec_command()?,
+                                "{} {}",
                                 ProcessExecutor::escape(
                                     &Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
                                 ),
@@ -1012,9 +1013,10 @@ try {{
                         // resolution, even if bin-dir contains composer too because the project requires composer/composer
                         // see https://github.com/composer/composer/issues/8748
                         if strpos(&exec, "composer ") == Some(0) {
+                            // COMPOSER_BINARY is a native executable, so it is run directly instead
+                            // of being passed to a PHP interpreter.
                             exec = format!(
-                                "{} {}{}",
-                                self.get_php_exec_command()?,
+                                "{}{}",
                                 ProcessExecutor::escape(
                                     &Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
                                 ),

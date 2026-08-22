@@ -36,6 +36,7 @@ use shirabe_symfony_console::output::output_interface;
 fn tear_down() {
     Platform::clear_env("COMPOSER_SKIP_SCRIPTS");
     Platform::clear_env("PHP_BINARY");
+    Platform::clear_env("COMPOSER_BINARY");
 }
 
 struct TearDown;
@@ -974,6 +975,53 @@ fn test_dispatcher_outputs_error_on_failed_command() {
     let expected = format!(
         "> exit 1{eol}Script exit 1 handling the post-install-cmd event returned with error code 1{eol}",
         eol = PHP_EOL
+    );
+    assert_eq!(expected, io.borrow().get_output());
+}
+
+/// Both `@composer <args>` and a bare `composer <args>` script re-enter the binary that is running
+/// the script, taken from COMPOSER_BINARY. That binary is a native executable, so it is run
+/// directly rather than being passed to a PHP interpreter.
+#[test]
+#[serial]
+fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
+    let _tear_down = TearDown;
+
+    Platform::put_env("COMPOSER_BINARY", "/path/to/shirabe");
+    let binary = ProcessExecutor::escape("/path/to/shirabe");
+
+    let (process, _process_guard) = get_process_executor_mock(
+        vec![
+            cmd(format!("{} install --no-dev", binary)),
+            cmd(format!("{} update", binary)),
+        ],
+        true,
+        MockHandler::default(),
+    );
+
+    let composer = create_composer_instance();
+    let io = buffer_io_verbose();
+    let io_dyn: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io.clone();
+
+    let mut dispatcher = dispatcher_with_listeners(
+        &composer,
+        io_dyn,
+        process,
+        listeners_const(vec!["@composer install --no-dev", "composer update"]),
+    );
+
+    dispatcher
+        .dispatch_script(
+            ScriptEvents::POST_INSTALL_CMD,
+            false,
+            vec![],
+            IndexMap::new(),
+        )
+        .unwrap();
+
+    let expected = format!(
+        "> post-install-cmd: @composer install --no-dev{eol}> post-install-cmd: composer update{eol}",
+        eol = PHP_EOL,
     );
     assert_eq!(expected, io.borrow().get_output());
 }
