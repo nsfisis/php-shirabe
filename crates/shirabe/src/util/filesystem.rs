@@ -533,8 +533,12 @@ impl Filesystem {
         prefer_relative: bool,
     ) -> String {
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
-            // PHP throws InvalidArgumentException
-            // Returning early-formatted Result is not possible without changing signature; panic to surface in tests.
+            // TODO(error-model): PHP throws InvalidArgumentException. Plugins reach this method
+            // through the RPC proxy, where a relative path is ordinary input rather than a
+            // programming error, and this panic kills the process instead of reaching their
+            // catch block; the plugin dispatcher repeats the check for that reason. Returning
+            // `anyhow::Result` from here and from `find_shortest_path_code` removes both the
+            // panic and the duplicated check.
             panic!(
                 "{}",
                 format!("$from ({}) and $to ({}) must be absolute paths.", from, to)
@@ -596,6 +600,8 @@ impl Filesystem {
         prefer_relative: bool,
     ) -> String {
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
+            // TODO(error-model): as in `find_shortest_path` — PHP throws
+            // InvalidArgumentException, and this panic cannot reach a plugin's catch block.
             panic!(
                 "{}",
                 format!("$from ({}) and $to ({}) must be absolute paths.", from, to)

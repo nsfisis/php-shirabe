@@ -732,9 +732,10 @@ fn dispatch_config_method(
 
 /// The download manager's contract is asynchronous on both sides: PHP declares a
 /// `PromiseInterface` return, Rust an `async fn`. The Rust future is driven to completion here
-/// and its value handed back as an already-settled React promise, which is the synchronous
-/// fallback of the promise design (`.ken/plugin-arch/design.md` §10.1.6) rather than the
-/// deferred resolution a concurrent engine would allow.
+/// and its value handed back as an already-settled React promise.
+///
+/// TODO(async): the boundary has no representation for a promise that is still pending, so the
+/// deferred resolution the PHP contract allows collapses into a blocking wait here.
 fn dispatch_download_manager_method(
     dm: &std::rc::Rc<std::cell::RefCell<dyn crate::downloader::DownloadManagerInterface>>,
     method_name: &str,
@@ -1006,12 +1007,15 @@ fn dispatch_event_dispatcher_method(
             if dispatcher.borrow_mut().has_event_listeners(&probe) {
                 // TODO(plugin): dispatching a worker-constructed event through the Rust-side
                 // dispatcher needs the event object (and the console input it carries) proxied
-                // back into this process; until then only the no-listener case — where
-                // upstream's dispatch is observably a no-op returning 0 — is supported.
+                // back into this process, so only the no-listener case is answered here.
                 return Err(runtime_throw(format!(
                     "dispatching `{name}` from the plugin process is not supported yet while listeners are registered for it"
                 )));
             }
+            // TODO(plugin): answering 0 here skips what `do_dispatch` does before it reaches the
+            // listener loop, and upstream does both regardless of the listener count: the
+            // `COMPOSER_DEBUG_EVENTS` trace line, and `push_event`'s circular-call detection
+            // (a nested dispatch of the same event name throws there even with no listeners).
             Ok(PluginValue::Int(0))
         }
         other => Err(runtime_throw(format!(
@@ -1610,6 +1614,15 @@ fn dispatch_package_method(
         }
         // `RootAliasPackage` overrides each of these to write through to its alias target, and
         // `RootPackage` reaches the same base state either way, so both go through the interface.
+        //
+        // TODO(type-model): choosing the body for the concrete variant belongs on `AnyPackage`,
+        // not here. The stub surface already decides which classes carry a method, so the
+        // `as_*_mut` accessors' "not available on an alias package" arms are unreachable for a
+        // method the alias stubs do not declare, and what is left is a per-variant dispatch that
+        // this guard only approximates: it covers `RootPackage` as well, where the extra hop is
+        // equivalent only while that impl keeps delegating to the base package, and nothing
+        // checks it. Method names repeated in the base-package arm below make the answer depend
+        // on arm order, and a new variant compiles into the wrong body without a diagnostic.
         "setRequires" | "setDevRequires" | "setConflicts" | "setProvides" | "setReplaces"
         | "setAutoload" | "setDevAutoload" | "setSuggests" | "setExtra"
             if package.borrow().is_root() =>
@@ -2497,8 +2510,10 @@ impl PhpInstallerProxy {
     /// The `?PromiseInterface` half of the installer contract. The Rust callers await the
     /// installer's effects rather than chaining continuations, so a returned promise is drained
     /// here: an already-settled one yields its value (or raises its rejection reason), while a
-    /// still-pending one is an explicit error — resolving it would need the concurrent execution
-    /// engine the boundary does not have (`.ken/plugin-arch/design.md` §10.1.6).
+    /// still-pending one is an explicit error.
+    ///
+    /// TODO(async): resolving a still-pending promise would need a concurrent execution engine
+    /// the boundary does not have.
     fn promise_result(&self, method: &str, value: PluginValue) -> anyhow::Result<Option<PhpMixed>> {
         let handle = match value {
             PluginValue::Null => return Ok(None),

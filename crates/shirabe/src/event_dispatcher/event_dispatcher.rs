@@ -751,11 +751,12 @@ impl EventDispatcher {
 
                         // PHP hosts the user's Command class in a throwaway, bare
                         // `Symfony\Component\Console\Application` (NOT Composer's Application),
-                        // built by a generated snippet running inside the worker. The command's
-                        // output is captured in a BufferedOutput and written back through the
-                        // dispatcher's IO; upstream hands the live output object of `$this->io`
-                        // to `$app->run()` instead, so only the interleaving with concurrent
-                        // writes differs.
+                        // built by a generated snippet running inside the worker.
+                        //
+                        // TODO(plugin): the BufferedOutput has to go. The command has to run
+                        // against the real output stream, the way upstream hands the live output
+                        // object of `$this->io` to `$app->run()`; collecting the output and
+                        // writing the buffer back once the run has returned is not a substitute.
                         let args = additional_args
                             .iter()
                             .map(|arg| ProcessExecutor::escape(arg))
@@ -775,6 +776,12 @@ impl EventDispatcher {
                         } else {
                             output_interface::VERBOSITY_NORMAL
                         };
+                        // TODO(error-model): the snippet's try/catch does not reproduce upstream's
+                        // boundary. Upstream wraps `$app->run()` alone and catches `\Exception`, so
+                        // an `\Error` from the command, and a throw from `new $className(...)`,
+                        // both escape without the "terminated with an exception" line. Here the
+                        // catch is `\Throwable`, and a constructor throw leaves the snippet as a
+                        // `Throw` reply from `__shirabe_eval`, so the line is written either way.
                         let snippet = format!(
                             r#"
 $className = {class_name_lit};
@@ -821,6 +828,8 @@ try {{
                         )?;
                         let result = match outcome {
                             Ok(value) => value.to_php_mixed()?,
+                            // TODO(error-model): `throw.exception_class` is dropped, so the class
+                            // upstream rethrows unchanged collapses to RuntimeException here.
                             Err(throw) => {
                                 self.io.write_error3(
                                     &format!(
@@ -846,6 +855,9 @@ try {{
                             self.io.write3(&command_output, false, crate::io::NORMAL);
                         }
                         if let Some(throw) = result.as_array().and_then(|map| map.get("throw")) {
+                            // TODO(error-model): the snippet reports `get_class($e)` as the first
+                            // field and nothing reads it, so the class upstream rethrows unchanged
+                            // collapses to RuntimeException here.
                             let fields = throw
                                 .as_list()
                                 .expect("the eval snippet reports exceptions as a list");

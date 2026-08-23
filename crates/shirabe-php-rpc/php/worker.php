@@ -267,6 +267,12 @@ final class ShirabeRpcRuntime
     /**
      * Converts a decoded wire value: handle descriptor arrays become live objects. A
      * materialized value arrives as a real instance already, revived by unserialize().
+     *
+     * TODO(type-model): a descriptor travels in-band as a plain array, so its exact key set is
+     * the only thing separating it from plugin data of the same shape. Every check below except
+     * __pclass matches on the reserved key alone, so an array a plugin built with a __rhandle or
+     * __phandle key of its own is read as a handle rather than kept as data. The Rust half
+     * (`decode_handle` in `src/value.rs`) matches the whole key set, and diverges the other way.
      */
     public static function fromWire($value)
     {
@@ -806,7 +812,7 @@ ShirabeRpcRuntime::$dispatch = [
     },
     // An already-fulfilled promise for a Rust-side call whose PHP signature declares
     // PromiseInterface. The Rust future ran to completion before this is called, so there is
-    // nothing left to defer; see .ken/plugin-arch/design.md §10.1.6.
+    // nothing left to defer.
     '__shirabe_resolved_promise' => static function ($args) {
         if (!function_exists('React\\Promise\\resolve')) {
             throw new RuntimeException(

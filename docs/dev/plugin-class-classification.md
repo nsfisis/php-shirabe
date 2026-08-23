@@ -36,7 +36,7 @@ exactly one category.
 | Category | Entity lives | PHP child process sees | Rust obligation |
 |---|---|---|---|
 | `rust-proxy` | Rust | generated proxy stub (methods RPC to Rust) | full-fidelity reproduction; every public/protected method needs an RPC handler |
-| `rust-snapshot` | Rust | generated snapshot class (`__rhandle` + eagerly copied fields, getters answer locally) | full-fidelity reproduction; snapshot serializer |
+| `rust-snapshot` | Rust | the real class, revived from the object record the wire carries (no handle, getters answer locally) | full-fidelity reproduction; both halves of the value codec |
 | `contract` | n/a (interface / abstract type) | generated declaration preserving the `extends`/`implements` hierarchy | depends on direction attributes |
 | `two-world` | both, independent siblings | the real PHP implementation (same FQCN, re-defined or vendor-loaded) | independent Rust implementation; only the seam objects (composer / io / dispatcher) are shared |
 | `php-native` | PHP | the real, unmodified PHP source | none — Rust may or may not have its own port for internal use, and that port is free to diverge in shape |
@@ -59,10 +59,15 @@ entity.
 
 #### rust-snapshot
 
-Immutable value objects, e.g. `Link` and the security-advisory family. The
-child receives the field values together with an interned `__rhandle`, so
-identity (`===`) is preserved while getters answer locally with zero
-round-trips.
+Immutable value objects, e.g. `Link` and the security-advisory family. A
+value has no entity to point at, so it gets no handle and no stub: the wire
+carries the object record `serialize()` writes for it, `unserialize()`
+revives a genuine instance of the real class without running a constructor,
+and getters answer locally with zero round-trips. Identity is not preserved
+— two calls of the same getter yield two objects in the child (see
+`docs/dev/php-rpc.md`). Only the classes on the codec's closed list cross
+this way today (`Link` and the `composer/semver` constraints it holds); the
+rest of the category has no artifact yet and is guarded.
 
 #### contract
 
@@ -124,8 +129,10 @@ Drives which side needs stubs and which needs adapters.
 A non-abstract class with a public constructor that is also reachable from
 the graph (e.g. `JsonFile`, obtainable via `Locker::getJsonFile()` *and*
 freely `new`ed by plugins). These need a constructor story on the stub (the
-stub ctor must RPC a `NewObject` so the entity is allocated Rust-side); the
-classifier surfaces them because they are individually design-sensitive.
+stub constructor forwards to `__shirabeConstruct` on the runtime service
+endpoint, and the Rust side allocates the entity and answers with its
+handle); the classifier surfaces them because they are individually
+design-sensitive.
 
 #### mutable-static
 
@@ -350,8 +357,10 @@ reviewable outcome in the report, not a silent guess.
 ## Known deviations and open questions
 
 The mechanical rules surfaced several points where earlier design prose was
-incomplete or a decision is still owed. Each needs an explicit user
-decision; the tool keeps them visible instead of resolving them silently.
+incomplete or a decision is still owed. Some have been decided since, and
+this section records what the implementation does instead; the rest still
+need an explicit user decision, and the tool keeps them visible instead of
+resolving them silently.
 
 ### ProcessExecutor and HttpDownloader are reachable
 
@@ -365,28 +374,55 @@ it as a stateless utility — survives only for plugin-`new`ed instances.
 This is exactly the dual-instantiation situation the
 `plugin-constructible` attribute exists to surface.
 
-Proxy-side access to the graph-owned instances (the `getLoop()` route) is
-left unimplemented — a `todo!()`-style explicit error, not a silent stub —
-until a real plugin demonstrates the need. Note that `executeAsync()`
-throws a `LogicException` without the `@internal` `enableAsync()` (called
-only by `Loop::__construct`), so plugin-`new`ed instances never reach the
-async path anyway.
+Both routes raise an explicit error today, and which one gets a story first
+is still open. The graph-owned instances cannot be obtained at all: the
+`Composer` proxy answers `getLoop()` with an explicit error, and `Loop`,
+`ProcessExecutor` and `HttpDownloader` are guarded classes, so a
+plugin-`new`ed instance is an explicit error too rather than a second
+instance the Rust side never sees.
+
+An earlier argument for leaving plugin-`new`ed instances alone does not
+hold: `executeAsync()` does throw a `LogicException` unless `enableAsync()`
+ran first, but `enableAsync()`, `wait()` and `countActiveJobs()` are all
+public — `@internal` is a docblock note — so nothing stops a plugin from
+driving its own instance through the async path.
 
 ### Dual instantiation
 
 `Locker::getJsonFile(): JsonFile` makes `JsonFile` reachable, so it is
 `rust-proxy` + `plugin-constructible` — and plugins `new JsonFile(...)`
-constantly. The question is not cosmetic: `ProcessExecutor`, `JsonFile`,
-and `Util\Filesystem` being `rust-proxy` is what demotes the VCS/auth
-utility belt (`Git`, `GitHub`, `GitLab`, `Bitbucket`, `Svn`, `AuthHelper`,
-`RemoteFilesystem`) to `unsupported` — each of them constructs one of those
-three internally. `ArrayLoader` is a fourth member: plugins `new
-ArrayLoader` constantly, and it drives constructor-plus-setters on the
-package classes, so its fate follows theirs. These utilities can become
-php-native the moment plugin-`new`ed instances of the trio may live
-PHP-locally (or the stub `NewObject` constructor story lands); until the
-user decides, the tool reports them as `unsupported` with the constructing
-site named.
+constantly. The question is not cosmetic: a `rust-proxy` class a plugin
+constructs demotes the constructing class, and the demotions cascade.
+`ProcessExecutor` is what carries the VCS/auth utility belt to
+`unsupported`: `GitHub`, `GitLab`, `Bitbucket` and `Svn` construct one,
+`Git` constructs a `Bitbucket`, `AuthHelper` a `GitHub`, and
+`RemoteFilesystem` an `AuthHelper`. `JsonFile` takes `ConfigValidator` and
+`RepositoryFactory` the same way, and `ArrayLoader` — which plugins `new`
+just as constantly, and which drives constructor-plus-setters on the
+package classes — takes `VersionSelector` and `VersionBumper`.
+
+The construction half now exists as a mechanism rather than a question: a
+stub constructor forwards to `__shirabeConstruct`, the Rust side allocates
+the entity and answers with its handle, and the plugin-`new`ed object is
+then the same entity the graph sees. It is filled in per class, driven by
+the explicit errors real plugins hit — today `Package`, `CompletePackage`,
+the three alias packages, the five solver operations and
+`Composer\Util\Filesystem` can be built this way, the last one only without
+a `ProcessExecutor` argument (that class has no stub, so the argument could
+only be an instance the Rust side never sees). Every other proxied class
+answers with an explicit error naming it.
+
+`JsonFile`, `ArrayLoader` and `ProcessExecutor` are still undecided, so the
+classes above stay `unsupported` — but a guard now shadows each of them in
+the child, so touching one is an explicit error instead of real code
+running against a second instance.
+
+The demotion rule has not been taught about the construction stories: it
+demotes for constructing any `rust-proxy` service, whether or not that
+service can now be built. `Composer\Package\Archiver\ArchivableFilesFinder`
+is `unsupported` for `new Filesystem` alone, which no longer forks any
+state; promoting such a class means feeding the per-class construction
+stories back into the rule.
 
 ### Process: dual instantiation split by caller
 
@@ -425,13 +461,26 @@ The child process necessarily `require`s the project's real
 `InstalledVersions`) to autoload plugin code, before any stub could load. A
 same-FQCN stub cannot coexist; both are overridden to `php-native`.
 `InstalledVersions::$installed` is nonetheless genuinely shared state —
-Rust rewrites `installed.php` on every dump — so the Rust side must push a
-reload (`InstalledVersions::reload()`) after installs, or post-install
-event handlers read stale data. Whether and when that reload push happens,
-and how plugin-class autoloading is split between the two worlds, is not
-yet decided; until it is, the `InstalledVersions` state a plugin observes
-after a Rust-side dump is undefined. The Rust-side reload site carries a
-`TODO(plugin)` marker.
+Rust rewrites `installed.php` on every dump — and the Rust side pushes the
+reload: right after writing the file it calls
+`__shirabe_installed_versions_reload` in the worker, which mirrors the tail
+of `FilesystemRepository::write` (the unconditional
+`InstalledVersions::reload($versions)` plus the reflection-based
+`selfDir`/`installedIsLocalDir` restore). It is skipped when no worker runs,
+and inside the worker when the class is not even autoloadable there; in
+both cases there is no observer code either.
+
+Plugin classes are autoloaded from the Rust side. The loaders
+`PluginManager::registerPackage` builds live in the Rust process, and the
+worker's autoloader asks them for a file through the runtime service
+endpoint (`__shirabe_find_file`); the files-autoload entries and the
+`_composer_tmp` class-rename path run in the worker. One gap remains: the
+Rust `spl_autoload_register` is a no-op and `ClassLoader::register` keeps
+one loader per vendor directory (matching upstream's `$registeredLoaders`)
+where PHP's autoload stack keeps every registered loader, so a second
+plugin loader registered under the same vendor directory evicts the first,
+and a class of the earlier plugin that was never loaded becomes
+unresolvable.
 
 ### ConsoleIO leaks world-2 objects
 
@@ -440,7 +489,8 @@ seam: `getTable(): Table` / `getProgressBar(): ProgressBar`, and its
 constructor takes `InputInterface`/`OutputInterface`/`HelperSet` — none of
 which can cross the wire as values. The stub needs a bespoke story (e.g. a
 local Table bound to a proxying `OutputInterface`); until one is designed,
-both members raise explicit errors.
+both members raise explicit errors, as does the constructor — the Rust side
+has no construction story for this class.
 
 ## The classifier tool
 

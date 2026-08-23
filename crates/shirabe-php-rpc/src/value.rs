@@ -612,6 +612,13 @@ fn parse_quoted(payload: &[u8], pos: &mut usize, terminator: u8) -> anyhow::Resu
 }
 
 /// Recognizes the reserved handle-descriptor arrays by their exact key sets.
+///
+/// TODO(type-model): a descriptor travels in-band as a plain array, so its exact key set is the
+/// only thing separating it from plugin data of the same shape. An array that carries a reserved
+/// key without matching a descriptor's whole key set is user data and should decode as an array;
+/// it is a decode error here instead, and that is the fatal lane, so a plugin passing
+/// `['__rhandle' => 1]` to a proxied method takes the channel down with it. The PHP half
+/// (`fromWire` in `php/worker.php`) diverges the other way, matching on the reserved key alone.
 fn decode_handle(entries: &IndexMap<Vec<u8>, PluginValue>) -> anyhow::Result<Option<PluginValue>> {
     let get = |key: &[u8]| entries.get(key);
 
