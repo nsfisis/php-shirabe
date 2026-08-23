@@ -6,6 +6,14 @@ pub fn array_values<V: Clone>(array: &IndexMap<String, V>) -> Vec<V> {
     array.values().cloned().collect()
 }
 
+pub fn array_values_mixed(value: &PhpMixed) -> Vec<PhpMixed> {
+    match value {
+        PhpMixed::List(items) => items.clone(),
+        PhpMixed::Array(map) => map.values().cloned().collect(),
+        _ => panic!("array_values(): Argument #1 ($array) must be of type array"),
+    }
+}
+
 pub fn array_keys<V>(array: &IndexMap<String, V>) -> Vec<String> {
     array.keys().cloned().collect()
 }

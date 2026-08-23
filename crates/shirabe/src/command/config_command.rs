@@ -20,10 +20,10 @@ use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
-    escapeshellcmd, exec, explode, file_exists, impl_php_class, implode, in_array_loose,
-    in_array_strict, is_array, is_bool, is_dir, is_numeric, is_object, is_string, json_encode,
-    php_regex, preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower, system,
-    touch, var_export,
+    array_values_mixed, escapeshellcmd, exec, explode, file_exists, impl_php_class, implode,
+    in_array_loose, in_array_strict, is_array, is_bool, is_dir, is_numeric, is_object, is_string,
+    json_encode, php_regex, php_to_string, preg_is_match, preg_match, preg_replace, str_replace,
+    strpos, strtolower, system, touch, var_export,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
@@ -199,7 +199,7 @@ impl ConfigCommand {
 
             let raw_val = raw_contents_arr.get(key).cloned().unwrap_or(PhpMixed::Null);
 
-            let value_inner = value.clone();
+            let mut value_inner = value.clone();
 
             if is_array(&value_inner)
                 && (!is_numeric(&key_first_key(&value_inner).unwrap_or_default().into())
@@ -224,27 +224,23 @@ impl ConfigCommand {
                 continue;
             }
 
-            let value_display: String = if is_array(&value_inner) {
-                let arr_strs: Vec<String> = value_inner
-                    .as_list()
-                    .map(|l| {
-                        l.iter()
-                            .map(|val| {
-                                if is_array(val) {
-                                    json_encode(val).unwrap_or_default()
-                                } else {
-                                    val.as_string().unwrap_or("").to_string()
-                                }
-                            })
-                            .collect::<Vec<_>>()
+            if is_array(&value_inner) {
+                let arr_strs: Vec<String> = array_values_mixed(&value_inner)
+                    .iter()
+                    .map(|val| {
+                        if is_array(val) {
+                            json_encode(val).unwrap_or_default()
+                        } else {
+                            php_to_string(val)
+                        }
                     })
-                    .unwrap_or_default();
-                format!("[{}]", implode(", ", &arr_strs))
-            } else if is_bool(&value_inner) {
-                var_export(&value_inner, true)
-            } else {
-                value_inner.as_string().unwrap_or("").to_string()
-            };
+                    .collect();
+                value_inner = PhpMixed::String(format!("[{}]", implode(", ", &arr_strs)));
+            }
+
+            if is_bool(&value_inner) {
+                value_inner = PhpMixed::String(var_export(&value_inner, true));
+            }
 
             let source = if show_source {
                 format!(
@@ -278,13 +274,7 @@ impl ConfigCommand {
                     let id = preg_replace(php_regex!("{-+}"), "-", &id);
                     format!("https://getcomposer.org/doc/06-config.md#{}", id)
                 };
-            if is_string(&raw_val)
-                && raw_val
-                    .as_string()
-                    .map(|s| s.to_string())
-                    .unwrap_or_default()
-                    != value_display
-            {
+            if is_string(&raw_val) && raw_val.as_string() != value_inner.as_string() {
                 self.get_io().write3(
                     &format!(
                         "[<fg=yellow;href={}>{}{}</>] <info>{} ({})</info>{}",
@@ -292,7 +282,7 @@ impl ConfigCommand {
                         k.clone().unwrap_or_default(),
                         key,
                         raw_val.as_string().unwrap_or(""),
-                        value_display,
+                        php_to_string(&value_inner),
                         source
                     ),
                     true,
@@ -305,7 +295,7 @@ impl ConfigCommand {
                         link,
                         k.clone().unwrap_or_default(),
                         key,
-                        value_display,
+                        php_to_string(&value_inner),
                         source
                     ),
                     true,
@@ -843,7 +833,7 @@ impl Command for ConfigCommand {
                     },
                 )?
             } else {
-                value.as_string().unwrap_or("").to_string()
+                php_to_string(&value)
             };
 
             let mut source_of_config_value = String::new();
