@@ -12,7 +12,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException, ZipArchive,
     bin2hex, class_exists, file_exists, file_get_contents, filesize, hash_file, impl_php_class,
-    is_file, json_encode, php_regex, preg_match, random_int, str_replace, strlen, substr,
+    is_file, json_encode, php_regex, preg_match, random_int, str_replace, strlen, substr_bytes,
     version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
@@ -233,16 +233,19 @@ impl ZipDownloader {
                 ));
                 self.inner.io.borrow().write_error(&format!(
                     "First 100 bytes (hex): {}",
-                    bin2hex(
-                        substr(&file_get_contents(file).unwrap_or_default(), 0, Some(100))
-                            .as_bytes()
-                    )
+                    bin2hex(&substr_bytes(
+                        &file_get_contents(file).unwrap_or_default(),
+                        0,
+                        Some(100)
+                    ))
                 ));
                 self.inner.io.borrow().write_error(&format!(
                     "Last 100 bytes (hex): {}",
-                    bin2hex(
-                        substr(&file_get_contents(file).unwrap_or_default(), -100, None).as_bytes()
-                    )
+                    bin2hex(&substr_bytes(
+                        &file_get_contents(file).unwrap_or_default(),
+                        -100,
+                        None
+                    ))
                 ));
                 if strlen(&package.get_dist_url().unwrap_or_default()) > 0 {
                     self.inner.io.borrow().write_error(&format!(

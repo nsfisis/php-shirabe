@@ -295,7 +295,11 @@ fn test_reference_config() {
                 "sha1",
                 &format!(
                     "{}{}",
-                    file_get_contents(format!("{}/composer.json", dist_url)).unwrap_or_default(),
+                    // TODO(bytes)
+                    String::from_utf8_lossy(
+                        &file_get_contents(format!("{}/composer.json", dist_url))
+                            .unwrap_or_default()
+                    ),
                     serialize(&PhpMixed::Array(options.clone()))
                 )
             ))

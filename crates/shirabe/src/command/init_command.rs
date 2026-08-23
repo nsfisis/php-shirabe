@@ -215,7 +215,9 @@ impl InitCommand {
     fn add_vendor_ignore(&self, ignore_file: &str, vendor: &str) {
         let mut contents = String::new();
         if file_exists(ignore_file) {
-            contents = file_get_contents(ignore_file).unwrap_or_default();
+            // TODO(bytes): the ignore file is edited as a String.
+            contents = String::from_utf8_lossy(&file_get_contents(ignore_file).unwrap_or_default())
+                .into_owned();
 
             if strpos(&contents, "\n") != Some(0) {
                 contents.push('\n');

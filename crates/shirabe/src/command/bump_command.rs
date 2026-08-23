@@ -73,8 +73,8 @@ impl BumpCommand {
 
         let composer_json = JsonFile::new(composer_json_path.clone(), None, None)?;
         let contents = match file_get_contents(composer_json.get_path()) {
-            Some(c) => c,
-            None => {
+            Ok(c) => c,
+            Err(_) => {
                 io.write_error3(
                     &format!("<error>{} is not readable.</error>", composer_json_path),
                     true,
@@ -86,7 +86,7 @@ impl BumpCommand {
 
         if !is_writable(&composer_json_path)
             && Silencer::call(|| {
-                file_put_contents(&composer_json_path, contents.as_bytes())
+                file_put_contents(&composer_json_path, &contents)
                     .map(|_| ())
                     .ok_or_else(|| anyhow::anyhow!("file_put_contents failed"))
             })
@@ -305,8 +305,9 @@ impl BumpCommand {
         updates: &indexmap::IndexMap<&str, indexmap::IndexMap<String, String>>,
     ) -> anyhow::Result<bool> {
         let contents = match file_get_contents(json.get_path()) {
-            Some(c) => c,
-            None => {
+            // TODO(bytes): JsonManipulator takes the JSON as a String.
+            Ok(c) => String::from_utf8_lossy(&c).into_owned(),
+            Err(_) => {
                 return Err(shirabe_php_shim::RuntimeException::new(format!(
                     "Unable to read {} contents.",
                     json.get_path()

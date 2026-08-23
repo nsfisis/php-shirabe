@@ -48,7 +48,11 @@ impl JsonConfigSource {
                 .into());
             }
 
-            contents = file_get_contents(self.file.borrow().get_path()).unwrap_or_default();
+            // TODO(bytes): JsonManipulator takes the JSON as a String.
+            contents = String::from_utf8_lossy(
+                &file_get_contents(self.file.borrow().get_path()).unwrap_or_default(),
+            )
+            .into_owned();
         } else if self.auth_config {
             contents = "{\n}\n".to_string();
         } else {

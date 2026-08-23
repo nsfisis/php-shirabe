@@ -556,8 +556,11 @@ return array(
             // carry over existing autoload.php's suffix if possible and none is configured
             if suffix.is_none() && Filesystem::is_readable(&format!("{}/autoload.php", vendor_path))
             {
-                let content =
-                    file_get_contents(format!("{}/autoload.php", vendor_path)).unwrap_or_default();
+                // TODO(bytes): preg_match matches over a &str.
+                let content = String::from_utf8_lossy(
+                    &file_get_contents(format!("{}/autoload.php", vendor_path)).unwrap_or_default(),
+                )
+                .into_owned();
                 if let Some(matches) =
                     preg_match(php_regex!("{ComposerAutoloaderInit([^:\\s]+)::}"), &content)
                 {

@@ -28,8 +28,12 @@ impl PhpFileParser {
                         "File at \"{}\" is not readable, check its permissions",
                         path
                     );
-                } else if trim(file_get_contents(path).unwrap_or_default().as_str(), None)
-                    .is_empty()
+                // TODO(bytes)
+                } else if trim(
+                    &String::from_utf8_lossy(&file_get_contents(path).unwrap_or_default()),
+                    None,
+                )
+                .is_empty()
                 {
                     // The input file was really empty and thus contains no classes
                     return Ok(vec![]);
@@ -178,7 +182,7 @@ impl PhpFileParser {
         }
 
         if is_file(path) {
-            return file_get_contents(path).is_some();
+            return file_get_contents(path).is_ok();
         }
 
         // assume false otherwise

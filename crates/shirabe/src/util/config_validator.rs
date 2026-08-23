@@ -72,7 +72,11 @@ impl ConfigValidator {
         }
 
         if manifest.is_some() {
-            let contents = shirabe_php_shim::file_get_contents(file).unwrap_or_default();
+            // TODO(bytes): detect_duplicate_keys scans the JSON as a &str.
+            let contents = String::from_utf8_lossy(
+                &shirabe_php_shim::file_get_contents(file).unwrap_or_default(),
+            )
+            .into_owned();
             if let Some((key, line)) = detect_duplicate_keys(&contents) {
                 warnings.push(format!("Key {key} is a duplicate in {file} at line {line}"));
             }

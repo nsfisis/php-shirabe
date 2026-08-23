@@ -631,10 +631,10 @@ impl Locker {
             Box<dyn FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>>,
         >,
     ) -> anyhow::Result<()> {
-        let contents = file_get_contents(composer_json.get_path());
-        let contents = match contents {
-            Some(s) => s,
-            None => {
+        let contents = match file_get_contents(composer_json.get_path()) {
+            // TODO(bytes): get_content_hash parses the contents as a &str.
+            Ok(s) => String::from_utf8_lossy(&s).into_owned(),
+            Err(_) => {
                 return Err(RuntimeException::new(format!(
                     "Unable to read {} contents to update the lock file hash.",
                     composer_json.get_path()

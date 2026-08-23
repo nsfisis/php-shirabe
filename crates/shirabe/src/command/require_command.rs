@@ -51,11 +51,11 @@ pub struct RequireCommand {
     first_require: std::cell::Cell<bool>,
     json: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<JsonFile>>>>,
     file: std::cell::RefCell<String>,
-    composer_backup: std::cell::RefCell<String>,
+    composer_backup: std::cell::RefCell<Vec<u8>>,
     /// file name
     lock: std::cell::RefCell<String>,
     /// contents before modification if the lock file exists
-    lock_backup: std::cell::RefCell<Option<String>>,
+    lock_backup: std::cell::RefCell<Option<Vec<u8>>>,
     dependency_resolution_completed: std::rc::Rc<std::cell::Cell<bool>>,
     repos: std::cell::RefCell<Option<crate::repository::RepositoryInterfaceHandle>>,
     repository_sets:
@@ -78,7 +78,7 @@ impl RequireCommand {
             first_require: std::cell::Cell::new(false),
             json: std::cell::RefCell::new(None),
             file: std::cell::RefCell::new(String::new()),
-            composer_backup: std::cell::RefCell::new(String::new()),
+            composer_backup: std::cell::RefCell::new(Vec::new()),
             lock: std::cell::RefCell::new(String::new()),
             lock_backup: std::cell::RefCell::new(None),
             dependency_resolution_completed: std::rc::Rc::new(std::cell::Cell::new(false)),
@@ -655,7 +655,11 @@ impl RequireCommand {
         remove_key: &str,
         sort_packages: bool,
     ) -> bool {
-        let contents = file_get_contents(json.borrow().get_path()).unwrap_or_default();
+        // TODO(bytes): JsonManipulator takes the JSON as a String.
+        let contents = String::from_utf8_lossy(
+            &file_get_contents(json.borrow().get_path()).unwrap_or_default(),
+        )
+        .into_owned();
 
         let mut manipulator = match JsonManipulator::new(contents) {
             Ok(m) => m,
@@ -712,12 +716,9 @@ impl RequireCommand {
                 extra
             );
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
-            file_put_contents(
-                json.borrow().get_path(),
-                self.composer_backup.borrow().as_bytes(),
-            );
+            file_put_contents(json.borrow().get_path(), &self.composer_backup.borrow());
             if let Some(ref lock_backup) = *self.lock_backup.borrow() {
-                file_put_contents(&lock, lock_backup.as_bytes());
+                file_put_contents(&lock, lock_backup);
             }
         }
     }
@@ -837,7 +838,7 @@ impl Command for RequireCommand {
             file_get_contents(json.borrow().get_path()).unwrap_or_default();
         let lock = self.lock.borrow().clone();
         *self.lock_backup.borrow_mut() = if file_exists(&lock) {
-            file_get_contents(&lock)
+            file_get_contents(&lock).ok()
         } else {
             None
         };
@@ -859,7 +860,7 @@ impl Command for RequireCommand {
         let backup_contents = self.composer_backup.borrow().clone();
         if !is_writable(&file)
             && Silencer::call(|| {
-                shirabe_php_shim::file_put_contents(&file_path, backup_contents.as_bytes());
+                shirabe_php_shim::file_put_contents(&file_path, &backup_contents);
                 Ok::<bool, anyhow::Error>(false)
             })
             .ok()

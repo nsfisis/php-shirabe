@@ -9,9 +9,9 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Silencer;
 use shirabe_php_shim::{
-    PhpMixed, basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
-    file_get_contents5, file_put_contents, fopen, is_dir, is_file, is_link, php_regex, preg_match,
-    realpath, rmdir, substr, trim, umask,
+    basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
+    file_get_contents_with_max_length, file_put_contents, fopen, is_dir, is_file, is_link,
+    php_regex, preg_match, realpath, rmdir, substr, trim, umask,
 };
 
 /// Seam over the BinaryInstaller methods reached through LibraryInstaller, so tests can inject a
@@ -311,8 +311,12 @@ impl BinaryInstaller {
         let bin_dir = ProcessExecutor::escape(&dirname(&bin_path));
         let bin_file = basename(&bin_path);
 
-        let bin_contents =
-            file_get_contents5(bin, false, PhpMixed::Null, 0, Some(500)).unwrap_or_default();
+        // TODO(bytes): preg_match matches over a &str, and the shebang it captures is spliced
+        // into the generated proxy as a String.
+        let bin_contents = String::from_utf8_lossy(
+            &file_get_contents_with_max_length(bin, 500).unwrap_or_default(),
+        )
+        .into_owned();
         // For php files, we generate a PHP proxy instead of a shell one,
         // which allows calling the proxy with a custom php process
         if let Some(m) = preg_match(

@@ -267,7 +267,14 @@ fn test_copy() {
         GetResult::True
     ));
     assert!(std::path::Path::new(&file).exists());
-    assert!(strpos(&file_get_contents(&file).unwrap_or_default(), "testCopy").is_some());
+    // TODO(bytes)
+    assert!(
+        strpos(
+            &String::from_utf8_lossy(&file_get_contents(&file).unwrap_or_default()),
+            "testCopy"
+        )
+        .is_some()
+    );
     unlink(&file);
 }
 

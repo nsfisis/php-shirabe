@@ -766,7 +766,11 @@ impl Factory {
                                     Some(io.clone()),
                                 )?,
                                 im,
-                                &file_get_contents(composer_file_path).unwrap_or_default(),
+                                // TODO(bytes): Locker takes the composer.json contents as a &str
+                                // to hash them.
+                                &String::from_utf8_lossy(
+                                    &file_get_contents(composer_file_path).unwrap_or_default(),
+                                ),
                                 process,
                             );
                             composer_full

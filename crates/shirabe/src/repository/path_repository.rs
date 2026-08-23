@@ -184,7 +184,11 @@ impl PathRepository {
                 continue;
             }
 
-            let json = file_get_contents(&composer_file_path).unwrap_or_default();
+            // TODO(bytes): JsonFile::parse_json takes the JSON as a &str.
+            let json = String::from_utf8_lossy(
+                &file_get_contents(&composer_file_path).unwrap_or_default(),
+            )
+            .into_owned();
             let parsed = JsonFile::parse_json(Some(&json), Some(&composer_file_path))?;
             let mut package: IndexMap<String, PhpMixed> = match parsed {
                 PhpMixed::Array(m) => m.into_iter().collect(),

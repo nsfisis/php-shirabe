@@ -434,10 +434,13 @@ impl PluginManager {
                 let path = class_loader.find_file(&class).unwrap_or_else(|| {
                     panic!("plugin class `{class}` is already defined but has no autoloadable file")
                 });
-                // TODO(bytes): file_get_contents is lossy UTF-8; the eval'd plugin source
-                // should be carried as bytes.
-                let code = file_get_contents(&path)
-                    .unwrap_or_else(|| panic!("unable to read the plugin class file `{path}`"));
+                // TODO(bytes): the eval'd plugin source is carried as a String, so
+                // from_utf8_lossy corrupts a source file that is not valid UTF-8.
+                let code =
+                    String::from_utf8_lossy(&file_get_contents(&path).unwrap_or_else(|_| {
+                        panic!("unable to read the plugin class file `{path}`")
+                    }))
+                    .into_owned();
                 let class_counter = CLASS_COUNTER.load(std::sync::atomic::Ordering::Relaxed);
                 let separator_pos = strrpos(&class, "\\");
                 let mut class_name = class.clone();

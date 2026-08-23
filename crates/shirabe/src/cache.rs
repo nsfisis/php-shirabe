@@ -136,7 +136,11 @@ impl Cache {
                     crate::io::DEBUG,
                 );
 
-                return file_get_contents(&full_path);
+                // TODO(bytes): the payload is handed back to callers as a String, so a cache
+                // entry that is not valid UTF-8 is corrupted by from_utf8_lossy.
+                return file_get_contents(&full_path)
+                    .map(|c| String::from_utf8_lossy(&c).into_owned())
+                    .ok();
             }
         }
 

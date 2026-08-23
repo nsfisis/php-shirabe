@@ -2263,7 +2263,7 @@ impl ApplicationHandle {
                     bin2hex(&random_bytes(5))
                 );
                 if !(file_put_contents(&tempfile, file!().as_bytes()).is_some_and(|n| n > 0)
-                    && file_get_contents(&tempfile).as_deref() == Some(file!())
+                    && file_get_contents(&tempfile).as_deref().ok() == Some(file!().as_bytes())
                     && unlink(&tempfile).is_ok()
                     && !file_exists(&tempfile))
                 {
@@ -2280,9 +2280,11 @@ impl ApplicationHandle {
             // add non-standard scripts as own commands
             let file = Factory::get_composer_file().unwrap_or_default();
             if may_need_script_command && is_file(&file) && Filesystem::is_readable(&file) {
-                let composer_json: PhpMixed =
-                    json_decode_assoc(&file_get_contents(&file).unwrap_or_default())
-                        .unwrap_or(PhpMixed::Null);
+                // TODO(bytes): json_decode_assoc takes the JSON as a &str.
+                let composer_json: PhpMixed = json_decode_assoc(&String::from_utf8_lossy(
+                    &file_get_contents(&file).unwrap_or_default(),
+                ))
+                .unwrap_or(PhpMixed::Null);
                 if let Some(arr) = composer_json.as_array()
                     && let Some(scripts) = arr.get("scripts").and_then(|v| v.as_array())
                 {

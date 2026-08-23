@@ -112,7 +112,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         // @phpstan-ignore-next-line as RequireCommand does not have the option above so this code is reachable there
         let file = Factory::get_composer_file().unwrap_or_default();
         if is_file(&file) && Filesystem::is_readable(&file) {
-            let contents = file_get_contents(&file).unwrap_or_default();
+            // TODO(bytes): json_decode_assoc takes the JSON as a &str.
+            let contents =
+                String::from_utf8_lossy(&file_get_contents(&file).unwrap_or_default()).into_owned();
             let composer = json_decode_assoc(&contents).unwrap_or(PhpMixed::Null);
             if is_array(&composer)
                 && let Some(arr) = composer.as_array()

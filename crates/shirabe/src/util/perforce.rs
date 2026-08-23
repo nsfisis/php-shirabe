@@ -371,8 +371,9 @@ impl Perforce {
             p4_create_client_command,
             None,
             None,
+            // TODO(bytes): Process carries its stdin as a PhpMixed::String.
             file_get_contents(self.get_p4_client_spec())
-                .map(PhpMixed::String)
+                .map(|s| PhpMixed::String(String::from_utf8_lossy(&s).into_owned()))
                 .unwrap_or(PhpMixed::Null),
             None,
         )?;

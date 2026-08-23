@@ -165,7 +165,11 @@ impl JsonFile {
                         io_interface::NORMAL,
                     );
                 }
-                Ok(file_get_contents(&self.path))
+                // TODO(bytes): the JSON text travels as a String, as it does on the
+                // HttpDownloader branch above.
+                Ok(file_get_contents(&self.path)
+                    .map(|c| String::from_utf8_lossy(&c).into_owned())
+                    .ok())
             }
         })() {
             Ok(j) => j,
@@ -282,10 +286,10 @@ impl JsonFile {
         content: &str,
     ) -> anyhow::Result<Option<i64>> {
         // PHP: @file_get_contents($path)
-        let current_content = Silencer::call(|| Ok(file_get_contents(path)))
+        let current_content = Silencer::call(|| Ok(file_get_contents(path).ok()))
             .ok()
             .flatten();
-        if current_content.is_none() || current_content.as_deref() != Some(content) {
+        if current_content.is_none() || current_content.as_deref() != Some(content.as_bytes()) {
             return Ok(file_put_contents(path, content.as_bytes()));
         }
 
@@ -307,7 +311,9 @@ impl JsonFile {
             ))
             .into());
         }
-        let content = file_get_contents(&self.path).unwrap_or_default();
+        // TODO(bytes): json_decode_obj and validate_syntax take the JSON as a &str.
+        let content = String::from_utf8_lossy(&file_get_contents(&self.path).unwrap_or_default())
+            .into_owned();
         let data = json_decode_obj(&content)?;
 
         if matches!(data, PhpMixed::Null) && content != "null" {

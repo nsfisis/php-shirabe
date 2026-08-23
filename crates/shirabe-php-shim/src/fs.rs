@@ -1,4 +1,3 @@
-use crate::PhpMixed;
 use crate::PhpResource;
 use crate::StreamBacking;
 use crate::StreamState;
@@ -871,7 +870,7 @@ pub fn file_put_contents3(filename: &str, data: &str, flags: i64) -> Option<i64>
     Some(data.len() as i64)
 }
 
-pub fn file_get_contents(path: impl AsRef<std::path::Path>) -> Option<String> {
+pub fn file_get_contents(path: impl AsRef<std::path::Path>) -> std::io::Result<Vec<u8>> {
     let path = path.as_ref();
     // PHP supports the file:// stream wrapper; strip it to read the local file.
     let path = path
@@ -879,34 +878,23 @@ pub fn file_get_contents(path: impl AsRef<std::path::Path>) -> Option<String> {
         .and_then(|s| s.strip_prefix("file://"))
         .map_or(path, std::path::Path::new);
     std::fs::read(path)
-        .ok()
-        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
 }
 
-/// `$use_include_path` and the stream `$context` have no effect; the read always goes to the
-/// local filesystem.
-pub fn file_get_contents5(
-    path: &str,
-    _use_include_path: bool,
-    _context: PhpMixed,
-    offset: i64,
-    length: Option<i64>,
-) -> Option<String> {
+pub fn file_get_contents_with_max_length(
+    path: impl AsRef<std::path::Path>,
+    length: usize,
+) -> std::io::Result<Vec<u8>> {
+    let path = path.as_ref();
     // PHP supports the file:// stream wrapper; strip it to read the local file.
-    let path = path.strip_prefix("file://").unwrap_or(path);
-    let bytes = std::fs::read(path).ok()?;
-    let len = bytes.len() as i64;
-    let start = if offset < 0 {
-        (len + offset).max(0)
-    } else {
-        offset.min(len)
-    } as usize;
-    let slice = &bytes[start..];
-    let slice = match length {
-        Some(l) if l >= 0 => &slice[..(l as usize).min(slice.len())],
-        _ => slice,
-    };
-    Some(String::from_utf8_lossy(slice).into_owned())
+    let path = path
+        .to_str()
+        .and_then(|s| s.strip_prefix("file://"))
+        .map_or(path, std::path::Path::new);
+    let mut buf = Vec::new();
+    std::fs::File::open(path)?
+        .take(length as u64)
+        .read_to_end(&mut buf)?;
+    Ok(buf)
 }
 
 pub fn getcwd() -> Option<String> {

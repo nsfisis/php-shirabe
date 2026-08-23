@@ -466,7 +466,7 @@ impl HttpDownloader {
             let _ = stream_context_create(&ctx_options, None);
             let test_connectivity = file_get_contents("https://8.8.8.8");
             Silencer::restore();
-            if test_connectivity.is_some() {
+            if test_connectivity.is_ok() {
                 return Some(vec![
                     "<error>The following exception probably indicates you have misconfigured DNS resolver(s)</error>".to_string(),
                 ]);

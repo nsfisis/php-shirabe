@@ -54,7 +54,9 @@ fn load_package(
 }
 
 fn read_test_file(file: &str, fixtures_dir: &str) -> IndexMap<String, String> {
-    let contents = shirabe_php_shim::file_get_contents(file).unwrap();
+    // TODO(bytes)
+    let contents =
+        String::from_utf8_lossy(&shirabe_php_shim::file_get_contents(file).unwrap()).into_owned();
     let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
 
     // PHP section_info is a map of name => required flag.

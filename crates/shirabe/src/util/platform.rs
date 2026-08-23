@@ -164,13 +164,14 @@ impl Platform {
                 return false;
             }
 
-            let file_contents = Silencer::call(|| Ok(file_get_contents("/proc/version")))
+            let file_contents = Silencer::call(|| Ok(file_get_contents("/proc/version").ok()))
                 .ok()
                 .flatten()
                 .unwrap_or_default();
             if !ini_get("open_basedir").is_some_and(|s| PhpMixed::String(s).to_bool())
                 && is_readable("/proc/version")
-                && stripos(&file_contents, "microsoft").is_some()
+                // TODO(bytes)
+                && stripos(&String::from_utf8_lossy(&file_contents), "microsoft").is_some()
                 && !Self::is_docker()
             // Docker and Podman running inside WSL should not be seen as WSL
             {
@@ -224,11 +225,12 @@ impl Platform {
                 Err(_) => break,
             };
             let data = match data {
-                Some(d) => d,
-                None => continue,
+                Ok(d) => d,
+                Err(_) => continue,
             };
             // detect default mount points created by Docker/containerd
-            if data.contains("/var/lib/docker/") || data.contains("/io.containerd.snapshotter") {
+            let contains = |needle: &[u8]| data.windows(needle.len()).any(|w| w == needle);
+            if contains(b"/var/lib/docker/") || contains(b"/io.containerd.snapshotter") {
                 *cached = Some(true);
                 return true;
             }

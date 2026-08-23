@@ -299,11 +299,8 @@ pub fn trim(s: &str, chars: Option<&str>) -> String {
 }
 
 // Byte-based, matching PHP's substr. A negative start/length counts from the end.
-// The result is reinterpreted as UTF-8 (lossily), which only matters when a slice
-// boundary falls inside a multibyte sequence.
-pub fn substr(s: &str, start: i64, length: Option<i64>) -> String {
-    let bytes = s.as_bytes();
-    let len = bytes.len() as i64;
+pub fn substr_bytes(s: &[u8], start: i64, length: Option<i64>) -> Vec<u8> {
+    let len = s.len() as i64;
     let start = if start < 0 {
         (len + start).max(0)
     } else {
@@ -314,7 +311,13 @@ pub fn substr(s: &str, start: i64, length: Option<i64>) -> String {
         Some(l) if l < 0 => (len + l).max(start),
         Some(l) => (start + l).min(len),
     };
-    String::from_utf8_lossy(&bytes[start as usize..end as usize]).into_owned()
+    s[start as usize..end as usize].to_vec()
+}
+
+// The result is reinterpreted as UTF-8 (lossily), which only matters when a slice
+// boundary falls inside a multibyte sequence.
+pub fn substr(s: &str, start: i64, length: Option<i64>) -> String {
+    String::from_utf8_lossy(&substr_bytes(s.as_bytes(), start, length)).into_owned()
 }
 
 pub fn implode(glue: &str, pieces: &[String]) -> String {

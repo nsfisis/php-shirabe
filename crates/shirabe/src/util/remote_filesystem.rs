@@ -17,10 +17,10 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS,
     STREAM_NOTIFY_PROGRESS, array_replace_recursive, base64_encode, explode, extension_loaded,
-    file_get_contents, file_get_contents5, file_put_contents, filter_var_boolean, gethostbyname,
-    http_clear_last_response_headers, http_get_last_response_headers, ini_get, json_decode_assoc,
-    parse_url, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, strpos, strtolower,
-    strtr, substr, trim, zlib_decode,
+    file_get_contents, file_get_contents_with_max_length, file_put_contents, filter_var_boolean,
+    gethostbyname, http_clear_last_response_headers, http_get_last_response_headers, ini_get,
+    json_decode_assoc, parse_url, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
+    strpos, strtolower, strtr, substr, trim, zlib_decode,
 };
 
 /// Result of `RemoteFilesystem::get` — string content, `true` (for copy), or `false`.
@@ -715,7 +715,7 @@ impl RemoteFilesystem {
         response_headers: &mut Vec<String>,
         max_file_size: Option<i64>,
     ) -> anyhow::Result<Option<String>> {
-        let mut result: Option<String> = None;
+        let mut result: Option<Vec<u8>> = None;
 
         // PHP reads the magic `$http_response_header` variable instead before 8.4, which is where
         // http_get_last_response_headers() and its companion appeared.
@@ -725,12 +725,13 @@ impl RemoteFilesystem {
         // PHP has no scheme branch here: `file_get_contents` reads `file://` URLs and plain
         // (scheme-less) local paths through the same stream wrapper it uses for the network
         // schemes. Only the local subset is modeled so far.
-        let outer: Result<Option<String>, anyhow::Error> =
+        let outer: Result<Option<Vec<u8>>, anyhow::Error> =
             if self.scheme == "file" || self.scheme.is_empty() {
                 Ok(match max_file_size {
-                    Some(max) => file_get_contents5(file_url, false, PhpMixed::Null, 0, Some(max)),
+                    Some(max) => file_get_contents_with_max_length(file_url, max as usize),
                     None => file_get_contents(file_url),
-                })
+                }
+                .ok())
             } else {
                 // TODO(http): wrap PHP's `file_get_contents` with stream context and error capture
                 // for http(s) and other network schemes; depends on the unmodeled PHP stream-context
@@ -742,13 +743,15 @@ impl RemoteFilesystem {
             Err(e) => caught_e = Some(e),
         }
 
+        // Platform::strlen counts bytes whichever branch it takes, so the length is read off the
+        // buffer directly.
         if let Some(ref r) = result
             && let Some(max) = max_file_size
-            && Platform::strlen(r) >= max
+            && r.len() as i64 >= max
         {
             return Err(MaxFileSizeExceededException::new(format!(
                 "Maximum allowed download size reached. Downloaded {} of allowed {} bytes",
-                Platform::strlen(r),
+                r.len(),
                 max
             ))
             .into());
@@ -761,7 +764,9 @@ impl RemoteFilesystem {
             return Err(e);
         }
 
-        Ok(result)
+        // TODO(bytes): the body is handed back as a String because RemoteFilesystem::get and
+        // GetResult carry it as one; from_utf8_lossy corrupts binary payloads.
+        Ok(result.map(|r| String::from_utf8_lossy(&r).into_owned()))
     }
 
     fn callback_get(

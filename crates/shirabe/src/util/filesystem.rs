@@ -804,7 +804,7 @@ impl Filesystem {
         }
 
         if is_file(path) {
-            return Silencer::call(|| Ok(file_get_contents(path).is_some())).unwrap_or(false);
+            return Silencer::call(|| Ok(file_get_contents(path).is_ok())).unwrap_or(false);
         }
 
         if is_dir(path) {
@@ -1018,7 +1018,7 @@ impl Filesystem {
     pub fn file_put_contents_if_modified(&self, path: &str, content: &str) -> anyhow::Result<i64> {
         let current_content =
             Silencer::call(|| Ok(file_get_contents(path).unwrap_or_default())).unwrap_or_default();
-        if current_content.is_empty() || current_content != content {
+        if current_content.is_empty() || current_content != content.as_bytes() {
             return Ok(file_put_contents(path, content.as_bytes()).unwrap_or(0));
         }
 
