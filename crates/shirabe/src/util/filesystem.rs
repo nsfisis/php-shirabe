@@ -116,9 +116,9 @@ impl Filesystem {
     /// Recursively remove a directory
     pub fn remove_directory(&mut self, directory: impl AsRef<Path>) -> anyhow::Result<bool> {
         // TODO(bytes):
-        // This path is matched against a regex (remove_edge_cases) and passed to an
-        // `rm -rf`/`rmdir` subprocess via the String-based ProcessExecutor, so it has to be
-        // representable as UTF-8.
+        // This path is matched against a regex (remove_edge_cases) and, on Windows, passed to an
+        // `rmdir` subprocess via the String-based ProcessExecutor, so it has to be representable as
+        // UTF-8.
         let directory = directory.as_ref();
         let directory = directory.to_str().ok_or_else(|| {
             RuntimeException::new(format!(
@@ -131,23 +131,24 @@ impl Filesystem {
             return Ok(r);
         }
 
-        let cmd: Vec<String> = if Platform::is_windows() {
-            vec![
+        let result = if Platform::is_windows() {
+            // TODO(perf,windows): `std::fs::remove_dir_all` is expected to be faster here too,
+            // but how it differs from the `rmdir` command has to be investigated first.
+            let cmd: Vec<String> = vec![
                 "rmdir".to_string(),
                 "/S".to_string(),
                 "/Q".to_string(),
                 Platform::realpath(directory),
-            ]
-        } else {
-            vec!["rm".to_string(), "-rf".to_string(), directory.to_string()]
-        };
+            ];
 
-        let mut output = PhpMixed::Null;
-        let result = self
-            .get_process()
-            .execute(&cmd, &mut output, None)
-            .map(|n| n == 0)
-            .unwrap_or(false);
+            let mut output = PhpMixed::Null;
+            self.get_process()
+                .execute(&cmd, &mut output, None)
+                .map(|n| n == 0)
+                .unwrap_or(false)
+        } else {
+            remove_directory_recursively(Path::new(directory)).is_ok()
+        };
 
         // clear stat cache because external processes aren't tracked by the php stat cache
         clearstatcache2(false, "");
@@ -164,7 +165,7 @@ impl Filesystem {
         this: &std::rc::Rc<std::cell::RefCell<Filesystem>>,
         directory: &str,
     ) -> anyhow::Result<bool> {
-        let (process_executor, cmd) = {
+        {
             let mut fs = this.borrow_mut();
 
             if let Some(mock) = fs.mock.as_mut()
@@ -179,28 +180,33 @@ impl Filesystem {
             if let Some(r) = edge_case_result {
                 return Ok(r);
             }
+        }
 
-            let cmd: Vec<String> = if Platform::is_windows() {
-                vec![
-                    "rmdir".to_string(),
-                    "/S".to_string(),
-                    "/Q".to_string(),
-                    Platform::realpath(directory),
-                ]
-            } else {
-                vec!["rm".to_string(), "-rf".to_string(), directory.to_string()]
-            };
+        let result = if Platform::is_windows() {
+            // TODO(perf,windows): `std::fs::remove_dir_all` is expected to be faster here too,
+            // but how it differs from the `rmdir` command has to be investigated first.
+            let cmd: Vec<String> = vec![
+                "rmdir".to_string(),
+                "/S".to_string(),
+                "/Q".to_string(),
+                Platform::realpath(directory),
+            ];
 
-            (fs.get_process_handle(), cmd)
+            let process_executor = this.borrow_mut().get_process_handle();
+            let process_future = process_executor.borrow_mut().execute_async(&cmd, None);
+            let mut process = process_future.await?;
+
+            process.is_successful()
+        } else {
+            remove_directory_recursively_async(Path::new(directory))
+                .await
+                .is_ok()
         };
-
-        let process_future = process_executor.borrow_mut().execute_async(&cmd, None);
-        let mut process = process_future.await?;
 
         // clear stat cache because external processes aren't tracked by the php stat cache
         clearstatcache2(false, "");
 
-        if process.is_successful() && !is_dir(directory) {
+        if result && !is_dir(directory) {
             return Ok(true);
         }
 
@@ -1082,5 +1088,26 @@ impl Filesystem {
         fclose(&b_handle);
 
         result
+    }
+}
+
+/// Removes `path` and everything below it, standing in for the `rm -rf` that Composer shells out
+/// to on non-Windows platforms. Symbolic links below `path` are unlinked rather than followed, and
+/// a `path` that is already gone counts as removed.
+///
+/// Unlike `rm -rf`, this stops at the first entry it cannot remove instead of removing the rest of
+/// the tree first. Callers fall back to `Filesystem::remove_directory_php` on failure, which walks
+/// the remainder and surfaces the error.
+fn remove_directory_recursively(path: &Path) -> std::io::Result<()> {
+    match std::fs::remove_dir_all(path) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+        _ => Ok(()),
+    }
+}
+
+async fn remove_directory_recursively_async(path: &Path) -> std::io::Result<()> {
+    match tokio::fs::remove_dir_all(path).await {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e),
+        _ => Ok(()),
     }
 }
