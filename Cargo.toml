@@ -75,3 +75,6 @@ large_enum_variant = "allow"
 module_inception = "allow"
 multiple_inherent_impl = "warn"
 type_complexity = "allow"
+
+[profile.release]
+strip = "debuginfo"
