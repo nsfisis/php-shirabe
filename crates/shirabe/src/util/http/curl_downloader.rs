@@ -642,7 +642,13 @@ impl CurlDownloader {
         }
 
         Ok(match sink {
-            Sink::File(_) => Body::File,
+            Sink::File(mut f) => {
+                // tokio's File returns from write_all once the blocking write is queued, so the
+                // tail of the body can still be in flight after the loop above. flush waits for it
+                // and reports its error; without it the caller renames and copies a short file.
+                f.flush().await.map_err(|e| (e.to_string(), false))?;
+                Body::File
+            }
             Sink::Memory(buf) => Body::Memory(buf),
         })
     }
