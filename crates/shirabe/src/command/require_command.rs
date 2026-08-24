@@ -31,7 +31,6 @@ use crate::repository::RepositorySet;
 use crate::signal::SignalSubscription;
 use crate::util::Filesystem;
 use crate::util::PackageSorter;
-use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_fill_keys, array_intersect, array_keys, array_map,
@@ -856,15 +855,9 @@ impl Command for RequireCommand {
 
         // check for writability by writing to the file as is_writable can not be trusted on network-mounts
         // see https://github.com/composer/composer/issues/8231 and https://bugs.php.net/bug.php?id=68926
-        let file_path = file.clone();
         let backup_contents = self.composer_backup.borrow().clone();
         if !is_writable(&file)
-            && Silencer::call(|| {
-                shirabe_php_shim::file_put_contents(&file_path, &backup_contents);
-                Ok::<bool, anyhow::Error>(false)
-            })
-            .ok()
-                == Some(false)
+            && shirabe_php_shim::file_put_contents(&file, &backup_contents).is_none()
         {
             let msg = format!("<error>{} is not writable.</error>", file);
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
