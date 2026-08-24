@@ -16,7 +16,6 @@ use crate::json::JsonFile;
 use crate::package::base_package::{self};
 use crate::util::Filesystem;
 use crate::util::Platform;
-use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
@@ -530,10 +529,7 @@ impl Command for ConfigCommand {
                 .borrow()
                 .write(PhpMixed::Array(empty_objs))?;
             let path_clone = auth_config_file.borrow().get_path().to_string();
-            Silencer::call(|| {
-                shirabe_php_shim::chmod(&path_clone, 0o600);
-                Ok(())
-            });
+            shirabe_php_shim::chmod(&path_clone, 0o600);
         }
         Ok(())
     }

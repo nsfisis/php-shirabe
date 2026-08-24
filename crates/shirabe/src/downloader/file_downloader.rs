@@ -21,7 +21,6 @@ use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use crate::util::Silencer;
 use crate::util::Url as UrlUtil;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
@@ -769,7 +768,7 @@ impl DownloaderInterface for FileDownloader {
         for bin in package.get_binaries() {
             let bin_path = format!("{}/{}", path, bin);
             if file_exists(&bin_path) && !is_executable(&bin_path) {
-                let _ = Silencer::call(|| Ok(shirabe_php_shim::chmod(&bin_path, 0o777 & !umask())));
+                shirabe_php_shim::chmod(&bin_path, 0o777 & !umask());
             }
         }
 

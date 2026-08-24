@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Util/Platform.php
 
 use crate::util::ProcessExecutor;
-use crate::util::Silencer;
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, defined,
     file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get, is_readable,
@@ -164,10 +163,7 @@ impl Platform {
                 return false;
             }
 
-            let file_contents = Silencer::call(|| Ok(file_get_contents("/proc/version").ok()))
-                .ok()
-                .flatten()
-                .unwrap_or_default();
+            let file_contents = file_get_contents("/proc/version").unwrap_or_default();
             if !ini_get("open_basedir").is_some_and(|s| PhpMixed::String(s).to_bool())
                 && is_readable("/proc/version")
                 // TODO(bytes)
@@ -220,11 +216,7 @@ impl Platform {
             }
             // suppress errors as some environments have these files as readable but system restrictions prevent the read from succeeding
             // see https://github.com/composer/composer/issues/12095
-            let data = match Silencer::call(|| Ok(file_get_contents(cgroup))) {
-                Ok(d) => d,
-                Err(_) => break,
-            };
-            let data = match data {
+            let data = match file_get_contents(cgroup) {
                 Ok(d) => d,
                 Err(_) => continue,
             };

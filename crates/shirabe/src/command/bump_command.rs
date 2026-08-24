@@ -15,7 +15,6 @@ use crate::package::base_package;
 use crate::package::version::VersionBumper;
 use crate::repository::PlatformRepository;
 use crate::util::Filesystem;
-use crate::util::Silencer;
 use shirabe_php_shim::{
     PhpMixed, file_get_contents, file_put_contents, impl_php_class, is_writable, php_regex,
     preg_is_match, preg_replace, strtolower,
@@ -85,12 +84,7 @@ impl BumpCommand {
         };
 
         if !is_writable(&composer_json_path)
-            && Silencer::call(|| {
-                file_put_contents(&composer_json_path, &contents)
-                    .map(|_| ())
-                    .ok_or_else(|| anyhow::anyhow!("file_put_contents failed"))
-            })
-            .is_err()
+            && file_put_contents(&composer_json_path, &contents).is_none()
         {
             io.write_error3(
                 &format!("<error>{} is not writable.</error>", composer_json_path),

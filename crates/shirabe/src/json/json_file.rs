@@ -7,7 +7,6 @@ use crate::io::io_interface;
 use crate::json::JsonValidationException;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
-use crate::util::Silencer;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
@@ -239,8 +238,7 @@ impl JsonFile {
                 ))
                 .into());
             }
-            // PHP: @mkdir($dir, 0777, true)
-            if !Silencer::call(|| Ok(mkdir(&dir, 0o777, true).is_ok())).unwrap_or(false) {
+            if mkdir(&dir, 0o777, true).is_err() {
                 return Err(UnexpectedValueException::new(format!(
                     "{} does not exist and could not be created.",
                     dir
@@ -285,10 +283,7 @@ impl JsonFile {
         path: &str,
         content: &str,
     ) -> anyhow::Result<Option<i64>> {
-        // PHP: @file_get_contents($path)
-        let current_content = Silencer::call(|| Ok(file_get_contents(path).ok()))
-            .ok()
-            .flatten();
+        let current_content = file_get_contents(path).ok();
         if current_content.is_none() || current_content.as_deref() != Some(content.as_bytes()) {
             return Ok(file_put_contents(path, content.as_bytes()));
         }

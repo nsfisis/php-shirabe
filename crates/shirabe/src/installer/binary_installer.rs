@@ -7,7 +7,6 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use crate::util::Silencer;
 use shirabe_php_shim::{
     basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
     file_get_contents_with_max_length, file_put_contents, fopen, is_dir, is_file, is_link,
@@ -152,10 +151,7 @@ impl BinaryInstaller {
             } else {
                 self.install_unixy_proxy_binaries(&bin_path, &link);
             }
-            let _ = Silencer::call(|| {
-                chmod(&bin_path, 0o777 & !umask());
-                Ok(())
-            });
+            chmod(&bin_path, 0o777 & !umask());
         }
     }
 
@@ -179,11 +175,7 @@ impl BinaryInstaller {
 
         // attempt removing the bin dir in case it is left empty
         if is_dir(&self.bin_dir) && self.filesystem.borrow_mut().is_dir_empty(&self.bin_dir) {
-            let bin_dir = self.bin_dir.clone();
-            let _ = Silencer::call(|| {
-                rmdir(&bin_dir);
-                Ok(())
-            });
+            let _ = rmdir(&self.bin_dir);
         }
     }
 
@@ -241,22 +233,14 @@ impl BinaryInstaller {
         if !file_exists(&link) {
             let code = self.generate_windows_proxy_code(bin_path, &link);
             file_put_contents(&link, code.as_bytes());
-            let link_clone = link.clone();
-            let _ = Silencer::call(|| {
-                chmod(&link_clone, 0o777 & !umask());
-                Ok(())
-            });
+            chmod(&link, 0o777 & !umask());
         }
     }
 
     fn install_unixy_proxy_binaries(&self, bin_path: &str, link: &str) {
         let code = self.generate_unixy_proxy_code(bin_path, link);
         file_put_contents(link, code.as_bytes());
-        let link_owned = link.to_string();
-        let _ = Silencer::call(|| {
-            chmod(&link_owned, 0o777 & !umask());
-            Ok(())
-        });
+        chmod(link, 0o777 & !umask());
     }
 
     fn initialize_bin_dir(&mut self) {

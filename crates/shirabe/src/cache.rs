@@ -4,7 +4,6 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::util::Filesystem;
 use crate::util::Platform;
-use crate::util::Silencer;
 use chrono::Utc;
 use shirabe_php_shim::{
     ErrorException, bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space,
@@ -105,9 +104,7 @@ impl Cache {
             self.enabled = Some(true);
 
             if !self.read_only
-                && ((!is_dir(&self.root)
-                    && !Silencer::call(|| Ok(mkdir(&self.root, 0o777, true).is_ok()))
-                        .unwrap_or(false))
+                && ((!is_dir(&self.root) && mkdir(&self.root, 0o777, true).is_err())
                     || !is_writable(&self.root))
             {
                 self.io.write_error(&format!(
@@ -270,7 +267,7 @@ impl Cache {
                         Ok(_) => {
                             // fallback in case the above failed due to incorrect ownership
                             // see https://github.com/composer/composer/issues/4070
-                            Silencer::call(|| Ok(shirabe_php_shim::touch(&full_path)))?;
+                            shirabe_php_shim::touch(&full_path);
                         }
                         Err(payload) => std::panic::resume_unwind(payload),
                     }

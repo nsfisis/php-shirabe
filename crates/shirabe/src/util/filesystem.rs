@@ -2,7 +2,6 @@
 
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use crate::util::Silencer;
 use shirabe_php_shim::{
     ErrorException, LogicException, PhpMixed, PregMatches, RuntimeException, array_pop, basename,
     chdir, clearstatcache, clearstatcache2, copy, dirname, explode, fclose, feof, file_exists,
@@ -810,11 +809,11 @@ impl Filesystem {
         }
 
         if is_file(path) {
-            return Silencer::call(|| Ok(file_get_contents(path).is_ok())).unwrap_or(false);
+            return file_get_contents(path).is_ok();
         }
 
         if is_dir(path) {
-            return Silencer::call(|| Ok(std::fs::read_dir(path).is_ok())).unwrap_or(false);
+            return std::fs::read_dir(path).is_ok();
         }
 
         // assume false otherwise
@@ -1022,8 +1021,7 @@ impl Filesystem {
     }
 
     pub fn file_put_contents_if_modified(&self, path: &str, content: &str) -> anyhow::Result<i64> {
-        let current_content =
-            Silencer::call(|| Ok(file_get_contents(path).unwrap_or_default())).unwrap_or_default();
+        let current_content = file_get_contents(path).unwrap_or_default();
         if current_content.is_empty() || current_content != content.as_bytes() {
             return Ok(file_put_contents(path, content.as_bytes()).unwrap_or(0));
         }

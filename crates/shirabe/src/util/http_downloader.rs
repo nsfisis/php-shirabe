@@ -9,7 +9,6 @@ use crate::package::version::VersionParser;
 use crate::util::GetResult;
 use crate::util::Platform;
 use crate::util::RemoteFilesystem;
-use crate::util::Silencer;
 use crate::util::StreamContextFactory;
 use crate::util::Url;
 use crate::util::http::CurlDownloader;
@@ -452,7 +451,6 @@ impl HttpDownloader {
         if strpos(e_as_transport.get_message(), "Resolving timed out").is_some()
             || strpos(e_as_transport.get_message(), "Could not resolve host").is_some()
         {
-            Silencer::suppress(None);
             let mut ctx_options: IndexMap<String, PhpMixed> = IndexMap::new();
             let mut ssl_map: IndexMap<String, PhpMixed> = IndexMap::new();
             ssl_map.insert("verify_peer".to_string(), PhpMixed::Bool(false));
@@ -465,7 +463,6 @@ impl HttpDownloader {
             // until the PHP stream-context layer is modeled.
             let _ = stream_context_create(&ctx_options, None);
             let test_connectivity = file_get_contents("https://8.8.8.8");
-            Silencer::restore();
             if test_connectivity.is_ok() {
                 return Some(vec![
                     "<error>The following exception probably indicates you have misconfigured DNS resolver(s)</error>".to_string(),

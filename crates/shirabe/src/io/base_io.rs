@@ -4,7 +4,6 @@ use crate::config::Config;
 use crate::io::IOInterface;
 use crate::io::io_interface;
 use crate::util::ProcessExecutor;
-use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
@@ -435,14 +434,11 @@ pub trait BaseIO: IOInterface {
         let mut message_str = message.to_string();
 
         if !context.is_empty() {
-            let json: anyhow::Result<Option<String>> = Silencer::call(|| {
-                Ok(json_encode_ex(
-                    &PhpMixed::Array(log_context(context)),
-                    JSON_INVALID_UTF8_IGNORE | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
-                )
-                .ok())
-            });
-            if let Ok(Some(json_str)) = json {
+            let json = json_encode_ex(
+                &PhpMixed::Array(log_context(context)),
+                JSON_INVALID_UTF8_IGNORE | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+            );
+            if let Ok(json_str) = json {
                 message_str += " ";
                 message_str += &json_str;
             }

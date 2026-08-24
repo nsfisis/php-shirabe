@@ -35,6 +35,11 @@ impl Silencer {
         }
     }
 
+    /// Wrap a callable only when it can reach the PHP runtime, where a plugin may emit diagnostics
+    /// of its own; the same holds for a region bracketed by `suppress` and `restore`. Work that
+    /// stays inside Rust has no `error_reporting()` level to lower and emits no diagnostic on
+    /// failure, and errors it raises propagate either way, so silencing it is indistinguishable
+    /// from running it unguarded. Run it unguarded instead.
     pub fn call<F, T>(callable: F) -> anyhow::Result<T>
     where
         F: FnOnce() -> anyhow::Result<T>,

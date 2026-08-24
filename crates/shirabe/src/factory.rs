@@ -48,7 +48,6 @@ use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
-use crate::util::Silencer;
 use crate::util::r#loop::Loop;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
@@ -135,10 +134,7 @@ impl Factory {
 
         // select first dir which exists of: $XDG_CONFIG_HOME/shirabe or ~/.shirabe
         for dir in &dirs {
-            let dir_copy = dir.clone();
-            let exists =
-                Silencer::call(|| Ok::<bool, anyhow::Error>(is_dir(&dir_copy))).unwrap_or(false);
-            if exists {
+            if is_dir(dir) {
                 return Ok(dir.clone());
             }
         }
@@ -177,7 +173,7 @@ impl Factory {
             {
                 let from = format!("{}/cache", home);
                 let to = format!("{}/Library/Caches/shirabe", user_dir);
-                let _ = Silencer::call(|| Ok::<bool, anyhow::Error>(rename(&from, &to)));
+                rename(&from, &to);
             }
 
             return Ok(format!("{}/Library/Caches/shirabe", user_dir));
@@ -298,15 +294,10 @@ impl Factory {
             for dir in &dirs {
                 if !file_exists(format!("{}/.htaccess", dir)) {
                     if !is_dir(dir) {
-                        let dir_owned = dir.clone();
-                        let _ = Silencer::call(|| {
-                            Ok::<bool, anyhow::Error>(mkdir(&dir_owned, 0o777, true).is_ok())
-                        });
+                        let _ = mkdir(dir, 0o777, true);
                     }
                     let path = format!("{}/.htaccess", dir);
-                    let _ = Silencer::call(|| {
-                        Ok::<Option<i64>, anyhow::Error>(file_put_contents(&path, b"Deny from all"))
-                    });
+                    let _ = file_put_contents(&path, b"Deny from all");
                 }
             }
         }
@@ -1578,7 +1569,7 @@ impl Factory {
             }
         }
 
-        Silencer::call(|| Ok::<bool, anyhow::Error>(is_dir("/etc/xdg"))).unwrap_or(false)
+        is_dir("/etc/xdg")
     }
 
     fn get_user_dir() -> anyhow::Result<String> {

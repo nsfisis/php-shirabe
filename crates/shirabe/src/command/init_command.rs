@@ -17,7 +17,6 @@ use crate::repository::PlatformRepositoryHandle;
 use crate::repository::RepositoryFactory;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
-use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -675,11 +674,7 @@ impl Command for InitCommand {
                     true,
                     io_interface::NORMAL,
                 );
-                let path_to_unlink = file_obj.get_path().to_string();
-                let _ = Silencer::call(|| {
-                    shirabe_php_shim::unlink(&path_to_unlink);
-                    Ok::<(), anyhow::Error>(())
-                });
+                let _ = shirabe_php_shim::unlink(file_obj.get_path());
 
                 return Ok(1);
             }

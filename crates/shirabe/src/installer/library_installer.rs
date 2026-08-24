@@ -11,7 +11,6 @@ use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Platform;
-use crate::util::Silencer;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, dirname, is_dir, is_link, preg_quote,
     preg_replace, realpath, rmdir, rtrim, strpos,
@@ -393,10 +392,7 @@ impl InstallerInterface for LibraryInstaller {
             if is_dir(&package_vendor_dir)
                 && self.filesystem.borrow().is_dir_empty(&package_vendor_dir)
             {
-                let _ = Silencer::call(|| {
-                    rmdir(&package_vendor_dir);
-                    Ok(())
-                });
+                let _ = rmdir(&package_vendor_dir);
             }
         }
 

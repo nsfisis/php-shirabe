@@ -5,7 +5,6 @@ use crate::json::JsonFile;
 use crate::json::JsonManipulator;
 use crate::json::JsonValidationException;
 use crate::util::Filesystem;
-use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -168,10 +167,7 @@ impl JsonConfigSource {
 
         if new_file {
             let path = self.file.borrow().get_path().to_string();
-            let _ = Silencer::call(|| {
-                chmod(&path, 0o600);
-                Ok(())
-            });
+            chmod(&path, 0o600);
         }
 
         Ok(())

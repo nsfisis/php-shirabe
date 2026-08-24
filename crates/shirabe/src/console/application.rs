@@ -2075,22 +2075,16 @@ impl ApplicationHandle {
                 if uid != 0 {
                     // Silently clobber any sudo credentials on the invoking user to avoid privilege escalations later on
                     // ref. https://github.com/composer/composer/issues/5119
-                    let _ = Silencer::call(|| {
-                        shirabe_php_shim::exec(
-                            &format!("sudo -u \\#{} sudo -K > /dev/null 2>&1", uid),
-                            None,
-                            None,
-                        );
-                        Ok(())
-                    });
+                    let _ = shirabe_php_shim::exec(
+                        &format!("sudo -u \\#{} sudo -K > /dev/null 2>&1", uid),
+                        None,
+                        None,
+                    );
                 }
             }
 
             // Silently clobber any remaining sudo leases on the current user as well to avoid privilege escalations
-            let _ = Silencer::call(|| {
-                shirabe_php_shim::exec("sudo -K > /dev/null 2>&1", None, None);
-                Ok(())
-            });
+            let _ = shirabe_php_shim::exec("sudo -K > /dev/null 2>&1", None, None);
         }
 
         // avoid loading plugins/initializing the Composer instance earlier than necessary if no plugin command is needed
@@ -2254,27 +2248,19 @@ impl ApplicationHandle {
             }
 
             // Check system temp folder for usability as it can cause weird runtime issues otherwise
-            let tempfile_msg: Option<String> = Silencer::call(|| -> anyhow::Result<Option<String>> {
-                let pid = format!("{}-", getmypid());
-                let tempfile = format!(
-                    "{}/temp-{}{}",
-                    sys_get_temp_dir(),
-                    pid,
-                    bin2hex(&random_bytes(5))
-                );
-                if !(file_put_contents(&tempfile, file!().as_bytes()).is_some_and(|n| n > 0)
-                    && file_get_contents(&tempfile).as_deref().ok() == Some(file!().as_bytes())
-                    && unlink(&tempfile).is_ok()
-                    && !file_exists(&tempfile))
-                {
-                    return Ok(Some(format!("<error>PHP temp directory ({}) does not exist or is not writable to Shirabe. Set sys_temp_dir in your php.ini</error>", sys_get_temp_dir())));
-                }
-                Ok(None)
-            })
-            .ok()
-            .flatten();
-            if let Some(msg) = tempfile_msg {
-                io.write_error(&msg);
+            let pid = format!("{}-", getmypid());
+            let tempfile = format!(
+                "{}/temp-{}{}",
+                sys_get_temp_dir(),
+                pid,
+                bin2hex(&random_bytes(5))
+            );
+            if !(file_put_contents(&tempfile, file!().as_bytes()).is_some_and(|n| n > 0)
+                && file_get_contents(&tempfile).as_deref().ok() == Some(file!().as_bytes())
+                && unlink(&tempfile).is_ok()
+                && !file_exists(&tempfile))
+            {
+                io.write_error(&format!("<error>PHP temp directory ({}) does not exist or is not writable to Shirabe. Set sys_temp_dir in your php.ini</error>", sys_get_temp_dir()));
             }
 
             // add non-standard scripts as own commands
@@ -2530,11 +2516,7 @@ impl ApplicationHandle {
             if let Some(ref owd) = old_working_dir
                 && !owd.is_empty()
             {
-                let owd = owd.clone();
-                let _ = Silencer::call(|| {
-                    chdir(&owd);
-                    Ok(())
-                });
+                let _ = chdir(owd);
             }
 
             if let Some(st) = start_time {

@@ -7,7 +7,6 @@ use crate::config::JsonConfigSource;
 use crate::factory::Factory;
 use crate::json::JsonFile;
 use crate::util::Platform;
-use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, chmod, touch};
 use shirabe_symfony_console::input::InputInterface;
@@ -93,10 +92,7 @@ pub trait BaseConfigCommand: BaseCommand {
                     m.insert("config".to_string(), PhpMixed::Object(IndexMap::new()));
                     m
                 }))?;
-            let _ = Silencer::call(|| {
-                chmod(&path, 0o600);
-                Ok(())
-            });
+            chmod(&path, 0o600);
         }
 
         if !self.config_file().unwrap().borrow().exists() {
