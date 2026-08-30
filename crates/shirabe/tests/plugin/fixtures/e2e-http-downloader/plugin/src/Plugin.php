@@ -137,6 +137,48 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             $response->collect();
         });
 
+        // The route Composer's own docblocks point plugin authors at: the loop the run built
+        // hands out the downloader and the executor the rest of the run uses.
+        $loop = $event->getComposer()->getLoop();
+        $shared = $loop->getHttpDownloader();
+        $lines[] = 'loop class=' . json_encode(\get_class($loop))
+            . ' downloader=' . json_encode(\get_class($shared))
+            . ' same=' . json_encode($shared === $loop->getHttpDownloader())
+            . ' executor=' . json_encode($loop->getProcessExecutor() === null ? null : \get_class($loop->getProcessExecutor()));
+
+        // The shared downloader is the one the run enabled async on, so it takes a request group
+        // without the plugin having to enable anything.
+        $waited = [];
+        $lines[] = 'loop wait=' . $this->describe(static function () use ($loop, $shared, $payload, &$waited): void {
+            $loop->wait([
+                $shared->add('file://' . $payload)->then(static function ($result) use (&$waited): void {
+                    $waited[] = $result->getBody();
+                }),
+                $shared->add('file://' . $payload)->then(static function ($result) use (&$waited): void {
+                    $waited[] = $result->getBody();
+                }),
+            ]);
+        }) . ' bodies=' . json_encode($waited);
+
+        // Only the class: the reason a stream failed to open comes from the PHP warning the
+        // reader raised, which this port does not have.
+        $rejected = null;
+        try {
+            $loop->wait([$shared->add('file:///shirabe-probe-missing.json')]);
+        } catch (\Throwable $e) {
+            $rejected = $e;
+        }
+        $lines[] = 'loop wait-rejected=' . json_encode($rejected === null ? null : \get_class($rejected));
+
+        $lines[] = 'abortJobs=' . $this->describe(static function () use ($loop): void {
+            $loop->abortJobs();
+        });
+
+        // A plugin may drive its own loop over the services it already holds.
+        $lines[] = 'own loop=' . $this->describe(static function () use ($downloader): void {
+            (new \Composer\Util\Loop($downloader))->wait([]);
+        });
+
         file_put_contents('http-downloader-trace.txt', implode("\n", $lines) . "\n");
     }
 

@@ -1044,6 +1044,10 @@ const STUB_FILES: &[(&str, &str)] = &[
         "Composer/Util/HttpDownloader.php",
         include_str!("../php/stubs/Composer/Util/HttpDownloader.php"),
     ),
+    (
+        "Composer/Util/Loop.php",
+        include_str!("../php/stubs/Composer/Util/Loop.php"),
+    ),
 ];
 
 /// Hand-written worker-side classes (two-world implementations with behavior of their own, not

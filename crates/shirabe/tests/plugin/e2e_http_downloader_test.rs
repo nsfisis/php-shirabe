@@ -82,6 +82,11 @@ add-missing=ok rejected=\"Composer\\\\Downloader\\\\TransportException\"
 addCopy=ok file=\"{\\\"probe\\\":true,\\\"n\\\":42}\"
 countActiveJobs=0 wait=ok
 collect=ok
+loop class=\"Composer\\\\Util\\\\Loop\" downloader=\"Composer\\\\Util\\\\HttpDownloader\" same=true executor=\"Composer\\\\Util\\\\ProcessExecutor\"
+loop wait=ok bodies=[\"{\\\"probe\\\":true,\\\"n\\\":42}\",\"{\\\"probe\\\":true,\\\"n\\\":42}\"]
+loop wait-rejected=\"Composer\\\\Downloader\\\\TransportException\"
+abortJobs=ok
+own loop=ok
 ",
         upstream.trace
     );

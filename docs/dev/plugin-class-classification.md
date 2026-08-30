@@ -432,10 +432,14 @@ resolves its promise with a `Symfony\Component\Process\Process`, whose state
 is the `proc_open()` resource of whichever process called `start()`; a request
 resolves its promise with a `Response`, which is data.
 
-`Loop` remains guarded, so `Composer::getLoop()` is still an explicit error
-and neither the graph's own executor nor its downloader is reachable through
-it. Serving it needs only a `Loop` stub, since both surfaces it hands out are
-already served.
+`Loop` is a proxy stub too, so `Composer::getLoop()` — the route Composer's own
+docblocks point plugin authors at — reaches the graph's own downloader and
+executor. Its `wait()` drains the promises it is given and rethrows the first
+rejection once the group is done, which is what `React\Promise\all()` hands
+PHP; `abortJobs()` has nothing to cancel while every request settles before the
+call that started it returns. A non-null `$progress` is an explicit error: a
+`ProgressBar` is a symfony/console object each world runs its own
+implementation of, so there is none to hand across.
 
 ### Dual instantiation
 

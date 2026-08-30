@@ -60,6 +60,7 @@ enum RustEntity {
     Plugin(std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>),
     ProcessExecutor(std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>),
     HttpDownloader(std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>),
+    Loop(std::rc::Rc<std::cell::RefCell<crate::util::r#loop::Loop>>),
 }
 
 /// The pointer identity backing R-table interning: the same shared instance must always cross
@@ -86,6 +87,7 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
         RustEntity::HttpDownloader(downloader) => {
             std::rc::Rc::as_ptr(downloader) as *const () as usize
         }
+        RustEntity::Loop(r#loop) => std::rc::Rc::as_ptr(r#loop) as *const () as usize,
     }
 }
 
@@ -389,6 +391,7 @@ pub(crate) fn dispatch_r_table_method(
         Some(RustEntity::HttpDownloader(downloader)) => {
             dispatch_http_downloader_method(&downloader, method_name, args)
         }
+        Some(RustEntity::Loop(r#loop)) => dispatch_loop_method(&r#loop, method_name, args),
         None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
     }
 }
@@ -425,6 +428,11 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
     };
     let config_arg = |position: usize| {
         arg::<std::rc::Rc<std::cell::RefCell<crate::config::Config>>>(&class, ctor_args, position)
+    };
+    let http_downloader_arg = |position: usize| {
+        arg::<std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>>(
+            &class, ctor_args, position,
+        )
     };
     let alias_package_arg =
         |position: usize| -> Result<crate::package::AliasPackageHandle, PhpThrow> {
@@ -551,6 +559,20 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             )));
             return Ok(construction_result(rhandle));
         }
+        // A loop owns nothing of its own: it holds the two services it drives and enables the
+        // async surface on each, so a plugin-built one is a second driver over whichever
+        // instances it was handed rather than a second copy of them.
+        "Composer\\Util\\Loop" => {
+            let process = match ctor_args.get(1) {
+                None | Some(PluginValue::Null) => None,
+                _ => Some(process_executor_arg(1)?),
+            };
+            let rhandle =
+                register_entity(RustEntity::Loop(std::rc::Rc::new(std::cell::RefCell::new(
+                    crate::util::r#loop::Loop::new(http_downloader_arg(0)?, process),
+                ))));
+            return Ok(construction_result(rhandle));
+        }
         // TODO(plugin): the remaining proxied classes get a construction story on demand,
         // driven by explicit errors from real plugins. Each one has to decide what a
         // plugin-built instance means for the Rust-side graph, which is why none of them is
@@ -603,7 +625,8 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::Operation(_)
         | RustEntity::Plugin(_)
         | RustEntity::ProcessExecutor(_)
-        | RustEntity::HttpDownloader(_) => {
+        | RustEntity::HttpDownloader(_)
+        | RustEntity::Loop(_) => {
             return Err(runtime_throw(
                 "cloning this Rust-side entity over RPC is not supported".to_string(),
             ));
@@ -723,6 +746,11 @@ fn dispatch_composer_method(
                 rhandle,
                 "Composer\\Downloader\\DownloadManager",
             ))
+        }
+        "getLoop" => {
+            let r#loop = composer.borrow().get_loop();
+            let rhandle = register_entity(RustEntity::Loop(r#loop));
+            Ok(rust_handle_value(rhandle, "Composer\\Util\\Loop"))
         }
         // TODO(plugin): the remaining Composer object graph (getLocker, getPluginManager, ...)
         // becomes reachable over RPC on demand, driven by explicit errors from real plugins.
@@ -912,6 +940,94 @@ fn rejected_promise(throw: PhpThrow) -> Result<PluginValue, PhpThrow> {
         Err(error) => Err(runtime_throw(format!(
             "creating a rejected promise in the plugin process failed: {error:#}"
         ))),
+    }
+}
+
+/// Drains one promise a plugin handed to `Loop::wait()`. React settles synchronously, so an
+/// already-settled promise yields its value here and a rejected one yields its reason as the
+/// throw; one that is still pending is an explicit error.
+fn settle_promise(method_name: &str, promise: PluginValue) -> Result<PluginValue, PhpThrow> {
+    let handle = match promise {
+        PluginValue::PhpHandle(handle) => handle,
+        other => return Err(arg_throw(method_name, 0, "a promise", Some(&other))),
+    };
+    let phandle = handle.phandle;
+    let settled = call_function_with_dispatcher(
+        "__shirabe_settle_promise",
+        vec![PluginValue::PhpHandle(handle)],
+        Some(&mut PluginRpcDispatcher::default()),
+    );
+    // The promise entity was interned in the worker's P table when it crossed; the plugin's own
+    // reference keeps the object alive, and nothing on this side owns it past this call.
+    let _ = release_php_handle(phandle);
+    match settled {
+        Ok(outcome) => outcome,
+        Err(error) => Err(runtime_throw(format!(
+            "draining a promise in the plugin process failed: {error:#}"
+        ))),
+    }
+}
+
+/// Serves the `Loop` proxy stub. The two services it hands out are the ones it was built over,
+/// and `wait()` drains the promises it is given.
+fn dispatch_loop_method(
+    r#loop: &std::rc::Rc<std::cell::RefCell<crate::util::r#loop::Loop>>,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    match method_name {
+        "getHttpDownloader" => {
+            let downloader = r#loop.borrow().get_http_downloader().clone();
+            let rhandle = register_entity(RustEntity::HttpDownloader(downloader));
+            Ok(rust_handle_value(rhandle, "Composer\\Util\\HttpDownloader"))
+        }
+        "getProcessExecutor" => {
+            let process = r#loop.borrow().get_process_executor().cloned();
+            match process {
+                Some(process) => {
+                    let rhandle = register_entity(RustEntity::ProcessExecutor(process));
+                    Ok(rust_handle_value(
+                        rhandle,
+                        "Composer\\Util\\ProcessExecutor",
+                    ))
+                }
+                None => Ok(PluginValue::Null),
+            }
+        }
+        "wait" => {
+            // TODO(symfony,plugin): the progress bar is a symfony/console object each world runs
+            // its own implementation of, so there is none to hand to the Rust side.
+            if !matches!(args.get(1), None | Some(PluginValue::Null)) {
+                return Err(runtime_throw(
+                    "Shirabe does not support passing a ProgressBar to Loop::wait() from a plugin yet"
+                        .to_string(),
+                ));
+            }
+            let promises = match args.first() {
+                Some(PluginValue::List(promises)) => promises.clone(),
+                Some(PluginValue::Array(promises)) => promises.values().cloned().collect(),
+                other => return Err(arg_throw(method_name, 0, "an array of promises", other)),
+            };
+            // PHP waits on every promise of the group and rethrows the first rejection once the
+            // group is done, which is what `React\Promise\all()` hands it.
+            let mut uncaught: Option<PhpThrow> = None;
+            for promise in promises {
+                if let Err(throw) = settle_promise(method_name, promise)
+                    && uncaught.is_none()
+                {
+                    uncaught = Some(throw);
+                }
+            }
+            match uncaught {
+                Some(throw) => Err(throw),
+                None => Ok(PluginValue::Null),
+            }
+        }
+        "abortJobs" => {
+            r#loop.borrow().abort_jobs();
+            Ok(PluginValue::Null)
+        }
+        other => Err(runtime_throw(format!("unknown Loop method `{other}`"))),
     }
 }
 
@@ -1783,6 +1899,28 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::config::Config>> {
                 }
             }
             other => Err(arg_throw(method, position, "a Config", other)),
+        }
+    }
+}
+
+/// Resolves a downloader argument back to the Rust-side entity its proxy stub stands for.
+impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>> {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::RustHandle(handle)) => {
+                match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
+                    Some(RustEntity::HttpDownloader(downloader)) => Ok(downloader),
+                    _ => Err(runtime_throw(format!(
+                        "{method} expects an HttpDownloader handle, got Rust handle {}",
+                        handle.rhandle
+                    ))),
+                }
+            }
+            other => Err(arg_throw(method, position, "an HttpDownloader", other)),
         }
     }
 }
