@@ -98,6 +98,39 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             $downloader->copy('file://' . $payload, $target);
         }) . ' file=' . json_encode(@file_get_contents($target));
 
+        // A downloader that is not part of a Loop refuses async requests, so the probe records
+        // both sides of the gate.
+        $lines[] = 'add-before-enable=' . $this->describe(static function () use ($downloader, $payload): void {
+            $downloader->add('file://' . $payload);
+        });
+        $downloader->enableAsync();
+
+        $added = null;
+        $lines[] = 'add=' . $this->describe(static function () use ($downloader, $payload, &$added): void {
+            $downloader->add('file://' . $payload)->then(static function ($result) use (&$added): void {
+                $added = $result;
+            });
+        }) . ' body=' . json_encode($added === null ? null : $added->getBody());
+
+        // A path that cannot exist keeps the rejection reason free of the temporary directory.
+        $rejection = null;
+        $lines[] = 'add-missing=' . $this->describe(static function () use ($downloader, &$rejection): void {
+            $downloader->add('file:///shirabe-probe-missing.json')->then(null, static function ($error) use (&$rejection): void {
+                $rejection = $error;
+            });
+        }) . ' rejected=' . json_encode($rejection === null ? null : \get_class($rejection));
+
+        $lines[] = 'addCopy=' . $this->describe(static function () use ($downloader, $payload): void {
+            $downloader->addCopy('file://' . $payload, getcwd() . '/probe-async-copy.json')->then(null, static function ($error): void {
+                throw $error;
+            });
+        }) . ' file=' . json_encode(@file_get_contents(getcwd() . '/probe-async-copy.json'));
+
+        $lines[] = 'countActiveJobs=' . json_encode($downloader->countActiveJobs())
+            . ' wait=' . $this->describe(static function () use ($downloader): void {
+                $downloader->wait();
+            });
+
         // collect() unsets the response's own properties, so the object is spent afterwards and
         // nothing may read it again.
         $lines[] = 'collect=' . $this->describe(static function () use ($response): void {

@@ -76,6 +76,11 @@ get=ok
 response class=\"Composer\\\\Util\\\\Http\\\\Response\" body=\"{\\\"probe\\\":true,\\\"n\\\":42}\" headers=[]
 getHeader=null
 copy=ok file=\"{\\\"probe\\\":true,\\\"n\\\":42}\"
+add-before-enable=LogicException: You must use the HttpDownloader instance which is part of a Composer\\Loop instance to be able to run async http requests
+add=ok body=\"{\\\"probe\\\":true,\\\"n\\\":42}\"
+add-missing=ok rejected=\"Composer\\\\Downloader\\\\TransportException\"
+addCopy=ok file=\"{\\\"probe\\\":true,\\\"n\\\":42}\"
+countActiveJobs=0 wait=ok
 collect=ok
 ",
         upstream.trace

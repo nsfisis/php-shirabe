@@ -33,7 +33,7 @@ use shirabe_php_rpc::{
     PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle,
     call_function_with_dispatcher, call_php_method, new_object, release_php_handle,
 };
-use shirabe_php_shim::{AnyThrowable, Catch as _, PhpClass as _, PhpMixed};
+use shirabe_php_shim::{AnyThrowable, Catch as _, LogicException, PhpClass as _, PhpMixed};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::input::InputValue;
@@ -886,6 +886,35 @@ fn resolved_promise(value: PluginValue) -> Result<PluginValue, PhpThrow> {
     }
 }
 
+/// A `\React\Promise\PromiseInterface` already rejected with the exception `throw` describes,
+/// built in the worker. A failed request reaches the plugin as a rejection it handles, the way it
+/// does under Composer, rather than as a throw out of the call that started it.
+fn rejected_promise(throw: PhpThrow) -> Result<PluginValue, PhpThrow> {
+    let properties = PluginValue::Array(
+        throw
+            .properties
+            .iter()
+            .map(|(name, value)| (name.clone().into_bytes(), value.clone()))
+            .collect(),
+    );
+    match call_function_with_dispatcher(
+        "__shirabe_rejected_promise",
+        vec![
+            PluginValue::string(throw.exception_class),
+            PluginValue::string(throw.message),
+            PluginValue::Int(throw.code),
+            properties,
+        ],
+        Some(&mut PluginRpcDispatcher::default()),
+    ) {
+        Ok(Ok(promise)) => Ok(promise),
+        Ok(Err(throw)) => Err(throw),
+        Err(error) => Err(runtime_throw(format!(
+            "creating a rejected promise in the plugin process failed: {error:#}"
+        ))),
+    }
+}
+
 fn dispatch_filesystem_method(
     fs: &std::rc::Rc<std::cell::RefCell<crate::util::Filesystem>>,
     method_name: &str,
@@ -1198,12 +1227,46 @@ fn dispatch_http_downloader_method(
                 .map_err(|error| error_throw("copy failed", &error))?;
             Ok(response_to_wire(&response))
         }
-        // TODO(plugin,async): the async surface resolves its promises with a Response the wire
-        // cannot carry, and driving it needs a promise representation that crosses the boundary
-        // unresolved. Neither exists yet.
-        "add" | "addCopy" | "wait" | "enableAsync" | "countActiveJobs" => Err(runtime_throw(
-            format!("Shirabe does not support HttpDownloader::{method_name}() from a plugin yet"),
-        )),
+        // TODO(async): the future runs to completion here, so the promise the plugin receives
+        // is already settled and requests it starts together run one after another instead of
+        // overlapping. Deferring the settlement needs a promise representation that crosses the
+        // boundary unresolved.
+        "add" | "addCopy" => {
+            let url = arg::<String>(method_name, args, 0)?;
+            let outcome = if method_name == "add" {
+                let options =
+                    arg_or::<IndexMap<String, PhpMixed>>(method_name, args, 1, IndexMap::new())?;
+                crate::util::sync_executor::block_on(downloader.borrow().add(&url, options))
+            } else {
+                let to = arg::<String>(method_name, args, 1)?;
+                let options =
+                    arg_or::<IndexMap<String, PhpMixed>>(method_name, args, 2, IndexMap::new())?;
+                crate::util::sync_executor::block_on(
+                    downloader.borrow().add_copy(&url, &to, options),
+                )
+            };
+            match outcome {
+                Ok(response) => resolved_promise(response_to_wire(&response)),
+                // PHP raises the empty-url check and the async gate out of `add()`/`addCopy()`
+                // itself, before the promise exists, and only what the job's resolver raises
+                // becomes a rejection. Those two are the port's only `LogicException`s here, and
+                // a failed request is a `TransportException`.
+                Err(error) if error.is_instanceof::<LogicException>() => {
+                    Err(error_throw(&format!("{method_name} failed"), &error))
+                }
+                Err(error) => {
+                    rejected_promise(error_throw(&format!("{method_name} failed"), &error))
+                }
+            }
+        }
+        "enableAsync" => {
+            downloader.borrow_mut().enable_async();
+            Ok(PluginValue::Null)
+        }
+        // TODO(async): every request settles before the call that started it returns, so the
+        // downloader never holds a queued or started job for these two to report on.
+        "wait" => Ok(PluginValue::Null),
+        "countActiveJobs" => Ok(PluginValue::Int(0)),
         other => Err(runtime_throw(format!(
             "unknown HttpDownloader method `{other}`"
         ))),

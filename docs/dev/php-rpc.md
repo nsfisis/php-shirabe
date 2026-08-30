@@ -167,9 +167,12 @@ Notable internal helpers:
   `selfDir`/`installedIsLocalDir` restore) into the worker; skipped only when the class is not
   even autoloadable there, i.e. no Composer PHP runtime and therefore no observer code.
 - `__shirabe_resolved_promise` — wraps a value in `\React\Promise\resolve()`, so a Rust method
-  whose PHP signature declares `PromiseInterface` (the `DownloadManager` surface) can answer
-  with the object type the caller expects. The Rust future has already run to completion by
-  then; deferred resolution across the boundary does not exist yet.
+  whose PHP signature declares `PromiseInterface` (the `DownloadManager` and `HttpDownloader`
+  surfaces) can answer with the object type the caller expects. The Rust future has already run
+  to completion by then; deferred resolution across the boundary does not exist yet.
+- `__shirabe_rejected_promise` — the failure half of the same: `\React\Promise\reject()` over
+  the exception a `Throw` frame's four fields describe, so a failed request reaches the caller
+  as a rejection it handles rather than as a throw out of the call that started it.
 - `__shirabe_settle_promise` — the inverse: drains a promise a plugin returned to Rust. React
   settles synchronously, so an already-settled promise yields its value here (a rejection is
   re-thrown as the Throw reply); one that is still pending is an explicit error.

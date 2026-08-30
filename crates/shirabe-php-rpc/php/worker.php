@@ -841,6 +841,21 @@ ShirabeRpcRuntime::$dispatch = [
         }
         return \React\Promise\resolve($args[0]);
     },
+    // An already-rejected promise for a Rust-side call whose PHP signature declares
+    // PromiseInterface. A failed request surfaces to the caller as a rejection it handles, the
+    // way it does under Composer, rather than as a throw out of the call that started it.
+    '__shirabe_rejected_promise' => static function ($args) {
+        if (!function_exists('React\\Promise\\reject')) {
+            throw new RuntimeException(
+                'react/promise is not loaded in the plugin process, so a PromiseInterface cannot be built'
+            );
+        }
+        [$class, $message, $code, $properties] = $args;
+
+        return \React\Promise\reject(
+            \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties)
+        );
+    },
     // Drains a promise a plugin returned to the Rust side. React settles promises
     // synchronously, so an already-settled one runs these handlers during then(); one that is
     // still pending is an explicit error rather than a silently dropped continuation.

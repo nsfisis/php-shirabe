@@ -415,10 +415,22 @@ its options, its TLS defaults and the authentication it collects into the
 run's IO are state the two worlds have to share, and a plugin-`new`ed one
 allocates a Rust-side entity rather than a second downloader the graph knows
 nothing about. `get()` and `copy()` answer with a
-`Composer\Util\Http\Response` the child holds as a value (see below); the
-async surface — `add()`, `addCopy()`, `wait()`, `enableAsync()`,
-`countActiveJobs()` — is still an explicit error, because driving it needs a
-promise representation that crosses the boundary unresolved.
+`Composer\Util\Http\Response` the child holds as a value (see below), and the
+async surface answers too, with the future driven to completion before the
+promise is handed over. Requests a plugin starts together therefore run one
+after another rather than overlapping; overlapping them needs a promise
+representation that crosses the boundary unresolved. Everything else the async
+surface does is preserved: `add()` still refuses a downloader outside a `Loop`,
+a failed request still arrives as a rejection rather than as a throw, and
+`wait()` and `countActiveJobs()` still answer for a downloader that holds no
+outstanding job — which, once every request settles before its call returns, it
+never does.
+
+This is where `ProcessExecutor` and `HttpDownloader` part company. The
+executor's async surface stays an explicit error because `executeAsync()`
+resolves its promise with a `Symfony\Component\Process\Process`, whose state
+is the `proc_open()` resource of whichever process called `start()`; a request
+resolves its promise with a `Response`, which is data.
 
 `Loop` remains guarded, so `Composer::getLoop()` is still an explicit error
 and neither the graph's own executor nor its downloader is reachable through
