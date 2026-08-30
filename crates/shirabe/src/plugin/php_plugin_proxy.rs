@@ -9,6 +9,7 @@ use crate::autoload::ClassLoader;
 use crate::command::BaseCommand;
 use crate::composer::ComposerHandle;
 use crate::dependency_resolver::operation::AnyOperation;
+use crate::downloader::TransportException;
 use crate::event_dispatcher::event_dispatcher::dispatch_event_method;
 use crate::event_dispatcher::{
     EventInterface, EventSubscriberInterface, SubscribedEventEntry, unwrap_php_result,
@@ -32,7 +33,7 @@ use shirabe_php_rpc::{
     PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle,
     call_function_with_dispatcher, call_php_method, new_object, release_php_handle,
 };
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{AnyThrowable, Catch as _, PhpClass as _, PhpMixed};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::input::InputValue;
@@ -640,7 +641,7 @@ fn dispatch_plugin_method(
             })?;
             let capabilities = capable
                 .get_capabilities()
-                .map_err(|error| runtime_throw(format!("getCapabilities failed: {error:#}")))?;
+                .map_err(|error| error_throw("getCapabilities failed", &error))?;
             Ok(capabilities.to_plugin_value())
         }
         // TODO(plugin): the lifecycle methods would have to turn the `$composer`/`$io` stubs the
@@ -718,14 +719,14 @@ fn dispatch_config_method(
             let value = config
                 .borrow()
                 .get_with_flags(&key(0)?, flags(1)?)
-                .map_err(|error| runtime_throw(format!("get failed over RPC: {error}")))?;
+                .map_err(|error| error_throw("get failed over RPC", &error))?;
             Ok(value.to_plugin_value())
         }
         "all" => {
             let all = config
                 .borrow_mut()
                 .all(flags(0)?)
-                .map_err(|error| runtime_throw(format!("all failed over RPC: {error}")))?;
+                .map_err(|error| error_throw("all failed over RPC", &error))?;
             Ok(all.to_plugin_value())
         }
         "raw" => Ok(config.borrow().raw().to_plugin_value()),
@@ -831,11 +832,7 @@ fn dispatch_download_manager_method(
                         .await
                     }
                 }
-                .map_err(|error| {
-                    // TODO(plugin): the original exception class is collapsed to
-                    // RuntimeException on this side of the boundary.
-                    runtime_throw(format!("{method_name} failed over RPC: {error:#}"))
-                })
+                .map_err(|error| error_throw(&format!("{method_name} failed over RPC"), &error))
             })?;
             resolved_promise(resolved.to_plugin_value())
         }
@@ -870,9 +867,7 @@ fn dispatch_filesystem_method(
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     let string_arg = |position: usize| arg::<String>(method_name, args, position);
-    // TODO(plugin): the exception class the real method throws (RuntimeException, IOException,
-    // LogicException) is collapsed to RuntimeException on this side of the boundary.
-    let failed = |error: anyhow::Error| runtime_throw(format!("{method_name} failed: {error:#}"));
+    let failed = |error: anyhow::Error| error_throw(&format!("{method_name} failed"), &error);
     match method_name {
         "remove" => Ok(fs
             .borrow_mut()
@@ -949,6 +944,7 @@ fn dispatch_filesystem_method(
                     exception_class: "InvalidArgumentException".to_string(),
                     message: format!("$from ({from}) and $to ({to}) must be absolute paths."),
                     code: 0,
+                    properties: Box::new(IndexMap::new()),
                 });
             }
             Ok(if method_name == "findShortestPath" {
@@ -1029,7 +1025,7 @@ fn dispatch_process_executor_method(
     args: &[PluginValue],
     out_params: &mut IndexMap<u32, PluginValue>,
 ) -> Result<PluginValue, PhpThrow> {
-    let failed = |error: anyhow::Error| runtime_throw(format!("{method_name} failed: {error:#}"));
+    let failed = |error: anyhow::Error| error_throw(&format!("{method_name} failed"), &error);
     let cwd_arg = |position: usize| -> Result<Option<String>, PhpThrow> {
         match args.get(position) {
             None | Some(PluginValue::Null) => Ok(None),
@@ -1334,11 +1330,9 @@ fn dispatch_repository_method(
     match method_name {
         "hasPackage" => {
             let package = arg::<PackageInterfaceHandle>(method_name, args, 0)?;
-            let has = repository.has_package(package).map_err(|error| {
-                // TODO(plugin): the original exception class is collapsed to RuntimeException
-                // on this side of the boundary.
-                runtime_throw(format!("hasPackage failed over RPC: {error}"))
-            })?;
+            let has = repository
+                .has_package(package)
+                .map_err(|error| error_throw("hasPackage failed over RPC", &error))?;
             Ok(has.to_plugin_value())
         }
         "addPackage" | "removePackage" => {
@@ -1356,19 +1350,15 @@ fn dispatch_repository_method(
             } else {
                 writable.remove_package(package)
             };
-            outcome.map_err(|error| {
-                // TODO(plugin): the original exception class is collapsed to RuntimeException
-                // on this side of the boundary.
-                runtime_throw(format!("{method_name} failed over RPC: {error}"))
-            })?;
+            outcome
+                .map_err(|error| error_throw(&format!("{method_name} failed over RPC"), &error))?;
             Ok(PluginValue::Null)
         }
         "getPackages" => {
-            let packages = repository.borrow_mut().get_packages().map_err(|error| {
-                // TODO(plugin): the original exception class is collapsed to RuntimeException
-                // on this side of the boundary.
-                runtime_throw(format!("getPackages failed over RPC: {error}"))
-            })?;
+            let packages = repository
+                .borrow_mut()
+                .get_packages()
+                .map_err(|error| error_throw("getPackages failed over RPC", &error))?;
             let mut items = Vec::with_capacity(packages.len());
             for package in packages {
                 items.push(package_handle_value(package.as_rc()));
@@ -1932,7 +1922,7 @@ fn dispatch_package_method(
                 .borrow_mut()
                 .as_package_interface_mut()
                 .set_repository(repository)
-                .map_err(|error| runtime_throw(format!("setRepository failed: {error}")))?;
+                .map_err(|error| error_throw("setRepository failed", &error))?;
             return Ok(PluginValue::Null);
         }
         "setTransportOptions" => {
@@ -2429,7 +2419,70 @@ fn runtime_throw(message: String) -> PhpThrow {
         exception_class: "RuntimeException".to_string(),
         message,
         code: 0,
+        properties: Box::new(IndexMap::new()),
     }
+}
+
+/// The `Throw` a failed Rust-side call crosses the boundary as. An error carrying a ported PHP
+/// exception keeps that exception's class, code and declared state, so a plugin catches what it
+/// would catch under Composer; one carrying no exception keeps the `RuntimeException` shape,
+/// with `context` naming the call that failed.
+fn error_throw(context: &str, error: &anyhow::Error) -> PhpThrow {
+    let Some(exception) = AnyThrowable::of(error.as_ref()) else {
+        return runtime_throw(format!("{context}: {error:#}"));
+    };
+    PhpThrow {
+        exception_class: exception.php_class_name(),
+        message: exception.get_message().to_string(),
+        code: exception.get_code(),
+        properties: Box::new(throwable_properties(error)),
+    }
+}
+
+/// The state a ported exception carries beyond `message` and `code`, keyed by the property names
+/// its PHP class declares. The child revives them onto the instance it rebuilds.
+///
+/// TODO(plugin): only `TransportException` is projected. Every other exception with state of its
+/// own (`InvalidPackageException`, `JsonValidationException`, `CommandNotFoundException`,
+/// `ProcessSignaledException`, `SolverProblemsException`) crosses with message and code alone.
+fn throwable_properties(error: &anyhow::Error) -> IndexMap<String, PluginValue> {
+    let mut properties = IndexMap::new();
+    if let Some(exception) = error.catch::<TransportException>() {
+        properties.insert(
+            "headers".to_string(),
+            match exception.get_headers() {
+                Some(headers) => {
+                    PluginValue::List(headers.iter().cloned().map(PluginValue::string).collect())
+                }
+                None => PluginValue::Null,
+            },
+        );
+        properties.insert(
+            "response".to_string(),
+            match exception.get_response() {
+                Some(response) => PluginValue::string(response),
+                None => PluginValue::Null,
+            },
+        );
+        properties.insert(
+            "statusCode".to_string(),
+            match exception.get_status_code() {
+                Some(status_code) => PluginValue::Int(status_code),
+                None => PluginValue::Null,
+            },
+        );
+        properties.insert(
+            "responseInfo".to_string(),
+            PluginValue::List(
+                exception
+                    .get_response_info()
+                    .iter()
+                    .map(PluginValue::from_php_mixed)
+                    .collect(),
+            ),
+        );
+    }
+    properties
 }
 
 /// `PluginInterface` adapter for a plugin entity living in the PHP child process: every

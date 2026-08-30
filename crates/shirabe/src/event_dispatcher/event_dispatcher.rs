@@ -1840,6 +1840,7 @@ fn runtime_throw(message: String) -> PhpThrow {
         exception_class: "RuntimeException".to_string(),
         message,
         code: 0,
+        properties: Box::new(IndexMap::new()),
     }
 }
 

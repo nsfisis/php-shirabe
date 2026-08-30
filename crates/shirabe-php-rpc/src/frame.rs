@@ -66,6 +66,9 @@ pub enum Frame {
         exception_class: String,
         message: String,
         code: i64,
+        /// The state the exception carries beyond `message` and `code`, keyed by the property
+        /// names its class declares. Empty for an exception that carries none.
+        properties: IndexMap<String, PluginValue>,
     },
     ReleaseRustHandle {
         rhandle: u64,
@@ -180,11 +183,18 @@ impl Frame {
                 exception_class,
                 message,
                 code,
+                properties,
                 ..
             } => vec![
                 PluginValue::string(exception_class.clone()),
                 PluginValue::string(message.clone()),
                 PluginValue::Int(*code),
+                PluginValue::Array(
+                    properties
+                        .iter()
+                        .map(|(name, v)| (name.clone().into_bytes(), v.clone()))
+                        .collect(),
+                ),
             ],
             Frame::ReleaseRustHandle { rhandle } => vec![int_value(*rhandle)],
             Frame::ReleasePhpHandle { phandle } => vec![int_value(*phandle)],
@@ -302,6 +312,7 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
                     panic!("PHP RPC: protocol violation — Throw code is not an int: {other:?}")
                 }
             },
+            properties: expect_properties(next()),
         },
         TAG_RELEASE_RUST_HANDLE => Frame::ReleaseRustHandle {
             rhandle: expect_id(next()),
@@ -352,6 +363,27 @@ fn expect_positions(value: PluginValue) -> Vec<u32> {
             }
         })
         .collect()
+}
+
+fn expect_properties(value: PluginValue) -> IndexMap<String, PluginValue> {
+    match value {
+        PluginValue::List(items) if items.is_empty() => IndexMap::new(),
+        PluginValue::Array(map) => map
+            .into_iter()
+            .map(|(key, item)| {
+                let name = String::from_utf8(key).unwrap_or_else(|error| {
+                    panic!(
+                        "PHP RPC: protocol violation — exception property name is not UTF-8: {:?}",
+                        String::from_utf8_lossy(error.as_bytes())
+                    )
+                });
+                (name, item)
+            })
+            .collect(),
+        other => {
+            panic!("PHP RPC: protocol violation — exception properties is not an array: {other:?}")
+        }
+    }
 }
 
 fn expect_out_params(value: PluginValue) -> IndexMap<u32, PluginValue> {
@@ -410,6 +442,42 @@ mod tests {
                 assert_eq!(function_name, "defined");
                 assert_eq!(args, vec![PluginValue::string("PHP_VERSION")]);
                 assert!(out_param_positions.is_empty());
+            }
+            other => panic!("unexpected frame: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn frame_roundtrip_throw_with_properties() {
+        let frame = roundtrip(Frame::Throw {
+            corr_id: 11,
+            exception_class: "Composer\\Downloader\\TransportException".to_string(),
+            message: "The \"https://example.org\" file could not be downloaded".to_string(),
+            code: 401,
+            properties: [
+                ("statusCode".to_string(), PluginValue::Int(401)),
+                ("response".to_string(), PluginValue::Null),
+            ]
+            .into_iter()
+            .collect(),
+        });
+        match frame {
+            Frame::Throw {
+                corr_id,
+                exception_class,
+                message,
+                code,
+                properties,
+            } => {
+                assert_eq!(corr_id, 11);
+                assert_eq!(exception_class, "Composer\\Downloader\\TransportException");
+                assert_eq!(
+                    message,
+                    "The \"https://example.org\" file could not be downloaded"
+                );
+                assert_eq!(code, 401);
+                assert_eq!(properties.get("statusCode"), Some(&PluginValue::Int(401)));
+                assert_eq!(properties.get("response"), Some(&PluginValue::Null));
             }
             other => panic!("unexpected frame: {other:?}"),
         }

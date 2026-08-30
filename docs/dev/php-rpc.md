@@ -51,7 +51,7 @@ frame is a fatal channel error, not an allocation attempt.
 | `0x03` | `CallPhpMethod` | Rust→PHP | `phandle`, `method_name`, `args`, `out_param_positions` |
 | `0x04` | `CallRustMethod` | PHP→Rust | `rhandle`, `method_name`, `args`, `out_param_positions` |
 | `0x05` | `Return` | both | `value`, `out_params` |
-| `0x06` | `Throw` | both | `exception_class`, `message`, `code` |
+| `0x06` | `Throw` | both | `exception_class`, `message`, `code`, `properties` |
 | `0x07` | `ReleaseRustHandle` | PHP→Rust | `rhandle` |
 | `0x08` | `ReleasePhpHandle` | Rust→PHP | `phandle` |
 | `0x09` | `EpochBump` | Rust→PHP | `rhandle`, `epoch` |
@@ -123,6 +123,14 @@ same dispatch while waiting for its own `Return`.
   frames.
 - The inner `Result<PluginValue, PhpThrow>` is the recoverable lane: a PHP exception crossing
   the boundary as a `Throw` frame.
+- A `Throw` names the class the exception was thrown as, and `properties` carries the state that
+  class declares beyond `message` and `code`. Rust to PHP, `\Shirabe\MaterializedThrowable`
+  rebuilds the exception in the child — `new $class($message, $code)` for a class whose
+  constructor has `\Exception`'s shape, then the properties by reflection — so a plugin's
+  `catch (TransportException $e)` catches what it would catch under Composer and reads the
+  status code off it. A class the child cannot construct that way keeps the `RuntimeException`
+  shape. PHP to Rust the field is empty: nothing on the Rust side rebuilds a ported exception
+  from a `PhpThrow` yet.
 - A frame that decodes to something protocol-invalid is a bug in Shirabe itself (both halves
   ship in the same commit) and panics; the PHP side symmetrically dies so Rust observes EOF.
 - The legacy scalar query API (`get_php_version` etc.) keeps its historical contract: every

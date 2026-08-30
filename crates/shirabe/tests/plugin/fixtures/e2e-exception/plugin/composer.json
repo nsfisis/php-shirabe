@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/exception-probe",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin recording the exceptions a Composer service raises at it.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\Exception\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\Exception\\Plugin"
+    }
+}

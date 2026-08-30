@@ -337,10 +337,13 @@ final class ShirabeRpcRuntime
                     $outParams = self::fromWire($fields[1] ?? []);
                     return self::fromWire($fields[0]);
                 }
-                [$class, $message, $code] = $fields;
-                // TODO(plugin): reconstruct the original exception class instead of collapsing
-                // everything to RuntimeException.
-                throw new RuntimeException($message, (int) $code);
+                [$class, $message, $code, $properties] = $fields;
+                throw \Shirabe\MaterializedThrowable::revive(
+                    $class,
+                    $message,
+                    (int) $code,
+                    self::fromWire($properties)
+                );
             }
             self::dispatchRequest($tag, $inId, $payload);
         }
@@ -435,7 +438,9 @@ final class ShirabeRpcRuntime
             self::writeFrame(
                 SHIRABE_TAG_THROW,
                 $corrId,
-                serialize([get_class($e), $e->getMessage(), (int) $e->getCode()])
+                // TODO(plugin): the properties field is empty in this direction; no Rust-side
+                // consumer rebuilds a ported exception from a Throw frame yet.
+                serialize([get_class($e), $e->getMessage(), (int) $e->getCode(), []])
             );
         }
     }

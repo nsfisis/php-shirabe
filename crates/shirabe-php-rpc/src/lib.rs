@@ -621,6 +621,15 @@ pub struct PhpThrow {
     pub exception_class: String,
     pub message: String,
     pub code: i64,
+    /// The state the exception carries beyond `message` and `code`, keyed by the property names
+    /// its class declares. The child revives them onto the instance it rebuilds.
+    ///
+    /// TODO(plugin): populated only Rust to PHP. An exception a plugin throws crosses with its
+    /// class, message and code alone, because no Rust-side consumer rebuilds a ported exception
+    /// from a `PhpThrow` yet.
+    ///
+    /// Boxed so a `Result<_, PhpThrow>` stays small; every dispatcher returns one.
+    pub properties: Box<IndexMap<String, PluginValue>>,
 }
 
 impl PhpThrow {
@@ -629,6 +638,7 @@ impl PhpThrow {
             exception_class: "RuntimeException".to_string(),
             message,
             code: 0,
+            properties: Box::new(IndexMap::new()),
         }
     }
 }
@@ -805,11 +815,13 @@ fn rpc_call(
                 exception_class,
                 message,
                 code,
+                properties,
             } if corr_id == my_id => {
                 return Ok(Err(PhpThrow {
                     exception_class,
                     message,
                     code,
+                    properties: Box::new(properties),
                 }));
             }
             Frame::CallRustMethod {
@@ -846,6 +858,7 @@ fn rpc_call(
                         exception_class: throw.exception_class,
                         message: throw.message,
                         code: throw.code,
+                        properties: *throw.properties,
                     },
                 };
                 send_frame(&reply)?;
@@ -1040,6 +1053,10 @@ const RUNTIME_FILES: &[(&str, &str)] = &[
     (
         "Composer/EventDispatcher/Event.php",
         include_str!("../php/runtime/Composer/EventDispatcher/Event.php"),
+    ),
+    (
+        "Shirabe/MaterializedThrowable.php",
+        include_str!("../php/runtime/Shirabe/MaterializedThrowable.php"),
     ),
     (
         "Shirabe/MaterializedValue.php",

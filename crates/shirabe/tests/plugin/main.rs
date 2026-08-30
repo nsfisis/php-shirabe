@@ -7,6 +7,7 @@ mod php_worker;
 
 mod alias_package_test;
 mod e2e_command_provider_test;
+mod e2e_exception_test;
 mod e2e_extension_installer_test;
 mod e2e_installer_test;
 mod e2e_installers_test;

@@ -1,0 +1,24 @@
+{
+    "name": "shirabe/e2e-exception",
+    "description": "E2E fixture project: record the exceptions a plugin catches from Composer services.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/exception-probe": "1.0.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "shirabe-test/exception-probe": true
+        }
+    }
+}
