@@ -21,6 +21,13 @@ impl Response {
         }
     }
 
+    /// The url of the request this response answered. PHP keeps the whole request array in a
+    /// private property with no getter, and the plugin boundary codec needs the url out of it to
+    /// rebuild the value in the child.
+    pub(crate) fn request_url(&self) -> &str {
+        &self.url
+    }
+
     pub fn get_status_code(&self) -> i64 {
         self.code
     }

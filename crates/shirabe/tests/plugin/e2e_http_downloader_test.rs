@@ -61,7 +61,8 @@ fn test_plugin_owned_http_downloader_matches_upstream_composer() {
 
     // Pinned as well as compared, so a run where neither side wrote a trace cannot pass. The
     // second options line is the evidence that both worlds merge into one value rather than each
-    // holding its own copy of the map.
+    // holding its own copy of the map, and the response lines are the evidence that the value the
+    // request answers with is a real instance of the class rather than something shaped like one.
     assert_eq!(
         "\
 event=post-update-cmd
@@ -71,6 +72,11 @@ options merged=[\"X-Probe: 2\"]
 isCurlEnabled=true
 hints other=null transport=null
 outputWarnings=ok
+get=ok
+response class=\"Composer\\\\Util\\\\Http\\\\Response\" body=\"{\\\"probe\\\":true,\\\"n\\\":42}\" headers=[]
+getHeader=null
+copy=ok file=\"{\\\"probe\\\":true,\\\"n\\\":42}\"
+collect=ok
 ",
         upstream.trace
     );

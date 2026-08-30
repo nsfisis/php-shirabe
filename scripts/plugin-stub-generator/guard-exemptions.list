@@ -12,3 +12,7 @@ Composer\Package\Link
 # the dual-mode Composer\EventDispatcher\Event (php/runtime/) carries a natively constructed event
 # to the Rust side as a P-table entity.
 Composer\Plugin\PreCommandRunEvent
+
+# The wire codec revives values of this class from the object record serialize() writes for them
+# (php/runtime/Shirabe/MaterializedValue.php), so the real declaration has to stay loadable.
+Composer\Util\Http\Response

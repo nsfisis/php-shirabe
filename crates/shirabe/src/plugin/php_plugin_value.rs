@@ -14,6 +14,7 @@
 //! constraint) has no faithful constructor call.
 
 use crate::package::Link;
+use crate::util::http::Response;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
 use shirabe_php_rpc::{PhpObject, PhpThrow, PluginValue};
 use shirabe_semver::constraint::{
@@ -21,6 +22,7 @@ use shirabe_semver::constraint::{
 };
 
 const LINK_CLASS: &str = "Composer\\Package\\Link";
+const RESPONSE_CLASS: &str = "Composer\\Util\\Http\\Response";
 const CONSTRAINT_CLASS: &str = "Composer\\Semver\\Constraint\\Constraint";
 const MULTI_CONSTRAINT_CLASS: &str = "Composer\\Semver\\Constraint\\MultiConstraint";
 const MATCH_ALL_CLASS: &str = "Composer\\Semver\\Constraint\\MatchAllConstraint";
@@ -195,6 +197,48 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
             )));
         }
     })
+}
+
+/// A `Response` is built for one request and never retained by the object graph, so the child
+/// holds a real instance rather than a handle, and `collect()` frees the copy it holds.
+///
+/// TODO(type-model): PHP's `$request` is the whole request array (`url`, `options`, `copyTo`)
+/// and this port keeps only the url, which is all `decodeJson()` reads back out of it.
+///
+/// TODO(port): Composer answers a curl request with a `Composer\Util\Http\CurlResponse`
+/// carrying the transfer info; this port flattens that subclass into `Response` before the
+/// value leaves `HttpDownloader`, so `getCurlInfo()` is gone and `get_class()` differs.
+pub(crate) fn response_to_wire(response: &Response) -> PluginValue {
+    let mut object = PhpObject::new(RESPONSE_CLASS);
+    let mut request = indexmap::IndexMap::new();
+    request.insert(b"url".to_vec(), PluginValue::string(response.request_url()));
+    object.set_private(RESPONSE_CLASS, "request", PluginValue::Array(request));
+    object.set_private(
+        RESPONSE_CLASS,
+        "code",
+        PluginValue::Int(response.get_status_code()),
+    );
+    object.set_private(
+        RESPONSE_CLASS,
+        "headers",
+        PluginValue::List(
+            response
+                .get_headers()
+                .iter()
+                .cloned()
+                .map(PluginValue::string)
+                .collect(),
+        ),
+    );
+    object.set_private(
+        RESPONSE_CLASS,
+        "body",
+        match response.get_body() {
+            Some(body) => PluginValue::string(body),
+            None => PluginValue::Null,
+        },
+    );
+    PluginValue::PhpObject(object)
 }
 
 pub(crate) fn link_to_wire(link: &Link) -> PluginValue {

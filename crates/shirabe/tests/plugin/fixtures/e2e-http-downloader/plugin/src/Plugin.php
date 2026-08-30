@@ -78,6 +78,32 @@ class Plugin implements PluginInterface, EventSubscriberInterface
             );
         });
 
+        // A file:// url keeps the probe offline and off the curl path, so the trace is the same
+        // on a machine with no network. Paths stay out of the trace: the two runs work in
+        // different temporary directories.
+        $payload = getcwd() . '/probe-payload.json';
+        file_put_contents($payload, '{"probe":true,"n":42}');
+
+        $response = null;
+        $lines[] = 'get=' . $this->describe(static function () use ($downloader, $payload, &$response): void {
+            $response = $downloader->get('file://' . $payload);
+        });
+        $lines[] = 'response class=' . json_encode($response === null ? null : \get_class($response))
+            . ' body=' . json_encode($response === null ? null : $response->getBody())
+            . ' headers=' . json_encode($response === null ? null : $response->getHeaders());
+        $lines[] = 'getHeader=' . json_encode($response === null ? null : $response->getHeader('Content-Type'));
+
+        $target = getcwd() . '/probe-copy.json';
+        $lines[] = 'copy=' . $this->describe(static function () use ($downloader, $payload, $target): void {
+            $downloader->copy('file://' . $payload, $target);
+        }) . ' file=' . json_encode(@file_get_contents($target));
+
+        // collect() unsets the response's own properties, so the object is spent afterwards and
+        // nothing may read it again.
+        $lines[] = 'collect=' . $this->describe(static function () use ($response): void {
+            $response->collect();
+        });
+
         file_put_contents('http-downloader-trace.txt', implode("\n", $lines) . "\n");
     }
 

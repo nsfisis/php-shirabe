@@ -70,10 +70,30 @@ impl PhpObject {
     pub fn set_protected(&mut self, name: &str, value: PluginValue) {
         self.props.insert(protected_key(name), value);
     }
+
+    /// PHP mangles a private property name to `\0<declaring class>\0name`. The declaring class is
+    /// the one whose body holds the `private` declaration, which is not `self.class` once a
+    /// subclass inherits it.
+    pub fn private(&self, declaring_class: &str, name: &str) -> Option<&PluginValue> {
+        self.props
+            .get(private_key(declaring_class, name).as_slice())
+    }
+
+    pub fn set_private(&mut self, declaring_class: &str, name: &str, value: PluginValue) {
+        self.props.insert(private_key(declaring_class, name), value);
+    }
 }
 
 fn protected_key(name: &str) -> Vec<u8> {
     let mut key = b"\0*\0".to_vec();
+    key.extend_from_slice(name.as_bytes());
+    key
+}
+
+fn private_key(declaring_class: &str, name: &str) -> Vec<u8> {
+    let mut key = vec![0];
+    key.extend_from_slice(declaring_class.as_bytes());
+    key.push(0);
     key.extend_from_slice(name.as_bytes());
     key
 }
@@ -795,6 +815,19 @@ mod tests {
             b"O:45:\"Composer\\Semver\\Constraint\\MatchAllConstraint\":1:{s:15:\"\0*\0prettyString\";N;}".as_slice(),
         );
 
+        // A private property carries the declaring class rather than `*`, which is what lets a
+        // subclass hold its own property of the same name.
+        let mut response = PhpObject::new("Composer\\Util\\Http\\Response");
+        response.set_private(
+            "Composer\\Util\\Http\\Response",
+            "code",
+            PluginValue::Int(200),
+        );
+        assert_eq!(
+            serialize(&PluginValue::PhpObject(response)),
+            b"O:27:\"Composer\\Util\\Http\\Response\":1:{s:33:\"\0Composer\\Util\\Http\\Response\0code\";i:200;}".as_slice(),
+        );
+
         let mut date = PhpObject::new("DateTimeImmutable");
         date.set_public("date", PluginValue::string("2026-08-07 12:34:56.123456"));
         date.set_public("timezone_type", PluginValue::Int(3));
@@ -819,6 +852,20 @@ mod tests {
         assert_eq!(inner.protected("operator"), Some(&PluginValue::Int(4)));
         assert_eq!(inner.public("operator"), None);
         assert_eq!(outer.protected("prettyConstraint"), None);
+
+        let mut response = PhpObject::new("Composer\\Util\\Http\\Response");
+        response.set_private(
+            "Composer\\Util\\Http\\Response",
+            "body",
+            PluginValue::string("{}"),
+        );
+        roundtrip(PluginValue::PhpObject(response.clone()));
+        assert_eq!(
+            response.private("Composer\\Util\\Http\\Response", "body"),
+            Some(&PluginValue::string("{}"))
+        );
+        assert_eq!(response.protected("body"), None);
+        assert_eq!(response.public("body"), None);
     }
 
     /// PHP numbers every value of a payload, including the ones inside an object and the

@@ -66,8 +66,19 @@ revives a genuine instance of the real class without running a constructor,
 and getters answer locally with zero round-trips. Identity is not preserved
 — two calls of the same getter yield two objects in the child (see
 `docs/dev/php-rpc.md`). Only the classes on the codec's closed list cross
-this way today (`Link` and the `composer/semver` constraints it holds); the
-rest of the category has no artifact yet and is guarded.
+this way today (`Link` and the `composer/semver` constraints it holds, and
+`Composer\Util\Http\Response`); the rest of the category has no artifact
+yet and is guarded.
+
+`Response` is on the list by `overrides.list` entry rather than by the
+value-object rule, which rejects it because `collect()` assigns to `$this`.
+The entity it would otherwise need does not exist: a response is built for
+one request and the graph never retains it, and `collect()` frees the copy
+each world holds, which is what that method is for. Two of its members do
+not work from the child even so: `decodeJson()` reaches
+`Composer\Json\JsonFile`, which a guard shadows, and Composer answers a
+curl request with the `CurlResponse` subclass where this port flattens the
+value into a `Response` before it leaves `HttpDownloader`.
 
 #### contract
 
@@ -403,11 +414,11 @@ note).
 its options, its TLS defaults and the authentication it collects into the
 run's IO are state the two worlds have to share, and a plugin-`new`ed one
 allocates a Rust-side entity rather than a second downloader the graph knows
-nothing about. What it does not serve is the request surface itself —
-`get()` and `copy()` have no wire representation for the
-`Composer\Util\Http\Response` they return, and
-`add()`/`addCopy()`/`wait()`/`enableAsync()`/`countActiveJobs()` resolve
-promises with one.
+nothing about. `get()` and `copy()` answer with a
+`Composer\Util\Http\Response` the child holds as a value (see below); the
+async surface — `add()`, `addCopy()`, `wait()`, `enableAsync()`,
+`countActiveJobs()` — is still an explicit error, because driving it needs a
+promise representation that crosses the boundary unresolved.
 
 `Loop` remains guarded, so `Composer::getLoop()` is still an explicit error
 and neither the graph's own executor nor its downloader is reachable through

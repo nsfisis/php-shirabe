@@ -21,7 +21,7 @@ use crate::package::{DisplayMode, PackageInterfaceHandle};
 use crate::plugin::capability::{Capability, CommandProvider};
 use crate::plugin::capable::Capable;
 use crate::plugin::php_plugin_value::{
-    date_time_from_wire, date_time_to_wire, link_from_wire, link_to_wire,
+    date_time_from_wire, date_time_to_wire, link_from_wire, link_to_wire, response_to_wire,
 };
 use crate::plugin::plugin_interface::PluginInterface;
 use crate::repository::{
@@ -1177,11 +1177,27 @@ fn dispatch_http_downloader_method(
             downloader.borrow_mut().set_options(options);
             Ok(PluginValue::Null)
         }
-        // TODO(plugin): a `Composer\Util\Http\Response` has no representation on the wire, so
-        // the two synchronous request methods have nothing to answer with.
-        "get" | "copy" => Err(runtime_throw(format!(
-            "Shirabe does not support HttpDownloader::{method_name}() from a plugin yet"
-        ))),
+        "get" => {
+            let url = arg::<String>(method_name, args, 0)?;
+            let options =
+                arg_or::<IndexMap<String, PhpMixed>>(method_name, args, 1, IndexMap::new())?;
+            let response = downloader
+                .borrow()
+                .get(&url, options)
+                .map_err(|error| error_throw("get failed", &error))?;
+            Ok(response_to_wire(&response))
+        }
+        "copy" => {
+            let url = arg::<String>(method_name, args, 0)?;
+            let to = arg::<String>(method_name, args, 1)?;
+            let options =
+                arg_or::<IndexMap<String, PhpMixed>>(method_name, args, 2, IndexMap::new())?;
+            let response = downloader
+                .borrow()
+                .copy(&url, &to, options)
+                .map_err(|error| error_throw("copy failed", &error))?;
+            Ok(response_to_wire(&response))
+        }
         // TODO(plugin,async): the async surface resolves its promises with a Response the wire
         // cannot carry, and driving it needs a promise representation that crosses the boundary
         // unresolved. Neither exists yet.

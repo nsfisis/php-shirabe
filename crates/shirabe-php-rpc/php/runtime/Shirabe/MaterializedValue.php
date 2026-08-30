@@ -17,6 +17,7 @@ use Composer\Semver\Constraint\Constraint;
 use Composer\Semver\Constraint\MatchAllConstraint;
 use Composer\Semver\Constraint\MatchNoneConstraint;
 use Composer\Semver\Constraint\MultiConstraint;
+use Composer\Util\Http\Response;
 
 final class MaterializedValue
 {
@@ -26,6 +27,7 @@ final class MaterializedValue
         MultiConstraint::class,
         MatchAllConstraint::class,
         MatchNoneConstraint::class,
+        Response::class,
         \DateTimeImmutable::class,
         \DateTime::class,
     ];

@@ -19,4 +19,44 @@ class CurlResponse extends Response
     {
         \ShirabeUnsupportedClass::fail(self::class, 'getCurlInfo');
     }
+
+    public function getStatusCode(): int
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'getStatusCode');
+    }
+
+    public function getStatusMessage(): ?string
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'getStatusMessage');
+    }
+
+    public function getHeaders(): array
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'getHeaders');
+    }
+
+    public function getHeader(string $name): ?string
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'getHeader');
+    }
+
+    public function getBody(): ?string
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'getBody');
+    }
+
+    public function decodeJson()
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'decodeJson');
+    }
+
+    public function collect(): void
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'collect');
+    }
+
+    public static function findHeaderValue(array $headers, string $name): ?string
+    {
+        \ShirabeUnsupportedClass::fail(self::class, 'findHeaderValue');
+    }
 }
