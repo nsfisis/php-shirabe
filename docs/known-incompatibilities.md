@@ -38,8 +38,6 @@ The following are intentionally left unchanged for ecosystem compatibility:
 * `composer.json` and `composer.lock`
 * `vendor/composer/` directory
 
-TODO: a CLI flag or an environment variable to force Shirabe to use compatible paths.
-
 
 ## Error Messages
 
