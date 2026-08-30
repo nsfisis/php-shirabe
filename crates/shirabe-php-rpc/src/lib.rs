@@ -1040,6 +1040,10 @@ const STUB_FILES: &[(&str, &str)] = &[
         "Composer/Util/ProcessExecutor.php",
         include_str!("../php/stubs/Composer/Util/ProcessExecutor.php"),
     ),
+    (
+        "Composer/Util/HttpDownloader.php",
+        include_str!("../php/stubs/Composer/Util/HttpDownloader.php"),
+    ),
 ];
 
 /// Hand-written worker-side classes (two-world implementations with behavior of their own, not

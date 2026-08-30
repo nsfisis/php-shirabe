@@ -399,9 +399,20 @@ can reach the async path on an instance of its own, since `enableAsync()`,
 `wait()` and `countActiveJobs()` are all public (`@internal` is a docblock
 note).
 
-`HttpDownloader` and `Loop` remain guarded, so `Composer::getLoop()` is still
-an explicit error and the graph's own executor is not reachable yet. Serving
-it needs only a `Loop` stub, since the executor's surface is already served.
+`HttpDownloader` is a proxy stub on the same terms and for the same reasons:
+its options, its TLS defaults and the authentication it collects into the
+run's IO are state the two worlds have to share, and a plugin-`new`ed one
+allocates a Rust-side entity rather than a second downloader the graph knows
+nothing about. What it does not serve is the request surface itself —
+`get()` and `copy()` have no wire representation for the
+`Composer\Util\Http\Response` they return, and
+`add()`/`addCopy()`/`wait()`/`enableAsync()`/`countActiveJobs()` resolve
+promises with one.
+
+`Loop` remains guarded, so `Composer::getLoop()` is still an explicit error
+and neither the graph's own executor nor its downloader is reachable through
+it. Serving it needs only a `Loop` stub, since both surfaces it hands out are
+already served.
 
 ### Dual instantiation
 
@@ -423,8 +434,9 @@ the entity and answers with its handle, and the plugin-`new`ed object is
 then the same entity the graph sees. It is filled in per class, driven by
 the explicit errors real plugins hit — today `Package`, `CompletePackage`,
 the three alias packages, the five solver operations,
-`Composer\Util\Filesystem` (with or without its `ProcessExecutor` argument)
-and `Composer\Util\ProcessExecutor` can be built this way. Every other
+`Composer\Util\Filesystem` (with or without its `ProcessExecutor` argument),
+`Composer\Util\ProcessExecutor` and `Composer\Util\HttpDownloader` can be
+built this way. Every other
 proxied class answers with an explicit error naming it.
 
 `JsonFile` and `ArrayLoader` are still undecided, so the classes above stay
@@ -438,8 +450,8 @@ service can now be built. `Composer\Package\Archiver\ArchivableFilesFinder`
 is `unsupported` for `new Filesystem` alone, and the VCS/auth belt is
 `unsupported` for `new ProcessExecutor` alone; neither forks any state any
 more. Promoting them means feeding the per-class construction stories back
-into the rule — and, for the belt, deciding `HttpDownloader` too, since
-those classes take one and no route to it exists yet.
+into the rule; the `HttpDownloader` those classes take as a constructor
+argument is one a plugin can now build.
 
 ### Package and CompletePackage
 

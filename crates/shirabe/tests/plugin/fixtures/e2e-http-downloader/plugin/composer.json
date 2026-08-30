@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/http-downloader-probe",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin driving an HttpDownloader it constructs itself.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\HttpDownloader\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\HttpDownloader\\Plugin"
+    }
+}

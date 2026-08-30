@@ -1,0 +1,24 @@
+{
+    "name": "shirabe/e2e-http-downloader",
+    "description": "E2E fixture project: record what a plugin's own HttpDownloader reports.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/http-downloader-probe": "1.0.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "shirabe-test/http-downloader-probe": true
+        }
+    }
+}

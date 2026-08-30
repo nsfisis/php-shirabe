@@ -9,6 +9,7 @@ mod alias_package_test;
 mod e2e_command_provider_test;
 mod e2e_exception_test;
 mod e2e_extension_installer_test;
+mod e2e_http_downloader_test;
 mod e2e_installer_test;
 mod e2e_installers_test;
 mod e2e_normalize_test;

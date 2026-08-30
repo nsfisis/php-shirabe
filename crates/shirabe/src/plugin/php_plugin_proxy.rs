@@ -59,6 +59,7 @@ enum RustEntity {
     Operation(std::rc::Rc<AnyOperation>),
     Plugin(std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>),
     ProcessExecutor(std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>),
+    HttpDownloader(std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>),
 }
 
 /// The pointer identity backing R-table interning: the same shared instance must always cross
@@ -82,6 +83,9 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
         RustEntity::Operation(operation) => std::rc::Rc::as_ptr(operation) as *const () as usize,
         RustEntity::Plugin(plugin) => std::rc::Rc::as_ptr(plugin) as *const () as usize,
         RustEntity::ProcessExecutor(process) => std::rc::Rc::as_ptr(process) as *const () as usize,
+        RustEntity::HttpDownloader(downloader) => {
+            std::rc::Rc::as_ptr(downloader) as *const () as usize
+        }
     }
 }
 
@@ -382,6 +386,9 @@ pub(crate) fn dispatch_r_table_method(
         Some(RustEntity::ProcessExecutor(process)) => {
             dispatch_process_executor_method(&process, method_name, args, out_params)
         }
+        Some(RustEntity::HttpDownloader(downloader)) => {
+            dispatch_http_downloader_method(&downloader, method_name, args)
+        }
         None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
     }
 }
@@ -415,6 +422,9 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         arg::<std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>>(
             &class, ctor_args, position,
         )
+    };
+    let config_arg = |position: usize| {
+        arg::<std::rc::Rc<std::cell::RefCell<crate::config::Config>>>(&class, ctor_args, position)
     };
     let alias_package_arg =
         |position: usize| -> Result<crate::package::AliasPackageHandle, PhpThrow> {
@@ -527,6 +537,20 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             )));
             return Ok(construction_result(rhandle));
         }
+        // A downloader carries its own options, TLS defaults and request backends; what it
+        // shares with the graph is the IO it collects authentication into and the config it
+        // reads, both of which it receives as the proxies the plugin already holds.
+        "Composer\\Util\\HttpDownloader" => {
+            let rhandle = register_entity(RustEntity::HttpDownloader(std::rc::Rc::new(
+                std::cell::RefCell::new(crate::util::HttpDownloader::new(
+                    io_arg(0)?,
+                    config_arg(1)?,
+                    arg_or::<IndexMap<String, PhpMixed>>(&class, ctor_args, 2, IndexMap::new())?,
+                    arg_or::<bool>(&class, ctor_args, 3, false)?,
+                )),
+            )));
+            return Ok(construction_result(rhandle));
+        }
         // TODO(plugin): the remaining proxied classes get a construction story on demand,
         // driven by explicit errors from real plugins. Each one has to decide what a
         // plugin-built instance means for the Rust-side graph, which is why none of them is
@@ -578,7 +602,8 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::EventDispatcher(_)
         | RustEntity::Operation(_)
         | RustEntity::Plugin(_)
-        | RustEntity::ProcessExecutor(_) => {
+        | RustEntity::ProcessExecutor(_)
+        | RustEntity::HttpDownloader(_) => {
             return Err(runtime_throw(
                 "cloning this Rust-side entity over RPC is not supported".to_string(),
             ));
@@ -1134,6 +1159,41 @@ fn dispatch_process_executor_method(
     }
 }
 
+/// Serves the `HttpDownloader` proxy stub, whether the downloader behind it belongs to the object
+/// graph or was built by plugin code writing `new HttpDownloader(...)`. Both run their requests
+/// out of the Rust process, which is what keeps the authentication a run collects, the TLS
+/// defaults and the parallel-request budget single-sourced across the boundary.
+fn dispatch_http_downloader_method(
+    downloader: &std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    match method_name {
+        "getOptions" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
+            downloader.borrow().get_options().clone(),
+        ))),
+        "setOptions" => {
+            let options = arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?;
+            downloader.borrow_mut().set_options(options);
+            Ok(PluginValue::Null)
+        }
+        // TODO(plugin): a `Composer\Util\Http\Response` has no representation on the wire, so
+        // the two synchronous request methods have nothing to answer with.
+        "get" | "copy" => Err(runtime_throw(format!(
+            "Shirabe does not support HttpDownloader::{method_name}() from a plugin yet"
+        ))),
+        // TODO(plugin,async): the async surface resolves its promises with a Response the wire
+        // cannot carry, and driving it needs a promise representation that crosses the boundary
+        // unresolved. Neither exists yet.
+        "add" | "addCopy" | "wait" | "enableAsync" | "countActiveJobs" => Err(runtime_throw(
+            format!("Shirabe does not support HttpDownloader::{method_name}() from a plugin yet"),
+        )),
+        other => Err(runtime_throw(format!(
+            "unknown HttpDownloader method `{other}`"
+        ))),
+    }
+}
+
 /// Decodes the `string|non-empty-list<string>` a process executor takes as its command.
 fn exec_command_arg(
     method: &str,
@@ -1622,6 +1682,28 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
                 }
             }
             other => Err(arg_throw(method, position, "an IOInterface", other)),
+        }
+    }
+}
+
+/// Resolves a config argument back to the Rust-side entity its proxy stub stands for.
+impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::config::Config>> {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::RustHandle(handle)) => {
+                match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
+                    Some(RustEntity::Config(config)) => Ok(config),
+                    _ => Err(runtime_throw(format!(
+                        "{method} expects a Config handle, got Rust handle {}",
+                        handle.rhandle
+                    ))),
+                }
+            }
+            other => Err(arg_throw(method, position, "a Config", other)),
         }
     }
 }
