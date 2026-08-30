@@ -16,9 +16,30 @@ fn git(repo_root: &std::path::Path, args: &[&str]) -> Option<String> {
     Some(String::from_utf8(output.stdout).ok()?.trim().to_string())
 }
 
-fn main() {
-    println!("cargo::rerun-if-changed=build.rs");
+fn from_env() -> Option<(String, Option<i64>)> {
+    let release_date = std::env::var("SHIRABE_RELEASE_DATE").ok();
+    let dev_warning_time = std::env::var("SHIRABE_DEV_WARNING_TIME").ok();
+    match (release_date, dev_warning_time) {
+        (Some(release_date), Some(dev_warning_time)) => {
+            let dev_warning_time = if dev_warning_time.is_empty() {
+                None
+            } else {
+                Some(dev_warning_time.parse().expect(
+                    "SHIRABE_DEV_WARNING_TIME holds a Unix timestamp, or nothing at all for a \
+                     tagged release",
+                ))
+            };
+            Some((release_date, dev_warning_time))
+        }
+        (None, None) => None,
+        _ => panic!(
+            "SHIRABE_RELEASE_DATE and SHIRABE_DEV_WARNING_TIME both describe the commit the build \
+             comes from: set them together, or set neither and build from a git checkout"
+        ),
+    }
+}
 
+fn from_git() -> (String, Option<i64>) {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let repo_root = std::path::Path::new(&manifest_dir)
         .parent()
@@ -66,6 +87,19 @@ fn main() {
         } else {
             Some(commit_time + 60 * 86400)
         };
+
+    (release_date, dev_warning_time)
+}
+
+fn main() {
+    println!("cargo::rerun-if-changed=build.rs");
+    println!("cargo::rerun-if-env-changed=SHIRABE_RELEASE_DATE");
+    println!("cargo::rerun-if-env-changed=SHIRABE_DEV_WARNING_TIME");
+
+    let (release_date, dev_warning_time) = match from_env() {
+        Some(values) => values,
+        None => from_git(),
+    };
 
     let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
     std::fs::write(out_dir.join("release_date.rs"), format!("{release_date:?}")).unwrap();

@@ -6,6 +6,7 @@ declare(strict_types=1);
 require __DIR__ . '/vendor/autoload.php';
 
 use Shirabe\Lint\Linters\CargoWorkspaceDependencies;
+use Shirabe\Lint\Linters\ComposerPin;
 use Shirabe\Lint\Linters\ContiguousUseBlock;
 use Shirabe\Lint\Linters\NoBannedUse;
 use Shirabe\Lint\Linters\NoDecorativeSectionComment;
@@ -24,6 +25,7 @@ $rootDir = dirname(__DIR__, 2);
 
 $runner = new Runner($rootDir, [
     [new CargoWorkspaceDependencies(), []],
+    [new ComposerPin(), []],
     [new ContiguousUseBlock(), []],
     [new NoBannedUse(), []],
     [new NoDecorativeSectionComment(), [

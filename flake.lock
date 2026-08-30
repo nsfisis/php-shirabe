@@ -1,5 +1,22 @@
 {
   "nodes": {
+    "composer": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1776166312,
+        "narHash": "sha256-cmz5YaxfykkUlF7Ai0Yu8L6sfNePmx3v24g6131+/RM=",
+        "owner": "composer",
+        "repo": "composer",
+        "rev": "82a2fbd1372a98d7915cfb092acf05207d9b4113",
+        "type": "github"
+      },
+      "original": {
+        "owner": "composer",
+        "ref": "2.9.7",
+        "repo": "composer",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": [
@@ -38,6 +55,7 @@
     },
     "root": {
       "inputs": {
+        "composer": "composer",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
         "rust-overlay": "rust-overlay",

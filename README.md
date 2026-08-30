@@ -27,7 +27,6 @@ Building Shirabe requires:
 * Direnv (optional)
 
 Nix flake supported; use `nix develop` to enter the development shell.
-TODO: support `nix build`
 
 
 ## Build
@@ -36,6 +35,12 @@ TODO: support `nix build`
 $ git submodule update --init
 $ composer install --no-dev --working-dir=composer
 $ cargo build --release
+```
+
+### Nix
+
+```
+$ nix build
 ```
 
 
