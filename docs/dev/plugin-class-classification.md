@@ -139,11 +139,15 @@ design-sensitive.
 The class writes to `static` properties. Sub-classified by the disposition
 list (see exception lists): `memo-cache` (pure memoization, each world may
 compute its own: `Git::$version`, `Platform::$isDocker`, …), `seed-once`
-(copied from the Rust side once at child startup:
-`ProcessExecutor::$timeout`, which Composer seeds from config),
-`needs-sync` (genuinely shared process state: `Platform`'s env table), or
-`needs-review` (default for newly appearing ones — the run fails loudly
-until a human files it).
+(copied from the Rust side once at child startup; nothing is filed this way
+today), `needs-sync` (genuinely shared process state: `Platform`'s env table,
+`ProcessExecutor::$timeout`), or `needs-review` (default for newly appearing
+ones — the run fails loudly until a human files it).
+
+A `needs-sync` static is not actually synced by copying it: the child holds no
+copy at all, because the stub forwards the accessors that read and write it
+(`__shirabeCallStatic`, see `docs/dev/plugin-stub-generation.md`). The
+disposition records that the state is shared, not the mechanism.
 
 #### throwable
 
@@ -369,23 +373,35 @@ Earlier design analysis assumed no public getter returns a
 `Composer::getLoop()` → `Loop::getProcessExecutor(): ?ProcessExecutor` /
 `Loop::getHttpDownloader(): HttpDownloader` make both reachable. The
 graph-owned `ProcessExecutor` instance must therefore be proxied (its job
-queue is driven by the Rust loop), while the design intent — plugins using
-it as a stateless utility — survives only for plugin-`new`ed instances.
-This is exactly the dual-instantiation situation the
-`plugin-constructible` attribute exists to surface.
+queue is driven by the Rust loop), which is the dual-instantiation situation
+the `plugin-constructible` attribute exists to surface.
 
-Both routes raise an explicit error today, and which one gets a story first
-is still open. The graph-owned instances cannot be obtained at all: the
-`Composer` proxy answers `getLoop()` with an explicit error, and `Loop`,
-`ProcessExecutor` and `HttpDownloader` are guarded classes, so a
-plugin-`new`ed instance is an explicit error too rather than a second
-instance the Rust side never sees.
+`ProcessExecutor` is one class in one category for both routes: it is a
+`rust-proxy` stub, and a plugin-`new`ed instance allocates a Rust-side entity
+of its own rather than a second, unconnected executor. That is what keeps
+`$timeout` — process-wide state Composer seeds from `process-timeout` and
+`RunScriptCommand` rewrites mid-run — readable and writable from both worlds
+through one value, and it is what lets the executor stay a constructor
+argument of the classes that take one (`new Filesystem($process)` is what
+plugins actually write). Children are spawned in the Rust process either way,
+which is also correct for stdio: the worker inherits the Rust process's
+standard streams, so both worlds see the same terminal.
 
-An earlier argument for leaving plugin-`new`ed instances alone does not
-hold: `executeAsync()` does throw a `LogicException` unless `enableAsync()`
-ran first, but `enableAsync()`, `wait()` and `countActiveJobs()` are all
-public — `@internal` is a docblock note — so nothing stops a plugin from
-driving its own instance through the async path.
+What stays an explicit error is the async surface — `executeAsync()`,
+`wait()`, `enableAsync()`, `countActiveJobs()` — for two reasons that outlive
+the choice of category. `executeAsync()` resolves its promise with a
+`Symfony\Component\Process\Process`, whose state is the `proc_open()`
+resource and OS pipes of whichever process called `start()`, so a Rust-side
+spawn has no such object to hand back; and driving it needs a promise
+representation that crosses the boundary unresolved, which the execution model
+does not have. Neither is specific to how the executor is obtained: a plugin
+can reach the async path on an instance of its own, since `enableAsync()`,
+`wait()` and `countActiveJobs()` are all public (`@internal` is a docblock
+note).
+
+`HttpDownloader` and `Loop` remain guarded, so `Composer::getLoop()` is still
+an explicit error and the graph's own executor is not reachable yet. Serving
+it needs only a `Loop` stub, since the executor's surface is already served.
 
 ### Dual instantiation
 
@@ -406,39 +422,24 @@ stub constructor forwards to `__shirabeConstruct`, the Rust side allocates
 the entity and answers with its handle, and the plugin-`new`ed object is
 then the same entity the graph sees. It is filled in per class, driven by
 the explicit errors real plugins hit — today `Package`, `CompletePackage`,
-the three alias packages, the five solver operations and
-`Composer\Util\Filesystem` can be built this way, the last one only without
-a `ProcessExecutor` argument (that class has no stub, so the argument could
-only be an instance the Rust side never sees). Every other proxied class
-answers with an explicit error naming it.
+the three alias packages, the five solver operations,
+`Composer\Util\Filesystem` (with or without its `ProcessExecutor` argument)
+and `Composer\Util\ProcessExecutor` can be built this way. Every other
+proxied class answers with an explicit error naming it.
 
-`JsonFile`, `ArrayLoader` and `ProcessExecutor` are still undecided, so the
-classes above stay `unsupported` — but a guard now shadows each of them in
-the child, so touching one is an explicit error instead of real code
-running against a second instance.
+`JsonFile` and `ArrayLoader` are still undecided, so the classes above stay
+`unsupported` — but a guard now shadows each of them in the child, so
+touching one is an explicit error instead of real code running against a
+second instance.
 
 The demotion rule has not been taught about the construction stories: it
 demotes for constructing any `rust-proxy` service, whether or not that
 service can now be built. `Composer\Package\Archiver\ArchivableFilesFinder`
-is `unsupported` for `new Filesystem` alone, which no longer forks any
-state; promoting such a class means feeding the per-class construction
-stories back into the rule.
-
-### Process: dual instantiation split by caller
-
-`ProcessExecutor::executeAsync()` resolves its promise with a
-`Symfony\Component\Process\Process` instance, so it may cross the language
-boundary despite being a wholesale-`php-native` vendor class. A `Process`
-can't be reconstructed PHP-side from Rust-generated data because its state
-is stored in a `resource` created by `proc_open()`.
-
-Proposed resolution (not adopted): split `ProcessExecutor`'s Rust
-implementation by caller.
-Rust-ported Composer code (`VersionGuesser`, `Git`, …) calls `execute_async()`
-directly and spawns in Rust. A plugin holding a `ProcessExecutor` handle
-(`Loop::getProcessExecutor()`) instead hits the `rust-proxy` stub's RPC entry,
-which forwards the spawn to the PHP child so the real `Process::start()` runs
-there. The plugin gets the genuine object, never a fake one.
+is `unsupported` for `new Filesystem` alone, and the VCS/auth belt is
+`unsupported` for `new ProcessExecutor` alone; neither forks any state any
+more. Promoting them means feeding the per-class construction stories back
+into the rule — and, for the belt, deciding `HttpDownloader` too, since
+those classes take one and no route to it exists yet.
 
 ### Package and CompletePackage
 

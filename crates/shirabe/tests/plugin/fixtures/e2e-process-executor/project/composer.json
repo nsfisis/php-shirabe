@@ -1,0 +1,25 @@
+{
+    "name": "shirabe/e2e-process-executor",
+    "description": "E2E fixture project: record what a plugin's own ProcessExecutor reports.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/process-executor-probe": "1.0.0"
+    },
+    "config": {
+        "process-timeout": 42,
+        "allow-plugins": {
+            "shirabe-test/process-executor-probe": true
+        }
+    }
+}

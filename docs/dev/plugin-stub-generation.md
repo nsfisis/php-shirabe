@@ -88,11 +88,32 @@ the generator's vendor directory or the classifier report is unavailable.
   the class's own public methods already cover their surface.
 * Methods returning `self`/`static` perform the RPC and then `return $this;`
   to preserve identity instead of round-tripping the handle.
+* **By-ref parameters** are declared `&$name` on the stub as well. The call
+  carries their positions, and the answer carries the value each of them holds
+  afterwards, which the stub assigns back (see "By-ref parameters" in
+  `docs/dev/php-rpc.md`). A position the answer omits is left alone, so a
+  parameter the callee never assigned to keeps the value it had.
+* **Arity** is reproduced when — and only when — the real method body calls
+  `func_num_args()`, in which case the stub trims the argument list to what the
+  caller actually passed instead of sending the declared defaults. Sending them
+  regardless would make the Rust side answer a call the plugin never made:
+  `ProcessExecutor::execute($cmd)` forwards the child's output, while
+  `execute($cmd, $out)` captures it, and only the argument count separates them.
+  A body calling `func_get_args()` fails generation instead.
 * **Class constants, static methods and public static properties** are
   materialized verbatim from the real source (they read no instance state and
   run locally in the worker), together with any non-public static helpers the
   methods call. Constants keep their declared visibility, so a non-public one
   stays unreadable from outside the stub as it is in the real class.
+* A static method is materialized only when it can actually run in the worker.
+  One that reads a **static property** — whose value the Rust side owns, as
+  `ProcessExecutor::$timeout` does — or that reaches a class a **guard**
+  shadows there — as `ProcessExecutor::escape()` reaches `Composer\Util\Platform`
+  — forwards instead, through `__shirabeCallStatic` on handle 0, carrying a
+  comment that names the reason. The test covers the transitive closure of the
+  non-public static helpers the method calls, since those are materialized with
+  it. A forwarded static may not take by-ref parameters; that combination fails
+  generation.
 * **Instance properties** are not declared on the stub, whatever their
   visibility: they are entity state. Every root stub instead carries
   `__get`/`__set`/`__isset`/`__unset` forwarders, so each access reaches the
@@ -137,8 +158,10 @@ Generation fails — instead of emitting something quietly wrong — on:
 
 * a target missing from the classifier report, classified other than
   `rust-proxy`/`contract`, or a report carrying violations,
-* by-ref or variadic parameters (in constructors too), static interface
-  methods, magic methods other than `__toString`/`__clone`,
+* variadic parameters (in constructors too), by-ref parameters in a
+  constructor or in a forwarded static method, `func_get_args()` in a forwarded
+  body, static interface methods, magic methods other than
+  `__toString`/`__clone`,
 * an omitted override diverging from the inherited stub signature,
 * a subclass target listed before its base class, or extending a class that is
   neither a target nor provided by `php/runtime/`,

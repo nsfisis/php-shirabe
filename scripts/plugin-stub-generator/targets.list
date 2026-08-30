@@ -34,3 +34,4 @@ Composer\DependencyResolver\Operation\UninstallOperation
 Composer\DependencyResolver\Operation\MarkAliasInstalledOperation
 Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation
 Composer\Util\Filesystem
+Composer\Util\ProcessExecutor

@@ -643,6 +643,12 @@ impl std::error::Error for PhpThrow {}
 
 /// Handles `CallRustMethod` requests arriving while a Rust-initiated call is waiting for its
 /// `Return` (the cooperative reentrancy loop). A handler may itself issue nested RPC calls.
+///
+/// `out_param_positions` names the by-ref parameters of the called method, as the calling stub
+/// declared them. A handler that assigns to one writes the resulting value into `out_params` under
+/// the same position, and the stub copies it back into the caller's variable; leaving a position
+/// out means the method never assigned to it, which is what PHP does with an untouched by-ref
+/// parameter.
 pub trait RustMethodDispatcher {
     fn dispatch(
         &mut self,
@@ -650,6 +656,7 @@ pub trait RustMethodDispatcher {
         method_name: &str,
         args: Vec<PluginValue>,
         out_param_positions: &[u32],
+        out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow>;
 }
 
@@ -812,10 +819,15 @@ fn rpc_call(
                 args,
                 out_param_positions,
             } => {
+                let mut out_params = IndexMap::new();
                 let outcome = match dispatcher.as_deref_mut() {
-                    Some(dispatcher) => {
-                        dispatcher.dispatch(rhandle, &method_name, args, &out_param_positions)
-                    }
+                    Some(dispatcher) => dispatcher.dispatch(
+                        rhandle,
+                        &method_name,
+                        args,
+                        &out_param_positions,
+                        &mut out_params,
+                    ),
                     // Never fall back to a silent null: an unroutable callback is reported as an
                     // explicit error on the PHP side.
                     None => Err(PhpThrow::runtime(format!(
@@ -827,7 +839,7 @@ fn rpc_call(
                     Ok(value) => Frame::Return {
                         corr_id,
                         value,
-                        out_params: IndexMap::new(),
+                        out_params,
                     },
                     Err(throw) => Frame::Throw {
                         corr_id,
@@ -1010,6 +1022,10 @@ const STUB_FILES: &[(&str, &str)] = &[
     (
         "Composer/Util/Filesystem.php",
         include_str!("../php/stubs/Composer/Util/Filesystem.php"),
+    ),
+    (
+        "Composer/Util/ProcessExecutor.php",
+        include_str!("../php/stubs/Composer/Util/ProcessExecutor.php"),
     ),
 ];
 

@@ -295,15 +295,29 @@ final class ShirabeRpcRuntime
         return array_map([self::class, 'fromWire'], $value);
     }
 
-    /** Sends a CallRustMethod request and drives the cooperative loop until its Return. */
-    public static function callRust(int $rhandle, string $method, array $args)
-    {
+    /**
+     * Sends a CallRustMethod request and drives the cooperative loop until its Return.
+     *
+     * `$outParamPositions` names the by-ref parameters of the called method; the Rust side
+     * answers with the value each of them holds afterwards, and the caller (a generated stub)
+     * assigns those back to its own by-ref parameters.
+     *
+     * @param list<int>  $outParamPositions
+     * @param array<int, mixed>|null $outParams
+     */
+    public static function callRust(
+        int $rhandle,
+        string $method,
+        array $args,
+        array $outParamPositions = [],
+        ?array &$outParams = null
+    ) {
         $corrId = self::$nextCorrId;
         self::$nextCorrId += 2;
         self::writeFrame(
             SHIRABE_TAG_CALL_RUST_METHOD,
             $corrId,
-            serialize([$rhandle, $method, self::toWire($args), []])
+            serialize([$rhandle, $method, self::toWire($args), $outParamPositions])
         );
         while (true) {
             $frame = self::readFrame();
@@ -320,6 +334,7 @@ final class ShirabeRpcRuntime
                     self::fail('protocol violation: unparseable response payload');
                 }
                 if ($tag === SHIRABE_TAG_RETURN) {
+                    $outParams = self::fromWire($fields[1] ?? []);
                     return self::fromWire($fields[0]);
                 }
                 [$class, $message, $code] = $fields;

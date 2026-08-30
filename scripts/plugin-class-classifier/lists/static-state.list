@@ -16,6 +16,6 @@ Composer\Util\Git memo-cache
 Composer\Util\Hg memo-cache
 Composer\Util\Http\ProxyManager memo-cache
 Composer\Util\Platform needs-sync
-Composer\Util\ProcessExecutor seed-once
+Composer\Util\ProcessExecutor needs-sync
 Composer\Util\Silencer memo-cache
 Composer\Util\Svn memo-cache

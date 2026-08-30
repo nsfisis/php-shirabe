@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/process-executor-probe",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin driving a ProcessExecutor it constructs itself.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\ProcessExecutor\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\ProcessExecutor\\Plugin"
+    }
+}

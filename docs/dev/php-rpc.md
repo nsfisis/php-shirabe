@@ -184,10 +184,24 @@ Notable internal helpers:
 The runtime service endpoint (handle 0) answers `__shirabe_find_file` (autoload lookups),
 `__shirabe_run_rust_command` — the reverse half of the two-world command split: a
 `\Shirabe\RustCommandStub` forwards its stringified input here and the built-in command runs in
-the Rust process, against the Rust-side application state — and `__shirabeConstruct`, which
+the Rust process, against the Rust-side application state — `__shirabeConstruct`, which
 allocates the Rust entity behind a `new SomeProxiedClass(...)` written by plugin code and
-answers with `[rhandle, epoch]`. Classes whose entity Rust cannot build are an explicit error
-naming the class.
+answers with `[rhandle, epoch]`, and `__shirabeCallStatic`, which takes `[class, method, args]`
+and runs a static method no handle identifies a receiver for. Classes and static methods Rust
+cannot answer are an explicit error naming them.
+
+### By-ref parameters
+
+`out_param_positions` names the by-ref parameters of the called method, as the caller declared
+them; the answering `Return` carries `out_params`, a map from the same positions to the value
+each parameter holds afterwards, and the caller assigns those back into its own variables. A
+position the answer leaves out was never assigned to, which is what PHP does with an untouched
+by-ref parameter — so an out-param is genuinely optional rather than defaulting to null.
+
+A generated stub fills both halves mechanically from the real signature
+(`docs/dev/plugin-stub-generation.md`). `Composer\Util\ProcessExecutor::execute` is the method
+this exists for: it is the only by-ref parameter on Composer's public surface that belongs to a
+proxied class.
 
 ## Proxy stubs, runtime classes and guards
 

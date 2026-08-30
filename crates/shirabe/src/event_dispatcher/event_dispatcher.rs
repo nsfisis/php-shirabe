@@ -1682,6 +1682,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
         method_name: &str,
         args: Vec<PluginValue>,
         _out_param_positions: &[u32],
+        out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow> {
         if rhandle == 0 {
             if method_name == "__shirabe_find_file" {
@@ -1707,6 +1708,9 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
             if method_name == "__shirabeConstruct" {
                 return crate::plugin::php_plugin_proxy::construct_entity(&args);
             }
+            if method_name == "__shirabeCallStatic" {
+                return crate::plugin::php_plugin_proxy::call_static_entity(&args);
+            }
             return Err(runtime_throw(format!(
                 "unknown runtime service method `{method_name}`"
             )));
@@ -1719,6 +1723,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
                 rhandle,
                 method_name,
                 &args,
+                out_params,
             ),
         }
     }

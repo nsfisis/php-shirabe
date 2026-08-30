@@ -83,26 +83,6 @@ class Filesystem implements \ShirabeRustStub
         return $path;
     }
 
-    public static function isLocalPath(string $path)
-    {
-        // on windows, \\foo indicates network paths so we exclude those from local paths, however it is unsafe
-        // on linux as file:////foo (which would be a network path \\foo on windows) will resolve to /foo which could be a local path
-        if (Platform::isWindows()) {
-            return Preg::isMatch('{^(file://(?!//)|/(?!/)|/?[a-z]:[\\\\/]|\.\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i', $path);
-        }
-
-        return Preg::isMatch('{^(file://|/|/?[a-z]:[\\\\/]|\.\.[\\\\/]|[a-z0-9_.-]+[\\\\/])}i', $path);
-    }
-
-    public static function getPlatformPath(string $path)
-    {
-        if (Platform::isWindows()) {
-            $path = Preg::replace('{^(?:file:///([a-z]):?/)}i', 'file://$1:/', $path);
-        }
-
-        return Preg::replace('{^file://}i', '', $path);
-    }
-
     public static function isReadable(string $path)
     {
         if (is_readable($path)) {
@@ -119,6 +99,18 @@ class Filesystem implements \ShirabeRustStub
 
         // assume false otherwise
         return false;
+    }
+
+    // Forwarded rather than materialized: it references Composer\Util\Platform, which a guard shadows in the worker.
+    public static function isLocalPath(string $path)
+    {
+        return \ShirabeRpcRuntime::callRust(0, '__shirabeCallStatic', [self::class, 'isLocalPath', [$path]]);
+    }
+
+    // Forwarded rather than materialized: it references Composer\Util\Platform, which a guard shadows in the worker.
+    public static function getPlatformPath(string $path)
+    {
+        return \ShirabeRpcRuntime::callRust(0, '__shirabeCallStatic', [self::class, 'getPlatformPath', [$path]]);
     }
 
     public function remove(string $file)

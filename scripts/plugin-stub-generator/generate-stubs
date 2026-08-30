@@ -104,7 +104,7 @@ foreach (array_keys($exempt) as $fqcn) {
 }
 
 try {
-    $generator = new Generator($composerRoot, $report, $targets, $runtimeProvided);
+    $generator = new Generator($composerRoot, $report, $targets, $runtimeProvided, $exemptions);
     $files = $generator->generate();
     $guardGenerator = new GuardGenerator(
         $project,

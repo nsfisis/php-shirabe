@@ -57,6 +57,7 @@ enum RustEntity {
     ),
     Operation(std::rc::Rc<AnyOperation>),
     Plugin(std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>),
+    ProcessExecutor(std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>),
 }
 
 /// The pointer identity backing R-table interning: the same shared instance must always cross
@@ -79,6 +80,7 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
         }
         RustEntity::Operation(operation) => std::rc::Rc::as_ptr(operation) as *const () as usize,
         RustEntity::Plugin(plugin) => std::rc::Rc::as_ptr(plugin) as *const () as usize,
+        RustEntity::ProcessExecutor(process) => std::rc::Rc::as_ptr(process) as *const () as usize,
     }
 }
 
@@ -288,6 +290,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
         method_name: &str,
         args: Vec<PluginValue>,
         _out_param_positions: &[u32],
+        out_params: &mut IndexMap<u32, PluginValue>,
     ) -> Result<PluginValue, PhpThrow> {
         if rhandle == 0 {
             if method_name == "__shirabe_find_file" {
@@ -308,6 +311,9 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             if method_name == "__shirabeConstruct" {
                 return construct_entity(&args);
             }
+            if method_name == "__shirabeCallStatic" {
+                return call_static_entity(&args);
+            }
             return Err(runtime_throw(format!(
                 "unknown runtime service method `{method_name}`"
             )));
@@ -319,7 +325,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             return dispatch_event_method(event, method_name);
         }
 
-        dispatch_r_table_method(rhandle, method_name, &args)
+        dispatch_r_table_method(rhandle, method_name, &args, out_params)
     }
 }
 
@@ -330,6 +336,7 @@ pub(crate) fn dispatch_r_table_method(
     rhandle: u64,
     method_name: &str,
     args: &[PluginValue],
+    out_params: &mut IndexMap<u32, PluginValue>,
 ) -> Result<PluginValue, PhpThrow> {
     // The entity is cloned out so no table borrow is held while the handler runs (a
     // handler that re-enters register_*_entity would otherwise panic on the RefCell).
@@ -371,6 +378,9 @@ pub(crate) fn dispatch_r_table_method(
             dispatch_operation_method(&operation, method_name, args)
         }
         Some(RustEntity::Plugin(plugin)) => dispatch_plugin_method(&plugin, method_name),
+        Some(RustEntity::ProcessExecutor(process)) => {
+            dispatch_process_executor_method(&process, method_name, args, out_params)
+        }
         None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
     }
 }
@@ -397,6 +407,14 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
     };
     let string_arg = |position: usize| arg::<String>(&class, ctor_args, position);
     let package_arg = |position: usize| arg::<PackageInterfaceHandle>(&class, ctor_args, position);
+    let io_arg = |position: usize| {
+        arg::<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>(&class, ctor_args, position)
+    };
+    let process_executor_arg = |position: usize| {
+        arg::<std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>>(
+            &class, ctor_args, position,
+        )
+    };
     let alias_package_arg =
         |position: usize| -> Result<crate::package::AliasPackageHandle, PhpThrow> {
             package_arg(position)?
@@ -486,18 +504,25 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // runs subprocesses through, so a plugin-built one is a complete instance rather than
         // a second view on a Rust-side service.
         "Composer\\Util\\Filesystem" => {
-            // TODO(plugin): `ProcessExecutor` has no proxy stub, so an executor argument could
-            // only be a second instance the Rust side never sees.
-            match ctor_args.first() {
-                None | Some(PluginValue::Null) => {}
-                other => {
-                    return Err(runtime_throw(format!(
-                        "{class} cannot take a ProcessExecutor over RPC yet, got {other:?}"
-                    )));
-                }
-            }
+            let executor = match ctor_args.first() {
+                None | Some(PluginValue::Null) => None,
+                _ => Some(process_executor_arg(0)?),
+            };
             let rhandle = register_entity(RustEntity::Filesystem(std::rc::Rc::new(
-                std::cell::RefCell::new(crate::util::Filesystem::new(None)),
+                std::cell::RefCell::new(crate::util::Filesystem::new(executor)),
+            )));
+            return Ok(construction_result(rhandle));
+        }
+        // The job queue and the async permits of a process executor are its own state, and the
+        // timeout it runs children under is the Rust side's; a plugin-built one is a complete
+        // instance of the former holding the latter, not a second view on the graph's executor.
+        "Composer\\Util\\ProcessExecutor" => {
+            let io = match ctor_args.first() {
+                None | Some(PluginValue::Null) => None,
+                _ => Some(io_arg(0)?),
+            };
+            let rhandle = register_entity(RustEntity::ProcessExecutor(std::rc::Rc::new(
+                std::cell::RefCell::new(crate::util::ProcessExecutor::new(io)),
             )));
             return Ok(construction_result(rhandle));
         }
@@ -551,7 +576,8 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::Repository(_)
         | RustEntity::EventDispatcher(_)
         | RustEntity::Operation(_)
-        | RustEntity::Plugin(_) => {
+        | RustEntity::Plugin(_)
+        | RustEntity::ProcessExecutor(_) => {
             return Err(runtime_throw(
                 "cloning this Rust-side entity over RPC is not supported".to_string(),
             ));
@@ -993,6 +1019,268 @@ fn dispatch_filesystem_method(
     }
 }
 
+/// Serves the `ProcessExecutor` proxy stub, whether the executor behind it belongs to the object
+/// graph or was built by plugin code writing `new ProcessExecutor(...)`. Both run their children in
+/// the Rust process, which is what keeps the timeout, the executable path cache and the job budget
+/// single-sourced across the boundary instead of forking a copy per world.
+fn dispatch_process_executor_method(
+    process: &std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>,
+    method_name: &str,
+    args: &[PluginValue],
+    out_params: &mut IndexMap<u32, PluginValue>,
+) -> Result<PluginValue, PhpThrow> {
+    let failed = |error: anyhow::Error| runtime_throw(format!("{method_name} failed: {error:#}"));
+    let cwd_arg = |position: usize| -> Result<Option<String>, PhpThrow> {
+        match args.get(position) {
+            None | Some(PluginValue::Null) => Ok(None),
+            _ => arg::<String>(method_name, args, position).map(Some),
+        }
+    };
+    match method_name {
+        "execute" => {
+            let command = exec_command_arg(method_name, args, 0)?;
+            let cwd = cwd_arg(2)?;
+            // PHP selects the output handling with `func_num_args() > 1` and `is_callable($output)`;
+            // the stub reproduces the caller's arity, so an absent argument is the forwarding case.
+            let Some(output) = args.get(1) else {
+                return process
+                    .borrow_mut()
+                    .execute(
+                        command,
+                        crate::util::ProcessExecutor::FORWARD_OUTPUT,
+                        cwd.as_deref(),
+                    )
+                    .map(|code| code.to_plugin_value())
+                    .map_err(failed);
+            };
+            if is_php_callable(output).map_err(failed)? {
+                // TODO(plugin): the executor stays mutably borrowed while the callback runs, so a
+                // callback re-entering this same executor panics instead of nesting the way PHP
+                // would.
+                let callable = output.clone();
+                let callback: Box<dyn FnMut(&str, &str) -> bool> =
+                    Box::new(move |r#type: &str, buffer: &str| {
+                        // TODO(error-model): `Process::run`'s callback cannot fail, so a throw
+                        // raised by the plugin's handler is dropped here rather than unwinding
+                        // out of the command the way PHP would.
+                        let _ = call_php_callable(
+                            &callable,
+                            vec![PluginValue::string(r#type), PluginValue::string(buffer)],
+                        );
+                        false
+                    });
+                return process
+                    .borrow_mut()
+                    .execute(command, callback, cwd.as_deref())
+                    .map(|code| code.to_plugin_value())
+                    .map_err(failed);
+            }
+            let mut captured: Option<String> = None;
+            let code = process
+                .borrow_mut()
+                .execute(command, &mut captured, cwd.as_deref())
+                .map_err(failed)?;
+            // PHP leaves `$output` alone when the child was signaled before the assignment, which
+            // is what an absent out-param position reproduces.
+            if let Some(captured) = captured {
+                out_params.insert(1, PluginValue::string(captured));
+            }
+            Ok(code.to_plugin_value())
+        }
+        "executeTty" => Ok(process
+            .borrow_mut()
+            .execute_tty(
+                exec_command_arg(method_name, args, 0)?,
+                cwd_arg(1)?.as_deref(),
+            )
+            .map_err(failed)?
+            .to_plugin_value()),
+        "splitLines" => {
+            let output = match args.first() {
+                None | Some(PluginValue::Null) => String::new(),
+                _ => arg::<String>(method_name, args, 0)?,
+            };
+            Ok(PluginValue::List(
+                process
+                    .borrow()
+                    .split_lines(&output)
+                    .into_iter()
+                    .map(PluginValue::string)
+                    .collect(),
+            ))
+        }
+        "getErrorOutput" => Ok(PluginValue::string(process.borrow().get_error_output())),
+        "requiresGitDirEnv" => Ok(process
+            .borrow()
+            .requires_git_dir_env(&exec_command_arg(method_name, args, 0)?)
+            .to_plugin_value()),
+        "setMaxJobs" => {
+            process
+                .borrow_mut()
+                .set_max_jobs(arg::<i64>(method_name, args, 0)?);
+            Ok(PluginValue::Null)
+        }
+        "resetMaxJobs" => {
+            process.borrow_mut().reset_max_jobs();
+            Ok(PluginValue::Null)
+        }
+        // TODO(plugin,async): the async surface needs an execution model that can hand a plugin a
+        // live `Symfony\Component\Process\Process`. That object's state is the `proc_open()`
+        // resource and the OS pipes of whichever process called `start()`, so a Rust-side spawn
+        // has none to give; the real `start()` has to run in the worker, driven by a promise
+        // representation that crosses the boundary unresolved. Neither exists yet.
+        "executeAsync" | "wait" | "enableAsync" | "countActiveJobs" => Err(runtime_throw(format!(
+            "Shirabe does not support ProcessExecutor::{method_name}() from a plugin yet"
+        ))),
+        other => Err(runtime_throw(format!(
+            "unknown ProcessExecutor method `{other}`"
+        ))),
+    }
+}
+
+/// Decodes the `string|non-empty-list<string>` a process executor takes as its command.
+fn exec_command_arg(
+    method: &str,
+    args: &[PluginValue],
+    position: usize,
+) -> Result<crate::util::process_executor::CommandLine, PhpThrow> {
+    match args.get(position) {
+        // TODO(bytes): lossy UTF-8; every PHP string crossing the boundary is bytes.
+        Some(PluginValue::String(bytes)) => Ok(crate::util::process_executor::CommandLine::Shell(
+            String::from_utf8_lossy(bytes).into_owned(),
+        )),
+        Some(PluginValue::List(items)) => {
+            let mut parts = Vec::with_capacity(items.len());
+            for (index, item) in items.iter().enumerate() {
+                match item {
+                    PluginValue::String(bytes) => {
+                        parts.push(String::from_utf8_lossy(bytes).into_owned());
+                    }
+                    other => {
+                        return Err(runtime_throw(format!(
+                            "{method} expects a list of strings at position {position}, \
+                             but element {index} is {other:?}"
+                        )));
+                    }
+                }
+            }
+            Ok(crate::util::process_executor::CommandLine::Args(parts))
+        }
+        other => Err(arg_throw(
+            method,
+            position,
+            "a command string or argument list",
+            other,
+        )),
+    }
+}
+
+/// PHP's `is_callable($value)`, answered by the worker because only its own function and class
+/// tables can say whether a string or a `[$object, 'method']` pair names something callable.
+/// Values that cannot name a callable at all are answered here rather than over a round trip.
+fn is_php_callable(value: &PluginValue) -> anyhow::Result<bool> {
+    match value {
+        PluginValue::String(_)
+        | PluginValue::List(_)
+        | PluginValue::Array(_)
+        | PluginValue::PhpHandle(_)
+        | PluginValue::PhpClass(_) => {
+            let answer = unwrap_php_result(call_function_with_dispatcher(
+                "is_callable",
+                vec![value.clone()],
+                Some(&mut PluginRpcDispatcher::default()),
+            ))?;
+            match answer {
+                PluginValue::Bool(answer) => Ok(answer),
+                other => Err(anyhow::anyhow!(
+                    "is_callable did not return a bool over RPC: {other:?}"
+                )),
+            }
+        }
+        _ => Ok(false),
+    }
+}
+
+/// Calls a PHP callable value in the worker, whatever form it takes: `call_user_func` resolves a
+/// closure, a function name and an `[$object, 'method']` pair exactly as the original call site
+/// would have.
+fn call_php_callable(
+    callable: &PluginValue,
+    args: Vec<PluginValue>,
+) -> anyhow::Result<PluginValue> {
+    let mut call_args = Vec::with_capacity(args.len() + 1);
+    call_args.push(callable.clone());
+    call_args.extend(args);
+    unwrap_php_result(call_function_with_dispatcher(
+        "call_user_func",
+        call_args,
+        Some(&mut PluginRpcDispatcher::default()),
+    ))
+}
+
+/// Serves the static methods a proxy stub forwards instead of running locally, because their real
+/// bodies reach state the Rust side owns or classes the worker has no code for.
+pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
+    let (class, method, call_args) = match (args.first(), args.get(1), args.get(2)) {
+        // TODO(bytes): lossy UTF-8; class and method names are bytes in PHP.
+        (
+            Some(PluginValue::String(class)),
+            Some(PluginValue::String(method)),
+            Some(PluginValue::List(call_args)),
+        ) => (
+            String::from_utf8_lossy(class).into_owned(),
+            String::from_utf8_lossy(method).into_owned(),
+            call_args.clone(),
+        ),
+        (
+            Some(PluginValue::String(class)),
+            Some(PluginValue::String(method)),
+            None | Some(PluginValue::Array(_)),
+        ) => (
+            String::from_utf8_lossy(class).into_owned(),
+            String::from_utf8_lossy(method).into_owned(),
+            Vec::new(),
+        ),
+        other => {
+            return Err(runtime_throw(format!(
+                "__shirabeCallStatic expects a class name, a method name and an argument list, \
+                 got {other:?}"
+            )));
+        }
+    };
+    let name = format!("{class}::{method}");
+    let string_arg = |position: usize| arg::<String>(&name, &call_args, position);
+    match (class.as_str(), method.as_str()) {
+        ("Composer\\Util\\Filesystem", "isLocalPath") => {
+            Ok(crate::util::Filesystem::is_local_path(&string_arg(0)?).to_plugin_value())
+        }
+        ("Composer\\Util\\Filesystem", "getPlatformPath") => Ok(PluginValue::string(
+            crate::util::Filesystem::get_platform_path(&string_arg(0)?),
+        )),
+        ("Composer\\Util\\ProcessExecutor", "getTimeout") => {
+            Ok(crate::util::ProcessExecutor::get_timeout().to_plugin_value())
+        }
+        ("Composer\\Util\\ProcessExecutor", "setTimeout") => {
+            crate::util::ProcessExecutor::set_timeout(arg::<i64>(&name, &call_args, 0)?);
+            Ok(PluginValue::Null)
+        }
+        // `escape(string|false|null $argument)` casts its argument to string first, which turns
+        // both of the non-string forms into the empty string.
+        ("Composer\\Util\\ProcessExecutor", "escape") => {
+            let argument = match call_args.first() {
+                None | Some(PluginValue::Null) | Some(PluginValue::Bool(false)) => String::new(),
+                _ => string_arg(0)?,
+            };
+            Ok(PluginValue::string(crate::util::ProcessExecutor::escape(
+                &argument,
+            )))
+        }
+        _ => Err(runtime_throw(format!(
+            "Shirabe does not support calling {name} from the plugin process yet"
+        ))),
+    }
+}
+
 fn dispatch_event_dispatcher_method(
     dispatcher: &std::rc::Rc<
         std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>,
@@ -1322,6 +1610,50 @@ impl FromPluginArg for PackageInterfaceHandle {
                 }
             }
             other => Err(arg_throw(method, position, "a package", other)),
+        }
+    }
+}
+
+/// Resolves an IO argument back to the Rust-side entity its proxy stub stands for.
+impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::RustHandle(handle)) => {
+                match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
+                    Some(RustEntity::Io(io)) => Ok(io),
+                    _ => Err(runtime_throw(format!(
+                        "{method} expects an IO handle, got Rust handle {}",
+                        handle.rhandle
+                    ))),
+                }
+            }
+            other => Err(arg_throw(method, position, "an IOInterface", other)),
+        }
+    }
+}
+
+/// Resolves a process executor argument back to the Rust-side entity its proxy stub stands for.
+impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>> {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::RustHandle(handle)) => {
+                match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
+                    Some(RustEntity::ProcessExecutor(process)) => Ok(process),
+                    _ => Err(runtime_throw(format!(
+                        "{method} expects a ProcessExecutor handle, got Rust handle {}",
+                        handle.rhandle
+                    ))),
+                }
+            }
+            other => Err(arg_throw(method, position, "a ProcessExecutor", other)),
         }
     }
 }

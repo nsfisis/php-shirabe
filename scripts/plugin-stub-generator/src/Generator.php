@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace Shirabe\PluginStubGenerator;
 
+use PhpParser\Node;
 use PhpParser\Node\Name;
 use PhpParser\Node\Stmt\Class_;
 use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Interface_;
+use PhpParser\NodeFinder;
 
 /**
  * Emits the proxy stub files deterministically from the Composer sources and the classifier
- * report. Anything the emitter cannot faithfully proxy (by-ref or variadic parameters,
+ * report. Anything the emitter cannot faithfully proxy (variadic parameters, `func_get_args()`,
  * magic methods, non-public constants) fails generation instead of degrading silently.
  */
 final class Generator
@@ -101,20 +103,32 @@ final class Generator
     /** @var array<string, true> */
     private array $runtimeSet = [];
 
+    /** @var array<string, true> */
+    private array $guardExemptSet = [];
+
+    private NodeFinder $nodeFinder;
+
     /**
      * @param list<string> $targets
      * @param list<string> $runtimeProvided FQCNs of the hand-written dual-mode classes under
      *                                      php/runtime/; they may serve as stub base classes
      *                                      but must never be generation targets themselves
+     * @param list<string> $guardExempt     FQCNs the Rust side owns that the child still resolves
+     *                                      to the real Composer class (guard-exemptions.list)
      */
     public function __construct(
         string $composerRoot,
         private readonly Report $report,
         private readonly array $targets,
         private readonly array $runtimeProvided = [],
+        array $guardExempt = [],
     ) {
         $this->project = new Project($composerRoot);
         $this->printer = new NamePrinter();
+        $this->nodeFinder = new NodeFinder();
+        foreach ($guardExempt as $fqcn) {
+            $this->guardExemptSet[$fqcn] = true;
+        }
         foreach ($targets as $fqcn) {
             $this->targetSet[$fqcn] = true;
         }
@@ -263,7 +277,10 @@ final class Generator
                 $ownInstanceMethods[$name] = $method;
             }
         }
-        $staticMethods = $this->materializeStatics($file, $publicStatics, $nonPublicStatics);
+        [$staticMethods, $forwardedStatics] = $this->partitionStatics($file, $publicStatics, $nonPublicStatics);
+        foreach ($forwardedStatics as $name => [$method, $reason]) {
+            $staticMethods[] = $this->renderStaticForwarder($fqcn, $name, $method, $file, $reason);
+        }
 
         $surface = [];
         $emitted = [];
@@ -394,34 +411,119 @@ final class Generator
     }
 
     /**
-     * Static methods read no instance state; their real implementation is materialized
-     * verbatim so they run locally in the worker. Non-public static helpers they call
-     * (through `self::`, `static::` or the class name) are materialized along with them.
+     * Splits the public static methods into the ones that run locally in the worker and the ones
+     * that have to forward. A static method reads no instance state, so its real implementation is
+     * materialized verbatim — unless it reaches something the worker does not have: a static
+     * property, whose value the Rust side owns, or a class a guard shadows there. Non-public
+     * static helpers a materialized method calls (through `self::`, `static::` or the class name)
+     * are materialized along with it, and count towards what it reaches.
      *
      * @param array<string, ClassMethod> $publicStatics
      * @param array<string, ClassMethod> $nonPublicStatics
-     * @return list<string>
+     * @return array{list<string>, array<string, array{ClassMethod, string}>} verbatim texts, and
+     *         the methods to forward with the reason each of them cannot run locally
      */
-    private function materializeStatics(SourceFile $file, array $publicStatics, array $nonPublicStatics): array
+    private function partitionStatics(SourceFile $file, array $publicStatics, array $nonPublicStatics): array
     {
         $texts = [];
+        $forwarded = [];
         foreach ($publicStatics as $name => $method) {
+            $blocker = $this->staticBlocker($file, $method, $nonPublicStatics);
+            if ($blocker !== null) {
+                $forwarded[$name] = [$method, $blocker];
+                continue;
+            }
             $texts[$name] = $file->verbatim($method->getStartLine(), $method->getEndLine());
         }
         $scan = array_values($texts);
         while ($scan !== []) {
             $text = array_shift($scan);
-            foreach ($nonPublicStatics as $name => $method) {
+            foreach ($this->calledHelpers($file, $text, $nonPublicStatics) as $name => $method) {
                 if (isset($texts[$name])) {
                     continue;
                 }
-                $receiver = '(?:self|static|' . preg_quote($file->classLike->name?->toString() ?? '', '/') . ')';
-                if (preg_match('/(?<![\w$])' . $receiver . '::' . preg_quote($name, '/') . '\s*\(/', $text) === 1) {
-                    $scan[] = $texts[$name] = $file->verbatim($method->getStartLine(), $method->getEndLine());
+                $scan[] = $texts[$name] = $file->verbatim($method->getStartLine(), $method->getEndLine());
+            }
+        }
+        return [array_values($texts), $forwarded];
+    }
+
+    /**
+     * The non-public static helpers a method body calls by name.
+     *
+     * @param  array<string, ClassMethod> $nonPublicStatics
+     * @return array<string, ClassMethod>
+     */
+    private function calledHelpers(SourceFile $file, string $text, array $nonPublicStatics): array
+    {
+        $receiver = '(?:self|static|' . preg_quote($file->classLike->name?->toString() ?? '', '/') . ')';
+        $found = [];
+        foreach ($nonPublicStatics as $name => $method) {
+            if (preg_match('/(?<![\w$])' . $receiver . '::' . preg_quote($name, '/') . '\s*\(/', $text) === 1) {
+                $found[$name] = $method;
+            }
+        }
+        return $found;
+    }
+
+    /**
+     * Why a static method cannot be materialized into the worker, or null when it can. The answer
+     * covers the transitive closure of the non-public static helpers it calls, since those are
+     * materialized with it and reach whatever it reaches.
+     *
+     * @param array<string, ClassMethod> $nonPublicStatics
+     */
+    private function staticBlocker(SourceFile $file, ClassMethod $method, array $nonPublicStatics): ?string
+    {
+        $closure = [$method];
+        $seen = [];
+        $queue = [$method];
+        while ($queue !== []) {
+            $current = array_shift($queue);
+            $text = $file->verbatim($current->getStartLine(), $current->getEndLine());
+            foreach ($this->calledHelpers($file, $text, $nonPublicStatics) as $name => $helper) {
+                if (isset($seen[$name])) {
+                    continue;
+                }
+                $seen[$name] = true;
+                $closure[] = $helper;
+                $queue[] = $helper;
+            }
+        }
+        foreach ($closure as $node) {
+            foreach ($this->nodeFinder->findInstanceOf($node, Node\Expr\StaticPropertyFetch::class) as $fetch) {
+                $property = $fetch->name instanceof Node\VarLikeIdentifier ? $fetch->name->toString() : '';
+                return "reads the static property \$$property, whose value the Rust side owns";
+            }
+            $references = array_merge(
+                $this->nodeFinder->findInstanceOf($node, Node\Expr\StaticCall::class),
+                $this->nodeFinder->findInstanceOf($node, Node\Expr\ClassConstFetch::class),
+                $this->nodeFinder->findInstanceOf($node, Node\Expr\New_::class),
+            );
+            foreach ($references as $reference) {
+                if (!$reference->class instanceof Name) {
+                    continue;
+                }
+                $fqcn = SourceFile::resolvedName($reference->class);
+                if ($this->isGuardedInChild($fqcn)) {
+                    return "references $fqcn, which a guard shadows in the worker";
                 }
             }
         }
-        return array_values($texts);
+        return null;
+    }
+
+    /**
+     * Whether the worker resolves this class to a guard rather than to executable code: the Rust
+     * side owns it and neither a stub, a runtime definition nor a guard exemption stands in for
+     * it, so materialized code reaching it would raise an explicit error at run time.
+     */
+    private function isGuardedInChild(string $fqcn): bool
+    {
+        if (isset($this->targetSet[$fqcn]) || isset($this->runtimeSet[$fqcn]) || isset($this->guardExemptSet[$fqcn])) {
+            return false;
+        }
+        return in_array($this->report->category($fqcn), ['rust-proxy', 'rust-snapshot', 'unsupported'], true);
     }
 
     /** Interfaces implemented by the class, each interface preceding the ones it extends. */
@@ -457,19 +559,74 @@ final class Generator
 
     private function renderProxyMethod(string $fqcn, string $name, ClassMethod $method, SourceFile $target): string
     {
+        [$params, $args, $outPositions] = $this->renderParams($fqcn, $name, $method, $target);
+        $returnType = $this->printer->renderType($method->returnType, $target);
+        $signature = "public function $name(" . implode(', ', $params) . ')'
+            . ($returnType === '' ? '' : ": $returnType");
+        $body = $this->renderForwardingBody(
+            "\\ShirabeRpcRuntime::callRust(\$this->__rhandle, '$name', %s%s)",
+            $args,
+            $outPositions,
+            $this->inspectsArgCount($fqcn, $name, $method),
+            $returnType,
+        );
+        return "    $signature\n    {\n$body\n    }";
+    }
+
+    /**
+     * The counterpart of renderProxyMethod for a static method that cannot be materialized: the
+     * call carries the class alongside the method name, since no handle identifies a receiver.
+     * `$reason` is why it cannot, and is emitted with it so the generated file explains itself.
+     */
+    private function renderStaticForwarder(
+        string $fqcn,
+        string $name,
+        ClassMethod $method,
+        SourceFile $target,
+        string $reason,
+    ): string {
+        [$params, $args, $outPositions] = $this->renderParams($fqcn, $name, $method, $target);
+        if ($outPositions !== []) {
+            $this->errors[] = "$fqcn::$name: a forwarded static method cannot take by-ref parameters yet";
+        }
+        $returnType = $this->printer->renderType($method->returnType, $target);
+        $signature = "public static function $name(" . implode(', ', $params) . ')'
+            . ($returnType === '' ? '' : ": $returnType");
+        // self::class, not static::class: the forwarded statics stand for this class's own state,
+        // and a plugin subclass redeclaring it is not modelled on the Rust side.
+        $body = $this->renderForwardingBody(
+            "\\ShirabeRpcRuntime::callRust(0, '__shirabeCallStatic', [self::class, '$name', %s]%s)",
+            $args,
+            $outPositions,
+            $this->inspectsArgCount($fqcn, $name, $method),
+            $returnType,
+        );
+        return "    // Forwarded rather than materialized: it $reason.\n"
+            . "    $signature\n    {\n$body\n    }";
+    }
+
+    /**
+     * The parameter list of a forwarded method and the argument expressions matching it.
+     *
+     * @return array{list<string>, list<string>, list<int>} parameters, arguments, by-ref positions
+     */
+    private function renderParams(string $fqcn, string $name, ClassMethod $method, SourceFile $target): array
+    {
         $params = [];
         $args = [];
-        foreach ($method->params as $param) {
+        $outPositions = [];
+        foreach ($method->params as $position => $param) {
             $paramName = $param->var->name;
-            if ($param->byRef) {
-                $this->errors[] = "$fqcn::$name: by-ref parameter \$$paramName cannot be proxied yet";
-            }
             if ($param->variadic) {
                 $this->errors[] = "$fqcn::$name: variadic parameter \$$paramName cannot be proxied yet";
             }
             $rendered = '';
             if ($param->type !== null) {
                 $rendered = $this->printer->renderType($param->type, $target) . ' ';
+            }
+            if ($param->byRef) {
+                $rendered .= '&';
+                $outPositions[] = $position;
             }
             $rendered .= '$' . $paramName;
             if ($param->default !== null) {
@@ -478,19 +635,85 @@ final class Generator
             $params[] = $rendered;
             $args[] = '$' . $paramName;
         }
+        return [$params, $args, $outPositions];
+    }
 
-        $returnType = $this->printer->renderType($method->returnType, $target);
-        $signature = "public function $name(" . implode(', ', $params) . ')'
-            . ($returnType === '' ? '' : ": $returnType");
-        $call = "\\ShirabeRpcRuntime::callRust(\$this->__rhandle, '$name', [" . implode(', ', $args) . '])';
-        // `self`/`static` returns are fluent interfaces; the local stub itself is returned to
-        // preserve identity instead of round-tripping the handle.
-        $body = match ($returnType) {
-            'void' => "        $call;",
-            'self', 'static' => "        $call;\n        return \$this;",
-            default => "        return $call;",
-        };
-        return "    $signature\n    {\n$body\n    }";
+    /**
+     * Whether the real method branches on how many arguments it was called with. The stub has to
+     * reproduce that arity across the boundary — sending every declared parameter would make the
+     * Rust side answer a call the plugin never made.
+     */
+    private function inspectsArgCount(string $fqcn, string $name, ClassMethod $method): bool
+    {
+        $inspects = false;
+        foreach ($this->nodeFinder->findInstanceOf($method, Node\Expr\FuncCall::class) as $call) {
+            if (!$call->name instanceof Name) {
+                continue;
+            }
+            $function = strtolower($call->name->toString());
+            if ($function === 'func_get_args') {
+                $this->errors[] = "$fqcn::$name: func_get_args() cannot be proxied yet";
+            }
+            if ($function === 'func_num_args') {
+                $inspects = true;
+            }
+        }
+        return $inspects;
+    }
+
+    /**
+     * The body every forwarding method shares: build the argument list, make the call, and copy
+     * each by-ref parameter back out of the response.
+     *
+     * `$callTemplate` takes the argument-list expression and the trailing arguments of
+     * `ShirabeRpcRuntime::callRust`, which only a by-ref parameter needs.
+     *
+     * @param list<string> $args
+     * @param list<int>    $outPositions
+     */
+    private function renderForwardingBody(
+        string $callTemplate,
+        array $args,
+        array $outPositions,
+        bool $arityAware,
+        string $returnType,
+    ): string {
+        $lines = [];
+        $argsExpr = '[' . implode(', ', $args) . ']';
+        if ($arityAware) {
+            $lines[] = "        \$__args = $argsExpr;";
+            $lines[] = '        array_splice($__args, func_num_args());';
+            $argsExpr = '$__args';
+        }
+        if ($outPositions === []) {
+            $call = sprintf($callTemplate, $argsExpr, '');
+            // `self`/`static` returns are fluent interfaces; the local stub itself is returned to
+            // preserve identity instead of round-tripping the handle.
+            $lines[] = match ($returnType) {
+                'void' => "        $call;",
+                'self', 'static' => "        $call;\n        return \$this;",
+                default => "        return $call;",
+            };
+            return implode("\n", $lines);
+        }
+
+        $tail = ', [' . implode(', ', $outPositions) . '], $__out';
+        $call = sprintf($callTemplate, $argsExpr, $tail);
+        $lines[] = '        $__out = [];';
+        $lines[] = $returnType === 'void' ? "        $call;" : "        \$__result = $call;";
+        foreach ($outPositions as $position) {
+            // Absent when the callee left the parameter alone, which PHP reproduces by simply
+            // not writing to it.
+            $lines[] = "        if (array_key_exists($position, \$__out)) {";
+            $lines[] = "            {$args[$position]} = \$__out[$position];";
+            $lines[] = '        }';
+        }
+        if ($returnType === 'self' || $returnType === 'static') {
+            $lines[] = '        return $this;';
+        } elseif ($returnType !== 'void') {
+            $lines[] = '        return $__result;';
+        }
+        return implode("\n", $lines);
     }
 
     /**

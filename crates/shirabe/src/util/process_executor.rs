@@ -618,37 +618,6 @@ impl ProcessExecutor {
         })
     }
 
-    /// Plugin-facing counterpart of `execute_async`. Reached only when the RPC dispatcher
-    /// relays a plugin's `executeAsync()` call made on the `rust-proxy` `ProcessExecutor` stub
-    /// (a plugin obtained the handle via `Loop::getProcessExecutor()`) — see
-    /// docs/dev/plugin-class-classification.md, "Process: dual instantiation split by caller".
-    ///
-    /// A `Symfony\Component\Process\Process` cannot be reconstructed on the Rust side: its state
-    /// (the `proc_open()` resource, the OS pipes) belongs to whichever process calls `start()`,
-    /// and it refuses serialization outright. So unlike `execute_async`, this must not
-    /// spawn in Rust: the real `Process::start()` has to run in the PHP child, and the plugin's
-    /// `.then()` callback must receive that genuine PHP-side object.
-    // TODO(plugin): once the plugin RPC channel exists, acquire a permit from `self.semaphore`
-    // (shared with `execute_async`, so the combined job budget — including any shared cap
-    // with HttpDownloader — stays correct regardless of which path runs a given job), then send
-    // the spawn request to the PHP child over that channel instead of calling `Process::start()`
-    // here. Release the permit on the child's completion notification, not by polling a
-    // Rust-owned process handle. The return type below is provisional: the real deliverable is a
-    // handle to the live PHP-side Process object, not a `shirabe_symfony_process` `Process`
-    // value, so this signature will need to change once the RPC plumbing exists.
-    pub fn execute_async_php<C>(
-        &mut self,
-        _command: C,
-        _cwd: Option<&str>,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>>>>
-    where
-        C: IntoExecCommand,
-    {
-        todo!(
-            "forward the spawn to the PHP child over the plugin RPC channel and await its completion notification"
-        )
-    }
-
     fn output_handler(
         capture_output: bool,
         io: &mut Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
@@ -855,6 +824,11 @@ impl ProcessExecutor {
             return false;
         }
 
+        // TODO(php-semantics): the shim's array_intersect returns a Vec and drops the keys PHP
+        // keeps from its first argument, so this compares values where PHP's `===` compares keys
+        // as well. PHP answers false for every pattern below, the early return above leaving `git`
+        // at index 0 so the intersection can never start where the pattern does; this answers
+        // true, which is what the patterns were written for.
         for git_cmd in Self::GIT_CMDS_NEED_GIT_DIR.iter() {
             let cmd_strs: Vec<String> = cmd.clone();
             let git_cmd_strs: Vec<String> = git_cmd.iter().map(|s| s.to_string()).collect();
@@ -973,6 +947,7 @@ impl<const N: usize> IntoExecCommand for &[String; N] {
 /// | `execute($cmd)` | forward child output to STDOUT/STDERR (or the IO) | [`ProcessForwardOutput`] | `false` |
 /// | `execute($cmd, $out)` | assign captured output back to `$out` | `&mut String` / `&mut PhpMixed` | `true` |
 /// | `execute($cmd, $out)` where `$out` is unused | capture (suppress output) but discard it | `()` | `true` |
+/// | `execute($cmd, $out)` from a plugin | capture, recording whether it was assigned | `&mut Option<String>` | `true` |
 /// | `execute($cmd, $cb)` | drive the child through the callback | `Box<dyn FnMut(&str, &str) -> bool>` | `false` |
 ///
 /// `capture_output` maps to PHP's `$this->captureOutput` (`func_num_args() > 3` in `doExecute`): when
@@ -1055,6 +1030,23 @@ impl<'a> IntoExecOutput<'a> for &'a mut String {
 
     fn write_back(&mut self, value: String) {
         **self = value;
+    }
+}
+
+/// `execute($cmd, $out)` reached over the plugin RPC boundary, where the caller has to know whether
+/// the output was assigned at all rather than just what it is: PHP leaves `$output` untouched when
+/// the child is signaled, and `None` reproduces that by sending no value back across the boundary.
+impl<'a> IntoExecOutput<'a> for &'a mut Option<String> {
+    fn capture_output(&self) -> bool {
+        true
+    }
+
+    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+        Err(self)
+    }
+
+    fn write_back(&mut self, value: String) {
+        **self = Some(value);
     }
 }
 
