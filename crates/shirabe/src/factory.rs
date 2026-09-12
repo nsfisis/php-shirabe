@@ -113,7 +113,7 @@ impl Factory {
             let appdata = Platform::get_env("APPDATA").unwrap_or_default();
             return Ok(format!(
                 "{}/Shirabe",
-                trim(&strtr(&appdata, "\\", "/"), Some("/"))
+                rtrim(&strtr(&appdata, "\\", "/"), Some("/"))
             ));
         }
 
@@ -162,7 +162,7 @@ impl Factory {
                 cache_dir = format!("{}/cache", home);
             }
 
-            return Ok(trim(&strtr(&cache_dir, "\\", "/"), Some("/")));
+            return Ok(rtrim(&strtr(&cache_dir, "\\", "/"), Some("/")));
         }
 
         let user_dir = Self::get_user_dir()?;
@@ -1579,7 +1579,7 @@ impl Factory {
                         .to_string()).into());
         }
 
-        Ok(trim(&strtr(&home, "\\", "/"), Some("/")))
+        Ok(rtrim(&strtr(&home, "\\", "/"), Some("/")))
     }
 
     fn validate_json_schema(
