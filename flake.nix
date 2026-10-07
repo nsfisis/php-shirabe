@@ -2,14 +2,11 @@
   description = "Port of Composer, the dependency manager for PHP, written in Rust";
 
   inputs = {
+    self.submodules = true;
+
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
     systems.url = "github:nix-systems/default";
-
-    composer = {
-      url = "github:composer/composer/2.9.7";
-      flake = false;
-    };
 
     flake-utils = {
       url = "github:numtide/flake-utils";
@@ -31,7 +28,6 @@
     {
       self,
       nixpkgs,
-      composer,
       flake-utils,
       rust-overlay,
       treefmt-nix,
@@ -56,7 +52,7 @@
           let
             versionLines = builtins.filter (match: match != null) (
               map (line: builtins.match " *public const VERSION = '(.*)';" line) (
-                pkgs.lib.splitString "\n" (builtins.readFile "${composer}/src/Composer/Composer.php")
+                pkgs.lib.splitString "\n" (builtins.readFile ./composer/src/Composer/Composer.php)
               )
             );
           in
@@ -65,7 +61,7 @@
         composerRuntime = pkgs.stdenvNoCC.mkDerivation {
           pname = "composer-runtime";
           version = composerVersion;
-          src = composer;
+          src = ./composer;
           nativeBuildInputs = [
             php
             php.packages.composer
@@ -87,7 +83,7 @@
 
           outputHashMode = "recursive";
           outputHashAlgo = "sha256";
-          outputHash = "sha256-owdTo9YBaQv3a3FnUubBfI0gjca5XEJ84/PukcukPfc=";
+          outputHash = "sha256-oohNQuoXHAhi9gDz/wZqllwB8h5suPDG3PwPh/nhIlw=";
         };
 
         commitTime = self.lastModified;
