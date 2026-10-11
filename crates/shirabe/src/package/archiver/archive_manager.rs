@@ -104,7 +104,7 @@ impl ArchiveManager {
         Ok(self.get_package_filename_from_parts(&parts))
     }
 
-    pub fn archive(
+    pub async fn archive(
         &mut self,
         package: CompletePackageInterfaceHandle,
         format: String,
@@ -150,7 +150,7 @@ impl ArchiveManager {
             source_path = format!("{}/composer_archive{}", tmp_dir, random_suffix);
             filesystem.ensure_directory_exists(&source_path)?;
 
-            let download_result = (|| -> anyhow::Result<()> {
+            let download_result: anyhow::Result<()> = async {
                 SyncHelper::r#await(
                     &self.r#loop,
                     Some(Box::pin(async {
@@ -160,7 +160,8 @@ impl ArchiveManager {
                             .await
                             .map(|_| ())
                     })),
-                )?;
+                )
+                .await?;
                 SyncHelper::r#await(
                     &self.r#loop,
                     Some(Box::pin(async {
@@ -170,9 +171,11 @@ impl ArchiveManager {
                             .await
                             .map(|_| ())
                     })),
-                )?;
+                )
+                .await?;
                 Ok(())
-            })();
+            }
+            .await;
 
             if let Err(e) = download_result {
                 filesystem.remove_directory(&source_path)?;
@@ -305,8 +308,9 @@ impl ArchiveManager {
 
 // Composer's Composer::setArchiveManager() accepts any ArchiveManager subclass, so plugins may
 // swap in a replacement. The interface captures the methods reached through Composer's accessor.
+#[async_trait::async_trait(?Send)]
 pub trait ArchiveManagerInterface: std::fmt::Debug {
-    fn archive(
+    async fn archive(
         &mut self,
         package: CompletePackageInterfaceHandle,
         format: String,
@@ -316,8 +320,9 @@ pub trait ArchiveManagerInterface: std::fmt::Debug {
     ) -> anyhow::Result<String>;
 }
 
+#[async_trait::async_trait(?Send)]
 impl ArchiveManagerInterface for ArchiveManager {
-    fn archive(
+    async fn archive(
         &mut self,
         package: CompletePackageInterfaceHandle,
         format: String,
@@ -326,5 +331,6 @@ impl ArchiveManagerInterface for ArchiveManager {
         ignore_filters: bool,
     ) -> anyhow::Result<String> {
         self.archive(package, format, target_dir, file_name, ignore_filters)
+            .await
     }
 }

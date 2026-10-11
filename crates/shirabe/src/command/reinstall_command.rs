@@ -45,6 +45,7 @@ impl ReinstallCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for ReinstallCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("reinstall")?;
@@ -75,7 +76,7 @@ impl Command for ReinstallCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -234,20 +235,14 @@ impl Command for ReinstallCommand {
         let repo = crate::repository::InstalledRepositoryInterfaceHandle::from_repository_handle(
             &local_repo,
         );
-        installation_manager.borrow().execute(
-            &repo,
-            uninstall_operations,
-            dev_mode,
-            true,
-            false,
-        )?;
-        installation_manager.borrow().execute(
-            &repo,
-            install_operations.clone(),
-            dev_mode,
-            true,
-            false,
-        )?;
+        installation_manager
+            .borrow()
+            .execute(&repo, uninstall_operations, dev_mode, true, false)
+            .await?;
+        installation_manager
+            .borrow()
+            .execute(&repo, install_operations.clone(), dev_mode, true, false)
+            .await?;
 
         if !input
             .borrow()

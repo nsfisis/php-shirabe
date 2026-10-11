@@ -54,12 +54,9 @@ impl Loop {
         // The awaits a wait further up the stack is parked on are not this group's.
         let parked_before = job_registry::parked_php_jobs();
 
-        // TODO(async): promises are now polled concurrently via FuturesUnordered, but
-        // each individual future (HttpDownloader::add/add_copy etc.) still resolves through a
-        // blocking bridge (curl_runtime()/sync_executor::block_on), so real I/O overlap does not
-        // happen yet — the bridged future fully blocks the thread until it settles before the next
-        // one gets polled. That only changes once a single top-level Runtime replaces those bridges.
-        // The PHP progress bar is tied to the worker active-job count and is also deferred until then.
+        // TODO(async): `_progress` is not advanced here. PHP sets the bar from the two services'
+        // `countActiveJobs()` on every pass of its loop; `InstallationManager::wait_on_promises`
+        // renders a single 0% -> 100% step after this returns instead.
         std::future::poll_fn(|cx| {
             while let std::task::Poll::Ready(Some(result)) = pending.poll_next_unpin(cx) {
                 if let Err(e) = result

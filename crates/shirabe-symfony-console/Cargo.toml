@@ -12,6 +12,7 @@ shirabe-php-shim.workspace = true
 shirabe-symfony-process.workspace = true
 shirabe-symfony-string.workspace = true
 anyhow.workspace = true
+async-trait.workspace = true
 indexmap.workspace = true
 regex.workspace = true
 

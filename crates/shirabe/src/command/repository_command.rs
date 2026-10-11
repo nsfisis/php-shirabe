@@ -195,6 +195,7 @@ impl RepositoryCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for RepositoryCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("repository")?;
@@ -312,7 +313,7 @@ impl Command for RepositoryCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

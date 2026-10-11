@@ -166,7 +166,7 @@ A job whose promise a plugin dropped without ever waiting is driven and settled 
 
 ## What this does not buy
 
-Whether I/O actually overlaps depends on the job's future being non-blocking end to end. The requests and the processes a plugin starts directly are: a curl request and a child process only park on the reactor. A job that wraps ported synchronous code is not. A `DownloadManager` job reaches the `sync_executor::block_on` bridge internally (see the TODOs in `util/sync_executor.rs` and `util/loop.rs`), so a single poll occupies that future until it completes and a tick drains such jobs one at a time. The boundary design neither depends on this being fixed nor fixes it. It only places the jobs so that overlap appears the moment the internals stop blocking. Until then, the surface a plugin can observe (pending promises, real `countActiveJobs()` values, a progress bar that advances, cancellation that works) is already correct.
+Whether I/O actually overlaps depends on the job's future being non-blocking end to end. The requests and the processes a plugin starts directly are: a curl request and a child process only park on the reactor. So is a `DownloadManager` job for a dist package, whose download is awaited through `HttpDownloader::add_copy` all the way down. A job that wraps ported synchronous code is not: a `DownloadManager` job for a VCS source runs its commands through the synchronous `ProcessExecutor::execute`, and the metadata fetches of `ComposerRepository` go through the `sync_executor::block_on` bridge (see `util/sync_executor.rs`), so a single poll occupies such a future until that work completes and a tick drains such jobs one at a time. The boundary design neither depends on this being fixed nor fixes it. It only places the jobs so that overlap appears where the internals do not block. The surface a plugin can observe (pending promises, real `countActiveJobs()` values, a progress bar that advances, cancellation that works) is the same either way.
 
 A `DownloadManager` job also borrows the manager for as long as its future lives, as the Rust-side callers of the same methods do. While such a job is pending between two ticks, a call that needs the manager mutably (`setPreferSource()`, `setPreferDist()`) panics on the cell.
 
@@ -174,13 +174,13 @@ Some things are out of scope here: an event loop in the worker, promises crossin
 
 ## Staging
 
-Stages 1 to 4 exist. Stage 5 does not.
+Stages 1 to 4 exist. Of stage 5, the bridges on the install path are gone; the ones listed in `util/sync_executor.rs` remain.
 
 1. **Make `Loop` and `SyncHelper` `two-world`.** `Composer::getLoop()` serves a memoized worker-side sibling, `abortJobs()` is forwarded, and the progress bar is unblocked.
 2. **The job registry.** The `{__job}` descriptor, `__shirabe_resolve_job` / `__shirabe_reject_job` / `__shirabeCancelJob` / `__shirabeAbortJobs`, a registry with the slot table, the counted-against entity and the bookkeeping entries, the four async methods of `HttpDownloader` on top of it, the six `DownloadManager` methods and `Filesystem::removeDirectoryAsync()` turned into jobs, and the guarded tick in the Rust-side `Loop::wait()`. The registry is `crates/shirabe/src/plugin/job_registry.rs`.
 3. **`Shirabe\RustProcessStub`**, with `ProcessExecutor::executeAsync()`, `wait()` and `countActiveJobs()`.
 4. **PHP-owned jobs.** `__shirabeResolveJob` / `__shirabeRejectJob` and the deadlock check in the Rust-side `Loop::wait()`. The promises a plugin-provided `InstallerInterface` returns are awaited this way.
-5. Independently of all of the above: remove the internal `block_on` bridges. At that point the jobs that wrap ported code overlap too.
+5. Independently of all of the above: remove the internal `block_on` bridges. The jobs that wrap ported code overlap once the code they wrap stops blocking.
 
 Not built, because nothing can reach it yet: the reverse plumbing for Rust-owned surfaces that take a `Loop`.
 

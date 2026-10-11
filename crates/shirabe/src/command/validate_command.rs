@@ -137,6 +137,7 @@ impl ValidateCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for ValidateCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("validate")?;
@@ -225,7 +226,7 @@ impl Command for ValidateCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

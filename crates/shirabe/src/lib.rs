@@ -34,7 +34,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 // See also `__shirabe_installed_versions_reload` in crates/shirabe-php-rpc/php/worker.php.
 
 /// ref: composer/bin/composer
-pub fn run(argv: Vec<String>) -> anyhow::Result<i32> {
+pub async fn run(argv: Vec<String>) -> anyhow::Result<i32> {
     use crate::console::ApplicationHandle;
     use crate::util::Platform;
     use shirabe_symfony_console::input::ArgvInput;
@@ -49,5 +49,5 @@ pub fn run(argv: Vec<String>) -> anyhow::Result<i32> {
 
     let application = ApplicationHandle::new("Shirabe".to_string(), String::new())?;
     let input = std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(Some(argv), None)?));
-    application.run(Some(input), None)
+    application.run(Some(input), None).await
 }

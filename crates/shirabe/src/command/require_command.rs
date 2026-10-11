@@ -163,7 +163,7 @@ impl RequireCommand {
     }
 
     /// @throws \Exception
-    fn do_update(
+    async fn do_update(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -438,7 +438,7 @@ impl RequireCommand {
             );
         }
 
-        let status = install.run()?;
+        let status = install.run().await?;
         if status != 0 && status != Installer::ERROR_AUDIT_FAILED {
             if status == Installer::ERROR_DEPENDENCY_RESOLUTION_FAILED {
                 for req in BaseCommand::normalize_requirements(
@@ -738,6 +738,7 @@ impl PackageDiscoveryTrait for RequireCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for RequireCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("require")?;
@@ -790,7 +791,7 @@ impl Command for RequireCommand {
     }
 
     /// @throws \Seld\JsonLint\ParsingException
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -1215,14 +1216,16 @@ impl Command for RequireCommand {
             .deactivate_installed_plugins()?;
 
         let io = self.get_io().clone();
-        let do_update_result = self.do_update(
-            input.clone(),
-            output,
-            io,
-            &requirements,
-            require_key,
-            remove_key,
-        );
+        let do_update_result = self
+            .do_update(
+                input.clone(),
+                output,
+                io,
+                &requirements,
+                require_key,
+                remove_key,
+            )
+            .await;
         if signals.is_triggered() {
             abort_on_signal(&signals);
         }

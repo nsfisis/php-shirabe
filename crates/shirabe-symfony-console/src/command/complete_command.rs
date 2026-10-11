@@ -181,6 +181,7 @@ fn instantiate_completion_output(class: &PhpMixed) -> Box<dyn CompletionOutputIn
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for CompleteCommand {
     fn configure(&self) -> anyhow::Result<()> {
         let shells = self
@@ -237,7 +238,7 @@ impl Command for CompleteCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

@@ -4115,13 +4115,14 @@ impl PhpCommandProxy {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for PhpCommandProxy {
     /// Forwards the whole run to the worker-side console application (the proxy-command idiom
     /// the trait allows): the real Symfony machinery there performs input binding, validation,
     /// interaction and execution against the live PHP command object, writing to the stdio the
     /// worker inherited. The Rust-side `base_run` half must not run against the mirrored
     /// definition, or binding and interaction would happen twice.
-    fn run(
+    async fn run(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -4147,7 +4148,7 @@ impl Command for PhpCommandProxy {
         }
     }
 
-    fn execute(
+    async fn execute(
         &self,
         _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

@@ -1038,11 +1038,9 @@ impl ComposerRepository {
             // then does a single `$this->loop->wait($promises)`; mirror that here by polling all
             // downloads concurrently via FuturesOrdered (submission order preserved) before doing
             // any of the per-name response processing below.
-            // TODO(async): the fan-out below is structurally concurrent, but each
-            // `start_cached_async_download` future still resolves through `HttpDownloader::add`'s
-            // `curl_runtime()`/`sync_executor::block_on` bridge, so real I/O overlap does not happen
-            // yet (see util/loop.rs::wait). That only changes once a single top-level Runtime
-            // replaces those bridges.
+            // TODO(async): `PoolBuilder` and `Problem` reach this through the synchronous
+            // `AdvisoryProviderInterface`, so the fan-out is driven from a bridge here rather than
+            // awaited by the caller (see util/sync_executor.rs).
             let this: &ComposerRepository = &*self;
             let specs: Vec<anyhow::Result<PhpMixed>> = sync_executor::block_on(async {
                 let downloads: FuturesOrdered<_> = names
@@ -1821,11 +1819,9 @@ impl ComposerRepository {
         // does a single `$this->loop->wait($promises)`; mirror that here by polling all downloads
         // concurrently via FuturesOrdered (submission order preserved) before doing any of the
         // per-name response processing below.
-        // TODO(async): the fan-out below is structurally concurrent, but each
-        // `start_cached_async_download` future still resolves through `HttpDownloader::add`'s
-        // `curl_runtime()`/`sync_executor::block_on` bridge, so real I/O overlap does not happen yet
-        // (see util/loop.rs::wait). That only changes once a single top-level Runtime replaces those
-        // bridges.
+        // TODO(async): the callers (`load_packages`, `find_packages`, `search`, ...) are the
+        // synchronous `RepositoryInterface`, so the fan-out is driven from a bridge here rather
+        // than awaited by the caller (see util/sync_executor.rs).
         let this: &ComposerRepository = &*self;
         let specs: Vec<anyhow::Result<PhpMixed>> = sync_executor::block_on(async {
             let downloads: FuturesOrdered<_> = download_targets

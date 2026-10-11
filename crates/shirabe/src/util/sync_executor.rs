@@ -1,30 +1,35 @@
-//! Sync-to-async bridge used across the codebase (repository / installer / downloader) at the
-//! many call sites that still have a synchronous signature but need to drive an `async fn`.
+//! Sync-to-async bridge for the synchronous APIs that sit below the `async fn` chain.
 //!
-//! `main.rs` enters a single top-level `tokio::runtime::Runtime` for the whole process, so in
-//! production `block_on` below always finds that runtime ambiently available via
-//! `Handle::try_current()` and rides it via `tokio::task::block_in_place` — this is the
-//! tokio-sanctioned way to call `Handle::block_on` from sync code that may itself already be
-//! running inside a task driven by that same runtime (a plain nested `Runtime::block_on` would
-//! panic with "Cannot start a runtime from within a runtime"; `block_in_place` does not).
-//! Because it rides the real ambient runtime instead of a reactor-less busy-spin, awaited futures
-//! that actually need the reactor (timers, real non-blocking socket I/O such as
-//! `CurlDownloader::download`) now work correctly here too.
+//! `main.rs` drives `shirabe::run` with `Runtime::block_on`, and that chain is `async fn` down
+//! through `Application::run`, `Command::execute`, `Installer::run`, `InstallationManager::execute`
+//! and `Loop::wait`, so the downloads of an install batch are awaited by their caller and overlap
+//! on the runtime. `block_on` below serves what is still synchronous under that chain:
 //!
-//! Test binaries generally call production sync APIs directly with no ambient runtime entered
-//! (see `crates/shirabe/tests/common/async_runtime.rs` for the few that do enter one). For that
-//! case — and for any other call site reached before `main.rs`'s runtime exists — `block_on` falls
-//! back to a disposable single-threaded runtime scoped to just that one call.
+//! * `HttpDownloader::get` / `copy`, synchronous in PHP as well (they run `wait()` on their own job)
+//! * the fan-outs of `ComposerRepository` (`load_async_packages`, `get_security_advisories`),
+//!   reached through the synchronous repository API by `PoolBuilder` and `Problem`
+//! * the parallel diffs of `VersionGuesser::guess_feature_version`
+//! * the RPC handlers that answer plugin code (`job_registry::tick`, `poll_once`,
+//!   `run_worker_reverse_command`), whose requests are synchronous
 //!
-//! TODO(async): this still leaves every one of `block_on`'s call sites synchronous rather than
-//! genuinely `async fn` propagated up to `Command::execute`, which remains the end goal of the
-//! async re-architecture (see the design doc). Nested `block_on` call sites (a sync fn reached
-//! from inside another `block_on`'s async block) do not run concurrently with their siblings —
-//! `block_in_place` only prevents panics/hangs there, it does not parallelize them — so real
-//! overlap only exists where a call chain is genuinely `async fn`/`.await` end-to-end (as arranged
-//! for `ComposerRepository::get_security_advisories`/`load_async_packages`, see
-//! `repository/composer_repository.rs`). Closing that gap for the remaining call sites requires
-//! the full `async fn` propagation this module was always meant to be replaced by.
+//! With the process-wide runtime of `main.rs` ambient, `block_on` rides it via
+//! `tokio::task::block_in_place` — the tokio-sanctioned way to call `Handle::block_on` from sync
+//! code that is itself running inside a future driven by that same runtime (a plain nested
+//! `Runtime::block_on` would panic with "Cannot start a runtime from within a runtime";
+//! `block_in_place` does not). The awaited future gets the real reactor, so timers and
+//! non-blocking socket I/O work inside it.
+//!
+//! Test binaries generally call production sync APIs with no ambient runtime entered (see
+//! `crates/shirabe/tests/common/async_runtime.rs` for the few that do enter one). For that case —
+//! and for any other call site reached before `main.rs`'s runtime exists — `block_on` falls back
+//! to a disposable runtime scoped to just that one call.
+//!
+//! TODO(async): each call site above is a synchronous caller driving a future to completion on
+//! its own thread. While it runs, the sibling futures of an enclosing `FuturesUnordered` (a
+//! `Loop::wait` further up the stack) are not polled, so a fan-out reached this way does not
+//! overlap with the group it is called from. Awaiting it from the caller instead needs the
+//! repository API (`RepositoryInterface` and its consumers `PoolBuilder` / `Problem`) and
+//! `VersionGuesser`'s callers (`RootPackageLoader`) to become `async fn`.
 
 use std::future::Future;
 

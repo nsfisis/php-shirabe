@@ -243,8 +243,9 @@ impl VcsDownloader for FossilDownloader {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl ChangeReportInterface for FossilDownloader {
-    fn get_local_changes(
+    async fn get_local_changes(
         &self,
         _package: PackageInterfaceHandle,
         path: &str,

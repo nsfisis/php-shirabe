@@ -92,6 +92,7 @@ impl HelpCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for HelpCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.inner.ignore_validation_errors();
@@ -135,7 +136,7 @@ impl Command for HelpCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

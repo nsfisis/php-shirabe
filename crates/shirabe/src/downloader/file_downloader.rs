@@ -22,7 +22,6 @@ use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url as UrlUtil;
-use crate::util::sync_executor;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -157,7 +156,7 @@ impl FileDownloader {
     /// to the concrete downloader class (e.g. `ArchiveDownloader::install` extracts the archive
     /// instead of copying the dist file). The Rust port embeds the parent class as `inner`, so
     /// delegating downloaders must pass themselves as `this` to preserve that dispatch.
-    pub(crate) fn base_get_local_changes(
+    pub(crate) async fn base_get_local_changes(
         &self,
         this: &dyn DownloaderInterface,
         package: PackageInterfaceHandle,
@@ -174,26 +173,24 @@ impl FileDownloader {
 
         let target_dir = Filesystem::trim_trailing_slash(path);
         // PHP attaches an onRejected handler to capture the error and drives the promise via
-        // httpDownloader->wait() / process->wait(); the single-threaded sync bridge block_on's the
-        // download/install futures, so a rejection surfaces directly as the Err captured below.
-        let result: anyhow::Result<String> = (|| -> anyhow::Result<String> {
+        // httpDownloader->wait() / process->wait(); awaiting the download/install futures
+        // surfaces a rejection directly as the Err captured below.
+        let result: anyhow::Result<String> = async {
             if is_dir(format!("{}_compare", target_dir)) {
                 self.filesystem
                     .borrow_mut()
                     .remove_directory(format!("{}_compare", target_dir))?;
             }
 
-            sync_executor::block_on(this.download(
+            this.download(
                 package.clone(),
                 &format!("{}_compare", target_dir),
                 None,
                 false,
-            ))?;
-            sync_executor::block_on(this.install(
-                package.clone(),
-                &format!("{}_compare", target_dir),
-                false,
-            ))?;
+            )
+            .await?;
+            this.install(package.clone(), &format!("{}_compare", target_dir), false)
+                .await?;
 
             let mut comparer = Comparer::new();
             comparer.set_source(format!("{}_compare", target_dir));
@@ -204,7 +201,8 @@ impl FileDownloader {
                 .borrow_mut()
                 .remove_directory(format!("{}_compare", target_dir))?;
             Ok(output)
-        })();
+        }
+        .await;
 
         *self.io.borrow_mut() = prev_io;
 
@@ -813,15 +811,16 @@ impl DownloaderInterface for FileDownloader {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl ChangeReportInterface for FileDownloader {
     /// @inheritDoc
     /// @throws \RuntimeException
-    fn get_local_changes(
+    async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>> {
-        self.base_get_local_changes(self, package, path)
+        self.base_get_local_changes(self, package, path).await
     }
 }
 

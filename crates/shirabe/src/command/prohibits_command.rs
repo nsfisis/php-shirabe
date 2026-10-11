@@ -49,6 +49,7 @@ impl BaseDependencyCommand for ProhibitsCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for ProhibitsCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("prohibits")?;
@@ -108,7 +109,7 @@ impl Command for ProhibitsCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

@@ -85,7 +85,7 @@ impl CreateProjectCommand {
 
     /// @throws \Exception
     #[allow(clippy::too_many_arguments)]
-    pub fn install_project(
+    pub async fn install_project(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
@@ -152,7 +152,8 @@ impl CreateProjectCommand {
                 disable_scripts,
                 no_progress,
                 secure_http,
-            )?
+            )
+            .await?
         } else {
             false
         };
@@ -305,7 +306,7 @@ impl CreateProjectCommand {
                 installer.disable_plugins();
             }
 
-            match installer.run() {
+            match installer.run().await {
                 Ok(status) => {
                     if 0 != status {
                         return Ok(status);
@@ -423,7 +424,7 @@ impl CreateProjectCommand {
 
     /// @throws \Exception
     #[allow(clippy::too_many_arguments)]
-    fn install_root_package(
+    async fn install_root_package(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -773,13 +774,16 @@ impl CreateProjectCommand {
         );
         // A shared borrow: plugin registration inside execute re-enters this manager handle
         // through the Composer graph.
-        let executed = installation_manager.borrow().execute(
-            &installed_repo,
-            vec![InstallOperation::new(package.clone()).into()],
-            true,
-            true,
-            false,
-        );
+        let executed = installation_manager
+            .borrow()
+            .execute(
+                &installed_repo,
+                vec![InstallOperation::new(package.clone()).into()],
+                true,
+                true,
+                false,
+            )
+            .await;
         if let Some(signals) = &signals
             && signals.is_triggered()
         {
@@ -788,7 +792,8 @@ impl CreateProjectCommand {
         executed?;
         installation_manager
             .borrow_mut()
-            .notify_installs(io.clone());
+            .notify_installs(io.clone())
+            .await;
 
         // collect suggestions
         self.suggested_packages_reporter
@@ -827,6 +832,7 @@ impl CreateProjectCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for CreateProjectCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("create-project")?;
@@ -878,7 +884,7 @@ impl Command for CreateProjectCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -999,6 +1005,7 @@ impl Command for CreateProjectCommand {
                 .as_bool()
                 .unwrap_or(false),
         )
+        .await
     }
 
     fn initialize(

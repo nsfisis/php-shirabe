@@ -37,6 +37,7 @@ impl SelfUpdateCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for SelfUpdateCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("self-update")?;
@@ -70,7 +71,7 @@ impl Command for SelfUpdateCommand {
     /// The self-update mechanism does not apply to Shirabe: the update flow
     /// differs fundamentally from the PHP phar-based one, and no release has
     /// been published yet. The command is therefore disabled.
-    fn execute(
+    async fn execute(
         &self,
         _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

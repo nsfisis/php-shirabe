@@ -2,8 +2,9 @@
 
 use crate::package::PackageInterfaceHandle;
 
+#[async_trait::async_trait(?Send)]
 pub trait ChangeReportInterface {
-    fn get_local_changes(
+    async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
         path: &str,

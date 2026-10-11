@@ -151,13 +151,13 @@ fn test_unknown_format() {
     let mut test_case = TestCase::set_up();
     let package = test_case.setup_package();
 
-    let result = test_case.manager.archive(
+    let result = shirabe::util::sync_executor::block_on(test_case.manager.archive(
         package,
         "__unknown_format__".to_string(),
         test_case.target_dir.clone(),
         None,
         false,
-    );
+    ));
 
     let err = result.expect_err("expected RuntimeException for unknown format");
     assert!(err.is_instanceof::<shirabe_php_shim::RuntimeException>());
@@ -176,16 +176,14 @@ fn test_archive_tar() {
 
     let package = test_case.setup_package();
 
-    test_case
-        .manager
-        .archive(
-            package.clone(),
-            "tar".to_string(),
-            test_case.target_dir.clone(),
-            None,
-            false,
-        )
-        .unwrap();
+    shirabe::util::sync_executor::block_on(test_case.manager.archive(
+        package.clone(),
+        "tar".to_string(),
+        test_case.target_dir.clone(),
+        None,
+        false,
+    ))
+    .unwrap();
 
     let target = test_case.get_target_name(package.clone(), "tar");
     assert!(file_exists(&target));
@@ -214,16 +212,14 @@ fn test_archive_custom_file_name() {
 
     let file_name = "testArchiveName";
 
-    test_case
-        .manager
-        .archive(
-            package.clone(),
-            "tar".to_string(),
-            test_case.target_dir.clone(),
-            Some(file_name.to_string()),
-            false,
-        )
-        .unwrap();
+    shirabe::util::sync_executor::block_on(test_case.manager.archive(
+        package.clone(),
+        "tar".to_string(),
+        test_case.target_dir.clone(),
+        Some(file_name.to_string()),
+        false,
+    ))
+    .unwrap();
 
     let target = format!("{}/{}.tar", test_case.target_dir, file_name);
 

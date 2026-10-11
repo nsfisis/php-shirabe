@@ -41,6 +41,7 @@ impl OutdatedCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for OutdatedCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("outdated")?;
@@ -75,7 +76,7 @@ impl Command for OutdatedCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -227,7 +228,7 @@ impl Command for OutdatedCommand {
                 .shared()
         };
 
-        Ok(application.run(Some(input), Some(output))? as i64)
+        Ok(application.run(Some(input), Some(output)).await? as i64)
     }
 
     fn initialize(

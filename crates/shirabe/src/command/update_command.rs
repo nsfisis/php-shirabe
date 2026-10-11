@@ -255,6 +255,7 @@ impl UpdateCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for UpdateCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("update")?;
@@ -315,7 +316,7 @@ impl Command for UpdateCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -694,7 +695,7 @@ impl Command for UpdateCommand {
             install.disable_plugins();
         }
 
-        let mut result = install.run()?;
+        let mut result = install.run().await?;
 
         if result == 0
             && !input

@@ -44,6 +44,7 @@ impl InstallCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for InstallCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("install")?;
@@ -84,7 +85,7 @@ impl Command for InstallCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -255,7 +256,7 @@ impl Command for InstallCommand {
             install.disable_plugins();
         }
 
-        install.run()
+        install.run().await
     }
 
     fn initialize(

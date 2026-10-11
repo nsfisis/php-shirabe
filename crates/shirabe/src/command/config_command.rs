@@ -427,6 +427,7 @@ impl Default for ConfigCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for ConfigCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("config")?;
@@ -534,7 +535,7 @@ impl Command for ConfigCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

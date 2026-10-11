@@ -30,8 +30,9 @@ use shirabe_symfony_console::output::OutputInterface;
 mockall::mock! {
     #[derive(Debug)]
     pub ArchiveManager {}
+    #[async_trait::async_trait(?Send)]
     impl ArchiveManagerInterface for ArchiveManager {
-        fn archive(
+        async fn archive(
             &mut self,
             package: CompletePackageInterfaceHandle,
             format: String,
@@ -164,7 +165,7 @@ fn test_uses_config_from_composer_object() {
     let command = ArchiveCommand::new();
     command.set_composer(composer);
 
-    command.run(input, output).unwrap();
+    shirabe::util::sync_executor::block_on(command.run(input, output)).unwrap();
 }
 
 #[test]
@@ -182,7 +183,10 @@ fn test_uses_config_from_factory_when_composer_is_not_defined() {
     command.__test_skip_initialize();
     command.__test_stub_archive(0);
 
-    assert_eq!(0, command.run(input, output).unwrap());
+    assert_eq!(
+        0,
+        shirabe::util::sync_executor::block_on(command.run(input, output)).unwrap()
+    );
 
     let calls = command.__test_archive_calls();
     assert_eq!(1, calls.len());
@@ -269,5 +273,5 @@ fn test_uses_config_from_composer_object_with_package_name() {
     let command = ArchiveCommand::new();
     command.set_composer(composer);
 
-    command.run(input, output).unwrap();
+    shirabe::util::sync_executor::block_on(command.run(input, output)).unwrap();
 }

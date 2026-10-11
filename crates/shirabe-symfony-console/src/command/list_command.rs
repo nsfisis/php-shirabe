@@ -86,6 +86,7 @@ impl ListCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for ListCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.inner.set_name("list")?;
@@ -140,7 +141,7 @@ impl Command for ListCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

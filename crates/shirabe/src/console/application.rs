@@ -1897,7 +1897,7 @@ impl ApplicationHandle {
         Ok(Some(command))
     }
 
-    pub fn run(
+    pub async fn run(
         &self,
         input: Option<std::rc::Rc<std::cell::RefCell<dyn InputInterface>>>,
         output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
@@ -1910,11 +1910,11 @@ impl ApplicationHandle {
             ),
         };
 
-        self.base_run(input, output)
+        self.base_run(input, output).await
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn do_run(
+    pub async fn do_run(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -2490,13 +2490,13 @@ impl ApplicationHandle {
         }
 
         let mut start_time: Option<f64> = None;
-        let result_outcome: anyhow::Result<i32> = (|| -> anyhow::Result<i32> {
+        let result_outcome: anyhow::Result<i32> = async {
             if input.borrow().has_parameter_option(&["--profile"], false) {
                 start_time = Some(microtime());
                 io.borrow_mut().enable_debugging(start_time.unwrap());
             }
 
-            let result = self.base_do_run(input.clone(), output.clone())?;
+            let result = self.base_do_run(input.clone(), output.clone()).await?;
 
             if input
                 .borrow()
@@ -2529,7 +2529,8 @@ impl ApplicationHandle {
             }
 
             Ok(result)
-        })();
+        }
+        .await;
 
         let outcome = match result_outcome {
             Ok(r) => Ok(r),
@@ -2609,7 +2610,7 @@ impl ApplicationHandle {
     }
 
     /// Runs the current application (Symfony base; `parent::run`).
-    pub fn base_run(
+    pub async fn base_run(
         &self,
         input: Option<std::rc::Rc<std::cell::RefCell<dyn InputInterface>>>,
         output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
@@ -2655,13 +2656,14 @@ impl ApplicationHandle {
                 }
             };
 
-        let result = (|| -> anyhow::Result<i32> {
+        let result: anyhow::Result<i32> = async {
             application.borrow_mut().configure_io(&input, &output)?;
 
-            let exit_code = self.do_run(input.clone(), output.clone())?;
+            let exit_code = self.do_run(input.clone(), output.clone()).await?;
 
             Ok(exit_code)
-        })();
+        }
+        .await;
 
         let exit_code = match result {
             Ok(exit_code) => exit_code,
@@ -2695,7 +2697,7 @@ impl ApplicationHandle {
     }
 
     /// Runs the current application (Symfony base; `parent::doRun`).
-    pub fn base_do_run(
+    pub async fn base_do_run(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -2839,7 +2841,9 @@ impl ApplicationHandle {
         application.borrow_mut().running_command = Some(command.clone());
         // do_run_command invokes the command's run(), which calls back into the application
         // (mergeApplicationDefinition etc.); it must run with no application borrow held.
-        let exit_code = self.do_run_command(command.clone(), input.clone(), output.clone())?;
+        let exit_code = self
+            .do_run_command(command.clone(), input.clone(), output.clone())
+            .await?;
         application.borrow_mut().running_command = None;
 
         Ok(exit_code)
@@ -2864,7 +2868,7 @@ impl ApplicationHandle {
     /// dispatched during the life-cycle of the command.
     ///
     /// Returns 0 if everything went fine, or an error code.
-    pub fn do_run_command(
+    pub async fn do_run_command(
         &self,
         command: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
@@ -2881,6 +2885,7 @@ impl ApplicationHandle {
         command
             .borrow()
             .run(input.clone(), output.clone())
+            .await
             .map(|c| c as i32)
     }
 }
@@ -3044,5 +3049,6 @@ pub(crate) fn run_worker_reverse_command(name: &str, input_line: &str) -> anyhow
     let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(ConsoleOutput::new(None, None, None)?),
     );
-    command.borrow().run(input, output)
+    // The worker's callback is a synchronous RPC request, answered on the thread serving it.
+    crate::util::sync_executor::block_on(command.borrow().run(input, output))
 }

@@ -266,6 +266,7 @@ macro_rules! delegate_base_command_trait_impls_to_inner {
     };
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for BaseCommandData {
     shirabe_symfony_console::delegate_command_trait_impls_to_inner!(inner);
 }

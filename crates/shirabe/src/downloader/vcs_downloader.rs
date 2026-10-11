@@ -450,7 +450,7 @@ pub trait VcsDownloader:
         _update: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         // the default implementation just fails if there are any changes, override in child classes to provide stash-ability
-        if self.get_local_changes(package, path)?.is_some() {
+        if self.get_local_changes(package, path).await?.is_some() {
             return Err(RuntimeException::new(format!(
                 "Source directory {} has uncommitted changes.",
                 path

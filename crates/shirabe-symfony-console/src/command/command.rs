@@ -302,6 +302,7 @@ macro_rules! delegate_command_trait_impls_to_inner {
 /// the state methods there and override the behavior hooks (`configure`/`execute`/...).
 /// Object-safe so `dyn Command` works. All methods take `&self`; the command's mutable
 /// state is interior-mutable (see [`CommandData`]).
+#[async_trait::async_trait(?Send)]
 pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim::PhpClass {
     /// Configures the current command.
     fn configure(&self) -> anyhow::Result<()> {
@@ -312,7 +313,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim:
     ///
     /// Concrete commands override this; reaching the default means a command class
     /// forgot to implement it (PHP throws LogicException — a programming error here).
-    fn execute(
+    async fn execute(
         &self,
         _input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -364,19 +365,19 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim:
     /// `self.execute()`, which dispatch to the concrete command's overrides. It must
     /// not be overridden (except by proxy commands like `GlobalCommand`) nor delegated,
     /// or that late binding breaks.
-    fn run(
+    async fn run(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        self.base_run(input, output)
+        self.base_run(input, output).await
     }
 
     /// The base-class (`Command`) body of `run`, as PHP's `Command::run`. Proxy commands such as
     /// `GlobalCommand` override `run` but still call `base_run` to delegate to the base behavior,
     /// matching PHP's `parent::run($input, $output)`. It must not be overridden, or the late
     /// binding of `initialize`/`interact`/`execute` to the concrete command breaks.
-    fn base_run(
+    async fn base_run(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -419,7 +420,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim:
             let code = code.as_ref().unwrap();
             code(&mut *input.borrow_mut(), &mut *output.borrow_mut())
         } else {
-            let executed = self.execute(input.clone(), output.clone())?;
+            let executed = self.execute(input.clone(), output.clone()).await?;
             // PHP also raises \TypeError when execute() does not return int; in this
             // strongly-typed port execute() already returns an int, so the check is moot.
             PhpMixed::from(executed)
@@ -505,6 +506,7 @@ impl shirabe_php_shim::PhpClass for CommandData {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for CommandData {
     fn is_enabled(&self) -> bool {
         true

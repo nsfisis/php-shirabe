@@ -377,7 +377,10 @@ impl ApplicationTester {
                 std::rc::Rc::new(std::cell::RefCell::new(array_input));
             let output = self.output.clone().expect("init_output initializes output");
 
-            let status_code = self.application.run(Some(input), Some(output))?;
+            // Symfony's tester is synchronous while the application's `run` is `async fn`.
+            let status_code = shirabe::util::sync_executor::block_on(
+                self.application.run(Some(input), Some(output)),
+            )?;
             self.status_code = Some(status_code);
 
             Ok(status_code)

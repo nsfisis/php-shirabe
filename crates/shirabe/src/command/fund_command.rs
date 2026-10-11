@@ -80,6 +80,7 @@ impl FundCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for FundCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("fund")?;
@@ -97,7 +98,7 @@ impl Command for FundCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

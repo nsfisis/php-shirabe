@@ -216,7 +216,7 @@ impl Installer {
 
     /// Run installation (or update)
     #[tracing::instrument(skip_all)]
-    pub fn run(&mut self) -> anyhow::Result<i64> {
+    pub async fn run(&mut self) -> anyhow::Result<i64> {
         // Composer disables GC to save CPU cycles, but Shirabe does not as Rust has no GC.
         // It is possible to disable GC in PHP via RPC, but it might not be effective.
 
@@ -287,9 +287,9 @@ impl Installer {
 
         let install = self.install;
         let res_result: anyhow::Result<i64> = if self.update {
-            self.do_update(local_repo, install)
+            self.do_update(local_repo, install).await
         } else {
-            self.do_install(local_repo, false)
+            self.do_install(local_repo, false).await
         };
 
         let res = match res_result {
@@ -311,7 +311,8 @@ impl Installer {
                 {
                     self.installation_manager
                         .borrow_mut()
-                        .notify_installs(self.io.clone());
+                        .notify_installs(self.io.clone())
+                        .await;
                 }
                 return Err(e);
             }
@@ -329,7 +330,8 @@ impl Installer {
         {
             self.installation_manager
                 .borrow_mut()
-                .notify_installs(self.io.clone());
+                .notify_installs(self.io.clone())
+                .await;
         }
 
         if self.update {
@@ -550,7 +552,7 @@ impl Installer {
     }
 
     #[tracing::instrument(skip_all)]
-    fn do_update(
+    async fn do_update(
         &mut self,
         local_repo: crate::repository::RepositoryInterfaceHandle,
         do_install: bool,
@@ -905,7 +907,7 @@ impl Installer {
 
         if do_install {
             // TODO ensure lock is used from locker as-is, since it may not have been written to disk in case of executeOperations == false
-            return self.do_install(local_repo, true);
+            return self.do_install(local_repo, true).await;
         }
 
         Ok(0)
@@ -997,7 +999,7 @@ impl Installer {
     }
 
     /// Whether the function is called as part of an update command or independently
-    fn do_install(
+    async fn do_install(
         &mut self,
         local_repo: crate::repository::RepositoryInterfaceHandle,
         already_solved: bool,
@@ -1245,15 +1247,18 @@ impl Installer {
             local_repo.set_dev_package_names(self.locker.borrow_mut().get_dev_package_names()?);
             // A shared borrow: plugin registration inside execute re-enters this manager
             // handle through the Composer graph.
-            self.installation_manager.borrow().execute(
-                &crate::repository::InstalledRepositoryInterfaceHandle::from_repository_handle(
-                    &local_repo,
-                ),
-                local_repo_transaction.get_operations().clone(),
-                self.dev_mode,
-                self.run_scripts,
-                self.download_only,
-            )?;
+            self.installation_manager
+                .borrow()
+                .execute(
+                    &crate::repository::InstalledRepositoryInterfaceHandle::from_repository_handle(
+                        &local_repo,
+                    ),
+                    local_repo_transaction.get_operations().clone(),
+                    self.dev_mode,
+                    self.run_scripts,
+                    self.download_only,
+                )
+                .await?;
 
             // see https://github.com/composer/composer/issues/2764
             if !local_repo_transaction.get_operations().is_empty() {

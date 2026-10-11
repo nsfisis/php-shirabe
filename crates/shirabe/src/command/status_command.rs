@@ -46,7 +46,7 @@ impl StatusCommand {
         command
     }
 
-    fn do_execute(
+    async fn do_execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> anyhow::Result<i64> {
@@ -107,8 +107,9 @@ impl StatusCommand {
                     );
                 }
 
-                if let Some(changes) =
-                    change_reporter.get_local_changes(package.clone(), &target_dir)?
+                if let Some(changes) = change_reporter
+                    .get_local_changes(package.clone(), &target_dir)
+                    .await?
                 {
                     errors.insert(target_dir.clone(), changes);
                 }
@@ -315,6 +316,7 @@ impl StatusCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for StatusCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("status")?;
@@ -334,7 +336,7 @@ impl Command for StatusCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -362,7 +364,7 @@ impl Command for StatusCommand {
                 );
         }
 
-        let exit_code = self.do_execute(input)?;
+        let exit_code = self.do_execute(input).await?;
 
         {
             let composer = crate::composer::composer_full(&composer_rc);

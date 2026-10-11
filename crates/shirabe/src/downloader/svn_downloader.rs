@@ -87,12 +87,12 @@ impl SvnDownloader {
 
     /// The default `VcsDownloader::clean_changes()` behavior: fail if the working copy has
     /// local changes.
-    fn fail_on_local_changes(
+    async fn fail_on_local_changes(
         &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<()> {
-        if self.get_local_changes(package, path)?.is_some() {
+        if self.get_local_changes(package, path).await?.is_some() {
             return Err(RuntimeException::new(format!(
                 "Source directory {} has uncommitted changes.",
                 path
@@ -249,7 +249,7 @@ impl VcsDownloader for SvnDownloader {
         path: &str,
         update: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let changes = self.get_local_changes(package.clone(), path)?;
+        let changes = self.get_local_changes(package.clone(), path).await?;
         if changes.is_none() {
             return Ok(None);
         }
@@ -266,7 +266,7 @@ impl VcsDownloader for SvnDownloader {
                 return self.discard_changes(path).await;
             }
 
-            self.fail_on_local_changes(package, path)?;
+            self.fail_on_local_changes(package, path).await?;
             return Ok(None);
         }
 
@@ -433,8 +433,9 @@ impl VcsDownloader for SvnDownloader {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl ChangeReportInterface for SvnDownloader {
-    fn get_local_changes(
+    async fn get_local_changes(
         &self,
         _package: PackageInterfaceHandle,
         path: &str,

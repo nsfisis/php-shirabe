@@ -331,6 +331,7 @@ impl BumpCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for BumpCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("bump")?;
@@ -387,7 +388,7 @@ impl Command for BumpCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

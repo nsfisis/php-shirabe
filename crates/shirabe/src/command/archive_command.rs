@@ -97,7 +97,7 @@ impl ArchiveCommand {
     }
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
-    pub fn archive(
+    pub async fn archive(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
@@ -173,13 +173,15 @@ impl ArchiveCommand {
             "<info>Creating the archive into \"{}\".</info>",
             dest
         ));
-        let package_path: String = archive_manager.archive(
-            package,
-            format.to_string(),
-            dest.to_string(),
-            file_name,
-            ignore_filters,
-        )?;
+        let package_path: String = archive_manager
+            .archive(
+                package,
+                format.to_string(),
+                dest.to_string(),
+                file_name,
+                ignore_filters,
+            )
+            .await?;
         let fs = Filesystem::new(None);
         let short_path =
             fs.find_shortest_path(&Platform::get_cwd(false)?, &package_path, true, false);
@@ -303,6 +305,7 @@ impl ArchiveCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for ArchiveCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("archive")?;
@@ -325,7 +328,7 @@ impl Command for ArchiveCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -381,33 +384,35 @@ impl Command for ArchiveCommand {
             });
 
         let io = self.get_io().clone();
-        let return_code = self.archive(
-            io.clone(),
-            &config,
-            input
-                .borrow()
-                .get_argument("package")?
-                .as_string()
-                .map(|s| s.to_string()),
-            input
-                .borrow()
-                .get_argument("version")?
-                .as_string()
-                .map(|s| s.to_string()),
-            &format,
-            &dir,
-            input
-                .borrow()
-                .get_option("file")?
-                .as_string()
-                .map(|s| s.to_string()),
-            input
-                .borrow()
-                .get_option("ignore-filters")?
-                .as_bool()
-                .unwrap_or(false),
-            composer.as_ref(),
-        )?;
+        let return_code = self
+            .archive(
+                io.clone(),
+                &config,
+                input
+                    .borrow()
+                    .get_argument("package")?
+                    .as_string()
+                    .map(|s| s.to_string()),
+                input
+                    .borrow()
+                    .get_argument("version")?
+                    .as_string()
+                    .map(|s| s.to_string()),
+                &format,
+                &dir,
+                input
+                    .borrow()
+                    .get_option("file")?
+                    .as_string()
+                    .map(|s| s.to_string()),
+                input
+                    .borrow()
+                    .get_option("ignore-filters")?
+                    .as_bool()
+                    .unwrap_or(false),
+                composer.as_ref(),
+            )
+            .await?;
 
         if return_code == 0
             && let Some(ref composer) = composer

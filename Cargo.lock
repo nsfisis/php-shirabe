@@ -2476,6 +2476,7 @@ name = "shirabe-symfony-console"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "async-trait",
  "indexmap",
  "regex",
  "shirabe-php-shim",

@@ -86,13 +86,14 @@ impl ArchiveDownloader for XzDownloader {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl ChangeReportInterface for XzDownloader {
-    fn get_local_changes(
+    async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<Option<String>> {
-        self.inner.base_get_local_changes(self, package, path)
+        self.inner.base_get_local_changes(self, package, path).await
     }
 }
 

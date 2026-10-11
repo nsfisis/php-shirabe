@@ -518,6 +518,7 @@ mockall::mock! {
 mockall::mock! {
     #[derive(Debug)]
     pub InstallationManager {}
+    #[async_trait::async_trait(?Send)]
     impl InstallationManagerInterface for InstallationManager {
         fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>);
         fn remove_installer(&self, installer: &dyn InstallerInterface);
@@ -528,7 +529,7 @@ mockall::mock! {
             package: PackageInterfaceHandle,
         ) -> anyhow::Result<bool>;
         fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
-        fn execute(
+        async fn execute(
             &self,
             repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
             operations: Vec<AnyOperation>,
@@ -538,7 +539,7 @@ mockall::mock! {
         ) -> anyhow::Result<()>;
         fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
         fn set_output_progress(&mut self, output_progress: bool);
-        fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
+        async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
     }
 }
 

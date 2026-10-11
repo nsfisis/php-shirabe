@@ -34,6 +34,7 @@ impl AboutCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for AboutCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("about")?;
@@ -42,7 +43,7 @@ impl Command for AboutCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

@@ -117,6 +117,7 @@ impl GlobalCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for GlobalCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("global")?;
@@ -220,7 +221,7 @@ impl Command for GlobalCommand {
         Ok(())
     }
 
-    fn run(
+    async fn run(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -240,7 +241,7 @@ impl Command for GlobalCommand {
         }
 
         if args.len() < 2 {
-            return self.base_run(input, output);
+            return self.base_run(input, output).await;
         }
 
         let sub_input = self.prepare_subcommand_input(input, false)?;
@@ -259,7 +260,7 @@ impl Command for GlobalCommand {
                 .shared()
         };
 
-        Ok(application.run(Some(sub_input), Some(output))? as i64)
+        Ok(application.run(Some(sub_input), Some(output)).await? as i64)
     }
 
     fn initialize(

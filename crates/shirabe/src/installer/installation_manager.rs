@@ -20,7 +20,6 @@ use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::signal::SignalSubscription;
 use crate::util::Platform;
 use crate::util::r#loop::Loop;
-use crate::util::sync_executor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_splice, array_unshift, http_build_query, json_encode,
@@ -239,7 +238,7 @@ impl InstallationManager {
     /// shared manager handle, and plugin registration inside the batch re-enters the same
     /// handle (`PluginManager::get_install_path`), so only shared borrows may be outstanding
     /// for the whole call.
-    pub fn execute(
+    pub async fn execute(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
         operations: Vec<AnyOperation>,
@@ -316,7 +315,7 @@ impl InstallationManager {
         let all_operations: Vec<std::rc::Rc<AnyOperation>> =
             operations.into_iter().map(std::rc::Rc::new).collect();
 
-        let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
+        let result: anyhow::Result<()> = async {
             // execute operations in batches to make sure download-modifying-plugins are installed
             // before the other packages get downloaded
             let mut batches: Vec<IndexMap<i64, std::rc::Rc<AnyOperation>>> = vec![];
@@ -356,9 +355,9 @@ impl InstallationManager {
 
             for batch_to_execute in batches {
                 if signals.is_triggered() {
-                    sync_executor::block_on(self.abort_on_signal(&signals, &cleanup_promises));
+                    self.abort_on_signal(&signals, &cleanup_promises).await;
                 }
-                sync_executor::block_on(self.download_and_execute_batch(
+                self.download_and_execute_batch(
                     repo,
                     batch_to_execute,
                     &mut cleanup_promises,
@@ -367,19 +366,21 @@ impl InstallationManager {
                     download_only,
                     all_operations.clone(),
                     &signals,
-                ))?;
+                )
+                .await?;
             }
 
             Ok(())
-        })();
+        }
+        .await;
 
         match result {
             Ok(()) => {}
             Err(e) => {
                 if signals.is_triggered() {
-                    sync_executor::block_on(self.abort_on_signal(&signals, &cleanup_promises));
+                    self.abort_on_signal(&signals, &cleanup_promises).await;
                 }
-                sync_executor::block_on(self.run_cleanup(&cleanup_promises));
+                self.run_cleanup(&cleanup_promises).await;
                 return Err(e);
             }
         }
@@ -833,15 +834,18 @@ impl InstallationManager {
         self.output_progress = output_progress;
     }
 
-    pub fn notify_installs(&mut self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
+    pub async fn notify_installs(&mut self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
         // For testing only (ref InstallationManagerMock::notifyInstalls is a noop).
         if self.mock.is_some() {
             return;
         }
 
-        // TODO(async): PHP collects every http_downloader.add() promise and runs them via
-        // Loop::wait; the single-threaded sync bridge block_on's each notification serially instead.
-        let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
+        let result: anyhow::Result<()> = async {
+            let http_downloader = self.loop_.borrow().get_http_downloader().clone();
+            let http_downloader = http_downloader.borrow();
+            let mut promises: Vec<
+                std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + '_>>,
+            > = vec![];
             for (repo_url, packages) in self.notifiable_packages.borrow().iter() {
                 // non-batch API, deprecated
                 if repo_url.contains("%package%") {
@@ -875,13 +879,10 @@ impl InstallationManager {
                             PhpMixed::Array(http.into_iter().collect()),
                         );
 
-                        sync_executor::block_on(
-                            self.loop_
-                                .borrow()
-                                .get_http_downloader()
-                                .borrow_mut()
-                                .add(&url, opts),
-                        )?;
+                        let http_downloader = &*http_downloader;
+                        promises.push(Box::pin(async move {
+                            http_downloader.add(&url, opts).await.map(|_| ())
+                        }));
                     }
 
                     continue;
@@ -937,17 +938,16 @@ impl InstallationManager {
                     PhpMixed::Array(http.into_iter().collect()),
                 );
 
-                sync_executor::block_on(
-                    self.loop_
-                        .borrow()
-                        .get_http_downloader()
-                        .borrow_mut()
-                        .add(repo_url, opts),
-                )?;
+                let http_downloader = &*http_downloader;
+                let repo_url = repo_url.clone();
+                promises.push(Box::pin(async move {
+                    http_downloader.add(&repo_url, opts).await.map(|_| ())
+                }));
             }
 
-            Ok(())
-        })();
+            self.loop_.borrow().wait(promises, None).await
+        }
+        .await;
         // PHP swallows the exception silently here
         let _ = result;
 
@@ -966,9 +966,9 @@ impl InstallationManager {
 
     /// PHP: waitOnPromises() creates a ProgressBar up front and Loop::wait advances it while the
     /// concurrent promises resolve.
-    /// TODO(async): Loop::wait has no active-job counter to feed the bar yet, so a
-    /// single 0% -> 100% jump is rendered after the wait instead of PHP's timing-driven
-    /// intermediate snapshots.
+    /// TODO(async): Loop::wait does not advance the bar it is handed (PHP sets it from the two
+    /// services' `countActiveJobs()` on every pass), so a single 0% -> 100% jump is rendered after
+    /// the wait instead of PHP's timing-driven intermediate snapshots.
     async fn wait_on_promises<'p>(
         &self,
         promises: Vec<
@@ -1064,6 +1064,7 @@ impl InstallationManager {
 // Composer's PartialComposer::setInstallationManager() accepts any InstallationManager subclass, so
 // plugins may swap in a replacement. The interface captures the methods reached through Composer's
 // accessor and through the `&mut dyn InstallationManagerInterface` references fed from it.
+#[async_trait::async_trait(?Send)]
 pub trait InstallationManagerInterface: std::fmt::Debug {
     /// For testing only: lets a test recover the concrete manager (e.g. the recording mock) from a
     /// trait object returned by `Composer::get_installation_manager`.
@@ -1080,7 +1081,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool>;
     fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
-    fn execute(
+    async fn execute(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
         operations: Vec<AnyOperation>,
@@ -1090,9 +1091,10 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
     ) -> anyhow::Result<()>;
     fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
     fn set_output_progress(&mut self, output_progress: bool);
-    fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
+    async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
 }
 
+#[async_trait::async_trait(?Send)]
 impl InstallationManagerInterface for InstallationManager {
     fn as_any(&self) -> &dyn std::any::Any {
         self
@@ -1122,7 +1124,7 @@ impl InstallationManagerInterface for InstallationManager {
         InstallationManager::ensure_binaries_presence(self, package);
     }
 
-    fn execute(
+    async fn execute(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
         operations: Vec<AnyOperation>,
@@ -1131,6 +1133,7 @@ impl InstallationManagerInterface for InstallationManager {
         download_only: bool,
     ) -> anyhow::Result<()> {
         self.execute(repo, operations, dev_mode, run_scripts, download_only)
+            .await
     }
 
     fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
@@ -1141,7 +1144,7 @@ impl InstallationManagerInterface for InstallationManager {
         self.set_output_progress(output_progress);
     }
 
-    fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
-        self.notify_installs(io);
+    async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
+        self.notify_installs(io).await;
     }
 }

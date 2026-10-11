@@ -653,12 +653,12 @@ impl GitDownloader {
 
     /// The default `VcsDownloader::clean_changes()` behavior: fail if the working copy has
     /// local changes.
-    fn fail_on_local_changes(
+    async fn fail_on_local_changes(
         &self,
         package: PackageInterfaceHandle,
         path: &str,
     ) -> anyhow::Result<()> {
-        if self.get_local_changes(package, path)?.is_some() {
+        if self.get_local_changes(package, path).await?.is_some() {
             return Err(RuntimeException::new(format!(
                 "Source directory {} has uncommitted changes.",
                 path
@@ -680,8 +680,9 @@ impl DvcsDownloaderInterface for GitDownloader {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl ChangeReportInterface for GitDownloader {
-    fn get_local_changes(
+    async fn get_local_changes(
         &self,
         _package: PackageInterfaceHandle,
         path: &str,
@@ -1143,7 +1144,7 @@ impl VcsDownloader for GitDownloader {
             .into());
         }
 
-        let changes = match self.get_local_changes(package.clone(), &path)? {
+        let changes = match self.get_local_changes(package.clone(), &path).await? {
             Some(c) => c,
             None => return Ok(None),
         };
@@ -1155,14 +1156,14 @@ impl VcsDownloader for GitDownloader {
             }
             if discard_changes.as_string() == Some("stash") {
                 if !update {
-                    self.fail_on_local_changes(package.clone(), &path)?;
+                    self.fail_on_local_changes(package.clone(), &path).await?;
                     return Ok(None);
                 }
 
                 return self.stash_changes(&path).await;
             }
 
-            self.fail_on_local_changes(package, &path)?;
+            self.fail_on_local_changes(package, &path).await?;
             return Ok(None);
         }
 

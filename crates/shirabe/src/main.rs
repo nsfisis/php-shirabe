@@ -38,22 +38,21 @@ fn main() {
     // Composer calls XdebugHandler::check() here to restart without Xdebug, which is intentionally
     // unported. See `docs/dev/xdebug.md`.
 
-    // The single process-wide tokio Runtime. `shirabe::run` and everything under it
-    // (Command::execute and friends) is still synchronous top to bottom; entering the runtime
-    // here (rather than driving `run` via `.block_on`) just makes it ambiently available via
-    // `Handle::try_current()` for `util::sync_executor::block_on`'s many scattered call sites,
-    // which ride it through `tokio::task::block_in_place` instead of each spinning up (or
-    // busy-spin-polling without) their own. See sync_executor.rs for the TODO(async) tracking
-    // the eventual goal of propagating `async fn` all the way up to here instead.
+    // The single process-wide tokio Runtime drives `shirabe::run`, which is `async fn` down to
+    // `Command::execute` and the installer. It is a multi-thread runtime because the synchronous
+    // APIs left below that chain (`HttpDownloader::get`/`copy`, the RPC handlers serving plugin
+    // code) bridge back into it through `util::sync_executor::block_on`, which relies on
+    // `tokio::task::block_in_place` and so on this flavor of runtime. The Composer object graph
+    // is `!Send`, so the future runs on this thread; the worker threads only serve the reactor
+    // and the connection tasks reqwest spawns.
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .expect("failed to build the top-level tokio runtime");
-    let _runtime_guard = runtime.enter();
 
     init_tracing();
 
-    let result = shirabe::run(std::env::args().collect());
+    let result = runtime.block_on(shirabe::run(std::env::args().collect()));
     let exit_code = match result {
         Ok(exit_code) => exit_code,
         Err(e) => {

@@ -153,6 +153,7 @@ impl RepositoryManagerInterface for MockRepositoryManager {
 #[derive(Debug)]
 struct MockInstallationManager;
 
+#[async_trait::async_trait(?Send)]
 impl InstallationManagerInterface for MockInstallationManager {
     fn add_installer(&self, _installer: std::rc::Rc<dyn InstallerInterface>) {}
 
@@ -170,7 +171,7 @@ impl InstallationManagerInterface for MockInstallationManager {
 
     fn ensure_binaries_presence(&mut self, _package: PackageInterfaceHandle) {}
 
-    fn execute(
+    async fn execute(
         &self,
         _repo: &InstalledRepositoryInterfaceHandle,
         _operations: Vec<AnyOperation>,
@@ -196,7 +197,7 @@ impl InstallationManagerInterface for MockInstallationManager {
 
     fn set_output_progress(&mut self, _output_progress: bool) {}
 
-    fn notify_installs(&mut self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {}
+    async fn notify_installs(&mut self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {}
 }
 
 /// Equivalent to PHP setUp()'s `new InstallationManager(...)`, used only to satisfy

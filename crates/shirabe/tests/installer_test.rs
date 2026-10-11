@@ -463,7 +463,7 @@ fn test_installer() {
             AuditConfig::from_config(&mut config.borrow_mut(), false, Auditor::FORMAT_SUMMARY)
                 .unwrap(),
         );
-        let result = installer.run().unwrap();
+        let result = shirabe::util::sync_executor::block_on(installer.run()).unwrap();
 
         let output = io_buffer.borrow().get_output().replace('\r', "");
         assert_eq!(0, result, "{}", output);
@@ -1040,7 +1040,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
                     )
                     .unwrap(),
                 );
-            let r = inst.run();
+            let r = shirabe::util::sync_executor::block_on(inst.run());
             let code = match &r {
                 Ok(c) => *c,
                 Err(_) => 1,
@@ -1140,7 +1140,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
                     .unwrap(),
                 )
                 .set_minimal_update(opt_bool(input, "minimal-changes"));
-            let r = inst.run();
+            let r = shirabe::util::sync_executor::block_on(inst.run());
             let code = match &r {
                 Ok(c) => *c,
                 Err(_) => 1,
@@ -1169,7 +1169,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(app_output));
 
-    let app_run = application.run(Some(input), Some(output));
+    let app_run =
+        shirabe::util::sync_executor::block_on(application.run(Some(input), Some(output)));
 
     let output_string = io_buffer.borrow().get_output().replace('\r', "");
 

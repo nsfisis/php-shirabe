@@ -42,6 +42,7 @@ impl SuggestsCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for SuggestsCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("suggests")?;
@@ -108,7 +109,7 @@ impl Command for SuggestsCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

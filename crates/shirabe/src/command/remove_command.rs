@@ -49,6 +49,7 @@ impl RemoveCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for RemoveCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("remove")?;
@@ -176,7 +177,7 @@ impl Command for RemoveCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -676,7 +677,7 @@ impl Command for RemoveCommand {
             install.set_update_allow_list(packages.clone());
         }
 
-        let status = install.run()?;
+        let status = install.run().await?;
         if status != 0 {
             io.write_error(&format!(
                 "\n<error>Removal failed, reverting {} to its original content.</error>",

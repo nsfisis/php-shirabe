@@ -1332,6 +1332,7 @@ impl ShowCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for ShowCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("show")?;
@@ -1459,7 +1460,7 @@ impl Command for ShowCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

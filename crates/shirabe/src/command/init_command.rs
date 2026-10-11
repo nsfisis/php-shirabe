@@ -261,8 +261,11 @@ impl InitCommand {
         shirabe_php_shim::filter_var_email(email)
     }
 
-    fn update_dependencies(&self, output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>) {
-        let result = (|| -> anyhow::Result<i64> {
+    async fn update_dependencies(
+        &self,
+        output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
+    ) {
+        let result: anyhow::Result<i64> = async {
             let application = self
                 .get_application()
                 .expect("a Composer command's application is always set");
@@ -271,8 +274,9 @@ impl InitCommand {
             let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
                 std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(vec![], None)?));
             let command = update_command.borrow();
-            command.run(input, output)
-        })();
+            command.run(input, output).await
+        }
+        .await;
 
         if result.is_err() {
             self.get_io().borrow().write_error(
@@ -281,11 +285,11 @@ impl InitCommand {
         }
     }
 
-    fn run_dump_autoload_command(
+    async fn run_dump_autoload_command(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
-        let result = (|| -> anyhow::Result<i64> {
+        let result: anyhow::Result<i64> = async {
             let application = self
                 .get_application()
                 .expect("a Composer command's application is always set");
@@ -294,8 +298,9 @@ impl InitCommand {
             let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
                 std::rc::Rc::new(std::cell::RefCell::new(ArrayInput::new(vec![], None)?));
             let command = command.borrow();
-            command.run(input, output)
-        })();
+            command.run(input, output).await
+        }
+        .await;
 
         if result.is_err() {
             self.get_io()
@@ -434,6 +439,7 @@ impl InitCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for InitCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.set_name("init")?;
@@ -463,7 +469,7 @@ impl Command for InitCommand {
     }
 
     /// @throws \Seld\JsonLint\ParsingException
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -688,7 +694,7 @@ impl Command for InitCommand {
 
             // dump-autoload only for projects without added dependencies.
             if !self.has_dependencies(&options) {
-                self.run_dump_autoload_command(output.clone());
+                self.run_dump_autoload_command(output.clone()).await;
             }
         }
 
@@ -714,7 +720,7 @@ impl Command for InitCommand {
             && self.has_dependencies(&options)
             && io.ask_confirmation(question, true)
         {
-            self.update_dependencies(output);
+            self.update_dependencies(output).await;
         }
 
         // --autoload - Show post-install configuration info

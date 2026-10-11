@@ -58,7 +58,7 @@ fn test_dev_warning() {
             .unwrap(),
         ));
     let output_trait: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = output.clone();
-    application.do_run(input, output_trait).unwrap();
+    shirabe::util::sync_executor::block_on(application.do_run(input, output_trait)).unwrap();
 
     let expected_output = format!(
         "<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>{}",
@@ -104,7 +104,7 @@ fn test_dev_warning_suppressed_for_self_update() {
             .unwrap(),
         ));
     let output_trait: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = output.clone();
-    application.do_run(input, output_trait).unwrap();
+    shirabe::util::sync_executor::block_on(application.do_run(input, output_trait)).unwrap();
 
     assert_eq!(
         "This instance of Composer does not have the self-update command.\n\
@@ -134,7 +134,10 @@ fn test_process_isolation_works_multiple_times() {
     let output1: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
     );
-    assert_eq!(0, application.do_run(input1, output1).unwrap());
+    assert_eq!(
+        0,
+        shirabe::util::sync_executor::block_on(application.do_run(input1, output1)).unwrap()
+    );
 
     let input2: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
@@ -147,7 +150,10 @@ fn test_process_isolation_works_multiple_times() {
     let output2: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
     );
-    assert_eq!(0, application.do_run(input2, output2).unwrap());
+    assert_eq!(
+        0,
+        shirabe::util::sync_executor::block_on(application.do_run(input2, output2)).unwrap()
+    );
 }
 
 #[test]
@@ -190,7 +196,7 @@ fn test_no_plugins_disables_plugins_when_script_commands_exist() {
     let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = std::rc::Rc::new(
         std::cell::RefCell::new(BufferedOutput::new(None, false, None)),
     );
-    application.do_run(input, output).unwrap();
+    shirabe::util::sync_executor::block_on(application.do_run(input, output)).unwrap();
 
     let composer = application.__get_composer(false, None, None).unwrap();
     assert!(
@@ -251,7 +257,8 @@ fn test_script_command_takes_priority_over_abbreviated_builtin_command() {
             .unwrap(),
         ));
     let output_trait: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = app_output.clone();
-    let exit_code = application.do_run(input, output_trait).unwrap();
+    let exit_code =
+        shirabe::util::sync_executor::block_on(application.do_run(input, output_trait)).unwrap();
 
     assert_eq!(0, exit_code, "Script command should have run successfully");
     assert!(

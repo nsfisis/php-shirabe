@@ -93,7 +93,7 @@ impl<'a> DownloaderOrManager<'a> {
 pub struct SyncHelper;
 
 impl SyncHelper {
-    pub fn download_and_install_package_sync(
+    pub async fn download_and_install_package_sync(
         r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
         downloader: DownloaderOrManager<'_>,
         path: String,
@@ -106,7 +106,7 @@ impl SyncHelper {
             "install"
         };
 
-        let result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
+        let result: anyhow::Result<()> = async {
             Self::r#await(
                 r#loop,
                 Some(Box::pin(async {
@@ -115,7 +115,8 @@ impl SyncHelper {
                         .await
                         .map(|_| ())
                 })),
-            )?;
+            )
+            .await?;
             Self::r#await(
                 r#loop,
                 Some(Box::pin(async {
@@ -124,7 +125,8 @@ impl SyncHelper {
                         .await
                         .map(|_| ())
                 })),
-            )?;
+            )
+            .await?;
             if r#type == "update" {
                 if let Some(prev) = &prev_package {
                     Self::r#await(
@@ -135,7 +137,8 @@ impl SyncHelper {
                                 .await
                                 .map(|_| ())
                         })),
-                    )?;
+                    )
+                    .await?;
                 }
             } else {
                 Self::r#await(
@@ -143,10 +146,12 @@ impl SyncHelper {
                     Some(Box::pin(async {
                         downloader.install(package.clone(), &path).await.map(|_| ())
                     })),
-                )?;
+                )
+                .await?;
             }
             Ok(())
-        })();
+        }
+        .await;
 
         if result.is_err() {
             Self::r#await(
@@ -157,7 +162,8 @@ impl SyncHelper {
                         .await
                         .map(|_| ())
                 })),
-            )?;
+            )
+            .await?;
             return result;
         }
 
@@ -169,18 +175,19 @@ impl SyncHelper {
                     .await
                     .map(|_| ())
             })),
-        )?;
+        )
+        .await?;
         Ok(())
     }
 
-    pub fn r#await(
+    pub async fn r#await(
         r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
         promise: Option<
             std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + '_>>,
         >,
     ) -> anyhow::Result<()> {
         if let Some(promise) = promise {
-            crate::util::sync_executor::block_on(r#loop.borrow().wait(vec![promise], None))?;
+            r#loop.borrow().wait(vec![promise], None).await?;
         }
         Ok(())
     }

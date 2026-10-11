@@ -142,6 +142,7 @@ impl DumpCompletionCommand {
     }
 }
 
+#[async_trait::async_trait(?Send)]
 impl Command for DumpCompletionCommand {
     fn configure(&self) -> anyhow::Result<()> {
         let full_command = shirabe_php_shim::PHP_SERVER
@@ -203,7 +204,7 @@ impl Command for DumpCompletionCommand {
         Ok(())
     }
 
-    fn execute(
+    async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
