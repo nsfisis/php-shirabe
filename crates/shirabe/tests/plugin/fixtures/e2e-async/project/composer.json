@@ -1,0 +1,33 @@
+{
+    "name": "shirabe/e2e-async",
+    "description": "E2E fixture project: record what the asynchronous surface reports to a plugin.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "path",
+            "url": "../packages/*",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/async-probe": "1.0.0",
+        "shirabe-test/async-asset-a": "1.0.0"
+    },
+    "config": {
+        "secure-http": false,
+        "allow-plugins": {
+            "shirabe-test/async-probe": true
+        }
+    }
+}

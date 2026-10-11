@@ -1,6 +1,7 @@
 pub mod capability;
 pub mod capable;
 pub mod command_event;
+pub(crate) mod job_registry;
 pub mod php_plugin_proxy;
 pub mod php_plugin_value;
 pub mod plugin_blocked_exception;

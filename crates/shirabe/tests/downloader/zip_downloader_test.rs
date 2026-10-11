@@ -170,7 +170,7 @@ fn test_error_messages() {
         .into_owned();
 
     let result: anyhow::Result<()> = (|| {
-        let mut loop_ = Loop::new(http_downloader.clone(), None);
+        let loop_ = Loop::new(http_downloader.clone(), None);
         let promise = Box::pin(async {
             DownloaderInterface::download(&downloader, package.clone(), &path, None, true)
                 .await

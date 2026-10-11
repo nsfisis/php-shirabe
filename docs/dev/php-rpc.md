@@ -66,12 +66,15 @@ Payloads are encoded with a Rust reimplementation of the PHP `serialize()` gramm
 (`src/value.rs`), byte-compatible with the PHP core implementation under
 `serialize_precision=-1` (the float formatting itself is ported in `shirabe-php-src`). The value
 model is `PluginValue`: PHP scalars, byte strings (`Vec<u8>` — non-UTF-8 round-trips
-losslessly), lists, ordered maps, object records, and three handle descriptor kinds encoded as
-reserved arrays:
+losslessly), lists, ordered maps, object records, and four descriptor kinds encoded as reserved
+arrays:
 
 - `{__rhandle, __class, __epoch[, __snapshot]}` — entity lives on the Rust side
 - `{__phandle, __class, __implements}` — entity lives in the PHP child
 - `{__pclass}` — a PHP class name
+- `{__job}` — an asynchronous job, which is how a `React\Promise\PromiseInterface` crosses: a
+  promise is never an entity in either table. The Rust side allocates odd job ids, the PHP side
+  even ones. See [docs/dev/plugin-async.md](./plugin-async.md).
 
 An immutable value has no entity to point at, so it crosses in neither table: it travels as the
 object record `serialize()` writes for it (`PluginValue::PhpObject` — the class name and the
@@ -166,16 +169,17 @@ Notable internal helpers:
   (the unconditional `InstalledVersions::reload($versions)` plus the reflection-based
   `selfDir`/`installedIsLocalDir` restore) into the worker; skipped only when the class is not
   even autoloadable there, i.e. no Composer PHP runtime and therefore no observer code.
-- `__shirabe_resolved_promise` — wraps a value in `\React\Promise\resolve()`, so a Rust method
-  whose PHP signature declares `PromiseInterface` (the `DownloadManager` and `HttpDownloader`
-  surfaces) can answer with the object type the caller expects. The Rust future has already run
-  to completion by then; deferred resolution across the boundary does not exist yet.
+- `__shirabe_resolve_job` / `__shirabe_reject_job` — the settle pushes of a Rust-owned job: the
+  worker resolves or rejects the `Deferred` behind the job's promise, which runs the callbacks
+  plugin code chained on it before the call returns. The rejection is the exception a `Throw`
+  frame's four fields describe.
+- `__shirabe_resolved_promise` — wraps a value in `\React\Promise\resolve()`, for a Rust method
+  whose PHP signature declares `PromiseInterface` and that has the value before any job exists.
+  The worker holds the promise under an even job id and answers with its `{__job}` descriptor,
+  which the Rust method passes on as its own answer.
 - `__shirabe_rejected_promise` — the failure half of the same: `\React\Promise\reject()` over
   the exception a `Throw` frame's four fields describe, so a failed request reaches the caller
   as a rejection it handles rather than as a throw out of the call that started it.
-- `__shirabe_settle_promise` — the inverse: drains a promise a plugin returned to Rust. React
-  settles synchronously, so an already-settled promise yields its value here (a rejection is
-  re-thrown as the Throw reply); one that is still pending is an explicit error.
 - `__shirabe_sync_env` — replays the environment writes the Rust side made after the worker was
   spawned into the storage each one names (`putenv()`, `$_ENV`, `$_SERVER`); see
   [docs/dev/env-vars-porting.md](./env-vars-porting.md). The outermost `rpc_call` of a session
@@ -197,9 +201,11 @@ The runtime service endpoint (handle 0) answers `__shirabe_find_file` (autoload 
 `\Shirabe\RustCommandStub` forwards its stringified input here and the built-in command runs in
 the Rust process, against the Rust-side application state — `__shirabeConstruct`, which
 allocates the Rust entity behind a `new SomeProxiedClass(...)` written by plugin code and
-answers with `[rhandle, epoch]`, and `__shirabeCallStatic`, which takes `[class, method, args]`
-and runs a static method no handle identifies a receiver for. Classes and static methods Rust
-cannot answer are an explicit error naming them.
+answers with `[rhandle, epoch]`, `__shirabeCallStatic`, which takes `[class, method, args]`
+and runs a static method no handle identifies a receiver for, and the job methods
+`__shirabeResolveJob` / `__shirabeRejectJob` / `__shirabeCancelJob` / `__shirabeAbortJobs`
+([docs/dev/plugin-async.md](./plugin-async.md)). Classes and static methods Rust cannot answer
+are an explicit error naming them.
 
 ### By-ref parameters
 
@@ -235,6 +241,13 @@ by `scripts/plugin-stub-generator/generate-stubs` and must not be edited by hand
   `PluginManager::getPluginCapability` does when it passes the plugin to a capability
   constructor. The Capable flavour exists because `$plugin instanceof Capable` decides whether
   Composer asks a plugin for capabilities.
+- `Composer\Util\Loop` — a same-FQCN port of the real class, running in the worker over the
+  `HttpDownloader` and `ProcessExecutor` proxy stubs. The instance `Composer::getLoop()` hands
+  out forwards `abortJobs()` to the Rust-side `Loop`, its sibling over the same job registry.
+- `Shirabe\RustProcessStub` — the `Symfony\Component\Process\Process` subclass an
+  `executeAsync()` promise resolves with: the child was spawned by the Rust side, so it answers
+  from what the Rust-side `Process` reports about the terminated process instead of from a
+  `proc_open()` resource.
 - `Shirabe\MaterializedValue` — the PHP half of the materialized-value codec: the closed list of
   classes `unserialize()` may revive, and the hook that hands such an instance to `serialize()`
   in place of a handle descriptor.
@@ -259,6 +272,16 @@ constructor (`newInstanceWithoutConstructor` plus `__shirabeBind`), because the 
 carries the real class's own signature and belongs to plugin code building a *new* entity. `clone` on a stub calls `__shirabeClone` on the
 entity and rebinds the copy to the handle that answers, so the two stubs never share (and never
 double-release) one entity; entities with no clone semantics answer with an explicit error.
+
+## Jobs
+
+`ShirabeJobRegistry` is the worker's half of the job registry
+([docs/dev/plugin-async.md](./plugin-async.md)). `fromWire` turns a `{__job}` descriptor with an
+odd id into the promise of a `React\Promise\Deferred` it interns for that id, held until the
+Rust side pushes the outcome; the promise's canceller asks the Rust side to drop the job.
+`toWire` turns any `React\Promise\PromiseInterface` into a `{__job}` descriptor with an even id
+and attaches a recorder that reports the outcome to the Rust side when the promise settles. The
+Rust half lives in `crates/shirabe/src/plugin/job_registry.rs`.
 
 ## The P table
 

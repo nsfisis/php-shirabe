@@ -105,7 +105,7 @@ fn test_error_messages() {
     let install_path = test_dir.join("install-path");
     let install_path = install_path.to_string_lossy().into_owned();
 
-    let mut loop_ = Loop::new(http_downloader, None);
+    let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
         downloader
             .download3(package.clone(), &install_path, None)

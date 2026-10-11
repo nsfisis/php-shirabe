@@ -1,5 +1,7 @@
 //! ref: composer/src/Composer/Util/Loop.php
 
+use crate::plugin::job_registry;
+use crate::plugin::job_registry::JobOwner;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use futures::StreamExt;
@@ -40,7 +42,7 @@ impl Loop {
     }
 
     pub async fn wait<'p>(
-        &mut self,
+        &self,
         promises: Vec<
             std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<()>> + 'p>>,
         >,
@@ -48,6 +50,9 @@ impl Loop {
     ) -> anyhow::Result<()> {
         let mut pending: FuturesUnordered<_> = promises.into_iter().collect();
         let mut uncaught: Option<anyhow::Error> = None;
+        let owners = self.job_owners();
+        // The awaits a wait further up the stack is parked on are not this group's.
+        let parked_before = job_registry::parked_php_jobs();
 
         // TODO(async): promises are now polled concurrently via FuturesUnordered, but
         // each individual future (HttpDownloader::add/add_copy etc.) still resolves through a
@@ -55,20 +60,64 @@ impl Loop {
         // happen yet — the bridged future fully blocks the thread until it settles before the next
         // one gets polled. That only changes once a single top-level Runtime replaces those bridges.
         // The PHP progress bar is tied to the worker active-job count and is also deferred until then.
-        while let Some(result) = pending.next().await {
-            if let Err(e) = result
-                && uncaught.is_none()
-            {
-                uncaught = Some(e);
+        std::future::poll_fn(|cx| {
+            while let std::task::Poll::Ready(Some(result)) = pending.poll_next_unpin(cx) {
+                if let Err(e) = result
+                    && uncaught.is_none()
+                {
+                    uncaught = Some(e);
+                }
             }
-        }
+
+            // PHP's wait ends when the two services report no active job, which covers the jobs
+            // plugin code started on them and never waited on. Those sit in the job registry; it
+            // is empty in a run that never started the plugin worker.
+            let jobs_left = match job_registry::poll_jobs_in_wait(&owners, cx) {
+                Ok(jobs_left) => jobs_left,
+                Err(e) => {
+                    if uncaught.is_none() {
+                        uncaught = Some(e);
+                    }
+                    false
+                }
+            };
+
+            if pending.is_empty() && !jobs_left {
+                return std::task::Poll::Ready(());
+            }
+
+            // A promise plugin code built settles only while PHP code runs. With no job left to
+            // push a settle and every remaining future parked on such a promise, nothing can run
+            // that code any more; PHP spins in its wait loop forever at this point.
+            if !jobs_left && !pending.is_empty() {
+                let parked: Vec<u64> = job_registry::parked_php_jobs()
+                    .into_iter()
+                    .filter(|id| !parked_before.contains(id))
+                    .collect();
+                if parked.len() >= pending.len() {
+                    job_registry::fail_php_jobs(&parked);
+                }
+            }
+
+            std::task::Poll::Pending
+        })
+        .await;
 
         uncaught.map_or(Ok(()), Err)
     }
 
+    fn job_owners(&self) -> Vec<JobOwner> {
+        let mut owners = vec![JobOwner::http_downloader(&self.http_downloader)];
+        if let Some(process_executor) = &self.process_executor {
+            owners.push(JobOwner::process_executor(process_executor));
+        }
+        owners
+    }
+
     pub fn abort_jobs(&self) {
-        // TODO(async): no-op until a cancellation mechanism is introduced. PHP cancels
-        // every in-flight promise group it tracks in $currentPromises; reintroduce that tracking
-        // once the asynchronous workers support cancellation on a multi-thread runtime.
+        // TODO(async): only the requests the Rust side awaits on the downloader are cancelled.
+        // PHP cancels every promise of the groups being waited on, which also reaches the
+        // processes they started.
+        job_registry::abort_internal_jobs(Some(&self.job_owners()));
     }
 }

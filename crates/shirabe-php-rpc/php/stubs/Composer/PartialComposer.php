@@ -105,7 +105,7 @@ class PartialComposer implements \ShirabeRustStub
 
     public function getLoop(): Loop
     {
-        return \ShirabeRpcRuntime::callRust($this->__rhandle, 'getLoop', []);
+        return \ShirabeRpcRuntime::loopFor($this, $this->__rhandle);
     }
 
     public function setRepositoryManager(RepositoryManager $manager): void

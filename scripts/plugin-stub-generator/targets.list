@@ -36,4 +36,3 @@ Composer\DependencyResolver\Operation\MarkAliasUninstalledOperation
 Composer\Util\Filesystem
 Composer\Util\ProcessExecutor
 Composer\Util\HttpDownloader
-Composer\Util\Loop

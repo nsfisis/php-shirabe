@@ -1,0 +1,6 @@
+{
+    "name": "shirabe-test/async-asset-a",
+    "version": "1.0.0",
+    "type": "shirabe-async-asset",
+    "description": "Fixture package installed by an installer whose promises are still pending when it returns them."
+}

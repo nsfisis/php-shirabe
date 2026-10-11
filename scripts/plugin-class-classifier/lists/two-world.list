@@ -4,3 +4,5 @@
 Composer\Console
 Composer\Command
 Symfony\Component\Console
+Composer\Util\Loop
+Composer\Util\SyncHelper

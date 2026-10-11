@@ -119,6 +119,9 @@ pub enum PluginValue {
     RustHandle(RustObjHandle),
     PhpHandle(PhpObjHandle),
     PhpClass(PhpClassHandle),
+    /// A job in the registry both sides hold an entry for (see `docs/dev/plugin-async.md`). The
+    /// Rust side allocates odd ids, the worker even ones.
+    Job(u64),
 }
 
 impl PluginValue {
@@ -176,7 +179,8 @@ impl PluginValue {
             PluginValue::PhpObject(_)
             | PluginValue::RustHandle(_)
             | PluginValue::PhpHandle(_)
-            | PluginValue::PhpClass(_) => {
+            | PluginValue::PhpClass(_)
+            | PluginValue::Job(_) => {
                 bail!(
                     "an object record or handle descriptor cannot be represented as PhpMixed: {self:?}"
                 )
@@ -196,6 +200,7 @@ const SNAPSHOT_KEY: &[u8] = b"__snapshot";
 const PHP_HANDLE_KEY: &[u8] = b"__phandle";
 const IMPLEMENTS_KEY: &[u8] = b"__implements";
 const PHP_CLASS_KEY: &[u8] = b"__pclass";
+const JOB_KEY: &[u8] = b"__job";
 
 /// Encodes a `PluginValue` in PHP `serialize()` grammar, byte-compatible with what the PHP core
 /// implementation produces under `serialize_precision=-1`.
@@ -304,6 +309,11 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
                 PHP_CLASS_KEY.to_vec(),
                 PluginValue::string(handle.class.clone()),
             );
+            serialize_map(&map, out);
+        }
+        PluginValue::Job(id) => {
+            let mut map: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
+            map.insert(JOB_KEY.to_vec(), PluginValue::Int(*id as i64));
             serialize_map(&map, out);
         }
     }
@@ -651,6 +661,12 @@ fn decode_handle(entries: &IndexMap<Vec<u8>, PluginValue>) -> anyhow::Result<Opt
                 class: descriptor_utf8(class, "__pclass")?,
             })));
         }
+        if let Some(value) = get(JOB_KEY) {
+            let PluginValue::Int(id) = value else {
+                bail!("__job descriptor with a non-int id: {value:?}");
+            };
+            return Ok(Some(PluginValue::Job(*id as u64)));
+        }
         return Ok(None);
     }
 
@@ -936,6 +952,7 @@ mod tests {
         roundtrip(PluginValue::PhpClass(PhpClassHandle {
             class: "MyPlugin".to_string(),
         }));
+        roundtrip(PluginValue::Job(7));
     }
 
     #[test]

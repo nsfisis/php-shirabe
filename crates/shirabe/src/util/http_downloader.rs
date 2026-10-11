@@ -3,6 +3,7 @@
 use crate::composer;
 use crate::config::Config;
 use crate::downloader::TransportException;
+use crate::exception::IrrecoverableDownloadException;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::version::VersionParser;
@@ -35,7 +36,9 @@ pub struct HttpDownloader {
     /// each in-flight request and released when it settles.
     semaphore: std::rc::Rc<tokio::sync::Semaphore>,
     /// @var ?CurlDownloader
-    curl: Option<CurlDownloader>,
+    ///
+    /// Shared so that a request future can hold it without borrowing the downloader.
+    curl: Option<std::rc::Rc<CurlDownloader>>,
     /// @var ?RemoteFilesystem
     rfs: Option<std::rc::Rc<std::cell::RefCell<RemoteFilesystem>>>,
     /// @var bool
@@ -48,6 +51,13 @@ pub struct HttpDownloader {
     /// (the same internal-hook pattern used for `ProcessExecutor`). Mirrors
     /// composer/tests/Composer/Test/Mock/HttpDownloaderMock.php.
     mock: Option<std::rc::Rc<std::cell::RefCell<HttpDownloaderMockState>>>,
+}
+
+/// What `HttpDownloader::add_job` hands back: a request that already ran, or the future of one
+/// that has not been polled yet.
+pub(crate) enum HttpDownloaderJob {
+    Settled(anyhow::Result<Response>),
+    Pending(std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Response>>>>),
 }
 
 /// For testing only. State backing the `HttpDownloaderMock`: an optional expectation queue,
@@ -114,12 +124,12 @@ impl HttpDownloader {
         self_options = array_replace_recursive(self_options, options.clone());
 
         let curl = if Self::is_curl_enabled() {
-            Some(CurlDownloader::new(
+            Some(std::rc::Rc::new(CurlDownloader::new(
                 io.clone(),
                 config.clone(),
                 options.clone(),
                 disable_tls,
-            ))
+            )))
         } else {
             None
         };
@@ -191,8 +201,7 @@ impl HttpDownloader {
     }
 
     /// Shared core of `get`/`add`/`copy`/`add_copy`: mock short-circuit, empty-URL guard, the
-    /// sync/allow_async gate, and the concurrency-limiting semaphore permit. Mirrors PHP `addJob`
-    /// up to (but not including) the resolver, which is `dispatch`.
+    /// sync/allow_async gate, and the resolver PHP's `addJob` picks for the request.
     async fn execute(
         &self,
         url: &str,
@@ -215,25 +224,62 @@ impl HttpDownloader {
             .into());
         }
 
-        let _permit = self
-            .semaphore
-            .acquire()
-            .await
-            .expect("semaphore is never closed");
-        self.dispatch(url, options, copy_to).await
+        let (options, origin) = self.prepare_request(url, options);
+        if !self.can_use_curl(url, &options) {
+            return self.download_with_rfs(&origin, url, options, copy_to);
+        }
+
+        // PHP keeps async jobs in a table `Loop::abortJobs()` can reach through the promises
+        // being waited on; a synchronous job is in no such group.
+        if sync {
+            return Self::download_with_curl(
+                self.semaphore.clone(),
+                self.curl.clone().unwrap(),
+                self.disabled,
+                origin,
+                url.to_string(),
+                options,
+                copy_to.map(ToOwned::to_owned),
+                None,
+            )
+            .await;
+        }
+        let (abort_handle, abort_registration) = futures::future::AbortHandle::new_pair();
+        let _recorded = crate::plugin::job_registry::record_internal_job(
+            crate::plugin::job_registry::JobOwner::of_http_downloader(self),
+            abort_handle,
+        );
+        let request = Self::download_with_curl(
+            self.semaphore.clone(),
+            self.curl.clone().unwrap(),
+            self.disabled,
+            origin,
+            url.to_string(),
+            options,
+            copy_to.map(ToOwned::to_owned),
+            None,
+        );
+        match futures::future::Abortable::new(request, abort_registration).await {
+            Ok(result) => result,
+            Err(futures::future::Aborted) => Err(Self::canceled(url).into()),
+        }
     }
 
-    /// Mirrors the resolver PHP's `addJob` builds (the curl branch queues itself for `startJob`;
-    /// the non-curl branch runs the blocking RemoteFilesystem download immediately) plus
-    /// `startJob`'s network-disabled short-circuit. That short-circuit only ever reached the curl
-    /// branch in PHP too: the non-curl resolver runs synchronously during Promise construction,
-    /// before `startJob` (and its `disabled` check) is ever invoked for that job.
-    async fn dispatch(
+    /// The exception PHP's canceler raises for a job that had started.
+    pub(crate) fn canceled(url: &str) -> IrrecoverableDownloadException {
+        IrrecoverableDownloadException::new(format!(
+            "Download of {} canceled",
+            Url::sanitize(url.to_string())
+        ))
+    }
+
+    /// The part of PHP's `addJob` that runs before the promise exists: the request options merged
+    /// over the downloader's own, the origin, and the credentials a URL carries.
+    fn prepare_request(
         &self,
         url: &str,
         options: IndexMap<String, PhpMixed>,
-        copy_to: Option<&str>,
-    ) -> anyhow::Result<Response> {
+    ) -> (IndexMap<String, PhpMixed>, String) {
         let options = array_replace_recursive(self.options.clone(), options);
         let origin = Url::get_origin(&self.config.borrow(), url);
 
@@ -248,70 +294,159 @@ impl HttpDownloader {
             );
         }
 
-        if self.can_use_curl(url, &options) {
-            if self.disabled {
-                let has_if_modified_since = {
-                    let http_header = options
-                        .get("http")
-                        .and_then(|v| match v {
-                            PhpMixed::Array(m) => m.get("header"),
-                            _ => None,
-                        })
-                        .cloned();
-                    if let Some(PhpMixed::List(list)) = http_header.as_ref() {
-                        let joined = implode(
-                            "",
-                            &list
-                                .iter()
-                                .map(|v| v.as_string().unwrap_or("").to_string())
-                                .collect::<Vec<_>>(),
-                        );
-                        stripos(&joined, "if-modified-since").is_some()
-                    } else if let Some(PhpMixed::Array(m)) = http_header.as_ref() {
-                        let joined = implode(
-                            "",
-                            &m.values()
-                                .map(|v| v.as_string().unwrap_or("").to_string())
-                                .collect::<Vec<_>>(),
-                        );
-                        stripos(&joined, "if-modified-since").is_some()
-                    } else {
-                        false
-                    }
-                };
-                if has_if_modified_since {
-                    return Ok(Response::new(
-                        url.to_string(),
-                        Some(304),
-                        Vec::new(),
-                        Some(String::new()),
-                    ));
-                }
+        (options, origin)
+    }
 
-                let mut e = TransportException::new(
-                    format!(
-                        "Network disabled, request canceled: {}",
-                        Url::sanitize(url.to_string())
-                    ),
-                    499,
-                );
-                e.set_status_code(Some(499));
-                return Err(e.into());
-            }
-
-            let curl = self.curl.as_ref().unwrap();
-            return match curl.download(&origin, url, options, copy_to).await {
-                Ok(Ok(response)) => Ok(response),
-                Ok(Err(e)) => Err(e),
-                Err(e) => Err(e),
-            };
+    /// The job behind `add()` / `add_copy()` for a caller that registers it instead of awaiting it
+    /// (see `docs/dev/plugin-async.md`). The gates PHP raises out of the call itself are the outer
+    /// error. A request the curl backend does not take is run on the spot, as PHP runs the
+    /// `RemoteFilesystem` resolver while it constructs the promise, and comes back settled. The
+    /// future of a curl request borrows nothing from the downloader, and `started` tells whether
+    /// the job budget has let the job through.
+    pub(crate) fn add_job(
+        &self,
+        url: &str,
+        copy_to: Option<&str>,
+        options: IndexMap<String, PhpMixed>,
+        started: std::rc::Rc<std::cell::Cell<bool>>,
+    ) -> anyhow::Result<HttpDownloaderJob> {
+        if self.mock.is_some() {
+            // `HttpDownloaderMock::add()` answers with a promise resolved by its own `get()`.
+            return Ok(HttpDownloaderJob::Settled(
+                Ok(self.mock_get(url, &options)?),
+            ));
+        }
+        if url.is_empty() {
+            return Err(InvalidArgumentException::new(
+                "$url must not be an empty string".to_string(),
+            )
+            .into());
+        }
+        if !self.allow_async {
+            return Err(LogicException::new("You must use the HttpDownloader instance which is part of a Composer\\Loop instance to be able to run async http requests"
+                .to_string())
+            .into());
         }
 
+        let (options, origin) = self.prepare_request(url, options);
+        if !self.can_use_curl(url, &options) {
+            return Ok(HttpDownloaderJob::Settled(
+                self.download_with_rfs(&origin, url, options, copy_to),
+            ));
+        }
+
+        // PHP starts the job before `add()` returns when the job budget has room. Nothing of the
+        // request runs before the first poll here, but a canceller asking whether the job had
+        // started gets PHP's answer.
+        started.set(self.semaphore.available_permits() > 0);
+
+        Ok(HttpDownloaderJob::Pending(Box::pin(
+            Self::download_with_curl(
+                self.semaphore.clone(),
+                self.curl.clone().unwrap(),
+                self.disabled,
+                origin,
+                url.to_string(),
+                options,
+                copy_to.map(ToOwned::to_owned),
+                Some(started),
+            ),
+        )))
+    }
+
+    /// PHP's `startJob` for a job the curl resolver queued: wait for the job budget, then either
+    /// answer for a disabled network or hand the request to curl.
+    #[allow(clippy::too_many_arguments)]
+    async fn download_with_curl(
+        semaphore: std::rc::Rc<tokio::sync::Semaphore>,
+        curl: std::rc::Rc<CurlDownloader>,
+        disabled: bool,
+        origin: String,
+        url: String,
+        options: IndexMap<String, PhpMixed>,
+        copy_to: Option<String>,
+        started: Option<std::rc::Rc<std::cell::Cell<bool>>>,
+    ) -> anyhow::Result<Response> {
+        let _permit = semaphore
+            .acquire()
+            .await
+            .expect("semaphore is never closed");
+        if let Some(started) = started {
+            started.set(true);
+        }
+
+        if disabled {
+            let has_if_modified_since = {
+                let http_header = options
+                    .get("http")
+                    .and_then(|v| match v {
+                        PhpMixed::Array(m) => m.get("header"),
+                        _ => None,
+                    })
+                    .cloned();
+                if let Some(PhpMixed::List(list)) = http_header.as_ref() {
+                    let joined = implode(
+                        "",
+                        &list
+                            .iter()
+                            .map(|v| v.as_string().unwrap_or("").to_string())
+                            .collect::<Vec<_>>(),
+                    );
+                    stripos(&joined, "if-modified-since").is_some()
+                } else if let Some(PhpMixed::Array(m)) = http_header.as_ref() {
+                    let joined = implode(
+                        "",
+                        &m.values()
+                            .map(|v| v.as_string().unwrap_or("").to_string())
+                            .collect::<Vec<_>>(),
+                    );
+                    stripos(&joined, "if-modified-since").is_some()
+                } else {
+                    false
+                }
+            };
+            if has_if_modified_since {
+                return Ok(Response::new(
+                    url,
+                    Some(304),
+                    Vec::new(),
+                    Some(String::new()),
+                ));
+            }
+
+            let mut e = TransportException::new(
+                format!("Network disabled, request canceled: {}", Url::sanitize(url)),
+                499,
+            );
+            e.set_status_code(Some(499));
+            return Err(e.into());
+        }
+
+        match curl
+            .download(&origin, &url, options, copy_to.as_deref())
+            .await
+        {
+            Ok(Ok(response)) => Ok(response),
+            Ok(Err(e)) => Err(e),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// The resolver PHP's `addJob` builds for a request curl does not take: the blocking
+    /// `RemoteFilesystem` download, run immediately. The network-disabled short-circuit never
+    /// reaches it in PHP either, since `startJob` only handles jobs the curl resolver queued.
+    fn download_with_rfs(
+        &self,
+        origin: &str,
+        url: &str,
+        options: IndexMap<String, PhpMixed>,
+        copy_to: Option<&str>,
+    ) -> anyhow::Result<Response> {
         let rfs = self.rfs.as_ref().unwrap();
         if let Some(copy_to) = copy_to {
             let (_, headers) =
                 rfs.borrow_mut()
-                    .copy(&origin, url, copy_to, false, options.clone())?;
+                    .copy(origin, url, copy_to, false, options.clone())?;
 
             let code = RemoteFilesystem::find_status_code(&headers);
             let body = Some(format!("{}~", copy_to));
@@ -319,7 +454,7 @@ impl HttpDownloader {
         } else {
             let (result, headers) =
                 rfs.borrow_mut()
-                    .get_contents(&origin, url, false, options.clone())?;
+                    .get_contents(origin, url, false, options.clone())?;
             let body = match result {
                 GetResult::Content(s) => Some(s),
                 _ => None,

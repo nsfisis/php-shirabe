@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/async-probe",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin driving the asynchronous surface: pending promises, ticks and cancellation.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\Async\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\Async\\Plugin"
+    }
+}

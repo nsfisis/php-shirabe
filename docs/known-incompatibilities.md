@@ -87,6 +87,27 @@ read or written through `ReflectionProperty`; only the public methods reach the 
 
 Reflection on objects a plugin creates itself works as usual.
 
+### Asynchronous jobs
+
+Requests and processes a plugin starts through `HttpDownloader::add()`, `HttpDownloader::addCopy()`
+and `ProcessExecutor::executeAsync()` run in the Shirabe process, and their promises settle inside
+`wait()` / `countActiveJobs()` / `Loop::wait()` as in Composer. The following differ:
+
+* The `Process` an `executeAsync()` promise resolves with is a subclass of
+  `Symfony\Component\Process\Process` that describes a terminated process. Its exit code, output
+  and status are available; `start()`, `wait()`, `signal()`, `getIterator()`, the setters and
+  `getLastOutputTime()` throw.
+* Cancelling the promise of a running process stops the child with `SIGTERM` (then `SIGKILL`),
+  where Composer sends `SIGINT` first.
+* `countActiveJobs()` reports only the jobs plugin code started, never the ones Shirabe has in
+  flight for itself, and a `wait()` called while Shirabe is downloading or installing returns as
+  soon as the plugin's own jobs are done.
+* `Loop::abortJobs()` cancels the requests Shirabe has in flight for itself, but not its processes.
+* Shirabe fails an installation whose plugin-provided installer returns a promise that nothing can
+  settle any more. Composer waits forever in that situation.
+* With `COMPOSER_DISABLE_NETWORK` set, the callbacks of an `add()` promise run at the next wait
+  rather than inside `add()`.
+
 ### Output buffering functions
 
 `ob_*()` functions work as usual in PHP, but cannot capture any output from

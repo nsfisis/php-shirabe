@@ -20,6 +20,8 @@ use crate::package::handle::AnyPackage;
 use crate::package::{DisplayMode, PackageInterfaceHandle};
 use crate::plugin::capability::{Capability, CommandProvider};
 use crate::plugin::capable::Capable;
+use crate::plugin::job_registry;
+use crate::plugin::job_registry::JobOwner;
 use crate::plugin::php_plugin_value::{
     date_time_from_wire, date_time_to_wire, link_from_wire, link_to_wire, response_to_wire,
 };
@@ -60,7 +62,8 @@ enum RustEntity {
     Plugin(std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>),
     ProcessExecutor(std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>),
     HttpDownloader(std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>),
-    Loop(std::rc::Rc<std::cell::RefCell<crate::util::r#loop::Loop>>),
+    /// A child a `ProcessExecutor` job ran to its exit, behind a `Shirabe\RustProcessStub`.
+    Process(std::rc::Rc<std::cell::RefCell<shirabe_symfony_process::Process>>),
 }
 
 /// The pointer identity backing R-table interning: the same shared instance must always cross
@@ -87,7 +90,7 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
         RustEntity::HttpDownloader(downloader) => {
             std::rc::Rc::as_ptr(downloader) as *const () as usize
         }
-        RustEntity::Loop(r#loop) => std::rc::Rc::as_ptr(r#loop) as *const () as usize,
+        RustEntity::Process(process) => std::rc::Rc::as_ptr(process) as *const () as usize,
     }
 }
 
@@ -321,6 +324,9 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             if method_name == "__shirabeCallStatic" {
                 return call_static_entity(&args);
             }
+            if let Some(answer) = dispatch_job_service_method(method_name, &args) {
+                return answer;
+            }
             return Err(runtime_throw(format!(
                 "unknown runtime service method `{method_name}`"
             )));
@@ -334,6 +340,79 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
 
         dispatch_r_table_method(rhandle, method_name, &args, out_params)
     }
+}
+
+/// Serves the runtime service methods of the job registry (`docs/dev/plugin-async.md`), shared by
+/// every dispatcher: the worker reports on a job whenever the promise behind it settles or is
+/// cancelled, whichever call happens to be in flight then. `None` for any other method.
+pub(crate) fn dispatch_job_service_method(
+    method_name: &str,
+    args: &[PluginValue],
+) -> Option<Result<PluginValue, PhpThrow>> {
+    let job_id = || arg::<i64>(method_name, args, 0).map(|id| id as u64);
+    Some(match method_name {
+        "__shirabeResolveJob" => job_id().map(|id| {
+            let value = args.get(1).cloned().unwrap_or(PluginValue::Null);
+            job_registry::settle_php_job(id, Ok(value));
+            PluginValue::Null
+        }),
+        "__shirabeRejectJob" => (|| {
+            let id = job_id()?;
+            let throw = PhpThrow {
+                exception_class: arg::<String>(method_name, args, 1)?,
+                message: arg::<String>(method_name, args, 2)?,
+                code: arg::<i64>(method_name, args, 3)?,
+                properties: Box::new(IndexMap::new()),
+            };
+            job_registry::settle_php_job(id, Err(throw));
+            Ok(PluginValue::Null)
+        })(),
+        "__shirabeCancelJob" => job_id().map(|id| match job_registry::cancel(id) {
+            Some(throw) => PluginValue::List(job_registry::throw_fields(throw)),
+            None => PluginValue::Null,
+        }),
+        "__shirabeAbortJobs" => {
+            job_registry::abort_internal_jobs(None);
+            Ok(PluginValue::Null)
+        }
+        _ => return None,
+    })
+}
+
+/// Polls a job future that was just built, the one time a job is advanced outside a tick.
+/// Composer starts a process inside `executeAsync()` itself when the job budget has room, and
+/// this poll is what takes the future that far.
+fn poll_once<T>(
+    future: &mut std::pin::Pin<Box<dyn std::future::Future<Output = T>>>,
+) -> std::task::Poll<T> {
+    crate::util::sync_executor::block_on(std::future::poll_fn(|cx| {
+        std::task::Poll::Ready(future.as_mut().poll(cx))
+    }))
+}
+
+/// How long one tick of each service may block with no job settling, matching the granularity of
+/// Composer's own wait loops: the `curl_multi_select()` timeout of `CurlDownloader::tick()`, and
+/// the `usleep()` between the ticks of `ProcessExecutor::wait()`.
+const HTTP_DOWNLOADER_TICK_CAP: std::time::Duration = std::time::Duration::from_secs(5);
+const PROCESS_EXECUTOR_TICK_CAP: std::time::Duration = std::time::Duration::from_millis(1);
+
+/// Serves `wait(?int $index)` and `countActiveJobs(?int $index)` of the two services, whose
+/// `$index` is a job id.
+fn dispatch_tick_method(
+    owner: JobOwner,
+    cap: std::time::Duration,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    let index = match args.first() {
+        None | Some(PluginValue::Null) => None,
+        _ => Some(arg::<i64>(method_name, args, 0)? as u64),
+    };
+    if method_name == "countActiveJobs" {
+        return Ok(PluginValue::Int(job_registry::tick(owner, cap, index)?));
+    }
+    while job_registry::tick(owner, cap, index)? != 0 {}
+    Ok(PluginValue::Null)
 }
 
 /// Serves a method call on an R-table entity, shared by every dispatcher: the child holds a
@@ -391,7 +470,7 @@ pub(crate) fn dispatch_r_table_method(
         Some(RustEntity::HttpDownloader(downloader)) => {
             dispatch_http_downloader_method(&downloader, method_name, args)
         }
-        Some(RustEntity::Loop(r#loop)) => dispatch_loop_method(&r#loop, method_name, args),
+        Some(RustEntity::Process(process)) => dispatch_process_method(&process, method_name),
         None => Err(runtime_throw(format!("unknown Rust handle {rhandle}"))),
     }
 }
@@ -428,11 +507,6 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
     };
     let config_arg = |position: usize| {
         arg::<std::rc::Rc<std::cell::RefCell<crate::config::Config>>>(&class, ctor_args, position)
-    };
-    let http_downloader_arg = |position: usize| {
-        arg::<std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>>(
-            &class, ctor_args, position,
-        )
     };
     let alias_package_arg =
         |position: usize| -> Result<crate::package::AliasPackageHandle, PhpThrow> {
@@ -559,20 +633,6 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             )));
             return Ok(construction_result(rhandle));
         }
-        // A loop owns nothing of its own: it holds the two services it drives and enables the
-        // async surface on each, so a plugin-built one is a second driver over whichever
-        // instances it was handed rather than a second copy of them.
-        "Composer\\Util\\Loop" => {
-            let process = match ctor_args.get(1) {
-                None | Some(PluginValue::Null) => None,
-                _ => Some(process_executor_arg(1)?),
-            };
-            let rhandle =
-                register_entity(RustEntity::Loop(std::rc::Rc::new(std::cell::RefCell::new(
-                    crate::util::r#loop::Loop::new(http_downloader_arg(0)?, process),
-                ))));
-            return Ok(construction_result(rhandle));
-        }
         // TODO(plugin): the remaining proxied classes get a construction story on demand,
         // driven by explicit errors from real plugins. Each one has to decide what a
         // plugin-built instance means for the Rust-side graph, which is why none of them is
@@ -626,7 +686,7 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::Plugin(_)
         | RustEntity::ProcessExecutor(_)
         | RustEntity::HttpDownloader(_)
-        | RustEntity::Loop(_) => {
+        | RustEntity::Process(_) => {
             return Err(runtime_throw(
                 "cloning this Rust-side entity over RPC is not supported".to_string(),
             ));
@@ -747,10 +807,25 @@ fn dispatch_composer_method(
                 "Composer\\Downloader\\DownloadManager",
             ))
         }
-        "getLoop" => {
+        // `getLoop()` itself never reaches here: the Loop is a two-world class, and the stub builds
+        // the worker-side one over the two services the Rust-side Loop drives.
+        "__shirabeLoopServices" => {
             let r#loop = composer.borrow().get_loop();
-            let rhandle = register_entity(RustEntity::Loop(r#loop));
-            Ok(rust_handle_value(rhandle, "Composer\\Util\\Loop"))
+            let downloader = r#loop.borrow().get_http_downloader().clone();
+            let process = r#loop.borrow().get_process_executor().cloned();
+            Ok(PluginValue::List(vec![
+                rust_handle_value(
+                    register_entity(RustEntity::HttpDownloader(downloader)),
+                    "Composer\\Util\\HttpDownloader",
+                ),
+                match process {
+                    Some(process) => rust_handle_value(
+                        register_entity(RustEntity::ProcessExecutor(process)),
+                        "Composer\\Util\\ProcessExecutor",
+                    ),
+                    None => PluginValue::Null,
+                },
+            ]))
         }
         // TODO(plugin): the remaining Composer object graph (getLocker, getPluginManager, ...)
         // becomes reachable over RPC on demand, driven by explicit errors from real plugins.
@@ -811,18 +886,20 @@ fn dispatch_config_method(
 }
 
 /// The download manager's contract is asynchronous on both sides: PHP declares a
-/// `PromiseInterface` return, Rust an `async fn`. The Rust future is driven to completion here
-/// and its value handed back as an already-settled React promise.
-///
-/// TODO(async): the boundary has no representation for a promise that is still pending, so the
-/// deferred resolution the PHP contract allows collapses into a blocking wait here.
+/// `PromiseInterface` return, Rust an `async fn`. Each call registers its future as a job and
+/// answers with the job's pending promise.
 fn dispatch_download_manager_method(
     dm: &std::rc::Rc<std::cell::RefCell<dyn crate::downloader::DownloadManagerInterface>>,
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     let string_arg = |position: usize| arg::<String>(method_name, args, position);
-    match method_name {
+    let package_arg = |position: usize| arg::<PackageInterfaceHandle>(method_name, args, position);
+    let optional_package_arg =
+        |position: usize| arg::<Option<PackageInterfaceHandle>>(method_name, args, position);
+    let future: std::pin::Pin<
+        Box<dyn std::future::Future<Output = anyhow::Result<Option<PhpMixed>>>>,
+    > = match method_name {
         "setPreferSource" | "setPreferDist" => {
             let preferred = arg::<bool>(method_name, args, 0)?;
             if method_name == "setPreferSource" {
@@ -830,76 +907,121 @@ fn dispatch_download_manager_method(
             } else {
                 dm.borrow_mut().set_prefer_dist(preferred);
             }
-            Ok(PluginValue::Null)
+            return Ok(PluginValue::Null);
         }
-        "download" | "prepare" | "install" | "update" | "remove" | "cleanup" => {
-            let resolved = crate::util::sync_executor::block_on(async {
-                let dm = dm.borrow();
-                match method_name {
-                    "download" => {
-                        dm.download(
-                            arg::<PackageInterfaceHandle>(method_name, args, 0)?,
-                            &string_arg(1)?,
-                            arg::<Option<PackageInterfaceHandle>>(method_name, args, 2)?,
-                        )
-                        .await
-                    }
-                    "prepare" => {
-                        dm.prepare(
-                            &string_arg(0)?,
-                            arg::<PackageInterfaceHandle>(method_name, args, 1)?,
-                            &string_arg(2)?,
-                            arg::<Option<PackageInterfaceHandle>>(method_name, args, 3)?,
-                        )
-                        .await
-                    }
-                    "install" => {
-                        dm.install(
-                            arg::<PackageInterfaceHandle>(method_name, args, 0)?,
-                            &string_arg(1)?,
-                        )
-                        .await
-                    }
-                    "update" => {
-                        dm.update(
-                            arg::<PackageInterfaceHandle>(method_name, args, 0)?,
-                            arg::<PackageInterfaceHandle>(method_name, args, 1)?,
-                            &string_arg(2)?,
-                        )
-                        .await
-                    }
-                    "remove" => {
-                        dm.remove(
-                            arg::<PackageInterfaceHandle>(method_name, args, 0)?,
-                            &string_arg(1)?,
-                        )
-                        .await
-                    }
-                    _ => {
-                        dm.cleanup(
-                            &string_arg(0)?,
-                            arg::<PackageInterfaceHandle>(method_name, args, 1)?,
-                            &string_arg(2)?,
-                            arg::<Option<PackageInterfaceHandle>>(method_name, args, 3)?,
-                        )
-                        .await
-                    }
-                }
-                .map_err(|error| error_throw(&format!("{method_name} failed over RPC"), &error))
-            })?;
-            resolved_promise(resolved.to_plugin_value())
+        // TODO(async): each future borrows the manager for as long as it runs, as the Rust-side
+        // callers of these methods do, so a job still pending between two ticks makes
+        // `setPreferSource()` / `setPreferDist()` panic on the cell.
+        "download" => {
+            let (dm, package, path, prev) = (
+                dm.clone(),
+                package_arg(0)?,
+                string_arg(1)?,
+                optional_package_arg(2)?,
+            );
+            Box::pin(async move { dm.borrow().download(package, &path, prev).await })
+        }
+        "prepare" => {
+            let (dm, r#type, package, path, prev) = (
+                dm.clone(),
+                string_arg(0)?,
+                package_arg(1)?,
+                string_arg(2)?,
+                optional_package_arg(3)?,
+            );
+            Box::pin(async move { dm.borrow().prepare(&r#type, package, &path, prev).await })
+        }
+        "install" => {
+            let (dm, package, path) = (dm.clone(), package_arg(0)?, string_arg(1)?);
+            Box::pin(async move { dm.borrow().install(package, &path).await })
+        }
+        "update" => {
+            let (dm, initial, target, path) =
+                (dm.clone(), package_arg(0)?, package_arg(1)?, string_arg(2)?);
+            Box::pin(async move { dm.borrow().update(initial, target, &path).await })
+        }
+        "remove" => {
+            let (dm, package, path) = (dm.clone(), package_arg(0)?, string_arg(1)?);
+            Box::pin(async move { dm.borrow().remove(package, &path).await })
+        }
+        "cleanup" => {
+            let (dm, r#type, package, path, prev) = (
+                dm.clone(),
+                string_arg(0)?,
+                package_arg(1)?,
+                string_arg(2)?,
+                optional_package_arg(3)?,
+            );
+            Box::pin(async move { dm.borrow().cleanup(&r#type, package, &path, prev).await })
         }
         // TODO(plugin): the downloader-facing surface (getDownloader / setDownloader /
         // getDownloaderForPackage / getDownloaderType) needs proxy stubs for
         // DownloaderInterface implementations before it can cross.
-        other => Err(runtime_throw(format!(
-            "the DownloadManager method `{other}` is not available over RPC yet"
-        ))),
+        other => {
+            return Err(runtime_throw(format!(
+                "the DownloadManager method `{other}` is not available over RPC yet"
+            )));
+        }
+    };
+
+    // Under Composer the promise is a chain over the job the downloader started on the graph's
+    // HttpDownloader, so that is the service whose `countActiveJobs()` keeps a wait going until
+    // this job is done.
+    let downloader = graph_http_downloader(dm)?;
+    let started = std::rc::Rc::new(std::cell::Cell::new(false));
+    let method = method_name.to_string();
+    Ok(job_registry::register(
+        JobOwner::http_downloader(&downloader),
+        downloader,
+        started.clone(),
+        // TODO(async): Composer's cancel reaches the request or the process at the root of the
+        // chain and rejects with that job's own exception; the root is not known here.
+        error_throw(
+            "",
+            &crate::exception::IrrecoverableDownloadException::new(format!(
+                "DownloadManager::{method_name}() canceled"
+            ))
+            .into(),
+        ),
+        Box::pin(async move {
+            started.set(true);
+            future
+                .await
+                .map(|resolved| resolved.to_plugin_value())
+                .map_err(|error| error_throw(&format!("{method} failed over RPC"), &error))
+        }),
+    ))
+}
+
+/// The HttpDownloader of the object graph `dm` belongs to: the one the Loop of its Composer
+/// instance drives.
+fn graph_http_downloader(
+    dm: &std::rc::Rc<std::cell::RefCell<dyn crate::downloader::DownloadManagerInterface>>,
+) -> Result<std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>, PhpThrow> {
+    let composers: Vec<ComposerHandle> = R_TABLE.with(|table| {
+        table
+            .borrow()
+            .values()
+            .filter_map(|entity| match entity {
+                RustEntity::Composer(composer) => Some(composer.clone()),
+                _ => None,
+            })
+            .collect()
+    });
+    for composer in composers {
+        let composer = composer.borrow();
+        if std::rc::Rc::ptr_eq(&composer.get_download_manager(), dm) {
+            return Ok(composer.get_loop().borrow().get_http_downloader().clone());
+        }
     }
+    Err(runtime_throw(
+        "this DownloadManager belongs to no Composer instance the plugin process holds".to_string(),
+    ))
 }
 
 /// A `\React\Promise\PromiseInterface` already fulfilled with `value`, built in the worker so
-/// PHP callers get the object type their signatures declare.
+/// PHP callers get the object type their signatures declare. The answer is the descriptor the
+/// worker exchanges for that promise, to be passed on as the answer of the call being served.
 fn resolved_promise(value: PluginValue) -> Result<PluginValue, PhpThrow> {
     match call_function_with_dispatcher(
         "__shirabe_resolved_promise",
@@ -918,21 +1040,9 @@ fn resolved_promise(value: PluginValue) -> Result<PluginValue, PhpThrow> {
 /// built in the worker. A failed request reaches the plugin as a rejection it handles, the way it
 /// does under Composer, rather than as a throw out of the call that started it.
 fn rejected_promise(throw: PhpThrow) -> Result<PluginValue, PhpThrow> {
-    let properties = PluginValue::Array(
-        throw
-            .properties
-            .iter()
-            .map(|(name, value)| (name.clone().into_bytes(), value.clone()))
-            .collect(),
-    );
     match call_function_with_dispatcher(
         "__shirabe_rejected_promise",
-        vec![
-            PluginValue::string(throw.exception_class),
-            PluginValue::string(throw.message),
-            PluginValue::Int(throw.code),
-            properties,
-        ],
+        job_registry::throw_fields(throw),
         Some(&mut PluginRpcDispatcher::default()),
     ) {
         Ok(Ok(promise)) => Ok(promise),
@@ -943,92 +1053,79 @@ fn rejected_promise(throw: PhpThrow) -> Result<PluginValue, PhpThrow> {
     }
 }
 
-/// Drains one promise a plugin handed to `Loop::wait()`. React settles synchronously, so an
-/// already-settled promise yields its value here and a rejected one yields its reason as the
-/// throw; one that is still pending is an explicit error.
-fn settle_promise(method_name: &str, promise: PluginValue) -> Result<PluginValue, PhpThrow> {
-    let handle = match promise {
-        PluginValue::PhpHandle(handle) => handle,
-        other => return Err(arg_throw(method_name, 0, "a promise", Some(&other))),
-    };
-    let phandle = handle.phandle;
-    let settled = call_function_with_dispatcher(
-        "__shirabe_settle_promise",
-        vec![PluginValue::PhpHandle(handle)],
-        Some(&mut PluginRpcDispatcher::default()),
-    );
-    // The promise entity was interned in the worker's P table when it crossed; the plugin's own
-    // reference keeps the object alive, and nothing on this side owns it past this call.
-    let _ = release_php_handle(phandle);
-    match settled {
-        Ok(outcome) => outcome,
-        Err(error) => Err(runtime_throw(format!(
-            "draining a promise in the plugin process failed: {error:#}"
-        ))),
-    }
-}
-
-/// Serves the `Loop` proxy stub. The two services it hands out are the ones it was built over,
-/// and `wait()` drains the promises it is given.
-fn dispatch_loop_method(
-    r#loop: &std::rc::Rc<std::cell::RefCell<crate::util::r#loop::Loop>>,
+/// Serves `Shirabe\RustProcessStub`: everything the stub answers about the terminated process
+/// behind it, read in one round trip.
+fn dispatch_process_method(
+    process: &std::rc::Rc<std::cell::RefCell<shirabe_symfony_process::Process>>,
     method_name: &str,
-    args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    match method_name {
-        "getHttpDownloader" => {
-            let downloader = r#loop.borrow().get_http_downloader().clone();
-            let rhandle = register_entity(RustEntity::HttpDownloader(downloader));
-            Ok(rust_handle_value(rhandle, "Composer\\Util\\HttpDownloader"))
-        }
-        "getProcessExecutor" => {
-            let process = r#loop.borrow().get_process_executor().cloned();
-            match process {
-                Some(process) => {
-                    let rhandle = register_entity(RustEntity::ProcessExecutor(process));
-                    Ok(rust_handle_value(
-                        rhandle,
-                        "Composer\\Util\\ProcessExecutor",
-                    ))
-                }
-                None => Ok(PluginValue::Null),
-            }
-        }
-        "wait" => {
-            // TODO(symfony,plugin): the progress bar is a symfony/console object each world runs
-            // its own implementation of, so there is none to hand to the Rust side.
-            if !matches!(args.get(1), None | Some(PluginValue::Null)) {
-                return Err(runtime_throw(
-                    "Shirabe does not support passing a ProgressBar to Loop::wait() from a plugin yet"
-                        .to_string(),
-                ));
-            }
-            let promises = match args.first() {
-                Some(PluginValue::List(promises)) => promises.clone(),
-                Some(PluginValue::Array(promises)) => promises.values().cloned().collect(),
-                other => return Err(arg_throw(method_name, 0, "an array of promises", other)),
-            };
-            // PHP waits on every promise of the group and rethrows the first rejection once the
-            // group is done, which is what `React\Promise\all()` hands it.
-            let mut uncaught: Option<PhpThrow> = None;
-            for promise in promises {
-                if let Err(throw) = settle_promise(method_name, promise)
-                    && uncaught.is_none()
-                {
-                    uncaught = Some(throw);
-                }
-            }
-            match uncaught {
-                Some(throw) => Err(throw),
-                None => Ok(PluginValue::Null),
-            }
-        }
-        "abortJobs" => {
-            r#loop.borrow().abort_jobs();
-            Ok(PluginValue::Null)
-        }
-        other => Err(runtime_throw(format!("unknown Loop method `{other}`"))),
+    if method_name != "__shirabeFacts" {
+        return Err(runtime_throw(format!(
+            "unknown Process method `{method_name}`"
+        )));
     }
+    let failed = |error: anyhow::Error| error_throw("reading the process failed", &error);
+    let mut process = process.borrow_mut();
+    let facts = [
+        ("exitCode", process.get_exit_code().to_plugin_value()),
+        (
+            "exitCodeText",
+            process.get_exit_code_text().to_plugin_value(),
+        ),
+        (
+            "output",
+            PluginValue::string(process.get_output().map_err(failed)?),
+        ),
+        (
+            "errorOutput",
+            PluginValue::string(process.get_error_output().map_err(failed)?),
+        ),
+        (
+            "signaled",
+            PluginValue::Bool(process.has_been_signaled().map_err(failed)?),
+        ),
+        (
+            "termSignal",
+            PluginValue::Int(process.get_term_signal().map_err(failed)?),
+        ),
+        (
+            "stopped",
+            PluginValue::Bool(process.has_been_stopped().map_err(failed)?),
+        ),
+        (
+            "stopSignal",
+            PluginValue::Int(process.get_stop_signal().map_err(failed)?),
+        ),
+        (
+            "commandLine",
+            PluginValue::string(process.get_command_line()),
+        ),
+        (
+            "workingDirectory",
+            process.get_working_directory().to_plugin_value(),
+        ),
+        (
+            "env",
+            PluginValue::from_php_mixed(&PhpMixed::Array(process.get_env().clone())),
+        ),
+        (
+            "timeout",
+            match process.get_timeout() {
+                Some(timeout) => PluginValue::Float(timeout),
+                None => PluginValue::Null,
+            },
+        ),
+        (
+            "startTime",
+            PluginValue::Float(process.get_start_time().map_err(failed)?),
+        ),
+    ];
+    Ok(PluginValue::Array(
+        facts
+            .into_iter()
+            .map(|(name, value)| (name.as_bytes().to_vec(), value))
+            .collect(),
+    ))
 }
 
 fn dispatch_filesystem_method(
@@ -1058,11 +1155,32 @@ fn dispatch_filesystem_method(
             .to_plugin_value()),
         "removeDirectoryAsync" => {
             let directory = string_arg(0)?;
-            let removed = crate::util::sync_executor::block_on(async {
-                crate::util::Filesystem::remove_directory_async_via(fs, &directory).await
-            })
-            .map_err(failed)?;
-            resolved_promise(removed.to_plugin_value())
+            let executor = fs.borrow_mut().get_process_handle();
+            let fs = fs.clone();
+            let mut future: std::pin::Pin<
+                Box<dyn std::future::Future<Output = anyhow::Result<bool>>>,
+            > = Box::pin(async move {
+                crate::util::Filesystem::remove_directory_async_via(&fs, &directory).await
+            });
+            // PHP settles the edge cases and starts the removal process before the call returns,
+            // and raises what goes wrong up to there out of the call.
+            match poll_once(&mut future) {
+                std::task::Poll::Ready(removed) => {
+                    resolved_promise(removed.map_err(failed)?.to_plugin_value())
+                }
+                std::task::Poll::Pending => Ok(job_registry::register(
+                    JobOwner::process_executor(&executor),
+                    executor,
+                    std::rc::Rc::new(std::cell::Cell::new(true)),
+                    runtime_throw("Aborted process".to_string()),
+                    Box::pin(async move {
+                        future
+                            .await
+                            .map(|removed| removed.to_plugin_value())
+                            .map_err(|error| error_throw("removeDirectoryAsync failed", &error))
+                    }),
+                )),
+            }
         }
         "removeDirectoryPhp" => Ok(fs
             .borrow_mut()
@@ -1290,14 +1408,62 @@ fn dispatch_process_executor_method(
             process.borrow_mut().reset_max_jobs();
             Ok(PluginValue::Null)
         }
-        // TODO(plugin,async): the async surface needs an execution model that can hand a plugin a
-        // live `Symfony\Component\Process\Process`. That object's state is the `proc_open()`
-        // resource and the OS pipes of whichever process called `start()`, so a Rust-side spawn
-        // has none to give; the real `start()` has to run in the worker, driven by a promise
-        // representation that crosses the boundary unresolved. Neither exists yet.
-        "executeAsync" | "wait" | "enableAsync" | "countActiveJobs" => Err(runtime_throw(format!(
-            "Shirabe does not support ProcessExecutor::{method_name}() from a plugin yet"
-        ))),
+        "enableAsync" => {
+            process.borrow_mut().enable_async();
+            Ok(PluginValue::Null)
+        }
+        "executeAsync" => {
+            let command = exec_command_arg(method_name, args, 0)?;
+            let cwd = cwd_arg(1)?;
+            let started = std::rc::Rc::new(std::cell::Cell::new(false));
+            let mut future = process.borrow_mut().execute_async_job(
+                command,
+                cwd.as_deref(),
+                Some(started.clone()),
+            );
+            let resolve = |child: shirabe_symfony_process::Process| {
+                rust_handle_value(
+                    register_entity(RustEntity::Process(std::rc::Rc::new(
+                        std::cell::RefCell::new(child),
+                    ))),
+                    "Shirabe\\RustProcessStub",
+                )
+            };
+            let future: std::pin::Pin<
+                Box<dyn std::future::Future<Output = Result<PluginValue, PhpThrow>>>,
+            > = match poll_once(&mut future) {
+                // PHP raises the async gate out of `executeAsync()` itself, and it is the port's
+                // only `LogicException` here; a child that fails to start rejects the promise.
+                std::task::Poll::Ready(Err(error)) if error.is_instanceof::<LogicException>() => {
+                    return Err(failed(error));
+                }
+                std::task::Poll::Ready(Err(error)) => return rejected_promise(failed(error)),
+                // The child exited within the poll. PHP resolves only from `countActiveJobs()`,
+                // so the result waits in the registry for the next tick.
+                std::task::Poll::Ready(Ok(child)) => Box::pin(async move { Ok(resolve(child)) }),
+                std::task::Poll::Pending => Box::pin(async move {
+                    future
+                        .await
+                        .map(resolve)
+                        .map_err(|error| error_throw("executeAsync failed", &error))
+                }),
+            };
+            Ok(job_registry::register(
+                JobOwner::process_executor(process),
+                process.clone(),
+                started,
+                // TODO(async): cancelling drops the future and the `Process` in it, whose drop
+                // stops the child with SIGTERM; PHP sends SIGINT first and then calls `stop(1)`.
+                runtime_throw("Aborted process".to_string()),
+                future,
+            ))
+        }
+        "wait" | "countActiveJobs" => dispatch_tick_method(
+            JobOwner::process_executor(process),
+            PROCESS_EXECUTOR_TICK_CAP,
+            method_name,
+            args,
+        ),
         other => Err(runtime_throw(format!(
             "unknown ProcessExecutor method `{other}`"
         ))),
@@ -1343,35 +1509,49 @@ fn dispatch_http_downloader_method(
                 .map_err(|error| error_throw("copy failed", &error))?;
             Ok(response_to_wire(&response))
         }
-        // TODO(async): the future runs to completion here, so the promise the plugin receives
-        // is already settled and requests it starts together run one after another instead of
-        // overlapping. Deferring the settlement needs a promise representation that crosses the
-        // boundary unresolved.
         "add" | "addCopy" => {
             let url = arg::<String>(method_name, args, 0)?;
-            let outcome = if method_name == "add" {
-                let options =
-                    arg_or::<IndexMap<String, PhpMixed>>(method_name, args, 1, IndexMap::new())?;
-                crate::util::sync_executor::block_on(downloader.borrow().add(&url, options))
+            let (to, options_position) = if method_name == "add" {
+                (None, 1)
             } else {
-                let to = arg::<String>(method_name, args, 1)?;
-                let options =
-                    arg_or::<IndexMap<String, PhpMixed>>(method_name, args, 2, IndexMap::new())?;
-                crate::util::sync_executor::block_on(
-                    downloader.borrow().add_copy(&url, &to, options),
-                )
+                (Some(arg::<String>(method_name, args, 1)?), 2)
             };
-            match outcome {
-                Ok(response) => resolved_promise(response_to_wire(&response)),
-                // PHP raises the empty-url check and the async gate out of `add()`/`addCopy()`
-                // itself, before the promise exists, and only what the job's resolver raises
-                // becomes a rejection. Those two are the port's only `LogicException`s here, and
-                // a failed request is a `TransportException`.
-                Err(error) if error.is_instanceof::<LogicException>() => {
-                    Err(error_throw(&format!("{method_name} failed"), &error))
+            let options = arg_or::<IndexMap<String, PhpMixed>>(
+                method_name,
+                args,
+                options_position,
+                IndexMap::new(),
+            )?;
+            let failed =
+                |error: anyhow::Error| error_throw(&format!("{method_name} failed"), &error);
+            let started = std::rc::Rc::new(std::cell::Cell::new(false));
+            // PHP raises the empty-url check and the async gate out of `add()`/`addCopy()`
+            // itself, before the promise exists; only a failed request becomes a rejection.
+            let job = downloader
+                .borrow()
+                .add_job(&url, to.as_deref(), options, started.clone())
+                .map_err(failed)?;
+            match job {
+                crate::util::http_downloader::HttpDownloaderJob::Settled(Ok(response)) => {
+                    resolved_promise(response_to_wire(&response))
                 }
-                Err(error) => {
-                    rejected_promise(error_throw(&format!("{method_name} failed"), &error))
+                crate::util::http_downloader::HttpDownloaderJob::Settled(Err(error)) => {
+                    rejected_promise(failed(error))
+                }
+                crate::util::http_downloader::HttpDownloaderJob::Pending(future) => {
+                    let method = method_name.to_string();
+                    Ok(job_registry::register(
+                        JobOwner::http_downloader(downloader),
+                        downloader.clone(),
+                        started,
+                        error_throw("", &crate::util::HttpDownloader::canceled(&url).into()),
+                        Box::pin(async move {
+                            future
+                                .await
+                                .map(|response| response_to_wire(&response))
+                                .map_err(|error| error_throw(&format!("{method} failed"), &error))
+                        }),
+                    ))
                 }
             }
         }
@@ -1379,10 +1559,12 @@ fn dispatch_http_downloader_method(
             downloader.borrow_mut().enable_async();
             Ok(PluginValue::Null)
         }
-        // TODO(async): every request settles before the call that started it returns, so the
-        // downloader never holds a queued or started job for these two to report on.
-        "wait" => Ok(PluginValue::Null),
-        "countActiveJobs" => Ok(PluginValue::Int(0)),
+        "wait" | "countActiveJobs" => dispatch_tick_method(
+            JobOwner::http_downloader(downloader),
+            HTTP_DOWNLOADER_TICK_CAP,
+            method_name,
+            args,
+        ),
         other => Err(runtime_throw(format!(
             "unknown HttpDownloader method `{other}`"
         ))),
@@ -3192,31 +3374,19 @@ impl PhpInstallerProxy {
     }
 
     /// The `?PromiseInterface` half of the installer contract. The Rust callers await the
-    /// installer's effects rather than chaining continuations, so a returned promise is drained
-    /// here: an already-settled one yields its value (or raises its rejection reason), while a
-    /// still-pending one is an explicit error.
-    ///
-    /// TODO(async): resolving a still-pending promise would need a concurrent execution engine
-    /// the boundary does not have.
-    fn promise_result(&self, method: &str, value: PluginValue) -> anyhow::Result<Option<PhpMixed>> {
-        let handle = match value {
+    /// installer's effects rather than chaining continuations, so a returned promise is awaited
+    /// here as the PHP-owned job it crossed the boundary as.
+    async fn promise_result(
+        &self,
+        method: &str,
+        value: PluginValue,
+    ) -> anyhow::Result<Option<PhpMixed>> {
+        let id = match value {
             PluginValue::Null => return Ok(None),
-            PluginValue::PhpHandle(handle) => handle,
+            PluginValue::Job(id) => id,
             other => return Err(self.unsupported_shape(method, &other)),
         };
-        if !php_is_a(&handle, "React\\Promise\\PromiseInterface")? {
-            return Err(self.unsupported_shape(method, &PluginValue::PhpHandle(handle)));
-        }
-        let phandle = handle.phandle;
-        let settled = unwrap_php_result(call_function_with_dispatcher(
-            "__shirabe_settle_promise",
-            vec![PluginValue::PhpHandle(handle)],
-            Some(&mut PluginRpcDispatcher::default()),
-        ));
-        // The promise entity was interned in the worker's P table when it crossed; it has no
-        // owner on this side beyond this call, on the rejection path too.
-        let _ = release_php_handle(phandle);
-        match settled? {
+        match job_registry::await_php_job(id).await? {
             PluginValue::Null => Ok(None),
             other => Ok(Some(other.to_php_mixed()?)),
         }
@@ -3262,7 +3432,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
             Self::optional_package_arg(&prev_package),
         ];
         let value = self.call("download", args)?;
-        self.promise_result("download", value)
+        self.promise_result("download", value).await
     }
 
     async fn prepare(
@@ -3277,7 +3447,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
             Self::optional_package_arg(&prev_package),
         ];
         let value = self.call("prepare", args)?;
-        self.promise_result("prepare", value)
+        self.promise_result("prepare", value).await
     }
 
     async fn install(
@@ -3287,7 +3457,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)];
         let value = self.call("install", args)?;
-        self.promise_result("install", value)
+        self.promise_result("install", value).await
     }
 
     async fn update(
@@ -3302,7 +3472,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
             Self::package_arg(&target),
         ];
         let value = self.call("update", args)?;
-        self.promise_result("update", value)
+        self.promise_result("update", value).await
     }
 
     async fn uninstall(
@@ -3312,7 +3482,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
     ) -> anyhow::Result<Option<PhpMixed>> {
         let args = vec![Self::repo_arg(repo)?, Self::package_arg(&package)];
         let value = self.call("uninstall", args)?;
-        self.promise_result("uninstall", value)
+        self.promise_result("uninstall", value).await
     }
 
     async fn cleanup(
@@ -3327,7 +3497,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
             Self::optional_package_arg(&prev_package),
         ];
         let value = self.call("cleanup", args)?;
-        self.promise_result("cleanup", value)
+        self.promise_result("cleanup", value).await
     }
 
     fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {

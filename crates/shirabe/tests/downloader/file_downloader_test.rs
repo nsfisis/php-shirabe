@@ -157,7 +157,7 @@ fn test_download_but_file_is_unsaved() {
 
     let (downloader, http_downloader, _guard) = get_downloader(None, Some(config));
 
-    let mut loop_ = Loop::new(http_downloader, None);
+    let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
         downloader
             .download(package.clone(), &path, None, true)
@@ -284,7 +284,7 @@ fn test_download_file_with_invalid_checksum() {
     std::fs::create_dir_all(dir).unwrap();
     std::fs::write(&dl_file, b"").unwrap();
 
-    let mut loop_ = Loop::new(http_downloader, None);
+    let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
         downloader
             .download(package.clone(), &path, None, true)
@@ -370,7 +370,7 @@ fn test_downgrade_shows_appropriate_message() {
     std::fs::create_dir_all(dir).unwrap();
     std::fs::write(&dl_file, b"").unwrap();
 
-    let mut loop_ = Loop::new(http_downloader, None);
+    let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
         downloader
             .download(new_package.clone(), &path, Some(old_package.clone()), true)

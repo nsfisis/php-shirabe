@@ -544,6 +544,21 @@ impl ProcessExecutor {
     where
         C: IntoExecCommand,
     {
+        self.execute_async_job(command, cwd, None)
+    }
+
+    /// `execute_async` for a caller that registers the future as a job (see
+    /// `docs/dev/plugin-async.md`): `started` is set once the job budget lets the job through,
+    /// which is when PHP's `startJob()` moves it from `STATUS_QUEUED` to `STATUS_STARTED`.
+    pub(crate) fn execute_async_job<C>(
+        &mut self,
+        command: C,
+        cwd: Option<&str>,
+        started: Option<std::rc::Rc<std::cell::Cell<bool>>>,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Process>>>>
+    where
+        C: IntoExecCommand,
+    {
         let command = command.into_exec_command();
         if self.mock.is_some() {
             // PHP resolves the promise with a Process mock whose getOutput/isSuccessful/getExitCode
@@ -582,6 +597,9 @@ impl ProcessExecutor {
                 .acquire()
                 .await
                 .expect("the semaphore is never closed");
+            if let Some(started) = started {
+                started.set(true);
+            }
 
             Self::output_command_run_with(&io, &command, cwd.as_deref(), true);
 

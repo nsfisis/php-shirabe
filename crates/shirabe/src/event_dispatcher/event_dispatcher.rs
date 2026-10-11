@@ -1711,6 +1711,11 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
             if method_name == "__shirabeCallStatic" {
                 return crate::plugin::php_plugin_proxy::call_static_entity(&args);
             }
+            if let Some(answer) =
+                crate::plugin::php_plugin_proxy::dispatch_job_service_method(method_name, &args)
+            {
+                return answer;
+            }
             return Err(runtime_throw(format!(
                 "unknown runtime service method `{method_name}`"
             )));

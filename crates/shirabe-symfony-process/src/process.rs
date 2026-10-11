@@ -485,6 +485,42 @@ impl Process {
             .unwrap_or(0))
     }
 
+    /// Returns true if the child process has been terminated by an uncaught signal.
+    pub fn has_been_signaled(&mut self) -> anyhow::Result<bool> {
+        self.require_process_is_terminated("hasBeenSignaled")?;
+
+        Ok(self
+            .process_information
+            .as_ref()
+            .and_then(|i| i.get("signaled"))
+            .map(shirabe_php_shim::php_truthy)
+            .unwrap_or(false))
+    }
+
+    /// Returns true if the child process has been stopped by a signal.
+    pub fn has_been_stopped(&mut self) -> anyhow::Result<bool> {
+        self.require_process_is_terminated("hasBeenStopped")?;
+
+        Ok(self
+            .process_information
+            .as_ref()
+            .and_then(|i| i.get("stopped"))
+            .map(shirabe_php_shim::php_truthy)
+            .unwrap_or(false))
+    }
+
+    /// Returns the number of the signal that caused the child process to stop its execution.
+    pub fn get_stop_signal(&mut self) -> anyhow::Result<i64> {
+        self.require_process_is_terminated("getStopSignal")?;
+
+        Ok(self
+            .process_information
+            .as_ref()
+            .and_then(|i| i.get("stopsig"))
+            .and_then(|v| v.as_int())
+            .unwrap_or(0))
+    }
+
     /// Checks if the process is currently running.
     pub fn is_running(&mut self) -> bool {
         if Self::STATUS_STARTED != self.status {
@@ -510,6 +546,13 @@ impl Process {
         self.update_status(false);
 
         Self::STATUS_TERMINATED == self.status
+    }
+
+    /// Gets the process status.
+    pub fn get_status(&mut self) -> &str {
+        self.update_status(false);
+
+        &self.status
     }
 
     /// Stops the process.
@@ -625,6 +668,11 @@ impl Process {
         self.cwd.clone()
     }
 
+    /// Gets the environment variables.
+    pub fn get_env(&self) -> &IndexMap<String, PhpMixed> {
+        &self.env
+    }
+
     /// Sets the environment variables.
     pub fn set_env(&mut self, env: IndexMap<String, PhpMixed>) -> &mut Self {
         self.env = env;
@@ -662,6 +710,17 @@ impl Process {
         }
 
         Ok(())
+    }
+
+    pub fn get_start_time(&self) -> anyhow::Result<f64> {
+        if !self.is_started() {
+            return Err(LogicException::new(
+                "Start time is only available after process start.".to_string(),
+            )
+            .into());
+        }
+
+        Ok(self.starttime.unwrap_or_default())
     }
 
     /// Returns whether TTY is supported on the current operating system.

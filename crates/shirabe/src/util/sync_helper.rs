@@ -180,7 +180,7 @@ impl SyncHelper {
         >,
     ) -> anyhow::Result<()> {
         if let Some(promise) = promise {
-            crate::util::sync_executor::block_on(r#loop.borrow_mut().wait(vec![promise], None))?;
+            crate::util::sync_executor::block_on(r#loop.borrow().wait(vec![promise], None))?;
         }
         Ok(())
     }

@@ -157,6 +157,156 @@ final class ShirabePhpObjectRegistry
     }
 }
 
+/**
+ * The worker's half of the job registry (docs/dev/plugin-async.md). A job is an asynchronous
+ * operation one side runs and the other side holds a promise for; only its id crosses the wire.
+ * The Rust side allocates odd ids, this side even ones.
+ */
+final class ShirabeJobRegistry
+{
+    /**
+     * Rust-owned jobs that have not settled yet. The entry holds the Deferred strongly: it has
+     * to outlive the plugin dropping its promise, until the Rust side reports the outcome.
+     *
+     * @var array<int, \React\Promise\Deferred>
+     */
+    private static array $deferreds = [];
+    /**
+     * PHP-owned jobs that have not settled yet. Holding the promise keeps its object id from
+     * being reused while the id is interned.
+     *
+     * @var array<int, \React\Promise\PromiseInterface>
+     */
+    private static array $promises = [];
+    /** @var array<int, int> spl_object_id => job id, so one promise keeps one id */
+    private static array $idsByObjectId = [];
+    /**
+     * Settled promises built here on the Rust side's behalf, each waiting for the answer that
+     * carries its id back.
+     *
+     * @var array<int, \React\Promise\PromiseInterface>
+     */
+    private static array $parked = [];
+    private static int $nextId = 2;
+
+    private static function requireReact(): void
+    {
+        if (!class_exists(\React\Promise\Deferred::class)) {
+            throw new RuntimeException(
+                'react/promise is not loaded in the plugin process, so a PromiseInterface cannot be built'
+            );
+        }
+    }
+
+    /** The promise standing for a job id that arrived over the wire. */
+    public static function promiseFor(int $id): \React\Promise\PromiseInterface
+    {
+        if ($id % 2 === 0) {
+            if (isset(self::$parked[$id])) {
+                $promise = self::$parked[$id];
+                unset(self::$parked[$id]);
+                return $promise;
+            }
+            if (!isset(self::$promises[$id])) {
+                throw new RuntimeException("unknown PHP-owned job {$id}");
+            }
+            return self::$promises[$id];
+        }
+        if (!isset(self::$deferreds[$id])) {
+            self::requireReact();
+            self::$deferreds[$id] = new \React\Promise\Deferred(static function () use ($id): void {
+                // The Rust side drops the job, so no settle push follows either way. It answers
+                // with the exception a started job is cancelled with, and with null for one that
+                // had not started, which Composer aborts without rejecting.
+                unset(self::$deferreds[$id]);
+                $thrown = ShirabeRpcRuntime::callRust(0, '__shirabeCancelJob', [$id]);
+                if ($thrown !== null) {
+                    [$class, $message, $code, $properties] = $thrown;
+                    throw \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties);
+                }
+            });
+        }
+        return self::$deferreds[$id]->promise();
+    }
+
+    private static function take(int $id): \React\Promise\Deferred
+    {
+        if (!isset(self::$deferreds[$id])) {
+            throw new RuntimeException("unknown Rust-owned job {$id}");
+        }
+        $deferred = self::$deferreds[$id];
+        unset(self::$deferreds[$id]);
+        return $deferred;
+    }
+
+    /** Runs the callbacks chained on the job's promise before it returns. */
+    public static function resolve(int $id, $value): void
+    {
+        self::take($id)->resolve($value);
+    }
+
+    public static function reject(int $id, \Throwable $reason): void
+    {
+        self::take($id)->reject($reason);
+    }
+
+    /**
+     * The descriptor of a settled promise the Rust side asked for. It names no job: the Rust
+     * side passes it on as the answer of the call it is serving, and the promise is handed out
+     * when that answer arrives.
+     *
+     * @return array{__job: int}
+     */
+    public static function park(\React\Promise\PromiseInterface $promise): array
+    {
+        $id = self::$nextId;
+        self::$nextId += 2;
+        self::$parked[$id] = $promise;
+        return ['__job' => $id];
+    }
+
+    /**
+     * The descriptor of a promise leaving for the Rust side. The recorder attached here reports
+     * the outcome when the promise settles, which is right away for one that already has.
+     *
+     * @return array{__job: int}
+     */
+    public static function descriptor(\React\Promise\PromiseInterface $promise): array
+    {
+        $objectId = spl_object_id($promise);
+        if (isset(self::$idsByObjectId[$objectId])) {
+            return ['__job' => self::$idsByObjectId[$objectId]];
+        }
+        $id = self::$nextId;
+        self::$nextId += 2;
+        self::$idsByObjectId[$objectId] = $id;
+        self::$promises[$id] = $promise;
+        $forget = static function () use ($id, $objectId): void {
+            unset(self::$promises[$id], self::$idsByObjectId[$objectId]);
+        };
+        $promise->then(
+            static function ($value) use ($id, $forget): void {
+                $forget();
+                ShirabeRpcRuntime::callRust(0, '__shirabeResolveJob', [$id, $value]);
+            },
+            static function ($reason) use ($id, $forget): void {
+                $forget();
+                if (!$reason instanceof Throwable) {
+                    $reason = new RuntimeException('the promise was rejected with ' . gettype($reason));
+                }
+                // TODO(plugin): the properties field is empty in this direction; no Rust-side
+                // consumer rebuilds a ported exception from these fields yet.
+                ShirabeRpcRuntime::callRust(
+                    0,
+                    '__shirabeRejectJob',
+                    [$id, get_class($reason), $reason->getMessage(), (int) $reason->getCode(), []]
+                );
+            }
+        );
+        return ['__job' => $id];
+    }
+}
+
 final class ShirabeRpcRuntime
 {
     /** @var resource */
@@ -171,6 +321,28 @@ final class ShirabeRpcRuntime
     private static int $nextCorrId = 2;
     private static bool $scriptAutoloaderRegistered = false;
     private static bool $shuttingDown = false;
+    /**
+     * The worker-side Loop of each Composer entity, with the stub it was built for. Holding the
+     * stub keeps the entity's handle, and with it this entry, alive for the rest of the run.
+     *
+     * @var array<int, array{0: object, 1: \Composer\Util\Loop}>
+     */
+    private static array $loops = [];
+
+    /**
+     * Serves `Composer::getLoop()`: the Loop is a two-world class, so the one a plugin gets is
+     * built here over the proxies of the two services the Rust-side Loop drives.
+     */
+    public static function loopFor(object $composer, int $rhandle): \Composer\Util\Loop
+    {
+        if (!isset(self::$loops[$rhandle])) {
+            [$httpDownloader, $processExecutor] = self::callRust($rhandle, '__shirabeLoopServices', []);
+            $loop = new \Composer\Util\Loop($httpDownloader, $processExecutor);
+            $loop->__shirabeBindToExecution();
+            self::$loops[$rhandle] = [$composer, $loop];
+        }
+        return self::$loops[$rhandle][1];
+    }
 
     public static function fail(string $message): void
     {
@@ -246,6 +418,9 @@ final class ShirabeRpcRuntime
             }
             // A natively-constructed dual-mode instance falls through to the P table below.
         }
+        if ($value instanceof \React\Promise\PromiseInterface) {
+            return ShirabeJobRegistry::descriptor($value);
+        }
         if (is_object($value)) {
             // A materialized value needs no descriptor: it crosses as the object record
             // serialize() writes for it, which the Rust side decodes into its own value.
@@ -273,6 +448,7 @@ final class ShirabeRpcRuntime
      * __pclass matches on the reserved key alone, so an array a plugin built with a __rhandle or
      * __phandle key of its own is read as a handle rather than kept as data. The Rust half
      * (`decode_handle` in `src/value.rs`) matches the whole key set, and diverges the other way.
+     * __pclass and __job are single-key descriptors and match on that.
      */
     public static function fromWire($value)
     {
@@ -291,6 +467,9 @@ final class ShirabeRpcRuntime
         }
         if (isset($value['__pclass']) && count($value) === 1) {
             return $value['__pclass'];
+        }
+        if (isset($value['__job']) && count($value) === 1) {
+            return ShirabeJobRegistry::promiseFor((int) $value['__job']);
         }
         return array_map([self::class, 'fromWire'], $value);
     }
@@ -831,19 +1010,18 @@ ShirabeRpcRuntime::$dispatch = [
         return true;
     },
     // An already-fulfilled promise for a Rust-side call whose PHP signature declares
-    // PromiseInterface. The Rust future ran to completion before this is called, so there is
-    // nothing left to defer.
+    // PromiseInterface and that has the value before a job exists.
     '__shirabe_resolved_promise' => static function ($args) {
         if (!function_exists('React\\Promise\\resolve')) {
             throw new RuntimeException(
                 'react/promise is not loaded in the plugin process, so a PromiseInterface cannot be built'
             );
         }
-        return \React\Promise\resolve($args[0]);
+        return ShirabeJobRegistry::park(\React\Promise\resolve($args[0]));
     },
-    // An already-rejected promise for a Rust-side call whose PHP signature declares
-    // PromiseInterface. A failed request surfaces to the caller as a rejection it handles, the
-    // way it does under Composer, rather than as a throw out of the call that started it.
+    // The failure half: a job that failed before it could be registered surfaces to the caller
+    // as a rejection it handles, the way it does under Composer, rather than as a throw out of
+    // the call that started it.
     '__shirabe_rejected_promise' => static function ($args) {
         if (!function_exists('React\\Promise\\reject')) {
             throw new RuntimeException(
@@ -852,45 +1030,23 @@ ShirabeRpcRuntime::$dispatch = [
         }
         [$class, $message, $code, $properties] = $args;
 
-        return \React\Promise\reject(
+        return ShirabeJobRegistry::park(\React\Promise\reject(
+            \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties)
+        ));
+    },
+    // The settle pushes of a Rust-owned job, sent from inside the tick that saw it finish. The
+    // callbacks plugin code chained on the job's promise run before these return.
+    '__shirabe_resolve_job' => static function ($args) {
+        ShirabeJobRegistry::resolve((int) $args[0], $args[1]);
+        return null;
+    },
+    '__shirabe_reject_job' => static function ($args) {
+        [$id, $class, $message, $code, $properties] = $args;
+        ShirabeJobRegistry::reject(
+            (int) $id,
             \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties)
         );
-    },
-    // Drains a promise a plugin returned to the Rust side. React settles promises
-    // synchronously, so an already-settled one runs these handlers during then(); one that is
-    // still pending is an explicit error rather than a silently dropped continuation.
-    '__shirabe_settle_promise' => static function ($args) {
-        $promise = $args[0];
-        if (!$promise instanceof \React\Promise\PromiseInterface) {
-            throw new RuntimeException('__shirabe_settle_promise expects a promise handle');
-        }
-        $settled = false;
-        $value = null;
-        $rejected = false;
-        $reason = null;
-        $promise->then(
-            static function ($result) use (&$settled, &$value) {
-                $settled = true;
-                $value = $result;
-            },
-            static function ($error) use (&$settled, &$rejected, &$reason) {
-                $settled = true;
-                $rejected = true;
-                $reason = $error;
-            }
-        );
-        if (!$settled) {
-            throw new RuntimeException(
-                'the promise returned to Shirabe is still pending; deferred resolution across the'
-                . ' RPC boundary is not implemented yet'
-            );
-        }
-        if ($rejected) {
-            throw $reason instanceof Throwable
-                ? $reason
-                : new RuntimeException('the promise returned to Shirabe was rejected with ' . gettype($reason));
-        }
-        return $value;
+        return null;
     },
     // Replays environment writes the Rust side made after this process was spawned, which only
     // inherited the environment as it stood then. The three storages PHP exposes are distinct

@@ -981,7 +981,7 @@ impl InstallationManager {
             && !self.io.is_debug()
             && promise_count > 1;
 
-        let result = self.loop_.borrow_mut().wait(promises, None).await;
+        let result = self.loop_.borrow().wait(promises, None).await;
 
         if result.is_ok() && show_progress {
             let bar = {
@@ -1034,7 +1034,7 @@ impl InstallationManager {
         }
 
         if (promises.len() as i64) > 0 {
-            let _ = self.loop_.borrow_mut().wait(promises, None).await;
+            let _ = self.loop_.borrow().wait(promises, None).await;
         }
     }
 

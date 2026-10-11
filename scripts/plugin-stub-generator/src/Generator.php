@@ -150,6 +150,11 @@ final class Generator
         foreach ($this->targets as $fqcn) {
             $files[str_replace('\\', '/', $fqcn) . '.php'] = $this->emitClass($fqcn);
         }
+        foreach (array_keys(self::LOCAL_BODIES) as $method) {
+            if (!isset($this->usedLocalBodies[$method])) {
+                $this->errors[] = "$method has a worker-side body but no stub declares it";
+            }
+        }
         if ($this->errors !== []) {
             throw new GenerationError($this->errors);
         }
@@ -557,12 +562,28 @@ final class Generator
         return $out;
     }
 
+    /**
+     * Methods a stub answers in the worker instead of forwarding. `Composer\Util\Loop` is a
+     * two-world class the Rust side never hands out as an entity, so `getLoop()` answers with the
+     * worker-side sibling built over the proxied services (docs/dev/plugin-async.md).
+     */
+    private const LOCAL_BODIES = [
+        'Composer\\PartialComposer::getLoop' => '        return \\ShirabeRpcRuntime::loopFor($this, $this->__rhandle);',
+    ];
+
+    /** @var array<string, true> */
+    private array $usedLocalBodies = [];
+
     private function renderProxyMethod(string $fqcn, string $name, ClassMethod $method, SourceFile $target): string
     {
         [$params, $args, $outPositions] = $this->renderParams($fqcn, $name, $method, $target);
         $returnType = $this->printer->renderType($method->returnType, $target);
         $signature = "public function $name(" . implode(', ', $params) . ')'
             . ($returnType === '' ? '' : ": $returnType");
+        if (isset(self::LOCAL_BODIES["$fqcn::$name"])) {
+            $this->usedLocalBodies["$fqcn::$name"] = true;
+            return "    $signature\n    {\n" . self::LOCAL_BODIES["$fqcn::$name"] . "\n    }";
+        }
         $body = $this->renderForwardingBody(
             "\\ShirabeRpcRuntime::callRust(\$this->__rhandle, '$name', %s%s)",
             $args,

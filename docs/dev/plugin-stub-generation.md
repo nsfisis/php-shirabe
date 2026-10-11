@@ -88,6 +88,11 @@ the generator's vendor directory or the classifier report is unavailable.
   the class's own public methods already cover their surface.
 * Methods returning `self`/`static` perform the RPC and then `return $this;`
   to preserve identity instead of round-tripping the handle.
+* A method listed in `Generator::LOCAL_BODIES` gets the body given there instead
+  of a forward. `PartialComposer::getLoop()` is the one entry: `Composer\Util\Loop`
+  is a `two-world` class the Rust side never hands out as an entity, so the stub
+  answers with the worker-side Loop built over the proxied services
+  (`docs/dev/plugin-async.md`). An entry no stub declares fails generation.
 * **By-ref parameters** are declared `&$name` on the stub as well. The call
   carries their positions, and the answer carries the value each of them holds
   afterwards, which the stub assigns back (see "By-ref parameters" in

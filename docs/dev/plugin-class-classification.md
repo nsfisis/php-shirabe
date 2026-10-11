@@ -398,48 +398,36 @@ plugins actually write). Children are spawned in the Rust process either way,
 which is also correct for stdio: the worker inherits the Rust process's
 standard streams, so both worlds see the same terminal.
 
-What stays an explicit error is the async surface — `executeAsync()`,
-`wait()`, `enableAsync()`, `countActiveJobs()` — for two reasons that outlive
-the choice of category. `executeAsync()` resolves its promise with a
-`Symfony\Component\Process\Process`, whose state is the `proc_open()`
-resource and OS pipes of whichever process called `start()`, so a Rust-side
-spawn has no such object to hand back; and driving it needs a promise
-representation that crosses the boundary unresolved, which the execution model
-does not have. Neither is specific to how the executor is obtained: a plugin
-can reach the async path on an instance of its own, since `enableAsync()`,
-`wait()` and `countActiveJobs()` are all public (`@internal` is a docblock
-note).
+The async surface — `executeAsync()`, `wait()`, `enableAsync()`,
+`countActiveJobs()` — is served on the same terms, for a graph-owned executor
+and a plugin-`new`ed one alike: `enableAsync()`, `wait()` and
+`countActiveJobs()` are all public (`@internal` is a docblock note), so a
+plugin can reach the async path on an instance of its own. `executeAsync()`
+resolves its promise with a `Symfony\Component\Process\Process`, whose state
+is the `proc_open()` resource and OS pipes of whichever process called
+`start()`. A Rust-side spawn has no such object to hand back, so the promise
+resolves with a `Shirabe\RustProcessStub`, a subclass limited to the surface
+that inspects a terminated process. See
+[plugin-async.md](./plugin-async.md).
 
 `HttpDownloader` is a proxy stub on the same terms and for the same reasons:
 its options, its TLS defaults and the authentication it collects into the
 run's IO are state the two worlds have to share, and a plugin-`new`ed one
 allocates a Rust-side entity rather than a second downloader the graph knows
 nothing about. `get()` and `copy()` answer with a
-`Composer\Util\Http\Response` the child holds as a value (see below), and the
-async surface answers too, with the future driven to completion before the
-promise is handed over. Requests a plugin starts together therefore run one
-after another rather than overlapping; overlapping them needs a promise
-representation that crosses the boundary unresolved. Everything else the async
-surface does is preserved: `add()` still refuses a downloader outside a `Loop`,
-a failed request still arrives as a rejection rather than as a throw, and
-`wait()` and `countActiveJobs()` still answer for a downloader that holds no
-outstanding job — which, once every request settles before its call returns, it
-never does.
+`Composer\Util\Http\Response` the child holds as a value (see below). The
+async surface registers each request as a job and answers with a promise that
+is still pending; `wait()` and `countActiveJobs()` drive the jobs and settle
+their promises.
 
-This is where `ProcessExecutor` and `HttpDownloader` part company. The
-executor's async surface stays an explicit error because `executeAsync()`
-resolves its promise with a `Symfony\Component\Process\Process`, whose state
-is the `proc_open()` resource of whichever process called `start()`; a request
-resolves its promise with a `Response`, which is data.
-
-`Loop` is a proxy stub too, so `Composer::getLoop()` — the route Composer's own
-docblocks point plugin authors at — reaches the graph's own downloader and
-executor. Its `wait()` drains the promises it is given and rethrows the first
-rejection once the group is done, which is what `React\Promise\all()` hands
-PHP; `abortJobs()` has nothing to cancel while every request settles before the
-call that started it returns. A non-null `$progress` is an explicit error: a
-`ProgressBar` is a symfony/console object each world runs its own
-implementation of, so there is none to hand across.
+`Loop` is `two-world`: the worker runs a port of the class over the two proxied
+services, and the Rust side keeps a Loop of its own for the execution itself.
+`Composer::getLoop()` — the route Composer's own docblocks point plugin authors
+at — answers with the worker-side one, built over the graph's own downloader
+and executor. `React\Promise\all()`, the rethrow of a rejection and the
+`ProgressBar` a caller passes all run in the worker, on real objects.
+`SyncHelper` is `two-world` with it, being pure orchestration over
+`Loop::wait()`.
 
 ### Dual instantiation
 
