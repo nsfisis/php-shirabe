@@ -1,6 +1,6 @@
 # Shirabe
 
-![Shirabe logo](./logo.svg)
+![Shirabe logo](./assets/logo/logo.svg)
 
 Shirabe is a port of [Composer](https://github.com/composer/composer), the dependency manager for PHP, written in Rust.
 
