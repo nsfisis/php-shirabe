@@ -461,10 +461,7 @@ impl Finder {
         };
 
         for entry in read {
-            let entry = match entry {
-                Ok(entry) => entry,
-                Err(_) => continue,
-            };
+            let Ok(entry) = entry else { continue };
 
             let filename = entry.file_name().to_string_lossy().into_owned();
             let pathname = entry.path();
@@ -474,9 +471,19 @@ impl Finder {
                 format!("{relative_dir}/{filename}")
             };
 
-            let metadata = std::fs::metadata(&pathname);
-            let is_dir = metadata.as_ref().map(|m| m.is_dir()).unwrap_or(false);
-            let is_file = metadata.as_ref().map(|m| m.is_file()).unwrap_or(false);
+            let file_type = entry.file_type().ok();
+            let is_symlink = file_type.is_some_and(|t| t.is_symlink());
+            let (is_dir, is_file) = match file_type {
+                Some(file_type) if !is_symlink => (file_type.is_dir(), file_type.is_file()),
+                _ => {
+                    // PHP's is_dir() and is_file() follow symlinks.
+                    let metadata = std::fs::metadata(&pathname).ok();
+                    (
+                        metadata.as_ref().is_some_and(|m| m.is_dir()),
+                        metadata.as_ref().is_some_and(|m| m.is_file()),
+                    )
+                }
+            };
 
             let entry = Entry {
                 pathname: pathname.clone(),
@@ -492,9 +499,6 @@ impl Finder {
                 continue;
             }
 
-            let is_symlink = std::fs::symlink_metadata(&pathname)
-                .map(|m| m.file_type().is_symlink())
-                .unwrap_or(false);
             let can_recurse = is_dir && (self.follow_links || !is_symlink);
 
             out.push(entry);
