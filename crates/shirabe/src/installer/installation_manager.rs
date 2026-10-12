@@ -238,6 +238,7 @@ impl InstallationManager {
     /// shared manager handle, and plugin registration inside the batch re-enters the same
     /// handle (`PluginManager::get_install_path`), so only shared borrows may be outstanding
     /// for the whole call.
+    #[tracing::instrument(skip_all)]
     pub async fn execute(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
@@ -555,6 +556,7 @@ impl InstallationManager {
     }
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
+    #[tracing::instrument(skip_all)]
     async fn execute_batch(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
@@ -834,6 +836,7 @@ impl InstallationManager {
         self.output_progress = output_progress;
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn notify_installs(&mut self, _io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>) {
         // For testing only (ref InstallationManagerMock::notifyInstalls is a noop).
         if self.mock.is_some() {

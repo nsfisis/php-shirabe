@@ -105,6 +105,7 @@ impl AutoloadGenerator {
     }
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
+    #[tracing::instrument(skip_all)]
     pub fn dump(
         &self,
         config: &Config,

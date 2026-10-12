@@ -209,6 +209,7 @@ impl FilesystemRepository {
     }
 
     /// Writes writable repository.
+    #[tracing::instrument(skip_all)]
     pub fn write(
         &mut self,
         dev_mode: bool,
