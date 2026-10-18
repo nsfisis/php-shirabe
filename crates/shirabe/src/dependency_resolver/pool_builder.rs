@@ -303,6 +303,12 @@ impl PoolBuilder {
             }
         }
 
+        // Both lists are reset once the pool is built, so they move into the event and on into
+        // the pool instead of being copied.
+        let mut packages: Vec<BasePackageHandle> =
+            std::mem::take(&mut self.packages).into_values().collect();
+        let mut unacceptable_fixed_or_locked_packages =
+            std::mem::take(&mut self.unacceptable_fixed_or_locked_packages);
         if let Some(event_dispatcher) = self.event_dispatcher.clone() {
             let mut pre_pool_create_event = PrePoolCreateEvent::new(
                 PluginEvents::PRE_POOL_CREATE.to_string(),
@@ -312,33 +318,25 @@ impl PoolBuilder {
                 self.stability_flags.clone(),
                 self.root_aliases.clone(),
                 self.root_references.clone(),
-                self.packages.values().cloned().collect(),
-                self.unacceptable_fixed_or_locked_packages.clone(),
+                packages,
+                unacceptable_fixed_or_locked_packages,
             );
             let pre_pool_create_event_name = pre_pool_create_event.get_name().to_string();
             let dispatched = event_dispatcher.borrow_mut().dispatch(
                 Some(&pre_pool_create_event_name),
                 Some(&mut pre_pool_create_event),
             );
-            let packages: IndexMap<i64, BasePackageHandle> = pre_pool_create_event
-                .get_packages()
-                .iter()
-                .cloned()
-                .enumerate()
-                .map(|(index, package)| (index as i64, package))
-                .collect();
-            let unacceptable_fixed_packages = pre_pool_create_event
-                .get_unacceptable_fixed_packages()
-                .clone();
-            *request = pre_pool_create_event.into_request();
+            let (lent_request, event_packages, event_unacceptable_fixed_packages) =
+                pre_pool_create_event.into_parts();
+            *request = lent_request;
             dispatched?;
-            self.packages = packages;
-            self.unacceptable_fixed_or_locked_packages = unacceptable_fixed_packages;
+            packages = event_packages;
+            unacceptable_fixed_or_locked_packages = event_unacceptable_fixed_packages;
         }
 
         let mut pool = Pool::new(
-            self.packages.values().cloned().collect(),
-            self.unacceptable_fixed_or_locked_packages.to_vec(),
+            packages,
+            unacceptable_fixed_or_locked_packages,
             IndexMap::new(),
             IndexMap::new(),
             IndexMap::new(),

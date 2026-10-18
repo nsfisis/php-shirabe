@@ -61,11 +61,16 @@ impl PrePoolCreateEvent {
         &self.request
     }
 
-    /// Hands back the request the event was built with. `PoolBuilder` lends the event the
-    /// `Request` it is building the pool for, which PHP shares by reference, and takes it back
-    /// once the listeners have run, so whatever they changed on it reaches the solver.
-    pub(crate) fn into_request(self) -> Request {
-        self.request
+    /// Hands back the request the event was built with, together with the package lists as the
+    /// listeners left them. `PoolBuilder` lends the event the `Request` it is building the pool
+    /// for, which PHP shares by reference, and takes it back once the listeners have run, so
+    /// whatever they changed on it reaches the solver.
+    pub(crate) fn into_parts(self) -> (Request, Vec<BasePackageHandle>, Vec<BasePackageHandle>) {
+        (
+            self.request,
+            self.packages,
+            self.unacceptable_fixed_packages,
+        )
     }
 
     pub fn get_acceptable_stabilities(&self) -> &IndexMap<String, i64> {
