@@ -1917,9 +1917,9 @@ pub(crate) fn dispatch_event_method(
         },
         "getTransaction" => match installer_event(event) {
             Some(event) => match event.get_transaction() {
-                Some(transaction) => {
-                    crate::plugin::php_plugin_proxy::transaction_handle_value(transaction)
-                }
+                Some(transaction) => Ok(crate::plugin::php_plugin_proxy::transaction_handle_value(
+                    transaction,
+                )),
                 None => Ok(PluginValue::Null),
             },
             None => Err(runtime_throw(

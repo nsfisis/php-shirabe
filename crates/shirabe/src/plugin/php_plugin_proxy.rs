@@ -236,24 +236,15 @@ pub fn plugin_handle_value(
 }
 
 /// Registers a transaction and returns its wire descriptor.
-pub(crate) fn transaction_handle_value(
-    transaction: &std::rc::Rc<AnyTransaction>,
-) -> Result<PluginValue, PhpThrow> {
+pub(crate) fn transaction_handle_value(transaction: &std::rc::Rc<AnyTransaction>) -> PluginValue {
     let class = match &**transaction {
         AnyTransaction::Transaction(_) => "Composer\\DependencyResolver\\Transaction",
         AnyTransaction::LocalRepoTransaction(_) => {
             "Composer\\DependencyResolver\\LocalRepoTransaction"
         }
-        // TODO(plugin): LockTransaction gets a proxy stub once one crosses the boundary; no
-        // event hands one out.
-        AnyTransaction::LockTransaction(_) => {
-            return Err(runtime_throw(
-                "no proxy stub class is available for a LockTransaction over RPC yet".to_string(),
-            ));
-        }
     };
     let rhandle = register_entity(RustEntity::Transaction(transaction.clone()));
-    Ok(rust_handle_value(rhandle, class))
+    rust_handle_value(rhandle, class)
 }
 
 /// Registers a solver operation and returns its wire descriptor.

@@ -389,14 +389,13 @@ impl Transaction {
     }
 }
 
-/// A `Transaction` of any concrete class, for a value PHP types as `Transaction` while its
-/// subclass stays observable (`InstallerEvent::getTransaction()` hands out the
-/// `LocalRepoTransaction` the installer built).
+/// A `Transaction` whose concrete class stays observable where PHP types the value as
+/// `Transaction` (`InstallerEvent::getTransaction()` hands out the `LocalRepoTransaction` the
+/// installer built). It covers the classes that cross such an API.
 #[derive(Debug)]
 pub enum AnyTransaction {
     Transaction(Transaction),
     LocalRepoTransaction(crate::dependency_resolver::LocalRepoTransaction),
-    LockTransaction(crate::dependency_resolver::LockTransaction),
 }
 
 impl AnyTransaction {
@@ -404,7 +403,6 @@ impl AnyTransaction {
         match self {
             Self::Transaction(transaction) => transaction.get_operations(),
             Self::LocalRepoTransaction(transaction) => transaction.get_operations(),
-            Self::LockTransaction(transaction) => transaction.get_operations(),
         }
     }
 }
