@@ -15,6 +15,8 @@ use crate::installer::InstallerEvent;
 use crate::installer::PackageEvent;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
+use crate::plugin::CommandEvent;
+use crate::plugin::PreCommandRunEvent;
 use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
@@ -429,7 +431,7 @@ impl EventDispatcher {
                 );
                 let stub_class =
                     Self::event_stub_class(event).ok_or_else(|| -> anyhow::Error {
-                        // TODO(plugin): the plugin events have no proxy stub yet.
+                        // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
                         RuntimeException::new(format!(
                         "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
                         event.get_name(),
@@ -1157,7 +1159,7 @@ try {{
         }
 
         let stub_class = Self::event_stub_class(event).ok_or_else(|| -> anyhow::Error {
-            // TODO(plugin): the plugin events have no proxy stub yet.
+            // TODO(plugin): an event class without a proxy stub cannot cross the boundary.
             RuntimeException::new(format!(
                 "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
                 event.get_name(),
@@ -1229,6 +1231,14 @@ try {{
             .is_some()
         {
             Some("Composer\\Plugin\\PrePoolCreateEvent")
+        } else if event.as_any().downcast_ref::<CommandEvent>().is_some() {
+            Some("Composer\\Plugin\\CommandEvent")
+        } else if event
+            .as_any()
+            .downcast_ref::<PreCommandRunEvent>()
+            .is_some()
+        {
+            Some("Composer\\Plugin\\PreCommandRunEvent")
         } else if event.as_any().downcast_ref::<Event>().is_some() {
             Some("Composer\\EventDispatcher\\Event")
         } else {
@@ -1869,6 +1879,36 @@ pub(crate) fn dispatch_event_method(
                 "getOperation is only available on package events".to_string(),
             )),
         },
+        "getCommandName" => match event.as_any().downcast_ref::<CommandEvent>() {
+            Some(event) => Ok(PluginValue::string(event.get_command_name())),
+            None => Err(runtime_throw(
+                "getCommandName is only available on command events".to_string(),
+            )),
+        },
+        "getCommand" => match event.as_any().downcast_ref::<PreCommandRunEvent>() {
+            Some(event) => Ok(PluginValue::string(event.get_command())),
+            None => Err(runtime_throw(
+                "getCommand is only available on pre-command-run events".to_string(),
+            )),
+        },
+        // TODO(plugin): symfony/console lives in both worlds independently, and nothing hands
+        // the Rust-side console input and output to the plugin process yet.
+        "getInput" | "getOutput"
+            if event.as_any().downcast_ref::<CommandEvent>().is_some()
+                || event
+                    .as_any()
+                    .downcast_ref::<PreCommandRunEvent>()
+                    .is_some() =>
+        {
+            Err(runtime_throw(format!(
+                "the console {} of a command event is not available over RPC yet",
+                if method_name == "getInput" {
+                    "input"
+                } else {
+                    "output"
+                }
+            )))
+        }
         "isExecutingOperations" => match installer_event(event) {
             Some(event) => Ok(PluginValue::Bool(event.is_executing_operations())),
             None => Err(runtime_throw(

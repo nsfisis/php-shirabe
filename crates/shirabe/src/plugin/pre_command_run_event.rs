@@ -1,6 +1,5 @@
 //! ref: composer/src/Composer/Plugin/PreCommandRunEvent.php
 
-// TODO(plugin): this event is part of the plugin API and is dispatched before a command runs
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
 use indexmap::IndexMap;

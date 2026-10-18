@@ -337,13 +337,13 @@ impl Command for ArchiveCommand {
 
         let config = if let Some(ref composer) = composer {
             let config = composer.borrow_partial().get_config();
-            // TODO(plugin): dispatch CommandEvent
-            let command_event =
+            let mut command_event =
                 CommandEvent::new(PluginEvents::COMMAND, "archive", input.clone(), output);
+            let command_event_name = command_event.get_name().to_string();
             let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
             event_dispatcher
                 .borrow_mut()
-                .dispatch(Some(command_event.get_name()), None);
+                .dispatch(Some(&command_event_name), Some(&mut command_event))?;
             event_dispatcher.borrow_mut().dispatch_script(
                 ScriptEvents::PRE_ARCHIVE_CMD,
                 true,

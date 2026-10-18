@@ -51,9 +51,8 @@ Inputs:
   exemption.
 * `guard-exemptions.list` — the Rust-owned FQCNs that stay resolvable to the real
   Composer class, each with the worker-side mechanism that makes a native
-  instance correct (the materialized-value codec for `Composer\Package\Link`,
-  the dual-mode `Composer\EventDispatcher\Event` for
-  `Composer\Plugin\PreCommandRunEvent`). An entry that needs no guard anyway
+  instance correct (the materialized-value codec for `Composer\Package\Link`
+  and `Composer\Util\Http\Response`). An entry that needs no guard anyway
   fails the run.
 
 The freshness check for both sets runs in `cargo test` as

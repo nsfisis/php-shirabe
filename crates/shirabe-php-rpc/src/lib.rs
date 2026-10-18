@@ -1021,6 +1021,10 @@ const STUB_FILES: &[(&str, &str)] = &[
         include_str!("../php/stubs/Composer/Plugin/PrePoolCreateEvent.php"),
     ),
     (
+        "Composer/Plugin/CommandEvent.php",
+        include_str!("../php/stubs/Composer/Plugin/CommandEvent.php"),
+    ),
+    (
         "Composer/DependencyResolver/Transaction.php",
         include_str!("../php/stubs/Composer/DependencyResolver/Transaction.php"),
     ),
@@ -1081,6 +1085,10 @@ const RUNTIME_FILES: &[(&str, &str)] = &[
     (
         "Composer/EventDispatcher/Event.php",
         include_str!("../php/runtime/Composer/EventDispatcher/Event.php"),
+    ),
+    (
+        "Composer/Plugin/PreCommandRunEvent.php",
+        include_str!("../php/runtime/Composer/Plugin/PreCommandRunEvent.php"),
     ),
     (
         "Composer/Util/Loop.php",

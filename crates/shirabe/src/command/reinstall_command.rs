@@ -183,13 +183,13 @@ impl Command for ReinstallCommand {
             b_order.cmp(&a_order)
         });
 
-        // TODO(plugin): dispatch CommandEvent
-        let command_event =
+        let mut command_event =
             CommandEvent::new(PluginEvents::COMMAND, "reinstall", input.clone(), output);
+        let command_event_name = command_event.get_name().to_string();
         let event_dispatcher = composer.get_event_dispatcher();
         event_dispatcher
             .borrow_mut()
-            .dispatch(Some(command_event.get_name()), None);
+            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
 
         let config = composer.get_config();
         let (prefer_source, prefer_dist) =

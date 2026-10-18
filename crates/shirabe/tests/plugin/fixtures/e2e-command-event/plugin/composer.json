@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/command-event-recorder",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin recording the command events it is subscribed to.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\CommandEvent\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\CommandEvent\\Plugin"
+    }
+}

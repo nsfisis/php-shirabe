@@ -105,19 +105,19 @@ impl Command for LicensesCommand {
     ) -> anyhow::Result<i64> {
         let composer_handle = self.require_composer(None, None)?;
 
-        // TODO(plugin): dispatch COMMAND event for plugin hooks
-        let command_event = CommandEvent::new(
+        let mut command_event = CommandEvent::new(
             PluginEvents::COMMAND,
             "licenses",
             input.clone(),
             output.clone(),
         );
+        let command_event_name = command_event.get_name().to_string();
         // The event dispatcher reads back through the shared Composer handle (script listeners), so the
         // dispatch must run while no other borrow of that handle is held.
         let event_dispatcher = composer_handle.borrow_partial().get_event_dispatcher();
         event_dispatcher
             .borrow_mut()
-            .dispatch(Some(command_event.get_name()), None);
+            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
 
         let composer = crate::composer::composer_full(&composer_handle);
         let root = composer.get_package();

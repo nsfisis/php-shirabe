@@ -509,7 +509,7 @@ impl Command for RemoveCommand {
         composer
             .get_event_dispatcher()
             .borrow_mut()
-            .dispatch(Some(&command_event_name), Some(&mut command_event));
+            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
 
         let allow_plugins = composer.get_config().borrow_mut().get("allow-plugins");
         let removed_plugins: Vec<String> =

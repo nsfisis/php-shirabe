@@ -256,6 +256,9 @@ by `scripts/plugin-stub-generator/generate-stubs` and must not be edited by hand
   Composer code in the worker does `new PreCommandRunEvent(...)`, whose parent constructor lands
   here) is a faithful in-process port of the real base class and crosses the wire as a P-table
   entity (`__shirabeRustHandleDescriptor()` returns null in native mode).
+- `Composer\Plugin\PreCommandRunEvent` — dual-mode in the same way as its parent: the event a
+  built-in command dispatches on the Rust side arrives as a proxy, while the one
+  `BaseCommand::initialize()` constructs here for a plugin command is the real class's port.
 
 `php/guards/` holds the guard classes: one per Composer class whose entity lives on the Rust side
 and that neither a stub nor a runtime class shadows. A guard keeps the FQCN, the hierarchy and the

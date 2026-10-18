@@ -132,13 +132,13 @@ impl Command for InstallCommand {
             io.write_error("<warning>Shirabe is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>");
         }
 
-        // TODO(plugin): dispatch CommandEvent
-        let command_event =
+        let mut command_event =
             CommandEvent::new(PluginEvents::COMMAND, "install", input.clone(), output);
+        let command_event_name = command_event.get_name().to_string();
         composer
             .get_event_dispatcher()
             .borrow_mut()
-            .dispatch(Some(command_event.get_name()), None);
+            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
 
         let mut install = Installer::create(io.clone(), &composer_handle);
 

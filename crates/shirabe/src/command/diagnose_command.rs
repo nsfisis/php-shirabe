@@ -1173,7 +1173,7 @@ impl Command for DiagnoseCommand {
             let c = crate::composer::composer_full(c);
             config = c.get_config();
 
-            let command_event = CommandEvent::new6(
+            let mut command_event = CommandEvent::new6(
                 PluginEvents::COMMAND,
                 "diagnose",
                 input,
@@ -1181,9 +1181,10 @@ impl Command for DiagnoseCommand {
                 vec![],
                 IndexMap::new(),
             );
+            let command_event_name = command_event.get_name().to_string();
             c.get_event_dispatcher()
                 .borrow_mut()
-                .dispatch(Some(command_event.get_name()), None);
+                .dispatch(Some(&command_event_name), Some(&mut command_event))?;
             *self.process.borrow_mut() = Some(
                 c.get_loop()
                     .borrow()

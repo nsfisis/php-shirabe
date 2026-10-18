@@ -345,13 +345,13 @@ impl Command for StatusCommand {
         {
             let composer = crate::composer::composer_full(&composer_rc);
 
-            // TODO(plugin): dispatch CommandEvent
-            let command_event =
+            let mut command_event =
                 CommandEvent::new(PluginEvents::COMMAND, "status", input.clone(), output);
+            let command_event_name = command_event.get_name().to_string();
             composer
                 .get_event_dispatcher()
                 .borrow_mut()
-                .dispatch(Some(command_event.get_name()), None);
+                .dispatch(Some(&command_event_name), Some(&mut command_event))?;
 
             composer
                 .get_event_dispatcher()

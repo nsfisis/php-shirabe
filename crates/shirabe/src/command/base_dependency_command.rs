@@ -5,6 +5,8 @@ use crate::io::IOInterfaceImmutable;
 use crate::package::Package;
 use crate::package::RootPackage;
 use crate::package::version::VersionParser;
+use crate::plugin::CommandEvent;
+use crate::plugin::PluginEvents;
 use crate::repository::CompositeRepository;
 use crate::repository::InstalledArrayRepository;
 use crate::repository::PlatformRepository;
@@ -42,9 +44,20 @@ pub trait BaseDependencyCommand: BaseCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         inverted: bool,
     ) -> anyhow::Result<i64> {
+        // Emit command event on startup
         let composer = self.require_composer(None, None)?;
+        let mut command_event = CommandEvent::new(
+            PluginEvents::COMMAND,
+            &self.get_name().unwrap_or_default(),
+            input.clone(),
+            output.clone(),
+        );
+        let command_event_name = command_event.get_name().to_string();
+        let event_dispatcher = composer.borrow_partial().get_event_dispatcher();
+        event_dispatcher
+            .borrow_mut()
+            .dispatch(Some(&command_event_name), Some(&mut command_event))?;
         let composer = crate::composer::composer_full(&composer);
-        // TODO(plugin): dispatch CommandEvent(PluginEvents::COMMAND, self.get_name(), input, output) via composer.get_event_dispatcher()
 
         let mut repos: Vec<crate::repository::RepositoryInterfaceHandle> =
             vec![crate::repository::RepositoryInterfaceHandle::new(
