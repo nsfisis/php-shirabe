@@ -426,7 +426,7 @@ impl EventDispatcher {
                 );
                 let stub_class =
                     Self::event_stub_class(event).ok_or_else(|| -> anyhow::Error {
-                        // TODO(plugin): installer and plugin events have no proxy stub yet.
+                        // TODO(plugin): the plugin events have no proxy stub yet.
                         RuntimeException::new(format!(
                         "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
                         event.get_name(),
@@ -1154,7 +1154,7 @@ try {{
         }
 
         let stub_class = Self::event_stub_class(event).ok_or_else(|| -> anyhow::Error {
-            // TODO(plugin): installer and plugin events have no proxy stub yet.
+            // TODO(plugin): the plugin events have no proxy stub yet.
             RuntimeException::new(format!(
                 "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
                 event.get_name(),
@@ -1206,6 +1206,8 @@ try {{
             Some("Composer\\Script\\Event")
         } else if event.as_any().downcast_ref::<PackageEvent>().is_some() {
             Some("Composer\\Installer\\PackageEvent")
+        } else if event.as_any().downcast_ref::<InstallerEvent>().is_some() {
+            Some("Composer\\Installer\\InstallerEvent")
         } else if event.as_any().downcast_ref::<Event>().is_some() {
             Some("Composer\\EventDispatcher\\Event")
         } else {
@@ -1758,20 +1760,31 @@ pub(crate) fn dispatch_event_method(
             event.stop_propagation();
             Ok(PluginValue::Null)
         }
-        "isDevMode" => match (script_event(event), package_event(event)) {
-            (Some(event), _) => Ok(PluginValue::Bool(event.is_dev_mode())),
-            (_, Some(event)) => Ok(PluginValue::Bool(event.is_dev_mode())),
+        "isDevMode" => match (
+            script_event(event),
+            package_event(event),
+            installer_event(event),
+        ) {
+            (Some(event), _, _) => Ok(PluginValue::Bool(event.is_dev_mode())),
+            (_, Some(event), _) => Ok(PluginValue::Bool(event.is_dev_mode())),
+            (_, _, Some(event)) => Ok(PluginValue::Bool(event.is_dev_mode())),
             _ => Err(runtime_throw(
-                "isDevMode is only available on script and package events".to_string(),
+                "isDevMode is only available on script, package and installer events".to_string(),
             )),
         },
         "getComposer" => {
-            let composer = match (script_event(event), package_event(event)) {
-                (Some(event), _) => event.get_composer().upgrade(),
-                (_, Some(event)) => event.get_composer().upgrade(),
+            let composer = match (
+                script_event(event),
+                package_event(event),
+                installer_event(event),
+            ) {
+                (Some(event), _, _) => event.get_composer().upgrade(),
+                (_, Some(event), _) => event.get_composer().upgrade(),
+                (_, _, Some(event)) => event.get_composer().upgrade(),
                 _ => {
                     return Err(runtime_throw(
-                        "getComposer is only available on script and package events".to_string(),
+                        "getComposer is only available on script, package and installer events"
+                            .to_string(),
                     ));
                 }
             };
@@ -1785,12 +1798,18 @@ pub(crate) fn dispatch_event_method(
             ))
         }
         "getIO" => {
-            let io = match (script_event(event), package_event(event)) {
-                (Some(event), _) => event.get_io(),
-                (_, Some(event)) => event.get_io(),
+            let io = match (
+                script_event(event),
+                package_event(event),
+                installer_event(event),
+            ) {
+                (Some(event), _, _) => event.get_io(),
+                (_, Some(event), _) => event.get_io(),
+                (_, _, Some(event)) => event.get_io(),
                 _ => {
                     return Err(runtime_throw(
-                        "getIO is only available on script and package events".to_string(),
+                        "getIO is only available on script, package and installer events"
+                            .to_string(),
                     ));
                 }
             };
@@ -1829,6 +1848,23 @@ pub(crate) fn dispatch_event_method(
                 "getOperation is only available on package events".to_string(),
             )),
         },
+        "isExecutingOperations" => match installer_event(event) {
+            Some(event) => Ok(PluginValue::Bool(event.is_executing_operations())),
+            None => Err(runtime_throw(
+                "isExecutingOperations is only available on installer events".to_string(),
+            )),
+        },
+        "getTransaction" => match installer_event(event) {
+            Some(event) => match event.get_transaction() {
+                Some(transaction) => {
+                    crate::plugin::php_plugin_proxy::transaction_handle_value(transaction)
+                }
+                None => Ok(PluginValue::Null),
+            },
+            None => Err(runtime_throw(
+                "getTransaction is only available on installer events".to_string(),
+            )),
+        },
         // TODO(plugin): the rest need full proxying of the object graph an event exposes, which
         // does not exist yet.
         other => Err(runtime_throw(format!(
@@ -1843,6 +1879,10 @@ fn script_event(event: &dyn EventInterface) -> Option<&ScriptEvent> {
 
 fn package_event(event: &dyn EventInterface) -> Option<&PackageEvent> {
     event.as_any().downcast_ref::<PackageEvent>()
+}
+
+fn installer_event(event: &dyn EventInterface) -> Option<&InstallerEvent> {
+    event.as_any().downcast_ref::<InstallerEvent>()
 }
 
 fn runtime_throw(message: String) -> PhpThrow {

@@ -27,6 +27,9 @@ Composer\Repository\InstalledFilesystemRepository
 Composer\Repository\RepositoryManager
 Composer\Installer\InstallationManager
 Composer\Installer\PackageEvent
+Composer\Installer\InstallerEvent
+Composer\DependencyResolver\Transaction
+Composer\DependencyResolver\LocalRepoTransaction
 Composer\DependencyResolver\Operation\SolverOperation
 Composer\DependencyResolver\Operation\InstallOperation
 Composer\DependencyResolver\Operation\UpdateOperation

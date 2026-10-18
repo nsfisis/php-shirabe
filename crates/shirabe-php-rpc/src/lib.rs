@@ -1005,6 +1005,18 @@ const STUB_FILES: &[(&str, &str)] = &[
         include_str!("../php/stubs/Composer/Installer/PackageEvent.php"),
     ),
     (
+        "Composer/Installer/InstallerEvent.php",
+        include_str!("../php/stubs/Composer/Installer/InstallerEvent.php"),
+    ),
+    (
+        "Composer/DependencyResolver/Transaction.php",
+        include_str!("../php/stubs/Composer/DependencyResolver/Transaction.php"),
+    ),
+    (
+        "Composer/DependencyResolver/LocalRepoTransaction.php",
+        include_str!("../php/stubs/Composer/DependencyResolver/LocalRepoTransaction.php"),
+    ),
+    (
         "Composer/DependencyResolver/Operation/SolverOperation.php",
         include_str!("../php/stubs/Composer/DependencyResolver/Operation/SolverOperation.php"),
     ),

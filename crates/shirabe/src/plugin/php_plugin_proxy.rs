@@ -8,6 +8,7 @@
 use crate::autoload::ClassLoader;
 use crate::command::BaseCommand;
 use crate::composer::ComposerHandle;
+use crate::dependency_resolver::AnyTransaction;
 use crate::dependency_resolver::operation::AnyOperation;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::event_dispatcher::dispatch_event_method;
@@ -59,6 +60,7 @@ enum RustEntity {
         std::rc::Rc<std::cell::RefCell<dyn crate::event_dispatcher::EventDispatcherInterface>>,
     ),
     Operation(std::rc::Rc<AnyOperation>),
+    Transaction(std::rc::Rc<AnyTransaction>),
     Plugin(std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>),
     ProcessExecutor(std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>),
     HttpDownloader(std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>),
@@ -85,6 +87,9 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
             std::rc::Rc::as_ptr(dispatcher) as *const () as usize
         }
         RustEntity::Operation(operation) => std::rc::Rc::as_ptr(operation) as *const () as usize,
+        RustEntity::Transaction(transaction) => {
+            std::rc::Rc::as_ptr(transaction) as *const () as usize
+        }
         RustEntity::Plugin(plugin) => std::rc::Rc::as_ptr(plugin) as *const () as usize,
         RustEntity::ProcessExecutor(process) => std::rc::Rc::as_ptr(process) as *const () as usize,
         RustEntity::HttpDownloader(downloader) => {
@@ -225,6 +230,27 @@ pub fn plugin_handle_value(
     };
     let rhandle = register_entity(RustEntity::Plugin(plugin.clone()));
     rust_handle_value(rhandle, class)
+}
+
+/// Registers a transaction and returns its wire descriptor.
+pub(crate) fn transaction_handle_value(
+    transaction: &std::rc::Rc<AnyTransaction>,
+) -> Result<PluginValue, PhpThrow> {
+    let class = match &**transaction {
+        AnyTransaction::Transaction(_) => "Composer\\DependencyResolver\\Transaction",
+        AnyTransaction::LocalRepoTransaction(_) => {
+            "Composer\\DependencyResolver\\LocalRepoTransaction"
+        }
+        // TODO(plugin): LockTransaction gets a proxy stub once one crosses the boundary; no
+        // event hands one out.
+        AnyTransaction::LockTransaction(_) => {
+            return Err(runtime_throw(
+                "no proxy stub class is available for a LockTransaction over RPC yet".to_string(),
+            ));
+        }
+    };
+    let rhandle = register_entity(RustEntity::Transaction(transaction.clone()));
+    Ok(rust_handle_value(rhandle, class))
 }
 
 /// Registers a solver operation and returns its wire descriptor.
@@ -463,6 +489,9 @@ pub(crate) fn dispatch_r_table_method(
         Some(RustEntity::Operation(operation)) => {
             dispatch_operation_method(&operation, method_name, args)
         }
+        Some(RustEntity::Transaction(transaction)) => {
+            dispatch_transaction_method(&transaction, method_name)
+        }
         Some(RustEntity::Plugin(plugin)) => dispatch_plugin_method(&plugin, method_name),
         Some(RustEntity::ProcessExecutor(process)) => {
             dispatch_process_executor_method(&process, method_name, args, out_params)
@@ -683,6 +712,7 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::Repository(_)
         | RustEntity::EventDispatcher(_)
         | RustEntity::Operation(_)
+        | RustEntity::Transaction(_)
         | RustEntity::Plugin(_)
         | RustEntity::ProcessExecutor(_)
         | RustEntity::HttpDownloader(_)
@@ -2805,6 +2835,24 @@ fn dispatch_operation_method(
         (other, _) => Err(runtime_throw(format!(
             "the operation method `{other}` is not available on a {} over RPC yet",
             operation_stub_class(operation)
+        ))),
+    }
+}
+
+fn dispatch_transaction_method(
+    transaction: &AnyTransaction,
+    method_name: &str,
+) -> Result<PluginValue, PhpThrow> {
+    match method_name {
+        "getOperations" => Ok(PluginValue::List(
+            transaction
+                .get_operations()
+                .iter()
+                .map(operation_handle_value)
+                .collect(),
+        )),
+        other => Err(runtime_throw(format!(
+            "the Transaction method `{other}` is not available over RPC yet"
         ))),
     }
 }

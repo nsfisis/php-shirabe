@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/installer-event-recorder",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin recording every InstallerEvent it is subscribed to.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\InstallerEvent\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\InstallerEvent\\Plugin"
+    }
+}

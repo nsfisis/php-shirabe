@@ -1,0 +1,32 @@
+{
+    "name": "shirabe/e2e-installer-event",
+    "description": "E2E fixture project: record the installer events a plugin receives.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "path",
+            "url": "../packages/*",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/installer-event-recorder": "1.0.0",
+        "shirabe-test/lib-a": "1.0.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "shirabe-test/installer-event-recorder": true
+        }
+    }
+}
