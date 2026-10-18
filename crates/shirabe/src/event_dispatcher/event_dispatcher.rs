@@ -18,6 +18,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
+use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
@@ -1222,6 +1223,12 @@ try {{
             .is_some()
         {
             Some("Composer\\Plugin\\PostFileDownloadEvent")
+        } else if event
+            .as_any()
+            .downcast_ref::<PrePoolCreateEvent>()
+            .is_some()
+        {
+            Some("Composer\\Plugin\\PrePoolCreateEvent")
         } else if event.as_any().downcast_ref::<Event>().is_some() {
             Some("Composer\\EventDispatcher\\Event")
         } else {
@@ -1883,6 +1890,11 @@ pub(crate) fn dispatch_event_method(
             if let Some(event) = event.as_any().downcast_ref::<PostFileDownloadEvent>() {
                 return crate::plugin::php_plugin_proxy::dispatch_post_file_download_event_method(
                     event, other,
+                );
+            }
+            if let Some(event) = event.as_any_mut().downcast_mut::<PrePoolCreateEvent>() {
+                return crate::plugin::php_plugin_proxy::dispatch_pre_pool_create_event_method(
+                    event, other, args,
                 );
             }
             match event.as_any_mut().downcast_mut::<PreFileDownloadEvent>() {

@@ -30,6 +30,7 @@ Composer\Installer\PackageEvent
 Composer\Installer\InstallerEvent
 Composer\Plugin\PreFileDownloadEvent
 Composer\Plugin\PostFileDownloadEvent
+Composer\Plugin\PrePoolCreateEvent
 Composer\DependencyResolver\Transaction
 Composer\DependencyResolver\LocalRepoTransaction
 Composer\DependencyResolver\Operation\SolverOperation

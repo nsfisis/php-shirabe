@@ -17,6 +17,7 @@ mod e2e_installer_test;
 mod e2e_installers_test;
 mod e2e_normalize_test;
 mod e2e_package_event_test;
+mod e2e_pre_pool_create_test;
 mod e2e_process_executor_test;
 mod e2e_script_command_test;
 mod e2e_script_event_test;

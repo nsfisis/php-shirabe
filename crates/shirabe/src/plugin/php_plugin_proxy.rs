@@ -29,6 +29,7 @@ use crate::plugin::php_plugin_value::{
 use crate::plugin::plugin_interface::PluginInterface;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::{FileDownloadContext, PreFileDownloadEvent};
+use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
 use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
     RepositoryInterfaceHandle, RepositoryManagerInterface,
@@ -2901,6 +2902,100 @@ pub(crate) fn dispatch_post_file_download_event_method(
             None => PluginValue::Null,
         }),
         "getType" => Ok(event.get_type().to_plugin_value()),
+        other => Err(runtime_throw(format!(
+            "the Event method `{other}` is not available over RPC yet"
+        ))),
+    }
+}
+
+/// Serves the methods `PrePoolCreateEvent` declares beyond the base event's.
+pub(crate) fn dispatch_pre_pool_create_event_method(
+    event: &mut PrePoolCreateEvent,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    let packages_value = |packages: &Vec<PackageInterfaceHandle>| {
+        PluginValue::List(
+            packages
+                .iter()
+                .map(|package| package_handle_value(package.as_rc()))
+                .collect(),
+        )
+    };
+    let int_map_value = |map: &IndexMap<String, i64>| {
+        PluginValue::from_php_mixed(&PhpMixed::Array(
+            map.iter()
+                .map(|(key, value)| (key.clone(), PhpMixed::Int(*value)))
+                .collect(),
+        ))
+    };
+    match method_name {
+        "getRepositories" => Ok(PluginValue::List(
+            event
+                .get_repositories()
+                .iter()
+                .map(repository_handle_value)
+                .collect::<Result<Vec<_>, _>>()?,
+        )),
+        // TODO(plugin): Request has no proxy stub, so the request a listener would inspect or
+        // change cannot cross the boundary yet.
+        "getRequest" => Err(runtime_throw(
+            "the Request of a PrePoolCreateEvent is not available over RPC yet".to_string(),
+        )),
+        "getAcceptableStabilities" => Ok(int_map_value(event.get_acceptable_stabilities())),
+        "getStabilityFlags" => Ok(int_map_value(event.get_stability_flags())),
+        "getRootAliases" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
+            event
+                .get_root_aliases()
+                .iter()
+                .map(|(name, versions)| {
+                    (
+                        name.clone(),
+                        PhpMixed::Array(
+                            versions
+                                .iter()
+                                .map(|(version, alias)| {
+                                    (
+                                        version.clone(),
+                                        PhpMixed::Array(
+                                            alias
+                                                .iter()
+                                                .map(|(key, value)| {
+                                                    (key.clone(), PhpMixed::String(value.clone()))
+                                                })
+                                                .collect(),
+                                        ),
+                                    )
+                                })
+                                .collect(),
+                        ),
+                    )
+                })
+                .collect(),
+        ))),
+        "getRootReferences" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
+            event
+                .get_root_references()
+                .iter()
+                .map(|(name, reference)| (name.clone(), PhpMixed::String(reference.clone())))
+                .collect(),
+        ))),
+        "getPackages" => Ok(packages_value(event.get_packages())),
+        "getUnacceptableFixedPackages" => {
+            Ok(packages_value(event.get_unacceptable_fixed_packages()))
+        }
+        "setPackages" => {
+            event.set_packages(arg::<Vec<PackageInterfaceHandle>>(method_name, args, 0)?);
+            Ok(PluginValue::Null)
+        }
+        "setUnacceptableFixedPackages" => {
+            event.set_unacceptable_fixed_packages(arg::<Vec<PackageInterfaceHandle>>(
+                method_name,
+                args,
+                0,
+            )?);
+            Ok(PluginValue::Null)
+        }
         other => Err(runtime_throw(format!(
             "the Event method `{other}` is not available over RPC yet"
         ))),

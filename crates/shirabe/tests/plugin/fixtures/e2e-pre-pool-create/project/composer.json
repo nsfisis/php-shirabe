@@ -1,0 +1,39 @@
+{
+    "name": "shirabe/e2e-pre-pool-create",
+    "description": "E2E fixture project: record and filter the pool a plugin sees before the solver runs.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "package",
+            "package": [
+                {
+                    "name": "shirabe-test/pool-lib",
+                    "version": "1.0.0",
+                    "type": "metapackage"
+                },
+                {
+                    "name": "shirabe-test/pool-lib",
+                    "version": "2.0.0",
+                    "type": "metapackage"
+                }
+            ]
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/pre-pool-create-recorder": "1.0.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "shirabe-test/pre-pool-create-recorder": true
+        }
+    }
+}

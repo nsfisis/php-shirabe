@@ -14,6 +14,8 @@ use crate::package::CompleteAliasPackageHandle;
 use crate::package::PackageInterfaceHandle;
 use crate::package::base_package;
 use crate::package::version::StabilityFilter;
+use crate::plugin::PluginEvents;
+use crate::plugin::PrePoolCreateEvent;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositoryInterface;
 use crate::repository::RepositoryInterfaceHandle;
@@ -301,13 +303,37 @@ impl PoolBuilder {
             }
         }
 
-        if self.event_dispatcher.is_some() {
-            // TODO(plugin): dispatch PluginEvents::PRE_POOL_CREATE. Constructing PrePoolCreateEvent
-            // would move the repositories and Request (neither clonable under PHP's shared
-            // semantics), and the event is purely plugin-facing: its mutations to the package list
-            // are never read back in the no-plugin path (Pool::new below reads self.packages
-            // directly). Skipped until the plugin API drives an Rc-based migration of
-            // Request/repositories so listeners can observe and mutate them.
+        if let Some(event_dispatcher) = self.event_dispatcher.clone() {
+            let mut pre_pool_create_event = PrePoolCreateEvent::new(
+                PluginEvents::PRE_POOL_CREATE.to_string(),
+                repositories.clone(),
+                std::mem::replace(request, Request::new(None)),
+                self.acceptable_stabilities.clone(),
+                self.stability_flags.clone(),
+                self.root_aliases.clone(),
+                self.root_references.clone(),
+                self.packages.values().cloned().collect(),
+                self.unacceptable_fixed_or_locked_packages.clone(),
+            );
+            let pre_pool_create_event_name = pre_pool_create_event.get_name().to_string();
+            let dispatched = event_dispatcher.borrow_mut().dispatch(
+                Some(&pre_pool_create_event_name),
+                Some(&mut pre_pool_create_event),
+            );
+            let packages: IndexMap<i64, BasePackageHandle> = pre_pool_create_event
+                .get_packages()
+                .iter()
+                .cloned()
+                .enumerate()
+                .map(|(index, package)| (index as i64, package))
+                .collect();
+            let unacceptable_fixed_packages = pre_pool_create_event
+                .get_unacceptable_fixed_packages()
+                .clone();
+            *request = pre_pool_create_event.into_request();
+            dispatched?;
+            self.packages = packages;
+            self.unacceptable_fixed_or_locked_packages = unacceptable_fixed_packages;
         }
 
         let mut pool = Pool::new(

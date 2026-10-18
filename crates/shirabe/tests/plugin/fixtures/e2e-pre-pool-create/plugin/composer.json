@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/pre-pool-create-recorder",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin recording and filtering the pool a PrePoolCreateEvent carries.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\PrePoolCreate\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\PrePoolCreate\\Plugin"
+    }
+}

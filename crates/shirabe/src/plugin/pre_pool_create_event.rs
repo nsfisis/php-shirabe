@@ -4,19 +4,21 @@ use crate::dependency_resolver::Request;
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
 use crate::package::BasePackageHandle;
-use crate::repository::RepositoryInterface;
+use crate::repository::RepositoryInterfaceHandle;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct PrePoolCreateEvent {
     inner: Event,
-    repositories: Vec<Box<dyn RepositoryInterface>>,
+    repositories: Vec<RepositoryInterfaceHandle>,
     request: Request,
     acceptable_stabilities: IndexMap<String, i64>,
     stability_flags: IndexMap<String, i64>,
     root_aliases: IndexMap<String, IndexMap<String, IndexMap<String, String>>>,
     root_references: IndexMap<String, String>,
+    // TODO(type-model): PoolBuilder's package array keeps the keys of the entries it unset, which
+    // a listener sees in PHP; the list here is reindexed.
     packages: Vec<BasePackageHandle>,
     unacceptable_fixed_packages: Vec<BasePackageHandle>,
 }
@@ -29,7 +31,7 @@ impl PrePoolCreateEvent {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: String,
-        repositories: Vec<Box<dyn RepositoryInterface>>,
+        repositories: Vec<RepositoryInterfaceHandle>,
         request: Request,
         acceptable_stabilities: IndexMap<String, i64>,
         stability_flags: IndexMap<String, i64>,
@@ -51,12 +53,19 @@ impl PrePoolCreateEvent {
         }
     }
 
-    pub fn get_repositories(&self) -> &Vec<Box<dyn RepositoryInterface>> {
+    pub fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {
         &self.repositories
     }
 
     pub fn get_request(&self) -> &Request {
         &self.request
+    }
+
+    /// Hands back the request the event was built with. `PoolBuilder` lends the event the
+    /// `Request` it is building the pool for, which PHP shares by reference, and takes it back
+    /// once the listeners have run, so whatever they changed on it reaches the solver.
+    pub(crate) fn into_request(self) -> Request {
+        self.request
     }
 
     pub fn get_acceptable_stabilities(&self) -> &IndexMap<String, i64> {
