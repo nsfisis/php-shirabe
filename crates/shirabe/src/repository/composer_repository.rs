@@ -2831,13 +2831,7 @@ impl ComposerRepository {
                         sha256.map(|s| s.to_string()),
                         filename.clone(),
                         "metadata".to_string(),
-                        {
-                            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                            // TODO(plugin): pass response and repository self-reference
-                            m.insert("response".to_string(), PhpMixed::Null);
-                            m.insert("repository".to_string(), PhpMixed::Null);
-                            m.into()
-                        },
+                        Some(FileDownloadContext::Repository),
                     );
                     let post_file_download_event_name =
                         post_file_download_event.get_name().to_string();
@@ -3016,12 +3010,7 @@ impl ComposerRepository {
                     None,
                     filename.clone(),
                     "metadata".to_string(),
-                    {
-                        let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                        m.insert("response".to_string(), PhpMixed::Null);
-                        m.insert("repository".to_string(), PhpMixed::Null);
-                        m.into()
-                    },
+                    Some(FileDownloadContext::Repository),
                 );
                 let post_file_download_event_name = post_file_download_event.get_name().to_string();
                 dispatcher.dispatch(
@@ -3192,7 +3181,21 @@ impl ComposerRepository {
             return Ok(PhpMixed::Bool(true));
         }
 
-        // TODO(plugin): dispatch PostFileDownloadEvent
+        if let Some(dispatcher) = self.event_dispatcher.as_ref() {
+            let mut post_file_download_event = PostFileDownloadEvent::new(
+                PluginEvents::POST_FILE_DOWNLOAD.to_string(),
+                None,
+                None,
+                filename.to_string(),
+                "metadata".to_string(),
+                Some(FileDownloadContext::Repository),
+            );
+            let post_file_download_event_name = post_file_download_event.get_name().to_string();
+            dispatcher.borrow_mut().dispatch(
+                Some(&post_file_download_event_name),
+                Some(&mut post_file_download_event),
+            )?;
+        }
 
         let decoded = response.decode_json()?;
         let mut data: IndexMap<String, PhpMixed> = decoded

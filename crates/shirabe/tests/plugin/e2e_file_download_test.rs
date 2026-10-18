@@ -155,8 +155,11 @@ fn test_file_download_events_match_upstream_composer() {
     assert_eq!(
         "\
 pre-file-download type=metadata url={server}/packages.json cacheKey=null transportOptions=[] httpDownloader=1 newTransportOptions={\"http\":{\"header\":[\"X-Shirabe-Probe: 1\"]}}
+post-file-download type=metadata url={server}/packages.json fileName=null checksum=null
 pre-file-download type=metadata url={server}/p2/shirabe-test/remote-lib.json cacheKey=null transportOptions=[] httpDownloader=1 newTransportOptions={\"http\":{\"header\":[\"X-Shirabe-Probe: 1\"]}}
+post-file-download type=metadata url={server}/p2/shirabe-test/remote-lib.json fileName=null checksum=null
 pre-file-download type=package url={server}/dists/missing.zip cacheKey=null transportOptions=[] httpDownloader=1 context=shirabe-test/remote-lib@1.0.0 rewritten={server}/dists/remote-lib.zip customCacheKey=custom-key
+post-file-download type=package url={server}/dists/remote-lib.zip fileName=\"composer\\/zip\" checksum=\"0cf62c3ceab11046cdb3f6a5c60fab5a1d731905\" context=shirabe-test/remote-lib@1.0.0
 ",
         upstream.trace
     );

@@ -2,6 +2,8 @@
 
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
+use crate::package::PackageInterfaceHandle;
+use crate::plugin::FileDownloadContext;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -11,7 +13,7 @@ pub struct PostFileDownloadEvent {
     file_name: Option<String>,
     checksum: Option<String>,
     url: String,
-    context: PhpMixed,
+    context: Option<FileDownloadContext>,
     r#type: String,
 }
 
@@ -22,7 +24,7 @@ impl PostFileDownloadEvent {
         checksum: Option<String>,
         url: String,
         r#type: String,
-        context: PhpMixed,
+        context: Option<FileDownloadContext>,
     ) -> Self {
         Self {
             inner: Event::new(name, vec![], indexmap::IndexMap::new()),
@@ -50,8 +52,18 @@ impl PostFileDownloadEvent {
         &self.url
     }
 
-    pub fn get_context(&self) -> &PhpMixed {
-        &self.context
+    pub fn get_context(&self) -> Option<&FileDownloadContext> {
+        self.context.as_ref()
+    }
+
+    pub fn get_package(&self) -> Option<PackageInterfaceHandle> {
+        // TODO(php-runtime): upstream raises an E_USER_DEPRECATED here ("PostFileDownloadEvent::
+        // getPackage is deprecated since Composer 2.1, use getContext instead."), which Composer's
+        // ErrorHandler prints as a deprecation notice; the error subsystem is not modeled.
+        match self.get_context() {
+            Some(FileDownloadContext::Package(package)) => Some(package.clone()),
+            _ => None,
+        }
     }
 
     pub fn get_type(&self) -> &str {

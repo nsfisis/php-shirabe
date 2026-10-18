@@ -19,6 +19,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::package::comparer::Comparer;
 use crate::plugin::FileDownloadContext;
 use crate::plugin::PluginEvents;
+use crate::plugin::PostFileDownloadEvent;
 use crate::plugin::PreFileDownloadEvent;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
@@ -668,7 +669,21 @@ impl DownloaderInterface for FileDownloader {
                 .into());
             }
 
-            // TODO(plugin): dispatch PostFileDownloadEvent.
+            if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
+                let mut post_file_download_event = PostFileDownloadEvent::new(
+                    PluginEvents::POST_FILE_DOWNLOAD.to_string(),
+                    Some(file_name.clone()),
+                    checksum.clone(),
+                    url.processed.clone(),
+                    "package".to_string(),
+                    Some(FileDownloadContext::Package(package.clone())),
+                );
+                let post_file_download_event_name = post_file_download_event.get_name().to_string();
+                event_dispatcher.borrow_mut().dispatch(
+                    Some(&post_file_download_event_name),
+                    Some(&mut post_file_download_event),
+                )?;
+            }
 
             return Ok(Some(PhpMixed::String(file_name)));
         }

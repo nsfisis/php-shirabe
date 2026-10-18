@@ -27,6 +27,7 @@ use crate::plugin::php_plugin_value::{
     date_time_from_wire, date_time_to_wire, link_from_wire, link_to_wire, response_to_wire,
 };
 use crate::plugin::plugin_interface::PluginInterface;
+use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::{FileDownloadContext, PreFileDownloadEvent};
 use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
@@ -2875,6 +2876,31 @@ pub(crate) fn dispatch_pre_file_download_event_method(
             event.set_transport_options(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
+        other => Err(runtime_throw(format!(
+            "the Event method `{other}` is not available over RPC yet"
+        ))),
+    }
+}
+
+/// Serves the methods `PostFileDownloadEvent` declares beyond the base event's.
+pub(crate) fn dispatch_post_file_download_event_method(
+    event: &PostFileDownloadEvent,
+    method_name: &str,
+) -> Result<PluginValue, PhpThrow> {
+    let optional_string = |value: Option<&str>| match value {
+        Some(value) => value.to_plugin_value(),
+        None => PluginValue::Null,
+    };
+    match method_name {
+        "getFileName" => Ok(optional_string(event.get_file_name())),
+        "getChecksum" => Ok(optional_string(event.get_checksum())),
+        "getUrl" => Ok(event.get_url().to_plugin_value()),
+        "getContext" => file_download_context_value(event.get_context()),
+        "getPackage" => Ok(match event.get_package() {
+            Some(package) => package_handle_value(package.as_rc()),
+            None => PluginValue::Null,
+        }),
+        "getType" => Ok(event.get_type().to_plugin_value()),
         other => Err(runtime_throw(format!(
             "the Event method `{other}` is not available over RPC yet"
         ))),

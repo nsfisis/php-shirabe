@@ -16,6 +16,7 @@ use crate::installer::PackageEvent;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
+use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
@@ -1215,6 +1216,12 @@ try {{
             .is_some()
         {
             Some("Composer\\Plugin\\PreFileDownloadEvent")
+        } else if event
+            .as_any()
+            .downcast_ref::<PostFileDownloadEvent>()
+            .is_some()
+        {
+            Some("Composer\\Plugin\\PostFileDownloadEvent")
         } else if event.as_any().downcast_ref::<Event>().is_some() {
             Some("Composer\\EventDispatcher\\Event")
         } else {
@@ -1872,18 +1879,25 @@ pub(crate) fn dispatch_event_method(
                 "getTransaction is only available on installer events".to_string(),
             )),
         },
-        other => match event.as_any_mut().downcast_mut::<PreFileDownloadEvent>() {
-            Some(event) => {
-                crate::plugin::php_plugin_proxy::dispatch_pre_file_download_event_method(
-                    event, other, args,
-                )
+        other => {
+            if let Some(event) = event.as_any().downcast_ref::<PostFileDownloadEvent>() {
+                return crate::plugin::php_plugin_proxy::dispatch_post_file_download_event_method(
+                    event, other,
+                );
             }
-            // TODO(plugin): the rest need full proxying of the object graph an event exposes,
-            // which does not exist yet.
-            None => Err(runtime_throw(format!(
-                "the Event method `{other}` is not available over RPC yet"
-            ))),
-        },
+            match event.as_any_mut().downcast_mut::<PreFileDownloadEvent>() {
+                Some(event) => {
+                    crate::plugin::php_plugin_proxy::dispatch_pre_file_download_event_method(
+                        event, other, args,
+                    )
+                }
+                // TODO(plugin): the rest need full proxying of the object graph an event exposes,
+                // which does not exist yet.
+                None => Err(runtime_throw(format!(
+                    "the Event method `{other}` is not available over RPC yet"
+                ))),
+            }
+        }
     }
 }
 
