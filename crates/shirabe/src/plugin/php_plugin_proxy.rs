@@ -2302,6 +2302,12 @@ impl ToPluginValue for crate::package::Link {
     }
 }
 
+impl ToPluginValue for PackageInterfaceHandle {
+    fn to_plugin_value(self) -> PluginValue {
+        package_handle_value(self.as_rc())
+    }
+}
+
 impl ToPluginValue for chrono::DateTime<chrono::Utc> {
     fn to_plugin_value(self) -> PluginValue {
         date_time_to_wire(&self)
@@ -2851,19 +2857,14 @@ pub(crate) fn dispatch_pre_file_download_event_method(
             event.set_processed_url(arg::<String>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
-        "getCustomCacheKey" => Ok(match event.get_custom_cache_key() {
-            Some(key) => key.to_plugin_value(),
-            None => PluginValue::Null,
-        }),
+        "getCustomCacheKey" => Ok(event.get_custom_cache_key().to_plugin_value()),
         "setCustomCacheKey" => {
             event.set_custom_cache_key(arg::<Option<String>>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
         "getType" => Ok(event.get_type().to_plugin_value()),
         "getContext" => file_download_context_value(event.get_context()),
-        "getTransportOptions" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
-            event.get_transport_options().clone(),
-        ))),
+        "getTransportOptions" => Ok(event.get_transport_options().clone().to_plugin_value()),
         "setTransportOptions" => {
             event.set_transport_options(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?);
             Ok(PluginValue::Null)
@@ -2879,19 +2880,12 @@ pub(crate) fn dispatch_post_file_download_event_method(
     event: &PostFileDownloadEvent,
     method_name: &str,
 ) -> Result<PluginValue, PhpThrow> {
-    let optional_string = |value: Option<&str>| match value {
-        Some(value) => value.to_plugin_value(),
-        None => PluginValue::Null,
-    };
     match method_name {
-        "getFileName" => Ok(optional_string(event.get_file_name())),
-        "getChecksum" => Ok(optional_string(event.get_checksum())),
+        "getFileName" => Ok(event.get_file_name().to_plugin_value()),
+        "getChecksum" => Ok(event.get_checksum().to_plugin_value()),
         "getUrl" => Ok(event.get_url().to_plugin_value()),
         "getContext" => file_download_context_value(event.get_context()),
-        "getPackage" => Ok(match event.get_package() {
-            Some(package) => package_handle_value(package.as_rc()),
-            None => PluginValue::Null,
-        }),
+        "getPackage" => Ok(event.get_package().to_plugin_value()),
         "getType" => Ok(event.get_type().to_plugin_value()),
         other => Err(runtime_throw(format!(
             "the Event method `{other}` is not available over RPC yet"
@@ -2905,21 +2899,6 @@ pub(crate) fn dispatch_pre_pool_create_event_method(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    let packages_value = |packages: &Vec<PackageInterfaceHandle>| {
-        PluginValue::List(
-            packages
-                .iter()
-                .map(|package| package_handle_value(package.as_rc()))
-                .collect(),
-        )
-    };
-    let int_map_value = |map: &IndexMap<String, i64>| {
-        PluginValue::from_php_mixed(&PhpMixed::Array(
-            map.iter()
-                .map(|(key, value)| (key.clone(), PhpMixed::Int(*value)))
-                .collect(),
-        ))
-    };
     match method_name {
         "getRepositories" => Ok(PluginValue::List(
             event
@@ -2933,48 +2912,17 @@ pub(crate) fn dispatch_pre_pool_create_event_method(
         "getRequest" => Err(runtime_throw(
             "the Request of a PrePoolCreateEvent is not available over RPC yet".to_string(),
         )),
-        "getAcceptableStabilities" => Ok(int_map_value(event.get_acceptable_stabilities())),
-        "getStabilityFlags" => Ok(int_map_value(event.get_stability_flags())),
-        "getRootAliases" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
-            event
-                .get_root_aliases()
-                .iter()
-                .map(|(name, versions)| {
-                    (
-                        name.clone(),
-                        PhpMixed::Array(
-                            versions
-                                .iter()
-                                .map(|(version, alias)| {
-                                    (
-                                        version.clone(),
-                                        PhpMixed::Array(
-                                            alias
-                                                .iter()
-                                                .map(|(key, value)| {
-                                                    (key.clone(), PhpMixed::String(value.clone()))
-                                                })
-                                                .collect(),
-                                        ),
-                                    )
-                                })
-                                .collect(),
-                        ),
-                    )
-                })
-                .collect(),
-        ))),
-        "getRootReferences" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
-            event
-                .get_root_references()
-                .iter()
-                .map(|(name, reference)| (name.clone(), PhpMixed::String(reference.clone())))
-                .collect(),
-        ))),
-        "getPackages" => Ok(packages_value(event.get_packages())),
-        "getUnacceptableFixedPackages" => {
-            Ok(packages_value(event.get_unacceptable_fixed_packages()))
+        "getAcceptableStabilities" => {
+            Ok(event.get_acceptable_stabilities().clone().to_plugin_value())
         }
+        "getStabilityFlags" => Ok(event.get_stability_flags().clone().to_plugin_value()),
+        "getRootAliases" => Ok(event.get_root_aliases().clone().to_plugin_value()),
+        "getRootReferences" => Ok(event.get_root_references().clone().to_plugin_value()),
+        "getPackages" => Ok(event.get_packages().clone().to_plugin_value()),
+        "getUnacceptableFixedPackages" => Ok(event
+            .get_unacceptable_fixed_packages()
+            .clone()
+            .to_plugin_value()),
         "setPackages" => {
             event.set_packages(arg::<Vec<PackageInterfaceHandle>>(method_name, args, 0)?);
             Ok(PluginValue::Null)
@@ -2999,7 +2947,7 @@ fn file_download_context_value(
 ) -> Result<PluginValue, PhpThrow> {
     match context {
         None => Ok(PluginValue::Null),
-        Some(FileDownloadContext::Package(package)) => Ok(package_handle_value(package.as_rc())),
+        Some(FileDownloadContext::Package(package)) => Ok(package.clone().to_plugin_value()),
         // TODO(plugin): the array a repository passes names the repository itself, which cannot
         // cross the boundary yet.
         Some(FileDownloadContext::Repository) => Err(runtime_throw(
