@@ -27,6 +27,7 @@ use crate::plugin::php_plugin_value::{
     date_time_from_wire, date_time_to_wire, link_from_wire, link_to_wire, response_to_wire,
 };
 use crate::plugin::plugin_interface::PluginInterface;
+use crate::plugin::pre_file_download_event::{FileDownloadContext, PreFileDownloadEvent};
 use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
     RepositoryInterfaceHandle, RepositoryManagerInterface,
@@ -2836,6 +2837,63 @@ fn dispatch_operation_method(
             "the operation method `{other}` is not available on a {} over RPC yet",
             operation_stub_class(operation)
         ))),
+    }
+}
+
+/// Serves the methods `PreFileDownloadEvent` declares beyond the base event's.
+pub(crate) fn dispatch_pre_file_download_event_method(
+    event: &mut PreFileDownloadEvent,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    match method_name {
+        "getHttpDownloader" => Ok(rust_handle_value(
+            register_entity(RustEntity::HttpDownloader(
+                event.get_http_downloader().clone(),
+            )),
+            "Composer\\Util\\HttpDownloader",
+        )),
+        "getProcessedUrl" => Ok(event.get_processed_url().to_plugin_value()),
+        "setProcessedUrl" => {
+            event.set_processed_url(arg::<String>(method_name, args, 0)?);
+            Ok(PluginValue::Null)
+        }
+        "getCustomCacheKey" => Ok(match event.get_custom_cache_key() {
+            Some(key) => key.to_plugin_value(),
+            None => PluginValue::Null,
+        }),
+        "setCustomCacheKey" => {
+            event.set_custom_cache_key(arg::<Option<String>>(method_name, args, 0)?);
+            Ok(PluginValue::Null)
+        }
+        "getType" => Ok(event.get_type().to_plugin_value()),
+        "getContext" => file_download_context_value(event.get_context()),
+        "getTransportOptions" => Ok(PluginValue::from_php_mixed(&PhpMixed::Array(
+            event.get_transport_options().clone(),
+        ))),
+        "setTransportOptions" => {
+            event.set_transport_options(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?);
+            Ok(PluginValue::Null)
+        }
+        other => Err(runtime_throw(format!(
+            "the Event method `{other}` is not available over RPC yet"
+        ))),
+    }
+}
+
+/// The `$context` of a file download event as the PHP value the event stub returns.
+fn file_download_context_value(
+    context: Option<&FileDownloadContext>,
+) -> Result<PluginValue, PhpThrow> {
+    match context {
+        None => Ok(PluginValue::Null),
+        Some(FileDownloadContext::Package(package)) => Ok(package_handle_value(package.as_rc())),
+        // TODO(plugin): the array a repository passes names the repository itself, which cannot
+        // cross the boundary yet.
+        Some(FileDownloadContext::Repository) => Err(runtime_throw(
+            "the repository context of a file download event is not available over RPC yet"
+                .to_string(),
+        )),
     }
 }
 

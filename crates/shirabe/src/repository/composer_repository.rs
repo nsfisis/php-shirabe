@@ -16,6 +16,7 @@ use crate::package::loader::ArrayLoader;
 use crate::package::loader::VersionFields;
 use crate::package::version::StabilityFilter;
 use crate::package::version::VersionParser;
+use crate::plugin::FileDownloadContext;
 use crate::plugin::PluginEvents;
 use crate::plugin::PostFileDownloadEvent;
 use crate::plugin::PreFileDownloadEvent;
@@ -2780,12 +2781,7 @@ impl ComposerRepository {
                         self.http_downloader.clone(),
                         filename.clone(),
                         "metadata".to_string(),
-                        {
-                            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                            // TODO(plugin): pass repository self-reference
-                            m.insert("repository".to_string(), PhpMixed::Null);
-                            m.into()
-                        },
+                        Some(FileDownloadContext::Repository),
                     );
                     pre_file_download_event
                         .set_transport_options(self.options.clone().into_iter().collect());
@@ -2963,11 +2959,7 @@ impl ComposerRepository {
                     self.http_downloader.clone(),
                     filename.clone(),
                     "metadata".to_string(),
-                    {
-                        let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                        m.insert("repository".to_string(), PhpMixed::Null);
-                        m.into()
-                    },
+                    Some(FileDownloadContext::Repository),
                 );
                 pre_file_download_event
                     .set_transport_options(self.options.clone().into_iter().collect());
@@ -3124,11 +3116,7 @@ impl ComposerRepository {
                 self.http_downloader.clone(),
                 filename.clone(),
                 "metadata".to_string(),
-                {
-                    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-                    m.insert("repository".to_string(), PhpMixed::Null);
-                    m.into()
-                },
+                Some(FileDownloadContext::Repository),
             );
             pre_file_download_event
                 .set_transport_options(self.options.clone().into_iter().collect());

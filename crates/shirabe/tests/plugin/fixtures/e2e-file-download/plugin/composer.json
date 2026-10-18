@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/file-download-recorder",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin recording the file download events it is subscribed to.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\FileDownload\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\FileDownload\\Plugin"
+    }
+}

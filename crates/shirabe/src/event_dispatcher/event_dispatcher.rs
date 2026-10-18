@@ -16,6 +16,7 @@ use crate::installer::PackageEvent;
 use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
+use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
@@ -1208,6 +1209,12 @@ try {{
             Some("Composer\\Installer\\PackageEvent")
         } else if event.as_any().downcast_ref::<InstallerEvent>().is_some() {
             Some("Composer\\Installer\\InstallerEvent")
+        } else if event
+            .as_any()
+            .downcast_ref::<PreFileDownloadEvent>()
+            .is_some()
+        {
+            Some("Composer\\Plugin\\PreFileDownloadEvent")
         } else if event.as_any().downcast_ref::<Event>().is_some() {
             Some("Composer\\EventDispatcher\\Event")
         } else {
@@ -1741,7 +1748,7 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
 pub(crate) fn dispatch_event_method(
     event: &mut dyn EventInterface,
     method_name: &str,
-    _args: &[PluginValue],
+    args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     match method_name {
         "getName" => Ok(PluginValue::string(event.get_name())),
@@ -1865,11 +1872,18 @@ pub(crate) fn dispatch_event_method(
                 "getTransaction is only available on installer events".to_string(),
             )),
         },
-        // TODO(plugin): the rest need full proxying of the object graph an event exposes, which
-        // does not exist yet.
-        other => Err(runtime_throw(format!(
-            "the Event method `{other}` is not available over RPC yet"
-        ))),
+        other => match event.as_any_mut().downcast_mut::<PreFileDownloadEvent>() {
+            Some(event) => {
+                crate::plugin::php_plugin_proxy::dispatch_pre_file_download_event_method(
+                    event, other, args,
+                )
+            }
+            // TODO(plugin): the rest need full proxying of the object graph an event exposes,
+            // which does not exist yet.
+            None => Err(runtime_throw(format!(
+                "the Event method `{other}` is not available over RPC yet"
+            ))),
+        },
     }
 }
 

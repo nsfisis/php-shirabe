@@ -1009,6 +1009,10 @@ const STUB_FILES: &[(&str, &str)] = &[
         include_str!("../php/stubs/Composer/Installer/InstallerEvent.php"),
     ),
     (
+        "Composer/Plugin/PreFileDownloadEvent.php",
+        include_str!("../php/stubs/Composer/Plugin/PreFileDownloadEvent.php"),
+    ),
+    (
         "Composer/DependencyResolver/Transaction.php",
         include_str!("../php/stubs/Composer/DependencyResolver/Transaction.php"),
     ),

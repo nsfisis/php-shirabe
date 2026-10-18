@@ -2,9 +2,22 @@
 
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
+use crate::package::PackageInterfaceHandle;
 use crate::util::HttpDownloader;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
+
+/// The `$context` a file download event carries: the package a dist download is for, or the
+/// array a repository passes along with a metadata download.
+#[derive(Debug)]
+pub enum FileDownloadContext {
+    Package(PackageInterfaceHandle),
+    /// `['repository' => $this]` (plus `'response' => $response` after the download).
+    ///
+    /// TODO(plugin): the repository has no handle to itself to put in the array, and
+    /// ComposerRepository has no proxy stub, so neither entry is carried.
+    Repository,
+}
 
 #[derive(Debug)]
 pub struct PreFileDownloadEvent {
@@ -13,7 +26,7 @@ pub struct PreFileDownloadEvent {
     processed_url: String,
     custom_cache_key: Option<String>,
     r#type: String,
-    context: PhpMixed,
+    context: Option<FileDownloadContext>,
     transport_options: IndexMap<String, PhpMixed>,
 }
 
@@ -23,7 +36,7 @@ impl PreFileDownloadEvent {
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         processed_url: String,
         r#type: String,
-        context: PhpMixed,
+        context: Option<FileDownloadContext>,
     ) -> Self {
         Self {
             inner: Event::new(name, vec![], IndexMap::new()),
@@ -64,8 +77,8 @@ impl PreFileDownloadEvent {
         &self.r#type
     }
 
-    pub fn get_context(&self) -> &PhpMixed {
-        &self.context
+    pub fn get_context(&self) -> Option<&FileDownloadContext> {
+        self.context.as_ref()
     }
 
     pub fn get_transport_options(&self) -> &IndexMap<String, PhpMixed> {

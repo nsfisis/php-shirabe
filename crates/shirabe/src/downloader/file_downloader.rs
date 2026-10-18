@@ -17,6 +17,9 @@ use crate::io::NullIO;
 use crate::io::io_interface;
 use crate::package::PackageInterfaceHandle;
 use crate::package::comparer::Comparer;
+use crate::plugin::FileDownloadContext;
+use crate::plugin::PluginEvents;
+use crate::plugin::PreFileDownloadEvent;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
 use crate::util::Platform;
@@ -443,11 +446,34 @@ impl DownloaderInterface for FileDownloader {
         // The PHP $download/$accept/$reject closures form a retry loop driven by recursion; here it
         // is expressed as a loop. $reject's "return $download()" maps to `continue`, "throw" to
         // `return Err`, and the success path runs the verification block and returns the file name.
-        let _ = cache_key_generator;
         loop {
             // === $download() ===
-            let url = urls[0].clone();
-            // TODO(plugin): dispatch PreFileDownloadEvent and apply its custom cache key / processed url.
+            let mut url = urls[0].clone();
+
+            if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
+                let mut pre_file_download_event = PreFileDownloadEvent::new(
+                    PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
+                    self.http_downloader.clone(),
+                    url.processed.clone(),
+                    "package".to_string(),
+                    Some(FileDownloadContext::Package(package.clone())),
+                );
+                let pre_file_download_event_name = pre_file_download_event.get_name().to_string();
+                event_dispatcher.borrow_mut().dispatch(
+                    Some(&pre_file_download_event_name),
+                    Some(&mut pre_file_download_event),
+                )?;
+                if let Some(custom_cache_key) = pre_file_download_event.get_custom_cache_key() {
+                    url.cache_key = cache_key_generator(package.clone(), custom_cache_key);
+                } else if pre_file_download_event.get_processed_url() != url.processed {
+                    url.cache_key = cache_key_generator(
+                        package.clone(),
+                        pre_file_download_event.get_processed_url(),
+                    );
+                }
+                url.processed = pre_file_download_event.get_processed_url().to_string();
+            }
+
             urls[0] = url.clone();
 
             let checksum = package.get_dist_sha1_checksum();

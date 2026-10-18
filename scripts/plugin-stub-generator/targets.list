@@ -28,6 +28,7 @@ Composer\Repository\RepositoryManager
 Composer\Installer\InstallationManager
 Composer\Installer\PackageEvent
 Composer\Installer\InstallerEvent
+Composer\Plugin\PreFileDownloadEvent
 Composer\DependencyResolver\Transaction
 Composer\DependencyResolver\LocalRepoTransaction
 Composer\DependencyResolver\Operation\SolverOperation

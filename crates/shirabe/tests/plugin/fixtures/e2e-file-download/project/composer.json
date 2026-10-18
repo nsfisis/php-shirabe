@@ -1,0 +1,29 @@
+{
+    "name": "shirabe/e2e-file-download",
+    "description": "E2E fixture project: record the file download events a plugin receives.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "composer",
+            "url": "{server}"
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/file-download-recorder": "1.0.0"
+    },
+    "config": {
+        "secure-http": false,
+        "allow-plugins": {
+            "shirabe-test/file-download-recorder": true
+        }
+    }
+}
