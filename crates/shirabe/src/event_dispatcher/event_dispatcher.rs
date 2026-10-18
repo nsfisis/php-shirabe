@@ -3,7 +3,7 @@
 use crate::autoload::ClassLoader;
 use crate::composer::PartialComposerHandle;
 use crate::composer::PartialComposerWeakHandle;
-use crate::dependency_resolver::Transaction;
+use crate::dependency_resolver::AnyTransaction;
 use crate::dependency_resolver::operation::AnyOperation;
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
@@ -274,7 +274,7 @@ impl EventDispatcher {
         event_name: &str,
         dev_mode: bool,
         execute_operations: bool,
-        transaction: Transaction,
+        transaction: std::rc::Rc<AnyTransaction>,
     ) -> anyhow::Result<i64> {
         let composer = self.composer();
         assert!(
@@ -1891,7 +1891,7 @@ pub trait EventDispatcherInterface: std::fmt::Debug {
         event_name: &str,
         dev_mode: bool,
         execute_operations: bool,
-        transaction: Transaction,
+        transaction: std::rc::Rc<AnyTransaction>,
     ) -> anyhow::Result<i64>;
     fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64);
     fn add_subscriber(&mut self, subscriber: &dyn EventSubscriberInterface) -> anyhow::Result<()>;
@@ -1923,7 +1923,7 @@ impl EventDispatcherInterface for EventDispatcher {
         event_name: &str,
         dev_mode: bool,
         execute_operations: bool,
-        transaction: Transaction,
+        transaction: std::rc::Rc<AnyTransaction>,
     ) -> anyhow::Result<i64> {
         self.dispatch_installer_event(event_name, dev_mode, execute_operations, transaction)
     }

@@ -141,7 +141,7 @@ fn check_solver_result_repo_set(
     let mut result_readable: Vec<(String, String)> = Vec::new();
     let mut result_ids: Vec<(String, Vec<usize>)> = Vec::new();
     for operation in transaction.get_operations() {
-        if let AnyOperation::Update(update) = operation {
+        if let AnyOperation::Update(update) = &**operation {
             let from = update.get_initial_package();
             let to = update.get_target_package();
             result_readable.push((
@@ -2521,7 +2521,7 @@ fn test_learn_positive_literal() {
     ];
     let mut result: Vec<(String, String)> = Vec::new();
     for operation in transaction.get_operations() {
-        if let AnyOperation::Update(update) = operation {
+        if let AnyOperation::Update(update) = &**operation {
             result.push((
                 "update".to_string(),
                 format!(

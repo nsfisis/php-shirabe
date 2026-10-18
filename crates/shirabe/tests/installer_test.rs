@@ -18,7 +18,7 @@ use shirabe::advisory::{AuditConfig, Auditor};
 use shirabe::autoload::{AutoloadGeneratorInterface, ClassLoader};
 use shirabe::config::Config;
 use shirabe::console::application::ApplicationHandle;
-use shirabe::dependency_resolver::{Transaction, UpdateAllowTransitiveDeps};
+use shirabe::dependency_resolver::{AnyTransaction, UpdateAllowTransitiveDeps};
 use shirabe::downloader::{DownloadManagerInterface, DownloaderInterface};
 use shirabe::event_dispatcher::{Callable, EventDispatcherInterface, EventInterface};
 use shirabe::factory::{DisablePlugins, Factory, LocalConfigInput};
@@ -183,7 +183,7 @@ impl EventDispatcherInterface for StubEventDispatcher {
         _event_name: &str,
         _dev_mode: bool,
         _execute_operations: bool,
-        _transaction: Transaction,
+        _transaction: std::rc::Rc<AnyTransaction>,
     ) -> anyhow::Result<i64> {
         Ok(0)
     }

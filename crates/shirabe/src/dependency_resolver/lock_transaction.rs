@@ -225,7 +225,9 @@ impl LockTransaction {
         used_aliases
     }
 
-    pub fn get_operations(&self) -> &Vec<crate::dependency_resolver::operation::AnyOperation> {
+    pub fn get_operations(
+        &self,
+    ) -> &Vec<std::rc::Rc<crate::dependency_resolver::operation::AnyOperation>> {
         self.inner.get_operations()
     }
 }

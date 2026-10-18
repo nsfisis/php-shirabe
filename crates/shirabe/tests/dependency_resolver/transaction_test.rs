@@ -63,7 +63,7 @@ impl PartialEq for OperationEntry {
 fn check_transaction_operations(transaction: &Transaction, expected: Vec<OperationEntry>) {
     let mut result: Vec<OperationEntry> = vec![];
     for operation in transaction.get_operations() {
-        if let AnyOperation::Update(update) = operation {
+        if let AnyOperation::Update(update) = &**operation {
             result.push(OperationEntry::Update {
                 from: update.get_initial_package(),
                 to: update.get_target_package(),

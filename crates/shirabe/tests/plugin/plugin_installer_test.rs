@@ -174,7 +174,7 @@ impl InstallationManagerInterface for MockInstallationManager {
     async fn execute(
         &self,
         _repo: &InstalledRepositoryInterfaceHandle,
-        _operations: Vec<AnyOperation>,
+        _operations: Vec<std::rc::Rc<AnyOperation>>,
         _dev_mode: bool,
         _run_scripts: bool,
         _download_only: bool,

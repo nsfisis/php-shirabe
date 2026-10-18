@@ -47,6 +47,7 @@ use crate::autoload::AutoloadGeneratorInterface;
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::GithubActionError;
+use crate::dependency_resolver::AnyTransaction;
 use crate::dependency_resolver::DefaultPolicy;
 use crate::dependency_resolver::LocalRepoTransaction;
 use crate::dependency_resolver::LockTransaction;
@@ -744,14 +745,14 @@ impl Installer {
         let platform_dev_reqs =
             self.extract_platform_requirements(&self.package.get_dev_requires());
 
-        let mut installs_updates: Vec<AnyOperation> = vec![];
-        let mut uninstalls: Vec<AnyOperation> = vec![];
+        let mut installs_updates: Vec<std::rc::Rc<AnyOperation>> = vec![];
+        let mut uninstalls: Vec<std::rc::Rc<AnyOperation>> = vec![];
         if !lock_transaction.get_operations().is_empty() {
             let mut install_names: Vec<String> = vec![];
             let mut update_names: Vec<String> = vec![];
             let mut uninstall_names: Vec<String> = vec![];
             for operation in lock_transaction.get_operations() {
-                if let AnyOperation::Install(io) = operation {
+                if let AnyOperation::Install(io) = &**operation {
                     installs_updates.push(operation.clone());
                     install_names.push(format!(
                         "{}:{}",
@@ -761,7 +762,7 @@ impl Installer {
                             crate::package::DisplayMode::SourceRefIfDev
                         )
                     ));
-                } else if let AnyOperation::Update(uo) = operation {
+                } else if let AnyOperation::Update(uo) = &**operation {
                     // when mirrors/metadata from a package gets updated we do not want to list it as an
                     // update in the output as it is only an internal lock file metadata update
                     if self.update_mirrors
@@ -781,7 +782,7 @@ impl Installer {
                             crate::package::DisplayMode::SourceRefIfDev
                         )
                     ));
-                } else if let AnyOperation::Uninstall(uo) = operation {
+                } else if let AnyOperation::Uninstall(uo) = &**operation {
                     uninstalls.push(operation.clone());
                     uninstall_names.push(uo.get_package().get_pretty_name().to_string());
                 }
@@ -827,7 +828,7 @@ impl Installer {
             }
         }
 
-        let sort_by_name = |a: &AnyOperation, b: &AnyOperation| -> i64 {
+        let sort_by_name = |a: &std::rc::Rc<AnyOperation>, b: &std::rc::Rc<AnyOperation>| -> i64 {
             strcmp(
                 &a.get_target_package().get_name(),
                 &b.get_target_package().get_name(),
@@ -836,11 +837,11 @@ impl Installer {
         usort(&mut uninstalls, &sort_by_name);
         usort(&mut installs_updates, &sort_by_name);
 
-        let mut merged: Vec<AnyOperation> = uninstalls;
+        let mut merged: Vec<std::rc::Rc<AnyOperation>> = uninstalls;
         merged.extend(installs_updates);
         for operation in &merged {
             // collect suggestions
-            if let AnyOperation::Install(io) = operation {
+            if let AnyOperation::Install(io) = &**operation {
                 self.suggested_packages_reporter
                     .borrow_mut()
                     .add_suggestions_from_package(io.get_package());
@@ -1169,12 +1170,14 @@ impl Installer {
         let local_repo_transaction = {
             let mut local_repo_ref = local_repo.borrow_mut();
             let mut locked_repo_ref = locked_repository.borrow_mut();
-            LocalRepoTransaction::new(
-                &mut *locked_repo_ref,
-                local_repo_ref
-                    .as_installed_repository_interface_mut()
-                    .unwrap(),
-            )?
+            std::rc::Rc::new(AnyTransaction::LocalRepoTransaction(
+                LocalRepoTransaction::new(
+                    &mut *locked_repo_ref,
+                    local_repo_ref
+                        .as_installed_repository_interface_mut()
+                        .unwrap(),
+                )?,
+            ))
         };
         self.event_dispatcher
             .borrow_mut()
@@ -1182,28 +1185,28 @@ impl Installer {
                 InstallerEvents::PRE_OPERATIONS_EXEC,
                 self.dev_mode,
                 self.execute_operations,
-                local_repo_transaction.to_transaction(),
+                local_repo_transaction.clone(),
             )?;
 
         let mut installs: Vec<String> = vec![];
         let mut updates: Vec<String> = vec![];
         let mut uninstalls: Vec<String> = vec![];
         for operation in local_repo_transaction.get_operations() {
-            if let AnyOperation::Install(io) = operation {
+            if let AnyOperation::Install(io) = &**operation {
                 installs.push(format!(
                     "{}:{}",
                     io.get_package().get_pretty_name(),
                     io.get_package()
                         .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
                 ));
-            } else if let AnyOperation::Update(uo) = operation {
+            } else if let AnyOperation::Update(uo) = &**operation {
                 updates.push(format!(
                     "{}:{}",
                     uo.get_target_package().get_pretty_name(),
                     uo.get_target_package()
                         .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
                 ));
-            } else if let AnyOperation::Uninstall(uo) = operation {
+            } else if let AnyOperation::Uninstall(uo) = &**operation {
                 uninstalls.push(uo.get_package().get_pretty_name().to_string());
             }
         }

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Installer/InstallerEvent.php
 
 use crate::composer::ComposerWeakHandle;
-use crate::dependency_resolver::Transaction;
+use crate::dependency_resolver::AnyTransaction;
 use crate::event_dispatcher::Event;
 use crate::event_dispatcher::EventInterface;
 use crate::io::IOInterface;
@@ -15,7 +15,7 @@ pub struct InstallerEvent {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     dev_mode: bool,
     execute_operations: bool,
-    transaction: Transaction,
+    transaction: std::rc::Rc<AnyTransaction>,
 }
 
 impl InstallerEvent {
@@ -25,7 +25,7 @@ impl InstallerEvent {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_mode: bool,
         execute_operations: bool,
-        transaction: Transaction,
+        transaction: std::rc::Rc<AnyTransaction>,
     ) -> Self {
         let inner = Event::new(event_name, vec![], indexmap::IndexMap::new());
         Self {
@@ -54,7 +54,7 @@ impl InstallerEvent {
         self.execute_operations
     }
 
-    pub fn get_transaction(&self) -> Option<&Transaction> {
+    pub fn get_transaction(&self) -> Option<&std::rc::Rc<AnyTransaction>> {
         Some(&self.transaction)
     }
 }

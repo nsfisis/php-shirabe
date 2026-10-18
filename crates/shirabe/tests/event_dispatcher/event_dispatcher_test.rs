@@ -10,6 +10,7 @@ use serial_test::serial;
 use shirabe::autoload::{AutoloadGenerator, AutoloadGeneratorInterface, ClassLoader};
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
+use shirabe::dependency_resolver::AnyTransaction;
 use shirabe::dependency_resolver::Transaction;
 use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::event_dispatcher::{Callable, EventDispatcher, EventInterface};
@@ -361,7 +362,10 @@ fn test_dispatcher_installer_events() {
     let mut dispatcher =
         dispatcher_with_listeners(&composer, null_io(), process, listeners_const(vec![]));
 
-    let transaction = Transaction::new(vec![], vec![]);
+    let transaction = std::rc::Rc::new(AnyTransaction::Transaction(Transaction::new(
+        vec![],
+        vec![],
+    )));
 
     dispatcher
         .dispatch_installer_event(
@@ -532,7 +536,7 @@ mockall::mock! {
         async fn execute(
             &self,
             repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
-            operations: Vec<AnyOperation>,
+            operations: Vec<std::rc::Rc<AnyOperation>>,
             dev_mode: bool,
             run_scripts: bool,
             download_only: bool,

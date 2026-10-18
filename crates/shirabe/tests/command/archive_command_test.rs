@@ -6,7 +6,7 @@ use shirabe::command::BaseCommand;
 use shirabe::command::archive_command::ArchiveCommand;
 use shirabe::composer::{Composer, PartialComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
-use shirabe::dependency_resolver::Transaction;
+use shirabe::dependency_resolver::AnyTransaction;
 use shirabe::event_dispatcher::{Callable, EventDispatcherInterface, EventInterface};
 use shirabe::package::{
     ArchiveManagerInterface, CompletePackageInterfaceHandle, RootPackageHandle,
@@ -85,7 +85,7 @@ mockall::mock! {
             event_name: &str,
             dev_mode: bool,
             execute_operations: bool,
-            transaction: Transaction,
+            transaction: std::rc::Rc<AnyTransaction>,
         ) -> anyhow::Result<i64>;
         fn add_listener(&mut self, event_name: &str, listener: Callable, priority: i64);
         fn add_subscriber<'a>(

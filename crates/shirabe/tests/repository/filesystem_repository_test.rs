@@ -107,7 +107,7 @@ mockall::mock! {
         async fn execute(
             &self,
             repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
-            operations: Vec<AnyOperation>,
+            operations: Vec<std::rc::Rc<AnyOperation>>,
             dev_mode: bool,
             run_scripts: bool,
             download_only: bool,

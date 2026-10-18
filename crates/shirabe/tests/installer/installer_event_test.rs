@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Installer/InstallerEventTest.php
 
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
+use shirabe::dependency_resolver::AnyTransaction;
 use shirabe::dependency_resolver::Transaction;
 use shirabe::event_dispatcher::EventInterface;
 use shirabe::installer::InstallerEvent;
@@ -13,7 +14,10 @@ fn test_getter() {
     let composer = ComposerHandle::from_rc_unchecked(composer_rc);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let transaction = Transaction::new(vec![], vec![]);
+    let transaction = std::rc::Rc::new(AnyTransaction::Transaction(Transaction::new(
+        vec![],
+        vec![],
+    )));
     let event = InstallerEvent::new(
         "EVENT_NAME".to_string(),
         composer.downgrade(),

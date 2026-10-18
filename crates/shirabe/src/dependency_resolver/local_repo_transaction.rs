@@ -23,11 +23,7 @@ impl LocalRepoTransaction {
         })
     }
 
-    pub fn get_operations(&self) -> &Vec<AnyOperation> {
+    pub fn get_operations(&self) -> &Vec<std::rc::Rc<AnyOperation>> {
         self.inner.get_operations()
-    }
-
-    pub(crate) fn to_transaction(&self) -> Transaction {
-        self.inner.clone()
     }
 }

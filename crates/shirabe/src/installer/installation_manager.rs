@@ -242,7 +242,7 @@ impl InstallationManager {
     pub async fn execute(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
-        operations: Vec<AnyOperation>,
+        operations: Vec<std::rc::Rc<AnyOperation>>,
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
@@ -257,7 +257,7 @@ impl InstallationManager {
             let mut repo = repo.borrow_mut();
             for operation in operations {
                 let trace = shirabe_php_shim::strip_tags(&operation.to_string());
-                match operation {
+                match &*operation {
                     AnyOperation::Install(op) => {
                         let package = op.get_package();
                         mock.installed.push(package.clone());
@@ -313,8 +313,7 @@ impl InstallationManager {
 
         // Shared rather than owned so that one operation reaches a plugin as one object, both
         // through the whole batch pipeline and through its pre- and post-event.
-        let all_operations: Vec<std::rc::Rc<AnyOperation>> =
-            operations.into_iter().map(std::rc::Rc::new).collect();
+        let all_operations = operations;
 
         let result: anyhow::Result<()> = async {
             // execute operations in batches to make sure download-modifying-plugins are installed
@@ -1087,7 +1086,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
     async fn execute(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
-        operations: Vec<AnyOperation>,
+        operations: Vec<std::rc::Rc<AnyOperation>>,
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,
@@ -1130,7 +1129,7 @@ impl InstallationManagerInterface for InstallationManager {
     async fn execute(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
-        operations: Vec<AnyOperation>,
+        operations: Vec<std::rc::Rc<AnyOperation>>,
         dev_mode: bool,
         run_scripts: bool,
         download_only: bool,

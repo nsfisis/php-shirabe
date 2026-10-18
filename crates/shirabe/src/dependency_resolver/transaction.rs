@@ -21,7 +21,7 @@ use shirabe_php_shim::{
 #[derive(Debug, Clone)]
 pub struct Transaction {
     /// @var OperationInterface[]
-    operations: Vec<AnyOperation>,
+    operations: Vec<std::rc::Rc<AnyOperation>>,
 
     /// Packages present at the beginning of the transaction
     /// @var PackageInterface[]
@@ -62,7 +62,7 @@ impl Transaction {
         this
     }
 
-    pub fn get_operations(&self) -> &Vec<AnyOperation> {
+    pub fn get_operations(&self) -> &Vec<std::rc::Rc<AnyOperation>> {
         &self.operations
     }
 
@@ -104,7 +104,7 @@ impl Transaction {
         }
     }
 
-    fn calculate_operations(&mut self) -> Vec<AnyOperation> {
+    fn calculate_operations(&mut self) -> Vec<std::rc::Rc<AnyOperation>> {
         let mut operations: Vec<AnyOperation> = vec![];
 
         let mut present_package_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
@@ -210,8 +210,8 @@ impl Transaction {
         // TODO skip updates which don't update? is this needed? we shouldn't schedule this update in the first place?
         // if ('update' === $opType) { ... }
 
-        self.operations = operations.clone();
-        operations
+        self.operations = operations.into_iter().map(std::rc::Rc::new).collect();
+        self.operations.clone()
     }
 
     /// Determine which packages in the result are not required by any other packages in it.
@@ -386,5 +386,25 @@ impl Transaction {
         result.extend(uninst_ops);
         result.extend(operations);
         result
+    }
+}
+
+/// A `Transaction` of any concrete class, for a value PHP types as `Transaction` while its
+/// subclass stays observable (`InstallerEvent::getTransaction()` hands out the
+/// `LocalRepoTransaction` the installer built).
+#[derive(Debug)]
+pub enum AnyTransaction {
+    Transaction(Transaction),
+    LocalRepoTransaction(crate::dependency_resolver::LocalRepoTransaction),
+    LockTransaction(crate::dependency_resolver::LockTransaction),
+}
+
+impl AnyTransaction {
+    pub fn get_operations(&self) -> &Vec<std::rc::Rc<AnyOperation>> {
+        match self {
+            Self::Transaction(transaction) => transaction.get_operations(),
+            Self::LocalRepoTransaction(transaction) => transaction.get_operations(),
+            Self::LockTransaction(transaction) => transaction.get_operations(),
+        }
     }
 }

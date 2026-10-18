@@ -778,7 +778,9 @@ impl CreateProjectCommand {
             .borrow()
             .execute(
                 &installed_repo,
-                vec![InstallOperation::new(package.clone()).into()],
+                vec![std::rc::Rc::new(
+                    InstallOperation::new(package.clone()).into(),
+                )],
                 true,
                 true,
                 false,

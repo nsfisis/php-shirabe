@@ -164,7 +164,7 @@ impl Command for ReinstallCommand {
 
         let mut install_order = indexmap::IndexMap::new();
         for (index, op) in install_operations.iter().enumerate() {
-            if let AnyOperation::Install(install_op) = op
+            if let AnyOperation::Install(install_op) = &**op
                 && install_op.get_package().as_alias().is_none()
             {
                 install_order.insert(install_op.get_package().get_name(), index);
@@ -230,8 +230,10 @@ impl Command for ReinstallCommand {
             indexmap::IndexMap::new(),
         );
 
-        let uninstall_operations: Vec<AnyOperation> =
-            uninstall_operations.into_iter().map(Into::into).collect();
+        let uninstall_operations: Vec<std::rc::Rc<AnyOperation>> = uninstall_operations
+            .into_iter()
+            .map(|operation| std::rc::Rc::new(operation.into()))
+            .collect();
         let repo = crate::repository::InstalledRepositoryInterfaceHandle::from_repository_handle(
             &local_repo,
         );
