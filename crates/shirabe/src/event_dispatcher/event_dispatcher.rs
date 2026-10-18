@@ -319,7 +319,7 @@ impl EventDispatcher {
 
         let autoloaders_before = spl_autoload_functions();
 
-        let result = self.do_dispatch_body(&*event, listeners);
+        let result = self.do_dispatch_body(event, listeners);
 
         // finally block
         self.pop_event();
@@ -359,7 +359,7 @@ impl EventDispatcher {
 
     fn do_dispatch_body(
         &mut self,
-        event: &dyn EventInterface,
+        event: &mut dyn EventInterface,
         listeners: Vec<Callable>,
     ) -> anyhow::Result<i64> {
         let mut return_max = 0_i64;
@@ -1137,7 +1137,7 @@ try {{
         &self,
         class_name: &str,
         method_name: &str,
-        event: &dyn EventInterface,
+        event: &mut dyn EventInterface,
     ) -> anyhow::Result<PhpMixed> {
         if self.io.is_verbose() {
             self.io.write_error3(
@@ -1672,7 +1672,7 @@ try {{
 /// graph an event exposes, which does not exist yet.
 struct ScriptRpcDispatcher<'a> {
     loader: Option<ClassLoader>,
-    event: Option<(u64, &'a dyn EventInterface)>,
+    event: Option<(u64, &'a mut dyn EventInterface)>,
 }
 
 impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
@@ -1721,8 +1721,8 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
             )));
         }
         match self.event {
-            Some((event_rhandle, event)) if event_rhandle == rhandle => {
-                dispatch_event_method(event, method_name)
+            Some((event_rhandle, ref mut event)) if event_rhandle == rhandle => {
+                dispatch_event_method(&mut **event, method_name, &args)
             }
             _ => crate::plugin::php_plugin_proxy::dispatch_r_table_method(
                 rhandle,
@@ -1737,8 +1737,9 @@ impl RustMethodDispatcher for ScriptRpcDispatcher<'_> {
 /// Serves an event proxy stub's method call, shared by the script dispatcher and the plugin
 /// dispatcher (both expose one live event handle per dispatched call).
 pub(crate) fn dispatch_event_method(
-    event: &dyn EventInterface,
+    event: &mut dyn EventInterface,
     method_name: &str,
+    _args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     match method_name {
         "getName" => Ok(PluginValue::string(event.get_name())),
@@ -1753,6 +1754,10 @@ pub(crate) fn dispatch_event_method(
             event.get_flags().clone(),
         ))),
         "isPropagationStopped" => Ok(PluginValue::Bool(event.is_propagation_stopped())),
+        "stopPropagation" => {
+            event.stop_propagation();
+            Ok(PluginValue::Null)
+        }
         "isDevMode" => match (script_event(event), package_event(event)) {
             (Some(event), _) => Ok(PluginValue::Bool(event.is_dev_mode())),
             (_, Some(event)) => Ok(PluginValue::Bool(event.is_dev_mode())),
@@ -1824,8 +1829,8 @@ pub(crate) fn dispatch_event_method(
                 "getOperation is only available on package events".to_string(),
             )),
         },
-        // TODO(plugin): stopPropagation and the rest need full proxying of the object graph
-        // an event exposes, which does not exist yet.
+        // TODO(plugin): the rest need full proxying of the object graph an event exposes, which
+        // does not exist yet.
         other => Err(runtime_throw(format!(
             "the Event method `{other}` is not available over RPC yet"
         ))),

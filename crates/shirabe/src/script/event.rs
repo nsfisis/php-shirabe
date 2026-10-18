@@ -79,6 +79,10 @@ impl EventInterface for Event {
         self
     }
 
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
     fn get_name(&self) -> &str {
         self.inner.get_name()
     }
@@ -102,6 +106,10 @@ impl EventInterface for Event {
 
 impl EventInterface for OriginatingEvent {
     fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
 

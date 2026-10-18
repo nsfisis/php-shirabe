@@ -290,7 +290,7 @@ pub(crate) struct PluginRpcDispatcher<'a> {
     /// TODO(plugin): a listener that stores the event stub beyond its own call observes an
     /// unknown handle error afterwards; keeping events in the R table needs full proxying of
     /// the object graph an event exposes, which does not exist yet.
-    pub(crate) event: Option<(u64, &'a dyn EventInterface)>,
+    pub(crate) event: Option<(u64, &'a mut dyn EventInterface)>,
 }
 
 impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
@@ -332,10 +332,10 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
             )));
         }
 
-        if let Some((event_rhandle, event)) = self.event
+        if let Some((event_rhandle, ref mut event)) = self.event
             && event_rhandle == rhandle
         {
-            return dispatch_event_method(event, method_name);
+            return dispatch_event_method(&mut **event, method_name, &args);
         }
 
         dispatch_r_table_method(rhandle, method_name, &args, out_params)

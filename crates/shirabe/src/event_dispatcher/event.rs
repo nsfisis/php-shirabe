@@ -50,6 +50,7 @@ pub trait EventInterface: std::fmt::Debug {
     /// For downcasting to the concrete event type (PHP `instanceof`), mirroring
     /// `IOInterface::as_any`.
     fn as_any(&self) -> &dyn std::any::Any;
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
     fn get_name(&self) -> &str;
     fn get_arguments(&self) -> &Vec<String>;
     fn get_flags(&self) -> &IndexMap<String, PhpMixed>;
@@ -59,6 +60,10 @@ pub trait EventInterface: std::fmt::Debug {
 
 impl EventInterface for Event {
     fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
 
