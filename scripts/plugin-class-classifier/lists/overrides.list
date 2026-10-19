@@ -1,6 +1,6 @@
 # Per-class category corrections: "FQCN category reason...". Every entry
 # must carry a reason. Keep this list short; prefer fixing the rules.
-Composer\Util\Platform rust-proxy env table is shared process state; the child's Platform stub RPCs putEnv/getEnv/clearEnv so both worlds see the same environment
+Composer\Util\Platform rust-proxy env table is shared process state; no stub exists, so the child resolves the class to a guard and every env access from plugin code is an explicit error
 Composer\Autoload\ClassLoader php-native the child bootstraps via the real vendor/composer/ClassLoader.php before any stub could load; a same-FQCN stub cannot shadow it. Registered-loader state is per-world.
 Composer\InstalledVersions php-native same bootstrap constraint as ClassLoader (real file in vendor/composer is always loaded); its static $installed is genuinely shared state — Rust must push a reload after each install dump (see static-state.list needs-sync)
 Composer\Platform\HhvmDetector php-native stateless environment probe; only reachable as a consumed ctor param of PlatformRepository, no Rust-owned instance is ever provided to plugins. Plugin-custom detectors passed into a proxied PlatformRepository become an explicit error.

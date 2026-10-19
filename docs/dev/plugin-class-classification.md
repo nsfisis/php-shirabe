@@ -52,10 +52,14 @@ error. See `docs/dev/plugin-stub-generation.md`.
 
 The living services: `Composer`, `Config`, `RepositoryManager`,
 `InstallationManager`, `EventDispatcher`, `Locker`, `PluginManager`,
-`DownloadManager`, `ArchiveManager`, `Loop`, `HttpDownloader`, the
+`DownloadManager`, `ArchiveManager`, `HttpDownloader`, the
 `IOInterface` implementations, and the Event objects passed to listeners.
 State sharing is their essence; every method call round-trips to the Rust
-entity.
+entity. Not all of them have a stub; those without one are guarded.
+`Composer\EventDispatcher\Event` and `Composer\Plugin\PreCommandRunEvent`
+are dual-mode: an instance revived from a Rust handle forwards over RPC,
+while one constructed in the worker runs natively (see "Dual
+instantiation").
 
 #### rust-snapshot
 
@@ -93,17 +97,29 @@ corresponding Rust trait. Contracts can be both (`InstallerInterface` is
 registered by plugins *and* returned by
 `InstallationManager::getInstaller()`).
 
+The Rust traits behind consumed contracts whose only implementor is the
+adapter for a PHP plugin are fallible: `EventSubscriberInterface::
+get_subscribed_events`, `Capable::get_capabilities` and
+`CommandProvider::get_commands` return `anyhow::Result`, so an exception the
+plugin throws propagates instead of degrading to an empty subscription list
+or capability map. `get_subscribed_events` takes `&self` although the PHP
+method is static, because the plugin's class is known only at run time.
+`PluginManager::getPluginCapability` builds the capability in the worker
+and wraps it in the adapter for its interface; a capability interface it has
+no adapter for (one a plugin ships itself) is an explicit error.
+
 For abstract *classes* with concrete state and bodies (`BaseIO`,
-`BasePackage`, `LibraryInstaller`) a declaration-only stub is not enough:
-real plugins subclass them relying on the inherited behavior, so the stub
+`BasePackage`) — and likewise for concrete base classes plugins subclass,
+such as `LibraryInstaller` (`rust-proxy`) — a declaration-only stub is not
+enough: real plugins subclass them relying on the inherited behavior, so the stub
 must carry the concrete members (proxy-dispatched or operating on snapshot
 state) — the per-method rows in the report cover exactly these members.
 
 #### two-world
 
 An exception-list category (it cannot be inferred from the sources):
-`Composer\Console\*`, `Composer\Command\*`, and the whole symfony/console
-package. Each world runs its own full implementation; instances do not cross
+`Composer\Console\*`, `Composer\Command\*`, the whole symfony/console
+package, and `Composer\Util\Loop` / `Composer\Util\SyncHelper`. Each world runs its own full implementation; instances do not cross
 the boundary.
 
 #### php-native
@@ -149,7 +165,7 @@ design-sensitive.
 
 The class writes to `static` properties. Sub-classified by the disposition
 list (see exception lists): `memo-cache` (pure memoization, each world may
-compute its own: `Git::$version`, `Platform::$isDocker`, …), `seed-once`
+compute its own: `Git::$version`, `Hg`, `Svn`, …), `seed-once`
 (copied from the Rust side once at child startup; nothing is filed this way
 today), `needs-sync` (genuinely shared process state: `Platform`'s env table,
 `ProcessExecutor::$timeout`), or `needs-review` (default for newly appearing
@@ -157,8 +173,10 @@ ones — the run fails loudly until a human files it).
 
 A `needs-sync` static is not actually synced by copying it: the child holds no
 copy at all, because the stub forwards the accessors that read and write it
-(`__shirabeCallStatic`, see `docs/dev/plugin-stub-generation.md`). The
-disposition records that the state is shared, not the mechanism.
+(`__shirabeCallStatic`, see `docs/dev/plugin-stub-generation.md`) where a
+stub exists (`ProcessExecutor`); a `needs-sync` class without a stub is
+guarded. The disposition records that the state is shared, not the
+mechanism.
 
 #### throwable
 
@@ -168,8 +186,10 @@ mapping for the `Throw` message.
 
 #### pure/mutator (per method)
 
-Drives epoch invalidation of the child-side getter caches: after a mutator
-runs Rust-side, the affected proxies' caches must be dropped. A method is a
+Intended to drive epoch invalidation of child-side getter caches: after a
+mutator runs Rust-side, the affected proxies' caches would have to be
+dropped. No such cache exists: stubs forward every call, and nothing
+consumes these verdicts. A method is a
 mutator iff it assigns to `$this->…` (directly, via compound assignment,
 `unset`, increment), passes a `$this`-rooted expression into a by-reference
 parameter position (builtin signatures resolved from
@@ -194,7 +214,7 @@ explicit signal instead of discovering them at runtime.
 #### public static properties
 
 On proxied/snapshotted classes (`FileDownloader::$downloadMetadata`,
-`BasePackage::$stabilities`). PHP has no `__getStatic`, so a stub cannot
+`Config::$defaultConfig`). PHP has no `__getStatic`, so a stub cannot
 intercept static property access — each one needs an explicit decision
 (materialize as a constant initializer when immutable, push-sync or
 explicit-error when mutable).
@@ -304,8 +324,8 @@ Assigned in order:
 ### Unreachable types
 
 Classes never touched by the closure are not part of the shared graph, but
-plugins may still reference them (`new Composer\Util\Filesystem()`,
-`JsonFile::parseJson()`, any vendor helper). The rule is a leaf-first fixed
+plugins may still reference them (`Composer\Platform\Version`,
+`Composer\Script\ScriptEvents`, any vendor helper). The rule is a leaf-first fixed
 point over *hard* body references — `new X`, `X::method()`, writes to
 `X::$prop` — while `instanceof`, `catch`, and `X::class` are satisfied by a
 mere declaration and never demote.
@@ -314,10 +334,10 @@ What a hard reference may legally target from real PHP running in the child
 process:
 
 * `X::method()` works when X has any executable presence there: a php-native
-  class, real vendor code, real console code (two-world), or a generated
-  stub — proxy stubs carry static methods as RPC forwarders, which is what
-  makes the ubiquitous `Platform::getEnv()` call sites loadable. Only
-  `unsupported` peers and unknown types demote.
+  class, real vendor code, real console code (two-world), or a class filed
+  as `rust-proxy` (a proxy stub forwards static methods over RPC; a class
+  without a stub is guarded, so the call is an explicit error rather than a
+  fork). Only `unsupported` peers and unknown types demote.
 * `new X` additionally requires local constructibility: php-native,
   two-world, vendor, and builtin classes are real code; `rust-snapshot`
   values may be built locally (they are values — they become Rust-backed
@@ -354,11 +374,12 @@ Three, all versioned next to the tool, all expected to stay short:
   (`memo-cache` / `seed-once` / `needs-sync`); anything not listed fails
   the run.
 * `overrides.list` — per-class category corrections. Every entry must carry
-  a reason. Initial content: `Platform` → `rust-proxy` (its env table is
-  shared state; the child's Platform stub RPCs env access so both worlds
-  see the same environment), the bootstrap classes (see "Known
-  deviations"), and two phantom-reachability corrections (`HhvmDetector`,
-  `VersionGuesser`).
+  a reason. Current content: `Platform` → `rust-proxy` (its env table is
+  shared state; no stub exists, so the child resolves the class to a guard
+  and every env access from plugin code is an explicit error), the
+  bootstrap classes (see "Known deviations"), two phantom-reachability
+  corrections (`HhvmDetector`, `VersionGuesser`), and
+  `Composer\Util\Http\Response` → `rust-snapshot` (see rust-snapshot above).
 
 ### Failure mode
 
@@ -453,6 +474,11 @@ the three alias packages, the five solver operations,
 `Composer\Util\ProcessExecutor` and `Composer\Util\HttpDownloader` can be
 built this way. Every other
 proxied class answers with an explicit error naming it.
+`Composer\EventDispatcher\Event` and `Composer\Plugin\PreCommandRunEvent`
+are the exception: their worker-side definitions are hand-written dual-mode
+classes, so `new` builds a native in-process instance (what
+`BaseCommand::initialize()` does), while an instance revived from a Rust
+handle forwards over RPC.
 
 `JsonFile` and `ArrayLoader` are still undecided, so the classes above stay
 `unsupported` — but a guard now shadows each of them in the child, so
@@ -580,11 +606,13 @@ All conservative:
 * dynamic calls (`$this->$m()`, `call_user_func` and other
   callback-forwarding builtins with `$this`-rooted arguments) force
   `mutator`;
-* a call to a method that is abstract at the analyzed level
-  (`$this->getVersion()` from `BasePackage::getUniqueName`) forces
-  `mutator` even when every concrete implementation is a pure read — this
-  costs spurious epoch invalidations, not correctness, and can be refined
-  by resolving abstract callees over all concrete subtypes;
+* a call to a method the class hierarchy does not declare (an
+  interface-only method such as `$this->getVersion()` from
+  `BasePackage::getUniqueName`) forces `mutator` even when every concrete
+  implementation is a pure read — this would cost spurious epoch
+  invalidations, not correctness, and can be refined by resolving such
+  callees over all concrete subtypes; a call to a declared abstract method
+  is treated as pure;
 * `parent::m()` purity resolves against the own hierarchy rather than the
   declaring parent;
 * vendor by-ref signatures are tabled only for composer/pcre

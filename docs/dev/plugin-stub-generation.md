@@ -34,8 +34,11 @@ Inputs:
 * `targets.list` — the FQCNs to emit, stub base classes before their subclasses.
   Growing the stub set means adding a line here and regenerating.
 * the hand-written classes under `crates/shirabe-php-rpc/php/runtime/` (their
-  FQCNs derive from the file paths). These are two-world implementations with
-  behavior of their own — not mechanical proxies — so the generator never emits
+  FQCNs derive from the file paths). These are hand-written implementations with
+  behavior of their own — two-world classes such as `Composer\Util\Loop` and
+  `Composer\Console\Application`, and dual-mode classes such as
+  `Composer\EventDispatcher\Event` that proxy when revived from a handle and run
+  natively when constructed in the worker — not mechanical proxies — so the generator never emits
   them, but it accepts them as base classes of generated stubs (computing the
   inherited surface from the real Composer class the runtime file mirrors) and
   fails if a `targets.list` entry would shadow one.
@@ -61,7 +64,8 @@ the generator's vendor directory or the classifier report is unavailable.
 
 ## What the generator emits
 
-* **Root stubs** (targets whose parent class is not itself a target) carry the
+* **Root stubs** (targets that extend no class; a target extending another
+  target or a `php/runtime/` class inherits the boilerplate from it) carry the
   proxy boilerplate: `__rhandle`/`__epoch` properties, the `__shirabeBind`
   binder the registry calls when reviving a stub for an existing entity, a
   destructor releasing the Rust handle, and the wire descriptor helper. The

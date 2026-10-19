@@ -14,8 +14,8 @@ We plan to support all platforms that Composer does, but currently:
 
 ## Commands
 
-The command `self-update` is intentionally disabled because there are no
-releases yet.
+The command `self-update` is intentionally disabled because prebuilt binaries
+have not been published yet.
 
 
 ## Default Home/Cache/Data Directories

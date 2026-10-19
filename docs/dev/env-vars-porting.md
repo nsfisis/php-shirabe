@@ -45,5 +45,5 @@ worker's own `$_SERVER` entries (`argv`, `SCRIPT_NAME`, ...) intact.
 
 ## TODOs
 
-Reflecting PHP-side mutations of `$_ENV`/`$_SERVER` back into Shirabe is unimplemented. How to
-handle the case where PHP code rewrites `$_ENV` or `$_SERVER` is still TBD.
+Writes PHP code makes in the worker — `putenv()` as well as assignments to `$_ENV`/`$_SERVER` — are
+not reflected back into Shirabe. How to handle them is still TBD.
