@@ -13,6 +13,7 @@ shirabe-symfony-process.workspace = true
 shirabe-symfony-string.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
+bstr.workspace = true
 indexmap.workspace = true
 regex.workspace = true
 

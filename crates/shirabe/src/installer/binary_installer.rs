@@ -7,6 +7,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
+use bstr::BString;
 use shirabe_php_shim::{
     basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
     file_get_contents_with_max_length, file_put_contents, fopen, is_dir, is_file, is_link,
@@ -192,11 +193,12 @@ impl BinaryInstaller {
                 fclose(&handle);
                 line
             }
-            Err(_) => String::new(),
+            Err(_) => BString::default(),
         };
+        // TODO(bytes): preg_match matches over a &str.
         if let Some(m) = preg_match(
             php_regex!(r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m"),
-            &line,
+            &String::from_utf8_lossy(&line),
         ) {
             return trim(m.get(1).unwrap_or(""), None);
         }

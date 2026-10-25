@@ -25,10 +25,14 @@ pub fn substr_count(haystack: &str, needle: &str) -> i64 {
 
 // Byte-based, matching PHP's substr_replace. `length` of `None` is PHP's omitted `$length`,
 // which replaces up to the end of the string.
-// TODO(bytes): slicing at arbitrary byte offsets can split a multi-byte sequence, and the
-// `String` return type forces the resulting invalid bytes through `from_utf8_lossy`.
-pub fn substr_replace(string: &str, replace: &str, start: i64, length: Option<i64>) -> String {
-    let bytes = string.as_bytes();
+pub fn substr_replace(
+    string: impl AsRef<[u8]>,
+    replace: impl AsRef<[u8]>,
+    start: i64,
+    length: Option<i64>,
+) -> BString {
+    let bytes = string.as_ref();
+    let replace = replace.as_ref();
     let str_len = bytes.len() as i64;
 
     // A negative start counts from the end of the string, clamped to both ends of the string.
@@ -48,11 +52,11 @@ pub fn substr_replace(string: &str, replace: &str, start: i64, length: Option<i6
 
     let start = start as usize;
     let end = start + length as usize;
-    let mut out: Vec<u8> = Vec::with_capacity(bytes.len() + replace.len());
+    let mut out = BString::from(Vec::with_capacity(bytes.len() + replace.len()));
     out.extend_from_slice(&bytes[..start]);
-    out.extend_from_slice(replace.as_bytes());
+    out.extend_from_slice(replace);
     out.extend_from_slice(&bytes[end..]);
-    String::from_utf8_lossy(&out).into_owned()
+    out
 }
 
 pub fn str_repeat(s: &str, count: usize) -> String {
@@ -116,13 +120,9 @@ pub fn str_split(s: &str, length: i64) -> Vec<String> {
         .collect()
 }
 
-pub fn str_bitand(a: &str, b: &str) -> String {
+pub fn str_bitand(a: &[u8], b: &[u8]) -> BString {
     // PHP's string `&` operator: byte-wise AND, the result truncated to the shorter operand.
-    let a = a.as_bytes();
-    let b = b.as_bytes();
-    let n = a.len().min(b.len());
-    let out: Vec<u8> = (0..n).map(|i| a[i] & b[i]).collect();
-    String::from_utf8_lossy(&out).into_owned()
+    a.iter().zip(b).map(|(a, b)| a & b).collect()
 }
 
 pub fn str_replace_arrays(search: &[String], replace: &[String], subject: &str) -> String {
@@ -570,8 +570,8 @@ pub fn ctype_digit(s: &str) -> bool {
     !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit())
 }
 
-pub fn ord(c: &str) -> i64 {
-    c.as_bytes().first().copied().unwrap_or(0) as i64
+pub fn ord(c: impl AsRef<[u8]>) -> i64 {
+    c.as_ref().first().copied().unwrap_or(0) as i64
 }
 
 pub fn ucwords(s: &str) -> String {
@@ -1109,6 +1109,7 @@ pub fn uniqid(prefix: &str, more_entropy: bool) -> String {
 
 #[cfg(test)]
 mod tests {
+    use super::str_bitand;
     use super::substr_replace;
 
     #[test]
@@ -1171,5 +1172,17 @@ mod tests {
         assert_eq!(substr_replace("abc", "X", -1, Some(-1)), "abXc");
         assert_eq!(substr_replace("abc", "X", 3, Some(0)), "abcX");
         assert_eq!(substr_replace("abc", "X", 3, None), "abcX");
+        // Splitting a multi-byte sequence keeps both halves as raw bytes.
+        assert_eq!(
+            substr_replace("é", "X", 1, Some(0)),
+            b"\xc3X\xa9".as_slice()
+        );
+    }
+
+    #[test]
+    fn str_bitand_matches_php() {
+        // Expected values are the output of PHP 8.5.9's `&` operator on strings.
+        assert_eq!(str_bitand(b"\xc3", b"\xf0"), b"\xc0".as_slice());
+        assert_eq!(str_bitand(b"abc", b"\xdf\xdf"), "AB");
     }
 }

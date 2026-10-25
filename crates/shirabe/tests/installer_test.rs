@@ -1211,9 +1211,11 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     let app_output_contents =
         shirabe_php_shim::stream_get_contents(&app_output_stream).unwrap_or_default();
     assert_eq!(
-        *expect_result, result,
+        *expect_result,
+        result,
         "{}{}",
-        output_string, app_output_contents
+        output_string,
+        bstr::BStr::new(&app_output_contents)
     );
 
     if let ExpectLock::Json(expect_lock) = &case.expect_lock {

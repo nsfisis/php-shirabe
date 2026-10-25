@@ -217,9 +217,11 @@ impl Terminal {
             Err(_) => return None,
         };
 
+        // TODO(bytes): the stty/mode output is returned as a String.
         let info = pipes
             .get(&1)
-            .and_then(shirabe_php_shim::stream_get_contents);
+            .and_then(shirabe_php_shim::stream_get_contents)
+            .map(|info| String::from_utf8_lossy(&info).into_owned());
         if let Some(pipe) = pipes.get(&1) {
             shirabe_php_shim::fclose(pipe);
         }

@@ -479,7 +479,7 @@ mod tests {
         .unwrap();
 
         let stdout = pipes.get(&1).unwrap();
-        assert_eq!(stream_get_contents(stdout).unwrap(), "hi\n");
+        assert_eq!(stream_get_contents(stdout).unwrap(), b"hi\n");
 
         // Reading to EOF means the child has finished; the status converges to "not running".
         let status = loop {
@@ -524,7 +524,7 @@ mod tests {
 
         assert_eq!(
             stream_get_contents(pipes.get(&1).unwrap()).unwrap(),
-            "ping\n"
+            b"ping\n"
         );
 
         assert_eq!(proc_close(&process), 0);
@@ -550,7 +550,7 @@ mod tests {
 
         assert_eq!(
             stream_get_contents(pipes.get(&3).unwrap()).unwrap(),
-            "beyond\n"
+            b"beyond\n"
         );
         assert_eq!(proc_close(&process), 0);
     }
@@ -581,7 +581,7 @@ mod tests {
 
         assert_eq!(
             stream_get_contents(pipes.get(&1).unwrap()).unwrap(),
-            "fed\n"
+            b"fed\n"
         );
         assert_eq!(proc_close(&process), 0);
     }

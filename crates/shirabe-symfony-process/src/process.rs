@@ -442,10 +442,12 @@ impl Process {
 
         self.read_pipes_for_output("getOutput", false)?;
 
-        Ok(
-            shirabe_php_shim::stream_get_contents3(self.stdout.as_ref().unwrap(), -1, 0)
+        // TODO(bytes): the output is returned as a String.
+        Ok(String::from_utf8_lossy(
+            &shirabe_php_shim::stream_get_contents3(self.stdout.as_ref().unwrap(), -1, 0)
                 .unwrap_or_default(),
         )
+        .into_owned())
     }
 
     /// Returns the current error output of the process (STDERR).
@@ -456,10 +458,12 @@ impl Process {
 
         self.read_pipes_for_output("getErrorOutput", false)?;
 
-        Ok(
-            shirabe_php_shim::stream_get_contents3(self.stderr.as_ref().unwrap(), -1, 0)
+        // TODO(bytes): the output is returned as a String.
+        Ok(String::from_utf8_lossy(
+            &shirabe_php_shim::stream_get_contents3(self.stderr.as_ref().unwrap(), -1, 0)
                 .unwrap_or_default(),
         )
+        .into_owned())
     }
 
     /// Returns the exit code returned by the process.

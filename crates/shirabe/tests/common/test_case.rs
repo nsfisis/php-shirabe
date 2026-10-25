@@ -486,7 +486,9 @@ impl ApplicationTester {
             .as_ref()
             .expect("output not initialized; did you run() before requesting the display?");
         shirabe_php_shim::rewind(stream);
-        shirabe_php_shim::stream_get_contents(stream).unwrap_or_default()
+        // TODO(bytes): the captured output is returned as a String.
+        String::from_utf8_lossy(&shirabe_php_shim::stream_get_contents(stream).unwrap_or_default())
+            .into_owned()
     }
 
     pub fn get_error_output(&self) -> String {
@@ -499,6 +501,8 @@ impl ApplicationTester {
             .as_ref()
             .expect("error output not initialized; did you run() before requesting it?");
         shirabe_php_shim::rewind(stream);
-        shirabe_php_shim::stream_get_contents(stream).unwrap_or_default()
+        // TODO(bytes): the captured output is returned as a String.
+        String::from_utf8_lossy(&shirabe_php_shim::stream_get_contents(stream).unwrap_or_default())
+            .into_owned()
     }
 }

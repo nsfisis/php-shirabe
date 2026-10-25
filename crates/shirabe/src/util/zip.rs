@@ -33,7 +33,8 @@ impl Zip {
         let stream = zip.get_stream(&configuration_file_name);
 
         if let Some(stream) = &stream {
-            content = stream_get_contents(stream);
+            // TODO(bytes): the composer.json contents are returned as a String.
+            content = stream_get_contents(stream).map(|c| String::from_utf8_lossy(&c).into_owned());
         }
 
         zip.close();

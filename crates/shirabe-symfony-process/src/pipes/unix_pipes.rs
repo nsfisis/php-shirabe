@@ -95,18 +95,19 @@ impl PipesInterface for UnixPipes {
         }
 
         for (fd, pipe) in &r {
-            let mut data = String::new();
+            let mut data = Vec::new();
             loop {
                 let chunk = shirabe_php_shim::fread(pipe, CHUNK_SIZE).unwrap_or_default();
                 let len = chunk.len() as i64;
-                data.push_str(&chunk);
+                data.extend_from_slice(&chunk);
                 if !(len > 0 && (close || len >= CHUNK_SIZE)) {
                     break;
                 }
             }
 
             if !data.is_empty() {
-                read.insert(*fd, data);
+                // TODO(bytes): PipesInterface hands the process output back as a String.
+                read.insert(*fd, String::from_utf8_lossy(&data).into_owned());
             }
 
             if close && shirabe_php_shim::feof(pipe) {

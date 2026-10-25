@@ -389,16 +389,14 @@ pub fn fwrite(stream: &PhpResource, data: impl AsRef<[u8]>, length: Option<i64>)
 }
 
 /// PHP `fread()`. Reads up to `length` bytes.
-/// TODO(bytes): byte-string semantics — should return Vec<u8>; from_utf8_lossy can corrupt
-/// binary reads (filesAreEqual / binary copy).
-pub fn fread(stream: &PhpResource, length: i64) -> Option<String> {
+pub fn fread(stream: &PhpResource, length: i64) -> Option<Vec<u8>> {
     let cap = length.max(0) as usize;
     match stream {
         PhpResource::Stdin => {
             let mut buf = vec![0u8; cap];
             let n = std::io::stdin().read(&mut buf).ok()?;
             buf.truncate(n);
-            Some(String::from_utf8_lossy(&buf).into_owned())
+            Some(buf)
         }
         PhpResource::Stdout | PhpResource::Stderr | PhpResource::Process(_) => None,
         PhpResource::Stream(state) => {
@@ -411,14 +409,14 @@ pub fn fread(stream: &PhpResource, length: i64) -> Option<String> {
                 Ok(n) => n,
                 // A non-blocking stream with no data ready is not an error in PHP: fread() returns
                 // the empty string and feof() stays false. std surfaces this as WouldBlock.
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => return Some(String::new()),
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => return Some(Vec::new()),
                 Err(_) => return None,
             };
             if cap > 0 && n == 0 {
                 state.eof = true;
             }
             buf.truncate(n);
-            Some(String::from_utf8_lossy(&buf).into_owned())
+            Some(buf)
         }
     }
 }
@@ -453,9 +451,7 @@ pub fn fclose(stream: &PhpResource) -> bool {
 
 /// PHP `fgets()`. Reads one line, including the trailing newline, capped at `length-1` bytes
 /// when given (matching PHP's `length` parameter).
-/// TODO(bytes): byte-string semantics — should return BString; from_utf8_lossy can corrupt
-/// binary reads.
-pub fn fgets(stream: &PhpResource, length: Option<i64>) -> Option<String> {
+pub fn fgets(stream: &PhpResource, length: Option<i64>) -> Option<BString> {
     let limit = match length {
         Some(l) if l > 0 => Some((l - 1) as usize),
         _ => None,
@@ -467,7 +463,7 @@ pub fn fgets(stream: &PhpResource, length: Option<i64>) -> Option<String> {
             if line.is_empty() {
                 return None;
             }
-            Some(String::from_utf8_lossy(&line).into_owned())
+            Some(line)
         }
         PhpResource::Stdout | PhpResource::Stderr | PhpResource::Process(_) => None,
         PhpResource::Stream(state) => {
@@ -480,7 +476,7 @@ pub fn fgets(stream: &PhpResource, length: Option<i64>) -> Option<String> {
                 state.eof = true;
                 return None;
             }
-            Some(String::from_utf8_lossy(&line).into_owned())
+            Some(line)
         }
     }
 }
@@ -511,8 +507,7 @@ fn fgets_read_line<R: std::io::Read + ?Sized>(
 }
 
 /// PHP `fgetc()`: reads a single byte, or `None` at end-of-stream.
-/// TODO(bytes): byte-string semantics — should return Vec<u8>.
-pub fn fgetc(stream: &PhpResource) -> Option<String> {
+pub fn fgetc(stream: &PhpResource) -> Option<BString> {
     let mut byte = [0u8; 1];
     match stream {
         PhpResource::Stdin => {
@@ -520,7 +515,7 @@ pub fn fgetc(stream: &PhpResource) -> Option<String> {
             if n == 0 {
                 return None;
             }
-            Some(String::from_utf8_lossy(&byte).into_owned())
+            Some(BString::from(&byte[..]))
         }
         PhpResource::Stdout | PhpResource::Stderr | PhpResource::Process(_) => None,
         PhpResource::Stream(state) => {
@@ -533,7 +528,7 @@ pub fn fgetc(stream: &PhpResource) -> Option<String> {
                 state.eof = true;
                 return None;
             }
-            Some(String::from_utf8_lossy(&byte).into_owned())
+            Some(BString::from(&byte[..]))
         }
     }
 }
@@ -820,11 +815,8 @@ pub fn is_dir(path: impl AsRef<std::path::Path>) -> bool {
 
 /// PHP `readlink()`: the target the link points at, without resolving it further.
 /// `None` is PHP's `false`-on-failure.
-/// TODO(bytes): byte-string semantics -- PHP returns the raw bytes of the link target.
-pub fn readlink(path: impl AsRef<std::path::Path>) -> Option<String> {
-    std::fs::read_link(path)
-        .ok()
-        .map(|target| target.to_string_lossy().into_owned())
+pub fn readlink(path: impl AsRef<std::path::Path>) -> Option<std::path::PathBuf> {
+    std::fs::read_link(path).ok()
 }
 
 pub fn fileatime(filename: impl AsRef<std::path::Path>) -> Option<i64> {
@@ -1342,6 +1334,26 @@ mod tests {
     use super::*;
 
     #[test]
+    fn reads_return_raw_bytes() {
+        let stream = fopen("php://temp", "w+").unwrap();
+        fwrite(&stream, b"\xff\xfe\n\xc3\xa9\x80", None);
+
+        rewind(&stream);
+        assert_eq!(
+            fgets(&stream, None),
+            Some(BString::from(b"\xff\xfe\n".as_slice()))
+        );
+        assert_eq!(fgetc(&stream), Some(BString::from(b"\xc3".as_slice())));
+        assert_eq!(fread(&stream, 10), Some(b"\xa9\x80".to_vec()));
+
+        rewind(&stream);
+        assert_eq!(
+            crate::stream_get_contents(&stream),
+            Some(b"\xff\xfe\n\xc3\xa9\x80".to_vec())
+        );
+    }
+
+    #[test]
     fn memory_stream_round_trips() {
         let stream = fopen("php://temp", "w+").unwrap();
 
@@ -1355,13 +1367,13 @@ mod tests {
         assert!(!feof(&stream));
 
         // fgets reads up to and including the newline.
-        assert_eq!(fgets(&stream, None).as_deref(), Some("hello\n"));
+        assert_eq!(fgets(&stream, None), Some("hello\n".into()));
         // fread reads the requested number of bytes.
-        assert_eq!(fread(&stream, 3).as_deref(), Some("wor"));
-        assert_eq!(fgetc(&stream).as_deref(), Some("l"));
-        assert_eq!(fread(&stream, 10).as_deref(), Some("d"));
+        assert_eq!(fread(&stream, 3).as_deref(), Some(&b"wor"[..]));
+        assert_eq!(fgetc(&stream), Some("l".into()));
+        assert_eq!(fread(&stream, 10).as_deref(), Some(&b"d"[..]));
         // A read past the end sets eof.
-        assert_eq!(fread(&stream, 10).as_deref(), Some(""));
+        assert_eq!(fread(&stream, 10).as_deref(), Some(&b""[..]));
         assert!(feof(&stream));
 
         // fstat reports the buffer size.

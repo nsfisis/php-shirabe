@@ -7,15 +7,13 @@ pub const STREAM_NOTIFY_FILE_SIZE_IS: i64 = 5;
 pub const STREAM_NOTIFY_PROGRESS: i64 = 7;
 
 /// PHP `stream_get_contents()`: read the remaining bytes from the stream's current position.
-/// TODO(bytes): byte-string semantics — should return Vec<u8>; from_utf8_lossy can corrupt
-/// binary reads.
-pub fn stream_get_contents(stream: &PhpResource) -> Option<String> {
+pub fn stream_get_contents(stream: &PhpResource) -> Option<Vec<u8>> {
     stream_read_remaining(stream, None)
 }
 
 // Reads from the stream's current position: all remaining bytes, or up to `max_length` when given
 // (a negative max means "until end").
-fn stream_read_remaining(stream: &PhpResource, max_length: Option<i64>) -> Option<String> {
+fn stream_read_remaining(stream: &PhpResource, max_length: Option<i64>) -> Option<Vec<u8>> {
     match stream {
         PhpResource::Stdin => {
             let mut buf = Vec::new();
@@ -28,7 +26,7 @@ fn stream_read_remaining(stream: &PhpResource, max_length: Option<i64>) -> Optio
                     std::io::stdin().read_to_end(&mut buf).ok()?;
                 }
             }
-            Some(String::from_utf8_lossy(&buf).into_owned())
+            Some(buf)
         }
         PhpResource::Stdout | PhpResource::Stderr | PhpResource::Process(_) => None,
         PhpResource::Stream(state) => {
@@ -42,7 +40,7 @@ fn stream_read_remaining(stream: &PhpResource, max_length: Option<i64>) -> Optio
                 _ => state.backing.as_rws().read_to_end(&mut buf),
             };
             res.ok()?;
-            Some(String::from_utf8_lossy(&buf).into_owned())
+            Some(buf)
         }
     }
 }
@@ -328,7 +326,7 @@ pub fn stream_select(
 
 /// PHP `stream_get_contents($stream, $maxlength, $offset)`. A non-negative `offset` seeks there
 /// first; `max_length < 0` reads until end.
-pub fn stream_get_contents3(stream: &PhpResource, max_length: i64, offset: i64) -> Option<String> {
+pub fn stream_get_contents3(stream: &PhpResource, max_length: i64, offset: i64) -> Option<Vec<u8>> {
     if offset >= 0 {
         crate::fs::fseek(stream, offset, crate::fs::SEEK_SET);
     }

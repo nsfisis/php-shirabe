@@ -187,11 +187,17 @@ impl ProcessExecutor {
                     && let Some(m) = preg_match(php_regex!(r"{^([^:/\\]++) }"), &command)
                 {
                     let m1 = m.get(1).unwrap_or_default().to_string();
-                    command = substr_replace(
-                        &command,
-                        &Self::escape(&Self::get_executable(&m1)),
-                        0,
-                        Some(strlen(&m1)),
+                    command = String::from_utf8(
+                        substr_replace(
+                            &command,
+                            Self::escape(&Self::get_executable(&m1)),
+                            0,
+                            Some(strlen(&m1)),
+                        )
+                        .into(),
+                    )
+                    .expect(
+                        "the replaced range is a regex match, so it ends on character boundaries",
                     );
                 }
 

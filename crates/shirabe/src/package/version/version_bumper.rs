@@ -114,12 +114,16 @@ impl VersionBumper {
                     } else {
                         format!("{}{}", new_pretty_constraint, suffix)
                     };
-                modified = shirabe_php_shim::substr_replace(
-                    &modified,
-                    &replacement,
-                    match_offset,
-                    Some(Platform::strlen(&match_str)),
-                );
+                modified = String::from_utf8(
+                    shirabe_php_shim::substr_replace(
+                        &modified,
+                        &replacement,
+                        match_offset,
+                        Some(Platform::strlen(&match_str)),
+                    )
+                    .into(),
+                )
+                .expect("the replaced range is a regex match, so it ends on character boundaries");
             }
 
             let new_constraint = parser.parse_constraints(&modified)?;

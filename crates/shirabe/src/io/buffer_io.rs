@@ -62,7 +62,10 @@ impl BufferIO {
         let stream = stream_output.get_stream();
         fseek(stream, 0, SEEK_SET);
 
-        let output = stream_get_contents(stream).unwrap_or_default();
+        // TODO(bytes): preg_replace_callback matches over a &str, and the output is returned as a
+        // String.
+        let output =
+            String::from_utf8_lossy(&stream_get_contents(stream).unwrap_or_default()).into_owned();
 
         // Regex pattern compatibility:
         // PHP uses `{(?<=^|\n|\x08)(.+?)(\x08+)}` to collapse backspace-overwritten spans (e.g.

@@ -255,7 +255,10 @@ impl Filesystem {
         self.mkdir(&shirabe_php_shim::dirname(&target_dir), 0o777)?;
 
         if shirabe_php_shim::is_link(&target_dir) {
-            if shirabe_php_shim::readlink(&target_dir).as_deref() == Some(origin_dir.as_str()) {
+            // PHP compares the raw strings, so `Path`'s component-wise equality is not used.
+            if shirabe_php_shim::readlink(&target_dir)
+                .is_some_and(|link| link.as_os_str() == std::ffi::OsStr::new(&origin_dir))
+            {
                 return Ok(());
             }
             self.remove(&target_dir)?;
@@ -321,8 +324,11 @@ impl Filesystem {
 
             if shirabe_php_shim::is_link(&pathname) {
                 // PHP coerces the false getLinkTarget() returns on failure to the empty string.
+                // TODO(bytes): symlink() takes the link target as a &str.
                 self.symlink(
-                    &shirabe_php_shim::readlink(&pathname).unwrap_or_default(),
+                    &shirabe_php_shim::readlink(&pathname)
+                        .unwrap_or_default()
+                        .to_string_lossy(),
                     &target,
                 )?;
             } else if shirabe_php_shim::is_dir(&pathname) {

@@ -18,6 +18,7 @@ use crate::output::output_interface;
 use crate::question::ChoiceQuestion;
 use crate::question::QuestionInterface;
 use crate::terminal::Terminal;
+use bstr::BString;
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_string::s;
 
@@ -484,12 +485,12 @@ impl QuestionHelper {
             // as opposed to fgets(), fread() returns an empty string when the stream content is empty, not false.
             if c.is_none()
                 || (ret.is_empty()
-                    && c.as_deref() == Some("")
+                    && c.as_deref() == Some(b"".as_slice())
                     && matches!(question.get_default(), PhpMixed::Null))
             {
                 shirabe_php_shim::shell_exec(&format!("stty {}", stty_mode));
                 return Err(MissingInputException::new("Aborted.".to_string()));
-            } else if c.as_deref() == Some("\u{7f}") {
+            } else if c.as_deref() == Some(b"\x7f".as_slice()) {
                 // Backspace Character
                 if 0 == num_matches && 0 != i {
                     i -= 1;
@@ -508,14 +509,14 @@ impl QuestionHelper {
 
                 // Pop the last character off the end of our string
                 ret = QuestionHelper::substr(Some(&ret), 0, Some(i));
-            } else if c.as_deref() == Some("\u{1b}") {
+            } else if c.as_deref() == Some(b"\x1b".as_slice()) {
                 // Did we read an escape sequence?
                 let escape = shirabe_php_shim::fread(input_stream, 2).unwrap_or_default();
-                let cc = format!("{}{}", c.clone().unwrap_or_default(), escape);
+                let cc = [c.clone().unwrap_or_default(), escape].concat();
                 c = Some(cc.clone());
 
                 // A = Up Arrow. B = Down Arrow
-                let c2 = cc.as_bytes().get(2).copied();
+                let c2 = cc.get(2).copied();
                 if c2 == Some(b'A') || c2 == Some(b'B') {
                     if c2 == Some(b'A') && -1 == ofs {
                         ofs = 0;
@@ -528,8 +529,9 @@ impl QuestionHelper {
                     ofs += if c2 == Some(b'A') { -1 } else { 1 };
                     ofs = (num_matches + ofs) % num_matches;
                 }
-            } else if shirabe_php_shim::ord(c.as_deref().unwrap_or("")) < 32 {
-                if c.as_deref() == Some("\t") || c.as_deref() == Some("\n") {
+            } else if shirabe_php_shim::ord(c.as_deref().unwrap_or_default()) < 32 {
+                if c.as_deref() == Some(b"\t".as_slice()) || c.as_deref() == Some(b"\n".as_slice())
+                {
                     if num_matches > 0 && -1 != ofs {
                         ret = matches[ofs as usize].to_string();
                         // Echo out remaining chars for current match
@@ -563,9 +565,9 @@ impl QuestionHelper {
                         ofs = -1;
                     }
 
-                    if c.as_deref() == Some("\n") {
+                    if c.as_deref() == Some(b"\n".as_slice()) {
                         output.borrow().write(
-                            &[c.unwrap_or_default()],
+                            &["\n".to_string()],
                             false,
                             output_interface::OUTPUT_NORMAL,
                         );
@@ -578,19 +580,21 @@ impl QuestionHelper {
                 continue;
             } else {
                 let cur = c.clone().unwrap_or_default();
-                if "\u{80}" <= cur.as_str() {
-                    let len = match shirabe_php_shim::str_bitand(&cur, "\u{f0}").as_str() {
-                        "\u{c0}" => 1,
-                        "\u{d0}" => 1,
-                        "\u{e0}" => 2,
-                        "\u{f0}" => 3,
+                if b"\x80".as_slice() <= cur.as_slice() {
+                    let len = match shirabe_php_shim::str_bitand(&cur, b"\xf0").as_slice() {
+                        b"\xc0" => 1,
+                        b"\xd0" => 1,
+                        b"\xe0" => 2,
+                        b"\xf0" => 3,
                         _ => 0,
                     };
                     let extra = shirabe_php_shim::fread(input_stream, len).unwrap_or_default();
-                    c = Some(format!("{}{}", cur, extra));
+                    c = Some([cur, extra].concat());
                 }
 
-                let cur = c.clone().unwrap_or_default();
+                // TODO(bytes): the output, the answer and the autocomplete matching all work on
+                // Strings.
+                let cur = String::from_utf8_lossy(&c.clone().unwrap_or_default()).into_owned();
                 output.borrow().write(
                     std::slice::from_ref(&cur),
                     false,
@@ -731,7 +735,8 @@ impl QuestionHelper {
         }
 
         let mut value = match value {
-            Some(value) => value,
+            // TODO(bytes): the answer is returned as a String.
+            Some(value) => String::from_utf8_lossy(&value).into_owned(),
             None => {
                 return Err(MissingInputException::new("Aborted.".to_string()).into());
             }
@@ -781,9 +786,11 @@ impl QuestionHelper {
             let cp = self.set_io_codepage();
             let ret = shirabe_php_shim::fgets(input_stream, Some(4096));
 
+            // TODO(bytes): PhpMixed::String carries the input as a String.
             return self.reset_io_codepage(
                 cp,
-                ret.map(PhpMixed::String).unwrap_or(PhpMixed::Bool(false)),
+                ret.map(|ret| PhpMixed::String(String::from_utf8_lossy(&ret).into_owned()))
+                    .unwrap_or(PhpMixed::Bool(false)),
             );
         }
 
@@ -793,7 +800,7 @@ impl QuestionHelper {
             None => return PhpMixed::Bool(false),
         };
 
-        let mut ret = String::new();
+        let mut ret = BString::default();
         let cp = self.set_io_codepage();
         loop {
             let char = shirabe_php_shim::fgetc(&multi_line_stream_reader);
@@ -801,13 +808,17 @@ impl QuestionHelper {
                 Some(char) => char,
                 None => break,
             };
-            if shirabe_php_shim::PHP_EOL == format!("{}{}", ret, char) {
+            if shirabe_php_shim::PHP_EOL.as_bytes() == [ret.as_slice(), char.as_slice()].concat() {
                 break;
             }
-            ret.push_str(&char);
+            ret.extend_from_slice(&char);
         }
 
-        self.reset_io_codepage(cp, PhpMixed::String(ret))
+        // TODO(bytes): PhpMixed::String carries the input as a String.
+        self.reset_io_codepage(
+            cp,
+            PhpMixed::String(String::from_utf8_lossy(&ret).into_owned()),
+        )
     }
 
     /// Sets console I/O to the host code page.

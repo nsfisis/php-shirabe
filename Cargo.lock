@@ -2491,6 +2491,7 @@ version = "0.2.0-dev"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bstr",
  "indexmap",
  "regex",
  "shirabe-php-shim",
