@@ -215,10 +215,8 @@ impl Command for ReinstallCommand {
             installation_manager.borrow_mut().disable_plugins();
         }
 
-        download_manager
-            .borrow_mut()
-            .set_prefer_source(prefer_source);
-        download_manager.borrow_mut().set_prefer_dist(prefer_dist);
+        download_manager.borrow().set_prefer_source(prefer_source);
+        download_manager.borrow().set_prefer_dist(prefer_dist);
 
         let dev_mode = local_repo.get_dev_mode().unwrap_or(true);
 

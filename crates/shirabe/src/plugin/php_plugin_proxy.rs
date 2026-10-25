@@ -929,15 +929,12 @@ fn dispatch_download_manager_method(
         "setPreferSource" | "setPreferDist" => {
             let preferred = arg::<bool>(method_name, args, 0)?;
             if method_name == "setPreferSource" {
-                dm.borrow_mut().set_prefer_source(preferred);
+                dm.borrow().set_prefer_source(preferred);
             } else {
-                dm.borrow_mut().set_prefer_dist(preferred);
+                dm.borrow().set_prefer_dist(preferred);
             }
             return Ok(PluginValue::Null);
         }
-        // TODO(async): each future borrows the manager for as long as it runs, as the Rust-side
-        // callers of these methods do, so a job still pending between two ticks makes
-        // `setPreferSource()` / `setPreferDist()` panic on the cell.
         "download" => {
             let (dm, package, path, prev) = (
                 dm.clone(),

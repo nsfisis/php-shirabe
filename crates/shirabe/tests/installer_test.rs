@@ -98,8 +98,8 @@ struct StubDownloadManager;
 
 #[async_trait::async_trait(?Send)]
 impl DownloadManagerInterface for StubDownloadManager {
-    fn set_prefer_source(&mut self, _prefer_source: bool) {}
-    fn set_prefer_dist(&mut self, _prefer_dist: bool) {}
+    fn set_prefer_source(&self, _prefer_source: bool) {}
+    fn set_prefer_dist(&self, _prefer_dist: bool) {}
     fn get_downloader_for_package(
         &self,
         _package: PackageInterfaceHandle,

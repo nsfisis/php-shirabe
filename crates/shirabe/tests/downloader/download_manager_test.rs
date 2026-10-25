@@ -410,7 +410,7 @@ fn test_bad_package_download_with_source_preferred() {
     let package = create_package_mock();
     // getSourceType() => null, getDistType() => null.
 
-    let mut manager = create_manager();
+    let manager = create_manager();
     manager.set_prefer_source(true);
 
     assert!(run(manager.download(package, "target_dir", None)).is_err());

@@ -21,9 +21,9 @@ pub struct DownloadManager {
     /// @var IOInterface
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     /// @var bool
-    prefer_dist: bool,
+    prefer_dist: std::cell::Cell<bool>,
     /// @var bool
-    prefer_source: bool,
+    prefer_source: std::cell::Cell<bool>,
     /// @var array<string, string>
     package_preferences: IndexMap<String, String>,
     /// @var Filesystem
@@ -47,8 +47,8 @@ impl DownloadManager {
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         Self {
             io,
-            prefer_source,
-            prefer_dist: false,
+            prefer_source: std::cell::Cell::new(prefer_source),
+            prefer_dist: std::cell::Cell::new(false),
             package_preferences: IndexMap::new(),
             filesystem,
             downloaders: IndexMap::new(),
@@ -58,15 +58,15 @@ impl DownloadManager {
     /// Makes downloader prefer source installation over the dist.
     ///
     /// @param  bool            $preferSource prefer downloading from source
-    pub fn set_prefer_source(&mut self, prefer_source: bool) {
-        self.prefer_source = prefer_source;
+    pub fn set_prefer_source(&self, prefer_source: bool) {
+        self.prefer_source.set(prefer_source);
     }
 
     /// Makes downloader prefer dist installation over the source.
     ///
     /// @param  bool            $preferDist prefer downloading from dist
-    pub fn set_prefer_dist(&mut self, prefer_dist: bool) {
-        self.prefer_dist = prefer_dist;
+    pub fn set_prefer_dist(&self, prefer_dist: bool) {
+        self.prefer_dist.set(prefer_dist);
     }
 
     /// Sets fine tuned preference settings for package level source/dist selection.
@@ -496,8 +496,9 @@ impl DownloadManager {
         }
 
         // reverse sources in case dist is the preferred source for this package
-        if !self.prefer_source
-            && (self.prefer_dist || "dist" == self.resolve_package_install_preference(package))
+        if !self.prefer_source.get()
+            && (self.prefer_dist.get()
+                || "dist" == self.resolve_package_install_preference(package))
         {
             sources = array_reverse(&sources, false);
         }
@@ -533,8 +534,8 @@ impl DownloadManager {
 // through the `Rc<RefCell<dyn DownloadManagerInterface>>` references fed from it.
 #[async_trait::async_trait(?Send)]
 pub trait DownloadManagerInterface: std::fmt::Debug {
-    fn set_prefer_source(&mut self, prefer_source: bool);
-    fn set_prefer_dist(&mut self, prefer_dist: bool);
+    fn set_prefer_source(&self, prefer_source: bool);
+    fn set_prefer_dist(&self, prefer_dist: bool);
     fn get_downloader_for_package(
         &self,
         package: PackageInterfaceHandle,
@@ -579,11 +580,11 @@ pub trait DownloadManagerInterface: std::fmt::Debug {
 
 #[async_trait::async_trait(?Send)]
 impl DownloadManagerInterface for DownloadManager {
-    fn set_prefer_source(&mut self, prefer_source: bool) {
+    fn set_prefer_source(&self, prefer_source: bool) {
         self.set_prefer_source(prefer_source);
     }
 
-    fn set_prefer_dist(&mut self, prefer_dist: bool) {
+    fn set_prefer_dist(&self, prefer_dist: bool) {
         self.set_prefer_dist(prefer_dist);
     }
 

@@ -168,8 +168,6 @@ A job whose promise a plugin dropped without ever waiting is driven and settled 
 
 Whether I/O actually overlaps depends on the job's future being non-blocking end to end. The requests and the processes a plugin starts directly are: an http(s) request and a child process only park on the reactor. So is a `DownloadManager` job for a dist package, whose download is awaited through `HttpDownloader::add_copy` all the way down. A job that wraps ported synchronous code is not: a `DownloadManager` job for a VCS source runs its commands through the synchronous `ProcessExecutor::execute`, and the metadata fetches of `ComposerRepository` go through the `sync_executor::block_on` bridge (see `util/sync_executor.rs`), so a single poll occupies such a future until that work completes and a tick drains such jobs one at a time. The boundary design neither depends on this being fixed nor fixes it. It only places the jobs so that overlap appears where the internals do not block. The surface a plugin can observe (pending promises, real `countActiveJobs()` values, a progress bar that advances, cancellation that works) is the same either way.
 
-A `DownloadManager` job also borrows the manager for as long as its future lives, as the Rust-side callers of the same methods do. While such a job is pending between two ticks, a call that needs the manager mutably (`setPreferSource()`, `setPreferDist()`) panics on the cell.
-
 Some things are out of scope here: an event loop in the worker, promises crossing the wire as entities, and the running-control side of `Process`. Windows is on hold for now, as project-wide policy has it, and Unix-specific spots such as sending `SIGINT` are written in the same branch shape as Composer.
 
 ## Staging

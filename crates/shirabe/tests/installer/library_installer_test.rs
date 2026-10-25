@@ -26,8 +26,8 @@ mockall::mock! {
     pub DownloadManager {}
     #[async_trait::async_trait(?Send)]
     impl DownloadManagerInterface for DownloadManager {
-        fn set_prefer_source(&mut self, prefer_source: bool);
-        fn set_prefer_dist(&mut self, prefer_dist: bool);
+        fn set_prefer_source(&self, prefer_source: bool);
+        fn set_prefer_dist(&self, prefer_dist: bool);
         fn get_downloader_for_package(
             &self,
             package: PackageInterfaceHandle,
