@@ -179,7 +179,7 @@ impl RepositoryFactory {
         let process = match process {
             Some(p) => p,
             None => {
-                let mut p = ProcessExecutor::new(Some(io.clone()));
+                let p = ProcessExecutor::new(Some(io.clone()));
                 p.enable_async();
                 std::rc::Rc::new(std::cell::RefCell::new(p))
             }

@@ -100,7 +100,7 @@ fn run_install_and_exec_binary_with_full_compat(contents: &[u8]) {
     );
     installer.install_binaries(package, &pkg_dir, true);
 
-    let mut proc = ProcessExecutor::new(None);
+    let proc = ProcessExecutor::new(None);
     let mut output = String::new();
     proc.execute(format!("{}/binary arg", setup.bin_dir), &mut output, None)
         .unwrap();

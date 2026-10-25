@@ -32,22 +32,24 @@ pub enum CommandLine {
     Args(Vec<String>),
 }
 
+/// The mutable state sits behind cells so that every method takes `&self`: an output callback
+/// running in the middle of `execute` can call back into the same executor, as PHP allows.
 #[derive(Debug)]
 pub struct ProcessExecutor {
     /// @var bool
-    capture_output: bool,
+    capture_output: std::cell::Cell<bool>,
     /// @var string
-    error_output: String,
+    error_output: std::cell::RefCell<String>,
     /// @var ?IOInterface
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     /// @var int
-    max_jobs: i64,
+    max_jobs: std::cell::Cell<i64>,
     /// PHP throttles async jobs through the $jobs queue and $maxJobs; here concurrent
     /// `execute_async`/`execute_async_php` calls hold a permit for the duration of the
     /// child process instead (same design as HttpDownloader).
-    semaphore: std::rc::Rc<tokio::sync::Semaphore>,
+    semaphore: std::cell::RefCell<std::rc::Rc<tokio::sync::Semaphore>>,
     /// @var bool
-    allow_async: bool,
+    allow_async: std::cell::Cell<bool>,
     /// Test-only mock state. `None` in production; set via [`ProcessExecutor::__expects`] in tests.
     /// Mirrors `composer/tests/Composer/Test/Mock/ProcessExecutorMock.php`. Wrapped in a `RefCell`
     /// so `execute_async`'s `&self` receiver can still consume the expectation queue.
@@ -132,13 +134,13 @@ impl ProcessExecutor {
         &[&["show"], &["log"], &["branch"], &["remote", "set-url"]];
 
     pub fn new(io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>) -> Self {
-        let mut this = Self {
-            capture_output: false,
-            error_output: String::new(),
+        let this = Self {
+            capture_output: std::cell::Cell::new(false),
+            error_output: std::cell::RefCell::new(String::new()),
             io,
-            max_jobs: 10,
-            semaphore: std::rc::Rc::new(tokio::sync::Semaphore::new(10)),
-            allow_async: false,
+            max_jobs: std::cell::Cell::new(10),
+            semaphore: std::cell::RefCell::new(std::rc::Rc::new(tokio::sync::Semaphore::new(10))),
+            allow_async: std::cell::Cell::new(false),
             mock: None,
         };
         this.reset_max_jobs();
@@ -146,12 +148,7 @@ impl ProcessExecutor {
     }
 
     /// runs a process on the commandline
-    pub fn execute<'o, C, O>(
-        &mut self,
-        command: C,
-        output: O,
-        cwd: Option<&str>,
-    ) -> anyhow::Result<i64>
+    pub fn execute<'o, C, O>(&self, command: C, output: O, cwd: Option<&str>) -> anyhow::Result<i64>
     where
         C: IntoExecCommand,
         O: IntoExecOutput<'o>,
@@ -161,7 +158,7 @@ impl ProcessExecutor {
     }
 
     /// runs a process on the commandline in TTY mode
-    pub fn execute_tty<C>(&mut self, command: C, cwd: Option<&str>) -> anyhow::Result<i64>
+    pub fn execute_tty<C>(&self, command: C, cwd: Option<&str>) -> anyhow::Result<i64>
     where
         C: IntoExecCommand,
     {
@@ -174,7 +171,7 @@ impl ProcessExecutor {
     }
 
     fn run_process<'o, O>(
-        &mut self,
+        &self,
         command: CommandLine,
         cwd: Option<&str>,
         env: Option<IndexMap<String, String>>,
@@ -244,20 +241,20 @@ impl ProcessExecutor {
                     process.run(Some(callback), IndexMap::new())?;
                 }
                 Err(mut output) => {
-                    let capture_output = self.capture_output;
+                    let capture_output = self.capture_output.get();
                     let mut io = self.io.clone();
                     let callback = move |r#type: &str, buffer: &str| {
                         Self::output_handler(capture_output, &mut io, r#type, buffer);
                         false
                     };
                     process.run(Some(Box::new(callback)), IndexMap::new())?;
-                    if self.capture_output {
+                    if self.capture_output.get() {
                         output.write_back(process.get_output()?);
                     }
                 }
             }
 
-            self.error_output = process.get_error_output()?;
+            *self.error_output.borrow_mut() = process.get_error_output()?;
             Ok(())
         })();
         if signals.is_triggered()
@@ -293,7 +290,7 @@ impl ProcessExecutor {
     }
 
     fn do_execute<'o, O>(
-        &mut self,
+        &self,
         command: CommandLine,
         cwd: Option<&str>,
         tty: bool,
@@ -308,8 +305,8 @@ impl ProcessExecutor {
 
         self.output_command_run(&command, cwd, false);
 
-        self.capture_output = output.capture_output();
-        self.error_output = String::new();
+        self.capture_output.set(output.capture_output());
+        *self.error_output.borrow_mut() = String::new();
 
         let mut env: Option<IndexMap<String, String>> = None;
 
@@ -427,7 +424,7 @@ impl ProcessExecutor {
     /// `ProcessExecutorMock::doExecute`). Delegates the matching to [`Self::mock_match`], then
     /// emits stdout/stderr through the output target and records `error_output`.
     fn mock_do_execute<'o, O>(
-        &mut self,
+        &self,
         command: CommandLine,
         cwd: Option<&str>,
         output: O,
@@ -436,8 +433,8 @@ impl ProcessExecutor {
         O: IntoExecOutput<'o>,
     {
         let capture_output = output.capture_output();
-        self.capture_output = capture_output;
-        self.error_output = String::new();
+        self.capture_output.set(capture_output);
+        *self.error_output.borrow_mut() = String::new();
 
         let (stdout, stderr, r#return) = self.mock_match(&command, cwd)?;
 
@@ -465,7 +462,7 @@ impl ProcessExecutor {
             }
         }
 
-        self.error_output = stderr;
+        *self.error_output.borrow_mut() = stderr;
 
         Ok(r#return)
     }
@@ -532,12 +529,11 @@ impl ProcessExecutor {
     /// call touches the same executor. The max_jobs throttle is enforced by the semaphore, shared
     /// with `execute_async_php`.
     ///
-    /// Takes `&mut self` (unlike the `&self` used while this only read `self.mock`) so the mock
-    /// branch can update `error_output`/`capture_output` before returning, mirroring
+    /// The mock branch updates `error_output`/`capture_output` before returning, mirroring
     /// `ProcessExecutorMock::executeAsync` — which resolves through the same `doExecute` the sync
     /// path uses, so it updates the executor's cached error output too (cf. `mock_do_execute`).
     pub fn execute_async<C>(
-        &mut self,
+        &self,
         command: C,
         cwd: Option<&str>,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = anyhow::Result<Process>>>>
@@ -551,7 +547,7 @@ impl ProcessExecutor {
     /// `docs/dev/plugin-async.md`): `started` is set once the job budget lets the job through,
     /// which is when PHP's `startJob()` moves it from `STATUS_QUEUED` to `STATUS_STARTED`.
     pub(crate) fn execute_async_job<C>(
-        &mut self,
+        &self,
         command: C,
         cwd: Option<&str>,
         started: Option<std::rc::Rc<std::cell::Cell<bool>>>,
@@ -567,8 +563,8 @@ impl ProcessExecutor {
             // `ZipArchive::__mock`.
             let matched = self.mock_match(&command, cwd);
             if let Ok((_, ref stderr, _)) = matched {
-                self.capture_output = true;
-                self.error_output = stderr.clone();
+                self.capture_output.set(true);
+                *self.error_output.borrow_mut() = stderr.clone();
             }
             return Box::pin(async move {
                 let (stdout, stderr, r#return) = matched?;
@@ -579,8 +575,8 @@ impl ProcessExecutor {
                 }))
             });
         }
-        let allow_async = self.allow_async;
-        let semaphore = self.semaphore.clone();
+        let allow_async = self.allow_async.get();
+        let semaphore = self.semaphore.borrow().clone();
         let io = self.io.clone();
         let cwd = cwd.map(ToOwned::to_owned);
 
@@ -663,33 +659,37 @@ impl ProcessExecutor {
         }
     }
 
-    pub fn set_max_jobs(&mut self, max_jobs: i64) {
-        self.max_jobs = max_jobs;
-        self.semaphore = std::rc::Rc::new(tokio::sync::Semaphore::new(max_jobs as usize));
+    pub fn set_max_jobs(&self, max_jobs: i64) {
+        self.max_jobs.set(max_jobs);
+        *self.semaphore.borrow_mut() =
+            std::rc::Rc::new(tokio::sync::Semaphore::new(max_jobs as usize));
     }
 
-    pub fn reset_max_jobs(&mut self) {
+    pub fn reset_max_jobs(&self) {
         let max_jobs_env = Platform::get_env("COMPOSER_MAX_PARALLEL_PROCESSES");
         let max_jobs_env_mixed = match &max_jobs_env {
             Some(s) => PhpMixed::String(s.clone()),
             None => PhpMixed::Null,
         };
         if is_numeric(&max_jobs_env_mixed) {
-            self.max_jobs = max_jobs_env
-                .as_deref()
-                .unwrap_or("0")
-                .parse()
-                .unwrap_or(0)
-                .clamp(1, 50);
+            self.max_jobs.set(
+                max_jobs_env
+                    .as_deref()
+                    .unwrap_or("0")
+                    .parse()
+                    .unwrap_or(0)
+                    .clamp(1, 50),
+            );
         } else {
-            self.max_jobs = 10;
+            self.max_jobs.set(10);
         }
-        self.semaphore = std::rc::Rc::new(tokio::sync::Semaphore::new(self.max_jobs as usize));
+        *self.semaphore.borrow_mut() =
+            std::rc::Rc::new(tokio::sync::Semaphore::new(self.max_jobs.get() as usize));
     }
 
     /// @internal
-    pub fn enable_async(&mut self) {
-        self.allow_async = true;
+    pub fn enable_async(&self) {
+        self.allow_async.set(true);
     }
 
     pub fn split_lines(&self, output: &str) -> Vec<String> {
@@ -703,8 +703,8 @@ impl ProcessExecutor {
     }
 
     /// Get any error output from the last command
-    pub fn get_error_output(&self) -> &str {
-        &self.error_output
+    pub fn get_error_output(&self) -> String {
+        self.error_output.borrow().clone()
     }
 
     /// @return int the timeout in seconds

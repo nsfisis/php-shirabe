@@ -77,7 +77,7 @@ impl HomeCommand {
     }
 
     fn open_browser(&self, url: &str) {
-        let mut process = ProcessExecutor::new(Some(self.get_io().clone()));
+        let process = ProcessExecutor::new(Some(self.get_io().clone()));
         if Platform::is_windows() {
             let _ = process.execute(&["start", "\"web\"", "explorer", url], (), None);
             return;

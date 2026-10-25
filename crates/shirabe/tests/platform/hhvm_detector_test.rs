@@ -40,7 +40,7 @@ fn test_hhvm_version_when_executing_in_php() {
     assert!(detected_version.is_some(), "Failed to detect HHVM version");
     let detected_version = detected_version.unwrap();
 
-    let mut process = ProcessExecutor::new(None);
+    let process = ProcessExecutor::new(None);
     let mut version = PhpMixed::Null;
     let cmd = format!(
         "{} --php -d hhvm.jit=0 -r \"echo HHVM_VERSION;\" 2>/dev/null",

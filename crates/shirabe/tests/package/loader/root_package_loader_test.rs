@@ -113,7 +113,7 @@ fn test_stability_flags_parsing() {
         None,
     )));
 
-    let mut process_executor = ProcessExecutor::new(Some(io.clone()));
+    let process_executor = ProcessExecutor::new(Some(io.clone()));
     process_executor.enable_async();
     let guesser = VersionGuesser::new(
         config.clone(),

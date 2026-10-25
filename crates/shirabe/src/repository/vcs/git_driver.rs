@@ -393,7 +393,7 @@ impl GitDriver {
                 return Ok(true);
             }
             GitUtil::check_for_repo_ownership_error(
-                process.borrow().get_error_output(),
+                &process.borrow().get_error_output(),
                 &url,
                 Some(io.clone()),
             )?;

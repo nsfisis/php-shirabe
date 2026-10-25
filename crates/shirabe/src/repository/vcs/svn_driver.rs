@@ -449,7 +449,7 @@ impl SvnDriver {
             return Ok(false);
         }
 
-        let mut process = ProcessExecutor::new(Some(io));
+        let process = ProcessExecutor::new(Some(io));
         let mut ignored_output = String::new();
         let exit = process.execute(
             &[
@@ -469,14 +469,14 @@ impl SvnDriver {
         }
 
         // Subversion client 1.7 and older
-        if stripos(process.get_error_output(), "authorization failed:").is_some() {
+        if stripos(&process.get_error_output(), "authorization failed:").is_some() {
             // This is likely a remote Subversion repository that requires
             // authentication. We will handle actual authentication later.
             return Ok(true);
         }
 
         // Subversion client 1.8 and newer
-        if stripos(process.get_error_output(), "Authentication failed").is_some() {
+        if stripos(&process.get_error_output(), "Authentication failed").is_some() {
             // This is likely a remote Subversion or newer repository that requires
             // authentication. We will handle actual authentication later.
             return Ok(true);

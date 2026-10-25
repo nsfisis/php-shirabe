@@ -319,7 +319,7 @@ impl FossilDriver {
                 return Ok(false);
             }
 
-            let mut process = ProcessExecutor::new(Some(io));
+            let process = ProcessExecutor::new(Some(io));
             let mut output = String::new();
             if process.execute(
                 ["fossil", "info"].map(|s| s.to_string()).as_ref(),

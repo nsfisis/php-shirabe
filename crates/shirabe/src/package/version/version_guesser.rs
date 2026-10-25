@@ -284,7 +284,7 @@ impl VersionGuesser {
             }
         }
         GitUtil::check_for_repo_ownership_error(
-            self.process.borrow().get_error_output(),
+            &self.process.borrow().get_error_output(),
             path,
             self.io.clone(),
         );

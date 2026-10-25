@@ -301,7 +301,7 @@ impl Platform {
             }
 
             if php_os_family() == "Linux" {
-                let mut process = ProcessExecutor::new(None);
+                let process = ProcessExecutor::new(None);
                 let mut output = String::new();
                 let result: anyhow::Result<()> = (|| {
                     if process.execute(&["lsmod".to_string()], &mut output, None)? == 0

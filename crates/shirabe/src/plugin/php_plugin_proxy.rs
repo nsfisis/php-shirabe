@@ -1356,7 +1356,7 @@ fn dispatch_process_executor_method(
             // the stub reproduces the caller's arity, so an absent argument is the forwarding case.
             let Some(output) = args.get(1) else {
                 return process
-                    .borrow_mut()
+                    .borrow()
                     .execute(
                         command,
                         crate::util::ProcessExecutor::FORWARD_OUTPUT,
@@ -1366,9 +1366,6 @@ fn dispatch_process_executor_method(
                     .map_err(failed);
             };
             if is_php_callable(output).map_err(failed)? {
-                // TODO(plugin): the executor stays mutably borrowed while the callback runs, so a
-                // callback re-entering this same executor panics instead of nesting the way PHP
-                // would.
                 let callable = output.clone();
                 let callback: Box<dyn FnMut(&str, &str) -> bool> =
                     Box::new(move |r#type: &str, buffer: &str| {
@@ -1382,14 +1379,14 @@ fn dispatch_process_executor_method(
                         false
                     });
                 return process
-                    .borrow_mut()
+                    .borrow()
                     .execute(command, callback, cwd.as_deref())
                     .map(|code| code.to_plugin_value())
                     .map_err(failed);
             }
             let mut captured: Option<String> = None;
             let code = process
-                .borrow_mut()
+                .borrow()
                 .execute(command, &mut captured, cwd.as_deref())
                 .map_err(failed)?;
             // PHP leaves `$output` alone when the child was signaled before the assignment, which
@@ -1400,7 +1397,7 @@ fn dispatch_process_executor_method(
             Ok(code.to_plugin_value())
         }
         "executeTty" => Ok(process
-            .borrow_mut()
+            .borrow()
             .execute_tty(
                 exec_command_arg(method_name, args, 0)?,
                 cwd_arg(1)?.as_deref(),
@@ -1428,27 +1425,26 @@ fn dispatch_process_executor_method(
             .to_plugin_value()),
         "setMaxJobs" => {
             process
-                .borrow_mut()
+                .borrow()
                 .set_max_jobs(arg::<i64>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
         "resetMaxJobs" => {
-            process.borrow_mut().reset_max_jobs();
+            process.borrow().reset_max_jobs();
             Ok(PluginValue::Null)
         }
         "enableAsync" => {
-            process.borrow_mut().enable_async();
+            process.borrow().enable_async();
             Ok(PluginValue::Null)
         }
         "executeAsync" => {
             let command = exec_command_arg(method_name, args, 0)?;
             let cwd = cwd_arg(1)?;
             let started = std::rc::Rc::new(std::cell::Cell::new(false));
-            let mut future = process.borrow_mut().execute_async_job(
-                command,
-                cwd.as_deref(),
-                Some(started.clone()),
-            );
+            let mut future =
+                process
+                    .borrow()
+                    .execute_async_job(command, cwd.as_deref(), Some(started.clone()));
             let resolve = |child: shirabe_symfony_process::Process| {
                 rust_handle_value(
                     register_entity(RustEntity::Process(std::rc::Rc::new(

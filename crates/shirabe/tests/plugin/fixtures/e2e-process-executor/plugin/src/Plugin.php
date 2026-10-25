@@ -85,6 +85,20 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $lines[] = 'callback code=' . $code . ' seen=' . json_encode($seen)
             . ' argument=' . json_encode(\is_callable($callback));
 
+        // The callback may call back into the executor that is running it. The nested command
+        // overwrites the error output, and the outer command overwrites it again once it ends.
+        $nested = [];
+        $reentrant = static function (string $type, string $buffer) use ($process, &$nested): void {
+            $code = $process->execute('echo inner; echo inner-err 1>&2', $inner);
+            $nested[] = trim($buffer) . ' code=' . $code . ' output=' . json_encode($inner)
+                . ' error=' . json_encode($process->getErrorOutput());
+            $process->setMaxJobs(4);
+            $process->resetMaxJobs();
+        };
+        $code = $process->execute('echo outer', $reentrant);
+        $lines[] = 'reentrant code=' . $code . ' nested=' . json_encode($nested)
+            . ' error=' . json_encode($process->getErrorOutput());
+
         $code = $process->execute('pwd', $cwdOutput, 'vendor');
         $lines[] = 'cwd code=' . $code . ' basename=' . json_encode(basename(trim((string) $cwdOutput)));
 

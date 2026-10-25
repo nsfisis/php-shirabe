@@ -17,7 +17,7 @@ use shirabe_symfony_console::output::{OutputInterface, VERBOSITY_DEBUG, VERBOSIT
 
 #[test]
 fn test_execute_captures_output() {
-    let mut process = ProcessExecutor::new(None);
+    let process = ProcessExecutor::new(None);
     let mut output = String::new();
     process.execute("echo foo", &mut output, None).unwrap();
     assert_eq!(format!("foo{}", PHP_EOL), output);
@@ -34,7 +34,7 @@ fn test_use_io_is_not_null_and_if_not_captured() {
     use crate::io_stub::IOStub;
 
     let io = std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
-    let mut process = ProcessExecutor::new(Some(
+    let process = ProcessExecutor::new(Some(
         io.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
     ));
 
@@ -50,7 +50,7 @@ fn test_use_io_is_not_null_and_if_not_captured() {
 
 #[test]
 fn test_execute_captures_stderr() {
-    let mut process = ProcessExecutor::new(None);
+    let process = ProcessExecutor::new(None);
     let mut output = String::new();
     process.execute("cat foo", &mut output, None).unwrap();
     assert!(
@@ -101,7 +101,7 @@ fn test_hide_passwords() {
         let buffer = std::rc::Rc::new(std::cell::RefCell::new(
             BufferIO::new(String::new(), VERBOSITY_DEBUG, None).unwrap(),
         ));
-        let mut process = ProcessExecutor::new(Some(
+        let process = ProcessExecutor::new(Some(
             buffer.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
         ));
         let mut output = String::new();
@@ -118,7 +118,7 @@ fn test_doesnt_hide_ports() {
     let buffer = std::rc::Rc::new(std::cell::RefCell::new(
         BufferIO::new(String::new(), VERBOSITY_DEBUG, None).unwrap(),
     ));
-    let mut process = ProcessExecutor::new(Some(
+    let process = ProcessExecutor::new(Some(
         buffer.clone() as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>
     ));
     let mut output = String::new();
@@ -159,9 +159,8 @@ fn test_console_io_does_not_format_symfony_console_style() {
         output.clone() as std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         QuestionHelper::default(),
     );
-    let mut process =
-        ProcessExecutor::new(Some(std::rc::Rc::new(std::cell::RefCell::new(console_io))
-            as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>));
+    let process = ProcessExecutor::new(Some(std::rc::Rc::new(std::cell::RefCell::new(console_io))
+        as std::rc::Rc<std::cell::RefCell<dyn IOInterface>>));
 
     process
         .execute(

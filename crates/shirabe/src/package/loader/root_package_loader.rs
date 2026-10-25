@@ -39,7 +39,7 @@ impl RootPackageLoader {
     ) -> Self {
         let inner = ArrayLoader::new(parser, true);
         let version_guesser = version_guesser.unwrap_or_else(|| {
-            let mut process_executor = ProcessExecutor::new(io.clone());
+            let process_executor = ProcessExecutor::new(io.clone());
             process_executor.enable_async();
             Box::new(VersionGuesser::new(
                 config.clone(),

@@ -276,7 +276,7 @@ impl Git {
                 messages.push(format!(
                     "- {}\n{}",
                     proto_url,
-                    preg_replace(r"#^#m", "  ", self.process.borrow().get_error_output())
+                    preg_replace(r"#^#m", "  ", &self.process.borrow().get_error_output())
                 ));
 
                 if initial_clone && let Some(ref orig) = orig_cwd {
@@ -858,7 +858,7 @@ impl Git {
 
             return Ok(true);
         }
-        Self::check_for_repo_ownership_error(self.process.borrow().get_error_output(), dir, None)?;
+        Self::check_for_repo_ownership_error(&self.process.borrow().get_error_output(), dir, None)?;
 
         // clean up directory and do a fresh clone into it
         self.filesystem.borrow_mut().remove_directory(dir);
@@ -1069,7 +1069,7 @@ impl Git {
                 return Ok(true);
             }
         }
-        Self::check_for_repo_ownership_error(self.process.borrow().get_error_output(), dir, None)?;
+        Self::check_for_repo_ownership_error(&self.process.borrow().get_error_output(), dir, None)?;
 
         Ok(false)
     }

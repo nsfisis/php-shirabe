@@ -451,7 +451,7 @@ impl GitDownloader {
         let mut exception_extra = String::new();
 
         // reference was not found (prints "fatal: reference is not a tree: $ref")
-        if strpos(self.inner.process.borrow().get_error_output(), reference).is_some() {
+        if strpos(&self.inner.process.borrow().get_error_output(), reference).is_some() {
             self.inner.io.write_error3(
                 &format!(
                     "    <warning>{} is gone (history was rewritten?)</warning>",

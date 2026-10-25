@@ -157,7 +157,7 @@ impl InitCommand {
             return Ok(self.git_config.borrow().clone().unwrap_or_default());
         }
 
-        let mut process = ProcessExecutor::new(Some(self.get_io().clone()));
+        let process = ProcessExecutor::new(Some(self.get_io().clone()));
 
         let mut output = String::new();
         if process.execute(

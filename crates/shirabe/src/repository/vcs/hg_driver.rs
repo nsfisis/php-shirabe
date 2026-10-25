@@ -321,7 +321,7 @@ impl HgDriver {
                 return Ok(false);
             }
 
-            let mut process = crate::util::ProcessExecutor::new(Some(io.clone()));
+            let process = crate::util::ProcessExecutor::new(Some(io.clone()));
             let mut output = String::new();
             if process.execute(
                 ["hg", "summary"].map(|s| s.to_string()).as_ref(),
@@ -337,7 +337,7 @@ impl HgDriver {
             return Ok(false);
         }
 
-        let mut process = crate::util::ProcessExecutor::new(Some(io));
+        let process = crate::util::ProcessExecutor::new(Some(io));
         let mut ignored = String::new();
         let exit = process.execute(
             ["hg", "identify", "--", url]
