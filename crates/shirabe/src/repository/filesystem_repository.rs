@@ -259,7 +259,7 @@ impl FilesystemRepository {
                     &normalized_path,
                     true,
                     false,
-                ));
+                )?);
             }
             install_paths.insert(package.get_name().to_string(), install_path.clone());
 
@@ -476,7 +476,7 @@ impl FilesystemRepository {
                     dev_mode,
                     repo_dir,
                     &dev_packages,
-                )
+                )?
                 .into_iter()
                 .collect(),
             ),
@@ -494,7 +494,7 @@ impl FilesystemRepository {
                 install_paths,
                 repo_dir,
                 &dev_packages,
-            );
+            )?;
             if let Some(PhpMixed::Array(versions_map)) = versions.get_mut("versions") {
                 versions_map.insert(
                     package.get_name().to_string(),
@@ -597,7 +597,7 @@ impl FilesystemRepository {
         install_paths: &IndexMap<String, Option<String>>,
         repo_dir: &str,
         dev_packages: &PhpMixed,
-    ) -> IndexMap<String, PhpMixed> {
+    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         let mut reference: Option<String> = None;
         if let Some(install_src) = package.get_installation_source() {
             reference = if install_src == "source" {
@@ -625,7 +625,7 @@ impl FilesystemRepository {
             Some(
                 self.filesystem
                     .borrow_mut()
-                    .find_shortest_path(repo_dir, &to, true, false),
+                    .find_shortest_path(repo_dir, &to, true, false)?,
             )
         } else {
             install_paths.get(&package.get_name()).cloned().flatten()
@@ -666,7 +666,7 @@ impl FilesystemRepository {
             ),
         );
 
-        data
+        Ok(data)
     }
 
     fn dump_root_package(
@@ -676,13 +676,13 @@ impl FilesystemRepository {
         dev_mode: bool,
         repo_dir: &str,
         dev_packages: &PhpMixed,
-    ) -> IndexMap<String, PhpMixed> {
+    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         let data = self.dump_installed_package(
             package.clone().into(),
             install_paths,
             repo_dir,
             dev_packages,
-        );
+        )?;
 
         let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
         result.insert("name".to_string(), PhpMixed::String(package.get_name()));
@@ -716,7 +716,7 @@ impl FilesystemRepository {
         );
         result.insert("dev".to_string(), PhpMixed::Bool(dev_mode));
 
-        result
+        Ok(result)
     }
 }
 

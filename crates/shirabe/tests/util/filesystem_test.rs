@@ -315,6 +315,7 @@ fn test_find_shortest_path_code() {
         assert_eq!(
             expected,
             fs.find_shortest_path_code(a, b, directory, static_code, prefer_relative)
+                .unwrap()
         );
     }
 }
@@ -424,6 +425,7 @@ fn test_find_shortest_path() {
         assert_eq!(
             expected,
             fs.find_shortest_path(a, b, directory, prefer_relative)
+                .unwrap()
         );
     }
 }

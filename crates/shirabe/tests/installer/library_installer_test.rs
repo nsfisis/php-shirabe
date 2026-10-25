@@ -81,7 +81,7 @@ mockall::mock! {
             package: PackageInterfaceHandle,
             install_path: &str,
             warn_on_overwrite: bool,
-        );
+        ) -> anyhow::Result<()>;
         fn remove_binaries(&mut self, package: PackageInterfaceHandle);
     }
 }
@@ -443,10 +443,10 @@ fn test_ensure_binaries_installed() {
                 && install_path == expected_install_path.as_str()
                 && !*warn_on_overwrite
         })
-        .returning(|_, _, _| ());
+        .returning(|_, _, _| Ok(()));
     library.__set_binary_installer(std::rc::Rc::new(std::cell::RefCell::new(binary_installer)));
 
-    library.ensure_binaries_presence(package);
+    library.ensure_binaries_presence(package).unwrap();
 
     tear_down(&mut setup);
 }

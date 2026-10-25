@@ -22,7 +22,7 @@ pub trait BinaryInstallerInterface: std::fmt::Debug {
         package: PackageInterfaceHandle,
         install_path: &str,
         warn_on_overwrite: bool,
-    );
+    ) -> anyhow::Result<()>;
     fn remove_binaries(&mut self, package: PackageInterfaceHandle);
 }
 
@@ -32,8 +32,8 @@ impl BinaryInstallerInterface for BinaryInstaller {
         package: PackageInterfaceHandle,
         install_path: &str,
         warn_on_overwrite: bool,
-    ) {
-        BinaryInstaller::install_binaries(self, package, install_path, warn_on_overwrite);
+    ) -> anyhow::Result<()> {
+        BinaryInstaller::install_binaries(self, package, install_path, warn_on_overwrite)
     }
 
     fn remove_binaries(&mut self, package: PackageInterfaceHandle) {
@@ -75,10 +75,10 @@ impl BinaryInstaller {
         package: PackageInterfaceHandle,
         install_path: &str,
         warn_on_overwrite: bool,
-    ) {
+    ) -> anyhow::Result<()> {
         let binaries = self.get_binaries(package.clone());
         if binaries.is_empty() {
-            return;
+            return Ok(());
         }
 
         Platform::workaround_filesystem_issues();
@@ -147,12 +147,14 @@ impl BinaryInstaller {
             }
 
             if bin_compat == "full" {
-                self.install_full_binaries(&bin_path, &link, bin, package.clone());
+                self.install_full_binaries(&bin_path, &link, bin, package.clone())?;
             } else {
-                self.install_unixy_proxy_binaries(&bin_path, &link);
+                self.install_unixy_proxy_binaries(&bin_path, &link)?;
             }
             chmod(&bin_path, 0o777 & !umask());
         }
+
+        Ok(())
     }
 
     pub fn remove_binaries(&mut self, package: PackageInterfaceHandle) {
@@ -212,11 +214,11 @@ impl BinaryInstaller {
         link: &str,
         bin: &str,
         package: PackageInterfaceHandle,
-    ) {
+    ) -> anyhow::Result<()> {
         let mut link = link.to_string();
         // add unixy support for cygwin and similar environments
         if ".bat" != substr(bin_path, -4, None) {
-            self.install_unixy_proxy_binaries(bin_path, &link);
+            self.install_unixy_proxy_binaries(bin_path, &link)?;
             link.push_str(".bat");
             if file_exists(&link) {
                 self.io.write_error3(
@@ -231,16 +233,20 @@ impl BinaryInstaller {
             }
         }
         if !file_exists(&link) {
-            let code = self.generate_windows_proxy_code(bin_path, &link);
+            let code = self.generate_windows_proxy_code(bin_path, &link)?;
             file_put_contents(&link, code.as_bytes());
             chmod(&link, 0o777 & !umask());
         }
+
+        Ok(())
     }
 
-    fn install_unixy_proxy_binaries(&self, bin_path: &str, link: &str) {
-        let code = self.generate_unixy_proxy_code(bin_path, link);
+    fn install_unixy_proxy_binaries(&self, bin_path: &str, link: &str) -> anyhow::Result<()> {
+        let code = self.generate_unixy_proxy_code(bin_path, link)?;
         file_put_contents(link, code.as_bytes());
         chmod(link, 0o777 & !umask());
+
+        Ok(())
     }
 
     fn initialize_bin_dir(&mut self) {
@@ -250,18 +256,18 @@ impl BinaryInstaller {
         self.bin_dir = realpath(&self.bin_dir).unwrap_or_default();
     }
 
-    fn generate_windows_proxy_code(&self, bin: &str, link: &str) -> String {
+    fn generate_windows_proxy_code(&self, bin: &str, link: &str) -> anyhow::Result<String> {
         let bin_path = self
             .filesystem
             .borrow_mut()
-            .find_shortest_path(link, bin, false, false);
+            .find_shortest_path(link, bin, false, false)?;
         let caller = Self::determine_binary_caller(bin);
 
         // if the target is a php file, we run the unixy proxy file
         // to ensure that _composer_autoload_path gets defined, instead
         // of running the binary directly
         if caller == "php" {
-            return format!(
+            return Ok(format!(
                 "@ECHO OFF\r\n\
                  setlocal DISABLEDELAYEDEXPANSION\r\n\
                  SET BIN_TARGET=%~dp0/{}\r\n\
@@ -272,10 +278,10 @@ impl BinaryInstaller {
                     Some("\"'")
                 ),
                 caller,
-            );
+            ));
         }
 
-        format!(
+        Ok(format!(
             "@ECHO OFF\r\n\
              setlocal DISABLEDELAYEDEXPANSION\r\n\
              SET BIN_TARGET=%~dp0/{}\r\n\
@@ -283,14 +289,14 @@ impl BinaryInstaller {
              {} \"%BIN_TARGET%\" %*\r\n",
             trim(&ProcessExecutor::escape(&bin_path), Some("\"'")),
             caller,
-        )
+        ))
     }
 
-    fn generate_unixy_proxy_code(&self, bin: &str, link: &str) -> String {
+    fn generate_unixy_proxy_code(&self, bin: &str, link: &str) -> anyhow::Result<String> {
         let bin_path = self
             .filesystem
             .borrow_mut()
-            .find_shortest_path(link, bin, false, false);
+            .find_shortest_path(link, bin, false, false)?;
 
         let bin_dir = ProcessExecutor::escape(&dirname(&bin_path));
         let bin_file = basename(&bin_path);
@@ -315,7 +321,7 @@ impl BinaryInstaller {
             let bin_path_exported = self
                 .filesystem
                 .borrow()
-                .find_shortest_path_code(link, bin, false, true, false);
+                .find_shortest_path_code(link, bin, false, true, false)?;
             let mut stream_proxy_code = String::new();
             let mut stream_hint = String::new();
             let mut globals_code = "$GLOBALS['_composer_bin_dir'] = __DIR__;\n".to_string();
@@ -333,7 +339,7 @@ impl BinaryInstaller {
                         false,
                         true,
                         false,
-                    ),
+                    )?,
                 ));
             }
             // Add workaround for PHPUnit process isolation
@@ -465,7 +471,7 @@ impl BinaryInstaller {
                 );
             }
 
-            return format!(
+            return Ok(format!(
                 r#"{proxy_code}
 <?php
 
@@ -483,10 +489,10 @@ namespace Composer;
 {stream_proxy_code}
 return include {bin_path_exported};
 "#
-            );
+            ));
         }
 
-        format!(
+        Ok(format!(
             r#"#!/usr/bin/env sh
 
 # Support bash to support `source` with fallback on $0 if this does not run with bash
@@ -525,6 +531,6 @@ fi
 
 exec "${{dir}}/{bin_file}" "$@"
 "#
-        )
+        ))
     }
 }

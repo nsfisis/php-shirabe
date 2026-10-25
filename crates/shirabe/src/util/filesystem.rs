@@ -3,13 +3,13 @@
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use shirabe_php_shim::{
-    ErrorException, LogicException, PhpMixed, PregMatches, RuntimeException, array_pop, basename,
-    chdir, clearstatcache, clearstatcache2, copy, dirname, explode, fclose, feof, file_exists,
-    file_get_contents, file_put_contents, fileatime, filemtime, filesize, fopen, fread, fwrite,
-    implode, is_dir, is_file, is_link, is_readable, lstat, mkdir, php_regex, preg_is_match,
-    preg_match, preg_replace, preg_replace_callback, rename, rmdir, rtrim, str_repeat, str_replace,
-    strlen, strpos, strtoupper, strtr, substr, substr_count, symlink, touch, unlink, usleep,
-    var_export,
+    ErrorException, InvalidArgumentException, LogicException, PhpMixed, PregMatches,
+    RuntimeException, array_pop, basename, chdir, clearstatcache, clearstatcache2, copy, dirname,
+    explode, fclose, feof, file_exists, file_get_contents, file_put_contents, fileatime, filemtime,
+    filesize, fopen, fread, fwrite, implode, is_dir, is_file, is_link, is_readable, lstat, mkdir,
+    php_regex, preg_is_match, preg_match, preg_replace, preg_replace_callback, rename, rmdir,
+    rtrim, str_repeat, str_replace, strlen, strpos, strtoupper, strtr, substr, substr_count,
+    symlink, touch, unlink, usleep, var_export,
 };
 use shirabe_symfony_filesystem::exception::IOException;
 use shirabe_symfony_finder::Finder;
@@ -530,18 +530,13 @@ impl Filesystem {
         to: &str,
         directories: bool,
         prefer_relative: bool,
-    ) -> String {
+    ) -> anyhow::Result<String> {
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
-            // TODO(error-model): PHP throws InvalidArgumentException. Plugins reach this method
-            // through the RPC proxy, where a relative path is ordinary input rather than a
-            // programming error, and this panic kills the process instead of reaching their
-            // catch block; the plugin dispatcher repeats the check for that reason. Returning
-            // `anyhow::Result` from here and from `find_shortest_path_code` removes both the
-            // panic and the duplicated check.
-            panic!(
-                "{}",
-                format!("$from ({}) and $to ({}) must be absolute paths.", from, to)
-            );
+            return Err(InvalidArgumentException::new(format!(
+                "$from ({}) and $to ({}) must be absolute paths.",
+                from, to
+            ))
+            .into());
         }
 
         let mut from = self.normalize_path(from);
@@ -552,7 +547,7 @@ impl Filesystem {
         }
 
         if dirname(&from) == dirname(&to) {
-            return format!("./{}", basename(&to));
+            return Ok(format!("./{}", basename(&to)));
         }
 
         let mut common_path = to.clone();
@@ -565,7 +560,7 @@ impl Filesystem {
 
         // no commonality at all
         if Some(0) != strpos(&from, &common_path) {
-            return to;
+            return Ok(to);
         }
 
         common_path = format!("{}/", rtrim(&common_path, Some("/")));
@@ -574,7 +569,7 @@ impl Filesystem {
 
         // allow top level /foo & /bar dirs to be addressed relatively as this is common in Docker setups
         if !prefer_relative && "/" == common_path && source_path_depth > 1 {
-            return to;
+            return Ok(to);
         }
 
         let result = format!(
@@ -583,10 +578,10 @@ impl Filesystem {
             substr(&to, strlen(&common_path), None)
         );
         if strlen(&result) == 0 {
-            return "./".to_string();
+            return Ok("./".to_string());
         }
 
-        result
+        Ok(result)
     }
 
     /// Returns PHP code that, when executed in $from, will return the path to $to
@@ -597,21 +592,20 @@ impl Filesystem {
         directories: bool,
         static_code: bool,
         prefer_relative: bool,
-    ) -> String {
+    ) -> anyhow::Result<String> {
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
-            // TODO(error-model): as in `find_shortest_path` — PHP throws
-            // InvalidArgumentException, and this panic cannot reach a plugin's catch block.
-            panic!(
-                "{}",
-                format!("$from ({}) and $to ({}) must be absolute paths.", from, to)
-            );
+            return Err(InvalidArgumentException::new(format!(
+                "$from ({}) and $to ({}) must be absolute paths.",
+                from, to
+            ))
+            .into());
         }
 
         let from = self.normalize_path(from);
         let to = self.normalize_path(to);
 
         if from == to {
-            return (if directories { "__DIR__" } else { "__FILE__" }).to_string();
+            return Ok((if directories { "__DIR__" } else { "__FILE__" }).to_string());
         }
 
         let mut common_path = to.clone();
@@ -625,15 +619,15 @@ impl Filesystem {
 
         // no commonality at all
         if Some(0) != strpos(&from, &common_path) || "." == common_path {
-            return var_export(&PhpMixed::String(to), true);
+            return Ok(var_export(&PhpMixed::String(to), true));
         }
 
         common_path = format!("{}/", rtrim(&common_path, Some("/")));
         if to.starts_with(&format!("{}/", from)) {
-            return format!(
+            return Ok(format!(
                 "__DIR__ . {}",
                 var_export(&PhpMixed::String(substr(&to, strlen(&from), None)), true)
-            );
+            ));
         }
         let source_path_depth = (substr_count(&substr(&from, strlen(&common_path), None), "/")
             as i64)
@@ -641,7 +635,7 @@ impl Filesystem {
 
         // allow top level /foo & /bar dirs to be addressed relatively as this is common in Docker setups
         if !prefer_relative && "/" == common_path && source_path_depth > 1 {
-            return var_export(&PhpMixed::String(to), true);
+            return Ok(var_export(&PhpMixed::String(to), true));
         }
 
         let common_path_code = if static_code {
@@ -659,7 +653,7 @@ impl Filesystem {
         };
         let rel_target = substr(&to, strlen(&common_path), None);
 
-        format!(
+        Ok(format!(
             "{}{}",
             common_path_code,
             if strlen(&rel_target) > 0 {
@@ -670,7 +664,7 @@ impl Filesystem {
             } else {
                 String::new()
             }
-        )
+        ))
     }
 
     /// Checks if the given path is absolute
@@ -865,16 +859,16 @@ impl Filesystem {
     }
 
     /// Creates a relative symlink from $link to $target
-    pub fn relative_symlink(&self, target: &str, link: &str) -> bool {
+    pub fn relative_symlink(&self, target: &str, link: &str) -> anyhow::Result<bool> {
         let cwd = Platform::get_cwd(false).unwrap_or_default();
 
-        let relative_path = self.find_shortest_path(link, target, false, false);
+        let relative_path = self.find_shortest_path(link, target, false, false)?;
         chdir(dirname(link));
         let result = symlink(&relative_path, link).is_ok();
 
         chdir(&cwd);
 
-        result
+        Ok(result)
     }
 
     /// return true if that directory is a symlink.

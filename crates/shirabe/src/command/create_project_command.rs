@@ -503,7 +503,7 @@ impl CreateProjectCommand {
             "<info>Creating a \"{}\" project at \"{}\"</info>",
             package_name,
             fs.borrow()
-                .find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)
+                .find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)?
         ));
 
         if file_exists(&directory) {

@@ -105,11 +105,11 @@ impl LibraryInstaller {
     }
 
     /// Make sure binaries are installed for a given package.
-    pub fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) {
+    pub fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         let install_path = self.get_install_path(package.clone()).unwrap();
         self.binary_installer
             .borrow_mut()
-            .install_binaries(package, &install_path, false);
+            .install_binaries(package, &install_path, false)
     }
 
     /// Returns the base path of the package without target-dir path
@@ -319,9 +319,11 @@ impl InstallerInterface for LibraryInstaller {
         let _ = self.install_code(package.clone()).await?;
 
         let install_path = self.get_install_path(package.clone()).unwrap();
-        self.binary_installer
-            .borrow_mut()
-            .install_binaries(package.clone(), &install_path, true);
+        self.binary_installer.borrow_mut().install_binaries(
+            package.clone(),
+            &install_path,
+            true,
+        )?;
         let mut repo = repo.borrow_mut();
         if !repo.has_package(package.clone())? {
             repo.add_package(PackageInterfaceHandle::dup(&package));
@@ -354,7 +356,7 @@ impl InstallerInterface for LibraryInstaller {
         let install_path = self.get_install_path(target.clone()).unwrap();
         self.binary_installer
             .borrow_mut()
-            .install_binaries(target.clone(), &install_path, true);
+            .install_binaries(target.clone(), &install_path, true)?;
         let mut repo = repo.borrow_mut();
         repo.remove_package(initial.clone());
         if !repo.has_package(target.clone())? {
@@ -429,7 +431,7 @@ impl InstallerInterface for LibraryInstaller {
 }
 
 impl BinaryPresenceInterface for LibraryInstaller {
-    fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) {
-        LibraryInstaller::ensure_binaries_presence(self, package);
+    fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
+        LibraryInstaller::ensure_binaries_presence(self, package)
     }
 }

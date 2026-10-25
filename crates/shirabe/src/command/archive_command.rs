@@ -184,7 +184,7 @@ impl ArchiveCommand {
             .await?;
         let fs = Filesystem::new(None);
         let short_path =
-            fs.find_shortest_path(&Platform::get_cwd(false)?, &package_path, true, false);
+            fs.find_shortest_path(&Platform::get_cwd(false)?, &package_path, true, false)?;
 
         io.write_error_no_newline("Created: ");
         let display = if short_path.len() < package_path.len() {

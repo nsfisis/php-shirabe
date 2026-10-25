@@ -1246,18 +1246,7 @@ fn dispatch_filesystem_method(
         "findShortestPath" | "findShortestPathCode" => {
             let from = string_arg(0)?;
             let to = string_arg(1)?;
-            // TODO(error-model): the port panics on a relative path where PHP throws
-            // InvalidArgumentException, and a panic would take the whole process down instead
-            // of reaching the plugin's catch block, so the check is repeated here.
             let fs = fs.borrow();
-            if !fs.is_absolute_path(&from) || !fs.is_absolute_path(&to) {
-                return Err(PhpThrow {
-                    exception_class: "InvalidArgumentException".to_string(),
-                    message: format!("$from ({from}) and $to ({to}) must be absolute paths."),
-                    code: 0,
-                    properties: Box::new(IndexMap::new()),
-                });
-            }
             Ok(if method_name == "findShortestPath" {
                 fs.find_shortest_path(
                     &from,
@@ -1274,6 +1263,7 @@ fn dispatch_filesystem_method(
                     arg::<bool>(method_name, args, 4)?,
                 )
             }
+            .map_err(failed)?
             .to_plugin_value())
         }
         "isAbsolutePath" => Ok(fs
@@ -1292,6 +1282,7 @@ fn dispatch_filesystem_method(
         "relativeSymlink" => Ok(fs
             .borrow()
             .relative_symlink(&string_arg(0)?, &string_arg(1)?)
+            .map_err(failed)?
             .to_plugin_value()),
         "isSymlinkedDirectory" => Ok(fs
             .borrow()

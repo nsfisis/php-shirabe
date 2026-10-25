@@ -423,7 +423,7 @@ impl Installer {
             for package in repository_manager.get_local_repository().get_packages()? {
                 self.installation_manager
                     .borrow_mut()
-                    .ensure_binaries_presence(package.clone());
+                    .ensure_binaries_presence(package.clone())?;
             }
         }
 

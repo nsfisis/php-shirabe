@@ -169,7 +169,9 @@ impl InstallationManagerInterface for MockInstallationManager {
         Ok(false)
     }
 
-    fn ensure_binaries_presence(&mut self, _package: PackageInterfaceHandle) {}
+    fn ensure_binaries_presence(&mut self, _package: PackageInterfaceHandle) -> anyhow::Result<()> {
+        Ok(())
+    }
 
     async fn execute(
         &self,

@@ -532,7 +532,7 @@ mockall::mock! {
             repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,
             package: PackageInterfaceHandle,
         ) -> anyhow::Result<bool>;
-        fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
+        fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
         async fn execute(
             &self,
             repo: &shirabe::repository::InstalledRepositoryInterfaceHandle,

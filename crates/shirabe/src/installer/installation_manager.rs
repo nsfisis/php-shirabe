@@ -203,20 +203,22 @@ impl InstallationManager {
 
     /// Install binary for the given package.
     /// If the installer associated to this package doesn't handle that function, it'll do nothing.
-    pub fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) {
+    pub fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         let installer = self.get_installer(&package.get_type());
         let installer = match installer {
             Ok(i) => i,
             Err(_e) => {
                 // no installer found for the current package type (@see `getInstaller()`)
-                return;
+                return Ok(());
             }
         };
 
         // if the given installer support installing binaries
         if let Some(bp) = installer.as_binary_presence_interface() {
-            bp.ensure_binaries_presence(package);
+            bp.ensure_binaries_presence(package)?;
         }
+
+        Ok(())
     }
 
     /// Executes solver operation.
@@ -1062,7 +1064,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<bool>;
-    fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle);
+    fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()>;
     async fn execute(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,
@@ -1102,8 +1104,8 @@ impl InstallationManagerInterface for InstallationManager {
         InstallationManager::is_package_installed(self, repo, package)
     }
 
-    fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) {
-        InstallationManager::ensure_binaries_presence(self, package);
+    fn ensure_binaries_presence(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
+        InstallationManager::ensure_binaries_presence(self, package)
     }
 
     async fn execute(

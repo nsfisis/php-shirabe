@@ -371,7 +371,7 @@ impl DownloaderInterface for PathDownloader {
                             &real_url,
                             false,
                             true,
-                        );
+                        )?;
                         Ok(symfony_filesystem.symlink(&format!("{}/", shortest_path), &path))
                     } else {
                         Ok(symfony_filesystem.symlink(&format!("{}/", real_url), &path))

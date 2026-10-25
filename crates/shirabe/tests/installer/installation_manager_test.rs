@@ -240,11 +240,12 @@ impl InstallerInterface for BinaryInstaller {
 }
 
 impl BinaryPresenceInterface for BinaryInstaller {
-    fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) {
+    fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         self.calls
             .borrow_mut()
             .ensure_binaries_presence
             .push(package);
+        Ok(())
     }
 }
 
@@ -475,7 +476,7 @@ fn test_install_binary() {
     manager.add_installer(std::rc::Rc::new(installer));
 
     let package = get_package("test/pkg", "1.0.0");
-    manager.ensure_binaries_presence(package.clone());
+    manager.ensure_binaries_presence(package.clone()).unwrap();
 
     assert_eq!(calls.borrow().supports_args, vec!["library".to_string()]);
     assert_eq!(calls.borrow().ensure_binaries_presence.len(), 1);
