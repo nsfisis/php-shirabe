@@ -506,10 +506,8 @@ impl Application {
 
     pub fn get_long_version(&self) -> String {
         let mut branch_alias_string = String::new();
-        if !composer::BRANCH_ALIAS_VERSION.is_empty()
-            && composer::BRANCH_ALIAS_VERSION != "@package_branch_alias_version@"
-        {
-            branch_alias_string = format!(" ({})", composer::BRANCH_ALIAS_VERSION);
+        if !composer::SHIRABE_BRANCH_ALIAS_VERSION.is_empty() {
+            branch_alias_string = format!(" ({})", composer::SHIRABE_BRANCH_ALIAS_VERSION);
         }
 
         format!(

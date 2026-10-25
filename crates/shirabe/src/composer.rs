@@ -22,14 +22,22 @@ pub const RELEASE_DATE: &str = "2026-04-14 13:31:52";
 pub const SOURCE_VERSION: &str = "";
 pub const RUNTIME_API_VERSION: &str = "2.2.2";
 
-pub const SHIRABE_VERSION: &str = env!("CARGO_PKG_VERSION");
+/// What Shirabe reports as its own version: the package version of a release build, or
+/// `<package version>+<commit hash>` for a development build, the way Composer's phar reports a
+/// snapshot build through `getVersion()`. Baked in by `build.rs`.
+pub const SHIRABE_VERSION: &str = include!(concat!(env!("OUT_DIR"), "/shirabe_version.rs"));
+
+/// The package version of a development build, which plays the role of Composer's branch alias,
+/// or empty for a release build. Baked in by `build.rs`.
+pub const SHIRABE_BRANCH_ALIAS_VERSION: &str =
+    include!(concat!(env!("OUT_DIR"), "/shirabe_branch_alias_version.rs"));
 
 /// The UTC date of the commit this build was made from. Baked in by `build.rs`, the way Composer's
 /// Compiler stamps `RELEASE_DATE` when it builds the phar.
 pub const SHIRABE_RELEASE_DATE: &str = include!(concat!(env!("OUT_DIR"), "/release_date.rs"));
 
-/// The deadline after which a development build reports itself as outdated, or `None` for a build
-/// made from a tagged revision. Baked in by `build.rs`.
+/// The deadline after which a development build reports itself as outdated, or `None` for a
+/// release build. Baked in by `build.rs`.
 ///
 /// Composer declares this as the global constant COMPOSER_DEV_WARNING_TIME from its phar stub, so
 /// a plugin can read it back with `defined()`/`constant()`. Here it is a Rust constant, and

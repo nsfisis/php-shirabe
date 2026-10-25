@@ -86,6 +86,7 @@
           outputHash = "sha256-oohNQuoXHAhi9gDz/wZqllwB8h5suPDG3PwPh/nhIlw=";
         };
 
+        commitHash = self.rev or (pkgs.lib.removeSuffix "-dirty" self.dirtyRev);
         commitTime = self.lastModified;
         commitDate = self.lastModifiedDate;
 
@@ -114,12 +115,13 @@
           '';
 
           env = {
+            SHIRABE_COMMIT_HASH = commitHash;
             SHIRABE_RELEASE_DATE =
               let
                 field = start: builtins.substring start 2 commitDate;
               in
               "${builtins.substring 0 4 commitDate}-${field 4}-${field 6} ${field 8}:${field 10}:${field 12}";
-            SHIRABE_DEV_WARNING_TIME = toString (commitTime + 60 * 86400);
+            SHIRABE_COMMIT_TIME = toString commitTime;
           };
 
           doCheck = false;

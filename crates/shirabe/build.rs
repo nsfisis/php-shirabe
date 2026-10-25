@@ -1,7 +1,17 @@
 //! ref: composer/src/Composer/Compiler.php
 //!
-//! Generates the constant values of `composer::SHIRABE_RELEASE_DATE` and
-//! `composer::COMPOSER_DEV_WARNING_TIME` from the HEAD commit.
+//! Generates the constant values of:
+//!
+//! - `composer::SHIRABE_VERSION`,
+//! - `composer::SHIRABE_BRANCH_ALIAS_VERSION`,
+//! - `composer::SHIRABE_RELEASE_DATE` and
+//! - `composer::COMPOSER_DEV_WARNING_TIME`.
+
+struct Commit {
+    hash: String,
+    release_date: String,
+    time: i64,
+}
 
 fn git(repo_root: &std::path::Path, args: &[&str]) -> Option<String> {
     let output = std::process::Command::new("git")
@@ -16,30 +26,28 @@ fn git(repo_root: &std::path::Path, args: &[&str]) -> Option<String> {
     Some(String::from_utf8(output.stdout).ok()?.trim().to_string())
 }
 
-fn from_env() -> Option<(String, Option<i64>)> {
+fn from_env() -> Option<Commit> {
+    let hash = std::env::var("SHIRABE_COMMIT_HASH").ok();
     let release_date = std::env::var("SHIRABE_RELEASE_DATE").ok();
-    let dev_warning_time = std::env::var("SHIRABE_DEV_WARNING_TIME").ok();
-    match (release_date, dev_warning_time) {
-        (Some(release_date), Some(dev_warning_time)) => {
-            let dev_warning_time = if dev_warning_time.is_empty() {
-                None
-            } else {
-                Some(dev_warning_time.parse().expect(
-                    "SHIRABE_DEV_WARNING_TIME holds a Unix timestamp, or nothing at all for a \
-                     tagged release",
-                ))
-            };
-            Some((release_date, dev_warning_time))
-        }
-        (None, None) => None,
+    let time = std::env::var("SHIRABE_COMMIT_TIME").ok();
+    match (hash, release_date, time) {
+        (Some(hash), Some(release_date), Some(time)) => Some(Commit {
+            hash,
+            release_date,
+            time: time
+                .parse()
+                .expect("SHIRABE_COMMIT_TIME holds the Unix timestamp of the commit"),
+        }),
+        (None, None, None) => None,
         _ => panic!(
-            "SHIRABE_RELEASE_DATE and SHIRABE_DEV_WARNING_TIME both describe the commit the build \
-             comes from: set them together, or set neither and build from a git checkout"
+            "SHIRABE_COMMIT_HASH, SHIRABE_RELEASE_DATE and SHIRABE_COMMIT_TIME all describe the \
+             commit the build comes from: set them together, or set none and build from a git \
+             checkout"
         ),
     }
 }
 
-fn from_git() -> (String, Option<i64>) {
+fn from_git() -> Commit {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
     let repo_root = std::path::Path::new(&manifest_dir)
         .parent()
@@ -51,7 +59,7 @@ fn from_git() -> (String, Option<i64>) {
         let git_dir = repo_root.join(git_dir);
         // Committing on the current branch moves the branch ref, not HEAD.
         let branch_ref = git(repo_root, &["symbolic-ref", "-q", "HEAD"]);
-        for path in ["HEAD", "packed-refs", "refs/tags"]
+        for path in ["HEAD", "packed-refs"]
             .iter()
             .map(|name| git_dir.join(name))
             .chain(branch_ref.map(|name| git_dir.join(name)))
@@ -62,10 +70,11 @@ fn from_git() -> (String, Option<i64>) {
         }
     }
 
-    // Both constants describe the HEAD commit, so a checkout git cannot read leaves the build
+    // These values describe the HEAD commit, so a checkout git cannot read leaves the build
     // unable to date itself. Falling back would ship a build that claims a release date it does
     // not have and that never reports itself as outdated.
     let expect_git = "the release date comes from the HEAD commit: build from a git checkout";
+    let hash = git(repo_root, &["rev-parse", "HEAD"]).expect(expect_git);
     let release_date = git(
         repo_root,
         &[
@@ -77,32 +86,52 @@ fn from_git() -> (String, Option<i64>) {
         ],
     )
     .expect(expect_git);
-    let commit_time = git(repo_root, &["log", "-n1", "--pretty=%ct", "HEAD"])
+    let time = git(repo_root, &["log", "-n1", "--pretty=%ct", "HEAD"])
         .and_then(|date| date.parse::<i64>().ok())
         .expect(expect_git);
 
-    let dev_warning_time =
-        if git(repo_root, &["describe", "--tags", "--exact-match", "HEAD"]).is_some() {
-            None
-        } else {
-            Some(commit_time + 60 * 86400)
-        };
-
-    (release_date, dev_warning_time)
+    Commit {
+        hash,
+        release_date,
+        time,
+    }
 }
 
 fn main() {
     println!("cargo::rerun-if-changed=build.rs");
+    println!("cargo::rerun-if-env-changed=SHIRABE_COMMIT_HASH");
     println!("cargo::rerun-if-env-changed=SHIRABE_RELEASE_DATE");
-    println!("cargo::rerun-if-env-changed=SHIRABE_DEV_WARNING_TIME");
+    println!("cargo::rerun-if-env-changed=SHIRABE_COMMIT_TIME");
 
-    let (release_date, dev_warning_time) = match from_env() {
-        Some(values) => values,
-        None => from_git(),
+    let commit = from_env().unwrap_or_else(from_git);
+
+    let package_version = std::env::var("CARGO_PKG_VERSION").unwrap();
+    let is_dev = std::env::var("CARGO_PKG_VERSION_PRE").unwrap() == "dev";
+
+    // Composer's phar reports a snapshot build as `<branch alias>+<commit hash>` and appends the
+    // branch alias to its long version; a tagged release has no branch alias.
+    let (version, branch_alias_version, dev_warning_time) = if is_dev {
+        (
+            format!("{package_version}+{}", commit.hash),
+            package_version,
+            Some(commit.time + 60 * 86400),
+        )
+    } else {
+        (package_version, String::new(), None)
     };
 
     let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
-    std::fs::write(out_dir.join("release_date.rs"), format!("{release_date:?}")).unwrap();
+    std::fs::write(out_dir.join("shirabe_version.rs"), format!("{version:?}")).unwrap();
+    std::fs::write(
+        out_dir.join("shirabe_branch_alias_version.rs"),
+        format!("{branch_alias_version:?}"),
+    )
+    .unwrap();
+    std::fs::write(
+        out_dir.join("release_date.rs"),
+        format!("{:?}", commit.release_date),
+    )
+    .unwrap();
     std::fs::write(
         out_dir.join("dev_warning_time.rs"),
         match dev_warning_time {
