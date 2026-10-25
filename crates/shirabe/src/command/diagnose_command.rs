@@ -35,9 +35,10 @@ use crate::util::http::RequestProxy;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpClass as _;
 use shirabe_php_shim::{
-    AnyThrowable, Catch as _, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, RuntimeException,
-    disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class, implode, php_regex,
-    preg_match, rtrim, str_replace, strpos, strstr, strstr3, strtolower, trim, version_compare,
+    AnyThrowable, Catch as _, CmpOp, Exception, InvalidArgumentException, PHP_EOL, PhpMixed,
+    RuntimeException, disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class,
+    implode, php_regex, preg_match, rtrim, str_replace, strpos, strstr, strstr3, strtolower, trim,
+    version_compare,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -318,73 +319,89 @@ impl DiagnoseCommand {
             return Ok(result);
         }
 
-        // TODO(error-model): PHP catches every \Exception below and returns it, so `output_result`
-        // renders it as `<error>[class] message</error>` and the caller goes on to the next
-        // protocol. The errors below propagate instead, cutting the proxy checks short.
-        let proxy_status = proxy.get_status(None).unwrap_or_default();
+        let result = (|| -> anyhow::Result<CheckResult> {
+            let proxy_status = proxy.get_status(None).unwrap_or_default();
 
-        if proxy.is_excluded_by_no_proxy() {
-            return Ok(CheckResult::Message(format!(
-                "<info>SKIP</> <comment>Because repo.packagist.org is {}</>",
-                proxy_status
-            )));
-        }
+            if proxy.is_excluded_by_no_proxy() {
+                return Ok(CheckResult::Message(format!(
+                    "<info>SKIP</> <comment>Because repo.packagist.org is {}</>",
+                    proxy_status
+                )));
+            }
 
-        let json = self
-            .http_downloader
-            .borrow()
-            .as_ref()
-            .unwrap()
-            .borrow_mut()
-            .get(
-                &format!("{}://repo.packagist.org/packages.json", protocol),
-                IndexMap::new(),
-            )?
-            .decode_json()?;
-        if let Some(provider_includes) = json.as_array().and_then(|a| a.get("provider-includes")) {
-            let provider_includes_arr = provider_includes.as_array().cloned().unwrap_or_default();
-            let first = provider_includes_arr
-                .values()
-                .next()
-                .cloned()
-                .unwrap_or(PhpMixed::Null);
-            let hash_val = first
-                .as_array()
-                .and_then(|a| a.get("sha256"))
-                .cloned()
-                .unwrap_or(PhpMixed::Null);
-            let path = str_replace(
-                "%hash%",
-                hash_val.as_string().unwrap_or(""),
-                &provider_includes
-                    .as_array()
-                    .and_then(|a| a.keys().next().cloned())
-                    .unwrap_or_default(),
-            );
-            let response = self
+            let json = self
                 .http_downloader
                 .borrow()
                 .as_ref()
                 .unwrap()
                 .borrow_mut()
                 .get(
-                    &format!("{}://repo.packagist.org/{}", protocol, path),
+                    &format!("{}://repo.packagist.org/packages.json", protocol),
                     IndexMap::new(),
-                )?;
-            let provider = response.get_body().unwrap_or_default().to_string();
+                )?
+                .decode_json()?;
+            if let Some(provider_includes) =
+                json.as_array().and_then(|a| a.get("provider-includes"))
+            {
+                let provider_includes_arr =
+                    provider_includes.as_array().cloned().unwrap_or_default();
+                let first = provider_includes_arr
+                    .values()
+                    .next()
+                    .cloned()
+                    .unwrap_or(PhpMixed::Null);
+                let hash_val = first
+                    .as_array()
+                    .and_then(|a| a.get("sha256"))
+                    .cloned()
+                    .unwrap_or(PhpMixed::Null);
+                let path = str_replace(
+                    "%hash%",
+                    hash_val.as_string().unwrap_or(""),
+                    &provider_includes
+                        .as_array()
+                        .and_then(|a| a.keys().next().cloned())
+                        .unwrap_or_default(),
+                );
+                let response = self
+                    .http_downloader
+                    .borrow()
+                    .as_ref()
+                    .unwrap()
+                    .borrow_mut()
+                    .get(
+                        &format!("{}://repo.packagist.org/{}", protocol, path),
+                        IndexMap::new(),
+                    )?;
+                let provider = response.get_body().unwrap_or_default().to_string();
 
-            if hash("sha256", &provider) != hash_val.as_string().unwrap_or("") {
-                return Ok(CheckResult::Message(format!(
-                    "<warning>It seems that your proxy ({}) is modifying {} traffic on the fly</>",
-                    proxy_status, protocol
-                )));
+                if hash("sha256", &provider) != hash_val.as_string().unwrap_or("") {
+                    return Ok(CheckResult::Message(format!(
+                        "<warning>It seems that your proxy ({}) is modifying {} traffic on the fly</>",
+                        proxy_status, protocol
+                    )));
+                }
             }
-        }
 
-        Ok(CheckResult::Message(format!(
-            "<info>OK</> <comment>{}</>",
-            proxy_status
-        )))
+            Ok(CheckResult::Message(format!(
+                "<info>OK</> <comment>{}</>",
+                proxy_status
+            )))
+        })();
+        // PHP: catch (\Exception $e) { return $e; }, which outputResult() renders as
+        // `<error>[class] message</error>`.
+        match result {
+            Err(e) if e.is_instanceof::<Exception>() => {
+                let exception = AnyThrowable::of(&e)
+                    .expect("the catch above proved the error carries a \\Throwable");
+                Ok(CheckResult::Message(format!(
+                    "<error>[{}] {}</error>",
+                    exception.php_class_name(),
+                    exception.get_message()
+                )))
+            }
+            result => result,
+        }
     }
 
     fn check_github_oauth(&self, domain: &str, token: &str) -> anyhow::Result<CheckResult> {
