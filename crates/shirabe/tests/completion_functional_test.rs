@@ -11,26 +11,20 @@
 
 #[path = "common/bootstrap.rs"]
 mod bootstrap;
+#[path = "common/isolated_cwd.rs"]
+mod isolated_cwd;
 
+#[cfg(not(target_os = "linux"))]
 use serial_test::serial;
 use shirabe::console::application::{Application, ApplicationHandle};
 use shirabe_symfony_console::tester::CommandCompletionTester;
 
-struct RestoreCwd(std::path::PathBuf);
-
-impl Drop for RestoreCwd {
-    fn drop(&mut self) {
-        let _ = std::env::set_current_dir(&self.0);
-    }
-}
-
 /// PHP runs from the Composer dev checkout; chdir into the vendored checkout to reproduce
-/// that environment (restored on drop, so the tests are `#[serial]`).
-fn chdir_composer_checkout() -> RestoreCwd {
-    let prev = std::env::current_dir().unwrap();
-    let checkout = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composer");
-    std::env::set_current_dir(checkout).unwrap();
-    RestoreCwd(prev)
+/// that environment.
+fn chdir_composer_checkout() -> isolated_cwd::RestoreCwd {
+    isolated_cwd::set_current_dir(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../composer"),
+    )
 }
 
 /// ref: CompletionFunctionalTest::testComplete
@@ -87,13 +81,13 @@ const INSTALLED_PACKAGES: &[&str] = &["composer/semver", "psr/log"];
 const PREFER_INSTALL: &[&str] = &["dist", "source", "auto"];
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_archive() {
     assert_complete("archive ", Some(&[RANDOM_VENDOR]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_archive_package_prefix() {
     assert_complete(
         "archive symfony/http-",
@@ -102,19 +96,19 @@ fn test_complete_archive_package_prefix() {
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_archive_format() {
     assert_complete("archive --format ", Some(&["tar", "zip"]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_create_project() {
     assert_complete("create-project ", Some(&[RANDOM_VENDOR]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_create_project_prefer_install() {
     assert_complete(
         "create-project symfony/skeleton --prefer-install ",
@@ -123,19 +117,19 @@ fn test_complete_create_project_prefer_install() {
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_depends() {
     assert_complete("depends ", Some(INSTALLED_PACKAGES));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_why() {
     assert_complete("why ", Some(INSTALLED_PACKAGES));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 #[ignore = "expects the Composer dev checkout's fully installed vendor/bin (phpstan, simple-phpunit, ...); the vendored checkout ships only jsonlint and validate-json"]
 fn test_complete_exec() {
     assert_complete(
@@ -152,25 +146,25 @@ fn test_complete_exec() {
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_browse() {
     assert_complete("browse ", Some(INSTALLED_PACKAGES));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_home_h() {
     assert_complete("home -H ", Some(INSTALLED_PACKAGES));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_init_require() {
     assert_complete("init --require ", Some(&[RANDOM_VENDOR]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_init_require_dev() {
     assert_complete(
         "init --require-dev foo/bar --require-dev ",
@@ -179,67 +173,67 @@ fn test_complete_init_require_dev() {
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_install_prefer_install() {
     assert_complete("install --prefer-install ", Some(PREFER_INSTALL));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_install() {
     assert_complete("install ", None);
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_outdated() {
     assert_complete("outdated ", Some(INSTALLED_PACKAGES));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_prohibits() {
     assert_complete("prohibits ", Some(&[RANDOM_VENDOR]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_why_not() {
     assert_complete("why-not symfony/http-ker", Some(&["symfony/http-kernel"]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_reinstall_prefer_install() {
     assert_complete("reinstall --prefer-install ", Some(PREFER_INSTALL));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_reinstall() {
     assert_complete("reinstall ", Some(INSTALLED_PACKAGES));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_remove() {
     assert_complete("remove ", Some(INSTALLED_PACKAGES));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_require_prefer_install() {
     assert_complete("require --prefer-install ", Some(PREFER_INSTALL));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_require() {
     assert_complete("require ", Some(&[RANDOM_VENDOR]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_require_dev_package_prefix() {
     assert_complete(
         "require --dev symfony/http-",
@@ -248,73 +242,73 @@ fn test_complete_require_dev_package_prefix() {
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_run_script() {
     assert_complete("run-script ", Some(&["compile", "test", "phpstan"]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_run_script_args() {
     assert_complete("run-script test ", None);
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_search_format() {
     assert_complete("search --format ", Some(&["text", "json"]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_show_format() {
     assert_complete("show --format ", Some(&["text", "json"]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_info() {
     assert_complete("info ", Some(INSTALLED_PACKAGES));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_suggests() {
     assert_complete("suggests ", Some(INSTALLED_PACKAGES));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_update_prefer_install() {
     assert_complete("update --prefer-install ", Some(PREFER_INSTALL));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_update() {
     assert_complete("update ", Some(INSTALLED_PACKAGES));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_list() {
     assert_complete("config --list ", None);
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_editor() {
     assert_complete("config --editor ", None);
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_auth() {
     assert_complete("config --auth ", None);
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config() {
     assert_complete(
         "config ",
@@ -336,27 +330,27 @@ fn test_complete_config() {
 
 // global setting
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_bin() {
     assert_complete("config bin", Some(&["bin-dir"]));
 }
 
 // existing package-property
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_nam() {
     assert_complete("config nam", Some(&["name"]));
 }
 
 // non-existing package-property
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_ver() {
     assert_complete("config ver", Some(&["version"]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_repo() {
     assert_complete(
         "config repo",
@@ -365,7 +359,7 @@ fn test_complete_config_repo() {
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_repositories_dot() {
     assert_complete(
         "config repositories.",
@@ -374,19 +368,19 @@ fn test_complete_config_repositories_dot() {
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_sug() {
     assert_complete("config sug", Some(&["suggest", "suggest.ext-zip"]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_suggest_ext() {
     assert_complete("config suggest.ext-", Some(&["suggest.ext-zip"]));
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_ext() {
     assert_complete(
         "config ext",
@@ -399,7 +393,7 @@ fn test_complete_config_ext() {
 // yield ['config http-basic.', […]];
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_unset() {
     assert_complete(
         "config --unset ",
@@ -417,27 +411,27 @@ fn test_complete_config_unset() {
 
 // global setting
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_unset_bin_dir() {
     assert_complete("config --unset bin-dir", None);
 }
 
 // existing package-property
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_unset_nam() {
     assert_complete("config --unset nam", Some(&["name"]));
 }
 
 // non-existing package-property
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_unset_version() {
     assert_complete("config --unset version", None);
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_unset_extra_dot() {
     assert_complete(
         "config --unset extra.",
@@ -450,7 +444,7 @@ fn test_complete_config_unset_extra_dot() {
 // yield ['config --unset http-basic.', […]];
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_global() {
     assert_complete(
         "config --global ",
@@ -464,7 +458,7 @@ fn test_complete_config_global() {
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_global_repo() {
     assert_complete(
         "config --global repo",
@@ -473,7 +467,7 @@ fn test_complete_config_global_repo() {
 }
 
 #[test]
-#[serial]
+#[cfg_attr(not(target_os = "linux"), serial)]
 fn test_complete_config_global_repositories_dot() {
     assert_complete(
         "config --global repositories.",
