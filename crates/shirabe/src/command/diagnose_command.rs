@@ -45,7 +45,7 @@ use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_process::ExecutableFinder;
 
-/// What a `check_*` method hands to `output_result`, mirroring PHP's `true|string|string[]`.
+/// What a `check_*` method hands to `output_result`.
 #[derive(Debug)]
 enum CheckResult {
     Ok,
@@ -53,6 +53,7 @@ enum CheckResult {
     Failed,
     Message(String),
     Messages(Vec<String>),
+    Exception(anyhow::Error),
 }
 
 /// What `get_github_rate_limit` returns: PHP yields either the `resources.core` entry of
@@ -388,18 +389,8 @@ impl DiagnoseCommand {
                 proxy_status
             )))
         })();
-        // PHP: catch (\Exception $e) { return $e; }, which outputResult() renders as
-        // `<error>[class] message</error>`.
         match result {
-            Err(e) if e.is_instanceof::<Exception>() => {
-                let exception = AnyThrowable::of(&e)
-                    .expect("the catch above proved the error carries a \\Throwable");
-                Ok(CheckResult::Message(format!(
-                    "<error>[{}] {}</error>",
-                    exception.php_class_name(),
-                    exception.get_message()
-                )))
-            }
+            Err(e) if e.is_instanceof::<Exception>() => Ok(CheckResult::Exception(e)),
             result => result,
         }
     }
@@ -455,13 +446,7 @@ impl DiagnoseCommand {
                         domain, domain
                     )));
                 }
-                Ok(CheckResult::Message(format!(
-                    "<error>[{}] {}</error>",
-                    AnyThrowable::of(&e)
-                        .expect("PHP reaches this only with a caught \\Throwable")
-                        .php_class_name(),
-                    e
-                )))
+                Ok(CheckResult::Exception(e))
             }
         }
     }
@@ -602,22 +587,8 @@ impl DiagnoseCommand {
         );
         let latest = match versions_util.get_latest(None) {
             Ok(Ok(l)) => l,
-            Ok(Err(e)) => {
-                return Ok(CheckResult::Message(format!(
-                    "<error>[{}] {}</error>",
-                    "UnexpectedValueException",
-                    e.get_message()
-                )));
-            }
-            Err(e) => {
-                return Ok(CheckResult::Message(format!(
-                    "<error>[{}] {}</error>",
-                    AnyThrowable::of(&e)
-                        .expect("PHP reaches this only with a caught \\Throwable")
-                        .php_class_name(),
-                    e
-                )));
-            }
+            Ok(Err(e)) => return Ok(CheckResult::Exception(e.into())),
+            Err(e) => return Ok(CheckResult::Exception(e)),
         };
 
         let latest_version = latest
@@ -797,7 +768,6 @@ impl DiagnoseCommand {
             .to_string()
     }
 
-    // PHP: $result instanceof \Exception → already converted to string at call sites here
     fn output_result(&self, result: CheckResult) {
         let io = self.get_io();
         let messages = match result {
@@ -805,6 +775,15 @@ impl DiagnoseCommand {
                 io.write("<info>OK</info>");
 
                 return;
+            }
+            CheckResult::Exception(e) => {
+                let exception = AnyThrowable::of(&e)
+                    .expect("a check_* method passes on only an \\Exception it caught");
+                vec![format!(
+                    "<error>[{}] {}</error>",
+                    exception.php_class_name(),
+                    exception.get_message()
+                )]
             }
             CheckResult::Failed => vec![],
             // PHP treats '' and '0' as falsey, so such a message never reaches the output loop.
@@ -1462,13 +1441,7 @@ impl Command for DiagnoseCommand {
                 self.output_result(if matches!(status, CheckResult::Message(_)) {
                     status
                 } else {
-                    CheckResult::Message(format!(
-                        "<error>[{}] {}</error>",
-                        AnyThrowable::of(&e)
-                            .expect("PHP reaches this only with a caught \\Throwable")
-                            .php_class_name(),
-                        e
-                    ))
+                    CheckResult::Exception(e)
                 });
             } else {
                 return Err(e);
@@ -1503,26 +1476,12 @@ impl Command for DiagnoseCommand {
                     }
                 }
                 Err(e) => {
-                    if let Some(te) = e.catch::<TransportException>() {
-                        if te.get_code() == 401 {
-                            self.output_result(CheckResult::Message("<comment>The oauth token for github.com seems invalid, run \"shirabe config --global --unset github-oauth.github.com\" to remove it</comment>".to_string()));
-                        } else {
-                            self.output_result(CheckResult::Message(format!(
-                                "<error>[{}] {}</error>",
-                                AnyThrowable::of(&e)
-                                    .expect("PHP reaches this only with a caught \\Throwable")
-                                    .php_class_name(),
-                                e
-                            )));
-                        }
+                    if let Some(te) = e.catch::<TransportException>()
+                        && te.get_code() == 401
+                    {
+                        self.output_result(CheckResult::Message("<comment>The oauth token for github.com seems invalid, run \"shirabe config --global --unset github-oauth.github.com\" to remove it</comment>".to_string()));
                     } else {
-                        self.output_result(CheckResult::Message(format!(
-                            "<error>[{}] {}</error>",
-                            AnyThrowable::of(&e)
-                                .expect("PHP reaches this only with a caught \\Throwable")
-                                .php_class_name(),
-                            e
-                        )));
+                        self.output_result(CheckResult::Exception(e));
                     }
                 }
             }
