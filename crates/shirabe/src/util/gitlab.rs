@@ -237,7 +237,7 @@ impl GitLab {
                 "A local auth config source was found, do you want to store the token there?"
                     .to_string(),
                 true,
-            );
+            )?;
         }
 
         let mut attempt_counter = 0;
@@ -419,7 +419,7 @@ impl GitLab {
         };
         let password = self
             .io
-            .ask_and_hide_answer("Password: ".to_string())
+            .ask_and_hide_answer("Password: ".to_string())?
             .unwrap_or_default();
 
         let headers = vec!["Content-Type: application/x-www-form-urlencoded".to_string()];

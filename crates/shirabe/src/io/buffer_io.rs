@@ -173,7 +173,7 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
     fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
         self.inner.ask(question, default)
     }
-    fn ask_confirmation(&self, question: String, default: bool) -> bool {
+    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool> {
         self.inner.ask_confirmation(question, default)
     }
     fn ask_and_validate(
@@ -186,7 +186,7 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
         self.inner
             .ask_and_validate(question, validator, attempts, default)
     }
-    fn ask_and_hide_answer(&self, question: String) -> Option<String> {
+    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
         self.inner.ask_and_hide_answer(question)
     }
     fn select(

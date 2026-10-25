@@ -372,7 +372,7 @@ impl Command for RemoveCommand {
                             alt_type
                         ),
                         true,
-                    )
+                    )?
                 {
                     if dry_run {
                         to_remove
@@ -432,7 +432,7 @@ impl Command for RemoveCommand {
                                     alt_type
                                 ),
                                 true,
-                            )
+                            )?
                         {
                             if dry_run {
                                 to_remove

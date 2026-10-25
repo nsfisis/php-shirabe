@@ -303,20 +303,20 @@ impl Perforce {
         Some(result)
     }
 
-    pub fn query_p4_password(&mut self) -> Option<String> {
+    pub fn query_p4_password(&mut self) -> anyhow::Result<Option<String>> {
         if let Some(ref p) = self.p4_password {
-            return Some(p.clone());
+            return Ok(Some(p.clone()));
         }
         let mut password = self.get_p4_variable("P4PASSWD");
         if strlen(&password.clone().unwrap_or_default()) <= 0 {
             password = self.io.ask_and_hide_answer(format!(
                 "Enter password for Perforce user {}: ",
                 self.get_user().unwrap_or_default()
-            ));
+            ))?;
         }
         self.p4_password = password.clone();
 
-        password
+        Ok(password)
     }
 
     /// @internal
@@ -527,7 +527,7 @@ impl Perforce {
     pub fn p4_login(&mut self) -> anyhow::Result<()> {
         self.query_p4_user()?;
         if !self.is_logged_in()? {
-            let password = self.query_p4_password();
+            let password = self.query_p4_password()?;
             if self.windows_flag {
                 self.windows_login(password.as_deref())?;
             } else {

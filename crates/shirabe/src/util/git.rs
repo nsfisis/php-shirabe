@@ -685,7 +685,8 @@ impl Git {
                     );
                     auth_map.insert(
                         "password".to_string(),
-                        self.io.ask_and_hide_answer("      Password: ".to_string()),
+                        self.io
+                            .ask_and_hide_answer("      Password: ".to_string())?,
                     );
                     auth = Some(auth_map);
                     store_auth = self.config.borrow_mut().get("store-auths");

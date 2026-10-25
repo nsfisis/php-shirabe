@@ -328,10 +328,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         self.ask_question(&question)
     }
 
-    // TODO(error-model): ask_confirmation and ask_and_hide_answer still collapse ask_question
-    // errors with .expect() instead of propagating them; extending Result propagation to
-    // them is a further IOInterface signature change that has not been decided yet.
-    fn ask_confirmation(&self, question: String, default: bool) -> bool {
+    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool> {
         let sanitized = Self::sanitize(&question, true);
         let question = StrictConfirmationQuestion::new(
             sanitized,
@@ -340,10 +337,8 @@ impl IOInterfaceImmutable for ConsoleIO {
             "/^no?$/i".to_string(),
         );
 
-        let result = self
-            .ask_question(&question)
-            .expect("QuestionHelper::ask raised an error");
-        result.as_bool().unwrap_or(false)
+        let result = self.ask_question(&question)?;
+        Ok(result.as_bool().unwrap_or(false))
     }
 
     fn ask_and_validate(
@@ -386,7 +381,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         self.ask_question(&question)
     }
 
-    fn ask_and_hide_answer(&self, question: String) -> Option<String> {
+    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
         let sanitized_question = Self::sanitize(&question, true);
         let mut question = Question::new(sanitized_question, Some(PhpMixed::Null));
         // setHidden only throws when an autocompleter is set, which is not the case here.
@@ -394,10 +389,8 @@ impl IOInterfaceImmutable for ConsoleIO {
             .set_hidden(true)
             .expect("a freshly constructed question has no autocompleter");
 
-        let result = self
-            .ask_question(&question)
-            .expect("QuestionHelper::ask raised an error");
-        result.as_string().map(|s| s.to_string())
+        let result = self.ask_question(&question)?;
+        Ok(result.as_string().map(|s| s.to_string()))
     }
 
     fn select(

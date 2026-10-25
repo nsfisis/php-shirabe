@@ -411,7 +411,9 @@ impl AuthHelper {
             let username = self
                 .io
                 .ask("      Username: ".to_string(), PhpMixed::Null)?;
-            let password = self.io.ask_and_hide_answer("      Password: ".to_string());
+            let password = self
+                .io
+                .ask_and_hide_answer("      Password: ".to_string())?;
             self.io.borrow_mut().set_authentication(
                 origin.to_string(),
                 username.as_string().unwrap_or("").to_string(),

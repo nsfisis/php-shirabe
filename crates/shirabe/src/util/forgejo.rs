@@ -76,7 +76,7 @@ impl Forgejo {
                 "A local auth config source was found, do you want to store the token there?"
                     .to_string(),
                 true,
-            );
+            )?;
         }
 
         let username = self
@@ -87,7 +87,7 @@ impl Forgejo {
             .unwrap_or_default();
         let token = self
             .io
-            .ask_and_hide_answer("Token (hidden): ".to_string())
+            .ask_and_hide_answer("Token (hidden): ".to_string())?
             .map(|s| s.trim().to_string())
             .unwrap_or_default();
 

@@ -560,7 +560,7 @@ impl RequireCommand {
                         "Are you sure you want to use this constraint (<comment>y</comment>) or would you rather abort (<comment>n</comment>) the whole operation [<comment>y,n</comment>]? "
                             .to_string(),
                         true,
-                    )
+                    )?
                 {
                     self.revert_composer_file();
 
@@ -1048,7 +1048,7 @@ impl Command for RequireCommand {
                     "<info>Do you want to re-run the command with --dev?</> [<comment>yes</>]? "
                         .to_string(),
                     true,
-                ) {
+                )? {
                     input
                         .borrow_mut()
                         .set_option("dev", InputValue::Bool(true))?;
@@ -1123,7 +1123,7 @@ impl Command for RequireCommand {
                         "this requirement"
                     },
                 );
-                if !self.get_io().ask_confirmation(q1, false) {
+                if !self.get_io().ask_confirmation(q1, false)? {
                     let q2 = format!(
                         "<info>Do you want to re-run the command {} --dev?</info> [<comment>yes</comment>]? ",
                         if input.borrow().get_option("dev")?.as_bool().unwrap_or(false) {
@@ -1132,7 +1132,7 @@ impl Command for RequireCommand {
                             "with"
                         },
                     );
-                    if !self.get_io().ask_confirmation(q2, true) {
+                    if !self.get_io().ask_confirmation(q2, true)? {
                         return Ok(0);
                     }
 

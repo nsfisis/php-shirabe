@@ -648,7 +648,7 @@ impl Command for InitCommand {
             if !io.ask_confirmation(
                 "Do you confirm generation [<comment>yes</comment>]? ".to_string(),
                 true,
-            ) {
+            )? {
                 io.write_error3("<error>Command aborted</error>", true, io_interface::NORMAL);
 
                 return Ok(1);
@@ -708,7 +708,7 @@ impl Command for InitCommand {
             if !self.has_vendor_ignore(&ignore_file, "vendor") {
                 let question = "Would you like the <info>vendor</info> directory added to your <info>.gitignore</info> [<comment>yes</comment>]? ".to_string();
 
-                if io.ask_confirmation(question, true) {
+                if io.ask_confirmation(question, true)? {
                     self.add_vendor_ignore(&ignore_file, "/vendor/");
                 }
             }
@@ -718,7 +718,7 @@ impl Command for InitCommand {
             "Would you like to install dependencies now [<comment>yes</comment>]? ".to_string();
         if input.borrow().is_interactive()
             && self.has_dependencies(&options)
-            && io.ask_confirmation(question, true)
+            && io.ask_confirmation(question, true)?
         {
             self.update_dependencies(output).await;
         }
@@ -1138,20 +1138,20 @@ impl Command for InitCommand {
                 .as_array()
                 .map(<[String]>::to_vec)
                 .unwrap_or_default();
-            let requirements = if (require.len() as i64) > 0 || io.ask_confirmation(question, true)
-            {
-                self.determine_requirements(
-                    input.clone(),
-                    output.clone(),
-                    require,
-                    platform_repo.as_ref(),
-                    &preferred_stability,
-                    false,
-                    false,
-                )?
-            } else {
-                vec![]
-            };
+            let requirements =
+                if (require.len() as i64) > 0 || io.ask_confirmation(question, true)? {
+                    self.determine_requirements(
+                        input.clone(),
+                        output.clone(),
+                        require,
+                        platform_repo.as_ref(),
+                        &preferred_stability,
+                        false,
+                        false,
+                    )?
+                } else {
+                    vec![]
+                };
             input
                 .borrow_mut()
                 .set_option("require", InputValue::Array(requirements));
@@ -1164,7 +1164,7 @@ impl Command for InitCommand {
                 .map(<[String]>::to_vec)
                 .unwrap_or_default();
             let dev_requirements =
-                if (require_dev.len() as i64) > 0 || io.ask_confirmation(question, true) {
+                if (require_dev.len() as i64) > 0 || io.ask_confirmation(question, true)? {
                     self.determine_requirements(
                         input.clone(),
                         output.clone(),

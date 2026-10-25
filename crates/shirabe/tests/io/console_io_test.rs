@@ -207,10 +207,18 @@ fn test_ask_confirmation() {
     // PHP asserts the helper receives a StrictConfirmationQuestion. Behaviorally, a "yes" answer
     // confirms and a "no" answer denies via the StrictConfirmationQuestion ConsoleIO builds.
     let (console_io, _output) = make_console_io_with_answer("yes\n");
-    assert!(console_io.ask_confirmation("Why?".to_string(), false));
+    assert!(
+        console_io
+            .ask_confirmation("Why?".to_string(), false)
+            .unwrap()
+    );
 
     let (console_io, _output) = make_console_io_with_answer("no\n");
-    assert!(!console_io.ask_confirmation("Why?".to_string(), false));
+    assert!(
+        !console_io
+            .ask_confirmation("Why?".to_string(), false)
+            .unwrap()
+    );
 }
 
 #[test]

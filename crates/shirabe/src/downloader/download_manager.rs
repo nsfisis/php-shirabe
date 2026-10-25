@@ -361,7 +361,7 @@ impl DownloadManager {
                     if !self.io.ask_confirmation(
                         "    Would you like to try reinstalling the package instead [<comment>yes</comment>]? ".to_string(),
                         true,
-                    ) {
+                    )? {
                         return Err(e);
                     }
                 }

@@ -333,7 +333,7 @@ impl CreateProjectCommand {
                 || io.ask_confirmation(
                     "<info>Do you want to remove the existing VCS (.git, .svn..) history?</info> [<comment>y,n</comment>]? ".to_string(),
                     true,
-                ));
+                )?);
         if remove_vcs {
             let mut finder = Finder::new();
             finder

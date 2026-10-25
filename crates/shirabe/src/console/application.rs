@@ -2024,7 +2024,7 @@ impl ApplicationHandle {
                         break;
                     }
                     if use_parent_dir_if_no_json_available.as_bool() == Some(true)
-                        || io.ask_confirmation(format!("<info>No composer.json in current directory, do you want to use the one at {}?</info> [<comment>y,n</comment>]? ", dir), true)
+                        || io.ask_confirmation(format!("<info>No composer.json in current directory, do you want to use the one at {}?</info> [<comment>y,n</comment>]? ", dir), true)?
                     {
                         if use_parent_dir_if_no_json_available.as_bool() == Some(true) {
                             io.write_error(&format!("<info>No composer.json in current directory, changing working directory to {}</info>", dir));
@@ -2096,7 +2096,7 @@ impl ApplicationHandle {
                         "<info>Continue as root/super user</info> [<comment>yes</comment>]? "
                             .to_string(),
                         true,
-                    )
+                    )?
                 {
                     // avoid a second prompt later
                     is_non_allowed_root = false;
@@ -2223,7 +2223,7 @@ impl ApplicationHandle {
                         "<info>Continue as root/super user</info> [<comment>yes</comment>]? "
                             .to_string(),
                         true,
-                    )
+                    )?
                 {
                     return Ok(1);
                 }

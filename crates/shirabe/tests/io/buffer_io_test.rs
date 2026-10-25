@@ -15,8 +15,16 @@ fn test_set_user_inputs() {
         .set_user_inputs(vec!["yes".to_string(), "no".to_string(), String::new()])
         .unwrap();
 
-    assert!(buffer_io.ask_confirmation("Please say yes!".to_string(), false));
-    assert!(!buffer_io.ask_confirmation("Now please say no!".to_string(), true));
+    assert!(
+        buffer_io
+            .ask_confirmation("Please say yes!".to_string(), false)
+            .unwrap()
+    );
+    assert!(
+        !buffer_io
+            .ask_confirmation("Now please say no!".to_string(), true)
+            .unwrap()
+    );
     assert_eq!(
         PhpMixed::String("default".to_string()),
         buffer_io

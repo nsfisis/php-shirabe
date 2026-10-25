@@ -227,7 +227,7 @@ impl IOInterfaceImmutable for IOMock {
         self.inner
             .ask(format!("{}{}", trim_eol(&question), PHP_EOL), default)
     }
-    fn ask_confirmation(&self, question: String, default: bool) -> bool {
+    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool> {
         self.inner
             .ask_confirmation(format!("{}{}", trim_eol(&question), PHP_EOL), default)
     }
@@ -245,17 +245,14 @@ impl IOInterfaceImmutable for IOMock {
             default,
         )
     }
-    fn ask_and_hide_answer(&self, question: String) -> Option<String> {
+    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
         // Do not hide the answer in tests because that blocks on Windows with
         // hiddeninput.exe, so PHP delegates to `ask` rather than the hidden variant.
-        let result = self
-            .inner
-            .ask(
-                format!("{}{}", trim_eol(&question), PHP_EOL),
-                PhpMixed::Null,
-            )
-            .expect("QuestionHelper::ask raised an error");
-        result.as_string().map(|s| s.to_string())
+        let result = self.inner.ask(
+            format!("{}{}", trim_eol(&question), PHP_EOL),
+            PhpMixed::Null,
+        )?;
+        Ok(result.as_string().map(|s| s.to_string()))
     }
     fn select(
         &self,

@@ -204,7 +204,7 @@ impl UpdateCommand {
                 if 1 == packages.len() { "" } else { "s" },
             ),
             true,
-        ) {
+        )? {
             return Ok(packages);
         }
 

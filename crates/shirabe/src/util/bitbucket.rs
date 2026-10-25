@@ -227,12 +227,12 @@ impl Bitbucket {
                 "A local auth config source was found, do you want to store the token there?"
                     .to_string(),
                 true,
-            );
+            )?;
         }
 
         let consumer_key = self
             .io
-            .ask_and_hide_answer("Consumer Key (hidden): ".to_string())
+            .ask_and_hide_answer("Consumer Key (hidden): ".to_string())?
             .unwrap_or_default()
             .trim()
             .to_string();
@@ -253,7 +253,7 @@ impl Bitbucket {
 
         let consumer_secret = self
             .io
-            .ask_and_hide_answer("Consumer Secret (hidden): ".to_string())
+            .ask_and_hide_answer("Consumer Secret (hidden): ".to_string())?
             .unwrap_or_default()
             .trim()
             .to_string();

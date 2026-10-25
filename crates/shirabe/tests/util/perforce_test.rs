@@ -354,7 +354,7 @@ fn test_query_p4_password_with_password_already_set() {
         io,
     );
 
-    let password = perforce.query_p4_password();
+    let password = perforce.query_p4_password().unwrap();
     assert_eq!(Some("TEST_PASSWORD".to_string()), password);
 }
 
@@ -377,7 +377,7 @@ fn test_query_p4_password_with_password_set_in_p4_variables_with_windows_os() {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
 
-    let password = perforce.query_p4_password();
+    let password = perforce.query_p4_password().unwrap();
     assert_eq!(Some("TEST_P4VARIABLE_PASSWORD".to_string()), password);
 }
 
@@ -397,7 +397,7 @@ fn test_query_p4_password_with_password_set_in_p4_variables_not_windows_os() {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(false, process, io);
 
-    let password = perforce.query_p4_password();
+    let password = perforce.query_p4_password().unwrap();
     assert_eq!(Some("TEST_P4VARIABLE_PASSWORD".to_string()), password);
 }
 
@@ -412,7 +412,7 @@ fn test_query_p4_password_queries_for_password() {
         ));
     let mut perforce = create_perforce(true, process, io);
 
-    let password = perforce.query_p4_password();
+    let password = perforce.query_p4_password().unwrap();
     assert_eq!(Some("TEST_QUERY_PASSWORD".to_string()), password);
 }
 

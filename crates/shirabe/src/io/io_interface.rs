@@ -91,7 +91,7 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
     /// to the caller, hence the `anyhow::Result` return type.
     fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed>;
 
-    fn ask_confirmation(&self, question: String, default: bool) -> bool;
+    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool>;
 
     fn ask_and_validate(
         &self,
@@ -101,7 +101,7 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
         default: PhpMixed,
     ) -> anyhow::Result<PhpMixed>;
 
-    fn ask_and_hide_answer(&self, question: String) -> Option<String>;
+    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>>;
 
     /// PHP `array $choices` may be a list (`PhpMixed::List`) or an associative
     /// array (`PhpMixed::Array`); list choices resolve to their index, while
@@ -276,7 +276,7 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         self.borrow().ask(question, default)
     }
 
-    fn ask_confirmation(&self, question: String, default: bool) -> bool {
+    fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool> {
         self.borrow().ask_confirmation(question, default)
     }
 
@@ -291,7 +291,7 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
             .ask_and_validate(question, validator, attempts, default)
     }
 
-    fn ask_and_hide_answer(&self, question: String) -> Option<String> {
+    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
         self.borrow().ask_and_hide_answer(question)
     }
 

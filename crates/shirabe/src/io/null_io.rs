@@ -69,8 +69,8 @@ impl IOInterfaceImmutable for NullIO {
         Ok(default)
     }
 
-    fn ask_confirmation(&self, _question: String, default: bool) -> bool {
-        default
+    fn ask_confirmation(&self, _question: String, default: bool) -> anyhow::Result<bool> {
+        Ok(default)
     }
 
     fn ask_and_validate(
@@ -83,8 +83,8 @@ impl IOInterfaceImmutable for NullIO {
         Ok(default)
     }
 
-    fn ask_and_hide_answer(&self, _question: String) -> Option<String> {
-        None
+    fn ask_and_hide_answer(&self, _question: String) -> anyhow::Result<Option<String>> {
+        Ok(None)
     }
 
     fn select(

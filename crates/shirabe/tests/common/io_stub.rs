@@ -220,8 +220,8 @@ impl IOInterfaceImmutable for IOStub {
     fn ask(&self, _question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
         Ok(self.ask.clone().unwrap_or(default))
     }
-    fn ask_confirmation(&self, _question: String, default: bool) -> bool {
-        self.ask_confirmation.unwrap_or(default)
+    fn ask_confirmation(&self, _question: String, default: bool) -> anyhow::Result<bool> {
+        Ok(self.ask_confirmation.unwrap_or(default))
     }
     fn ask_and_validate(
         &self,
@@ -237,11 +237,11 @@ impl IOInterfaceImmutable for IOStub {
             None => Ok(default),
         }
     }
-    fn ask_and_hide_answer(&self, question: String) -> Option<String> {
+    fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
         if let Some(responses) = &self.ask_and_hide_answer_responses {
-            return Some(responses.get(&question).cloned().unwrap_or_default());
+            return Ok(Some(responses.get(&question).cloned().unwrap_or_default()));
         }
-        self.ask_and_hide_answer.clone().unwrap_or(None)
+        Ok(self.ask_and_hide_answer.clone().unwrap_or(None))
     }
     fn select(
         &self,

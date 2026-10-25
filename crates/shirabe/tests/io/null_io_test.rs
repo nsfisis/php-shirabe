@@ -23,7 +23,7 @@ fn test_has_authentication() {
 fn test_ask_and_hide_answer() {
     let io = NullIO::new();
 
-    assert_eq!(None, io.ask_and_hide_answer("foo".to_string()));
+    assert_eq!(None, io.ask_and_hide_answer("foo".to_string()).unwrap());
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn test_ask() {
 fn test_ask_confirmation() {
     let io = NullIO::new();
 
-    assert!(!io.ask_confirmation("bar".to_string(), false));
+    assert!(!io.ask_confirmation("bar".to_string(), false).unwrap());
 }
 
 #[test]

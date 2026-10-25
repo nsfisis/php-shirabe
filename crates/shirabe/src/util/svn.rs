@@ -228,14 +228,14 @@ impl Svn {
                 .to_string(),
             password: self
                 .io
-                .ask_and_hide_answer("Password: ".to_string())
+                .ask_and_hide_answer("Password: ".to_string())?
                 .unwrap_or_default(),
         });
 
         self.cache_credentials = self.io.ask_confirmation(
             "Should Subversion cache these credentials? (yes/no) ".to_string(),
             true,
-        );
+        )?;
 
         Ok(self)
     }
