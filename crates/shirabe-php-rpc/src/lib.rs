@@ -1174,6 +1174,47 @@ impl Worker {
             Err(wait_err) => format!("failed to check PHP worker process status: {wait_err}"),
         }
     }
+
+    /// Ends this process the way the worker ended, if it has: the worker stands in for the PHP
+    /// process Composer runs in, so a plugin's `exit()`, a fatal error or a signal that ends the
+    /// worker ends Shirabe with the same exit code or signal, as it ends Composer. Returns when the
+    /// worker is still running.
+    ///
+    /// TODO(php-runtime): Composer's own shutdown functions, such as the memory-limit hint its
+    /// Application registers, run in the process that ended and so are not run here.
+    fn exit_if_worker_is_dead(&mut self) {
+        // The socket closes as the worker ends, a moment before it can be reaped.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(1);
+        let status = loop {
+            match self.child.try_wait() {
+                Ok(Some(status)) => break status,
+                Ok(None) if std::time::Instant::now() < deadline => {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                _ => return,
+            }
+        };
+        use std::io::Write as _;
+        let _ = std::io::stdout().flush();
+        let _ = std::io::stderr().flush();
+        if let Some(code) = status.code() {
+            std::process::exit(code);
+        }
+        if let Some(signal) = std::os::unix::process::ExitStatusExt::signal(&status)
+            && let Ok(signal) = nix::sys::signal::Signal::try_from(signal)
+        {
+            let default = nix::sys::signal::SigAction::new(
+                nix::sys::signal::SigHandler::SigDfl,
+                nix::sys::signal::SaFlags::empty(),
+                nix::sys::signal::SigSet::empty(),
+            );
+            // SAFETY: SIG_DFL installs no handler code, and nothing runs after the raise below
+            // that could rely on the disposition this replaces.
+            let _ = unsafe { nix::sys::signal::sigaction(signal, &default) };
+            let _ = nix::sys::signal::raise(signal);
+            std::process::exit(128 + signal as i32);
+        }
+    }
 }
 
 /// The PHP worker, spawned on first use.
@@ -1205,15 +1246,19 @@ pub fn ensure_worker() -> anyhow::Result<()> {
 /// worker locked across a whole call.
 fn send_frame(frame: &Frame) -> anyhow::Result<()> {
     with_worker(|worker| {
-        frame::write_frame(&mut worker.stream, frame)
-            .map_err(|e| anyhow::Error::new(e).context(worker.worker_state()))
+        frame::write_frame(&mut worker.stream, frame).map_err(|e| {
+            worker.exit_if_worker_is_dead();
+            anyhow::Error::new(e).context(worker.worker_state())
+        })
     })?
 }
 
 fn recv_frame() -> anyhow::Result<Frame> {
     with_worker(|worker| {
-        frame::read_frame(&mut worker.stream)
-            .map_err(|e| anyhow::Error::new(e).context(worker.worker_state()))
+        frame::read_frame(&mut worker.stream).map_err(|e| {
+            worker.exit_if_worker_is_dead();
+            anyhow::Error::new(e).context(worker.worker_state())
+        })
     })?
 }
 

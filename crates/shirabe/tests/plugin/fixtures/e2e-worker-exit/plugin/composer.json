@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/worker-exit",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin ending the PHP process the way SHIRABE_E2E_WORKER_EXIT names.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\WorkerExit\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\WorkerExit\\Plugin"
+    }
+}

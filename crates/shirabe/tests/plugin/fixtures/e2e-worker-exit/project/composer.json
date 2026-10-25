@@ -1,0 +1,24 @@
+{
+    "name": "shirabe/e2e-worker-exit",
+    "description": "E2E fixture project: a plugin that ends the PHP process in the middle of an install.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "shirabe-test/worker-exit": "1.0.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "shirabe-test/worker-exit": true
+        }
+    }
+}

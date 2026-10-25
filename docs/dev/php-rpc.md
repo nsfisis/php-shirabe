@@ -25,7 +25,7 @@ The child is started with the following arguments:
   `php://fd/3` rather than connecting anywhere. A bound path would have to fit in `sun_path`
   (108 bytes), which a long `TMPDIR` overruns. The pair is connected from the start, so nothing
   has to wait for an `accept` either: a child that dies before reading surfaces as EOF on the
-  first call, with its exit status attached.
+  first call.
 - The PHP glue code (`php/worker.php`), the proxy stubs (`php/stubs/`), the runtime classes
   (`php/runtime/`) and the guards (`php/guards/`) are embedded in the Rust binary and written to a
   `0700` temp dir at spawn time, so both halves of the protocol are always the same commit.
@@ -130,9 +130,13 @@ same dispatch while waiting for its own `Return`.
 
 ## Failure model
 
-- The outer `anyhow::Result` of `call_function`/`call_static_method` is the fatal lane: dead
-  worker (EOF, with the child's exit status attached as context), broken framing, oversized
-  frames.
+- A worker that has ended takes Shirabe down with it: the worker stands in for the PHP process
+  Composer runs in, so when a read or a write finds it gone, Shirabe exits with its exit code, or
+  is killed by the signal that killed it, as Composer would be by a plugin's `exit()`, a fatal
+  error or a signal.
+- The outer `anyhow::Result` of `call_function`/`call_static_method` is the fatal lane: broken
+  framing, oversized frames, and an I/O failure while the worker is still running (with its
+  state attached as context).
 - The inner `Result<PluginValue, PhpThrow>` is the recoverable lane: a PHP exception crossing
   the boundary as a `Throw` frame.
 - A `Throw` names the class the exception was thrown as, `properties` carries the state that
