@@ -522,13 +522,12 @@ pub(crate) fn dispatch_r_table_method(
 /// ends up holding a second, unconnected instance of a Composer service.
 pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
     let (class, ctor_args) = match (args.first(), args.get(1)) {
-        // TODO(bytes): lossy UTF-8; class names are bytes in PHP.
         (Some(PluginValue::String(class)), Some(PluginValue::List(ctor_args))) => {
-            (String::from_utf8_lossy(class).into_owned(), ctor_args)
+            (class, ctor_args)
         }
         (Some(PluginValue::String(class)), None | Some(PluginValue::Array(_))) => {
             // An empty PHP array crosses as a list; anything else keyed is a protocol error.
-            (String::from_utf8_lossy(class).into_owned(), &Vec::new())
+            (class, &Vec::new())
         }
         other => {
             return Err(runtime_throw(format!(
@@ -536,49 +535,59 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             )));
         }
     };
-    let string_arg = |position: usize| arg::<String>(&class, ctor_args, position);
-    let package_arg = |position: usize| arg::<PackageInterfaceHandle>(&class, ctor_args, position);
+    let class_name = class.to_string();
+    let string_arg = |position: usize| arg::<String>(&class_name, ctor_args, position);
+    let package_arg =
+        |position: usize| arg::<PackageInterfaceHandle>(&class_name, ctor_args, position);
     let io_arg = |position: usize| {
-        arg::<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>(&class, ctor_args, position)
+        arg::<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>(&class_name, ctor_args, position)
     };
     let process_executor_arg = |position: usize| {
         arg::<std::rc::Rc<std::cell::RefCell<crate::util::ProcessExecutor>>>(
-            &class, ctor_args, position,
+            &class_name,
+            ctor_args,
+            position,
         )
     };
     let config_arg = |position: usize| {
-        arg::<std::rc::Rc<std::cell::RefCell<crate::config::Config>>>(&class, ctor_args, position)
+        arg::<std::rc::Rc<std::cell::RefCell<crate::config::Config>>>(
+            &class_name,
+            ctor_args,
+            position,
+        )
     };
     let alias_package_arg =
         |position: usize| -> Result<crate::package::AliasPackageHandle, PhpThrow> {
             package_arg(position)?
                 .as_alias()
-                .ok_or_else(|| runtime_throw(format!("{class} expects an AliasPackage")))
+                .ok_or_else(|| runtime_throw(format!("{class_name} expects an AliasPackage")))
         };
-    let package = match class.as_str() {
-        "Composer\\Package\\Package" => AnyPackage::Package(crate::package::Package::new(
+    let package = match class.as_slice() {
+        b"Composer\\Package\\Package" => AnyPackage::Package(crate::package::Package::new(
             string_arg(0)?,
             string_arg(1)?,
             string_arg(2)?,
         )),
-        "Composer\\Package\\CompletePackage" => AnyPackage::CompletePackage(
+        b"Composer\\Package\\CompletePackage" => AnyPackage::CompletePackage(
             crate::package::CompletePackage::new(string_arg(0)?, string_arg(1)?, string_arg(2)?),
         ),
         // The alias target has to be a package that already lives on the Rust side; an alias of
         // an alias has no Rust representation, so its narrowing is an explicit error too.
-        "Composer\\Package\\AliasPackage" => {
-            let alias_of = package_arg(0)?
-                .as_package()
-                .ok_or_else(|| runtime_throw(format!("{class} expects a real Package to alias")))?;
+        b"Composer\\Package\\AliasPackage" => {
+            let alias_of = package_arg(0)?.as_package().ok_or_else(|| {
+                runtime_throw(format!("{class_name} expects a real Package to alias"))
+            })?;
             AnyPackage::AliasPackage(crate::package::AliasPackage::new(
                 alias_of,
                 string_arg(1)?,
                 string_arg(2)?,
             ))
         }
-        "Composer\\Package\\CompleteAliasPackage" => {
+        b"Composer\\Package\\CompleteAliasPackage" => {
             let alias_of = package_arg(0)?.as_complete_package().ok_or_else(|| {
-                runtime_throw(format!("{class} expects a real CompletePackage to alias"))
+                runtime_throw(format!(
+                    "{class_name} expects a real CompletePackage to alias"
+                ))
             })?;
             AnyPackage::CompleteAliasPackage(crate::package::CompleteAliasPackage::new(
                 alias_of,
@@ -586,9 +595,9 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                 string_arg(2)?,
             ))
         }
-        "Composer\\Package\\RootAliasPackage" => {
+        b"Composer\\Package\\RootAliasPackage" => {
             let alias_of = package_arg(0)?.as_root_package().ok_or_else(|| {
-                runtime_throw(format!("{class} expects a real RootPackage to alias"))
+                runtime_throw(format!("{class_name} expects a real RootPackage to alias"))
             })?;
             AnyPackage::RootAliasPackage(crate::package::RootAliasPackage::new(
                 alias_of,
@@ -598,12 +607,12 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         }
         // A solver operation carries no state beyond the packages it names, so a plugin-built
         // one is a complete instance rather than a second view on a Rust-side service.
-        "Composer\\DependencyResolver\\Operation\\InstallOperation" => {
+        b"Composer\\DependencyResolver\\Operation\\InstallOperation" => {
             return Ok(operation_construction_result(AnyOperation::Install(
                 crate::dependency_resolver::operation::InstallOperation::new(package_arg(0)?),
             )));
         }
-        "Composer\\DependencyResolver\\Operation\\UpdateOperation" => {
+        b"Composer\\DependencyResolver\\Operation\\UpdateOperation" => {
             return Ok(operation_construction_result(AnyOperation::Update(
                 crate::dependency_resolver::operation::UpdateOperation::new(
                     package_arg(0)?,
@@ -611,12 +620,12 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                 ),
             )));
         }
-        "Composer\\DependencyResolver\\Operation\\UninstallOperation" => {
+        b"Composer\\DependencyResolver\\Operation\\UninstallOperation" => {
             return Ok(operation_construction_result(AnyOperation::Uninstall(
                 crate::dependency_resolver::operation::UninstallOperation::new(package_arg(0)?),
             )));
         }
-        "Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation" => {
+        b"Composer\\DependencyResolver\\Operation\\MarkAliasInstalledOperation" => {
             return Ok(operation_construction_result(
                 AnyOperation::MarkAliasInstalled(
                     crate::dependency_resolver::operation::MarkAliasInstalledOperation::new(
@@ -625,7 +634,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                 ),
             ));
         }
-        "Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation" => {
+        b"Composer\\DependencyResolver\\Operation\\MarkAliasUninstalledOperation" => {
             return Ok(operation_construction_result(
                 AnyOperation::MarkAliasUninstalled(
                     crate::dependency_resolver::operation::MarkAliasUninstalledOperation::new(
@@ -637,7 +646,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // A Filesystem shares no state with the object graph beyond the process executor it
         // runs subprocesses through, so a plugin-built one is a complete instance rather than
         // a second view on a Rust-side service.
-        "Composer\\Util\\Filesystem" => {
+        b"Composer\\Util\\Filesystem" => {
             let executor = match ctor_args.first() {
                 None | Some(PluginValue::Null) => None,
                 _ => Some(process_executor_arg(0)?),
@@ -650,7 +659,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // The job queue and the async permits of a process executor are its own state, and the
         // timeout it runs children under is the Rust side's; a plugin-built one is a complete
         // instance of the former holding the latter, not a second view on the graph's executor.
-        "Composer\\Util\\ProcessExecutor" => {
+        b"Composer\\Util\\ProcessExecutor" => {
             let io = match ctor_args.first() {
                 None | Some(PluginValue::Null) => None,
                 _ => Some(io_arg(0)?),
@@ -663,13 +672,18 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // A downloader carries its own options, TLS defaults and request backends; what it
         // shares with the graph is the IO it collects authentication into and the config it
         // reads, both of which it receives as the proxies the plugin already holds.
-        "Composer\\Util\\HttpDownloader" => {
+        b"Composer\\Util\\HttpDownloader" => {
             let rhandle = register_entity(RustEntity::HttpDownloader(std::rc::Rc::new(
                 std::cell::RefCell::new(crate::util::HttpDownloader::new(
                     io_arg(0)?,
                     config_arg(1)?,
-                    arg_or::<IndexMap<String, PhpMixed>>(&class, ctor_args, 2, IndexMap::new())?,
-                    arg_or::<bool>(&class, ctor_args, 3, false)?,
+                    arg_or::<IndexMap<String, PhpMixed>>(
+                        &class_name,
+                        ctor_args,
+                        2,
+                        IndexMap::new(),
+                    )?,
+                    arg_or::<bool>(&class_name, ctor_args, 3, false)?,
                 )),
             )));
             return Ok(construction_result(rhandle));
@@ -678,9 +692,9 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         // driven by explicit errors from real plugins. Each one has to decide what a
         // plugin-built instance means for the Rust-side graph, which is why none of them is
         // answered generically here.
-        other => {
+        _ => {
             return Err(runtime_throw(format!(
-                "Shirabe does not support constructing {other} inside the plugin process yet"
+                "Shirabe does not support constructing {class_name} inside the plugin process yet"
             )));
         }
     };
@@ -1674,25 +1688,16 @@ fn call_php_callable(
 /// bodies reach state the Rust side owns or classes the worker has no code for.
 pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, PhpThrow> {
     let (class, method, call_args) = match (args.first(), args.get(1), args.get(2)) {
-        // TODO(bytes): lossy UTF-8; class and method names are bytes in PHP.
         (
             Some(PluginValue::String(class)),
             Some(PluginValue::String(method)),
             Some(PluginValue::List(call_args)),
-        ) => (
-            String::from_utf8_lossy(class).into_owned(),
-            String::from_utf8_lossy(method).into_owned(),
-            call_args.clone(),
-        ),
+        ) => (class, method, call_args.clone()),
         (
             Some(PluginValue::String(class)),
             Some(PluginValue::String(method)),
             None | Some(PluginValue::Array(_)),
-        ) => (
-            String::from_utf8_lossy(class).into_owned(),
-            String::from_utf8_lossy(method).into_owned(),
-            Vec::new(),
-        ),
+        ) => (class, method, Vec::new()),
         other => {
             return Err(runtime_throw(format!(
                 "__shirabeCallStatic expects a class name, a method name and an argument list, \
@@ -1702,23 +1707,23 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
     };
     let name = format!("{class}::{method}");
     let string_arg = |position: usize| arg::<String>(&name, &call_args, position);
-    match (class.as_str(), method.as_str()) {
-        ("Composer\\Util\\Filesystem", "isLocalPath") => {
+    match (class.as_slice(), method.as_slice()) {
+        (b"Composer\\Util\\Filesystem", b"isLocalPath") => {
             Ok(crate::util::Filesystem::is_local_path(&string_arg(0)?).to_plugin_value())
         }
-        ("Composer\\Util\\Filesystem", "getPlatformPath") => Ok(PluginValue::string(
+        (b"Composer\\Util\\Filesystem", b"getPlatformPath") => Ok(PluginValue::string(
             crate::util::Filesystem::get_platform_path(&string_arg(0)?),
         )),
-        ("Composer\\Util\\ProcessExecutor", "getTimeout") => {
+        (b"Composer\\Util\\ProcessExecutor", b"getTimeout") => {
             Ok(crate::util::ProcessExecutor::get_timeout().to_plugin_value())
         }
-        ("Composer\\Util\\ProcessExecutor", "setTimeout") => {
+        (b"Composer\\Util\\ProcessExecutor", b"setTimeout") => {
             crate::util::ProcessExecutor::set_timeout(arg::<i64>(&name, &call_args, 0)?);
             Ok(PluginValue::Null)
         }
         // `escape(string|false|null $argument)` casts its argument to string first, which turns
         // both of the non-string forms into the empty string.
-        ("Composer\\Util\\ProcessExecutor", "escape") => {
+        (b"Composer\\Util\\ProcessExecutor", b"escape") => {
             let argument = match call_args.first() {
                 None | Some(PluginValue::Null) | Some(PluginValue::Bool(false)) => String::new(),
                 _ => string_arg(0)?,
@@ -3270,15 +3275,13 @@ fn decode_subscribed_events(
     };
     let mut events: IndexMap<String, SubscribedEventEntry> = IndexMap::new();
     for (event_name, params) in entries {
-        // TODO(bytes): lossy UTF-8; event and method names are bytes in PHP.
+        // TODO(bytes): lossy UTF-8; the dispatcher keys its listeners by String event names.
         let event_name = String::from_utf8_lossy(&event_name).into_owned();
         let entry = match &params {
-            PluginValue::String(method) => {
-                SubscribedEventEntry::Method(String::from_utf8_lossy(method).into_owned())
-            }
+            PluginValue::String(method) => SubscribedEventEntry::Method(method.clone()),
             PluginValue::List(items) => match items.first() {
                 Some(PluginValue::String(method)) => SubscribedEventEntry::MethodWithPriority(
-                    String::from_utf8_lossy(method).into_owned(),
+                    method.clone(),
                     decode_listener_priority(class, items.get(1))?,
                 ),
                 _ => {
@@ -3291,7 +3294,7 @@ fn decode_subscribed_events(
                             return Err(subscribed_events_shape_error(class, &params));
                         };
                         listeners.push((
-                            String::from_utf8_lossy(method).into_owned(),
+                            method.clone(),
                             decode_listener_priority(class, pair.get(1))?,
                         ));
                     }
@@ -4267,5 +4270,53 @@ impl shirabe_php_shim::PhpClass for PhpCommandProxy {
 impl Drop for PhpCommandProxy {
     fn drop(&mut self) {
         let _ = release_php_handle(self.handle.phandle);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_listener_method_name_that_is_not_utf8_keeps_its_bytes() {
+        let method = BString::from(b"on\xffEvent".as_slice());
+        let events = decode_subscribed_events(
+            "Plugin",
+            PluginValue::Array(IndexMap::from([
+                (BString::from("a"), PluginValue::String(method.clone())),
+                (
+                    BString::from("b"),
+                    PluginValue::List(vec![
+                        PluginValue::String(method.clone()),
+                        PluginValue::Int(1),
+                    ]),
+                ),
+                (
+                    BString::from("c"),
+                    PluginValue::List(vec![PluginValue::List(vec![PluginValue::String(
+                        method.clone(),
+                    )])]),
+                ),
+            ])),
+        )
+        .unwrap();
+        assert!(matches!(&events["a"], SubscribedEventEntry::Method(m) if *m == method));
+        assert!(
+            matches!(&events["b"], SubscribedEventEntry::MethodWithPriority(m, Some(1)) if *m == method)
+        );
+        assert!(matches!(&events["c"], SubscribedEventEntry::Methods(l) if l[0].0 == method));
+    }
+
+    #[test]
+    fn a_subclass_name_that_is_not_utf8_is_not_constructed() {
+        // `static::class` of a plugin's subclass of a proxied class.
+        let class =
+            PluginValue::String(BString::from(b"Composer\\Package\\Package\xff".as_slice()));
+        let throw = construct_entity(&[class, PluginValue::List(Vec::new())]).unwrap_err();
+        assert!(
+            throw
+                .message
+                .starts_with("Shirabe does not support constructing")
+        );
     }
 }

@@ -3,6 +3,7 @@
 //! fields as a PHP-serialized list. See `docs/dev/php-rpc.md`.
 
 use crate::value::{self, PluginValue};
+use bstr::BString;
 use indexmap::IndexMap;
 use std::io::{Read as _, Write as _};
 use std::os::unix::net::UnixStream;
@@ -45,7 +46,7 @@ pub enum Frame {
     CallPhpMethod {
         corr_id: u64,
         phandle: u64,
-        method_name: String,
+        method_name: BString,
         args: Vec<PluginValue>,
         out_param_positions: Vec<u32>,
     },
@@ -156,7 +157,7 @@ impl Frame {
                 ..
             } => vec![
                 int_value(*phandle),
-                PluginValue::string(method_name.clone()),
+                PluginValue::String(method_name.clone()),
                 PluginValue::List(args.clone()),
                 positions_value(out_param_positions),
             ],
@@ -296,7 +297,7 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
         TAG_CALL_PHP_METHOD => Frame::CallPhpMethod {
             corr_id,
             phandle: expect_id(next()),
-            method_name: expect_string(next()),
+            method_name: expect_bytes(next()),
             args: expect_list(next()),
             out_param_positions: expect_positions(next()),
         },
@@ -356,6 +357,13 @@ fn expect_string(value: PluginValue) -> String {
     match value {
         PluginValue::String(bytes) => String::from_utf8(bytes.into())
             .unwrap_or_else(|e| panic!("PHP RPC: protocol violation — non-UTF-8 name field: {e}")),
+        other => panic!("PHP RPC: protocol violation — expected a string field: {other:?}"),
+    }
+}
+
+fn expect_bytes(value: PluginValue) -> BString {
+    match value {
+        PluginValue::String(bytes) => bytes,
         other => panic!("PHP RPC: protocol violation — expected a string field: {other:?}"),
     }
 }

@@ -773,7 +773,7 @@ pub fn new_object(
 /// Calls `$obj->$method(...$args)` on a P-table entity in the worker.
 pub fn call_php_method(
     phandle: u64,
-    method: &str,
+    method: impl AsRef<[u8]>,
     args: Vec<PluginValue>,
     dispatcher: Option<&mut dyn RustMethodDispatcher>,
 ) -> anyhow::Result<Result<PluginValue, PhpThrow>> {
@@ -781,7 +781,7 @@ pub fn call_php_method(
         |corr_id| Frame::CallPhpMethod {
             corr_id,
             phandle,
-            method_name: method.to_string(),
+            method_name: method.as_ref().into(),
             args,
             out_param_positions: Vec::new(),
         },

@@ -662,8 +662,8 @@ fn test_dispatcher_remove_listener() {
             shirabe_php_rpc::PluginValue::PhpHandle(handle) => handle,
             other => panic!("the worker returned no object handle for the listener: {other:?}"),
         };
-    let listener = Callable::PhpMethod(this.clone(), "someMethod".to_string());
-    let listener2 = Callable::PhpMethod(this.clone(), "someMethod2".to_string());
+    let listener = Callable::PhpMethod(this.clone(), "someMethod".into());
+    let listener2 = Callable::PhpMethod(this.clone(), "someMethod2".into());
     let listener3 = Callable::String(
         "Composer\\Test\\EventDispatcher\\EventDispatcherTest::someMethod".to_string(),
     );

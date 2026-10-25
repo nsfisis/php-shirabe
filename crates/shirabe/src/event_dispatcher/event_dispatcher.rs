@@ -26,6 +26,7 @@ use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
@@ -63,7 +64,7 @@ pub enum Callable {
     Closure(std::rc::Rc<dyn Fn(&dyn EventInterface) -> PhpMixed>),
     /// `[$subscriber, $methodName]` array callable whose object half is a plugin entity in the
     /// PHP child process, registered through `addSubscriber`. Invoked over RPC.
-    PhpMethod(shirabe_php_rpc::PhpObjHandle, String),
+    PhpMethod(shirabe_php_rpc::PhpObjHandle, BString),
 }
 
 impl std::fmt::Debug for Callable {
@@ -408,7 +409,7 @@ impl EventDispatcher {
                     "is_callable",
                     vec![PluginValue::List(vec![
                         PluginValue::PhpHandle(handle.clone()),
-                        PluginValue::string(method_name.clone()),
+                        PluginValue::String(method_name.clone()),
                     ])],
                     Some(&mut PluginRpcDispatcher::default()),
                 ))?;

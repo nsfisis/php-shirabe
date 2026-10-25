@@ -1,14 +1,15 @@
 //! ref: composer/src/Composer/EventDispatcher/EventSubscriberInterface.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::PhpObjHandle;
 
 /// Represents one event's subscriber info: method name only, method+priority, or multiple handlers.
 #[derive(Debug)]
 pub enum SubscribedEventEntry {
-    Method(String),
-    MethodWithPriority(String, Option<i64>),
-    Methods(Vec<(String, Option<i64>)>),
+    Method(BString),
+    MethodWithPriority(BString, Option<i64>),
+    Methods(Vec<(BString, Option<i64>)>),
 }
 
 // The sole implementor is the PHP plugin proxy (plugins are the only subscribers in Composer
