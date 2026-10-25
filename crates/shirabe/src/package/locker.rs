@@ -61,9 +61,10 @@ impl Locker {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         lock_file: JsonFile,
         installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>>,
-        composer_file_contents: &str,
+        composer_file_contents: impl AsRef<[u8]>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
+        let composer_file_contents = composer_file_contents.as_ref();
         Self {
             lock_file,
             installation_manager,
@@ -83,7 +84,7 @@ impl Locker {
     }
 
     /// Returns the md5 hash of the sorted content of the composer file.
-    pub fn get_content_hash(composer_file_contents: &str) -> anyhow::Result<String> {
+    pub fn get_content_hash(composer_file_contents: impl AsRef<[u8]>) -> anyhow::Result<String> {
         let content = JsonFile::parse_json(Some(composer_file_contents), Some("composer.json"))?;
         let content_map: IndexMap<String, PhpMixed> = match &content {
             PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
@@ -632,8 +633,7 @@ impl Locker {
         >,
     ) -> anyhow::Result<()> {
         let contents = match file_get_contents(composer_json.get_path()) {
-            // TODO(bytes): get_content_hash parses the contents as a &str.
-            Ok(s) => String::from_utf8_lossy(&s).into_owned(),
+            Ok(s) => s,
             Err(_) => {
                 return Err(RuntimeException::new(format!(
                     "Unable to read {} contents to update the lock file hash.",

@@ -2257,11 +2257,9 @@ impl ApplicationHandle {
             // add non-standard scripts as own commands
             let file = Factory::get_composer_file().unwrap_or_default();
             if may_need_script_command && is_file(&file) && Filesystem::is_readable(&file) {
-                // TODO(bytes): json_decode_assoc takes the JSON as a &str.
-                let composer_json: PhpMixed = json_decode_assoc(&String::from_utf8_lossy(
-                    &file_get_contents(&file).unwrap_or_default(),
-                ))
-                .unwrap_or(PhpMixed::Null);
+                let composer_json: PhpMixed =
+                    json_decode_assoc(file_get_contents(&file).unwrap_or_default())
+                        .unwrap_or(PhpMixed::Null);
                 if let Some(arr) = composer_json.as_array()
                     && let Some(scripts) = arr.get("scripts").and_then(|v| v.as_array())
                 {

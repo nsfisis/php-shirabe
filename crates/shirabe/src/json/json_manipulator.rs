@@ -1301,7 +1301,7 @@ impl JsonManipulator {
         if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
             let key_capture = &self.contents[m.key_pos..m.value_end];
-            if json_decode_obj(&format!("{{{}}}", key_capture))?.is_null() {
+            if json_decode_obj(format!("{{{}}}", key_capture))?.is_null() {
                 return Ok(false);
             }
 
@@ -1375,7 +1375,7 @@ impl JsonManipulator {
         if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
             let removal = &self.contents[m.key_pos..m.value_end];
-            if json_decode_obj(&format!("{{{}}}", removal))?.is_null() {
+            if json_decode_obj(format!("{{{}}}", removal))?.is_null() {
                 return Ok(false);
             }
 

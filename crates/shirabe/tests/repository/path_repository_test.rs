@@ -293,15 +293,11 @@ fn test_reference_config() {
             package.get_dist_reference(),
             Some(hash(
                 "sha1",
-                &format!(
-                    "{}{}",
-                    // TODO(bytes)
-                    String::from_utf8_lossy(
-                        &file_get_contents(format!("{}/composer.json", dist_url))
-                            .unwrap_or_default()
-                    ),
-                    serialize(&PhpMixed::Array(options.clone()))
-                )
+                [
+                    file_get_contents(format!("{}/composer.json", dist_url)).unwrap_or_default(),
+                    serialize(&PhpMixed::Array(options.clone())).into_bytes(),
+                ]
+                .concat()
             ))
         );
     }

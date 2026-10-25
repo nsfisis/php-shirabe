@@ -68,19 +68,19 @@ pub fn json_encode_ex<T: serde::Serialize + ?Sized>(
 
 // PHP's `json_decode($s, true)`: JSON objects decode to associative arrays. Without
 // JSON_THROW_ON_ERROR it never throws, returning null on malformed input.
-pub fn json_decode_assoc(s: &str) -> anyhow::Result<PhpMixed> {
-    json_decode(s, true)
+pub fn json_decode_assoc(s: impl AsRef<[u8]>) -> anyhow::Result<PhpMixed> {
+    json_decode(s.as_ref(), true)
 }
 
 // PHP's `json_decode($s, false)`: JSON objects decode to stdClass-equivalent
 // `PhpMixed::Object` values. Without JSON_THROW_ON_ERROR it never throws, returning null on
 // malformed input.
-pub fn json_decode_obj(s: &str) -> anyhow::Result<PhpMixed> {
-    json_decode(s, false)
+pub fn json_decode_obj(s: impl AsRef<[u8]>) -> anyhow::Result<PhpMixed> {
+    json_decode(s.as_ref(), false)
 }
 
-fn json_decode(s: &str, assoc: bool) -> anyhow::Result<PhpMixed> {
-    let mut deserializer = serde_json::Deserializer::from_str(s);
+fn json_decode(s: &[u8], assoc: bool) -> anyhow::Result<PhpMixed> {
+    let mut deserializer = serde_json::Deserializer::from_slice(s);
     let Ok(value) = PhpMixedSeed { assoc }.deserialize(&mut deserializer) else {
         return Ok(PhpMixed::Null);
     };
@@ -171,5 +171,26 @@ impl<'de> Visitor<'de> for PhpMixedSeed {
         } else {
             PhpMixed::Object(data)
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn input_that_is_not_utf8_decodes_to_null() {
+        assert!(matches!(
+            json_decode_assoc(b"\"\xff\"").unwrap(),
+            PhpMixed::Null
+        ));
+        assert!(matches!(
+            json_decode_obj(b"{\"a\": \"\xc3\"}").unwrap(),
+            PhpMixed::Null
+        ));
+        assert!(matches!(
+            json_decode_assoc(b"\"\xc3\xa9\"").unwrap(),
+            PhpMixed::String(s) if s == "é"
+        ));
     }
 }

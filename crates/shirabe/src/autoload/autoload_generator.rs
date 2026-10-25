@@ -2021,7 +2021,7 @@ class ComposerStaticInit{}
 
     fn get_file_identifier(&self, package: PackageInterfaceHandle, path: &str) -> String {
         // TODO composer v3 change this to sha1 or xxh3? Possibly not worth the potential breakage though
-        hash("md5", &format!("{}:{}", package.get_name(), path))
+        hash("md5", format!("{}:{}", package.get_name(), path))
     }
 
     /// Filters out dev-dependencies

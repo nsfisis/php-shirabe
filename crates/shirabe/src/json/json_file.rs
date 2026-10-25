@@ -132,13 +132,13 @@ impl JsonFile {
     /// @throws ParsingException
     /// @throws \RuntimeException
     pub fn read(&self) -> anyhow::Result<PhpMixed> {
-        let json: Option<String> = match (|| -> anyhow::Result<Option<String>> {
+        let json: Option<Vec<u8>> = match (|| -> anyhow::Result<Option<Vec<u8>>> {
             if let Some(http_downloader) = &self.http_downloader {
                 Ok(http_downloader
                     .borrow_mut()
                     .get(&self.path, indexmap::IndexMap::new())?
                     .get_body()
-                    .map(|s| s.to_string()))
+                    .map(|s| s.as_bytes().to_vec()))
             } else {
                 if !Filesystem::is_readable(&self.path) {
                     return Err(RuntimeException::new(format!(
@@ -162,11 +162,7 @@ impl JsonFile {
                         io_interface::NORMAL,
                     );
                 }
-                // TODO(bytes): the JSON text travels as a String, as it does on the
-                // HttpDownloader branch above.
-                Ok(file_get_contents(&self.path)
-                    .map(|c| String::from_utf8_lossy(&c).into_owned())
-                    .ok())
+                Ok(file_get_contents(&self.path).ok())
             }
         })() {
             Ok(j) => j,
@@ -199,7 +195,8 @@ impl JsonFile {
             }
         };
 
-        *self.indent.borrow_mut() = Self::detect_indenting(Some(&json));
+        // The indent is a run of spaces and tabs at a line start, which a lossy decode leaves intact.
+        *self.indent.borrow_mut() = Self::detect_indenting(Some(&String::from_utf8_lossy(&json)));
 
         Self::parse_json(Some(&json), Some(&self.path))
     }
@@ -304,12 +301,10 @@ impl JsonFile {
             ))
             .into());
         }
-        // TODO(bytes): json_decode_obj and validate_syntax take the JSON as a &str.
-        let content = String::from_utf8_lossy(&file_get_contents(&self.path).unwrap_or_default())
-            .into_owned();
+        let content = file_get_contents(&self.path).unwrap_or_default();
         let data = json_decode_obj(&content)?;
 
-        if matches!(data, PhpMixed::Null) && content != "null" {
+        if matches!(data, PhpMixed::Null) && content != b"null" {
             Self::validate_syntax(&content, Some(&self.path))?;
         }
 
@@ -467,10 +462,13 @@ impl JsonFile {
     /// @param string $file the json file
     ///
     /// @throws ParsingException
-    pub fn parse_json(json: Option<&str>, file: Option<&str>) -> anyhow::Result<PhpMixed> {
-        let json = match json {
+    pub fn parse_json(
+        json: Option<impl AsRef<[u8]>>,
+        file: Option<&str>,
+    ) -> anyhow::Result<PhpMixed> {
+        let json = match &json {
             None => return Ok(PhpMixed::Null),
-            Some(j) => j,
+            Some(j) => j.as_ref(),
         };
         let mut data = json_decode_assoc(json)?;
         // PHP: `null === $data && JSON_ERROR_NONE !== json_last_error()`, i.e. the decode produced
@@ -478,10 +476,13 @@ impl JsonFile {
         // json_decode_assoc swallows the error into PhpMixed::Null, so detect the failure by
         // comparing the source against `null`, mirroring validateSchema's own
         // `'null' !== $content` check.
-        if matches!(data, PhpMixed::Null) && json != "null" {
+        if matches!(data, PhpMixed::Null) && json != b"null" {
             // attempt resolving simple conflicts in lock files so that one can run `composer update --lock` and get a valid lock file
+            // TODO(bytes): preg_replace2 matches over a &str, so input that is not UTF-8 skips
+            // this; PHP still resolves a conflict whose marker lines hold the only invalid bytes.
             if let Some(file) = file
                 && file.ends_with(".lock")
+                && let Ok(json) = std::str::from_utf8(json)
                 && json.contains("\"content-hash\"")
             {
                 let mut count: usize = 0;
@@ -513,20 +514,21 @@ impl JsonFile {
     /// @throws \UnexpectedValueException
     /// @throws ParsingException
     /// @return bool                      true on success
-    fn validate_syntax(json: &str, file: Option<&str>) -> anyhow::Result<bool> {
+    fn validate_syntax(json: &[u8], file: Option<&str>) -> anyhow::Result<bool> {
+        // PHP's linter checks the syntax byte-wise and leaves the encoding to the json_decode()
+        // that ran before. A lossy decode keeps the syntax and the line numbers intact, so it
+        // stands in for the former, and the UTF-8 check below for the latter.
+        let lossy = String::from_utf8_lossy(json);
         // TODO(php-semantics): make json_decode() returns an error object with details.
-        let error = match serde_json::from_str::<serde_json::Value>(json) {
+        let error = match serde_json::from_str::<serde_json::Value>(&lossy) {
             Ok(_) => {
-                // TODO(bytes): Rust's &str is guaranteed as UTF-8, but PHP string is not. Change `json`
-                // to &BStr and check UTF-8 validity here.
-
-                // if (defined('JSON_ERROR_UTF8') && JSON_ERROR_UTF8 === json_last_error()) {
-                //     if ($file === null) {
-                //         throw new \UnexpectedValueException('The input is not UTF-8, could not parse as JSON');
-                //     } else {
-                //         throw new \UnexpectedValueException('"' . $file . '" is not UTF-8, could not parse as JSON');
-                //     }
-                // }
+                if std::str::from_utf8(json).is_err() {
+                    return Err(UnexpectedValueException::new(match file {
+                        None => "The input is not UTF-8, could not parse as JSON".to_string(),
+                        Some(file) => format!("\"{file}\" is not UTF-8, could not parse as JSON"),
+                    })
+                    .into());
+                }
 
                 return Ok(true);
             }
@@ -582,5 +584,27 @@ impl jsonschema::Retrieve for SchemaRetriever {
             }
             scheme => Err(format!("Unknown scheme {scheme}").into()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Expected values are the output of PHP 8.5.9 running Composer's JsonFile::parseJson().
+    #[test]
+    fn input_that_is_not_utf8_is_rejected_as_php_rejects_it() {
+        let err = JsonFile::parse_json(Some(b"{\"a\": \"\xff\"}"), Some("x.json")).unwrap_err();
+        assert!(err.is_instanceof::<UnexpectedValueException>());
+        assert_eq!(
+            err.to_string(),
+            "\"x.json\" is not UTF-8, could not parse as JSON"
+        );
+
+        let err = JsonFile::parse_json(Some(b"{\"a\": 1\xff}"), Some("x.json")).unwrap_err();
+        assert!(err.is_instanceof::<ParsingException>());
+
+        let err = JsonFile::parse_json(Some(b"\xff"), Some("x.json")).unwrap_err();
+        assert!(err.is_instanceof::<ParsingException>());
     }
 }

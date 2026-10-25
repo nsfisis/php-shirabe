@@ -50,7 +50,7 @@ impl MultiConflictRule {
             .map(|l| l.to_string())
             .collect::<Vec<_>>()
             .join(",");
-        let binary = hash_raw("xxh3", &format!("c:{}", joined));
+        let binary = hash_raw("xxh3", format!("c:{}", joined));
         match binary.get(..4) {
             Some(chunk) => Ok(i32::from_ne_bytes(chunk.try_into().unwrap()) as i64),
             None => Err(RuntimeException::new(format!("Failed unpacking: {}", joined)).into()),

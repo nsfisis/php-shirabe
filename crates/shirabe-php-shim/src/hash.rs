@@ -1,12 +1,12 @@
 use crate::bin2hex;
 use sha1::Digest as _;
 
-pub fn hash(algo: &str, data: &str) -> String {
-    crate::bin2hex(&calculate_hash(algo, data.as_bytes()))
+pub fn hash(algo: &str, data: impl AsRef<[u8]>) -> String {
+    crate::bin2hex(&calculate_hash(algo, data.as_ref()))
 }
 
-pub fn hash_raw(algo: &str, data: &str) -> Vec<u8> {
-    calculate_hash(algo, data.as_bytes())
+pub fn hash_raw(algo: &str, data: impl AsRef<[u8]>) -> Vec<u8> {
+    calculate_hash(algo, data.as_ref())
 }
 
 pub fn hash_file(algo: &str, filename: impl AsRef<std::path::Path>) -> Option<String> {

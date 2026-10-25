@@ -184,11 +184,7 @@ impl PathRepository {
                 continue;
             }
 
-            // TODO(bytes): JsonFile::parse_json takes the JSON as a &str.
-            let json = String::from_utf8_lossy(
-                &file_get_contents(&composer_file_path).unwrap_or_default(),
-            )
-            .into_owned();
+            let json = file_get_contents(&composer_file_path).unwrap_or_default();
             let parsed = JsonFile::parse_json(Some(&json), Some(&composer_file_path))?;
             let mut package: IndexMap<String, PhpMixed> = match parsed {
                 PhpMixed::Array(m) => m.into_iter().collect(),
@@ -219,7 +215,10 @@ impl PathRepository {
                         .map(|(k, v)| (k.clone(), v.clone()))
                         .collect(),
                 );
-                let ref_hash = hash("sha1", &format!("{}{}", json, serialize(&options_mixed)));
+                let ref_hash = hash(
+                    "sha1",
+                    [json.as_slice(), serialize(&options_mixed).as_bytes()].concat(),
+                );
                 if let Some(PhpMixed::Array(dist)) = package.get_mut("dist") {
                     dist.insert("reference".to_string(), PhpMixed::String(ref_hash));
                 }

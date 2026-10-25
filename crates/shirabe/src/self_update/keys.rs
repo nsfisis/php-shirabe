@@ -10,7 +10,7 @@ impl Keys {
         let content = std::fs::read_to_string(path)?;
         let re = Regex::new(r"\s").unwrap();
         let cleaned = re.replace_all(&content, "");
-        let hash = hash("sha256", &cleaned).to_uppercase();
+        let hash = hash("sha256", cleaned.as_bytes()).to_uppercase();
 
         Ok([
             &hash[0..8],

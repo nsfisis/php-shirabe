@@ -313,7 +313,7 @@ impl FileDownloader {
                     .unwrap_or(""),
                 hash(
                     "md5",
-                    &format!("{}{}", package, spl_object_hash(&PhpMixed::Null))
+                    format!("{}{}", package, spl_object_hash(&PhpMixed::Null))
                 ),
                 extension
             ),
