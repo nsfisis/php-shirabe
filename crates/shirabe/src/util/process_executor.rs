@@ -242,7 +242,7 @@ impl ProcessExecutor {
                     let mut io = self.io.clone();
                     let callback = move |r#type: &str, buffer: &str| {
                         Self::output_handler(capture_output, &mut io, r#type, buffer);
-                        false
+                        Ok(false)
                     };
                     process.run(Some(Box::new(callback)), IndexMap::new())?;
                     if self.capture_output.get() {
@@ -435,10 +435,10 @@ impl ProcessExecutor {
         match output.to_callback() {
             Ok(mut callback) => {
                 if !stdout.is_empty() {
-                    callback(Process::OUT, &stdout);
+                    callback(Process::OUT, &stdout)?;
                 }
                 if !stderr.is_empty() {
-                    callback(Process::ERR, &stderr);
+                    callback(Process::ERR, &stderr)?;
                 }
             }
             Err(mut out) => {
@@ -952,7 +952,7 @@ impl<const N: usize> IntoExecCommand for &[String; N] {
 /// | `execute($cmd, $out)` | assign captured output back to `$out` | `&mut String` / `&mut PhpMixed` | `true` |
 /// | `execute($cmd, $out)` where `$out` is unused | capture (suppress output) but discard it | `()` | `true` |
 /// | `execute($cmd, $out)` from a plugin | capture, recording whether it was assigned | `&mut Option<String>` | `true` |
-/// | `execute($cmd, $cb)` | drive the child through the callback | `Box<dyn FnMut(&str, &str) -> bool>` | `false` |
+/// | `execute($cmd, $cb)` | drive the child through the callback | `Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>` | `false` |
 ///
 /// `capture_output` maps to PHP's `$this->captureOutput` (`func_num_args() > 3` in `doExecute`): when
 /// `true`, `outputHandler` swallows the child output instead of echoing it, and the full output is
@@ -969,7 +969,9 @@ pub trait IntoExecOutput<'a>: Sized {
     /// `Ok(callback)` for a user-supplied output handler (passed straight to `Process::run`),
     /// `Err(self)` for the capture/forward cases (a default handler is used and `self` is returned
     /// so the captured output can still be written back).
-    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self>;
+    fn to_callback(
+        self,
+    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self>;
 
     /// Assigns the captured output back to the by-reference target, mirroring PHP's
     /// `$output = $process->getOutput()`. Only meaningful when [`capture_output`](Self::capture_output)
@@ -984,7 +986,9 @@ impl<'a> IntoExecOutput<'a> for () {
         true
     }
 
-    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+    fn to_callback(
+        self,
+    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self> {
         Err(self)
     }
 
@@ -998,7 +1002,9 @@ impl<'a> IntoExecOutput<'a> for ProcessForwardOutput {
         false
     }
 
-    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+    fn to_callback(
+        self,
+    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self> {
         Err(self)
     }
 
@@ -1012,7 +1018,9 @@ impl<'a> IntoExecOutput<'a> for &'a mut PhpMixed {
         true
     }
 
-    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+    fn to_callback(
+        self,
+    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self> {
         Err(self)
     }
 
@@ -1028,7 +1036,9 @@ impl<'a> IntoExecOutput<'a> for &'a mut String {
         true
     }
 
-    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+    fn to_callback(
+        self,
+    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self> {
         Err(self)
     }
 
@@ -1045,7 +1055,9 @@ impl<'a> IntoExecOutput<'a> for &'a mut Option<String> {
         true
     }
 
-    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+    fn to_callback(
+        self,
+    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self> {
         Err(self)
     }
 
@@ -1057,12 +1069,14 @@ impl<'a> IntoExecOutput<'a> for &'a mut Option<String> {
 /// `execute($cmd, $cb)` where `$cb` is callable: the callback is passed straight to `Process::run`
 /// as the output handler, so the caller drives the child's output itself (e.g. `Svn`'s streaming
 /// handler). The `bool` return mirrors Symfony's ignored callback return value.
-impl<'a> IntoExecOutput<'a> for Box<dyn FnMut(&str, &str) -> bool> {
+impl<'a> IntoExecOutput<'a> for Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>> {
     fn capture_output(&self) -> bool {
         false
     }
 
-    fn to_callback(self) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> bool>, Self> {
+    fn to_callback(
+        self,
+    ) -> anyhow::Result<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>, Self> {
         Ok(self)
     }
 

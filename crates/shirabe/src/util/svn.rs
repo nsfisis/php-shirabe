@@ -137,13 +137,13 @@ impl Svn {
             std::rc::Rc::new(std::cell::RefCell::new(None));
         let io = self.io.clone();
         let output_for_handler = output.clone();
-        let handler: Box<dyn FnMut(&str, &str) -> bool> =
+        let handler: Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>> =
             Box::new(move |r#type: &str, buffer: &str| {
                 if r#type != "out" {
-                    return false;
+                    return Ok(false);
                 }
                 if strpos(buffer, "Redirecting to URL ") == Some(0) {
-                    return false;
+                    return Ok(false);
                 }
                 output_for_handler
                     .borrow_mut()
@@ -152,7 +152,7 @@ impl Svn {
                 if verbose {
                     io.borrow().write_error2(buffer, false);
                 }
-                false
+                Ok(false)
             });
         let status = self
             .process

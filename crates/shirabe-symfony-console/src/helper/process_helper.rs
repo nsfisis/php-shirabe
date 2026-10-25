@@ -138,12 +138,13 @@ impl ProcessHelper {
                 ProcessHelperCmdElement::Process(_) => None,
             })
             .collect();
-        let callback: Option<Box<dyn FnMut(&str, &str) -> bool>> = callback.map(|mut cb| {
-            Box::new(move |r#type: &str, buffer: &str| -> bool {
-                cb(r#type, buffer);
-                false
-            }) as Box<dyn FnMut(&str, &str) -> bool>
-        });
+        let callback: Option<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>> =
+            callback.map(|mut cb| {
+                Box::new(move |r#type: &str, buffer: &str| -> anyhow::Result<bool> {
+                    cb(r#type, buffer);
+                    Ok(false)
+                }) as Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>
+            });
         process.run(callback, env)?;
 
         if verbosity <= output.borrow().get_verbosity() {

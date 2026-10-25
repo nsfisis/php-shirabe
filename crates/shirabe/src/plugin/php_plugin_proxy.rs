@@ -1353,16 +1353,13 @@ fn dispatch_process_executor_method(
             };
             if is_php_callable(output).map_err(failed)? {
                 let callable = output.clone();
-                let callback: Box<dyn FnMut(&str, &str) -> bool> =
+                let callback: Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>> =
                     Box::new(move |r#type: &str, buffer: &str| {
-                        // TODO(error-model): `Process::run`'s callback cannot fail, so a throw
-                        // raised by the plugin's handler is dropped here rather than unwinding
-                        // out of the command the way PHP would.
-                        let _ = call_php_callable(
+                        call_php_callable(
                             &callable,
                             vec![PluginValue::string(r#type), PluginValue::string(buffer)],
-                        );
-                        false
+                        )?;
+                        Ok(false)
                     });
                 return process
                     .borrow()

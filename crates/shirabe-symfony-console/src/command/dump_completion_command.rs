@@ -125,7 +125,7 @@ impl DumpCompletionCommand {
                     false,
                     output_interface::OUTPUT_NORMAL,
                 );
-                false
+                Ok(false)
             })),
             indexmap::IndexMap::new(),
         )?;

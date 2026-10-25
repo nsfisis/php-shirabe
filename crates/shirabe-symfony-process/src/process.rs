@@ -17,12 +17,13 @@ use shirabe_php_shim::{
 };
 use std::sync::OnceLock;
 
-/// A user-supplied callback invoked with the output type ("out"/"err") and a chunk of output.
-pub type UserCallback = Box<dyn FnMut(&str, &str) -> bool>;
+/// A user-supplied callback invoked with the output type ("out"/"err") and a chunk of output. An
+/// error it returns is the exception PHP lets unwind out of `readPipes()`.
+pub type UserCallback = Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>;
 
 /// The callback built by `build_callback`. It receives the owning Process so it can append output
 /// to the internal buffers, mirroring the `$this`-capturing closure produced in PHP.
-type ProcessCallback = Box<dyn FnMut(&mut Process, &str, &str) -> bool>;
+type ProcessCallback = Box<dyn FnMut(&mut Process, &str, &str) -> anyhow::Result<bool>>;
 
 /// PHP `$this->commandline` is `array|string`.
 #[derive(Debug, Clone)]
@@ -47,6 +48,14 @@ pub struct ProcessMock {
 /// start independent PHP processes.
 pub struct Process {
     callback: Option<ProcessCallback>,
+    /// The error the callback returned while the pipes were read, held until a fallible method
+    /// can return it. The callback is not called again while one is held.
+    ///
+    /// TODO(error-model): PHP throws it out of whichever method read the pipes, including
+    /// `isRunning()`, `isTerminated()`, `getStatus()` and `getExitCode()`. Those return no
+    /// `Result` here, so an error raised under them surfaces at the next `start()`, `wait()` or
+    /// output read instead.
+    callback_error: Option<anyhow::Error>,
     commandline: CommandLine,
     cwd: Option<String>,
     env: IndexMap<String, PhpMixed>,
@@ -173,6 +182,7 @@ impl Process {
 
         Self {
             callback: None,
+            callback_error: None,
             commandline: CommandLine::Array(Vec::new()),
             cwd: None,
             env: IndexMap::new(),
@@ -359,6 +369,7 @@ impl Process {
         }
 
         self.update_status(false);
+        self.take_callback_error()?;
         self.check_timeout()?;
         Ok(())
     }
@@ -368,6 +379,7 @@ impl Process {
         self.require_process_is_started("wait")?;
 
         self.update_status(false);
+        self.take_callback_error()?;
 
         if let Some(callback) = callback {
             self.callback = Some(self.build_callback(Some(callback)));
@@ -377,16 +389,20 @@ impl Process {
             self.check_timeout()?;
             let running = self.is_running()
                 && (cfg!(windows) || self.process_pipes.as_ref().unwrap().are_open());
+            self.take_callback_error()?;
             self.read_pipes(running, !cfg!(windows) || !running);
+            self.take_callback_error()?;
             if !running {
                 break;
             }
         }
 
         while self.is_running() {
+            self.take_callback_error()?;
             self.check_timeout()?;
             shirabe_php_shim::usleep(1000);
         }
+        self.take_callback_error()?;
 
         let signaled = self
             .process_information
@@ -766,7 +782,7 @@ impl Process {
         let out = Self::OUT;
 
         Box::new(
-            move |this: &mut Process, r#type: &str, data: &str| -> bool {
+            move |this: &mut Process, r#type: &str, data: &str| -> anyhow::Result<bool> {
                 if out == r#type {
                     this.add_output(data);
                 } else {
@@ -775,7 +791,7 @@ impl Process {
 
                 match callback.as_mut() {
                     Some(cb) => cb(r#type, data),
-                    None => false,
+                    None => Ok(false),
                 }
             },
         )
@@ -810,7 +826,15 @@ impl Process {
         self.require_process_is_started(caller)?;
 
         self.update_status(blocking);
-        Ok(())
+        self.take_callback_error()
+    }
+
+    /// Returns the error the callback raised under a method that could not return it.
+    fn take_callback_error(&mut self) -> anyhow::Result<()> {
+        match self.callback_error.take() {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
     }
 
     /// Validates and returns the filtered timeout.
@@ -839,8 +863,11 @@ impl Process {
 
         let mut callback = self.callback.take();
         for (r#type, data) in result {
-            if let Some(cb) = callback.as_mut() {
-                cb(
+            if self.callback_error.is_some() {
+                break;
+            }
+            if let Some(cb) = callback.as_mut()
+                && let Err(error) = cb(
                     self,
                     if Self::STDOUT == r#type {
                         Self::OUT
@@ -848,7 +875,9 @@ impl Process {
                         Self::ERR
                     },
                     &data,
-                );
+                )
+            {
+                self.callback_error = Some(error);
             }
         }
         self.callback = callback;

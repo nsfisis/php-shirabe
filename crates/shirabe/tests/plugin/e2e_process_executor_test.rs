@@ -73,6 +73,7 @@ failing code=3 output=\"out\\n\" error=\"err\\n\"
 forwarded code=0 file=\"forwarded\"
 callback code=0 seen=[\"out:through-a-callback\"] argument=true
 reentrant code=0 nested=[\"outer code=0 output=\\\"inner\\\\n\\\" error=\\\"inner-err\\\\n\\\"\"] error=\"\"
+throwing caught=RuntimeException message=\"from the callback: first\" code=7 calls=1
 cwd code=0 basename=\"vendor\"
 splitLines code=0 lines=[\"x\",\"y\"] empty=[]
 escape=\"'a b'\\\\''c'\"

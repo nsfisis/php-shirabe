@@ -99,6 +99,20 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         $lines[] = 'reentrant code=' . $code . ' nested=' . json_encode($nested)
             . ' error=' . json_encode($process->getErrorOutput());
 
+        // A throw from the callback unwinds out of execute() before the rest of the output.
+        $calls = 0;
+        $throwing = static function (string $type, string $buffer) use (&$calls): void {
+            $calls++;
+            throw new \RuntimeException('from the callback: ' . trim($buffer), 7);
+        };
+        try {
+            $process->execute('echo first; sleep 0.2; echo second', $throwing);
+            $lines[] = 'throwing returned';
+        } catch (\Exception $e) {
+            $lines[] = 'throwing caught=' . get_class($e) . ' message=' . json_encode($e->getMessage())
+                . ' code=' . $e->getCode() . ' calls=' . $calls;
+        }
+
         $code = $process->execute('pwd', $cwdOutput, 'vendor');
         $lines[] = 'cwd code=' . $code . ' basename=' . json_encode(basename(trim((string) $cwdOutput)));
 
