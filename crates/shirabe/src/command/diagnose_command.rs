@@ -227,7 +227,7 @@ impl DiagnoseCommand {
 
                     result_list.push(format!(
                         "<error>[{}] {}</error>",
-                        AnyThrowable::of(e.as_ref())
+                        AnyThrowable::of(&e)
                             .expect("the catch above proved the error carries a \\Throwable")
                             .php_class_name(),
                         te.get_message()
@@ -286,7 +286,7 @@ impl DiagnoseCommand {
 
                     result_list.push(format!(
                         "<error>[{}] {}</error>",
-                        AnyThrowable::of(e.as_ref())
+                        AnyThrowable::of(&e)
                             .expect("the catch above proved the error carries a \\Throwable")
                             .php_class_name(),
                         te.get_message()
@@ -440,7 +440,7 @@ impl DiagnoseCommand {
                 }
                 Ok(CheckResult::Message(format!(
                     "<error>[{}] {}</error>",
-                    AnyThrowable::of(e.as_ref())
+                    AnyThrowable::of(&e)
                         .expect("PHP reaches this only with a caught \\Throwable")
                         .php_class_name(),
                     e
@@ -595,7 +595,7 @@ impl DiagnoseCommand {
             Err(e) => {
                 return Ok(CheckResult::Message(format!(
                     "<error>[{}] {}</error>",
-                    AnyThrowable::of(e.as_ref())
+                    AnyThrowable::of(&e)
                         .expect("PHP reaches this only with a caught \\Throwable")
                         .php_class_name(),
                     e
@@ -1447,7 +1447,7 @@ impl Command for DiagnoseCommand {
                 } else {
                     CheckResult::Message(format!(
                         "<error>[{}] {}</error>",
-                        AnyThrowable::of(e.as_ref())
+                        AnyThrowable::of(&e)
                             .expect("PHP reaches this only with a caught \\Throwable")
                             .php_class_name(),
                         e
@@ -1492,7 +1492,7 @@ impl Command for DiagnoseCommand {
                         } else {
                             self.output_result(CheckResult::Message(format!(
                                 "<error>[{}] {}</error>",
-                                AnyThrowable::of(e.as_ref())
+                                AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
                                     .php_class_name(),
                                 e
@@ -1501,7 +1501,7 @@ impl Command for DiagnoseCommand {
                     } else {
                         self.output_result(CheckResult::Message(format!(
                             "<error>[{}] {}</error>",
-                            AnyThrowable::of(e.as_ref())
+                            AnyThrowable::of(&e)
                                 .expect("PHP reaches this only with a caught \\Throwable")
                                 .php_class_name(),
                             e

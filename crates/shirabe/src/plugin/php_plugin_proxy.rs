@@ -3057,7 +3057,7 @@ fn runtime_throw(message: String) -> PhpThrow {
 /// would catch under Composer; one carrying no exception keeps the `RuntimeException` shape,
 /// with `context` naming the call that failed.
 fn error_throw(context: &str, error: &anyhow::Error) -> PhpThrow {
-    let Some(exception) = AnyThrowable::of(error.as_ref()) else {
+    let Some(exception) = AnyThrowable::of(error) else {
         return runtime_throw(format!("{context}: {error:#}"));
     };
     PhpThrow {

@@ -157,7 +157,7 @@ pub trait VcsDownloader:
                         self.io().write_error3(
                             &format!(
                                 "Failed: [{}] {}",
-                                AnyThrowable::of(e.as_ref())
+                                AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
                                     .php_class_name(),
                                 e
@@ -267,7 +267,7 @@ pub trait VcsDownloader:
                         self.io().write_error3(
                             &format!(
                                 "Failed: [{}] {}",
-                                AnyThrowable::of(e.as_ref())
+                                AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
                                     .php_class_name(),
                                 e
@@ -339,7 +339,7 @@ pub trait VcsDownloader:
                         self.io().write_error3(
                             &format!(
                                 "Failed: [{}] {}",
-                                AnyThrowable::of(e.as_ref())
+                                AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
                                     .php_class_name(),
                                 e

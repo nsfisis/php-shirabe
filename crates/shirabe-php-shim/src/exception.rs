@@ -93,11 +93,9 @@ impl AnyThrowable {
         Self(Box::new(exception))
     }
 
-    /// The exception a Rust error carries, or `None` if it carries none.
-    // TODO(error-model): this matches only an error that *is* the exception, where [`Catch`]'s
-    // `anyhow::Error` impl also sees one behind an `anyhow::Context` layer. Nothing in the port
-    // adds context to an error yet, so an exception wrapped that way would go silently unseen.
-    pub fn of<'e>(error: &'e (dyn std::error::Error + 'static)) -> Option<&'e Self> {
+    /// The exception a Rust error carries, or `None` if it carries none. Like [`Catch`], this sees
+    /// an exception behind an `anyhow::Context` layer.
+    pub fn of(error: &anyhow::Error) -> Option<&Self> {
         error.downcast_ref::<Self>()
     }
 
@@ -498,6 +496,17 @@ mod tests {
         assert!(error.catch::<Error>().is_some());
         assert!(error.catch::<ThrowableFields>().is_some());
         assert!(error.catch::<Exception>().is_none());
+    }
+
+    #[test]
+    fn of_sees_an_exception_behind_a_context_layer() {
+        let error: anyhow::Error = RuntimeException::with_code("boom".to_string(), 3).into();
+        let error = error.context("while doing something");
+
+        assert_eq!(
+            AnyThrowable::of(&error).map(AnyThrowable::get_code),
+            Some(3)
+        );
     }
 
     #[test]

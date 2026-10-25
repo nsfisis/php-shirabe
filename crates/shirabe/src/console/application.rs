@@ -57,11 +57,11 @@ use crate::util::Silencer;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    LogicException as ShimLogicException, PhpMixed, RuntimeException, bin2hex, chdir, defined,
-    dirname, disk_free_space, extension_loaded, file_exists, file_get_contents, file_put_contents,
-    function_exists, getcwd, getmypid, glob, ini_set, is_array, is_dir, is_file, is_string,
-    json_decode_assoc, memory_get_peak_usage, memory_get_usage, microtime, php_regex, php_uname,
-    posix_getuid, preg_grep, preg_match, preg_quote, preg_split, random_bytes, realpath,
+    AnyThrowable, LogicException as ShimLogicException, PhpMixed, RuntimeException, bin2hex, chdir,
+    defined, dirname, disk_free_space, extension_loaded, file_exists, file_get_contents,
+    file_put_contents, function_exists, getcwd, getmypid, glob, ini_set, is_array, is_dir, is_file,
+    is_string, json_decode_assoc, memory_get_peak_usage, memory_get_usage, microtime, php_regex,
+    php_uname, posix_getuid, preg_grep, preg_match, preg_quote, preg_split, random_bytes, realpath,
     restore_error_handler, round, str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
@@ -492,7 +492,7 @@ impl Application {
             Ok(()) => {}
             Err(e) => {
                 // Errors must be ignored, full binding/validation happens later when the command is known.
-                if !throwable_is_exception_interface(e.as_ref()) {
+                if !throwable_is_exception_interface(AnyThrowable::of(&e)) {
                     return Err(e);
                 }
             }
@@ -1305,18 +1305,17 @@ impl Application {
         e: &anyhow::Error,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
-        // do { ... } while ($e = $e->getPrevious());
-        // PHP walks getPrevious(); anyhow models the exception chain as the source chain, which
-        // `anyhow::Error::chain()` yields head-first.
-        for e in e.chain() {
+        let mut current = Some(e);
+        while let Some(e) = current {
+            let exception = AnyThrowable::of(e);
             let message = shirabe_php_shim::trim(&e.to_string(), None);
             let verbosity = output.borrow().get_verbosity();
 
             let mut len;
             let mut title = String::new();
             if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
-                let class = throwable_debug_type(e);
-                let code = throwable_get_code(e);
+                let class = throwable_debug_type(exception);
+                let code = throwable_get_code(exception);
                 title = format!(
                     "  [{}{}]  ",
                     class,
@@ -1357,7 +1356,7 @@ impl Application {
             }
 
             let mut messages: Vec<String> = Vec::new();
-            if !throwable_is_exception_interface(e)
+            if !throwable_is_exception_interface(exception)
                 || output_interface::VERBOSITY_VERBOSE <= verbosity
             {
                 // TODO(error-model): anyhow::Error carries no PHP file/line, so getFile()/getLine() take
@@ -1400,6 +1399,8 @@ impl Application {
             // PHP renders the `Exception trace:` block (getTrace()) at -v or higher. A PHP backtrace
             // has no faithful Rust equivalent, so this block is intentionally never ported; verbose
             // output simply omits the trace.
+
+            current = exception.and_then(AnyThrowable::get_previous);
         }
     }
 
@@ -2664,7 +2665,7 @@ impl ApplicationHandle {
 
                 // $exitCode = $e->getCode();
                 // is_numeric($exitCode) ? max(1, (int) $exitCode) : 1
-                let exit_code = throwable_get_code(e.as_ref()) as i32;
+                let exit_code = throwable_get_code(AnyThrowable::of(&e)) as i32;
                 if shirabe_php_shim::is_numeric_string(&exit_code.to_string()) {
                     if exit_code <= 0 { 1 } else { exit_code }
                 } else {
@@ -2703,7 +2704,7 @@ impl ApplicationHandle {
             Ok(()) => {}
             Err(e) => {
                 // Errors must be ignored, full binding/validation happens later when the command is known.
-                if !throwable_is_exception_interface(e.as_ref()) {
+                if !throwable_is_exception_interface(AnyThrowable::of(&e)) {
                     return Err(e);
                 }
             }
@@ -2930,8 +2931,8 @@ impl BaseApplication for Application {
 // TODO(plugin): a plugin can throw an exception class of its own that implements
 // ExceptionInterface, and no enumeration on this side can name it. Answering that needs the
 // interfaces a thrown exception implements, not just its superclasses.
-fn throwable_is_exception_interface(e: &(dyn std::error::Error + 'static)) -> bool {
-    shirabe_php_shim::AnyThrowable::of(e).is_some_and(|e| {
+fn throwable_is_exception_interface(e: Option<&AnyThrowable>) -> bool {
+    e.is_some_and(|e| {
         e.is_instanceof::<CommandNotFoundException>()
             || e.is_instanceof::<NamespaceNotFoundException>()
             || e.is_instanceof::<ConsoleLogicException>()
@@ -2942,16 +2943,16 @@ fn throwable_is_exception_interface(e: &(dyn std::error::Error + 'static)) -> bo
     })
 }
 
-/// PHP's `$e->getCode()` for a node of the source chain; everything the port does not recognize as
-/// an exception defaults to PHP's 0.
-fn throwable_get_code(e: &(dyn std::error::Error + 'static)) -> i64 {
-    shirabe_php_shim::AnyThrowable::of(e).map_or(0, shirabe_php_shim::AnyThrowable::get_code)
+/// PHP's `$e->getCode()`; everything the port does not recognize as an exception defaults to PHP's
+/// 0.
+fn throwable_get_code(e: Option<&AnyThrowable>) -> i64 {
+    e.map_or(0, AnyThrowable::get_code)
 }
 
 /// PHP's `get_debug_type($e)` for the title line, reached only when the message is empty or output
 /// is verbose.
-fn throwable_debug_type(e: &(dyn std::error::Error + 'static)) -> String {
-    shirabe_php_shim::AnyThrowable::of(e).map_or_else(
+fn throwable_debug_type(e: Option<&AnyThrowable>) -> String {
+    e.map_or_else(
         || "Exception".to_string(),
         shirabe_php_shim::PhpClass::php_class_name,
     )

@@ -143,7 +143,7 @@ impl FilesystemRepository {
                 return Err(InvalidRepositoryException::new(format!(
                     "Invalid repository data in {}, packages could not be loaded: [{}] {}",
                     self.file.get_path(),
-                    AnyThrowable::of(e.as_ref())
+                    AnyThrowable::of(&e)
                         .expect("PHP reaches this only with a caught \\Throwable")
                         .php_class_name(),
                     e,

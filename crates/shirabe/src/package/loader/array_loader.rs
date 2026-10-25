@@ -138,7 +138,7 @@ impl ArrayLoader {
                         config.get("name").and_then(|v| v.as_string()).unwrap_or(""),
                         e
                     );
-                    let code = AnyThrowable::of(e.as_ref()).map_or(0, AnyThrowable::get_code);
+                    let code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code);
                     return Err(UnexpectedValueException::with_code_and_previous(
                         message,
                         code,
@@ -686,7 +686,7 @@ impl ArrayLoader {
                     "Link constraint in {} {} > {} should be a valid version constraint, got \"{}\"",
                     source, description, target, constraint
                 );
-                let code = AnyThrowable::of(e.as_ref()).map_or(0, AnyThrowable::get_code);
+                let code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code);
                 return Err(UnexpectedValueException::with_code_and_previous(
                     message,
                     code,

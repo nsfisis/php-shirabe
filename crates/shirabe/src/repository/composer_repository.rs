@@ -2719,7 +2719,7 @@ impl ComposerRepository {
                     .as_ref()
                     .map(|s| format!(" from {}", s))
                     .unwrap_or_default(),
-                AnyThrowable::of(e.as_ref()).map_or_else(
+                AnyThrowable::of(&e).map_or_else(
                     || "Exception".to_string(),
                     shirabe_php_shim::PhpClass::php_class_name,
                 ),
