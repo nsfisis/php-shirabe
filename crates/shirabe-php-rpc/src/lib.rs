@@ -14,8 +14,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_process::PhpExecutableFinder;
 use std::os::unix::net::UnixStream;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{LazyLock, Mutex, OnceLock};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 
 /// The version constants of the PHP the worker runs.
 #[derive(Debug)]
@@ -789,7 +789,10 @@ pub fn release_php_handle(phandle: u64) -> anyhow::Result<()> {
 /// mirror state into an already-running worker (e.g. `InstalledVersions::reload` pushes) use
 /// this to avoid spawning a worker that would have nothing to observe.
 pub fn worker_is_running() -> bool {
-    WORKER_SPAWNED.load(Ordering::SeqCst)
+    WORKER
+        .lock()
+        .unwrap_or_else(|e| panic!("PHP RPC: worker mutex poisoned: {e}"))
+        .is_some()
 }
 
 fn rpc_call(
@@ -1153,34 +1156,45 @@ impl Worker {
     }
 }
 
-// TODO(error-model): a failed spawn panics rather than propagating a `Result`; this is an interim
-// step until PHP RPC gets proper error handling (see docs/dev/php-rpc.md).
-static WORKER: LazyLock<Mutex<Worker>> = LazyLock::new(|| {
-    let worker =
-        spawn_worker().unwrap_or_else(|e| panic!("PHP RPC: failed to spawn PHP worker: {e:#}"));
-    WORKER_SPAWNED.store(true, Ordering::SeqCst);
-    Mutex::new(worker)
-});
+/// The PHP worker, spawned on first use.
+static WORKER: Mutex<Option<Worker>> = Mutex::new(None);
 
-static WORKER_SPAWNED: AtomicBool = AtomicBool::new(false);
+/// Runs `f` on the worker while holding its mutex, spawning the worker first if it is not running.
+fn with_worker<T>(f: impl FnOnce(&mut Worker) -> T) -> anyhow::Result<T> {
+    let mut guard = WORKER
+        .lock()
+        .unwrap_or_else(|e| panic!("PHP RPC: worker mutex poisoned: {e}"));
+    let worker = match &mut *guard {
+        Some(worker) => worker,
+        None => guard.insert(
+            spawn_worker().map_err(|e| anyhow::anyhow!("failed to spawn the PHP worker: {e:#}"))?,
+        ),
+    };
+    Ok(f(worker))
+}
+
+/// Spawns the PHP worker unless it is already running, and reports a failed spawn as an error.
+/// The scalar query API (`get_php_version` etc.) panics on any failure, so an entry point calls
+/// this before its first query to report a missing or broken PHP as an ordinary error.
+pub fn ensure_worker() -> anyhow::Result<()> {
+    with_worker(|_| ())
+}
 
 /// Writes one frame while holding the worker mutex only for the duration of the write, so the
 /// session owner (see `session`) can interleave sends and blocking reads without keeping the
 /// worker locked across a whole call.
 fn send_frame(frame: &Frame) -> anyhow::Result<()> {
-    let mut guard = WORKER
-        .lock()
-        .unwrap_or_else(|e| panic!("PHP RPC: worker mutex poisoned: {e}"));
-    let result = frame::write_frame(&mut guard.stream, frame);
-    result.map_err(|e| anyhow::Error::new(e).context(guard.worker_state()))
+    with_worker(|worker| {
+        frame::write_frame(&mut worker.stream, frame)
+            .map_err(|e| anyhow::Error::new(e).context(worker.worker_state()))
+    })?
 }
 
 fn recv_frame() -> anyhow::Result<Frame> {
-    let mut guard = WORKER
-        .lock()
-        .unwrap_or_else(|e| panic!("PHP RPC: worker mutex poisoned: {e}"));
-    let result = frame::read_frame(&mut guard.stream);
-    result.map_err(|e| anyhow::Error::new(e).context(guard.worker_state()))
+    with_worker(|worker| {
+        frame::read_frame(&mut worker.stream)
+            .map_err(|e| anyhow::Error::new(e).context(worker.worker_state()))
+    })?
 }
 
 /// The descriptor the worker's end of the RPC socket is installed on in the child. `pre_exec`

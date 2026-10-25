@@ -1918,6 +1918,8 @@ impl ApplicationHandle {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i32> {
         let application = &self.0;
+        shirabe_php_rpc::ensure_worker()?;
+
         application.borrow_mut().disable_plugins_by_default = input
             .borrow()
             .has_parameter_option(&["--no-plugins"], false);
