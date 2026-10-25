@@ -12,7 +12,6 @@ use crate::installer::Installer;
 use crate::io::IOInterfaceImmutable;
 use crate::plugin::CommandEvent;
 use crate::plugin::PluginEvents;
-use crate::util::HttpDownloader;
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -128,9 +127,8 @@ impl Command for InstallCommand {
         let composer_handle = self.require_composer(None, None)?;
         let composer = crate::composer::composer_full(&composer_handle);
 
-        if !composer.get_locker().borrow_mut().is_locked() && !HttpDownloader::is_curl_enabled() {
-            io.write_error("<warning>Shirabe is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>");
-        }
+        // Composer warns here that it runs slower without the curl extension when there is no lock
+        // file. Shirabe does not use curl for its own downloads, so there is nothing to warn about.
 
         let mut command_event =
             CommandEvent::new(PluginEvents::COMMAND, "install", input.clone(), output);

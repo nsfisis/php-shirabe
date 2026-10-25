@@ -1091,6 +1091,27 @@ ShirabeRpcRuntime::$dispatch = [
         }
         return $obj->{$args[1]};
     },
+    // For testing only: the ReflectionMethod / ReflectionProperty access PHPUnit tests use to
+    // reach the non-public members of a P-table entity.
+    '__shirabe_reflection_invoke' => static function ($args) {
+        [$obj, $method, $methodArgs] = $args;
+        $reflMethod = new ReflectionMethod($obj, $method);
+        (\PHP_VERSION_ID < 80100) and $reflMethod->setAccessible(true);
+        return $reflMethod->invokeArgs($obj, $methodArgs);
+    },
+    '__shirabe_reflection_get_property' => static function ($args) {
+        [$obj, $name] = $args;
+        $reflProp = new ReflectionProperty($obj, $name);
+        (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
+        return $reflProp->getValue($obj);
+    },
+    '__shirabe_reflection_set_property' => static function ($args) {
+        [$obj, $name, $value] = $args;
+        $reflProp = new ReflectionProperty($obj, $name);
+        (\PHP_VERSION_ID < 80100) and $reflProp->setAccessible(true);
+        $reflProp->setValue($obj, $value);
+        return null;
+    },
     // Builds the worker-side Composer\Console\Application (the runtime/ definition, not the
     // real class) from the Rust handoff; the caller keeps the returned handle and runs
     // plugin-provided commands through __shirabe_run_console_application.

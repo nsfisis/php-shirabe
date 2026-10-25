@@ -160,6 +160,14 @@ pub(crate) fn register_io_entity(io: &std::rc::Rc<std::cell::RefCell<dyn IOInter
     register_entity(RustEntity::Io(io.clone()))
 }
 
+/// Wire value handing a Rust-side `Config` to the child, interned in the R table.
+pub(crate) fn config_handle_value(
+    config: &std::rc::Rc<std::cell::RefCell<crate::config::Config>>,
+) -> PluginValue {
+    let rhandle = register_entity(RustEntity::Config(config.clone()));
+    rust_handle_value(rhandle, "Composer\\Config")
+}
+
 /// A `RustHandle` wire descriptor for a freshly registered (or re-interned) entity.
 pub(crate) fn rust_handle_value(rhandle: u64, class: &str) -> PluginValue {
     PluginValue::RustHandle(RustObjHandle {
@@ -818,11 +826,7 @@ fn dispatch_composer_method(
                 "Composer\\EventDispatcher\\EventDispatcher",
             ))
         }
-        "getConfig" => {
-            let config = composer.borrow().get_config();
-            let rhandle = register_entity(RustEntity::Config(config));
-            Ok(rust_handle_value(rhandle, "Composer\\Config"))
-        }
+        "getConfig" => Ok(config_handle_value(&composer.borrow().get_config())),
         "getDownloadManager" => {
             let dm = composer.borrow().get_download_manager();
             let rhandle = register_entity(RustEntity::DownloadManager(dm));

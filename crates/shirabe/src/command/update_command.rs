@@ -25,7 +25,6 @@ use crate::repository::CanonicalPackagesTrait;
 use crate::repository::CompositeRepository;
 use crate::repository::PlatformRepository;
 use crate::repository::RepositorySet;
-use crate::util::HttpDownloader;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
@@ -345,13 +344,8 @@ impl Command for UpdateCommand {
         let composer_handle = self.require_composer(None, None)?;
         let composer = crate::composer::composer_full(&composer_handle);
 
-        if !HttpDownloader::is_curl_enabled() {
-            io.write_error3(
-                "<warning>Shirabe is operating significantly slower than normal because you do not have the PHP curl extension enabled.</warning>",
-                true,
-                io_interface::NORMAL,
-            );
-        }
+        // Composer warns here that it runs slower without the curl extension. Shirabe does not use
+        // curl for its own downloads, so there is nothing to warn about.
 
         let mut packages: Vec<String> = input
             .borrow()

@@ -1,7 +1,11 @@
 //! ref: composer/src/Composer/Util/Http/CurlDownloader.php
 //!
-//! reqwest-based re-implementation. Unlike the libcurl multi-handle event loop of the PHP
-//! original, `download()` is a single `async fn`: it sends the request, hands the result to
+//! The downloader `HttpDownloader` hands http(s) requests to, in the place of Composer's
+//! `CurlDownloader`. It performs the requests in-process over reqwest instead of libcurl, so it
+//! works whether or not the PHP runtime has the curl extension. Plugin code that names
+//! `CurlDownloader` itself gets the real PHP class in the worker, not this one.
+//!
+//! Unlike the libcurl multi-handle event loop of the PHP original, `download()` is a single `async fn`: it sends the request, hands the result to
 //! `decide()` (retry / redirect / fail / succeed), and loops until it resolves. There is no job
 //! table or `tick()` driver anymore; the caller `.await`s `download()` directly and gets the
 //! final `Response` (or `TransportException`) back.
@@ -12,7 +16,7 @@
 //! are simplified to a single default Client; see the TODOs below.
 //!
 //! TODO(async): PHP's `CurlDownloader::abortRequest()`, which `HttpDownloader`'s canceler calls,
-//! has no method here. A request is cancelled by dropping the `download()` future instead, which
+//! has no counterpart here. A request is cancelled by dropping the `download()` future instead, which
 //! closes the connection and the file handle but skips the `@unlink($filename.'~')` PHP does, so
 //! a cancelled file download leaves its partial `~` file behind.
 
@@ -24,7 +28,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::Url;
-use crate::util::http::CurlResponse;
+use crate::util::http::NativeHttpResponse;
 use crate::util::http::ProxyManager;
 use crate::util::http::Response;
 use crate::util::{AuthHelper, PromptAuthResult, StoreAuth};
@@ -36,7 +40,7 @@ use shirabe_php_shim::{
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Debug)]
-pub struct CurlDownloader {
+pub struct NativeHttpDownloader {
     /// Connection pool / cookie / TLS-session sharing — reqwest::Client handles this internally,
     /// replacing the PHP multiHandle + shareHandle. Redirects are disabled because we follow them
     /// manually (to control auth-header re-attachment), matching CURLOPT_FOLLOWLOCATION = false.
@@ -62,10 +66,10 @@ enum Decision {
 
 /// The reqwest Client to use on the calling thread's tokio runtime.
 ///
-/// Nothing in `CurlDownloader::new` varies the Client (`options` and `disable_tls` are not applied
-/// to it; see the TODO in `send_once`), so one Client serves every CurlDownloader a run builds and
-/// its connection pool survives across them. PHP instead hands each CurlDownloader its own curl
-/// multi handle.
+/// Nothing in `NativeHttpDownloader::new` varies the Client (`options` and `disable_tls` are not
+/// applied to it; see the TODO in `send_once`), so one Client serves every NativeHttpDownloader a
+/// run builds and its connection pool survives across them. PHP instead hands each
+/// CurlDownloader its own curl multi handle.
 ///
 /// A pooled connection is driven by a task on the runtime that opened it and hangs if it is later
 /// handed to another one, so the Client is cached per runtime: `main.rs` enters one runtime for the
@@ -79,7 +83,7 @@ fn runtime_client() -> reqwest::Client {
             .build()
             // The default builder cannot realistically fail; if the TLS backend is unavailable we
             // cannot proceed, mirroring PHP aborting when curl is missing.
-            .expect("failed to build reqwest client for CurlDownloader")
+            .expect("failed to build reqwest client for NativeHttpDownloader")
     }
 
     let Ok(handle) = tokio::runtime::Handle::try_current() else {
@@ -98,7 +102,7 @@ fn runtime_client() -> reqwest::Client {
     }
 }
 
-impl CurlDownloader {
+impl NativeHttpDownloader {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
@@ -353,7 +357,7 @@ impl CurlDownloader {
         };
 
         let status_code = response.status;
-        let curl_response = response.into_curl_response(url);
+        let native_response = response.into_native_http_response(url);
 
         self.io.write_error3(
             &format!("[{}] {}", status_code, Url::sanitize(url.to_string())),
@@ -362,9 +366,10 @@ impl CurlDownloader {
         );
 
         // Output JSON warnings (PHP HttpDownloader::outputWarnings) for >= 300 JSON bodies.
-        if curl_response.inner.get_status_code() >= 300
-            && curl_response.inner.get_header("content-type").as_deref() == Some("application/json")
-            && let Some(body) = curl_response.inner.get_body()
+        if native_response.inner.get_status_code() >= 300
+            && native_response.inner.get_header("content-type").as_deref()
+                == Some("application/json")
+            && let Some(body) = native_response.inner.get_body()
         {
             let decoded = shirabe_php_shim::json_decode_assoc(body)?;
             if let PhpMixed::Array(a) = decoded {
@@ -373,8 +378,13 @@ impl CurlDownloader {
         }
 
         // Authenticated-retry detection (401/403, Bitbucket login page, GitLab archive 404).
-        let auth_result =
-            self.is_authenticated_retry_needed(url, origin, filename, attributes, &curl_response)?;
+        let auth_result = self.is_authenticated_retry_needed(
+            url,
+            origin,
+            filename,
+            attributes,
+            &native_response,
+        )?;
         match auth_result {
             Ok(prompt) if prompt.retry => {
                 attributes.insert(
@@ -410,7 +420,7 @@ impl CurlDownloader {
             && status_code != 304
             && redirects < self.max_redirects
         {
-            match self.handle_redirect(url, attributes, &curl_response)? {
+            match self.handle_redirect(url, attributes, &native_response)? {
                 Ok(location) if !location.is_empty() => {
                     attributes.insert("redirects".to_string(), PhpMixed::Int(redirects + 1));
                     if let Some(filename) = filename {
@@ -461,13 +471,16 @@ impl CurlDownloader {
                 });
             }
 
-            let status_msg = curl_response.inner.get_status_message().unwrap_or_default();
+            let status_msg = native_response
+                .inner
+                .get_status_message()
+                .unwrap_or_default();
             // Enrich with the response headers/status/body, mirroring PHP's catch block that
             // calls setHeaders/setStatusCode/setResponse before reject().
-            let mut e = self.fail_response(url, filename, &curl_response, &status_msg);
-            e.set_headers(curl_response.inner.get_headers().clone());
-            e.set_status_code(Some(curl_response.inner.get_status_code()));
-            e.set_response(curl_response.inner.get_body().map(|s| s.to_string()));
+            let mut e = self.fail_response(url, filename, &native_response, &status_msg);
+            e.set_headers(native_response.inner.get_headers().clone());
+            e.set_status_code(Some(native_response.inner.get_status_code()));
+            e.set_response(native_response.inner.get_body().map(|s| s.to_string()));
             return Ok(Decision::Failed((*e).into()));
         }
 
@@ -487,7 +500,7 @@ impl CurlDownloader {
             rename(format!("{}~", filename), filename);
         }
 
-        Ok(Decision::Done(curl_response.inner))
+        Ok(Decision::Done(native_response.inner))
     }
 
     /// Performs one non-blocking HTTP request via reqwest, enforcing max_file_size and streaming
@@ -655,7 +668,7 @@ impl CurlDownloader {
         &self,
         url: &str,
         attributes: &IndexMap<String, PhpMixed>,
-        response: &CurlResponse,
+        response: &NativeHttpResponse,
     ) -> anyhow::Result<Result<String, Box<TransportException>>> {
         let mut target_url = String::new();
         if let Some(location_header) = response.inner.get_header("location")
@@ -738,7 +751,7 @@ impl CurlDownloader {
         origin: &str,
         filename: Option<&str>,
         attributes: &IndexMap<String, PhpMixed>,
-        response: &CurlResponse,
+        response: &NativeHttpResponse,
     ) -> anyhow::Result<Result<PromptAuthResult, Box<TransportException>>> {
         let retry_auth_failure = attributes
             .get("retryAuthFailure")
@@ -846,7 +859,7 @@ impl CurlDownloader {
         &self,
         url: &str,
         filename: Option<&str>,
-        response: &CurlResponse,
+        response: &NativeHttpResponse,
         error_message: &str,
     ) -> Box<TransportException> {
         if let Some(filename) = filename {
@@ -925,7 +938,7 @@ struct TransportError {
     is_max_file_size: bool,
 }
 
-/// Raw send result before conversion to `CurlResponse`.
+/// Raw send result before conversion to `NativeHttpResponse`.
 struct RawResponse {
     status: i64,
     headers: Vec<String>,
@@ -940,7 +953,7 @@ enum Body {
 }
 
 impl RawResponse {
-    fn into_curl_response(self, url: &str) -> CurlResponse {
+    fn into_native_http_response(self, url: &str) -> NativeHttpResponse {
         let body = match self.body {
             Body::Memory(b) => Some(String::from_utf8_lossy(&b).into_owned()),
             // File mode: PHP stores `$filename.'~'` as the contents string; the actual bytes live
@@ -948,7 +961,7 @@ impl RawResponse {
             // rename/read handling does not consult the body for successful file downloads.
             Body::File => None,
         };
-        CurlResponse::new(
+        NativeHttpResponse::new(
             url.to_string(),
             Some(self.status),
             self.headers,

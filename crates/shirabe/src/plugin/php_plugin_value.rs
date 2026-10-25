@@ -206,8 +206,9 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
 /// and this port keeps only the url, which is all `decodeJson()` reads back out of it.
 ///
 /// TODO(port): Composer answers a curl request with a `Composer\Util\Http\CurlResponse`
-/// carrying the transfer info; this port flattens that subclass into `Response` before the
-/// value leaves `HttpDownloader`, so `getCurlInfo()` is gone and `get_class()` differs.
+/// carrying the transfer info; the native downloader that takes those requests here flattens its
+/// response into `Response` before the value leaves `HttpDownloader`, so `getCurlInfo()` is gone
+/// and `get_class()` differs.
 pub(crate) fn response_to_wire(response: &Response) -> PluginValue {
     let mut object = PhpObject::new(RESPONSE_CLASS);
     let mut request = indexmap::IndexMap::new();

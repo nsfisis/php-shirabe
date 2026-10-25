@@ -1,27 +1,21 @@
 //! ref: composer/src/Composer/Util/RemoteFilesystem.php
+//!
+//! The real `Composer\Util\RemoteFilesystem`, running in the PHP worker: every method forwards
+//! to an instance there. `HttpDownloader` reaches for it last, for the requests neither
+//! `NativeHttpDownloader` nor `LocalFilesystem` takes, which only PHP's stream layer can serve
+//! (the stream wrappers of other schemes, including the ones plugins register). The instance is
+//! built on first use, so a run that never needs it never spawns the worker.
 
 use crate::config::Config;
 use crate::downloader::MaxFileSizeExceededException;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::util::AuthHelper;
-use crate::util::HttpDownloader;
-use crate::util::Platform;
-use crate::util::StreamContextFactory;
-use crate::util::Url;
-use crate::util::http::ProxyManager;
-use crate::util::http::Response;
+use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, config_handle_value, io_handle_value};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{
-    PhpMixed, RuntimeException, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS,
-    STREAM_NOTIFY_PROGRESS, array_replace_recursive, base64_encode, explode, extension_loaded,
-    file_get_contents, file_get_contents_with_max_length, file_put_contents, filter_var_boolean,
-    gethostbyname, http_clear_last_response_headers, http_get_last_response_headers, ini_get,
-    json_decode_assoc, parse_url, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
-    strpos, strtolower, strtr, substr, trim, zlib_decode,
-};
+use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue};
+use shirabe_php_shim::{PhpMixed, RuntimeException, php_regex, preg_match};
+
+const CLASS: &str = "Composer\\Util\\RemoteFilesystem";
 
 /// Result of `RemoteFilesystem::get` — string content, `true` (for copy), or `false`.
 #[derive(Debug, Clone)]
@@ -35,116 +29,99 @@ pub enum GetResult {
 pub struct RemoteFilesystem {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    scheme: String,
-    bytes_max: i64,
-    origin_url: String,
-    file_url: String,
-    file_name: Option<String>,
-    retry: bool,
-    progress: bool,
-    last_progress: Option<i64>,
     options: IndexMap<String, PhpMixed>,
     disable_tls: bool,
-    last_headers: Vec<String>,
-    store_auth: bool,
-    auth_helper: AuthHelper,
-    degraded_mode: bool,
-    redirects: i64,
-    max_redirects: i64,
+    entity: std::cell::OnceCell<PhpObjHandle>,
 }
 
 impl RemoteFilesystem {
+    /// TODO(plugin): PHP's trailing `?AuthHelper $authHelper` parameter is not offered: a Rust
+    /// `AuthHelper` has no wire form, so the PHP instance always builds its own.
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         options: IndexMap<String, PhpMixed>,
         disable_tls: bool,
-        auth_helper: Option<AuthHelper>,
     ) -> Self {
-        let (computed_options, disable_tls_set) = if !disable_tls {
-            (
-                StreamContextFactory::get_tls_defaults(&options, ())
-                    .unwrap_or_else(|_| IndexMap::new()),
-                false,
-            )
-        } else {
-            (IndexMap::new(), true)
-        };
-
-        let merged = array_replace_recursive(computed_options, options);
-        let auth_helper =
-            auth_helper.unwrap_or_else(|| AuthHelper::new(io.clone(), config.clone()));
         Self {
             io,
             config,
-            scheme: String::new(),
-            bytes_max: 0,
-            origin_url: String::new(),
-            file_url: String::new(),
-            file_name: None,
-            retry: false,
-            progress: false,
-            last_progress: None,
-            options: merged,
-            disable_tls: disable_tls_set,
-            last_headers: Vec::new(),
-            store_auth: false,
-            auth_helper,
-            degraded_mode: false,
-            redirects: 0,
-            max_redirects: 20,
+            options,
+            disable_tls,
+            entity: std::cell::OnceCell::new(),
         }
     }
 
-    /// Returns the response headers alongside the result (rather than requiring a follow-up
-    /// `get_last_headers()` call) so that a caller sharing this instance via `Rc<RefCell<...>>`
-    /// always reads the headers produced by its own call, not one clobbered by a concurrent one.
     pub fn copy(
-        &mut self,
+        &self,
         origin_url: &str,
         file_url: &str,
         file_name: &str,
         progress: bool,
         options: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<(GetResult, Vec<String>)> {
-        let result = self.get(
-            origin_url,
-            file_url,
-            options,
-            Some(file_name.to_string()),
-            progress,
+    ) -> anyhow::Result<GetResult> {
+        let value = self.call(
+            "copy",
+            vec![
+                PluginValue::string(origin_url),
+                PluginValue::string(file_url),
+                PluginValue::string(file_name),
+                PluginValue::Bool(progress),
+                PluginValue::from_php_mixed(&PhpMixed::Array(options)),
+            ],
         )?;
-        Ok((result, self.last_headers.clone()))
+        Self::get_result(value)
     }
 
-    /// See `copy` for why the headers are bundled into the return value.
     pub fn get_contents(
-        &mut self,
+        &self,
         origin_url: &str,
         file_url: &str,
         progress: bool,
         options: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<(GetResult, Vec<String>)> {
-        let result = self.get(origin_url, file_url, options, None, progress)?;
-        Ok((result, self.last_headers.clone()))
+    ) -> anyhow::Result<GetResult> {
+        let value = self.call(
+            "getContents",
+            vec![
+                PluginValue::string(origin_url),
+                PluginValue::string(file_url),
+                PluginValue::Bool(progress),
+                PluginValue::from_php_mixed(&PhpMixed::Array(options)),
+            ],
+        )?;
+        Self::get_result(value)
     }
 
-    pub fn get_options(&self) -> &IndexMap<String, PhpMixed> {
-        &self.options
+    pub fn get_options(&self) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+        match self.call("getOptions", Vec::new())?.to_php_mixed()? {
+            PhpMixed::Array(options) => Ok(options),
+            PhpMixed::List(list) if list.is_empty() => Ok(IndexMap::new()),
+            other => Err(Self::shape_error("getOptions", &other)),
+        }
     }
 
-    pub fn set_options(&mut self, options: IndexMap<String, PhpMixed>) {
-        self.options = array_replace_recursive(self.options.clone(), options);
+    pub fn set_options(&self, options: IndexMap<String, PhpMixed>) -> anyhow::Result<()> {
+        self.call(
+            "setOptions",
+            vec![PluginValue::from_php_mixed(&PhpMixed::Array(options))],
+        )?;
+        Ok(())
     }
 
-    pub fn is_tls_disabled(&self) -> bool {
-        self.disable_tls
+    pub fn is_tls_disabled(&self) -> anyhow::Result<bool> {
+        match self.call("isTlsDisabled", Vec::new())? {
+            PluginValue::Bool(disabled) => Ok(disabled),
+            other => Err(Self::shape_error("isTlsDisabled", &other)),
+        }
     }
 
-    pub fn get_last_headers(&self) -> &[String] {
-        &self.last_headers
+    pub fn get_last_headers(&self) -> anyhow::Result<Vec<String>> {
+        let value = self.call("getLastHeaders", Vec::new())?;
+        Self::string_list("getLastHeaders", value)
     }
 
+    /// Computed on this side: a static method has no instance to forward to, and the function is
+    /// pure.
     pub fn find_status_code(headers: &[String]) -> Option<i64> {
         let mut value: Option<i64> = None;
         for header in headers {
@@ -156,923 +133,144 @@ impl RemoteFilesystem {
         value
     }
 
-    pub fn find_status_message(&self, headers: &[String]) -> Option<String> {
-        let mut value: Option<String> = None;
-        for header in headers {
-            if preg_is_match(php_regex!("{^HTTP/\\S+ \\d+}i"), header) {
-                value = Some(header.clone());
-            }
-        }
-
-        value
-    }
-
-    fn get(
-        &mut self,
-        origin_url: &str,
-        file_url: &str,
-        additional_options: IndexMap<String, PhpMixed>,
-        file_name: Option<String>,
-        progress: bool,
-    ) -> anyhow::Result<GetResult> {
-        self.scheme = parse_url(&strtr(file_url, "\\", "/"))
-            .and_then(|parsed| parsed.scheme)
-            .unwrap_or_default();
-        self.bytes_max = 0;
-        self.origin_url = origin_url.to_string();
-        self.file_url = file_url.to_string();
-        self.file_name = file_name.clone();
-        self.progress = progress;
-        self.last_progress = None;
-        let mut retry_auth_failure = true;
-        self.last_headers = Vec::new();
-        self.redirects = 1; // The first request counts.
-
-        let mut temp_additional_options = additional_options.clone();
-        if let Some(v) = temp_additional_options
-            .get("retry-auth-failure")
-            .and_then(|v| v.as_opt())
-            .cloned()
-        {
-            retry_auth_failure = v.to_bool();
-            temp_additional_options.shift_remove("retry-auth-failure");
-        }
-
-        let mut is_redirect = false;
-        if let Some(v) = temp_additional_options.get("redirects").cloned() {
-            self.redirects = v.as_int().unwrap_or(self.redirects);
-            is_redirect = true;
-            temp_additional_options.shift_remove("redirects");
-        }
-
-        let mut options = self.get_options_for_url(origin_url, temp_additional_options);
-
-        let orig_file_url = file_url.to_string();
-        let mut file_url = file_url.to_string();
-
-        if options.contains_key("prevent_ip_access_callable") {
-            return Err(RuntimeException::new(
-                "RemoteFilesystem doesn't support the 'prevent_ip_access_callable' config."
-                    .to_string(),
-            )
-            .into());
-        }
-
-        if let Some(token) = options.get("gitlab-token").cloned() {
-            let separator = if strpos(&file_url, "?").is_none() {
-                "?"
-            } else {
-                "&"
-            };
-            file_url = format!(
-                "{}{}access_token={}",
-                file_url,
-                separator,
-                token.as_string().unwrap_or("")
-            );
-            options.shift_remove("gitlab-token");
-        }
-
-        if let Some(http_opts) = options.get_mut("http")
-            && let PhpMixed::Array(m) = http_opts
-        {
-            m.insert("ignore_errors".to_string(), PhpMixed::Bool(true));
-        }
-
-        let mut degraded_packagist = false;
-        if self.degraded_mode && strpos(&file_url, "http://repo.packagist.org/") == Some(0) {
-            file_url = format!(
-                "http://{}{}",
-                gethostbyname("repo.packagist.org"),
-                substr(&file_url, 20, None)
-            );
-            degraded_packagist = true;
-        }
-
-        let mut max_file_size: Option<i64> = None;
-        if let Some(v) = options.get("max_file_size").cloned() {
-            max_file_size = v.as_int();
-            options.shift_remove("max_file_size");
-        }
-
-        // TODO(plugin): `Closure::fromCallable([$this, 'callbackGet'])` for stream notification.
-        let ctx = StreamContextFactory::get_context(&file_url, options.clone(), IndexMap::new())
-            .map_err(|e| anyhow::anyhow!(e))?;
-
-        let using_proxy = {
-            let proxy_manager_guard = ProxyManager::get_instance();
-            let proxy = proxy_manager_guard
-                .as_ref()
-                .expect("ProxyManager instance")
-                .get_proxy_for_request(&file_url)
-                .map_err(|e| anyhow::anyhow!(e))?;
-            proxy
-                .get_status(Some(" using proxy (%s)"))
-                .unwrap_or_default()
-        };
-        self.io.write_error3(
-            &format!(
-                "{}{}{}",
-                if strpos(&orig_file_url, "http") == Some(0) {
-                    "Downloading "
-                } else {
-                    "Reading "
-                },
-                Url::sanitize(orig_file_url),
-                using_proxy
-            ),
-            true,
-            crate::io::DEBUG,
-        );
-
-        if (!preg_is_match(
-            php_regex!("{^http://(repo\\.)?packagist\\.org/p/}"),
-            &file_url,
-        ) || (strpos(&file_url, "$").is_none() && strpos(&file_url, "%24").is_none()))
-            && !degraded_packagist
-        {
-            let _ = self.config.borrow_mut().prohibit_url_by_config(
-                &file_url,
-                Some(self.io.clone()),
-                &indexmap::IndexMap::new(),
-            );
-        }
-
-        if self.progress && !is_redirect {
-            self.io.write_error3(
-                "Downloading (<comment>connecting...</comment>)",
-                false,
-                crate::io::NORMAL,
-            );
-        }
-
-        let mut error_message = String::new();
-        let error_code = 0_i64;
-        let mut result: Option<String> = None;
-        // TODO(http): PHP captures file_get_contents warnings here via set_error_handler. Rust
-        // reports I/O failures through return values rather than warnings, so error_message stays
-        // empty until get_remote_contents surfaces a read reason.
-        let mut http_response_header: Vec<String> = Vec::new();
-        let inner_result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
-            result = self.get_remote_contents(
-                origin_url,
-                &file_url,
-                &ctx,
-                &mut http_response_header,
-                max_file_size,
-            )?;
-
-            if !http_response_header.is_empty() && !http_response_header[0].is_empty() {
-                let status_code = Self::find_status_code(&http_response_header);
-                if let Some(code) = status_code {
-                    if code >= 300
-                        && Response::find_header_value(&http_response_header, "content-type")
-                            .as_deref()
-                            == Some("application/json")
-                    {
-                        let parsed = result
-                            .as_deref()
-                            .map(|s| json_decode_assoc(s).unwrap_or(PhpMixed::Null))
-                            .unwrap_or(PhpMixed::Null);
-                        let parsed_map: IndexMap<String, PhpMixed> = match parsed {
-                            PhpMixed::Array(m) => m.into_iter().collect(),
-                            _ => IndexMap::new(),
-                        };
-                        let _ = HttpDownloader::output_warnings(
-                            self.io.clone(),
-                            origin_url,
-                            &parsed_map,
-                        );
-                    }
-
-                    if [401_i64, 403].contains(&code) && retry_auth_failure {
-                        let status_message = self.find_status_message(&http_response_header);
-                        self.prompt_auth_and_retry(
-                            code,
-                            status_message,
-                            http_response_header.clone(),
-                        )?;
-                    }
-                }
-            }
-
-            let content_length =
-                if !http_response_header.is_empty() && !http_response_header[0].is_empty() {
-                    Response::find_header_value(&http_response_header, "content-length")
-                } else {
-                    None
-                };
-            if let Some(cl) = content_length {
-                let cl_int: i64 = cl.parse().unwrap_or(0);
-                if cl_int > 0 && Platform::strlen(result.as_deref().unwrap_or("")) < cl_int {
-                    let mut e = TransportException::new(
-                        format!(
-                            "Content-Length mismatch, received {} bytes out of the expected {}",
-                            Platform::strlen(result.as_deref().unwrap_or("")),
-                            cl_int
-                        ),
-                        0,
-                    );
-                    e.set_headers(http_response_header.clone());
-                    e.set_status_code(Self::find_status_code(&http_response_header));
-                    let decoded = self
-                        .decode_result(result.as_deref(), &http_response_header)
-                        .unwrap_or_else(|_| self.normalize_result(result.as_deref()));
-                    e.set_response(decoded);
-
-                    self.io.write_error3(
-                        &format!(
-                            "Content-Length mismatch, received {} out of {} bytes: ({})",
-                            Platform::strlen(result.as_deref().unwrap_or("")),
-                            cl_int,
-                            base64_encode(result.as_deref().unwrap_or(""))
-                        ),
-                        true,
-                        crate::io::DEBUG,
-                    );
-
-                    return Err(anyhow::anyhow!(e));
-                }
-            }
-            Ok(())
-        })();
-        let mut caught_e: Option<anyhow::Error> = None;
-        if let Err(mut e) = inner_result {
-            if let Some(te) = e.catch_mut::<TransportException>() {
-                if !http_response_header.is_empty() && !http_response_header[0].is_empty() {
-                    te.set_headers(http_response_header.clone());
-                    te.set_status_code(Self::find_status_code(&http_response_header));
-                }
-                if result.is_some()
-                    && let Ok(decoded) =
-                        self.decode_result(result.as_deref(), &http_response_header)
-                {
-                    te.set_response(decoded);
-                }
-            }
-            caught_e = Some(e);
-            result = None;
-        }
-        if !error_message.is_empty()
-            && !filter_var_boolean(&ini_get("allow_url_fopen").unwrap_or_default())
-        {
-            error_message = format!(
-                "allow_url_fopen must be enabled in php.ini ({})",
-                error_message
-            );
-        }
-        if let Some(e) = caught_e
-            && !self.retry
-        {
-            let msg_owned = format!("{}", e);
-            if !self.degraded_mode && strpos(&msg_owned, "Operation timed out").is_some() {
-                self.degraded_mode = true;
-                self.io.write_error3("", true, crate::io::NORMAL);
-                self.io.write_error3(
-                        &format!(
-                            "<error>{}</error>\n<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>",
-                            msg_owned,
-                        ),
-                        true,
-                        crate::io::NORMAL,
-                    );
-
-                return self.get(
-                    &self.origin_url.clone(),
-                    &self.file_url.clone(),
-                    additional_options,
-                    self.file_name.clone(),
-                    self.progress,
-                );
-            }
-
-            return Err(e);
-        }
-
-        let mut status_code: Option<i64> = None;
-        let mut content_type: Option<String> = None;
-        let mut location_header: Option<String> = None;
-        if !http_response_header.is_empty() && !http_response_header[0].is_empty() {
-            status_code = Self::find_status_code(&http_response_header);
-            content_type = Response::find_header_value(&http_response_header, "content-type");
-            location_header = Response::find_header_value(&http_response_header, "location");
-        }
-
-        let bitbucket_login_match = origin_url == "bitbucket.org"
-            && !self
-                .auth_helper
-                .is_public_bit_bucket_download(&self.file_url)
-            && substr(&self.file_url, -4, None) == ".zip"
-            && (location_header.is_none()
-                || substr(
-                    &parse_url(location_header.as_deref().unwrap_or(""))
-                        .and_then(|parsed| parsed.path)
-                        .unwrap_or_default(),
-                    -4,
-                    None,
-                ) != ".zip")
-            && content_type.is_some()
-            && preg_is_match(
-                php_regex!("{^text/html\\b}i"),
-                content_type.as_deref().unwrap_or(""),
-            );
-        if bitbucket_login_match {
-            result = None;
-            if retry_auth_failure {
-                self.prompt_auth_and_retry(401, None, Vec::new())?;
-            }
-        }
-
-        let gitlab_domains_value = self.config.borrow_mut().get("gitlab-domains");
-        let gitlab_domains: Vec<String> = gitlab_domains_value
-            .as_list()
-            .map(|l| {
-                l.iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        if status_code == Some(404)
-            && gitlab_domains.iter().any(|d| d == origin_url)
-            && strpos(&self.file_url, "archive.zip").is_some()
-        {
-            result = None;
-            if retry_auth_failure {
-                self.prompt_auth_and_retry(401, None, Vec::new())?;
-            }
-        }
-
-        let mut has_followed_redirect = false;
-        if let Some(code) = status_code
-            && (300..=399).contains(&code)
-            && code != 304
-            && self.redirects < self.max_redirects
-        {
-            has_followed_redirect = true;
-            result = self.handle_redirect(
-                &http_response_header,
-                additional_options.clone(),
-                result.clone(),
-            )?;
-        }
-
-        if let Some(code) = status_code
-            && (400..=599).contains(&code)
-        {
-            if !self.retry {
-                if self.progress && !is_redirect {
-                    self.io.overwrite_error4(
-                        "Downloading (<error>failed</error>)",
-                        false,
-                        None,
-                        crate::io::NORMAL,
-                    );
-                }
-
-                let mut e = TransportException::new(
-                    format!(
-                        "The \"{}\" file could not be downloaded ({})",
-                        self.file_url, http_response_header[0]
-                    ),
-                    code,
-                );
-                e.set_headers(http_response_header.clone());
-                let decoded = self
-                    .decode_result(result.as_deref(), &http_response_header)
-                    .unwrap_or(None);
-                e.set_response(decoded);
-                e.set_status_code(Some(code));
-                return Err(anyhow::anyhow!(e));
-            }
-            result = None;
-        }
-
-        if self.progress && !self.retry && !is_redirect {
-            self.io.overwrite_error4(
-                &format!(
-                    "Downloading ({})",
-                    if result.is_none() {
-                        "<error>failed</error>"
-                    } else {
-                        "<comment>100%</comment>"
-                    }
-                ),
-                false,
-                None,
-                crate::io::NORMAL,
-            );
-        }
-
-        if result.is_some()
-            && extension_loaded("zlib")
-            && strpos(&file_url, "http") == Some(0)
-            && !has_followed_redirect
-        {
-            match self.decode_result(result.as_deref(), &http_response_header) {
-                Ok(decoded) => {
-                    result = decoded;
-                }
-                Err(e) => {
-                    if self.degraded_mode {
-                        return Err(e);
-                    }
-
-                    self.degraded_mode = true;
-                    self.io.write_error3(
-                        &format!(
-                            "\n<error>Failed to decode response: {}</error>\n<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>",
-                            e,
-                        ),
-                        true,
-                        crate::io::NORMAL,
-                    );
-
-                    return self.get(
-                        &self.origin_url.clone(),
-                        &self.file_url.clone(),
-                        additional_options,
-                        self.file_name.clone(),
-                        self.progress,
-                    );
-                }
-            }
-        }
-
-        if result.is_some() && file_name.is_some() && !is_redirect {
-            let result_str = result.as_deref().unwrap();
-            if result_str.is_empty() {
-                return Err(TransportException::new(
-                    format!(
-                        "\"{}\" appears broken, and returned an empty 200 response",
-                        self.file_url
-                    ),
-                    0,
-                )
-                .into());
-            }
-
-            // TODO(php-semantics): PHP captures the file_put_contents warning here via set_error_handler
-            // (see the get() reads above); Rust reports the failure through the return value, so
-            // put_error_message stays empty until file_put_contents surfaces a write reason.
-            let put_error_message = String::new();
-            let write_result =
-                file_put_contents(file_name.as_deref().unwrap(), result_str.as_bytes());
-            if write_result.is_none() {
-                return Err(TransportException::new(
-                    format!(
-                        "The \"{}\" file could not be written to {}: {}",
-                        self.file_url,
-                        file_name.as_deref().unwrap(),
-                        put_error_message
-                    ),
-                    0,
-                )
-                .into());
-            }
-            let _ = put_error_message;
-        }
-
-        if self.retry {
-            self.retry = false;
-
-            let new_result = self.get(
-                &self.origin_url.clone(),
-                &self.file_url.clone(),
-                additional_options,
-                self.file_name.clone(),
-                self.progress,
-            )?;
-
-            if self.store_auth {
-                let _ = self.auth_helper.store_auth(
-                    &self.origin_url,
-                    crate::util::StoreAuth::Bool(self.store_auth),
-                );
-                self.store_auth = false;
-            }
-
-            return Ok(new_result);
-        }
-
-        if result.is_none() {
-            let mut e = TransportException::new(
-                format!(
-                    "The \"{}\" file could not be downloaded: {}",
-                    self.file_url, error_message
-                ),
-                error_code,
-            );
-            if !http_response_header.is_empty() && !http_response_header[0].is_empty() {
-                e.set_headers(http_response_header.clone());
-            }
-
-            let msg_owned = format!("{}", e);
-            if !self.degraded_mode && strpos(&msg_owned, "Operation timed out").is_some() {
-                self.degraded_mode = true;
-                self.io.write_error3("", true, crate::io::NORMAL);
-                self.io.write_error3(
-                    &format!(
-                        "<error>{}</error>\n<error>Retrying with degraded mode, check https://getcomposer.org/doc/articles/troubleshooting.md#degraded-mode for more info</error>",
-                        msg_owned,
-                    ),
-                    true,
-                    crate::io::NORMAL,
-                );
-
-                return self.get(
-                    &self.origin_url.clone(),
-                    &self.file_url.clone(),
-                    additional_options,
-                    self.file_name.clone(),
-                    self.progress,
-                );
-            }
-
-            return Err(anyhow::anyhow!(e));
-        }
-
-        if !http_response_header.is_empty() && !http_response_header[0].is_empty() {
-            self.last_headers = http_response_header.clone();
-        }
-
-        match result {
-            Some(s) => {
-                if file_name.is_some() && !is_redirect {
-                    Ok(GetResult::True)
-                } else {
-                    Ok(GetResult::Content(s))
-                }
-            }
-            None => Ok(GetResult::False),
-        }
-    }
-
-    fn get_remote_contents(
-        &self,
-        _origin_url: &str,
-        file_url: &str,
-        _context: &PhpMixed,
-        response_headers: &mut Vec<String>,
-        max_file_size: Option<i64>,
-    ) -> anyhow::Result<Option<String>> {
-        let mut result: Option<Vec<u8>> = None;
-
-        // PHP reads the magic `$http_response_header` variable instead before 8.4, which is where
-        // http_get_last_response_headers() and its companion appeared.
-        http_clear_last_response_headers();
-
-        let mut caught_e: Option<anyhow::Error> = None;
-        // PHP has no scheme branch here: `file_get_contents` reads `file://` URLs and plain
-        // (scheme-less) local paths through the same stream wrapper it uses for the network
-        // schemes. Only the local subset is modeled so far.
-        let outer: Result<Option<Vec<u8>>, anyhow::Error> =
-            if self.scheme == "file" || self.scheme.is_empty() {
-                Ok(match max_file_size {
-                    Some(max) => file_get_contents_with_max_length(file_url, max as usize),
-                    None => file_get_contents(file_url),
-                }
-                .ok())
-            } else {
-                // TODO(http): wrap PHP's `file_get_contents` with stream context and error capture
-                // for http(s) and other network schemes; depends on the unmodeled PHP stream-context
-                // layer.
-                Ok(None)
-            };
-        match outer {
-            Ok(v) => result = v,
-            Err(e) => caught_e = Some(e),
-        }
-
-        // Platform::strlen counts bytes whichever branch it takes, so the length is read off the
-        // buffer directly.
-        if let Some(ref r) = result
-            && let Some(max) = max_file_size
-            && r.len() as i64 >= max
-        {
-            return Err(MaxFileSizeExceededException::new(format!(
-                "Maximum allowed download size reached. Downloaded {} of allowed {} bytes",
-                r.len(),
-                max
-            ))
-            .into());
-        }
-
-        *response_headers = http_get_last_response_headers().unwrap_or_default();
-        http_clear_last_response_headers();
-
-        if let Some(e) = caught_e {
-            return Err(e);
-        }
-
-        // TODO(bytes): the body is handed back as a String because RemoteFilesystem::get and
-        // GetResult carry it as one; from_utf8_lossy corrupts binary payloads.
-        Ok(result.map(|r| String::from_utf8_lossy(&r).into_owned()))
-    }
-
-    fn callback_get(
-        &mut self,
-        notification_code: i64,
-        _severity: i64,
-        message: Option<String>,
-        message_code: i64,
-        bytes_transferred: i64,
-        bytes_max: i64,
-    ) -> anyhow::Result<()> {
-        match notification_code {
-            x if x == STREAM_NOTIFY_FAILURE => {
-                if 400 == message_code {
-                    return Err(TransportException::new(
-                        format!(
-                            "The '{}' URL could not be accessed: {}",
-                            self.file_url,
-                            message.unwrap_or_default()
-                        ),
-                        message_code,
-                    )
-                    .into());
-                }
-            }
-            x if x == STREAM_NOTIFY_FILE_SIZE_IS => {
-                self.bytes_max = bytes_max;
-            }
-            x if x == STREAM_NOTIFY_PROGRESS => {
-                if self.bytes_max > 0 && self.progress {
-                    let progression = (((bytes_transferred as f64 / self.bytes_max as f64) * 100.0)
-                        .round() as i64)
-                        .min(100_i64);
-
-                    if 0 == progression % 5
-                        && 100 != progression
-                        && Some(progression) != self.last_progress
-                    {
-                        self.last_progress = Some(progression);
-                        self.io.overwrite_error4(
-                            &format!("Downloading (<comment>{}%</comment>)", progression),
-                            false,
-                            None,
-                            crate::io::NORMAL,
-                        );
-                    }
-                }
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-
-    fn prompt_auth_and_retry(
-        &mut self,
-        http_status: i64,
-        reason: Option<String>,
-        headers: Vec<String>,
-    ) -> anyhow::Result<()> {
-        let file_url = self.file_url.clone();
-        let origin_url = self.origin_url.clone();
-        let result = self.auth_helper.prompt_auth_if_needed(
-            &file_url,
-            &origin_url,
-            http_status,
-            reason.as_deref(),
-            headers,
-            1,
-            None,
+    pub fn find_status_message(&self, headers: &[String]) -> anyhow::Result<Option<String>> {
+        let value = self.call(
+            "findStatusMessage",
+            vec![PluginValue::List(
+                headers.iter().map(PluginValue::string).collect(),
+            )],
         )?;
-
-        self.store_auth = matches!(
-            result.store_auth,
-            crate::util::StoreAuth::Bool(true) | crate::util::StoreAuth::Prompt
-        );
-        self.retry = result.retry;
-
-        if self.retry {
-            return Err(TransportException::new("RETRY".to_string(), 0).into());
+        match value {
+            PluginValue::Null => Ok(None),
+            PluginValue::String(message) => Ok(Some(String::from_utf8(message)?)),
+            other => Err(Self::shape_error("findStatusMessage", &other)),
         }
-        Ok(())
     }
 
-    fn get_options_for_url(
-        &mut self,
-        origin_url: &str,
-        additional_options: IndexMap<String, PhpMixed>,
-    ) -> IndexMap<String, PhpMixed> {
-        let tls_options: IndexMap<String, PhpMixed> = IndexMap::new();
-        let mut headers: Vec<String> = Vec::new();
-
-        if extension_loaded("zlib") {
-            headers.push("Accept-Encoding: gzip".to_string());
+    /// The worker-side instance, built on the first call.
+    fn entity(&self) -> anyhow::Result<&PhpObjHandle> {
+        if let Some(entity) = self.entity.get() {
+            return Ok(entity);
         }
 
-        let mut options = array_replace_recursive(self.options.clone(), tls_options);
-        options = array_replace_recursive(options, additional_options);
-        if !self.degraded_mode {
-            let http_entry = options
-                .entry("http".to_string())
-                .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
-            if let PhpMixed::Array(m) = http_entry {
-                m.insert("protocol_version".to_string(), PhpMixed::Float(1.1));
-            }
-            headers.push("Connection: close".to_string());
-        }
+        let cache_dir = self.config.borrow().get_str("cache-dir")?;
+        crate::event_dispatcher::EventDispatcher::ensure_composer_php_runtime(
+            std::path::Path::new(&cache_dir),
+        )?;
+        let value = Self::php_result(shirabe_php_rpc::new_object(
+            CLASS,
+            vec![
+                io_handle_value(&self.io)?,
+                config_handle_value(&self.config),
+                PluginValue::from_php_mixed(&PhpMixed::Array(self.options.clone())),
+                PluginValue::Bool(self.disable_tls),
+            ],
+            Some(&mut PluginRpcDispatcher::default()),
+        ))?;
+        let PluginValue::PhpHandle(handle) = value else {
+            return Err(Self::shape_error("__construct", &value));
+        };
 
-        let header_is_string = options
-            .get("http")
-            .and_then(|v| v.as_array())
-            .and_then(|m| m.get("header"))
-            .map(|v| matches!(v, PhpMixed::String(_)))
-            .unwrap_or(false);
-        if header_is_string {
-            let header_str = options["http"].as_array().unwrap()["header"]
-                .as_string()
-                .unwrap_or("")
-                .to_string();
-            let split = explode("\r\n", &trim(&header_str, Some("\r\n")));
-            if let Some(PhpMixed::Array(m)) = options.get_mut("http") {
-                m.insert(
-                    "header".to_string(),
-                    PhpMixed::List(split.into_iter().map(PhpMixed::String).collect()),
-                );
-            }
-        }
-        let file_url = self.file_url.clone();
-        options = self
-            .auth_helper
-            .add_authentication_options(options, origin_url, &file_url)
-            .unwrap_or_else(|_| IndexMap::new());
+        Ok(self.entity.get_or_init(|| handle))
+    }
 
-        let http_entry = options
-            .entry("http".to_string())
-            .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
-        if let PhpMixed::Array(m) = http_entry {
-            m.insert("follow_location".to_string(), PhpMixed::Int(0));
-        }
+    fn call(&self, method: &str, args: Vec<PluginValue>) -> anyhow::Result<PluginValue> {
+        let entity = self.entity()?;
+        Self::php_result(shirabe_php_rpc::call_php_method(
+            entity.phandle,
+            method,
+            args,
+            Some(&mut PluginRpcDispatcher::default()),
+        ))
+    }
 
-        for header in headers {
-            if let Some(PhpMixed::Array(m)) = options.get_mut("http") {
-                let header_list = m
-                    .entry("header".to_string())
-                    .or_insert_with(|| PhpMixed::List(Vec::new()));
-                if let PhpMixed::List(l) = header_list {
-                    l.push(PhpMixed::String(header));
+    /// Carries an exception the PHP instance throws over as the ported class, so a caller
+    /// catching `TransportException` catches it as it would under Composer.
+    ///
+    /// TODO(plugin): only the message and code cross (see `PhpThrow::properties`); the headers,
+    /// status code and response body a `TransportException` holds are lost.
+    fn php_result(
+        outcome: anyhow::Result<Result<PluginValue, PhpThrow>>,
+    ) -> anyhow::Result<PluginValue> {
+        match outcome? {
+            Ok(value) => Ok(value),
+            Err(throw) => Err(match throw.exception_class.as_str() {
+                "Composer\\Downloader\\TransportException" => {
+                    TransportException::new(throw.message, throw.code).into()
                 }
-            }
+                "Composer\\Downloader\\MaxFileSizeExceededException" => {
+                    MaxFileSizeExceededException::new(throw.message).into()
+                }
+                _ => RuntimeException::with_code(throw.message, throw.code).into(),
+            }),
         }
-
-        options
     }
 
-    fn handle_redirect(
-        &mut self,
-        response_headers: &[String],
-        mut additional_options: IndexMap<String, PhpMixed>,
-        result: Option<String>,
-    ) -> anyhow::Result<Option<String>> {
-        let mut target_url: Option<String> = None;
-        if let Some(location_header) = Response::find_header_value(response_headers, "location") {
-            let location_parsed = parse_url(&location_header);
-            if location_parsed
-                .as_ref()
-                .and_then(|parsed| parsed.scheme.as_deref())
-                .is_some_and(|scheme| !scheme.is_empty() && scheme != "0")
-            {
-                target_url = Some(location_header);
-            } else if location_parsed
-                .as_ref()
-                .and_then(|parsed| parsed.host.as_deref())
-                .is_some_and(|host| !host.is_empty() && host != "0")
-            {
-                target_url = Some(format!("{}:{}", self.scheme, location_header));
-            } else if location_header.starts_with('/') {
-                let url_host = parse_url(&self.file_url)
-                    .and_then(|parsed| parsed.host)
-                    .unwrap_or_default();
-
-                target_url = Some(preg_replace(
-                    format!(
-                        "{{^(.+(?://|@){}(?::\\d+)?)(?:[/\\?].*)?$}}",
-                        preg_quote(&url_host, None)
-                    ),
-                    &format!("\\1{}", location_header),
-                    &self.file_url,
-                ));
-            } else {
-                target_url = Some(preg_replace(
-                    php_regex!("{^(.+/)[^/?]*(?:\\?.*)?$}"),
-                    &format!("\\1{}", location_header),
-                    &self.file_url,
-                ));
-            }
+    fn get_result(value: PluginValue) -> anyhow::Result<GetResult> {
+        match value {
+            PluginValue::Bool(true) => Ok(GetResult::True),
+            PluginValue::Bool(false) => Ok(GetResult::False),
+            // TODO(bytes): GetResult carries the body as a String; from_utf8_lossy corrupts binary
+            // payloads.
+            PluginValue::String(content) => Ok(GetResult::Content(
+                String::from_utf8_lossy(&content).into_owned(),
+            )),
+            other => Err(Self::shape_error("get", &other)),
         }
-
-        if let Some(target_url) = target_url {
-            self.redirects += 1;
-
-            self.io.write_error3("", true, crate::io::DEBUG);
-            self.io.write_error3(
-                &format!(
-                    "Following redirect ({}) {}",
-                    self.redirects,
-                    Url::sanitize(target_url.clone()),
-                ),
-                true,
-                crate::io::DEBUG,
-            );
-
-            additional_options.insert("redirects".to_string(), PhpMixed::Int(self.redirects));
-
-            let host = parse_url(&target_url)
-                .and_then(|parsed| parsed.host)
-                .unwrap_or_default();
-            let res = self.get(
-                &host,
-                &target_url,
-                additional_options,
-                self.file_name.clone(),
-                self.progress,
-            )?;
-            return Ok(match res {
-                GetResult::Content(s) => Some(s),
-                _ => None,
-            });
-        }
-
-        if !self.retry {
-            let mut e = TransportException::new(
-                format!(
-                    "The \"{}\" file could not be downloaded, got redirect without Location ({})",
-                    self.file_url,
-                    response_headers.first().map(|s| s.as_str()).unwrap_or("")
-                ),
-                0,
-            );
-            e.set_headers(response_headers.to_vec());
-            let decoded = self.decode_result(result.as_deref(), response_headers)?;
-            e.set_response(decoded);
-
-            return Err(anyhow::anyhow!(e));
-        }
-
-        Ok(None)
     }
 
-    fn decode_result(
-        &self,
-        result: Option<&str>,
-        response_headers: &[String],
-    ) -> anyhow::Result<Option<String>> {
-        let mut result = result.map(|s| s.to_string());
-        if result.is_some() && extension_loaded("zlib") {
-            let content_encoding =
-                Response::find_header_value(response_headers, "content-encoding");
-            let decode = content_encoding
-                .as_deref()
-                .map(|s| "gzip" == strtolower(s))
-                .unwrap_or(false);
-
-            if decode {
-                let decoded = zlib_decode(result.as_deref().unwrap_or("").as_bytes());
-
-                result = match decoded {
-                    // TODO(bytes): byte-string semantics — the response body travels through
-                    // RemoteFilesystem as a String; from_utf8_lossy can corrupt binary payloads
-                    Some(d) => Some(String::from_utf8_lossy(&d).into_owned()),
-                    None => {
-                        return Err(TransportException::new(
-                            "Failed to decode zlib stream".to_string(),
-                            0,
-                        )
-                        .into());
-                    }
-                };
-            }
-        }
-
-        Ok(self.normalize_result(result.as_deref()))
+    fn string_list(method: &str, value: PluginValue) -> anyhow::Result<Vec<String>> {
+        let PluginValue::List(list) = value else {
+            return match value {
+                PluginValue::Array(ref map) if map.is_empty() => Ok(Vec::new()),
+                other => Err(Self::shape_error(method, &other)),
+            };
+        };
+        list.into_iter()
+            .map(|item| match item {
+                PluginValue::String(s) => Ok(String::from_utf8(s)?),
+                other => Err(Self::shape_error(method, &other)),
+            })
+            .collect()
     }
 
-    fn normalize_result(&self, result: Option<&str>) -> Option<String> {
-        result.map(|s| s.to_string())
+    fn shape_error(method: &str, value: &dyn std::fmt::Debug) -> anyhow::Error {
+        RuntimeException::new(format!(
+            "{CLASS}::{method} answered with an unsupported shape over RPC: {value:?}"
+        ))
+        .into()
     }
 
-    /// For testing only. Invokes the private `get_options_for_url`, mirroring the
-    /// `ReflectionMethod` access in `RemoteFilesystemTest::callGetOptionsForUrl`.
+    /// For testing only. Invokes the protected `getOptionsForUrl` of the PHP instance, mirroring
+    /// the `ReflectionMethod` access in `RemoteFilesystemTest::callGetOptionsForUrl`.
     pub fn __get_options_for_url(
-        &mut self,
+        &self,
         origin_url: &str,
         additional_options: IndexMap<String, PhpMixed>,
-    ) -> IndexMap<String, PhpMixed> {
-        self.get_options_for_url(origin_url, additional_options)
+    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+        let value = self.reflection_invoke(
+            "getOptionsForUrl",
+            vec![
+                PluginValue::string(origin_url),
+                PluginValue::from_php_mixed(&PhpMixed::Array(additional_options)),
+            ],
+        )?;
+        match value.to_php_mixed()? {
+            PhpMixed::Array(options) => Ok(options),
+            other => Err(Self::shape_error("getOptionsForUrl", &other)),
+        }
     }
 
-    /// For testing only. Sets the private `file_url`, mirroring the
+    /// For testing only. Sets the private `fileUrl` of the PHP instance, mirroring the
     /// `ReflectionProperty` access in `RemoteFilesystemTest::callGetOptionsForUrl`.
-    pub fn __set_file_url(&mut self, file_url: &str) {
-        self.file_url = file_url.to_string();
+    pub fn __set_file_url(&self, file_url: &str) -> anyhow::Result<()> {
+        self.reflection_set_property("fileUrl", PluginValue::string(file_url))
     }
 
-    /// For testing only. Invokes the private `callback_get`, mirroring the
+    /// For testing only. Invokes the protected `callbackGet` of the PHP instance, mirroring the
     /// `ReflectionMethod` access in `RemoteFilesystemTest::callCallbackGet`.
     pub fn __callback_get(
-        &mut self,
+        &self,
         notification_code: i64,
         severity: i64,
         message: Option<String>,
@@ -1080,33 +278,88 @@ impl RemoteFilesystem {
         bytes_transferred: i64,
         bytes_max: i64,
     ) -> anyhow::Result<()> {
-        self.callback_get(
-            notification_code,
-            severity,
-            message,
-            message_code,
-            bytes_transferred,
-            bytes_max,
-        )
+        self.reflection_invoke(
+            "callbackGet",
+            vec![
+                PluginValue::Int(notification_code),
+                PluginValue::Int(severity),
+                match message {
+                    Some(message) => PluginValue::string(message),
+                    None => PluginValue::Null,
+                },
+                PluginValue::Int(message_code),
+                PluginValue::Int(bytes_transferred),
+                PluginValue::Int(bytes_max),
+            ],
+        )?;
+        Ok(())
     }
 
-    /// For testing only. Reads the private `bytes_max`.
-    pub fn __bytes_max(&self) -> i64 {
-        self.bytes_max
+    /// For testing only. Reads the private `bytesMax` of the PHP instance.
+    pub fn __bytes_max(&self) -> anyhow::Result<i64> {
+        match self.reflection_get_property("bytesMax")? {
+            PluginValue::Int(bytes_max) => Ok(bytes_max),
+            other => Err(Self::shape_error("bytesMax", &other)),
+        }
     }
 
-    /// For testing only. Sets the private `bytes_max`.
-    pub fn __set_bytes_max(&mut self, bytes_max: i64) {
-        self.bytes_max = bytes_max;
+    /// For testing only. Sets the private `bytesMax` of the PHP instance.
+    pub fn __set_bytes_max(&self, bytes_max: i64) -> anyhow::Result<()> {
+        self.reflection_set_property("bytesMax", PluginValue::Int(bytes_max))
     }
 
-    /// For testing only. Sets the private `progress`.
-    pub fn __set_progress(&mut self, progress: bool) {
-        self.progress = progress;
+    /// For testing only. Sets the private `progress` of the PHP instance.
+    pub fn __set_progress(&self, progress: bool) -> anyhow::Result<()> {
+        self.reflection_set_property("progress", PluginValue::Bool(progress))
     }
 
-    /// For testing only. Reads the private `last_progress`.
-    pub fn __last_progress(&self) -> Option<i64> {
-        self.last_progress
+    /// For testing only. Reads the private `lastProgress` of the PHP instance.
+    pub fn __last_progress(&self) -> anyhow::Result<Option<i64>> {
+        match self.reflection_get_property("lastProgress")? {
+            PluginValue::Null => Ok(None),
+            PluginValue::Int(last_progress) => Ok(Some(last_progress)),
+            other => Err(Self::shape_error("lastProgress", &other)),
+        }
+    }
+
+    fn reflection_invoke(
+        &self,
+        method: &str,
+        args: Vec<PluginValue>,
+    ) -> anyhow::Result<PluginValue> {
+        let entity = PluginValue::PhpHandle(self.entity()?.clone());
+        Self::php_result(shirabe_php_rpc::call_function_with_dispatcher(
+            "__shirabe_reflection_invoke",
+            vec![entity, PluginValue::string(method), PluginValue::List(args)],
+            Some(&mut PluginRpcDispatcher::default()),
+        ))
+    }
+
+    fn reflection_get_property(&self, name: &str) -> anyhow::Result<PluginValue> {
+        let entity = PluginValue::PhpHandle(self.entity()?.clone());
+        Self::php_result(shirabe_php_rpc::call_function_with_dispatcher(
+            "__shirabe_reflection_get_property",
+            vec![entity, PluginValue::string(name)],
+            Some(&mut PluginRpcDispatcher::default()),
+        ))
+    }
+
+    fn reflection_set_property(&self, name: &str, value: PluginValue) -> anyhow::Result<()> {
+        let entity = PluginValue::PhpHandle(self.entity()?.clone());
+        Self::php_result(shirabe_php_rpc::call_function_with_dispatcher(
+            "__shirabe_reflection_set_property",
+            vec![entity, PluginValue::string(name), value],
+            Some(&mut PluginRpcDispatcher::default()),
+        ))?;
+        Ok(())
+    }
+}
+
+impl Drop for RemoteFilesystem {
+    fn drop(&mut self) {
+        if let Some(entity) = self.entity.get() {
+            // A dead worker has nothing left to release.
+            let _ = shirabe_php_rpc::release_php_handle(entity.phandle);
+        }
     }
 }

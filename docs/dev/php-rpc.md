@@ -196,6 +196,10 @@ Notable internal helpers:
   [docs/dev/env-vars-porting.md](./env-vars-porting.md). The outermost `rpc_call` of a session
   issues it whenever the journal has moved on.
 - `__shirabe_get_property` — for testing only: reads a public property of a P-table entity.
+- `__shirabe_reflection_invoke` / `__shirabe_reflection_get_property` /
+  `__shirabe_reflection_set_property` — for testing only: the `ReflectionMethod` /
+  `ReflectionProperty` access PHPUnit tests use to reach the non-public members of a P-table
+  entity.
 - `__shirabe_oracle_roundtrip` — codec oracle support for tests.
 - `__shirabe_console_application_boot` — builds the worker-side `Composer\Console\Application`
   (the `php/runtime/` definition) from the Rust handoff: the shared `$composer`/`$io` proxies,

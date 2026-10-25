@@ -22,6 +22,7 @@ mod gitlab_test;
 mod http;
 mod http_downloader_test;
 mod ini_helper_test;
+mod local_filesystem_test;
 mod metadata_minifier_test;
 mod no_proxy_pattern_test;
 mod package_sorter_test;

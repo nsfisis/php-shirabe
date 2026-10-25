@@ -8,11 +8,12 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::package::version::VersionParser;
 use crate::util::GetResult;
+use crate::util::LocalFilesystem;
 use crate::util::Platform;
 use crate::util::RemoteFilesystem;
 use crate::util::StreamContextFactory;
 use crate::util::Url;
-use crate::util::http::CurlDownloader;
+use crate::util::http::NativeHttpDownloader;
 use crate::util::http::Response;
 use crate::util::sync_executor;
 use indexmap::IndexMap;
@@ -35,12 +36,13 @@ pub struct HttpDownloader {
     /// Replaces PHP's `$runningJobs`/`$maxJobs` counters: a permit is held for the duration of
     /// each in-flight request and released when it settles.
     semaphore: std::rc::Rc<tokio::sync::Semaphore>,
-    /// @var ?CurlDownloader
-    ///
-    /// Shared so that a request future can hold it without borrowing the downloader.
-    curl: Option<std::rc::Rc<CurlDownloader>>,
-    /// @var ?RemoteFilesystem
-    rfs: Option<std::rc::Rc<std::cell::RefCell<RemoteFilesystem>>>,
+    /// Takes the http(s) requests, in the place of Composer's `?CurlDownloader`. Shared so that a
+    /// request future can hold it without borrowing the downloader.
+    native: Option<std::rc::Rc<NativeHttpDownloader>>,
+    /// Takes `file://` URLs and local paths, which Composer hands to its `RemoteFilesystem`.
+    local: LocalFilesystem,
+    /// Takes whatever neither of the above does. Composer's `RemoteFilesystem`, in the worker.
+    rfs: RemoteFilesystem,
     /// @var bool
     disabled: bool,
     /// @var bool
@@ -123,20 +125,18 @@ impl HttpDownloader {
         // handle the other externally set options normally.
         self_options = array_replace_recursive(self_options, options.clone());
 
-        let curl = if Self::is_curl_enabled() {
-            Some(std::rc::Rc::new(CurlDownloader::new(
-                io.clone(),
-                config.clone(),
-                options.clone(),
-                disable_tls,
-            )))
-        } else {
-            None
-        };
-
-        let rfs = Some(std::rc::Rc::new(std::cell::RefCell::new(
-            RemoteFilesystem::new(io.clone(), config.clone(), options, disable_tls, None),
+        // Composer builds its CurlDownloader only when the curl extension is loaded. The native
+        // downloader needs no extension, so it is always there.
+        let native = Some(std::rc::Rc::new(NativeHttpDownloader::new(
+            io.clone(),
+            config.clone(),
+            options.clone(),
+            disable_tls,
         )));
+
+        let local = LocalFilesystem::new(io.clone(), config.clone());
+
+        let rfs = RemoteFilesystem::new(io.clone(), config.clone(), options, disable_tls);
 
         let mut max_jobs: i64 = 12;
         let max_jobs_env = Platform::get_env("COMPOSER_MAX_PARALLEL_HTTP");
@@ -158,7 +158,8 @@ impl HttpDownloader {
             config,
             options: self_options,
             semaphore: std::rc::Rc::new(tokio::sync::Semaphore::new(max_jobs as usize)),
-            curl,
+            native,
+            local,
             rfs,
             disabled,
             allow_async: false,
@@ -225,16 +226,16 @@ impl HttpDownloader {
         }
 
         let (options, origin) = self.prepare_request(url, options);
-        if !self.can_use_curl(url, &options) {
-            return self.download_with_rfs(&origin, url, options, copy_to);
+        if !self.can_use_native(url, &options) {
+            return self.download_with_filesystem(&origin, url, options, copy_to);
         }
 
         // PHP keeps async jobs in a table `Loop::abortJobs()` can reach through the promises
         // being waited on; a synchronous job is in no such group.
         if sync {
-            return Self::download_with_curl(
+            return Self::download_with_native(
                 self.semaphore.clone(),
-                self.curl.clone().unwrap(),
+                self.native.clone().unwrap(),
                 self.disabled,
                 origin,
                 url.to_string(),
@@ -249,9 +250,9 @@ impl HttpDownloader {
             crate::plugin::job_registry::JobOwner::of_http_downloader(self),
             abort_handle,
         );
-        let request = Self::download_with_curl(
+        let request = Self::download_with_native(
             self.semaphore.clone(),
-            self.curl.clone().unwrap(),
+            self.native.clone().unwrap(),
             self.disabled,
             origin,
             url.to_string(),
@@ -299,9 +300,9 @@ impl HttpDownloader {
 
     /// The job behind `add()` / `add_copy()` for a caller that registers it instead of awaiting it
     /// (see `docs/dev/plugin-async.md`). The gates PHP raises out of the call itself are the outer
-    /// error. A request the curl backend does not take is run on the spot, as PHP runs the
+    /// error. A request the native downloader does not take is run on the spot, as PHP runs the
     /// `RemoteFilesystem` resolver while it constructs the promise, and comes back settled. The
-    /// future of a curl request borrows nothing from the downloader, and `started` tells whether
+    /// future of a native request borrows nothing from the downloader, and `started` tells whether
     /// the job budget has let the job through.
     pub(crate) fn add_job(
         &self,
@@ -329,9 +330,9 @@ impl HttpDownloader {
         }
 
         let (options, origin) = self.prepare_request(url, options);
-        if !self.can_use_curl(url, &options) {
+        if !self.can_use_native(url, &options) {
             return Ok(HttpDownloaderJob::Settled(
-                self.download_with_rfs(&origin, url, options, copy_to),
+                self.download_with_filesystem(&origin, url, options, copy_to),
             ));
         }
 
@@ -341,9 +342,9 @@ impl HttpDownloader {
         started.set(self.semaphore.available_permits() > 0);
 
         Ok(HttpDownloaderJob::Pending(Box::pin(
-            Self::download_with_curl(
+            Self::download_with_native(
                 self.semaphore.clone(),
-                self.curl.clone().unwrap(),
+                self.native.clone().unwrap(),
                 self.disabled,
                 origin,
                 url.to_string(),
@@ -355,11 +356,11 @@ impl HttpDownloader {
     }
 
     /// PHP's `startJob` for a job the curl resolver queued: wait for the job budget, then either
-    /// answer for a disabled network or hand the request to curl.
+    /// answer for a disabled network or hand the request to the native downloader.
     #[allow(clippy::too_many_arguments)]
-    async fn download_with_curl(
+    async fn download_with_native(
         semaphore: std::rc::Rc<tokio::sync::Semaphore>,
-        curl: std::rc::Rc<CurlDownloader>,
+        native: std::rc::Rc<NativeHttpDownloader>,
         disabled: bool,
         origin: String,
         url: String,
@@ -422,7 +423,7 @@ impl HttpDownloader {
             return Err(e.into());
         }
 
-        match curl
+        match native
             .download(&origin, &url, options, copy_to.as_deref())
             .await
         {
@@ -433,32 +434,50 @@ impl HttpDownloader {
     }
 
     /// The resolver PHP's `addJob` builds for a request curl does not take: the blocking
-    /// `RemoteFilesystem` download, run immediately. The network-disabled short-circuit never
-    /// reaches it in PHP either, since `startJob` only handles jobs the curl resolver queued.
-    fn download_with_rfs(
+    /// `RemoteFilesystem` download, run immediately. A local file is read by `LocalFilesystem`
+    /// instead, which answers with no headers, as the PHP class does for one. The
+    /// network-disabled short-circuit never reaches it in PHP either, since `startJob` only
+    /// handles jobs the curl resolver queued.
+    fn download_with_filesystem(
         &self,
         origin: &str,
         url: &str,
         options: IndexMap<String, PhpMixed>,
         copy_to: Option<&str>,
     ) -> anyhow::Result<Response> {
-        let rfs = self.rfs.as_ref().unwrap();
-        if let Some(copy_to) = copy_to {
-            let (_, headers) =
-                rfs.borrow_mut()
-                    .copy(origin, url, copy_to, false, options.clone())?;
+        if LocalFilesystem::handles(url) {
+            return if let Some(copy_to) = copy_to {
+                self.local.copy(origin, url, copy_to, false, options)?;
 
+                Ok(Response::new(
+                    url.to_string(),
+                    None,
+                    Vec::new(),
+                    Some(format!("{}~", copy_to)),
+                ))
+            } else {
+                let body = match self.local.get_contents(origin, url, false, options)? {
+                    GetResult::Content(s) => Some(s),
+                    _ => None,
+                };
+                Ok(Response::new(url.to_string(), None, Vec::new(), body))
+            };
+        }
+
+        if let Some(copy_to) = copy_to {
+            self.rfs.copy(origin, url, copy_to, false, options)?;
+
+            let headers = self.rfs.get_last_headers()?;
             let code = RemoteFilesystem::find_status_code(&headers);
             let body = Some(format!("{}~", copy_to));
             Ok(Response::new(url.to_string(), code, headers, body))
         } else {
-            let (result, headers) =
-                rfs.borrow_mut()
-                    .get_contents(origin, url, false, options.clone())?;
+            let result = self.rfs.get_contents(origin, url, false, options)?;
             let body = match result {
                 GetResult::Content(s) => Some(s),
                 _ => None,
             };
+            let headers = self.rfs.get_last_headers()?;
             let code = RemoteFilesystem::find_status_code(&headers);
             Ok(Response::new(url.to_string(), code, headers, body))
         }
@@ -612,8 +631,10 @@ impl HttpDownloader {
         None
     }
 
-    fn can_use_curl(&self, url: &str, options: &IndexMap<String, PhpMixed>) -> bool {
-        if self.curl.is_none() {
+    /// PHP's `canUseCurl`, asked of the native downloader: Composer's reasons to keep a request
+    /// away from curl hold for it too.
+    fn can_use_native(&self, url: &str, options: &IndexMap<String, PhpMixed>) -> bool {
+        if self.native.is_none() {
             return false;
         }
 
@@ -641,19 +662,20 @@ impl HttpDownloader {
 
     /// For testing only. Builds an HttpDownloader whose request methods are fully
     /// short-circuited by the mock (see [`HttpDownloader::__expects`]), without
-    /// constructing the real curl/rfs backends. Mirrors HttpDownloaderMock, which
+    /// constructing the native downloader. Mirrors HttpDownloaderMock, which
     /// extends HttpDownloader but never performs curl I/O.
     pub fn __new_mock(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
     ) -> Self {
         Self {
+            local: LocalFilesystem::new(io.clone(), config.clone()),
+            rfs: RemoteFilesystem::new(io.clone(), config.clone(), IndexMap::new(), false),
             io,
             config,
             options: IndexMap::new(),
             semaphore: std::rc::Rc::new(tokio::sync::Semaphore::new(12)),
-            curl: None,
-            rfs: None,
+            native: None,
             disabled: false,
             allow_async: false,
             mock: None,

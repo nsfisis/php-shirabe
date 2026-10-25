@@ -378,8 +378,13 @@ Three, all versioned next to the tool, all expected to stay short:
   shared state; no stub exists, so the child resolves the class to a guard
   and every env access from plugin code is an explicit error), the
   bootstrap classes (see "Known deviations"), two phantom-reachability
-  corrections (`HhvmDetector`, `VersionGuesser`), and
-  `Composer\Util\Http\Response` → `rust-snapshot` (see rust-snapshot above).
+  corrections (`HhvmDetector`, `VersionGuesser`),
+  `Composer\Util\Http\Response` → `rust-snapshot` (see rust-snapshot above),
+  and the transport classes the Rust-side `HttpDownloader` does not own →
+  `php-native`: `CurlDownloader` and `CurlResponse` (its http(s) requests go
+  to a native downloader instead) and `RemoteFilesystem` (it hands the
+  requests it cannot serve itself to an instance of the real class in the
+  child).
 
 ### Failure mode
 
@@ -459,7 +464,9 @@ constructs demotes the constructing class, and the demotions cascade.
 `ProcessExecutor` is what carries the VCS/auth utility belt to
 `unsupported`: `GitHub`, `GitLab`, `Bitbucket` and `Svn` construct one,
 `Git` constructs a `Bitbucket`, `AuthHelper` a `GitHub`, and
-`RemoteFilesystem` an `AuthHelper`. `JsonFile` takes `ConfigValidator` and
+`RemoteFilesystem` an `AuthHelper` (`RemoteFilesystem` itself is filed
+`php-native` by override, so building one is the explicit error of the
+`AuthHelper` guard). `JsonFile` takes `ConfigValidator` and
 `RepositoryFactory` the same way, and `ArrayLoader` — which plugins `new`
 just as constantly, and which drives constructor-plus-setters on the
 package classes — takes `VersionSelector` and `VersionBumper`.
