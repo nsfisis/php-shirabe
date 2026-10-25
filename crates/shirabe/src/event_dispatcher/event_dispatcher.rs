@@ -781,12 +781,6 @@ impl EventDispatcher {
                         } else {
                             output_interface::VERBOSITY_NORMAL
                         };
-                        // TODO(error-model): the snippet's try/catch does not reproduce upstream's
-                        // boundary. Upstream wraps `$app->run()` alone and catches `\Exception`, so
-                        // an `\Error` from the command, and a throw from `new $className(...)`,
-                        // both escape without the "terminated with an exception" line. Here the
-                        // catch is `\Throwable`, and a constructor throw leaves the snippet as a
-                        // `Throw` reply from `__shirabe_eval`, so the line is written either way.
                         let snippet = format!(
                             r#"
 $className = {class_name_lit};
@@ -808,7 +802,7 @@ try {{
     $status = $app->run(new \Symfony\Component\Console\Input\StringInput({input_lit}), $output);
     return ['status' => $status, 'output' => $output->fetch()];
 }} catch (\Throwable $e) {{
-    return ['throw' => [get_class($e), $e->getMessage(), (int) $e->getCode()], 'output' => $output->fetch()];
+    return ['throw' => [get_class($e), $e->getMessage(), (int) $e->getCode(), $e instanceof \Exception], 'output' => $output->fetch()];
 }}
 "#,
                             class_name_lit = php_single_quote(&class_name),
@@ -836,15 +830,6 @@ try {{
                             // TODO(error-model): `throw.exception_class` is dropped, so the class
                             // upstream rethrows unchanged collapses to RuntimeException here.
                             Err(throw) => {
-                                self.io.write_error3(
-                                    &format!(
-                                        "<error>Script {} handling the {} event terminated with an exception</error>",
-                                        callable_str.clone(),
-                                        event.get_name(),
-                                    ),
-                                    true,
-                                    crate::io::QUIET,
-                                );
                                 return Err(
                                     RuntimeException::with_code(throw.message, throw.code).into()
                                 );
@@ -875,15 +860,18 @@ try {{
                                 Some(PhpMixed::Int(code)) => *code,
                                 _ => 0,
                             };
-                            self.io.write_error3(
-                                &format!(
-                                    "<error>Script {} handling the {} event terminated with an exception</error>",
-                                    callable_str.clone(),
-                                    event.get_name(),
-                                ),
-                                true,
-                                crate::io::QUIET,
-                            );
+                            let caught = matches!(fields.get(3), Some(PhpMixed::Bool(true)));
+                            if caught {
+                                self.io.write_error3(
+                                    &format!(
+                                        "<error>Script {} handling the {} event terminated with an exception</error>",
+                                        callable_str.clone(),
+                                        event.get_name(),
+                                    ),
+                                    true,
+                                    crate::io::QUIET,
+                                );
+                            }
                             return Err(RuntimeException::with_code(message, code).into());
                         }
                         r#return = match result.as_array().and_then(|map| map.get("status")) {

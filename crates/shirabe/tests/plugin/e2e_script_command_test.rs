@@ -74,7 +74,7 @@ fn test_script_command_class_import_matches_upstream_composer() {
         (env!("CARGO_BIN_EXE_shirabe"), vec![]),
     ];
 
-    let mut results: Vec<[CommandRun; 4]> = Vec::new();
+    let mut results: Vec<[CommandRun; 6]> = Vec::new();
     for (program, prefix) in &implementations {
         let work = TempDir::new().unwrap();
         copy_dir(&fixture_dir(), work.path());
@@ -85,12 +85,20 @@ fn test_script_command_class_import_matches_upstream_composer() {
         let renamed = run_command(work.path(), program, prefix, &["renamed"]);
         let help = run_command(work.path(), program, prefix, &["help", "greet"]);
         let list = run_command(work.path(), program, prefix, &["list"]);
-        results.push([greet, renamed, help, list]);
+        let thrown_exception = run_command(
+            work.path(),
+            program,
+            prefix,
+            &["run-script", "throw-exception"],
+        );
+        let thrown_error =
+            run_command(work.path(), program, prefix, &["run-script", "throw-error"]);
+        results.push([greet, renamed, help, list, thrown_exception, thrown_error]);
     }
 
     let [upstream, shirabe] = <[_; 2]>::try_from(results).ok().unwrap();
-    let [u_greet, u_renamed, u_help, u_list] = upstream;
-    let [s_greet, s_renamed, s_help, s_list] = shirabe;
+    let [u_greet, u_renamed, u_help, u_list, u_exception, u_error] = upstream;
+    let [s_greet, s_renamed, s_help, s_list, s_exception, s_error] = shirabe;
 
     // The imported command runs with its own definition bound: the argument, the shorthand
     // option, the name the constructor took from composer.json and the hosting application.
@@ -166,5 +174,48 @@ fn test_script_command_class_import_matches_upstream_composer() {
     assert_eq!(
         vec!["  greet                Greets someone from a script-provided command."],
         lines_starting_with(&s_list.stdout, "greet")
+    );
+
+    // Run through the event dispatcher, the class runs in a bare console application whose run
+    // alone is wrapped in a catch of \Exception: an exception gets the "terminated with an
+    // exception" line before it is rethrown, an \Error escapes without it.
+    let terminated = "Script ShirabeTest\\ScriptCommand\\ThrowingExceptionCommand handling the throw-exception event terminated with an exception";
+    assert_ne!(0, u_exception.exit_code);
+    assert_eq!(u_exception.exit_code, s_exception.exit_code);
+    assert!(
+        u_exception.stderr.contains(terminated),
+        "{}",
+        u_exception.stderr
+    );
+    assert!(
+        s_exception.stderr.contains(terminated),
+        "{}",
+        s_exception.stderr
+    );
+    assert!(
+        s_exception.stderr.contains("thrown by the command"),
+        "{}",
+        s_exception.stderr
+    );
+    assert_eq!(
+        lines_starting_with(&u_exception.stdout, "throw-exception:"),
+        lines_starting_with(&s_exception.stdout, "throw-exception:")
+    );
+
+    assert_ne!(0, u_error.exit_code);
+    assert_eq!(u_error.exit_code, s_error.exit_code);
+    assert!(
+        !u_error.stderr.contains("terminated with an exception"),
+        "{}",
+        u_error.stderr
+    );
+    assert!(
+        !s_error.stderr.contains("terminated with an exception"),
+        "{}",
+        s_error.stderr
+    );
+    assert_eq!(
+        lines_starting_with(&u_error.stdout, "throw-error:"),
+        lines_starting_with(&s_error.stdout, "throw-error:")
     );
 }

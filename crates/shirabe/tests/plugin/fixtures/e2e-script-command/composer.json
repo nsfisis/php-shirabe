@@ -10,6 +10,8 @@
         "greet": "ShirabeTest\\ScriptCommand\\GreetCommand",
         "renamed": "ShirabeTest\\ScriptCommand\\MismatchedNameCommand",
         "single": "ShirabeTest\\ScriptCommand\\SingleAppCommand",
+        "throw-exception": "ShirabeTest\\ScriptCommand\\ThrowingExceptionCommand",
+        "throw-error": "ShirabeTest\\ScriptCommand\\ThrowingErrorCommand",
         "plain": "echo plain-script"
     },
     "scripts-descriptions": {
