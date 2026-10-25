@@ -69,6 +69,10 @@ pub enum Frame {
         /// The state the exception carries beyond `message` and `code`, keyed by the property
         /// names its class declares. Empty for an exception that carries none.
         properties: IndexMap<String, PluginValue>,
+        file: String,
+        line: i64,
+        /// The superclasses of `exception_class`, nearest first.
+        parents: Vec<String>,
     },
     ReleaseRustHandle {
         rhandle: u64,
@@ -184,6 +188,9 @@ impl Frame {
                 message,
                 code,
                 properties,
+                file,
+                line,
+                parents,
                 ..
             } => vec![
                 PluginValue::string(exception_class.clone()),
@@ -195,6 +202,9 @@ impl Frame {
                         .map(|(name, v)| (name.clone().into_bytes(), v.clone()))
                         .collect(),
                 ),
+                PluginValue::string(file.clone()),
+                PluginValue::Int(*line),
+                PluginValue::List(parents.iter().cloned().map(PluginValue::string).collect()),
             ],
             Frame::ReleaseRustHandle { rhandle } => vec![int_value(*rhandle)],
             Frame::ReleasePhpHandle { phandle } => vec![int_value(*phandle)],
@@ -313,6 +323,20 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
                 }
             },
             properties: expect_properties(next()),
+            // TODO(bytes): a PHP path is bytes, not necessarily UTF-8.
+            file: match next() {
+                PluginValue::String(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+                other => {
+                    panic!("PHP RPC: protocol violation — Throw file is not a string: {other:?}")
+                }
+            },
+            line: match next() {
+                PluginValue::Int(line) => line,
+                other => {
+                    panic!("PHP RPC: protocol violation — Throw line is not an int: {other:?}")
+                }
+            },
+            parents: expect_list(next()).into_iter().map(expect_string).collect(),
         },
         TAG_RELEASE_RUST_HANDLE => Frame::ReleaseRustHandle {
             rhandle: expect_id(next()),
@@ -460,6 +484,9 @@ mod tests {
             ]
             .into_iter()
             .collect(),
+            file: "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php".to_string(),
+            line: 42,
+            parents: vec!["RuntimeException".to_string(), "Exception".to_string()],
         });
         match frame {
             Frame::Throw {
@@ -468,7 +495,16 @@ mod tests {
                 message,
                 code,
                 properties,
+                file,
+                line,
+                parents,
             } => {
+                assert_eq!(
+                    file,
+                    "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php"
+                );
+                assert_eq!(line, 42);
+                assert_eq!(parents, vec!["RuntimeException", "Exception"]);
                 assert_eq!(corr_id, 11);
                 assert_eq!(exception_class, "Composer\\Downloader\\TransportException");
                 assert_eq!(

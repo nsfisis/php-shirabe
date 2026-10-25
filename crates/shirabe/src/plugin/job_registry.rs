@@ -5,9 +5,9 @@
 //! `docs/dev/plugin-async.md`.
 
 use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
+use crate::plugin::throwable_bridge::throw_into_error;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue, call_function_with_dispatcher};
-use shirabe_php_shim::RuntimeException;
 
 /// The service a job is counted against: the one whose `countActiveJobs()` reports it and whose
 /// tick drives it.
@@ -201,17 +201,14 @@ fn push_settle(id: u64, outcome: Result<PluginValue, PhpThrow>) -> Result<(), Ph
     match call_function_with_dispatcher(function, args, Some(&mut PluginRpcDispatcher::default())) {
         Ok(Ok(_)) => Ok(()),
         Ok(Err(throw)) => Err(throw),
-        Err(error) => Err(PhpThrow {
-            exception_class: "RuntimeException".to_string(),
-            message: format!("settling job {id} in the plugin process failed: {error:#}"),
-            code: 0,
-            properties: Box::new(IndexMap::new()),
-        }),
+        Err(error) => Err(PhpThrow::runtime(format!(
+            "settling job {id} in the plugin process failed: {error:#}"
+        ))),
     }
 }
 
-/// The four fields a `Throw` frame carries, as the argument list the worker rebuilds an exception
-/// from.
+/// The fields a `Throw` frame carries, as the argument list the worker rebuilds an exception
+/// from: class, message, code, declared state, file and line.
 pub(crate) fn throw_fields(throw: PhpThrow) -> Vec<PluginValue> {
     let properties = PluginValue::Array(
         throw
@@ -225,6 +222,8 @@ pub(crate) fn throw_fields(throw: PhpThrow) -> Vec<PluginValue> {
         PluginValue::string(throw.message),
         PluginValue::Int(throw.code),
         properties,
+        PluginValue::string(throw.file),
+        PluginValue::Int(throw.line),
     ]
 }
 
@@ -382,15 +381,7 @@ pub(crate) async fn await_php_job(id: u64) -> anyhow::Result<PluginValue> {
     })
     .await;
     drop(parked);
-    outcome.map_err(throw_to_error)
-}
-
-/// A PHP exception as the error the callers on the Rust side propagate.
-///
-/// TODO(error-model): the class of the exception is lost; nothing on the Rust side rebuilds a
-/// ported exception from the fields a `Throw` carries yet.
-fn throw_to_error(throw: PhpThrow) -> anyhow::Error {
-    RuntimeException::with_code(throw.message, throw.code).into()
+    outcome.map_err(throw_into_error)
 }
 
 fn take_php_job_outcome(id: u64) -> Option<Result<PluginValue, PhpThrow>> {
@@ -440,15 +431,10 @@ pub(crate) fn fail_php_jobs(ids: &[u64]) {
     for id in ids {
         settle_php_job(
             *id,
-            Err(PhpThrow {
-                exception_class: "RuntimeException".to_string(),
-                message: format!(
-                    "the promise of plugin job {id} can never settle: no job is left whose \
-                     completion could run the code that resolves it"
-                ),
-                code: 0,
-                properties: Box::new(IndexMap::new()),
-            }),
+            Err(PhpThrow::runtime(format!(
+                "the promise of plugin job {id} can never settle: no job is left whose \
+                 completion could run the code that resolves it"
+            ))),
         );
     }
 }
@@ -464,7 +450,7 @@ pub(crate) fn poll_jobs_in_wait(
         return Ok(false);
     }
     let pass = begin_pass();
-    let settled = poll_jobs(owners, cx).map_err(throw_to_error)?;
+    let settled = poll_jobs(owners, cx).map_err(throw_into_error)?;
     if settled || another_pass_ran_since(pass) {
         cx.waker().wake_by_ref();
     }

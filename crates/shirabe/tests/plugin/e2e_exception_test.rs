@@ -73,6 +73,11 @@ logic=true runtime=false
 ensureDirectoryExists class=\"RuntimeException\" \
 message=\"not-a-directory exists and is not a directory.\" code=0 logic=false runtime=true
 catch-clause=InvalidArgumentException
+callback-own-class class=\"ShirabeTest\\\\Exception\\\\PluginException\" \
+message=\"from the plugin\" code=7 logic=false runtime=true
+callback-transport class=\"Composer\\\\Downloader\\\\TransportException\" \
+message=\"not found\" code=404 logic=false runtime=true status=404 response=\"missing\" \
+headers=[\"HTTP\\/1.1 404 Not Found\"]
 ",
         upstream.trace
     );

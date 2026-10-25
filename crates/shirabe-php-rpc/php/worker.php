@@ -221,8 +221,8 @@ final class ShirabeJobRegistry
                 unset(self::$deferreds[$id]);
                 $thrown = ShirabeRpcRuntime::callRust(0, '__shirabeCancelJob', [$id]);
                 if ($thrown !== null) {
-                    [$class, $message, $code, $properties] = $thrown;
-                    throw \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties);
+                    [$class, $message, $code, $properties, $file, $line] = $thrown;
+                    throw \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties, $file, (int) $line);
                 }
             });
         }
@@ -294,12 +294,10 @@ final class ShirabeJobRegistry
                 if (!$reason instanceof Throwable) {
                     $reason = new RuntimeException('the promise was rejected with ' . gettype($reason));
                 }
-                // TODO(plugin): the properties field is empty in this direction; no Rust-side
-                // consumer rebuilds a ported exception from these fields yet.
                 ShirabeRpcRuntime::callRust(
                     0,
                     '__shirabeRejectJob',
-                    [$id, get_class($reason), $reason->getMessage(), (int) $reason->getCode(), []]
+                    array_merge([$id], \Shirabe\MaterializedThrowable::describe($reason))
                 );
             }
         );
@@ -516,12 +514,14 @@ final class ShirabeRpcRuntime
                     $outParams = self::fromWire($fields[1] ?? []);
                     return self::fromWire($fields[0]);
                 }
-                [$class, $message, $code, $properties] = $fields;
+                [$class, $message, $code, $properties, $file, $line] = $fields;
                 throw \Shirabe\MaterializedThrowable::revive(
                     $class,
                     $message,
                     (int) $code,
-                    self::fromWire($properties)
+                    self::fromWire($properties),
+                    $file,
+                    (int) $line
                 );
             }
             self::dispatchRequest($tag, $inId, $payload);
@@ -614,13 +614,9 @@ final class ShirabeRpcRuntime
                 serialize([self::toWire($result), []])
             );
         } catch (Throwable $e) {
-            self::writeFrame(
-                SHIRABE_TAG_THROW,
-                $corrId,
-                // TODO(plugin): the properties field is empty in this direction; no Rust-side
-                // consumer rebuilds a ported exception from a Throw frame yet.
-                serialize([get_class($e), $e->getMessage(), (int) $e->getCode(), []])
-            );
+            $fields = \Shirabe\MaterializedThrowable::describe($e);
+            $fields[3] = self::toWire($fields[3]);
+            self::writeFrame(SHIRABE_TAG_THROW, $corrId, serialize($fields));
         }
     }
 
@@ -1028,10 +1024,10 @@ ShirabeRpcRuntime::$dispatch = [
                 'react/promise is not loaded in the plugin process, so a PromiseInterface cannot be built'
             );
         }
-        [$class, $message, $code, $properties] = $args;
+        [$class, $message, $code, $properties, $file, $line] = $args;
 
         return ShirabeJobRegistry::park(\React\Promise\reject(
-            \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties)
+            \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties, $file, (int) $line)
         ));
     },
     // The settle pushes of a Rust-owned job, sent from inside the tick that saw it finish. The
@@ -1041,10 +1037,10 @@ ShirabeRpcRuntime::$dispatch = [
         return null;
     },
     '__shirabe_reject_job' => static function ($args) {
-        [$id, $class, $message, $code, $properties] = $args;
+        [$id, $class, $message, $code, $properties, $file, $line] = $args;
         ShirabeJobRegistry::reject(
             (int) $id,
-            \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties)
+            \Shirabe\MaterializedThrowable::revive($class, $message, (int) $code, $properties, $file, (int) $line)
         );
         return null;
     },

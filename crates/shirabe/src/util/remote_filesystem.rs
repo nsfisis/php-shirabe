@@ -7,8 +7,6 @@
 //! built on first use, so a run that never needs it never spawns the worker.
 
 use crate::config::Config;
-use crate::downloader::MaxFileSizeExceededException;
-use crate::downloader::TransportException;
 use crate::io::IOInterface;
 use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, config_handle_value, io_handle_value};
 use indexmap::IndexMap;
@@ -186,23 +184,12 @@ impl RemoteFilesystem {
 
     /// Carries an exception the PHP instance throws over as the ported class, so a caller
     /// catching `TransportException` catches it as it would under Composer.
-    ///
-    /// TODO(plugin): only the message and code cross (see `PhpThrow::properties`); the headers,
-    /// status code and response body a `TransportException` holds are lost.
     fn php_result(
         outcome: anyhow::Result<Result<PluginValue, PhpThrow>>,
     ) -> anyhow::Result<PluginValue> {
         match outcome? {
             Ok(value) => Ok(value),
-            Err(throw) => Err(match throw.exception_class.as_str() {
-                "Composer\\Downloader\\TransportException" => {
-                    TransportException::new(throw.message, throw.code).into()
-                }
-                "Composer\\Downloader\\MaxFileSizeExceededException" => {
-                    MaxFileSizeExceededException::new(throw.message).into()
-                }
-                _ => RuntimeException::with_code(throw.message, throw.code).into(),
-            }),
+            Err(throw) => Err(crate::plugin::throwable_bridge::throw_into_error(throw)),
         }
     }
 

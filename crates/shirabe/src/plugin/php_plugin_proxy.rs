@@ -10,7 +10,6 @@ use crate::command::BaseCommand;
 use crate::composer::ComposerHandle;
 use crate::dependency_resolver::AnyTransaction;
 use crate::dependency_resolver::operation::AnyOperation;
-use crate::downloader::TransportException;
 use crate::event_dispatcher::event_dispatcher::dispatch_event_method;
 use crate::event_dispatcher::{
     EventInterface, EventSubscriberInterface, SubscribedEventEntry, unwrap_php_result,
@@ -30,6 +29,7 @@ use crate::plugin::plugin_interface::PluginInterface;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::{FileDownloadContext, PreFileDownloadEvent};
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
+use crate::plugin::throwable_bridge::{exception_into_throw, throw_into_error};
 use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
     RepositoryInterfaceHandle, RepositoryManagerInterface,
@@ -39,7 +39,7 @@ use shirabe_php_rpc::{
     PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle,
     call_function_with_dispatcher, call_php_method, new_object, release_php_handle,
 };
-use shirabe_php_shim::{AnyThrowable, Catch as _, LogicException, PhpClass as _, PhpMixed};
+use shirabe_php_shim::{AnyThrowable, Catch as _, LogicException, PhpMixed};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::input::InputValue;
@@ -386,12 +386,23 @@ pub(crate) fn dispatch_job_service_method(
         }),
         "__shirabeRejectJob" => (|| {
             let id = job_id()?;
-            let throw = PhpThrow {
-                exception_class: arg::<String>(method_name, args, 1)?,
-                message: arg::<String>(method_name, args, 2)?,
-                code: arg::<i64>(method_name, args, 3)?,
-                properties: Box::new(IndexMap::new()),
+            let mut throw = PhpThrow::new(
+                arg::<String>(method_name, args, 1)?,
+                arg::<String>(method_name, args, 2)?,
+                arg::<i64>(method_name, args, 3)?,
+            );
+            *throw.properties = match args.get(4) {
+                Some(PluginValue::Array(properties)) => properties
+                    .iter()
+                    .map(|(name, value)| {
+                        (String::from_utf8_lossy(name).into_owned(), value.clone())
+                    })
+                    .collect(),
+                _ => IndexMap::new(),
             };
+            throw.file = arg::<String>(method_name, args, 5)?;
+            throw.line = arg::<i64>(method_name, args, 6)?;
+            throw.parents = arg::<Vec<String>>(method_name, args, 7)?;
             job_registry::settle_php_job(id, Err(throw));
             Ok(PluginValue::Null)
         })(),
@@ -3044,12 +3055,7 @@ fn decode_write_args(
 }
 
 fn runtime_throw(message: String) -> PhpThrow {
-    PhpThrow {
-        exception_class: "RuntimeException".to_string(),
-        message,
-        code: 0,
-        properties: Box::new(IndexMap::new()),
-    }
+    PhpThrow::runtime(message)
 }
 
 /// The `Throw` a failed Rust-side call crosses the boundary as. An error carrying a ported PHP
@@ -3057,61 +3063,10 @@ fn runtime_throw(message: String) -> PhpThrow {
 /// would catch under Composer; one carrying no exception keeps the `RuntimeException` shape,
 /// with `context` naming the call that failed.
 fn error_throw(context: &str, error: &anyhow::Error) -> PhpThrow {
-    let Some(exception) = AnyThrowable::of(error) else {
-        return runtime_throw(format!("{context}: {error:#}"));
-    };
-    PhpThrow {
-        exception_class: exception.php_class_name(),
-        message: exception.get_message().to_string(),
-        code: exception.get_code(),
-        properties: Box::new(throwable_properties(error)),
+    match AnyThrowable::of(error) {
+        Some(exception) => exception_into_throw(exception, error),
+        None => runtime_throw(format!("{context}: {error:#}")),
     }
-}
-
-/// The state a ported exception carries beyond `message` and `code`, keyed by the property names
-/// its PHP class declares. The child revives them onto the instance it rebuilds.
-///
-/// TODO(plugin): only `TransportException` is projected. Every other exception with state of its
-/// own (`InvalidPackageException`, `JsonValidationException`, `CommandNotFoundException`,
-/// `ProcessSignaledException`, `SolverProblemsException`) crosses with message and code alone.
-fn throwable_properties(error: &anyhow::Error) -> IndexMap<String, PluginValue> {
-    let mut properties = IndexMap::new();
-    if let Some(exception) = error.catch::<TransportException>() {
-        properties.insert(
-            "headers".to_string(),
-            match exception.get_headers() {
-                Some(headers) => {
-                    PluginValue::List(headers.iter().cloned().map(PluginValue::string).collect())
-                }
-                None => PluginValue::Null,
-            },
-        );
-        properties.insert(
-            "response".to_string(),
-            match exception.get_response() {
-                Some(response) => PluginValue::string(response),
-                None => PluginValue::Null,
-            },
-        );
-        properties.insert(
-            "statusCode".to_string(),
-            match exception.get_status_code() {
-                Some(status_code) => PluginValue::Int(status_code),
-                None => PluginValue::Null,
-            },
-        );
-        properties.insert(
-            "responseInfo".to_string(),
-            PluginValue::List(
-                exception
-                    .get_response_info()
-                    .iter()
-                    .map(PluginValue::from_php_mixed)
-                    .collect(),
-            ),
-        );
-    }
-    properties
 }
 
 /// `PluginInterface` adapter for a plugin entity living in the PHP child process: every
@@ -3149,11 +3104,7 @@ impl PhpPluginProxy {
         )?;
         match outcome {
             Ok(_) => Ok(()),
-            // TODO(plugin): the original exception class is collapsed to RuntimeException on
-            // this side of the boundary.
-            Err(throw) => {
-                Err(shirabe_php_shim::RuntimeException::with_code(throw.message, throw.code).into())
-            }
+            Err(throw) => Err(throw_into_error(throw)),
         }
     }
 
@@ -3173,9 +3124,7 @@ impl PhpPluginProxy {
         )?;
         match outcome {
             Ok(value) => Ok(value.to_php_mixed()?),
-            Err(throw) => {
-                Err(shirabe_php_shim::RuntimeException::with_code(throw.message, throw.code).into())
-            }
+            Err(throw) => Err(throw_into_error(throw)),
         }
     }
 }
@@ -3249,15 +3198,7 @@ impl EventSubscriberInterface for PhpPluginProxy {
         )?;
         let value = match outcome {
             Ok(value) => value,
-            // TODO(plugin): the original exception class is collapsed to RuntimeException on
-            // this side of the boundary.
-            Err(throw) => {
-                return Err(shirabe_php_shim::RuntimeException::with_code(
-                    throw.message,
-                    throw.code,
-                )
-                .into());
-            }
+            Err(throw) => return Err(throw_into_error(throw)),
         };
         decode_subscribed_events(&self.class, value)
     }
@@ -3281,15 +3222,7 @@ impl Capable for PhpPluginProxy {
         )?;
         let value = match outcome {
             Ok(value) => value,
-            // TODO(plugin): the original exception class is collapsed to RuntimeException on
-            // this side of the boundary.
-            Err(throw) => {
-                return Err(shirabe_php_shim::RuntimeException::with_code(
-                    throw.message,
-                    throw.code,
-                )
-                .into());
-            }
+            Err(throw) => return Err(throw_into_error(throw)),
         };
         // PHP: `(array) $plugin->getCapabilities()` — the interface declares no return type,
         // so a non-array return is cast. A handle in the map (a plugin putting an object among
@@ -3738,9 +3671,7 @@ impl PhpCapabilityProxy {
         )?;
         match outcome {
             Ok(value) => Ok(value),
-            Err(throw) => {
-                Err(shirabe_php_shim::RuntimeException::with_code(throw.message, throw.code).into())
-            }
+            Err(throw) => Err(throw_into_error(throw)),
         }
     }
 }

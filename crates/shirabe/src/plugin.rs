@@ -12,6 +12,7 @@ pub mod post_file_download_event;
 pub mod pre_command_run_event;
 pub mod pre_file_download_event;
 pub mod pre_pool_create_event;
+pub(crate) mod throwable_bridge;
 
 pub use capability::*;
 pub use capable::*;

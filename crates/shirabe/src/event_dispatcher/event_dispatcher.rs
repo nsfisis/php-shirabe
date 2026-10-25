@@ -21,6 +21,7 @@ use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
+use crate::plugin::throwable_bridge::{described_throw, throw_into_error};
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
@@ -463,11 +464,7 @@ impl EventDispatcher {
                             0
                         }
                     }
-                    // TODO(plugin): the original exception class is collapsed to
-                    // RuntimeException on this side of the boundary.
-                    Err(throw) => {
-                        return Err(RuntimeException::with_code(throw.message, throw.code).into());
-                    }
+                    Err(throw) => return Err(throw_into_error(throw)),
                 };
             } else if !is_string_callable {
                 // TODO(plugin): an ArrayCallable whose object half is a PhpMixed has no
@@ -802,7 +799,7 @@ try {{
     $status = $app->run(new \Symfony\Component\Console\Input\StringInput({input_lit}), $output);
     return ['status' => $status, 'output' => $output->fetch()];
 }} catch (\Throwable $e) {{
-    return ['throw' => [get_class($e), $e->getMessage(), (int) $e->getCode(), $e instanceof \Exception], 'output' => $output->fetch()];
+    return ['throw' => \Shirabe\MaterializedThrowable::describe($e), 'caught' => $e instanceof \Exception, 'output' => $output->fetch()];
 }}
 "#,
                             class_name_lit = php_single_quote(&class_name),
@@ -827,13 +824,7 @@ try {{
                         )?;
                         let result = match outcome {
                             Ok(value) => value.to_php_mixed()?,
-                            // TODO(error-model): `throw.exception_class` is dropped, so the class
-                            // upstream rethrows unchanged collapses to RuntimeException here.
-                            Err(throw) => {
-                                return Err(
-                                    RuntimeException::with_code(throw.message, throw.code).into()
-                                );
-                            }
+                            Err(throw) => return Err(throw_into_error(throw)),
                         };
                         let command_output = result
                             .as_array()
@@ -845,22 +836,15 @@ try {{
                             self.io.write3(&command_output, false, crate::io::NORMAL);
                         }
                         if let Some(throw) = result.as_array().and_then(|map| map.get("throw")) {
-                            // TODO(error-model): the snippet reports `get_class($e)` as the first
-                            // field and nothing reads it, so the class upstream rethrows unchanged
-                            // collapses to RuntimeException here.
-                            let fields = throw
-                                .as_list()
-                                .expect("the eval snippet reports exceptions as a list");
-                            let message = fields
-                                .get(1)
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                                .to_string();
-                            let code = match fields.get(2) {
-                                Some(PhpMixed::Int(code)) => *code,
-                                _ => 0,
-                            };
-                            let caught = matches!(fields.get(3), Some(PhpMixed::Bool(true)));
+                            let throw = described_throw(
+                                throw
+                                    .as_list()
+                                    .expect("the eval snippet reports exceptions as a list"),
+                            );
+                            let caught = result
+                                .as_array()
+                                .and_then(|map| map.get("caught"))
+                                .is_some_and(|caught| matches!(caught, PhpMixed::Bool(true)));
                             if caught {
                                 self.io.write_error3(
                                     &format!(
@@ -872,7 +856,7 @@ try {{
                                     crate::io::QUIET,
                                 );
                             }
-                            return Err(RuntimeException::with_code(message, code).into());
+                            return Err(throw_into_error(throw));
                         }
                         r#return = match result.as_array().and_then(|map| map.get("status")) {
                             Some(PhpMixed::Int(status)) => *status,
@@ -1186,9 +1170,7 @@ try {{
         )?;
         match outcome {
             Ok(value) => Ok(value.to_php_mixed()?),
-            // TODO(plugin): the original exception class is collapsed to RuntimeException on
-            // this side of the boundary.
-            Err(throw) => Err(RuntimeException::with_code(throw.message, throw.code).into()),
+            Err(throw) => Err(throw_into_error(throw)),
         }
     }
 
@@ -1954,12 +1936,7 @@ fn installer_event(event: &dyn EventInterface) -> Option<&InstallerEvent> {
 }
 
 fn runtime_throw(message: String) -> PhpThrow {
-    PhpThrow {
-        exception_class: "RuntimeException".to_string(),
-        message,
-        code: 0,
-        properties: Box::new(IndexMap::new()),
-    }
+    PhpThrow::runtime(message)
 }
 
 /// Collapses the two failure lanes of an RPC call into `anyhow`: the callers here treat a PHP
@@ -1969,7 +1946,7 @@ pub(crate) fn unwrap_php_result(
 ) -> anyhow::Result<PluginValue> {
     match outcome? {
         Ok(value) => Ok(value),
-        Err(throw) => Err(RuntimeException::with_code(throw.message, throw.code).into()),
+        Err(throw) => Err(throw_into_error(throw)),
     }
 }
 

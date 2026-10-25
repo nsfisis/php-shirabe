@@ -191,6 +191,14 @@ impl AnyThrowable {
         self.0.fields().get_line()
     }
 
+    /// PHP's `code` property is protected with no setter; an exception rebuilt from one raised
+    /// elsewhere takes the code it was raised with.
+    pub fn set_code(&mut self, code: i64) {
+        self.downcast_mut::<ThrowableFields>()
+            .expect("every exception bottoms out at the ThrowableFields")
+            .set_code(code);
+    }
+
     pub fn set_location(&mut self, file: String, line: i64) {
         self.downcast_mut::<ThrowableFields>()
             .expect("every exception bottoms out at the ThrowableFields")
@@ -491,6 +499,69 @@ impl ErrorException {
 
 crate::impl_php_exception!(ErrorException, inner, r"ErrorException");
 
+/// An exception of a PHP class the port has no type for, such as one a plugin declares, rebuilt
+/// from the nearest superclass the port does have one for. It answers to its own class name and
+/// is an instance of every superclass of that one, so a `catch` behaves as PHP's would.
+///
+/// TODO(plugin): the state the class itself declares is not kept.
+#[derive(Debug)]
+pub struct UnportedThrowable {
+    class_name: String,
+    parent: AnyThrowable,
+}
+
+impl UnportedThrowable {
+    pub fn new(class_name: String, parent: AnyThrowable) -> Self {
+        Self { class_name, parent }
+    }
+}
+
+impl std::fmt::Display for UnportedThrowable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.parent, f)
+    }
+}
+
+impl PhpClass for UnportedThrowable {
+    fn php_class_name(&self) -> String {
+        self.class_name.clone()
+    }
+}
+
+impl Throwable for UnportedThrowable {
+    fn fields(&self) -> &ThrowableFields {
+        self.parent.0.fields()
+    }
+
+    fn as_any(&self) -> &(dyn std::any::Any + 'static) {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut (dyn std::any::Any + 'static) {
+        self
+    }
+
+    fn parent(&self) -> Option<&dyn Throwable> {
+        Some(&*self.parent.0)
+    }
+
+    fn parent_mut(&mut self) -> Option<&mut dyn Throwable> {
+        Some(&mut *self.parent.0)
+    }
+}
+
+impl From<UnportedThrowable> for AnyThrowable {
+    fn from(exception: UnportedThrowable) -> Self {
+        AnyThrowable::new(exception)
+    }
+}
+
+impl From<UnportedThrowable> for anyhow::Error {
+    fn from(exception: UnportedThrowable) -> Self {
+        anyhow::Error::new(AnyThrowable::new(exception))
+    }
+}
+
 /// Models PHP's `exit`/`die` language construct propagated as a recoverable error so the actual
 /// process termination happens at a single top-level site instead of deep in the call stack.
 ///
@@ -583,6 +654,23 @@ mod tests {
 
         assert_eq!("/path/to/file.php", exception.get_file());
         assert_eq!(42, exception.get_line());
+    }
+
+    #[test]
+    fn an_unported_class_is_an_instance_of_its_superclasses() {
+        let parent: AnyThrowable =
+            UnexpectedValueException::with_code("boom".to_string(), 5).into();
+        let error: anyhow::Error =
+            UnportedThrowable::new(r"Vendor\PluginException".to_string(), parent).into();
+
+        let exception = AnyThrowable::of(&error).unwrap();
+        assert_eq!(r"Vendor\PluginException", exception.php_class_name());
+        assert_eq!("boom", exception.get_message());
+        assert_eq!(5, exception.get_code());
+        assert!(error.is_instanceof::<UnexpectedValueException>());
+        assert!(error.is_instanceof::<RuntimeException>());
+        assert!(!error.is_class::<UnexpectedValueException>());
+        assert!(error.catch::<LogicException>().is_none());
     }
 
     #[test]

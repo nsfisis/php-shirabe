@@ -622,24 +622,35 @@ pub struct PhpThrow {
     pub message: String,
     pub code: i64,
     /// The state the exception carries beyond `message` and `code`, keyed by the property names
-    /// its class declares. The child revives them onto the instance it rebuilds.
-    ///
-    /// TODO(plugin): populated only Rust to PHP. An exception a plugin throws crosses with its
-    /// class, message and code alone, because no Rust-side consumer rebuilds a ported exception
-    /// from a `PhpThrow` yet.
+    /// its class declares. The receiving side revives them onto the instance it rebuilds.
     ///
     /// Boxed so a `Result<_, PhpThrow>` stays small; every dispatcher returns one.
     pub properties: Box<IndexMap<String, PluginValue>>,
+    /// Where the exception was created, as `getFile()` and `getLine()` report it. Empty and 0
+    /// for a failure that was no exception.
+    pub file: String,
+    pub line: i64,
+    /// The superclasses of `exception_class`, nearest first, so the receiving side can rebuild
+    /// the nearest one it has a type for. Empty from Rust to PHP, where every class is known.
+    pub parents: Vec<String>,
 }
 
 impl PhpThrow {
-    fn runtime(message: String) -> PhpThrow {
+    /// An exception of `exception_class` carrying nothing beyond its message and code.
+    pub fn new(exception_class: String, message: String, code: i64) -> PhpThrow {
         PhpThrow {
-            exception_class: "RuntimeException".to_string(),
+            exception_class,
             message,
-            code: 0,
+            code,
             properties: Box::new(IndexMap::new()),
+            file: String::new(),
+            line: 0,
+            parents: Vec::new(),
         }
+    }
+
+    pub fn runtime(message: String) -> PhpThrow {
+        PhpThrow::new("RuntimeException".to_string(), message, 0)
     }
 }
 
@@ -819,12 +830,18 @@ fn rpc_call(
                 message,
                 code,
                 properties,
+                file,
+                line,
+                parents,
             } if corr_id == my_id => {
                 return Ok(Err(PhpThrow {
                     exception_class,
                     message,
                     code,
                     properties: Box::new(properties),
+                    file,
+                    line,
+                    parents,
                 }));
             }
             Frame::CallRustMethod {
@@ -862,6 +879,9 @@ fn rpc_call(
                         message: throw.message,
                         code: throw.code,
                         properties: *throw.properties,
+                        file: throw.file,
+                        line: throw.line,
+                        parents: throw.parents,
                     },
                 };
                 send_frame(&reply)?;

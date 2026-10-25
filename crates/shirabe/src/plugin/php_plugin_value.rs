@@ -42,12 +42,7 @@ const TIMEZONE_TYPE_IDENTIFIER: i64 = 3;
 const TIMEZONE_UTC: &str = "UTC";
 
 fn throw(message: String) -> PhpThrow {
-    PhpThrow {
-        exception_class: "RuntimeException".to_string(),
-        message,
-        code: 0,
-        properties: Box::new(indexmap::IndexMap::new()),
-    }
+    PhpThrow::runtime(message)
 }
 
 fn as_object(value: &PluginValue) -> Option<&PhpObject> {

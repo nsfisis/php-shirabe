@@ -3,12 +3,14 @@
 namespace ShirabeTest\Exception;
 
 use Composer\Composer;
+use Composer\Downloader\TransportException;
 use Composer\EventDispatcher\EventSubscriberInterface;
 use Composer\IO\IOInterface;
 use Composer\Plugin\PluginInterface;
 use Composer\Script\Event;
 use Composer\Script\ScriptEvents;
 use Composer\Util\Filesystem;
+use Composer\Util\ProcessExecutor;
 
 /**
  * Records what a plugin sees when a Composer service raises an exception at it: the class it was
@@ -72,6 +74,27 @@ class Plugin implements PluginInterface, EventSubscriberInterface
         }
         $lines[] = 'catch-clause=' . $caught;
 
+        // A throw from plugin code unwinds through the service that called it and back out to the
+        // plugin, keeping its own class, the parents of a class only the plugin declares, and the
+        // state of a Composer class.
+        $executor = new ProcessExecutor($event->getIO());
+        $lines[] = 'callback-own-class ' . $this->describe(static function () use ($executor): void {
+            $callback = static function (): void {
+                throw new PluginException('from the plugin', 7);
+            };
+            $executor->execute('echo out', $callback);
+        });
+        $lines[] = 'callback-transport ' . $this->describe(static function () use ($executor): void {
+            $callback = static function (): void {
+                $e = new TransportException('not found', 404);
+                $e->setStatusCode(404);
+                $e->setResponse('missing');
+                $e->setHeaders(['HTTP/1.1 404 Not Found']);
+                throw $e;
+            };
+            $executor->execute('echo out', $callback);
+        });
+
         file_put_contents('exception-trace.txt', implode("\n", $lines) . "\n");
     }
 
@@ -86,7 +109,12 @@ class Plugin implements PluginInterface, EventSubscriberInterface
                 . ' message=' . json_encode($e->getMessage())
                 . ' code=' . json_encode($e->getCode())
                 . ' logic=' . json_encode($e instanceof \LogicException)
-                . ' runtime=' . json_encode($e instanceof \RuntimeException);
+                . ' runtime=' . json_encode($e instanceof \RuntimeException)
+                . ($e instanceof TransportException
+                    ? ' status=' . json_encode($e->getStatusCode())
+                        . ' response=' . json_encode($e->getResponse())
+                        . ' headers=' . json_encode($e->getHeaders())
+                    : '');
         }
     }
 }
