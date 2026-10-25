@@ -78,7 +78,7 @@ impl BaseCommandData {
 pub trait BaseCommand: Command {
     /// Access to the embedded base-command state. Each command returns
     /// `&self.base_command_data`; the definition builders and the completion dispatch below
-    /// go through it. The state is interior-mutable, so a shared reference is enough.
+    /// go through it.
     fn base_command_data(&self) -> &BaseCommandData;
 
     /// Access to the embedded Symfony command state, forwarding to `CommandData`'s
@@ -752,8 +752,6 @@ pub fn base_command_complete(
 
     // PHP: (string) $input->getCompletionName()
     let name = input.get_completion_name().unwrap_or_default();
-    // The definition Ref and the side-map Refs must be dropped before the suggestion closure
-    // runs: the closure may re-enter the command (require_composer etc.).
     if CompletionInput::TYPE_OPTION_VALUE == input.get_completion_type()
         && cmd.get_definition().has_option(&name)
     {

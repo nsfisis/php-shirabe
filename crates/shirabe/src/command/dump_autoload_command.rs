@@ -83,7 +83,6 @@ impl Command for DumpAutoloadCommand {
             .borrow_mut()
             .dispatch(Some(&command_event_name), Some(&mut command_event))?;
 
-        // Clone the Rc<RefCell<Config>> so we can take mutable borrows of composer later
         let config = composer.get_config();
 
         let mut missing_dependencies = false;

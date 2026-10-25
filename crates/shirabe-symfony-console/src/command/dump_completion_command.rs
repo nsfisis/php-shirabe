@@ -96,8 +96,6 @@ impl DumpCompletionCommand {
         )
     }
 
-    /// The PHP closure captures `$output` by reference; `Process::run` needs a `'static`
-    /// callback, so the shared handle is moved into it instead.
     fn tail_debug_log(
         &self,
         command_name: &str,

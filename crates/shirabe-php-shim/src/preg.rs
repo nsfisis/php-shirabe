@@ -92,8 +92,7 @@ pub fn preg_match<'h>(pattern: impl PregPattern, subject: &'h str) -> Option<Pre
 }
 
 // Every occurrence of the pattern in `subject`, in match order. The search runs eagerly, as PHP's
-// does: a match borrows `subject` alone, so the matches outlive the compiled pattern, which is only
-// resolved for the duration of this call.
+// does.
 pub fn preg_match_all<'h>(
     pattern: impl PregPattern,
     subject: &'h str,

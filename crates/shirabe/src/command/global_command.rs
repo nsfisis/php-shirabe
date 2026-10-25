@@ -164,8 +164,6 @@ impl Command for GlobalCommand {
             .get_application()
             .expect("a proxy command is always attached to its application");
         if input.must_suggest_argument_values_for("command-name") {
-            // The application borrow must be dropped before suggest_values (harmless) and
-            // before any command re-entry below.
             let values: Vec<StringOrSuggestion> = {
                 let mut app_ref = application.borrow_mut();
                 let app = app_ref

@@ -159,8 +159,6 @@ impl SolverProblemsException {
     }
 }
 
-// `learned_pool` holds `Rc<RefCell<Rule>>`, so this exception rides an inner `Result` rather than
-// an `anyhow::Error`.
 shirabe_php_shim::impl_php_exception!(
     SolverProblemsException,
     inner,

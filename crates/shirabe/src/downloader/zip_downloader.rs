@@ -125,8 +125,6 @@ impl ZipDownloader {
             }
         }
 
-        // Build the future first so the executor borrow is released before awaiting; a borrow
-        // held across the await would collide with sibling extracts or sync execute() calls.
         let process_future = self
             .inner
             .process

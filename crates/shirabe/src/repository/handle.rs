@@ -58,7 +58,7 @@ impl RepositoryInterfaceHandle {
         std::rc::Rc::as_ptr(&self.0) as *const () as usize
     }
 
-    /// PHP `instanceof T` for a concrete repository type. Keeps the `RefCell` borrow internal.
+    /// PHP `instanceof T` for a concrete repository type.
     pub fn is<T: RepositoryInterface + 'static>(&self) -> bool {
         self.0.borrow().as_any().is::<T>()
     }
@@ -193,11 +193,6 @@ impl RepositoryInterfaceHandle {
 }
 
 /// Shared handle over a repository known to implement `InstalledRepositoryInterface`.
-///
-/// The installer pipeline passes this instead of a long-lived `&mut dyn
-/// InstalledRepositoryInterface` so that re-entrant access to the same repository through
-/// `RepositoryManager::get_local_repository()` — e.g. `PluginManager::register_package` running
-/// inside `InstallationManager::execute` — borrows the shared `RefCell` only transiently.
 #[derive(Debug, Clone)]
 pub struct InstalledRepositoryInterfaceHandle(
     std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>>,

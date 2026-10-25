@@ -23,7 +23,7 @@ fn http_body(
 }
 
 // Equivalent to FactoryMock::createConfig(): a real Config with a writable, unique
-// home directory. The TempDir is returned so it outlives the test.
+// home directory.
 fn create_config() -> (Config, TempDir) {
     let home = TempDir::new().unwrap();
     let mut config = Config::new(true, None);

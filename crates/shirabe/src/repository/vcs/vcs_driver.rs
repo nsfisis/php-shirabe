@@ -134,8 +134,7 @@ impl VcsDriverBase {
 
     // Caching layer of the base `getComposerInformation`. Concrete drivers that
     // inherit the base implementation thread their own `get_file_content` /
-    // `get_change_date` fetch between these two calls; splitting read and write
-    // keeps each `self.inner` borrow disjoint from the fetch's `self` borrow.
+    // `get_change_date` fetch between these two calls.
     // Returns `Some(_)` when the value is already known (in-memory or on-disk
     // cache), or `None` when the caller must fetch it.
     pub fn read_cached_composer(

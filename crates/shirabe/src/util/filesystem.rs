@@ -841,8 +841,6 @@ impl Filesystem {
         self.process_executor.as_ref().unwrap().borrow_mut()
     }
 
-    /// Hands out the executor handle itself so async callers can hold only a shared borrow
-    /// across their awaits (a RefMut held across an await panics once calls overlap).
     pub(crate) fn get_process_handle(
         &mut self,
     ) -> std::rc::Rc<std::cell::RefCell<ProcessExecutor>> {

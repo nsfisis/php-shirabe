@@ -107,8 +107,6 @@ pub trait RepositoryInterface: std::fmt::Debug {
         None
     }
 
-    // The `+ 'static` object bound lets `InstalledRepositoryInterfaceHandle` project a
-    // `Ref`/`RefMut` through this method (`Ref::map` needs a lifetime-independent target).
     fn as_installed_repository_interface(
         &self,
     ) -> Option<&(dyn crate::repository::InstalledRepositoryInterface + 'static)> {

@@ -15,9 +15,8 @@ const MAX_JOBS: i64 = 10;
 /// The cheapest child that still goes through the whole spawn path.
 const COMMAND: &[&str; 1] = &["true"];
 
-/// `execute_async`'s futures are `!Send` (the io handle is an `Rc`), so they are driven by
-/// `block_on` on a current-thread runtime rather than spawned onto a worker pool. Concurrency
-/// within a case therefore comes from joining futures inside the single task.
+/// Concurrency within a case comes from joining futures inside a single task on a current-thread
+/// runtime.
 fn runtime() -> tokio::runtime::Runtime {
     tokio::runtime::Builder::new_current_thread()
         .enable_all()

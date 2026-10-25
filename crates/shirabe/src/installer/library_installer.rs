@@ -20,8 +20,6 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct LibraryInstaller {
     pub(crate) composer: PartialComposerWeakHandle,
-    /// Behind a RefCell so initialize_vendor_dir can canonicalize it through `&self` (the
-    /// installer instance is shared between concurrent package operations).
     vendor_dir: std::cell::RefCell<String>,
     download_manager: Option<std::rc::Rc<std::cell::RefCell<dyn DownloadManagerInterface>>>,
     pub(crate) io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,

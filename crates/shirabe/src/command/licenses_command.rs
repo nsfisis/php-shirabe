@@ -112,8 +112,6 @@ impl Command for LicensesCommand {
             output.clone(),
         );
         let command_event_name = command_event.get_name().to_string();
-        // The event dispatcher reads back through the shared Composer handle (script listeners), so the
-        // dispatch must run while no other borrow of that handle is held.
         let event_dispatcher = composer_handle.borrow_partial().get_event_dispatcher();
         event_dispatcher
             .borrow_mut()

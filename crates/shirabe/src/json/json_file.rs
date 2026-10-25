@@ -71,8 +71,6 @@ pub struct JsonFile {
     /// @var ?IOInterface
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     /// @var string
-    // RefCell so that read() can stay `&self`: PHP's late-bound repository initialize()
-    // chains (getRepoName -> count -> initialize -> file read) run from shared contexts.
     indent: std::cell::RefCell<String>,
 }
 

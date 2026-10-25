@@ -357,7 +357,6 @@ fn dump(
     suffix: &str,
 ) -> anyhow::Result<shirabe_class_map_generator::class_map::ClassMap> {
     let config = s.config();
-    // Borrow splitting: take fields out so dump can hold &mut to several at once.
     let SetUp {
         repository,
         im,

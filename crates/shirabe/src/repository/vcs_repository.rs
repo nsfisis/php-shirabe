@@ -41,9 +41,6 @@ pub struct VcsRepository {
     /// @var string
     url: String,
     /// @var ?string
-    ///
-    /// Interior mutability: set lazily by the (now `&self`) `initialize`, mirroring how PHP's
-    /// inherited ArrayRepository methods drive the overridden `initialize()` on first access.
     package_name: std::cell::RefCell<Option<String>>,
     /// @var bool
     is_verbose: bool,
@@ -70,9 +67,6 @@ pub struct VcsRepository {
     /// @var array<string, class-string<VcsDriverInterface>>
     drivers: IndexMap<String, VcsDriverKind>,
     /// @var ?VcsDriverInterface
-    ///
-    /// Interior mutability: memoized by `ensure_driver` (PHP `getDriver`), which is reached from
-    /// the `&self` RepositoryInterface methods (`count`, `has_package`, `get_repo_name`).
     driver: std::cell::RefCell<Option<Box<dyn VcsDriverInterface>>>,
     /// Kind of the resolved `driver`, used by `get_repo_name` to recover the driver type
     /// (PHP `array_search(get_class($driver), $this->drivers)`).
@@ -198,10 +192,8 @@ impl VcsRepository {
         *self.loader.borrow_mut() = Some(loader);
     }
 
-    /// PHP `getDriver()` lazily instantiates and memoizes the matching VCS driver. Because Rust's
-    /// `RefCell` cannot hand out a `&mut` reference that outlives the borrow, this is split from the
-    /// reference-returning shape into a resolver: it populates `self.driver`/`self.driver_kind` once,
-    /// and callers borrow `self.driver` as needed afterwards.
+    /// PHP `getDriver()` lazily instantiates and memoizes the matching VCS driver. This populates
+    /// `self.driver`/`self.driver_kind` once.
     pub fn ensure_driver(&self) {
         if self.driver.borrow().is_some() {
             return;

@@ -37,8 +37,6 @@ pub struct FilesystemRepository {
     /// @var Filesystem
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
     /// @var bool|null
-    // Cell so that initialize() can stay `&self` (late-bound initialization out of shared
-    // contexts such as getRepoName).
     dev_mode: std::cell::Cell<Option<bool>>,
 }
 

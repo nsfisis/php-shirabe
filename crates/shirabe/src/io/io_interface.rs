@@ -15,12 +15,6 @@ pub const DEBUG: i64 = 16;
 // `LoggerInterface` entity on the Rust side: the LoggerInterface methods that
 // Composer actually invokes through an IO are folded directly into this trait
 // (each is annotated as originating from LoggerInterface).
-//
-// On the Rust side the interface is split into an immutable part (`&self`
-// methods, below) and a mutable part (`IOInterfaceMutable`, the `&mut self`
-// methods). The shared handle `Rc<RefCell<dyn IOInterface>>` implements only
-// `IOInterfaceImmutable`, so the mutating methods are reachable only via
-// `io.borrow_mut()` — enforced at compile time rather than at runtime.
 pub trait IOInterfaceImmutable: std::fmt::Debug {
     fn is_interactive(&self) -> bool;
 
@@ -141,9 +135,7 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
     fn debug(&self, message: &str, context: &[(&str, &str)]);
 }
 
-// The `&mut self` part of PHP `IOInterface`. The shared handle does NOT
-// implement this trait, so these methods can only be reached through
-// `io.borrow_mut()`.
+// The `&mut self` part of PHP `IOInterface`.
 pub trait IOInterfaceMutable {
     fn set_authentication(
         &mut self,
@@ -170,11 +162,6 @@ pub trait IOInterface: IOInterfaceImmutable + IOInterfaceMutable {
     }
 }
 
-// Shared-ownership handle for a PHP IO instance (reference semantics). It
-// exposes only the immutable surface; mutating methods (`set_authentication`,
-// `load_configuration`) are reached via `io.borrow_mut()`. Because the handle
-// does not implement `IOInterfaceMutable`, calling those directly on the handle
-// is a compile error rather than a runtime panic.
 impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     fn is_interactive(&self) -> bool {
         self.borrow().is_interactive()

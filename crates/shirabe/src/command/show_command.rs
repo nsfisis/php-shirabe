@@ -1823,7 +1823,6 @@ impl Command for ShowCommand {
                 if has_non_platform_reqs(&root_pkg.get_requires())
                     || has_non_platform_reqs(&root_pkg.get_dev_requires())
                 {
-                    // Borrow is local; release composer_local borrow first.
                     let _ = root_pkg;
                     self.get_io().write_error("<warning>No dependencies installed. Try running shirabe install or update.</warning>");
                 }

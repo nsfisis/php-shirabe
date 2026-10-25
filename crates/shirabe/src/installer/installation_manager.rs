@@ -29,16 +29,9 @@ use shirabe_php_shim::{
 /// Package operation manager.
 #[derive(Debug)]
 pub struct InstallationManager {
-    /// Rc rather than Box so `get_installer` can hand out shareable handles: the download/cleanup
-    /// futures collected for Loop::wait must own their installer beyond the loop iteration that
-    /// created them (PHP closures capture $installer the same way).
-    /// RefCell so a plugin activated from inside `execute` — which holds a shared borrow of this
-    /// manager for the whole run — can still register its own installer.
     installers: std::cell::RefCell<Vec<std::rc::Rc<dyn InstallerInterface>>>,
     /// Maps a package type to its installer.
-    /// RefCell so lookups can populate the cache through `&self` from concurrent operation chains.
     cache: std::cell::RefCell<IndexMap<String, std::rc::Rc<dyn InstallerInterface>>>,
-    /// RefCell so mark_for_notification works through `&self` from concurrent operation chains.
     notifiable_packages: std::cell::RefCell<IndexMap<String, Vec<PackageInterfaceHandle>>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
@@ -47,8 +40,6 @@ pub struct InstallationManager {
     /// For testing only: present iff this manager behaves like
     /// `Composer\Test\Mock\InstallationManagerMock`, recording operations instead of executing
     /// them. `None` in production.
-    // RefCell so the recording survives `execute(&self)` (shared borrows of the manager
-    // handle must coexist with re-entrant plugin registration; see `execute`).
     mock: Option<std::cell::RefCell<InstallationManagerMockState>>,
 }
 
@@ -132,10 +123,6 @@ impl InstallationManager {
     }
 
     /// Adds installer
-    ///
-    /// The installer is taken as a shared handle: PHP hands over an object reference and both
-    /// sides keep the same identity afterwards, which `removeInstaller` and the plugin
-    /// manager's `registeredPlugins` bookkeeping compare against.
     pub fn add_installer(&self, installer: std::rc::Rc<dyn InstallerInterface>) {
         array_unshift(&mut self.installers.borrow_mut(), installer);
         self.cache.borrow_mut().clear();
@@ -233,11 +220,6 @@ impl InstallationManager {
     }
 
     /// Executes solver operation.
-    ///
-    /// `&self` (not `&mut self`, unlike the porting default): callers invoke this through the
-    /// shared manager handle, and plugin registration inside the batch re-enters the same
-    /// handle (`PluginManager::get_install_path`), so only shared borrows may be outstanding
-    /// for the whole call.
     #[tracing::instrument(skip_all)]
     pub async fn execute(
         &self,
@@ -248,9 +230,7 @@ impl InstallationManager {
         download_only: bool,
     ) -> anyhow::Result<()> {
         // For testing only: the mock records each operation and mutates the repo directly,
-        // skipping the download step (ref InstallationManagerMock::execute). The alias operations'
-        // repo mutation is inlined (rather than calling mark_alias_*) so `self.mock` can stay
-        // borrowed across the loop without also borrowing `&self`.
+        // skipping the download step (ref InstallationManagerMock::execute).
         if let Some(mock) = self.mock.as_ref() {
             let mut mock = mock.borrow_mut();
             let _ = (dev_mode, run_scripts, download_only);

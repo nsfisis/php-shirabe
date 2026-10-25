@@ -22,11 +22,6 @@ use std::cell::{Cell, Ref};
 /// which holds the base-class fields and provides their canonical behavior via
 /// `impl Command for CommandData`. Subclasses embed a `CommandData` (directly, or
 /// transitively through `BaseCommandData`) and forward the state methods to it.
-///
-/// The mutable fields use interior mutability (`Cell`/`RefCell`) so that the `Command`
-/// trait methods take `&self`, mirroring PHP's reference semantics: calling a method on a
-/// command does not lock the object, so a command can be re-entered (e.g. the help command
-/// describing itself) without the borrow conflicts a `&mut self` design would cause.
 pub struct CommandData {
     application: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn Application>>>>,
     name: std::cell::RefCell<Option<String>>,
@@ -223,8 +218,7 @@ pub enum SetDefinitionArg {
 /// Each `Command`/`BaseCommand` implementer spells out the methods it delegates, one
 /// `delegate_to_inner!` per method, alongside the few methods it overrides by hand.
 /// The first argument names the field to forward to; the second is the method's
-/// signature. Every method takes `&self` (the command state is interior-mutable);
-/// fluent setters returning `&Self` (optionally wrapped in `anyhow::Result`) are handled
+/// signature. Fluent setters returning `&Self` (optionally wrapped in `anyhow::Result`) are handled
 /// specially so the returned reference is re-rooted at the outer `self` rather than the
 /// inner field.
 #[macro_export]
@@ -300,8 +294,6 @@ macro_rules! delegate_command_trait_impls_to_inner {
 ///
 /// The canonical behavior lives in `impl Command for CommandData`; subclasses forward
 /// the state methods there and override the behavior hooks (`configure`/`execute`/...).
-/// Object-safe so `dyn Command` works. All methods take `&self`; the command's mutable
-/// state is interior-mutable (see [`CommandData`]).
 #[async_trait::async_trait(?Send)]
 pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim::PhpClass {
     /// Configures the current command.
@@ -545,8 +537,6 @@ impl Command for CommandData {
             Some(application) => application.clone(),
         };
 
-        // InputDefinition stores its entries as `Rc<InputArgument>` / `Rc<InputOption>` while the
-        // setters take owned values, so the shared entries are cloned out (both types derive Clone).
         let app_definition = application.borrow_mut().get_definition();
 
         let mut full_definition =

@@ -13,8 +13,6 @@ use shirabe_symfony_string::b;
 #[derive(Debug)]
 pub struct OutputFormatter {
     decorated: bool,
-    // PHP objects have reference semantics: get_style must hand out the shared
-    // style instance, so each style is held behind an Rc<RefCell<...>> handle.
     styles: indexmap::IndexMap<
         String,
         std::rc::Rc<std::cell::RefCell<Box<dyn OutputFormatterStyleInterface>>>,

@@ -29,10 +29,6 @@ pub trait InstallerInterface: std::fmt::Debug {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    // install/update/uninstall take the repository as a shared handle: the concurrent operation
-    // chains share it (and re-entrant flows like plugin registration reach the same repository
-    // through RepositoryManager), so implementations must borrow it only in synchronous
-    // sections (never across an await).
     async fn install(
         &self,
         repo: &InstalledRepositoryInterfaceHandle,

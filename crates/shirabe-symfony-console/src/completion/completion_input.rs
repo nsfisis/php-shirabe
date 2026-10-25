@@ -216,9 +216,7 @@ impl CompletionInput {
         self.inner.get_first_argument()
     }
 
-    /// PHP `CompletionInput::parseToken` (called back from `ArgvInput::base_bind`). Takes the
-    /// embedded ArgvInput instead of `&mut self` because the parse loop already holds the
-    /// exclusive borrow of it.
+    /// PHP `CompletionInput::parseToken` (called back from `ArgvInput::base_bind`).
     fn parse_token(inner: &mut ArgvInput, token: &str, parse_options: bool) -> bool {
         match inner.parse_token(token, parse_options) {
             Ok(value) => return value,

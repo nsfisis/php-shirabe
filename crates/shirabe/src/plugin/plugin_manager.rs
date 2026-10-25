@@ -40,8 +40,6 @@ pub struct PluginManager {
     global_composer: Option<PartialComposerHandle>,
     version_parser: VersionParser,
     disable_plugins: DisablePlugins,
-    // PHP stores the same plugin instance in both $plugins and $registeredPlugins (reference
-    // semantics); shared handles preserve the identity comparisons that relies on.
     plugins: Vec<std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>>,
     registered_plugins: IndexMap<String, Vec<PluginOrInstaller>>,
     allow_plugin_rules: Option<IndexMap<String, bool>>,
@@ -185,9 +183,6 @@ impl PluginManager {
     }
 
     /// Gets all currently active plugin instances
-    ///
-    /// PHP returns `$this->plugins` directly; the plugin objects are shared by reference, so this
-    /// borrows the stored instances rather than cloning them.
     pub fn get_plugins(&self) -> &[std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>] {
         &self.plugins
     }
@@ -498,8 +493,6 @@ impl PluginManager {
                     ],
                 )?;
                 let installer = crate::plugin::php_installer_proxy(handle);
-                // A shared borrow: this runs inside `InstallationManager::execute`, which holds
-                // one of its own for the whole run.
                 composer
                     .borrow()
                     .get_installation_manager()
@@ -630,8 +623,7 @@ impl PluginManager {
         }
 
         // PHP unsets registeredPlugins only after the loop; a deactivate() throw must leave the
-        // entry observable, so removal happens last here too. Plugins are cloned out per index
-        // (shared handles); installer entries are only referenced while calling removeInstaller.
+        // entry observable, so removal happens last here too.
         let name = package.get_name();
         let count = self
             .registered_plugins
@@ -846,8 +838,6 @@ impl PluginManager {
         Ok(())
     }
 
-    // The repository stays behind its shared handle (borrowed only transiently) because
-    // register_package re-enters the same local repository through the RepositoryManager.
     fn load_repository(
         &mut self,
         repo: &RepositoryInterfaceHandle,
@@ -979,8 +969,6 @@ impl PluginManager {
         global: bool,
     ) -> Option<String> {
         if !global {
-            // Shared borrow: this runs re-entrantly while InstallationManager::execute holds a
-            // shared borrow of the same manager handle.
             return self
                 .composer_full()
                 .borrow()
@@ -1257,8 +1245,7 @@ impl PluginManager {
         if self.io.is_interactive() && prompt {
             // TODO(plugin): interactive consent flow — preserved as a stub. PHP picks
             // $this->globalComposer's config when is_global_plugin; the stub uses the
-            // local composer's config in both cases. Access the `composer` field directly
-            // (not via `composer_full()`) so the borrow stays disjoint from `rules`.
+            // local composer's config in both cases.
             let config = self
                 .composer
                 .upgrade()

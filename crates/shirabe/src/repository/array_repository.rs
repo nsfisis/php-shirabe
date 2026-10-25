@@ -43,10 +43,6 @@ impl ArrayRepository {
         self.packages.borrow().as_ref().unwrap().to_vec()
     }
 
-    // The RepositoryInterface findPackage/findPackages only need shared access to the package list;
-    // the `&mut self` on the trait methods is an artifact of the shared interface signature. These
-    // `&self` variants let callers that already hold a shared borrow (e.g. wrapper repositories
-    // initializing from a `&self` context) reuse the same logic.
     pub(crate) fn find_package_internal(
         &self,
         name: &str,
@@ -202,8 +198,7 @@ impl ArrayRepository {
         *self.packages.borrow_mut() = Some(vec![]);
     }
 
-    /// Shared body of `RepositoryInterface::count`, kept on `&self` for `get_repo_name` (PHP's
-    /// `getRepoName` also triggers lazy initialization through `count()`).
+    /// Shared body of `RepositoryInterface::count`.
     pub(crate) fn base_count(&self) -> usize {
         if self.packages.borrow().is_none() {
             self.initialize();

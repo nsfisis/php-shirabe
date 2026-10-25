@@ -289,8 +289,6 @@ fn test_add_remove_installer() {
         .expect_supports()
         .times(2)
         .returning(|arg| arg == "vendor");
-    // The manager stores installers as Rc, so the PHP object-identity semantics (assertSame,
-    // removeInstaller) map to Rc::ptr_eq on the handle the caller keeps.
     let installer: std::rc::Rc<dyn InstallerInterface> = std::rc::Rc::new(installer);
 
     let mut installer2 = MockInstaller::new();

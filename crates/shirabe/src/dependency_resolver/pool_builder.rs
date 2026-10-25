@@ -303,8 +303,6 @@ impl PoolBuilder {
             }
         }
 
-        // Both lists are reset once the pool is built, so they move into the event and on into
-        // the pool instead of being copied.
         let mut packages: Vec<BasePackageHandle> =
             std::mem::take(&mut self.packages).into_values().collect();
         let mut unacceptable_fixed_or_locked_packages =

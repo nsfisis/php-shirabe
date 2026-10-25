@@ -203,8 +203,7 @@ impl std::fmt::Display for AliasPackage {
 
 impl PackageInterface for AliasPackage {
     fn get_name(&self) -> &str {
-        // PHP delegates to aliasOf; the local name mirrors aliasOf->getName(),
-        // so it is returned here to avoid borrowing across the shared handle.
+        // PHP delegates to aliasOf; the local name mirrors aliasOf->getName().
         &self.name
     }
 

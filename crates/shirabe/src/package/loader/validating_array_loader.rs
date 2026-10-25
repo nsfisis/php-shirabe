@@ -22,8 +22,6 @@ use shirabe_spdx_licenses::SpdxLicenses;
 pub struct ValidatingArrayLoader {
     loader: Box<dyn LoaderInterface>,
     version_parser: VersionParser,
-    // RefCell: `load` implements `LoaderInterface`, whose signature takes `&self`, but PHP's
-    // implementation freely mutates these as scratch state for the duration of a single call.
     errors: std::cell::RefCell<Vec<String>>,
     warnings: std::cell::RefCell<Vec<String>>,
     config: std::cell::RefCell<IndexMap<String, PhpMixed>>,

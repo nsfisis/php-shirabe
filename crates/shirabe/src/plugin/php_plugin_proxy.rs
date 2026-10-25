@@ -452,8 +452,6 @@ pub(crate) fn dispatch_r_table_method(
     args: &[PluginValue],
     out_params: &mut IndexMap<u32, PluginValue>,
 ) -> Result<PluginValue, PhpThrow> {
-    // The entity is cloned out so no table borrow is held while the handler runs (a
-    // handler that re-enters register_*_entity would otherwise panic on the RefCell).
     let entity = R_TABLE.with(|table| table.borrow().get(&rhandle).cloned());
     if method_name == "__shirabeClone" {
         return match entity {
@@ -2386,7 +2384,6 @@ fn dispatch_package_method(
     method_name: &str,
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
-    // Mutators borrow mutably and must not hold the borrow across the shared-borrow arms.
     match method_name {
         "setId" => {
             let id = arg::<i64>(method_name, args, 0)?;

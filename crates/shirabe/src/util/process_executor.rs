@@ -32,8 +32,6 @@ pub enum CommandLine {
     Args(Vec<String>),
 }
 
-/// The mutable state sits behind cells so that every method takes `&self`: an output callback
-/// running in the middle of `execute` can call back into the same executor, as PHP allows.
 #[derive(Debug)]
 pub struct ProcessExecutor {
     /// @var bool
@@ -51,8 +49,7 @@ pub struct ProcessExecutor {
     /// @var bool
     allow_async: std::cell::Cell<bool>,
     /// Test-only mock state. `None` in production; set via [`ProcessExecutor::__expects`] in tests.
-    /// Mirrors `composer/tests/Composer/Test/Mock/ProcessExecutorMock.php`. Wrapped in a `RefCell`
-    /// so `execute_async`'s `&self` receiver can still consume the expectation queue.
+    /// Mirrors `composer/tests/Composer/Test/Mock/ProcessExecutorMock.php`.
     mock: Option<std::cell::RefCell<ProcessExecutorMockState>>,
 }
 
@@ -349,8 +346,7 @@ impl ProcessExecutor {
     /// error in strict mode (cf. PHPUnit's `AssertionFailedError`, itself a catchable
     /// `\RuntimeException` — callers such as `Git::get_mirror_default_branch` rely on being able
     /// to catch a strict-mode mismatch rather than have it abort the process). Returns `(stdout,
-    /// stderr, return)`. Takes `&self`: the expectation queue is wrapped in a `RefCell` so
-    /// `execute_async`'s `&self` receiver can still consume it.
+    /// stderr, return)`.
     fn mock_match(
         &self,
         command: &CommandLine,
@@ -409,9 +405,6 @@ impl ProcessExecutor {
             .into());
         }
 
-        // Release the RefMut before firing the callback: a callback that re-enters the same
-        // executor (e.g. via a cloned `Rc<RefCell<ProcessExecutor>>`) would otherwise hit
-        // `already mutably borrowed` here even before reaching the outer RefCell.
         drop(mock);
         if let Some(mut callback) = callback {
             callback();
@@ -522,12 +515,7 @@ impl ProcessExecutor {
     /// instantiation split by caller"). This is the direct 1:1 port of PHP's `executeAsync()`:
     /// almost all calls go through here, spawning in Rust with no PHP child involved.
     ///
-    /// The returned future does NOT borrow the executor: everything it needs is captured up
-    /// front, so callers can drop their `Ref`/`RefMut` on the shared `Rc<RefCell<ProcessExecutor>>`
-    /// before awaiting (`let fut = pe.borrow_mut().execute_async(...); fut.await`). Holding
-    /// a borrow across the await would panic as soon as a sibling future or a sync `execute()`
-    /// call touches the same executor. The max_jobs throttle is enforced by the semaphore, shared
-    /// with `execute_async_php`.
+    /// The max_jobs throttle is enforced by the semaphore, shared with `execute_async_php`.
     ///
     /// The mock branch updates `error_output`/`capture_output` before returning, mirroring
     /// `ProcessExecutorMock::executeAsync` — which resolves through the same `doExecute` the sync
@@ -726,8 +714,6 @@ impl ProcessExecutor {
         Self::output_command_run_with(&self.io, command, cwd, r#async);
     }
 
-    /// `output_command_run` body as an associated fn so the `execute_async` future can carry a
-    /// clone of the io handle instead of borrowing the executor.
     fn output_command_run_with(
         io: &Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         command: &CommandLine,

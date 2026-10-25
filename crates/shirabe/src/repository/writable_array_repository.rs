@@ -13,8 +13,6 @@ use shirabe_semver::constraint::AnyConstraint;
 #[derive(Debug)]
 pub struct WritableArrayRepository {
     inner: ArrayRepository,
-    // RefCell so that FilesystemRepository::initialize can stay `&self` (late-bound
-    // initialization out of shared contexts such as getRepoName).
     pub(crate) dev_package_names: std::cell::RefCell<Vec<String>>,
     dev_mode: Option<bool>,
 }
@@ -33,7 +31,7 @@ impl WritableArrayRepository {
         self.dev_mode
     }
 
-    /// See `ArrayRepository::base_count`; kept on `&self` for `is_fresh` callers.
+    /// See `ArrayRepository::base_count`.
     pub(crate) fn base_count(&self) -> usize {
         self.inner.base_count()
     }

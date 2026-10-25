@@ -1062,8 +1062,6 @@ impl ComposerRepository {
                     PhpMixed::List(mut l) if !l.is_empty() => l.remove(0),
                     _ => PhpMixed::Null,
                 };
-                // Takes ownership out of response instead of cloning: response is local to this
-                // iteration's own package metadata and is not read again afterwards.
                 let mut response_arr = match response {
                     PhpMixed::Array(a) => a,
                     _ => continue,
@@ -1867,8 +1865,6 @@ impl ComposerRepository {
                 PhpMixed::Array(a) => a,
                 _ => continue,
             };
-            // Takes ownership out of response_arr instead of cloning: response_arr is local to
-            // this iteration and "packages" is not read again afterwards (only "minified" is).
             let versions_mixed =
                 match response_arr
                     .shift_remove("packages")

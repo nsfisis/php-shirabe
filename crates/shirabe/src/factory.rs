@@ -550,15 +550,9 @@ impl Factory {
 
         let vendor_dir = config.get_str("vendor-dir")?;
 
-        // wrap config into Rc<RefCell<...>> for shared ownership across composer + downloaders/utils
         let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 
         // initialize composer
-        //
-        // The whole Composer graph is built at once with Rc::new_cyclic so that
-        // back-references (the EventDispatcher's composer, etc.) can hold a
-        // PartialComposerWeak (Weak<RefCell<InnerComposer>>). The closure cannot return a
-        // Result, so construction errors are surfaced through `build_error`.
         let mut build_error: Option<anyhow::Error> = None;
         let composer = std::rc::Rc::new_cyclic(
             |composer_weak: &std::rc::Weak<std::cell::RefCell<PartialOrFullComposer>>| {

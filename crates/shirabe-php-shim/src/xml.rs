@@ -1,8 +1,4 @@
 //! Minimal, PHP-compatible subset of the DOM classes.
-//!
-//! PHP DOM nodes have reference semantics and form a mutable shared graph, so each node
-//! is held behind `Rc<RefCell<_>>`. `DOMDocument`, `DOMNode` and `DOMNodeList` are thin
-//! handles over that graph.
 
 use std::rc::Weak;
 

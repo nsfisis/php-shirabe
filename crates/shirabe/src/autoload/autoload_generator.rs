@@ -1085,7 +1085,6 @@ return array(
             return None;
         }
 
-        // pre-mutate to avoid borrow conflict
         let _ = &mut files;
 
         Some(format!(

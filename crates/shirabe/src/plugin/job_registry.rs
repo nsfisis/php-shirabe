@@ -72,9 +72,7 @@ struct Registry {
 }
 
 thread_local! {
-    /// One per thread, like the R table whose entities the jobs are counted against. It sits
-    /// behind its own cell, apart from the services the dispatcher borrows, because a callback a
-    /// settle push runs may start another job on the same service.
+    /// One per thread, like the R table whose entities the jobs are counted against.
     static REGISTRY: std::cell::RefCell<Registry> = std::cell::RefCell::new(Registry::default());
 }
 
@@ -82,7 +80,7 @@ thread_local! {
 static NEXT_JOB_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
 
 /// Registers a job without polling it and answers with the descriptor the worker turns into the
-/// job's promise. The future must not borrow the entity it is counted against.
+/// job's promise.
 pub(crate) fn register(
     owner: JobOwner,
     owner_entity: std::rc::Rc<dyn std::any::Any>,
@@ -142,9 +140,6 @@ fn another_pass_ran_since(pass: u64) -> bool {
 
 /// Polls every job counted against `owners` once and pushes the outcome of each one that
 /// finished to the worker before polling the next. Returns whether any job settled.
-///
-/// No registry borrow and no future other than the one being polled is held across a poll or a
-/// push, so plugin code running inside either can start jobs, cancel them and tick again.
 fn poll_jobs(owners: &[JobOwner], cx: &mut std::task::Context<'_>) -> Result<bool, PhpThrow> {
     let ids: Vec<u64> = REGISTRY.with(|registry| {
         registry

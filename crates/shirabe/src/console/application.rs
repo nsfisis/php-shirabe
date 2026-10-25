@@ -137,8 +137,7 @@ pub struct Application {
     /// details.
     dev_warning_time: Option<i64>,
     /// Self-reference used to hand commands their owning application (PHP's `$command->setApplication($this)`).
-    /// Set by `new_shared`; the run flow threads the upgraded `Rc` so command callbacks never
-    /// re-borrow the application while it is already borrowed.
+    /// Set by `new_shared`.
     me: std::rc::Weak<std::cell::RefCell<Application>>,
 }
 
@@ -241,8 +240,6 @@ impl Application {
         }
 
         Silencer::suppress(None);
-        // Compute the disk-space hint message first; emit it via io afterwards to
-        // avoid overlapping borrows of self (get_composer needs &mut self).
         let disk_hint_msg: Option<String> = (|| -> anyhow::Result<Option<String>> {
             let composer = self.get_composer(false, Some(true), None)?;
             if let Some(composer) = composer {
@@ -1811,21 +1808,11 @@ impl Application {
 }
 
 /// Shared handle to an `Application`.
-///
-/// PHP `Application` instances are shared by reference — commands hold a back-pointer to their
-/// owning application that aliases this very `RefCell`. The whole run flow is therefore driven
-/// through this handle with short-lived borrows, so a command callback never re-borrows the
-/// application while it is already borrowed. Mirrors the Composer handle pattern (`ComposerHandle`).
 #[derive(Debug, Clone)]
 pub struct ApplicationHandle(std::rc::Rc<std::cell::RefCell<Application>>);
 
 impl ApplicationHandle {
     /// Builds the application inside a shared handle and registers the default commands.
-    ///
-    /// Commands hold a back-pointer to their application, which shares this very `RefCell`. So the
-    /// whole run flow is driven through the handle (never a long-lived `borrow_mut`), and command
-    /// registration happens here — before any borrow is taken — so `set_application` can borrow the
-    /// application without a re-entrant conflict.
     pub fn new(name: String, version: String) -> anyhow::Result<ApplicationHandle> {
         let application = ApplicationHandle(std::rc::Rc::new(std::cell::RefCell::new(
             Application::new(name, version),
@@ -1850,9 +1837,6 @@ impl ApplicationHandle {
     ///
     /// If a command with the same name already exists, it will be overridden.
     /// If the command is not enabled it will not be added.
-    ///
-    /// Takes the shared application handle rather than `&mut self` so no application borrow is held
-    /// while calling into the command, letting `set_application` borrow back safely.
     pub fn add(
         &self,
         command: std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>,
@@ -1940,8 +1924,6 @@ impl ApplicationHandle {
             output.clone(),
             QuestionHelper::default(),
         )));
-        // Cache the IO so the rest of the flow does not re-borrow the application; command callbacks
-        // (e.g. mergeApplicationDefinition) need the application's RefCell free.
         let io = application.borrow().io.clone();
 
         // Register error handler again to pass it the IO instance
@@ -2839,8 +2821,6 @@ impl ApplicationHandle {
         // LazyCommand is intentionally not ported.
 
         application.borrow_mut().running_command = Some(command.clone());
-        // do_run_command invokes the command's run(), which calls back into the application
-        // (mergeApplicationDefinition etc.); it must run with no application borrow held.
         let exit_code = self
             .do_run_command(command.clone(), input.clone(), output.clone())
             .await?;

@@ -10,8 +10,7 @@ use shirabe_php_shim::{
 use std::cell::Cell;
 
 // PHP keeps `$io` / `$hasShownDeprecationNotice` as process-global statics. Composer runs
-// single-threaded, so thread-locals on the main thread reproduce that faithfully while letting
-// us hold the same shared (`Rc<RefCell<dyn IOInterface>>`) IO instance the application uses.
+// single-threaded, so thread-locals on the main thread reproduce that faithfully.
 thread_local! {
     static IO: std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>> = const { std::cell::RefCell::new(None) };
     static HAS_SHOWN_DEPRECATION_NOTICE: Cell<i64> = const { Cell::new(0) };

@@ -67,8 +67,6 @@ impl Command for ClearCacheCommand {
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let composer = self.try_composer(None, None);
-        // composer.getConfig() yields an Rc<RefCell<Config>>; Factory::createConfig() an owned
-        // Config. Keep whichever applies alive in a local and read both through a shared &Config.
         let config_rc = composer.as_ref().map(|c| c.borrow_partial().get_config());
         let created_config = if config_rc.is_none() {
             Some(Factory::create_config(None, None)?)

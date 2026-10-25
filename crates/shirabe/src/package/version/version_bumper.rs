@@ -76,7 +76,6 @@ impl VersionBumper {
             major = major
         );
 
-        // Collected eagerly: a match borrows `pretty_constraint`, which the returns below move.
         let constraint_matches: Vec<(String, i64)> = preg_match_all(&pattern, &pretty_constraint)
             .map(|match_| {
                 let constraint = match_

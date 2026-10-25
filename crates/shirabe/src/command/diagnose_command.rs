@@ -1424,10 +1424,6 @@ impl Command for DiagnoseCommand {
         };
         let proxy_check_result: anyhow::Result<(), anyhow::Error> = (|| -> anyhow::Result<()> {
             for proto in &protos {
-                // Compute the proxy under a short-lived lock: `check_http_proxy` below transitively
-                // re-enters `ProxyManager::get_instance()` (via HttpDownloader ->
-                // NativeHttpDownloader / LocalFilesystem), and `std::sync::Mutex` is not reentrant, so the guard must not
-                // still be held when that call happens.
                 let proxy = ProxyManager::get_instance()
                     .as_ref()
                     .unwrap()

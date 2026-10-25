@@ -36,8 +36,7 @@ pub struct HttpDownloader {
     /// Replaces PHP's `$runningJobs`/`$maxJobs` counters: a permit is held for the duration of
     /// each in-flight request and released when it settles.
     semaphore: std::rc::Rc<tokio::sync::Semaphore>,
-    /// Takes the http(s) requests, in the place of Composer's `?CurlDownloader`. Shared so that a
-    /// request future can hold it without borrowing the downloader.
+    /// Takes the http(s) requests, in the place of Composer's `?CurlDownloader`.
     native: Option<std::rc::Rc<NativeHttpDownloader>>,
     /// Takes `file://` URLs and local paths, which Composer hands to its `RemoteFilesystem`.
     local: LocalFilesystem,
@@ -301,9 +300,8 @@ impl HttpDownloader {
     /// The job behind `add()` / `add_copy()` for a caller that registers it instead of awaiting it
     /// (see `docs/dev/plugin-async.md`). The gates PHP raises out of the call itself are the outer
     /// error. A request the native downloader does not take is run on the spot, as PHP runs the
-    /// `RemoteFilesystem` resolver while it constructs the promise, and comes back settled. The
-    /// future of a native request borrows nothing from the downloader, and `started` tells whether
-    /// the job budget has let the job through.
+    /// `RemoteFilesystem` resolver while it constructs the promise, and comes back settled.
+    /// `started` tells whether the job budget has let the job through.
     pub(crate) fn add_job(
         &self,
         url: &str,

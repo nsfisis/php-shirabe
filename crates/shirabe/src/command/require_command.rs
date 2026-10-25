@@ -927,9 +927,6 @@ impl Command for RequireCommand {
             composer.get_package().get_minimum_stability()
         };
 
-        // Hoist argument computations into locals so no borrow of `input` is held across the
-        // call: `determine_requirements` may prompt via ConsoleIO, which mutably borrows the
-        // same input RefCell.
         let packages: Vec<String> = input
             .borrow()
             .get_argument("packages")?

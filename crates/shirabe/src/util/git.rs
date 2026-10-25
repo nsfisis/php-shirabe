@@ -1394,9 +1394,7 @@ impl RunCommandOutput for &mut PhpMixed {
 
 /// `runCommands(..., $callable)`: the callable is used as the output handler for every command.
 /// PHP passes the same `$commandOutput` callable to each `process->execute` call, so the handler
-/// state is shared across all commands and protocol/auth retries; we mirror that by holding the
-/// handler in an [`Rc`](std::rc::Rc)/[`RefCell`](std::cell::RefCell) and producing a fresh
-/// forwarding box per command.
+/// state is shared across all commands and protocol/auth retries.
 pub struct GitRunCommandOutputHandler {
     handler: std::rc::Rc<std::cell::RefCell<dyn FnMut(&str, &str) -> bool>>,
 }

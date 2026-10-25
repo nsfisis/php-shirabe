@@ -269,9 +269,6 @@ impl Solver {
         );
 
         if !self.problems.is_empty() {
-            // SolverProblemsException stores `Rc<RefCell<Rule>>` which is not `Send + Sync`, so it
-            // cannot satisfy `anyhow::Error`'s bounds. It is the recoverable exception PHP callers
-            // `catch`, so it rides the inner `Result` while fatal errors stay on the outer one.
             return Ok(Err(SolverProblemsException::new(
                 std::mem::take(&mut self.problems),
                 std::mem::take(&mut self.learned_pool),

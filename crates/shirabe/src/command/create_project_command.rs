@@ -772,8 +772,6 @@ impl CreateProjectCommand {
         let installed_repo = crate::repository::InstalledRepositoryInterfaceHandle::new(
             InstalledArrayRepository::new()?,
         );
-        // A shared borrow: plugin registration inside execute re-enters this manager handle
-        // through the Composer graph.
         let executed = installation_manager
             .borrow()
             .execute(

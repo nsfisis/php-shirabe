@@ -54,9 +54,6 @@ pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<String, Vec<String>>>> =
 #[derive(Debug)]
 pub struct FileDownloader {
     /// @var IOInterface
-    ///
-    /// Behind a RefCell so `get_local_changes` can temporarily swap in a NullIO through `&self`
-    /// (PHP: `$this->io = new NullIO;` ... restore), now that the downloader methods take `&self`.
     pub(crate) io: std::cell::RefCell<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     /// @var Config
     pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
@@ -71,16 +68,8 @@ pub struct FileDownloader {
     /// @var ProcessExecutor
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     /// @var array<string, string> Map of package name to cache key
-    ///
-    /// Behind a Mutex so `download()` can record cache writes through `&self`. `download()` blocks
-    /// for a while and (once the workers are parallelized) runs from several threads; requiring
-    /// `&mut self` would force locking the whole FileDownloader for each download's duration. Only
-    /// this write needs guarding, so it is the only field isolated behind a lock.
     last_cache_writes: Mutex<IndexMap<String, String>>,
     /// @var array<string, string[]> Map of package name to list of paths
-    ///
-    /// Behind a RefCell so add/remove_cleanup_path work through `&self` (needed since install()
-    /// mutates it while downloads of other packages may be in flight on sibling futures).
     additional_cleanup_paths: std::cell::RefCell<IndexMap<String, Vec<String>>>,
 }
 

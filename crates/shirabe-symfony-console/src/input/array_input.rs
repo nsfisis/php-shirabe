@@ -129,7 +129,6 @@ impl ArrayInput {
     }
 
     fn parse(&mut self) -> anyhow::Result<()> {
-        // Clone to avoid borrowing self while mutating; PHP iterates over a copy semantically.
         let parameters = self.parameters.clone();
         for (key, value) in parameters {
             // PHP compares the key as a string even when it is an int.
