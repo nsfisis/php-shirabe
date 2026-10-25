@@ -3,28 +3,29 @@
 //! what the generator emits from the current Composer checkout and classifier report.
 //!
 //! The generator needs a PHP interpreter, its composer vendor directory and the classifier
-//! report; when any of those is missing the test returns early, following the non-mock test
-//! convention of this crate.
+//! report. A missing prerequisite fails the test; `just setup` prepares all of them.
 
 use shirabe_symfony_process::PhpExecutableFinder;
 use std::path::Path;
 
 #[test]
 fn generated_stubs_are_fresh() {
-    let Some(php) = PhpExecutableFinder::new().find(false) else {
-        return;
-    };
+    let php = PhpExecutableFinder::new()
+        .find(false)
+        .expect("no PHP interpreter found; the stub generator needs one");
     let tool_dir =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/plugin-stub-generator");
-    if !tool_dir.join("vendor/autoload.php").is_file() {
-        return;
-    }
-    if !tool_dir
-        .join("../plugin-class-classifier/report.json")
-        .is_file()
-    {
-        return;
-    }
+    assert!(
+        tool_dir.join("vendor/autoload.php").is_file(),
+        "{} is missing; run `composer install` there or `just setup`",
+        tool_dir.join("vendor").display(),
+    );
+    let report = tool_dir.join("../plugin-class-classifier/report.json");
+    assert!(
+        report.is_file(),
+        "{} is missing; run scripts/plugin-class-classifier/classify or `just setup`",
+        report.display(),
+    );
 
     let output = std::process::Command::new(php)
         .arg(tool_dir.join("generate-stubs"))

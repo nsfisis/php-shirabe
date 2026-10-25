@@ -24,6 +24,13 @@ setup: fetch-fixtures
     if [[ ! -f scripts/linters/vendor/autoload.php ]]; then
         composer install --working-dir=scripts/linters
     fi
+    if [[ ! -f scripts/plugin-class-classifier/vendor/autoload.php ]]; then
+        composer install --working-dir=scripts/plugin-class-classifier
+    fi
+    if [[ ! -f scripts/plugin-stub-generator/vendor/autoload.php ]]; then
+        composer install --working-dir=scripts/plugin-stub-generator
+    fi
+    scripts/plugin-class-classifier/classify > /dev/null
 
 fetch-fixtures:
     #!/usr/bin/env bash

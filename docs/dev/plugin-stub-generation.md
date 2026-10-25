@@ -59,8 +59,9 @@ Inputs:
   fails the run.
 
 The freshness check for both sets runs in `cargo test` as
-`crates/shirabe-php-rpc/tests/generated_stubs.rs`; it returns early when PHP,
-the generator's vendor directory or the classifier report is unavailable.
+`crates/shirabe-php-rpc/tests/generated_stubs.rs`; it fails when PHP, the
+generator's vendor directory or the classifier report is unavailable. `just setup`
+installs both tools' dependencies and regenerates the report.
 
 ## What the generator emits
 
