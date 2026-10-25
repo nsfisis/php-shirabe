@@ -6,6 +6,7 @@ use shirabe_php_shim::RuntimeException;
 pub struct SolverBugException(pub RuntimeException);
 
 impl SolverBugException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         let full_message = format!(
             "{}\nThis exception was most likely caused by a bug in Composer.\n\

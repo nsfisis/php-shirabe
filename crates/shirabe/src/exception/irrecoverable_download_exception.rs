@@ -6,6 +6,7 @@ use shirabe_php_shim::RuntimeException;
 pub struct IrrecoverableDownloadException(pub RuntimeException);
 
 impl IrrecoverableDownloadException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self(RuntimeException::new(message))
     }

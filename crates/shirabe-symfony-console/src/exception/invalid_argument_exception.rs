@@ -6,6 +6,7 @@ use super::exception_interface::ExceptionInterface;
 pub struct InvalidArgumentException(pub shirabe_php_shim::InvalidArgumentException);
 
 impl InvalidArgumentException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self(shirabe_php_shim::InvalidArgumentException::new(message))
     }

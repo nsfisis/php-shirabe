@@ -10,6 +10,7 @@ pub struct ProcessFailedException {
 }
 
 impl ProcessFailedException {
+    #[track_caller]
     pub fn new(process: &mut Process) -> anyhow::Result<Self> {
         if process.is_successful() {
             return Err(InvalidArgumentException::new(

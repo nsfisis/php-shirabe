@@ -7,6 +7,7 @@ use shirabe_php_shim::RuntimeException;
 pub struct NoSslException(pub RuntimeException);
 
 impl NoSslException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self(RuntimeException::new(message))
     }

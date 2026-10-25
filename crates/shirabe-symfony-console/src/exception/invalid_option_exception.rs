@@ -7,6 +7,7 @@ use shirabe_php_shim::InvalidArgumentException;
 pub struct InvalidOptionException(pub InvalidArgumentException);
 
 impl InvalidOptionException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self(InvalidArgumentException::new(message))
     }

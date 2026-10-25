@@ -1359,12 +1359,20 @@ impl Application {
             if !throwable_is_exception_interface(exception)
                 || output_interface::VERBOSITY_VERBOSE <= verbosity
             {
-                // TODO(error-model): anyhow::Error carries no PHP file/line, so getFile()/getLine() take
-                // the 'n/a' fallback PHP itself uses when they are unavailable. The real source
-                // location cannot be reproduced (it would be a Rust path, not Composer's PHP path).
+                // An exception the port raised was created in Rust, so its file is a Rust source
+                // file rather than one of Composer's. An error that is no exception has no
+                // location, which PHP's 'n/a' fallback stands for.
+                let file = exception
+                    .map(|e| shirabe_php_shim::basename(e.get_file()))
+                    .filter(|file| !file.is_empty())
+                    .unwrap_or_else(|| "n/a".to_string());
+                let line = exception
+                    .map(AnyThrowable::get_line)
+                    .filter(|line| *line != 0)
+                    .map_or_else(|| "n/a".to_string(), |line| line.to_string());
                 messages.push(format!(
                     "<comment>{}</comment>",
-                    OutputFormatter::escape(&format!("In {} line {}:", "n/a", "n/a")).unwrap()
+                    OutputFormatter::escape(&format!("In {} line {}:", file, line)).unwrap()
                 ));
             }
             let empty_line = format!(

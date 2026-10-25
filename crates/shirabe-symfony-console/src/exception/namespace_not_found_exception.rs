@@ -7,6 +7,7 @@ use super::exception_interface::ExceptionInterface;
 pub struct NamespaceNotFoundException(pub CommandNotFoundException);
 
 impl NamespaceNotFoundException {
+    #[track_caller]
     pub fn new(message: String, alternatives: Vec<String>, code: i64) -> Self {
         Self(CommandNotFoundException::new(message, alternatives, code))
     }

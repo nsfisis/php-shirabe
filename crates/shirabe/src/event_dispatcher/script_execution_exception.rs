@@ -7,6 +7,7 @@ use shirabe_php_shim::RuntimeException;
 pub struct ScriptExecutionException(pub RuntimeException);
 
 impl ScriptExecutionException {
+    #[track_caller]
     pub fn new(message: String, code: i64) -> Self {
         Self(RuntimeException::with_code(message, code))
     }

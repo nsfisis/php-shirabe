@@ -9,6 +9,7 @@ pub struct JsonValidationException {
 }
 
 impl JsonValidationException {
+    #[track_caller]
     pub fn new(message: String, errors: Vec<String>) -> Self {
         Self {
             inner: Exception::new(message),

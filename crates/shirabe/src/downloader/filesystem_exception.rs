@@ -6,6 +6,7 @@ use shirabe_php_shim::Exception;
 pub struct FilesystemException(pub Exception);
 
 impl FilesystemException {
+    #[track_caller]
     pub fn new(message: String, code: i64) -> Self {
         FilesystemException(Exception::with_code(
             format!("Filesystem exception: \n{}", message),

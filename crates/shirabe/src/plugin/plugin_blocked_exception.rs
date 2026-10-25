@@ -7,6 +7,7 @@ use shirabe_php_shim::UnexpectedValueException;
 pub struct PluginBlockedException(pub UnexpectedValueException);
 
 impl PluginBlockedException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self(UnexpectedValueException::new(message))
     }

@@ -6,6 +6,7 @@ use super::exception_interface::ExceptionInterface;
 pub struct RuntimeException(pub shirabe_php_shim::RuntimeException);
 
 impl RuntimeException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self(shirabe_php_shim::RuntimeException::new(message))
     }

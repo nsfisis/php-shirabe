@@ -6,6 +6,7 @@ use super::exception_interface::ExceptionInterface;
 pub struct LogicException(pub shirabe_php_shim::LogicException);
 
 impl LogicException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self(shirabe_php_shim::LogicException::new(message))
     }

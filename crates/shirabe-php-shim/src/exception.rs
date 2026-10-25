@@ -6,14 +6,31 @@ use crate::PhpClass;
 /// `previous` is any error rather than an [`AnyThrowable`], because the port reaches a `catch`
 /// carrying errors PHP would have raised as exception objects and the port raises as itself. One
 /// that does carry an exception is still reachable as such, through [`Catch`].
+///
+/// `file` and `line` are where the exception was created, as PHP records them in `new`. For an
+/// exception the port creates, that is the Rust source location of the constructor call.
 #[derive(Debug, Clone)]
 pub struct ThrowableFields {
     message: String,
     code: i64,
+    file: String,
+    line: i64,
     previous: Option<std::sync::Arc<anyhow::Error>>,
 }
 
 impl ThrowableFields {
+    #[track_caller]
+    fn new(message: String, code: i64, previous: Option<std::sync::Arc<anyhow::Error>>) -> Self {
+        let location = std::panic::Location::caller();
+        Self {
+            message,
+            code,
+            file: location.file().to_string(),
+            line: i64::from(location.line()),
+            previous,
+        }
+    }
+
     pub fn get_message(&self) -> &str {
         &self.message
     }
@@ -29,6 +46,22 @@ impl ThrowableFields {
 
     pub fn get_previous(&self) -> Option<&anyhow::Error> {
         self.previous.as_deref()
+    }
+
+    pub fn get_file(&self) -> &str {
+        &self.file
+    }
+
+    pub fn get_line(&self) -> i64 {
+        self.line
+    }
+
+    /// PHP's `file` and `line` properties are protected with no setter. `ErrorException`'s
+    /// constructor overwrites them, and an exception rebuilt from one raised elsewhere takes the
+    /// location it was raised at.
+    pub fn set_location(&mut self, file: String, line: i64) {
+        self.file = file;
+        self.line = line;
     }
 }
 
@@ -148,6 +181,20 @@ impl AnyThrowable {
 
     pub fn get_previous(&self) -> Option<&anyhow::Error> {
         self.0.fields().get_previous()
+    }
+
+    pub fn get_file(&self) -> &str {
+        self.0.fields().get_file()
+    }
+
+    pub fn get_line(&self) -> i64 {
+        self.0.fields().get_line()
+    }
+
+    pub fn set_location(&mut self, file: String, line: i64) {
+        self.downcast_mut::<ThrowableFields>()
+            .expect("every exception bottoms out at the ThrowableFields")
+            .set_location(file, line);
     }
 }
 
@@ -297,6 +344,18 @@ macro_rules! impl_php_exception {
             pub fn get_previous(&self) -> Option<&::anyhow::Error> {
                 self.$field.get_previous()
             }
+
+            pub fn get_file(&self) -> &str {
+                self.$field.get_file()
+            }
+
+            pub fn get_line(&self) -> i64 {
+                self.$field.get_line()
+            }
+
+            pub fn set_location(&mut self, file: String, line: i64) {
+                self.$field.set_location(file, line);
+            }
         }
 
         impl std::fmt::Display for $ty {
@@ -320,17 +379,14 @@ macro_rules! define_php_exception {
         define_php_exception!(@shared $ty, ThrowableFields, $class_name);
 
         impl $ty {
+            #[track_caller]
             pub fn with_code_and_previous(
                 message: String,
                 code: i64,
                 previous: Option<std::sync::Arc<anyhow::Error>>,
             ) -> Self {
                 Self {
-                    inner: ThrowableFields {
-                        message,
-                        code,
-                        previous,
-                    },
+                    inner: ThrowableFields::new(message, code, previous),
                 }
             }
         }
@@ -339,6 +395,7 @@ macro_rules! define_php_exception {
         define_php_exception!(@shared $ty, $parent, $class_name);
 
         impl $ty {
+            #[track_caller]
             pub fn with_code_and_previous(
                 message: String,
                 code: i64,
@@ -357,10 +414,12 @@ macro_rules! define_php_exception {
         }
 
         impl $ty {
+            #[track_caller]
             pub fn new(message: String) -> Self {
                 Self::with_code_and_previous(message, 0, None)
             }
 
+            #[track_caller]
             pub fn with_code(message: String, code: i64) -> Self {
                 Self::with_code_and_previous(message, code, None)
             }
@@ -410,6 +469,7 @@ pub struct ErrorException {
 }
 
 impl ErrorException {
+    #[track_caller]
     pub fn new(
         message: String,
         code: i64,
@@ -418,8 +478,10 @@ impl ErrorException {
         lineno: i64,
         previous: Option<std::sync::Arc<anyhow::Error>>,
     ) -> Self {
+        let mut inner = Exception::with_code_and_previous(message, code, previous);
+        inner.set_location(filename.clone(), lineno);
         Self {
-            inner: Exception::with_code_and_previous(message, code, previous),
+            inner,
             severity,
             filename,
             lineno,
@@ -496,6 +558,31 @@ mod tests {
         assert!(error.catch::<Error>().is_some());
         assert!(error.catch::<ThrowableFields>().is_some());
         assert!(error.catch::<Exception>().is_none());
+    }
+
+    #[test]
+    fn an_exception_records_where_it_was_created() {
+        let line = i64::from(line!()) + 1;
+        let error: anyhow::Error = UnexpectedValueException::new("boom".to_string()).into();
+
+        let exception = AnyThrowable::of(&error).unwrap();
+        assert_eq!(file!(), exception.get_file());
+        assert_eq!(line, exception.get_line());
+    }
+
+    #[test]
+    fn an_error_exception_takes_the_location_it_is_given() {
+        let exception = ErrorException::new(
+            "boom".to_string(),
+            0,
+            1,
+            "/path/to/file.php".to_string(),
+            42,
+            None,
+        );
+
+        assert_eq!("/path/to/file.php", exception.get_file());
+        assert_eq!(42, exception.get_line());
     }
 
     #[test]

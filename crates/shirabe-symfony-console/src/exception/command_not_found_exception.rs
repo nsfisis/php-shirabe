@@ -9,6 +9,7 @@ pub struct CommandNotFoundException {
 }
 
 impl CommandNotFoundException {
+    #[track_caller]
     pub fn new(message: String, alternatives: Vec<String>, code: i64) -> Self {
         Self {
             inner: shirabe_php_shim::InvalidArgumentException::with_code(message, code),

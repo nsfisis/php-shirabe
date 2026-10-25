@@ -12,6 +12,7 @@ pub struct TransportException {
 }
 
 impl TransportException {
+    #[track_caller]
     pub fn new(message: String, code: i64) -> Self {
         Self {
             inner: RuntimeException::with_code(message, code),

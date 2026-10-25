@@ -9,6 +9,7 @@ pub struct ProcessTimedOutException {
 }
 
 impl ProcessTimedOutException {
+    #[track_caller]
     pub fn new(process: &Process) -> Self {
         let exceeded_timeout = process.get_timeout();
 

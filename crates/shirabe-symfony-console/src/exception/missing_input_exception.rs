@@ -7,6 +7,7 @@ use super::runtime_exception::RuntimeException;
 pub struct MissingInputException(pub RuntimeException);
 
 impl MissingInputException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self(RuntimeException::new(message))
     }

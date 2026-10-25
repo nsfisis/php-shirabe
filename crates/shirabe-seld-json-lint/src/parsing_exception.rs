@@ -30,6 +30,7 @@ pub struct ParsingException {
 }
 
 impl ParsingException {
+    #[track_caller]
     pub fn new(message: String, details: ParsingExceptionDetails) -> Self {
         Self {
             inner: shirabe_php_shim::Exception::new(message),

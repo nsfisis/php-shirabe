@@ -12,6 +12,7 @@ pub struct InvalidPackageException {
 }
 
 impl InvalidPackageException {
+    #[track_caller]
     pub fn new(
         errors: Vec<String>,
         warnings: Vec<String>,

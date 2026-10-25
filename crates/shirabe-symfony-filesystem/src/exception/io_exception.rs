@@ -9,6 +9,7 @@ pub struct IOException {
 }
 
 impl IOException {
+    #[track_caller]
     pub fn new(
         message: String,
         code: i64,

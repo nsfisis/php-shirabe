@@ -6,6 +6,7 @@ pub struct InvalidArgumentException {
 }
 
 impl InvalidArgumentException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self {
             inner: shirabe_php_shim::InvalidArgumentException::new(message),

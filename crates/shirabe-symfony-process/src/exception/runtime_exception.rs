@@ -6,6 +6,7 @@ pub struct RuntimeException {
 }
 
 impl RuntimeException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self {
             inner: shirabe_php_shim::RuntimeException::new(message),

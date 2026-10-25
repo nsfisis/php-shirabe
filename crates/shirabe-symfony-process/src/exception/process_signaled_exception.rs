@@ -10,6 +10,7 @@ pub struct ProcessSignaledException {
 }
 
 impl ProcessSignaledException {
+    #[track_caller]
     pub fn new(process: &mut Process) -> anyhow::Result<Self> {
         let signal = process.get_term_signal()?;
 

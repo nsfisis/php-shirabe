@@ -488,6 +488,7 @@ pub struct PharException {
 }
 
 impl PharException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self {
             inner: crate::Exception::new(message),

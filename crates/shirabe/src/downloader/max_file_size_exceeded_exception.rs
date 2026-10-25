@@ -6,6 +6,7 @@ use crate::downloader::transport_exception::TransportException;
 pub struct MaxFileSizeExceededException(pub TransportException);
 
 impl MaxFileSizeExceededException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self(TransportException::new(message, 0))
     }

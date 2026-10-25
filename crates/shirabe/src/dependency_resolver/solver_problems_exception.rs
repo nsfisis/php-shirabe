@@ -18,6 +18,7 @@ pub struct SolverProblemsException {
 impl SolverProblemsException {
     pub const ERROR_DEPENDENCY_RESOLUTION_FAILED: i64 = 2;
 
+    #[track_caller]
     pub fn new(
         problems: Vec<Problem>,
         learned_pool: Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,

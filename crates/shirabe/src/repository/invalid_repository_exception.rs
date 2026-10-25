@@ -7,6 +7,7 @@ use shirabe_php_shim::Exception;
 pub struct InvalidRepositoryException(pub Exception);
 
 impl InvalidRepositoryException {
+    #[track_caller]
     pub fn new(message: String) -> Self {
         Self(Exception::new(message))
     }
