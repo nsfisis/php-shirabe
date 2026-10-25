@@ -214,7 +214,7 @@ pub(crate) fn throw_fields(throw: PhpThrow) -> Vec<PluginValue> {
         throw
             .properties
             .iter()
-            .map(|(name, value)| (name.clone().into_bytes(), value.clone()))
+            .map(|(name, value)| (name.as_str().into(), value.clone()))
             .collect(),
     );
     vec![

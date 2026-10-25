@@ -207,7 +207,7 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
 pub(crate) fn response_to_wire(response: &Response) -> PluginValue {
     let mut object = PhpObject::new(RESPONSE_CLASS);
     let mut request = indexmap::IndexMap::new();
-    request.insert(b"url".to_vec(), PluginValue::string(response.request_url()));
+    request.insert("url".into(), PluginValue::string(response.request_url()));
     object.set_private(RESPONSE_CLASS, "request", PluginValue::Array(request));
     object.set_private(
         RESPONSE_CLASS,

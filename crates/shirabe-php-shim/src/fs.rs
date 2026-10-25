@@ -2,6 +2,7 @@ use crate::PhpResource;
 use crate::StreamBacking;
 use crate::StreamState;
 use crate::UnexpectedValueException;
+use bstr::BString;
 use std::io::{Read as _, Write as _};
 
 pub const PHP_EOL: &str = "\n";
@@ -452,7 +453,7 @@ pub fn fclose(stream: &PhpResource) -> bool {
 
 /// PHP `fgets()`. Reads one line, including the trailing newline, capped at `length-1` bytes
 /// when given (matching PHP's `length` parameter).
-/// TODO(bytes): byte-string semantics — should return Vec<u8>; from_utf8_lossy can corrupt
+/// TODO(bytes): byte-string semantics — should return BString; from_utf8_lossy can corrupt
 /// binary reads.
 pub fn fgets(stream: &PhpResource, length: Option<i64>) -> Option<String> {
     let limit = match length {
@@ -488,8 +489,8 @@ pub fn fgets(stream: &PhpResource, length: Option<i64>) -> Option<String> {
 fn fgets_read_line<R: std::io::Read + ?Sized>(
     r: &mut R,
     limit: Option<usize>,
-) -> std::io::Result<Vec<u8>> {
-    let mut line = Vec::new();
+) -> std::io::Result<BString> {
+    let mut line = BString::default();
     let mut byte = [0u8; 1];
     loop {
         if let Some(max) = limit

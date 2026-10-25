@@ -24,6 +24,7 @@ shirabe-symfony-process.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
 base64.workspace = true
+bstr.workspace = true
 chrono.workspace = true
 futures.workspace = true
 indexmap.workspace = true

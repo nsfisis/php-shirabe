@@ -241,8 +241,8 @@ impl ConsoleIO {
 
     /// Ensures a string is valid UTF-8, replacing invalid byte sequences with '?'
     // TODO(bytes): PHP sanitizes invalid byte sequences here, but `&str` is always valid UTF-8
-    // so this is a no-op for now. The codebase does not yet strictly distinguish `Vec<u8>` from
-    // `String`; once it does, this should take `&[u8]` and lossily convert it to `String`.
+    // so this is a no-op for now. The codebase does not yet strictly distinguish `BString` from
+    // `String`; once it does, this should take `&BStr` and lossily convert it to `String`.
     fn ensure_valid_utf8(string: &str) -> String {
         string.to_string()
     }

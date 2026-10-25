@@ -5,10 +5,11 @@
 //! independent from `shirabe_php_shim::PhpMixed`: handles exist only at the plugin boundary,
 //! and the codec below is a separate implementation from `shirabe_php_shim::var::serialize`.
 //!
-//! Strings and array keys are byte strings (`Vec<u8>`), matching PHP's string semantics: the
+//! Strings and array keys are byte strings (`BString`), matching PHP's string semantics: the
 //! codec must round-trip non-UTF-8 byte sequences losslessly.
 
 use anyhow::bail;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -19,7 +20,7 @@ pub struct RustObjHandle {
     pub class: String,
     pub epoch: u64,
     /// Present when the descriptor also carries a value snapshot of the entity's fields.
-    pub snapshot: Option<IndexMap<Vec<u8>, PluginValue>>,
+    pub snapshot: Option<IndexMap<BString, PluginValue>>,
 }
 
 /// A handle to an object whose entity lives in the PHP child process.
@@ -42,7 +43,7 @@ pub struct PhpClassHandle {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PhpObject {
     pub class: String,
-    pub props: IndexMap<Vec<u8>, PluginValue>,
+    pub props: IndexMap<BString, PluginValue>,
 }
 
 impl PhpObject {
@@ -59,12 +60,12 @@ impl PhpObject {
     }
 
     pub fn set_public(&mut self, name: &str, value: PluginValue) {
-        self.props.insert(name.as_bytes().to_vec(), value);
+        self.props.insert(name.into(), value);
     }
 
     /// PHP mangles a protected property name to `\0*\0name`.
     pub fn protected(&self, name: &str) -> Option<&PluginValue> {
-        self.props.get(protected_key(name).as_slice())
+        self.props.get(&protected_key(name))
     }
 
     pub fn set_protected(&mut self, name: &str, value: PluginValue) {
@@ -75,8 +76,7 @@ impl PhpObject {
     /// the one whose body holds the `private` declaration, which is not `self.class` once a
     /// subclass inherits it.
     pub fn private(&self, declaring_class: &str, name: &str) -> Option<&PluginValue> {
-        self.props
-            .get(private_key(declaring_class, name).as_slice())
+        self.props.get(&private_key(declaring_class, name))
     }
 
     pub fn set_private(&mut self, declaring_class: &str, name: &str, value: PluginValue) {
@@ -84,14 +84,14 @@ impl PhpObject {
     }
 }
 
-fn protected_key(name: &str) -> Vec<u8> {
-    let mut key = b"\0*\0".to_vec();
+fn protected_key(name: &str) -> BString {
+    let mut key = BString::from(b"\0*\0");
     key.extend_from_slice(name.as_bytes());
     key
 }
 
-fn private_key(declaring_class: &str, name: &str) -> Vec<u8> {
-    let mut key = vec![0];
+fn private_key(declaring_class: &str, name: &str) -> BString {
+    let mut key = BString::from(vec![0]);
     key.extend_from_slice(declaring_class.as_bytes());
     key.push(0);
     key.extend_from_slice(name.as_bytes());
@@ -111,10 +111,10 @@ pub enum PluginValue {
     Bool(bool),
     Int(i64),
     Float(f64),
-    String(Vec<u8>),
+    String(BString),
     List(Vec<PluginValue>),
-    Array(IndexMap<Vec<u8>, PluginValue>),
-    Object(IndexMap<Vec<u8>, PluginValue>),
+    Array(IndexMap<BString, PluginValue>),
+    Object(IndexMap<BString, PluginValue>),
     PhpObject(PhpObject),
     RustHandle(RustObjHandle),
     PhpHandle(PhpObjHandle),
@@ -126,7 +126,7 @@ pub enum PluginValue {
 
 impl PluginValue {
     pub fn string(s: impl Into<String>) -> PluginValue {
-        PluginValue::String(s.into().into_bytes())
+        PluginValue::String(s.into().into())
     }
 
     /// Converts a plain data value (no handles are ever produced) coming from ported code.
@@ -136,18 +136,18 @@ impl PluginValue {
             PhpMixed::Bool(b) => PluginValue::Bool(*b),
             PhpMixed::Int(n) => PluginValue::Int(*n),
             PhpMixed::Float(f) => PluginValue::Float(*f),
-            PhpMixed::String(s) => PluginValue::String(s.clone().into_bytes()),
+            PhpMixed::String(s) => PluginValue::String(s.as_str().into()),
             PhpMixed::List(items) => {
                 PluginValue::List(items.iter().map(PluginValue::from_php_mixed).collect())
             }
             PhpMixed::Array(map) => PluginValue::Array(
                 map.iter()
-                    .map(|(k, v)| (k.clone().into_bytes(), PluginValue::from_php_mixed(v)))
+                    .map(|(k, v)| (k.as_str().into(), PluginValue::from_php_mixed(v)))
                     .collect(),
             ),
             PhpMixed::Object(map) => PluginValue::Object(
                 map.iter()
-                    .map(|(k, v)| (k.clone().into_bytes(), PluginValue::from_php_mixed(v)))
+                    .map(|(k, v)| (k.as_str().into(), PluginValue::from_php_mixed(v)))
                     .collect(),
             ),
         }
@@ -263,36 +263,30 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
             out.push(b'}');
         }
         PluginValue::RustHandle(handle) => {
-            let mut map: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
+            let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
             map.insert(
-                RUST_HANDLE_KEY.to_vec(),
+                RUST_HANDLE_KEY.into(),
                 PluginValue::Int(i64::try_from(handle.rhandle).expect("rhandle exceeds i64")),
             );
+            map.insert(CLASS_KEY.into(), PluginValue::string(handle.class.clone()));
             map.insert(
-                CLASS_KEY.to_vec(),
-                PluginValue::string(handle.class.clone()),
-            );
-            map.insert(
-                EPOCH_KEY.to_vec(),
+                EPOCH_KEY.into(),
                 PluginValue::Int(i64::try_from(handle.epoch).expect("epoch exceeds i64")),
             );
             if let Some(snapshot) = &handle.snapshot {
-                map.insert(SNAPSHOT_KEY.to_vec(), PluginValue::Array(snapshot.clone()));
+                map.insert(SNAPSHOT_KEY.into(), PluginValue::Array(snapshot.clone()));
             }
             serialize_map(&map, out);
         }
         PluginValue::PhpHandle(handle) => {
-            let mut map: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
+            let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
             map.insert(
-                PHP_HANDLE_KEY.to_vec(),
+                PHP_HANDLE_KEY.into(),
                 PluginValue::Int(i64::try_from(handle.phandle).expect("phandle exceeds i64")),
             );
+            map.insert(CLASS_KEY.into(), PluginValue::string(handle.class.clone()));
             map.insert(
-                CLASS_KEY.to_vec(),
-                PluginValue::string(handle.class.clone()),
-            );
-            map.insert(
-                IMPLEMENTS_KEY.to_vec(),
+                IMPLEMENTS_KEY.into(),
                 PluginValue::List(
                     handle
                         .implements
@@ -304,16 +298,16 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
             serialize_map(&map, out);
         }
         PluginValue::PhpClass(handle) => {
-            let mut map: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
+            let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
             map.insert(
-                PHP_CLASS_KEY.to_vec(),
+                PHP_CLASS_KEY.into(),
                 PluginValue::string(handle.class.clone()),
             );
             serialize_map(&map, out);
         }
         PluginValue::Job(id) => {
-            let mut map: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
-            map.insert(JOB_KEY.to_vec(), PluginValue::Int(*id as i64));
+            let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
+            map.insert(JOB_KEY.into(), PluginValue::Int(*id as i64));
             serialize_map(&map, out);
         }
     }
@@ -327,7 +321,7 @@ fn serialize_bytes(bytes: &[u8], out: &mut Vec<u8>) {
     out.extend_from_slice(b"\";");
 }
 
-fn serialize_map(map: &IndexMap<Vec<u8>, PluginValue>, out: &mut Vec<u8>) {
+fn serialize_map(map: &IndexMap<BString, PluginValue>, out: &mut Vec<u8>) {
     out.extend_from_slice(b"a:");
     out.extend_from_slice(map.len().to_string().as_bytes());
     out.extend_from_slice(b":{");
@@ -389,7 +383,7 @@ enum Lex {
 /// not recurse: nesting depth must never translate into call stack depth, so a hostile or
 /// corrupted payload cannot overflow the stack (the explicit depth cap exists on top of that).
 struct Frame {
-    entries: IndexMap<Vec<u8>, PluginValue>,
+    entries: IndexMap<BString, PluginValue>,
     /// The class name of an object record; `None` for an array.
     class: Option<String>,
     /// This container's own number in the payload's value numbering.
@@ -397,7 +391,7 @@ struct Frame {
     count: usize,
     parsed: usize,
     is_list: bool,
-    pending_key: Option<Vec<u8>>,
+    pending_key: Option<BString>,
 }
 
 fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
@@ -446,7 +440,7 @@ fn parse_value(payload: &[u8], pos: &mut usize) -> anyhow::Result<PluginValue> {
             match lex(payload, pos)? {
                 Lex::Value(PluginValue::Int(n)) => {
                     frame.is_list &= n == index;
-                    frame.pending_key = Some(n.to_string().into_bytes());
+                    frame.pending_key = Some(n.to_string().into());
                 }
                 Lex::Value(PluginValue::String(bytes)) => {
                     frame.is_list = false;
@@ -543,7 +537,7 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
         b"a:" => Ok(Lex::ContainerOpen(parse_entry_count(payload, pos)?, None)),
         b"O:" => {
             let class = parse_quoted(payload, pos, b':')?;
-            let class = String::from_utf8(class)
+            let class = String::from_utf8(class.into())
                 .map_err(|_| anyhow::anyhow!("object record with a non-UTF-8 class name"))?;
             Ok(Lex::ContainerOpen(
                 parse_entry_count(payload, pos)?,
@@ -610,12 +604,12 @@ fn parse_entry_count(payload: &[u8], pos: &mut usize) -> anyhow::Result<usize> {
     Ok(count)
 }
 
-fn parse_string_body(payload: &[u8], pos: &mut usize) -> anyhow::Result<Vec<u8>> {
+fn parse_string_body(payload: &[u8], pos: &mut usize) -> anyhow::Result<BString> {
     parse_quoted(payload, pos, b';')
 }
 
 /// A length-prefixed quoted run: `<len>:"<bytes>"` followed by `terminator`.
-fn parse_quoted(payload: &[u8], pos: &mut usize, terminator: u8) -> anyhow::Result<Vec<u8>> {
+fn parse_quoted(payload: &[u8], pos: &mut usize, terminator: u8) -> anyhow::Result<BString> {
     let len_bytes = take_until(payload, pos, b':')?;
     let len: usize = std::str::from_utf8(len_bytes)
         .ok()
@@ -638,7 +632,7 @@ fn parse_quoted(payload: &[u8], pos: &mut usize, terminator: u8) -> anyhow::Resu
         bail!("expected closing quote at byte {}", *pos);
     }
     *pos += 2;
-    Ok(bytes.to_vec())
+    Ok(bytes.into())
 }
 
 /// Recognizes the reserved handle-descriptor arrays by their exact key sets.
@@ -649,7 +643,7 @@ fn parse_quoted(payload: &[u8], pos: &mut usize, terminator: u8) -> anyhow::Resu
 /// it is a decode error here instead, and that is the fatal lane, so a plugin passing
 /// `['__rhandle' => 1]` to a proxied method takes the channel down with it. The PHP half
 /// (`fromWire` in `php/worker.php`) diverges the other way, matching on the reserved key alone.
-fn decode_handle(entries: &IndexMap<Vec<u8>, PluginValue>) -> anyhow::Result<Option<PluginValue>> {
+fn decode_handle(entries: &IndexMap<BString, PluginValue>) -> anyhow::Result<Option<PluginValue>> {
     let get = |key: &[u8]| entries.get(key);
 
     if entries.len() == 1 {
@@ -690,7 +684,7 @@ fn decode_handle(entries: &IndexMap<Vec<u8>, PluginValue>) -> anyhow::Result<Opt
                 items
                     .iter()
                     .enumerate()
-                    .map(|(i, v)| (i.to_string().into_bytes(), v.clone()))
+                    .map(|(i, v)| (i.to_string().into(), v.clone()))
                     .collect(),
             ),
             Some(other) => bail!("__snapshot is not an array: {other:?}"),
@@ -791,18 +785,18 @@ mod tests {
         assert_eq!(serialize(&PluginValue::Float(1e17)), b"d:1.0E+17;");
         assert_eq!(serialize(&PluginValue::string("ab")), b"s:2:\"ab\";");
         assert_eq!(
-            serialize(&PluginValue::String(vec![0xff, 0x00, 0xfe])),
+            serialize(&PluginValue::String(vec![0xff, 0x00, 0xfe].into())),
             b"s:3:\"\xff\x00\xfe\";"
         );
     }
 
     #[test]
     fn encodes_arrays_with_php_key_canonicalization() {
-        let mut map: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
-        map.insert(b"5".to_vec(), PluginValue::Int(1));
-        map.insert(b"05".to_vec(), PluginValue::Int(2));
-        map.insert(b"-0".to_vec(), PluginValue::Int(3));
-        map.insert(b"x".to_vec(), PluginValue::Int(4));
+        let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
+        map.insert(b"5".into(), PluginValue::Int(1));
+        map.insert(b"05".into(), PluginValue::Int(2));
+        map.insert(b"-0".into(), PluginValue::Int(3));
+        map.insert(b"x".into(), PluginValue::Int(4));
         assert_eq!(
             serialize(&PluginValue::Array(map)),
             b"a:4:{i:5;i:1;s:2:\"05\";i:2;s:2:\"-0\";i:3;s:1:\"x\";i:4;}".as_slice(),
@@ -811,8 +805,8 @@ mod tests {
 
     #[test]
     fn object_is_encode_only_and_collapses_to_array() {
-        let mut map: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
-        map.insert(b"a".to_vec(), PluginValue::Int(1));
+        let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
+        map.insert(b"a".into(), PluginValue::Int(1));
         let encoded = serialize(&PluginValue::Object(map.clone()));
         assert_eq!(encoded, serialize(&PluginValue::Array(map.clone())));
         assert_eq!(unserialize(&encoded).unwrap(), PluginValue::Array(map));
@@ -927,12 +921,12 @@ mod tests {
             PluginValue::Bool(true),
             PluginValue::Int(7),
             PluginValue::Float(0.5),
-            PluginValue::String(vec![0x80, 0x81]),
+            PluginValue::String(vec![0x80, 0x81].into()),
         ]));
 
-        let mut inner: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
-        inner.insert(vec![0xff, b'k'], PluginValue::string("v"));
-        inner.insert(b"10".to_vec(), PluginValue::List(vec![]));
+        let mut inner: IndexMap<BString, PluginValue> = IndexMap::new();
+        inner.insert(vec![0xff, b'k'].into(), PluginValue::string("v"));
+        inner.insert(b"10".into(), PluginValue::List(vec![]));
         roundtrip(PluginValue::Array(inner));
     }
 

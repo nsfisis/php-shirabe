@@ -1,4 +1,5 @@
 use crate::PhpMixed;
+use bstr::BString;
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::string::{addcslashes, strip_tags, stripcslashes};
 use shirabe_php_src::standard::string::{php_trim_mask, php_wordwrap};
@@ -365,7 +366,7 @@ fn canonical_encoding(name: &str) -> String {
     }
 }
 
-pub fn mb_convert_encoding(string: Vec<u8>, to_encoding: &str, from_encoding: &str) -> String {
+pub fn mb_convert_encoding(string: BString, to_encoding: &str, from_encoding: &str) -> String {
     let to = canonical_encoding(to_encoding);
     let from = canonical_encoding(from_encoding);
     // ASCII is a subset of UTF-8, so converting among ASCII/UTF-8 is a byte-level no-op. Other
@@ -434,7 +435,7 @@ pub fn mb_convert_variables(to: &str, from: &str, vars: &mut [String]) -> Option
     // Converts each variable in place from `from` to `to`, returning the source encoding (PHP
     // returns the detected source encoding; here `from` is a single named encoding).
     for v in vars.iter_mut() {
-        *v = mb_convert_encoding(std::mem::take(v).into_bytes(), to, from);
+        *v = mb_convert_encoding(std::mem::take(v).into(), to, from);
     }
     Some(from.to_string())
 }

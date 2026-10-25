@@ -1067,12 +1067,8 @@ impl PluginManager {
         };
         let mut ctor_args = ctor_args;
         ctor_args.insert("plugin".to_string(), plugin_value);
-        let args_value = PluginValue::Array(
-            ctor_args
-                .into_iter()
-                .map(|(k, v)| (k.into_bytes(), v))
-                .collect(),
-        );
+        let args_value =
+            PluginValue::Array(ctor_args.into_iter().map(|(k, v)| (k.into(), v)).collect());
 
         // PHP: $capabilityObj = new $capabilityClass($ctorArgs);
         let capability_obj = unwrap_php_result(shirabe_php_rpc::new_object(

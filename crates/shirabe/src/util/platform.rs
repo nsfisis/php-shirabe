@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Util/Platform.php
 
 use crate::util::ProcessExecutor;
+use bstr::ByteSlice;
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, defined,
     file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get, is_readable,
@@ -221,8 +222,9 @@ impl Platform {
                 Err(_) => continue,
             };
             // detect default mount points created by Docker/containerd
-            let contains = |needle: &[u8]| data.windows(needle.len()).any(|w| w == needle);
-            if contains(b"/var/lib/docker/") || contains(b"/io.containerd.snapshotter") {
+            if data.contains_str("/var/lib/docker/")
+                || data.contains_str("/io.containerd.snapshotter")
+            {
                 *cached = Some(true);
                 return true;
             }

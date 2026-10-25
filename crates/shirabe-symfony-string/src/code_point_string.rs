@@ -84,10 +84,6 @@ impl CodePointString {
         }
 
         // PHP falls back to iconv() only when mb_convert_encoding() rejects the target encoding.
-        shirabe_php_shim::mb_convert_encoding(
-            self.string.clone().into_bytes(),
-            to_encoding,
-            "UTF-8",
-        )
+        shirabe_php_shim::mb_convert_encoding(self.string.clone().into(), to_encoding, "UTF-8")
     }
 }

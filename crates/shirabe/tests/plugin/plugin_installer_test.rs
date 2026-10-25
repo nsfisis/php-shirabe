@@ -866,9 +866,9 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
     // PHP: assertSame(['a' => 1, 'b' => 2, 'plugin' => $plugin], $capability->args)
     assert_eq!(
         PluginValue::Array(IndexMap::from([
-            (b"a".to_vec(), PluginValue::Int(1)),
-            (b"b".to_vec(), PluginValue::Int(2)),
-            (b"plugin".to_vec(), plugin_handle_value(&plugin)),
+            ("a".into(), PluginValue::Int(1)),
+            ("b".into(), PluginValue::Int(2)),
+            ("plugin".into(), plugin_handle_value(&plugin)),
         ])),
         capability.__get_property("args").unwrap()
     );

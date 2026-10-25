@@ -36,7 +36,7 @@ impl ByteString {
 
         CodePointString {
             string: shirabe_php_shim::mb_convert_encoding(
-                self.string.clone().into_bytes(),
+                self.string.clone().into(),
                 "UTF-8",
                 from_encoding,
             ),

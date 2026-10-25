@@ -79,7 +79,7 @@ fn call_static(method: &str, args: Vec<PluginValue>) -> PluginValue {
 
 fn string_of(value: &PluginValue) -> String {
     match value {
-        PluginValue::String(bytes) => String::from_utf8(bytes.clone()).unwrap(),
+        PluginValue::String(bytes) => String::from_utf8(bytes.clone().into()).unwrap(),
         other => panic!("expected a string, got {other:?}"),
     }
 }
@@ -475,11 +475,11 @@ fn test_with_class_loader_loaded() {
         call_static("isInstalled", vec![PluginValue::string("foo/bar")])
     );
     let reloaded = PluginValue::Array(IndexMap::from([
-        (b"root".to_vec(), call_static("getRootPackage", vec![])),
+        ("root".into(), call_static("getRootPackage", vec![])),
         (
-            b"versions".to_vec(),
+            "versions".into(),
             PluginValue::Array(IndexMap::from([(
-                b"foo/bar".to_vec(),
+                "foo/bar".into(),
                 PluginValue::from_php_mixed(&PhpMixed::Array(IndexMap::from([
                     ("version".to_string(), PhpMixed::String("1.0.0".to_string())),
                     ("dev_requirement".to_string(), PhpMixed::Bool(false)),

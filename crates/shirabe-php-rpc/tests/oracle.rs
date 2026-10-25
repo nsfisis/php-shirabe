@@ -6,6 +6,7 @@
 //! byte-identical. Floats (serialize_precision), non-UTF-8 byte strings and deep nesting are the
 //! focus areas.
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::value::{serialize, unserialize};
 use shirabe_php_rpc::{PhpObject, PluginValue, call_function};
@@ -19,11 +20,11 @@ fn php_available() -> bool {
 fn php_reserialize(bytes: &[u8]) -> Vec<u8> {
     let outcome = call_function(
         "__shirabe_oracle_roundtrip",
-        vec![PluginValue::String(bytes.to_vec())],
+        vec![PluginValue::String(bytes.into())],
     )
     .expect("oracle roundtrip request failed");
     match outcome.expect("oracle roundtrip threw") {
-        PluginValue::String(bytes) => bytes,
+        PluginValue::String(bytes) => bytes.into(),
         other => panic!("oracle roundtrip returned a non-string: {other:?}"),
     }
 }
@@ -116,13 +117,18 @@ fn encode_direction_matches_php_for_non_utf8_bytes() {
         return;
     }
 
-    assert_php_agrees(&PluginValue::String(vec![0xff, 0x00, 0xfe, 0x80, b'"']));
+    assert_php_agrees(&PluginValue::String(
+        vec![0xff, 0x00, 0xfe, 0x80, b'"'].into(),
+    ));
     assert_php_agrees(&PluginValue::String((0u8..=255).collect()));
 
-    let mut map: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
-    map.insert(vec![0xff, 0x00], PluginValue::String(vec![0x80]));
-    map.insert(b"05".to_vec(), PluginValue::Bool(true));
-    map.insert(b"5".to_vec(), PluginValue::Null);
+    let mut map: IndexMap<BString, PluginValue> = IndexMap::new();
+    map.insert(
+        vec![0xff, 0x00].into(),
+        PluginValue::String(vec![0x80].into()),
+    );
+    map.insert(b"05".into(), PluginValue::Bool(true));
+    map.insert(b"5".into(), PluginValue::Null);
     assert_php_agrees(&PluginValue::Array(map));
 }
 
@@ -132,10 +138,10 @@ fn encode_direction_matches_php_for_nested_arrays() {
         return;
     }
 
-    let mut inner: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
-    inner.insert(b"a".to_vec(), PluginValue::Int(1));
+    let mut inner: IndexMap<BString, PluginValue> = IndexMap::new();
+    inner.insert(b"a".into(), PluginValue::Int(1));
     inner.insert(
-        b"b".to_vec(),
+        b"b".into(),
         PluginValue::List(vec![
             PluginValue::Float(0.1),
             PluginValue::string("x"),

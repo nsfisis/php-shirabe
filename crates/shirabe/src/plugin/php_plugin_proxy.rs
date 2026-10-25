@@ -34,6 +34,7 @@ use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
     RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle,
@@ -1157,7 +1158,7 @@ fn dispatch_process_method(
     Ok(PluginValue::Array(
         facts
             .into_iter()
-            .map(|(name, value)| (name.as_bytes().to_vec(), value))
+            .map(|(name, value)| (name.into(), value))
             .collect(),
     ))
 }
@@ -2269,7 +2270,7 @@ impl<T: ToPluginValue> ToPluginValue for IndexMap<String, T> {
         } else {
             PluginValue::Array(
                 self.into_iter()
-                    .map(|(key, value)| (key.into_bytes(), value.to_plugin_value()))
+                    .map(|(key, value)| (key.into(), value.to_plugin_value()))
                     .collect(),
             )
         }
@@ -2280,8 +2281,8 @@ impl<T: ToPluginValue> ToPluginValue for IndexMap<String, T> {
 impl ToPluginValue for crate::package::Mirror {
     fn to_plugin_value(self) -> PluginValue {
         PluginValue::Array(IndexMap::from([
-            (b"url".to_vec(), PluginValue::string(self.url)),
-            (b"preferred".to_vec(), PluginValue::Bool(self.preferred)),
+            ("url".into(), PluginValue::string(self.url)),
+            ("preferred".into(), PluginValue::Bool(self.preferred)),
         ]))
     }
 }
@@ -3774,14 +3775,14 @@ pub(crate) struct RustCommandMetadata {
 
 impl RustCommandMetadata {
     fn wire_value(&self) -> PluginValue {
-        let mut row: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
-        row.insert(b"name".to_vec(), PluginValue::string(self.name.clone()));
+        let mut row: IndexMap<BString, PluginValue> = IndexMap::new();
+        row.insert("name".into(), PluginValue::string(self.name.clone()));
         row.insert(
-            b"description".to_vec(),
+            "description".into(),
             PluginValue::string(self.description.clone()),
         );
         row.insert(
-            b"aliases".to_vec(),
+            "aliases".into(),
             PluginValue::List(
                 self.aliases
                     .iter()
@@ -3789,7 +3790,7 @@ impl RustCommandMetadata {
                     .collect(),
             ),
         );
-        row.insert(b"hidden".to_vec(), PluginValue::Bool(self.hidden));
+        row.insert("hidden".into(), PluginValue::Bool(self.hidden));
         PluginValue::Array(row)
     }
 }
@@ -3878,32 +3879,32 @@ impl PhpConsoleApplicationContext {
         if let Some(app) = self.app.borrow().as_ref() {
             return Ok(app.clone());
         }
-        let mut config: IndexMap<Vec<u8>, PluginValue> = IndexMap::new();
+        let mut config: IndexMap<BString, PluginValue> = IndexMap::new();
         config.insert(
-            b"composer".to_vec(),
+            "composer".into(),
             match &self.composer {
                 Some(composer) => composer_handle_value(composer),
                 None => PluginValue::Null,
             },
         );
-        config.insert(b"io".to_vec(), io_handle_value(&self.io)?);
+        config.insert("io".into(), io_handle_value(&self.io)?);
         config.insert(
-            b"initialWorkingDirectory".to_vec(),
+            "initialWorkingDirectory".into(),
             match &self.initial_working_directory {
                 Some(dir) => PluginValue::string(dir.clone()),
                 None => PluginValue::Null,
             },
         );
         config.insert(
-            b"disablePluginsByDefault".to_vec(),
+            "disablePluginsByDefault".into(),
             PluginValue::Bool(self.disable_plugins_by_default),
         );
         config.insert(
-            b"disableScriptsByDefault".to_vec(),
+            "disableScriptsByDefault".into(),
             PluginValue::Bool(self.disable_scripts_by_default),
         );
         config.insert(
-            b"rustCommands".to_vec(),
+            "rustCommands".into(),
             PluginValue::List(
                 self.rust_commands
                     .iter()
@@ -3912,7 +3913,7 @@ impl PhpConsoleApplicationContext {
             ),
         );
         config.insert(
-            b"pluginCommands".to_vec(),
+            "pluginCommands".into(),
             PluginValue::List(
                 self.plugin_commands
                     .borrow()
@@ -4053,7 +4054,7 @@ impl PhpCommandProxy {
             PluginValue::Array(map) => map,
             other => return Err(Self::unsupported_shape(handle, "getDefinition", &other)),
         };
-        let field = |row: &mut IndexMap<Vec<u8>, PluginValue>, key: &str| -> PluginValue {
+        let field = |row: &mut IndexMap<BString, PluginValue>, key: &str| -> PluginValue {
             row.shift_remove(key.as_bytes())
                 .unwrap_or(PluginValue::Null)
         };

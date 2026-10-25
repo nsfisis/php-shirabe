@@ -140,7 +140,7 @@ impl RemoteFilesystem {
         )?;
         match value {
             PluginValue::Null => Ok(None),
-            PluginValue::String(message) => Ok(Some(String::from_utf8(message)?)),
+            PluginValue::String(message) => Ok(Some(String::from_utf8(message.into())?)),
             other => Err(Self::shape_error("findStatusMessage", &other)),
         }
     }
@@ -215,7 +215,7 @@ impl RemoteFilesystem {
         };
         list.into_iter()
             .map(|item| match item {
-                PluginValue::String(s) => Ok(String::from_utf8(s)?),
+                PluginValue::String(s) => Ok(String::from_utf8(s.into())?),
                 other => Err(Self::shape_error(method, &other)),
             })
             .collect()

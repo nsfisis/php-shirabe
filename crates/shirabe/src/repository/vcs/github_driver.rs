@@ -411,7 +411,7 @@ impl GitHubDriver {
             return PhpMixed::Bool(false);
         }
 
-        let mut funding: Option<Vec<u8>> = None;
+        let mut funding: Option<bstr::BString> = None;
         for file_url in &[
             format!(
                 "{}/repos/{}/{}/contents/.github/FUNDING.yml",
@@ -463,7 +463,7 @@ impl GitHubDriver {
             );
             match decoded {
                 Some(b) if !b.is_empty() => {
-                    funding = Some(b);
+                    funding = Some(b.into());
                     break;
                 }
                 _ => continue,

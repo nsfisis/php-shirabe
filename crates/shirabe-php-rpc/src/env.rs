@@ -41,9 +41,9 @@ pub(crate) fn flush() -> anyhow::Result<()> {
         .map(|mutation| {
             PluginValue::List(vec![
                 PluginValue::string(storage_name(mutation.storage)),
-                PluginValue::String(mutation.key.as_bytes().to_vec()),
+                PluginValue::String(mutation.key.as_bytes().into()),
                 match mutation.value {
-                    Some(value) => PluginValue::String(value.as_bytes().to_vec()),
+                    Some(value) => PluginValue::String(value.as_bytes().into()),
                     None => PluginValue::Null,
                 },
             ])

@@ -518,7 +518,7 @@ impl JsonFile {
         let error = match serde_json::from_str::<serde_json::Value>(json) {
             Ok(_) => {
                 // TODO(bytes): Rust's &str is guaranteed as UTF-8, but PHP string is not. Change `json`
-                // to &[u8] and check UTF-8 validity here.
+                // to &BStr and check UTF-8 validity here.
 
                 // if (defined('JSON_ERROR_UTF8') && JSON_ERROR_UTF8 === json_last_error()) {
                 //     if ($file === null) {
