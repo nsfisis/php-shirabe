@@ -79,20 +79,19 @@ impl StreamOutput {
     /// https://github.com/composer/xdebug-handler
     fn has_color_support(stream: &shirabe_php_shim::PhpResource) -> bool {
         // Follow https://no-color.org/
-        if !no_color_first_char().is_empty() {
+        if no_color_first_char().is_some() {
             return false;
         }
 
         // Detect msysgit/mingw and assume this is a tty because detection
         // does not work correctly, see https://github.com/composer/composer/issues/9690
         if !shirabe_php_shim::stream_isatty_resource(stream)
-            && !["MINGW32", "MINGW64"].contains(
-                &shirabe_php_shim::strtoupper(
-                    &shirabe_php_shim::getenv("MSYSTEM")
-                        .unwrap_or_default()
-                        .to_string_lossy(),
-                )
-                .as_str(),
+            && ![b"MINGW32".as_slice(), b"MINGW64"].contains(
+                &shirabe_php_shim::getenv("MSYSTEM")
+                    .unwrap_or_default()
+                    .as_encoded_bytes()
+                    .to_ascii_uppercase()
+                    .as_slice(),
             )
         {
             return false;
@@ -111,10 +110,11 @@ impl StreamOutput {
             return true;
         }
 
+        // TODO(bytes): preg_match matches over a &str.
         let term = shirabe_php_shim::getenv("TERM")
             .unwrap_or_default()
-            .to_string_lossy()
-            .into_owned();
+            .into_string()
+            .unwrap_or_else(|term| panic!("TERM is not valid UTF-8: {term:?}"));
         if "dumb" == term {
             return false;
         }
@@ -130,16 +130,12 @@ impl StreamOutput {
 }
 
 /// PHP: `(($_SERVER['NO_COLOR'] ?? getenv('NO_COLOR'))[0] ?? '')`.
-fn no_color_first_char() -> String {
-    let value = shirabe_php_shim::getenv("NO_COLOR")
+fn no_color_first_char() -> Option<u8> {
+    shirabe_php_shim::getenv("NO_COLOR")
         .unwrap_or_default()
-        .to_string_lossy()
-        .into_owned();
-    value
-        .chars()
-        .next()
-        .map(|c| c.to_string())
-        .unwrap_or_default()
+        .as_encoded_bytes()
+        .first()
+        .copied()
 }
 
 impl DoWrite for StreamOutput {
