@@ -151,7 +151,12 @@ impl Platform {
             && function_exists("posix_getpwuid")
             && let Some(info) = posix_getpwuid(posix_getuid())
         {
-            return Ok(info.dir);
+            // TODO(bytes): the user directory is returned as a String.
+            return Ok(info
+                .dir
+                .into_os_string()
+                .into_string()
+                .unwrap_or_else(|dir| panic!("home directory is not valid UTF-8: {dir:?}")));
         }
 
         Err(RuntimeException::new("Could not determine user directory".to_string()).into())
