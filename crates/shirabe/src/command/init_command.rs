@@ -347,21 +347,28 @@ impl InitCommand {
         let name = self.sanitize_package_name_component(&name);
 
         let mut vendor = name.clone();
+        // TODO(bytes): PhpMixed::String carries the value as a String.
         let composer_default_vendor = PHP_SERVER
             .lock()
             .unwrap()
             .get("COMPOSER_DEFAULT_VENDOR")
-            .map(|value| value.to_string_lossy().into_owned());
-        let server_username = PHP_SERVER
-            .lock()
-            .unwrap()
-            .get("USERNAME")
-            .map(|value| value.to_string_lossy().into_owned());
-        let server_user = PHP_SERVER
-            .lock()
-            .unwrap()
-            .get("USER")
-            .map(|value| value.to_string_lossy().into_owned());
+            .map(|value| {
+                value.into_string().unwrap_or_else(|value| {
+                    panic!("COMPOSER_DEFAULT_VENDOR is not valid UTF-8: {value:?}")
+                })
+            });
+        // TODO(bytes): PhpMixed::String carries the value as a String.
+        let server_username = PHP_SERVER.lock().unwrap().get("USERNAME").map(|value| {
+            value
+                .into_string()
+                .unwrap_or_else(|value| panic!("USERNAME is not valid UTF-8: {value:?}"))
+        });
+        // TODO(bytes): PhpMixed::String carries the value as a String.
+        let server_user = PHP_SERVER.lock().unwrap().get("USER").map(|value| {
+            value
+                .into_string()
+                .unwrap_or_else(|value| panic!("USER is not valid UTF-8: {value:?}"))
+        });
         if !empty(
             &composer_default_vendor
                 .clone()
@@ -398,11 +405,16 @@ impl InitCommand {
         let git = self.get_git_config()?;
 
         let mut author_name: Option<String> = None;
+        // TODO(bytes): PhpMixed::String carries the value as a String.
         let composer_default_author = PHP_SERVER
             .lock()
             .unwrap()
             .get("COMPOSER_DEFAULT_AUTHOR")
-            .map(|value| value.to_string_lossy().into_owned());
+            .map(|value| {
+                value.into_string().unwrap_or_else(|value| {
+                    panic!("COMPOSER_DEFAULT_AUTHOR is not valid UTF-8: {value:?}")
+                })
+            });
         if !empty(
             &composer_default_author
                 .clone()
@@ -415,11 +427,16 @@ impl InitCommand {
         }
 
         let mut author_email: Option<String> = None;
+        // TODO(bytes): PhpMixed::String carries the value as a String.
         let composer_default_email = PHP_SERVER
             .lock()
             .unwrap()
             .get("COMPOSER_DEFAULT_EMAIL")
-            .map(|value| value.to_string_lossy().into_owned());
+            .map(|value| {
+                value.into_string().unwrap_or_else(|value| {
+                    panic!("COMPOSER_DEFAULT_EMAIL is not valid UTF-8: {value:?}")
+                })
+            });
         if !empty(
             &composer_default_email
                 .clone()
@@ -1068,11 +1085,16 @@ impl Command for InitCommand {
                 .as_string()
                 .map(|s| s.to_string());
             if license.is_none() {
+                // TODO(bytes): PhpMixed::String carries the value as a String.
                 let default_license = PHP_SERVER
                     .lock()
                     .unwrap()
                     .get("COMPOSER_DEFAULT_LICENSE")
-                    .map(|value| value.to_string_lossy().into_owned());
+                    .map(|value| {
+                        value.into_string().unwrap_or_else(|value| {
+                            panic!("COMPOSER_DEFAULT_LICENSE is not valid UTF-8: {value:?}")
+                        })
+                    });
                 if !empty(
                     &default_license
                         .clone()
