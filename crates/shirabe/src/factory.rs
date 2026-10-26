@@ -1406,7 +1406,12 @@ impl Factory {
         let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
         config_section.insert(
             "home".to_string(),
-            PhpMixed::String(home.to_string_lossy().into_owned()),
+            // TODO(bytes): PhpMixed::String carries the path as a String.
+            PhpMixed::String(
+                home.into_os_string()
+                    .into_string()
+                    .unwrap_or_else(|home| panic!("temp dir is not valid UTF-8: {home:?}")),
+            ),
         );
         let mut repositories: IndexMap<String, PhpMixed> = IndexMap::new();
         repositories.insert("packagist".to_string(), PhpMixed::Bool(false));
@@ -1567,7 +1572,7 @@ impl Factory {
             .map(|(key, _)| key)
             .collect();
         for key in keys {
-            if strpos(&key.to_string_lossy(), "XDG_") == Some(0) {
+            if key.as_encoded_bytes().starts_with(b"XDG_") {
                 return true;
             }
         }
