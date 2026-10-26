@@ -38,8 +38,8 @@ hyperfine \
   --export-json "$OUTDIR/results-$PACKAGE_SLUG.json" \
   --export-markdown "$OUTDIR/results-$PACKAGE_SLUG.md" \
   --show-output \
-  --command-name Shirabe "RUST_BACKTRACE=1 '$BIN' create-project --profile --no-plugins --no-scripts --no-audit '$PACKAGE' '$TARGET_DIR-shirabe'" \
-  --command-name Composer "'$COMPOSER_BIN' create-project --profile --no-plugins --no-scripts --no-audit '$PACKAGE' '$TARGET_DIR-composer'"
+  --command-name Shirabe "'$BIN' create-project --no-plugins --no-scripts --no-audit '$PACKAGE' '$TARGET_DIR-shirabe'" \
+  --command-name Composer "'$COMPOSER_BIN' create-project --no-plugins --no-scripts --no-audit '$PACKAGE' '$TARGET_DIR-composer'"
 
 echo ">> results: $OUTDIR/results-$PACKAGE_SLUG.json" >&2
 echo ">>          $OUTDIR/results-$PACKAGE_SLUG.md" >&2

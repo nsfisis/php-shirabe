@@ -49,7 +49,7 @@ hyperfine \
   --prepare "bash '$PREPARE_SCRIPT'" \
   --export-json "$OUTDIR/results-$PACKAGE_SLUG.json" \
   --export-markdown "$OUTDIR/results-$PACKAGE_SLUG.md" \
-  --command-name Shirabe "RUST_BACKTRACE=1 '$BIN' require --no-install --no-audit --no-interaction --working-dir='$TARGET_DIR-shirabe' '$PACKAGE'" \
+  --command-name Shirabe "'$BIN' require --no-install --no-audit --no-interaction --working-dir='$TARGET_DIR-shirabe' '$PACKAGE'" \
   --command-name Composer "'$COMPOSER_BIN' require --no-install --no-audit --no-interaction --working-dir='$TARGET_DIR-composer' '$PACKAGE'"
 
 echo ">> results: $OUTDIR/results-$PACKAGE_SLUG.json" >&2

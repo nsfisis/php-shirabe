@@ -50,7 +50,7 @@ hyperfine \
   --prepare "bash '$PREPARE_SCRIPT'" \
   --export-json "$OUTDIR/results-$PACKAGE_SLUG.json" \
   --export-markdown "$OUTDIR/results-$PACKAGE_SLUG.md" \
-  --command-name Shirabe "RUST_BACKTRACE=1 '$BIN' install --no-plugins --no-scripts --no-interaction --working-dir='$TARGET_DIR-shirabe'" \
+  --command-name Shirabe "'$BIN' install --no-plugins --no-scripts --no-interaction --working-dir='$TARGET_DIR-shirabe'" \
   --command-name Composer "'$COMPOSER_BIN' install --no-plugins --no-scripts --no-interaction --working-dir='$TARGET_DIR-composer'"
 
 echo ">> results: $OUTDIR/results-$PACKAGE_SLUG.json" >&2

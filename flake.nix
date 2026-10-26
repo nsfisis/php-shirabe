@@ -148,6 +148,7 @@
             php
             php.packages.composer
             pkgs.just
+            pkgs.hyperfine
 
             # The following softwares are used for testing:
 
