@@ -23,7 +23,12 @@ impl Platform {
     ///
     /// @throws \RuntimeException
     pub fn get_cwd(allow_empty: bool) -> anyhow::Result<String> {
-        let mut cwd = getcwd();
+        // TODO(bytes): the cwd is returned as a String.
+        let mut cwd = getcwd().map(|cwd| {
+            cwd.into_os_string()
+                .into_string()
+                .unwrap_or_else(|cwd| panic!("cwd is not valid UTF-8: {cwd:?}"))
+        });
 
         // fallback to realpath('') just in case this works but odds are it would break as well if we are in a case where getcwd fails
         if cwd.is_none() {

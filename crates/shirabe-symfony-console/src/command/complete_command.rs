@@ -140,12 +140,13 @@ impl CompleteCommand {
                 .unwrap_or_default()
                 .to_string_lossy(),
         );
+        // TODO(bytes): file_put_contents3 takes the path as a &str.
+        let tmp_dir = shirabe_php_shim::sys_get_temp_dir()
+            .into_os_string()
+            .into_string()
+            .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
         shirabe_php_shim::file_put_contents3(
-            &format!(
-                "{}/sf_{}.log",
-                shirabe_php_shim::sys_get_temp_dir(),
-                command_name
-            ),
+            &format!("{}/sf_{}.log", tmp_dir, command_name),
             &(messages.join(shirabe_php_shim::PHP_EOL) + shirabe_php_shim::PHP_EOL),
             shirabe_php_shim::FILE_APPEND,
         );

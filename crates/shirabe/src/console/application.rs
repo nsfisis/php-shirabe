@@ -132,7 +132,7 @@ pub struct Application {
     disable_plugins_by_default: bool,
     disable_scripts_by_default: bool,
     /// Store the initial working directory at startup time
-    initial_working_directory: Option<String>,
+    initial_working_directory: Option<std::path::PathBuf>,
     /// For testing only: see [__set_dev_warning_time](Application::__set_dev_warning_time) for
     /// details.
     dev_warning_time: Option<i64>,
@@ -266,7 +266,11 @@ impl Application {
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 }
                 if !hit {
-                    dir = sys_get_temp_dir();
+                    // TODO(bytes): the directory is kept as a String.
+                    dir = sys_get_temp_dir()
+                        .into_os_string()
+                        .into_string()
+                        .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
                     let df = disk_free_space(&dir);
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 }
@@ -674,7 +678,7 @@ impl Application {
     }
 
     /// Get the working directory at startup time
-    pub fn get_initial_working_directory(&self) -> Option<String> {
+    pub fn get_initial_working_directory(&self) -> Option<std::path::PathBuf> {
         self.initial_working_directory.clone()
     }
 
@@ -2240,9 +2244,13 @@ impl ApplicationHandle {
 
             // Check system temp folder for usability as it can cause weird runtime issues otherwise
             let pid = format!("{}-", getmypid());
+            // TODO(bytes): file_put_contents takes the path as a &str.
             let tempfile = format!(
                 "{}/temp-{}{}",
-                sys_get_temp_dir(),
+                sys_get_temp_dir()
+                    .into_os_string()
+                    .into_string()
+                    .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}")),
                 pid,
                 bin2hex(&random_bytes(5))
             );
@@ -2251,7 +2259,7 @@ impl ApplicationHandle {
                 && unlink(&tempfile).is_ok()
                 && !file_exists(&tempfile))
             {
-                io.write_error(&format!("<error>PHP temp directory ({}) does not exist or is not writable to Shirabe. Set sys_temp_dir in your php.ini</error>", sys_get_temp_dir()));
+                io.write_error(&format!("<error>PHP temp directory ({}) does not exist or is not writable to Shirabe. Set sys_temp_dir in your php.ini</error>", sys_get_temp_dir().display()));
             }
 
             // add non-standard scripts as own commands

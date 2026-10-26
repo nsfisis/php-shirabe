@@ -55,7 +55,6 @@ $runner = new Runner($rootDir, [
     [new NoModRs(), []],
     [new NoStdCollectionsMaps(), []],
     [new NoToStringLossy(), [
-        'crates/shirabe-php-shim/src/fs.rs',
         'crates/shirabe-php-shim/src/net.rs',
         'crates/shirabe-php-shim/src/phar.rs',
         'crates/shirabe-php-shim/src/process.rs',

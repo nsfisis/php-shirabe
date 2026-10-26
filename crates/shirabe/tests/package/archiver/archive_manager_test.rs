@@ -188,11 +188,9 @@ fn test_archive_tar() {
     let target = test_case.get_target_name(package.clone(), "tar");
     assert!(file_exists(&target));
 
-    let tmppath = format!(
-        "{}/composer_archiver/{}",
-        sys_get_temp_dir(),
-        test_case.manager.get_package_filename(package).unwrap()
-    );
+    let tmppath = sys_get_temp_dir()
+        .join("composer_archiver")
+        .join(test_case.manager.get_package_filename(package).unwrap());
     assert!(!file_exists(&tmppath));
 
     unlink(&target);
@@ -225,11 +223,9 @@ fn test_archive_custom_file_name() {
 
     assert!(file_exists(&target));
 
-    let tmppath = format!(
-        "{}/composer_archiver/{}",
-        sys_get_temp_dir(),
-        test_case.manager.get_package_filename(package).unwrap()
-    );
+    let tmppath = sys_get_temp_dir()
+        .join("composer_archiver")
+        .join(test_case.manager.get_package_filename(package).unwrap());
     assert!(!file_exists(&tmppath));
 
     unlink(&target);

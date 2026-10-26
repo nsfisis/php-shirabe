@@ -384,7 +384,11 @@ impl ClassMapGenerator {
 
     fn get_cwd() -> anyhow::Result<String> {
         match getcwd() {
-            Some(cwd) => Ok(cwd),
+            // TODO(bytes): the cwd is returned as a String.
+            Some(cwd) => Ok(cwd
+                .into_os_string()
+                .into_string()
+                .unwrap_or_else(|cwd| panic!("cwd is not valid UTF-8: {cwd:?}"))),
             None => Err(RuntimeException::new(
                 "Could not determine the current working directory".to_string(),
             )

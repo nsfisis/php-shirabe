@@ -145,7 +145,11 @@ impl ArchiveManager {
         if is_root {
             source_path = realpath(".").unwrap_or_else(|| ".".to_string());
         } else {
-            let tmp_dir = sys_get_temp_dir();
+            // TODO(bytes): the source path is kept as a String.
+            let tmp_dir = sys_get_temp_dir()
+                .into_os_string()
+                .into_string()
+                .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
             let random_suffix = bin2hex(&random_bytes(5));
             source_path = format!("{}/composer_archive{}", tmp_dir, random_suffix);
             filesystem.ensure_directory_exists(&source_path)?;
@@ -236,9 +240,13 @@ impl ArchiveManager {
         }
 
         let tmp_suffix = bin2hex(&random_bytes(5));
+        // TODO(bytes): the target path is kept as a String.
         let temp_target = format!(
             "{}/composer_archive{}.{}",
-            sys_get_temp_dir(),
+            sys_get_temp_dir()
+                .into_os_string()
+                .into_string()
+                .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}")),
             tmp_suffix,
             format
         );

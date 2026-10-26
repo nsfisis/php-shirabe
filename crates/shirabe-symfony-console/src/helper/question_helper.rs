@@ -692,7 +692,12 @@ impl QuestionHelper {
             // handle code running from a phar
             let mut tmp_exe: Option<String> = None;
             if shirabe_php_shim::substr(&magic_file(), 0, Some(5)) == "phar:" {
-                let tmp = format!("{}/hiddeninput.exe", shirabe_php_shim::sys_get_temp_dir());
+                // TODO(bytes): the executable path is kept as a String.
+                let tmp_dir = shirabe_php_shim::sys_get_temp_dir()
+                    .into_os_string()
+                    .into_string()
+                    .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
+                let tmp = format!("{}/hiddeninput.exe", tmp_dir);
                 shirabe_php_shim::copy(&exe, &tmp);
                 exe = tmp.clone();
                 tmp_exe = Some(tmp);

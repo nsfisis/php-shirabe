@@ -58,7 +58,10 @@ impl ArchiverTestCase {
 
         self.setup_dummy_repo(&mut files);
         let package = self.setup_package();
-        let target = format!("{}/composer_archiver_test.zip", sys_get_temp_dir());
+        let target = format!(
+            "{}/composer_archiver_test.zip",
+            sys_get_temp_dir().to_str().unwrap()
+        );
         self.files_to_cleanup.push(target.clone());
 
         let archiver = ZipArchiver::new();

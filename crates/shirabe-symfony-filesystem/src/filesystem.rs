@@ -209,6 +209,16 @@ impl Filesystem {
                     shirabe_php_shim::FilesystemIterator::CURRENT_AS_PATHNAME
                         | shirabe_php_shim::FilesystemIterator::SKIP_DOTS,
                 )?;
+                // TODO(bytes): do_remove takes the paths as Strings.
+                let entries = entries
+                    .into_iter()
+                    .map(|entry| {
+                        entry
+                            .into_os_string()
+                            .into_string()
+                            .unwrap_or_else(|entry| panic!("path is not valid UTF-8: {entry:?}"))
+                    })
+                    .collect();
                 Self::do_remove(entries, true)?;
 
                 if let Err(last_error) = shirabe_php_shim::rmdir(&file)

@@ -317,7 +317,7 @@ impl CreateProjectCommand {
                         io.write_error("<error>Hint: To allow running the config command recommended below before dependencies are installed, run create-project with --no-install.</error>");
                         io.write_error(&format!(
                             "<error>You can then cd into {}, configure allow-plugins, and finally run a shirabe install to complete the process.</error>",
-                            getcwd().unwrap_or_default()
+                            getcwd().unwrap_or_default().display()
                         ));
                     }
                     return Err(e);

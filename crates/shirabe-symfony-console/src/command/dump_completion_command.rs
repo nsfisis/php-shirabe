@@ -101,11 +101,12 @@ impl DumpCompletionCommand {
         command_name: &str,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
-        let debug_file = format!(
-            "{}/sf_{}.log",
-            shirabe_php_shim::sys_get_temp_dir(),
-            command_name
-        );
+        // TODO(bytes): Process takes the command line as Strings.
+        let tmp_dir = shirabe_php_shim::sys_get_temp_dir()
+            .into_os_string()
+            .into_string()
+            .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
+        let debug_file = format!("{}/sf_{}.log", tmp_dir, command_name);
         if !shirabe_php_shim::file_exists(&debug_file) {
             shirabe_php_shim::touch(&debug_file);
         }

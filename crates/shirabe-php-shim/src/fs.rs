@@ -51,7 +51,7 @@ impl FilesystemIterator {
 pub fn filesystem_iterator(
     path: impl AsRef<std::path::Path>,
     flags: i64,
-) -> Result<Vec<String>, UnexpectedValueException> {
+) -> Result<Vec<std::path::PathBuf>, UnexpectedValueException> {
     assert!(
         flags & FilesystemIterator::CURRENT_AS_PATHNAME != 0,
         "filesystem_iterator yields pathnames, so CURRENT_AS_PATHNAME must be set"
@@ -67,10 +67,7 @@ pub fn filesystem_iterator(
             base.display()
         ))
     })?;
-    Ok(rd
-        .flatten()
-        .map(|entry| entry.path().to_string_lossy().into_owned())
-        .collect())
+    Ok(rd.flatten().map(|entry| entry.path()).collect())
 }
 
 #[derive(Debug, Clone)]
@@ -80,8 +77,19 @@ pub struct DirectoryIteratorEntry {
 
 impl DirectoryIteratorEntry {
     // SplFileInfo::getBasename(): the trailing name component.
-    pub fn get_basename(&self) -> String {
-        basename(&self.path.to_string_lossy())
+    pub fn get_basename(&self) -> std::ffi::OsString {
+        let path = self.path.as_os_str().as_encoded_bytes();
+        let end = path
+            .iter()
+            .rposition(|&b| b != b'/' && b != b'\\')
+            .map_or(0, |index| index + 1);
+        let trimmed = &path[..end];
+        let start = trimmed
+            .iter()
+            .rposition(|&b| b == b'/' || b == b'\\')
+            .map_or(0, |index| index + 1);
+        // SAFETY: the bytes come from an OsStr and are split only next to ASCII separators.
+        unsafe { std::ffi::OsStr::from_encoded_bytes_unchecked(&trimmed[start..]) }.to_os_string()
     }
     // SplFileInfo::isFile() follows symlinks.
     pub fn is_file(&self) -> bool {
@@ -90,11 +98,16 @@ impl DirectoryIteratorEntry {
             .unwrap_or(false)
     }
     // SplFileInfo::getExtension(): substring after the basename's last '.'.
-    pub fn get_extension(&self) -> String {
+    pub fn get_extension(&self) -> std::ffi::OsString {
         let base = self.get_basename();
-        match base.rfind('.') {
-            Some(index) => base[index + 1..].to_string(),
-            None => String::new(),
+        let base = base.as_encoded_bytes();
+        match base.iter().rposition(|&b| b == b'.') {
+            // SAFETY: the bytes come from an OsStr and are split only next to an ASCII '.'.
+            Some(index) => {
+                unsafe { std::ffi::OsStr::from_encoded_bytes_unchecked(&base[index + 1..]) }
+                    .to_os_string()
+            }
+            None => std::ffi::OsString::new(),
         }
     }
 }
@@ -121,7 +134,7 @@ impl RecursiveIteratorIterator {
     pub const SELF_FIRST: i64 = 0;
     pub const CHILD_FIRST: i64 = 16;
 
-    pub fn get_sub_pathname(&self) -> String {
+    pub fn get_sub_pathname(&self) -> std::path::PathBuf {
         self.entries[self.cursor.get()].sub_pathname()
     }
 }
@@ -185,8 +198,8 @@ impl RecursiveIteratorFileInfo {
             .unwrap_or(false)
     }
 
-    pub fn get_pathname(&self) -> String {
-        self.path.to_string_lossy().into_owned()
+    pub fn get_pathname(&self) -> std::path::PathBuf {
+        self.path.clone()
     }
 
     pub fn get_size(&self) -> anyhow::Result<i64> {
@@ -200,10 +213,10 @@ impl RecursiveIteratorFileInfo {
         }
     }
 
-    fn sub_pathname(&self) -> String {
+    fn sub_pathname(&self) -> std::path::PathBuf {
         self.path
             .strip_prefix(&self.root)
-            .map(|p| p.to_string_lossy().into_owned())
+            .map(|p| p.to_path_buf())
             .unwrap_or_else(|_| self.get_pathname())
     }
 }
@@ -890,10 +903,8 @@ pub fn file_get_contents_with_max_length(
     Ok(buf)
 }
 
-pub fn getcwd() -> Option<String> {
-    std::env::current_dir()
-        .ok()
-        .map(|p| p.to_string_lossy().into_owned())
+pub fn getcwd() -> Option<std::path::PathBuf> {
+    std::env::current_dir().ok()
 }
 
 pub fn chdir(path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
@@ -1011,8 +1022,8 @@ pub fn symlink(
     std::os::unix::fs::symlink(target.as_ref(), link.as_ref())
 }
 
-pub fn sys_get_temp_dir() -> String {
-    std::env::temp_dir().to_string_lossy().into_owned()
+pub fn sys_get_temp_dir() -> std::path::PathBuf {
+    std::env::temp_dir()
 }
 
 pub fn pathinfo(path: &str, option: i64) -> String {
@@ -1133,7 +1144,10 @@ fn glob_collect(pattern: &str, flags: i64, out: &mut Vec<String>) {
                 let read_base = if base.is_empty() { "." } else { base.as_str() };
                 if let Ok(rd) = std::fs::read_dir(read_base) {
                     for entry in rd.flatten() {
-                        let name = entry.file_name().to_string_lossy().into_owned();
+                        // TODO(bytes): glob matches and returns paths as Strings.
+                        let name = entry.file_name().into_string().unwrap_or_else(|name| {
+                            panic!("glob: file name is not valid UTF-8: {name:?}")
+                        });
                         if glob_fnmatch(seg, &name) {
                             let path = glob_join(base, &name);
                             if is_last || std::path::Path::new(&path).is_dir() {
@@ -1401,12 +1415,12 @@ mod tests {
         std::fs::create_dir(dir.path().join("sub")).unwrap();
 
         let entries = directory_iterator(dir.path().to_str().unwrap()).unwrap();
-        let basenames: Vec<String> = entries.iter().map(|e| e.get_basename()).collect();
+        let basenames: Vec<std::ffi::OsString> = entries.iter().map(|e| e.get_basename()).collect();
         // PHP's DirectoryIterator includes the "." and ".." entries.
-        assert!(basenames.contains(&".".to_string()));
-        assert!(basenames.contains(&"..".to_string()));
-        assert!(basenames.contains(&"completion.bash".to_string()));
-        assert!(basenames.contains(&"sub".to_string()));
+        assert!(basenames.contains(&".".into()));
+        assert!(basenames.contains(&"..".into()));
+        assert!(basenames.contains(&"completion.bash".into()));
+        assert!(basenames.contains(&"sub".into()));
 
         let file = entries
             .iter()
