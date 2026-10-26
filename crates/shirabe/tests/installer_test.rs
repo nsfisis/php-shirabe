@@ -429,8 +429,7 @@ fn test_installer() {
         // the installer falls back to an update; PHP uses an in-memory JsonFile mock instead).
         let lock_dir = tempfile::TempDir::new().unwrap();
         let lock_path = lock_dir.path().join("composer.lock");
-        let lock_json =
-            JsonFile::new(lock_path.to_string_lossy().into_owned(), None, None).unwrap();
+        let lock_json = JsonFile::new(lock_path.to_str().unwrap().to_string(), None, None).unwrap();
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
         ))));
@@ -698,7 +697,7 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
         let mut composer: serde_json::Value = serde_json::from_str(&test_data["COMPOSER"]).unwrap();
 
         if let Some(repositories) = composer.get_mut("repositories") {
-            let fixtures_str = dir.to_string_lossy().replace('\\', "/");
+            let fixtures_str = dir.to_str().unwrap().replace('\\', "/");
             let rewrite = |repo: &mut serde_json::Value| {
                 if repo.get("type").and_then(|t| t.as_str()) != Some("composer") {
                     return;
@@ -791,8 +790,9 @@ fn load_integration_tests(path: &str) -> Vec<IntegrationCase> {
             file: file
                 .strip_prefix(&dir)
                 .unwrap()
-                .to_string_lossy()
-                .into_owned(),
+                .to_str()
+                .unwrap()
+                .to_string(),
             message,
             condition,
             composer,
@@ -912,7 +912,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         case.installed.as_ref().unwrap_or(&serde_json::json!([])),
     );
     let installed_json =
-        JsonFile::new(installed_path.to_string_lossy().into_owned(), None, None).unwrap();
+        JsonFile::new(installed_path.to_str().unwrap().to_string(), None, None).unwrap();
     let local_repo = shirabe::repository::InstalledFilesystemRepository::__new_mock(
         installed_json,
         false,
@@ -932,7 +932,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         write_json(&lock_path, lock);
     }
     let lock_before = std::fs::read_to_string(&lock_path).ok();
-    let lock_json = JsonFile::new(lock_path.to_string_lossy().into_owned(), None, None).unwrap();
+    let lock_json = JsonFile::new(lock_path.to_str().unwrap().to_string(), None, None).unwrap();
 
     // The Locker needs a concrete InstallationManager; build a fresh recording mock just for it. The
     // asserted trace comes from the composer's own installation manager (read via as_any below).

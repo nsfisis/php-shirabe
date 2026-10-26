@@ -13,9 +13,9 @@ use tempfile::TempDir;
 
 // ref: ArchiverTestCase. Holds the unique tmp testDir plus the ZipArchiverTest cleanup list.
 struct ArchiverTestCase {
-    test_dir: String,
+    test_dir: std::path::PathBuf,
     _test_dir_guard: TempDir,
-    files_to_cleanup: Vec<String>,
+    files_to_cleanup: Vec<std::path::PathBuf>,
 }
 
 impl Drop for ArchiverTestCase {
@@ -29,7 +29,7 @@ impl Drop for ArchiverTestCase {
 impl ArchiverTestCase {
     fn set_up() -> Self {
         let guard = TempDir::new().unwrap();
-        let test_dir = guard.path().to_string_lossy().to_string();
+        let test_dir = guard.path().to_path_buf();
         Self {
             test_dir,
             _test_dir_guard: guard,
@@ -58,17 +58,14 @@ impl ArchiverTestCase {
 
         self.setup_dummy_repo(&mut files);
         let package = self.setup_package();
-        let target = format!(
-            "{}/composer_archiver_test.zip",
-            sys_get_temp_dir().to_str().unwrap()
-        );
+        let target = sys_get_temp_dir().join("composer_archiver_test.zip");
         self.files_to_cleanup.push(target.clone());
 
         let archiver = ZipArchiver::new();
         archiver
             .archive(
                 package.get_source_url().unwrap(),
-                target.clone(),
+                target.to_str().unwrap().to_string(),
                 "zip".to_string(),
                 vec![],
                 false,

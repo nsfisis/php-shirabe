@@ -146,7 +146,7 @@ fn ensure_php_binary() -> bool {
     for dir in std::env::split_paths(&path) {
         let candidate = dir.join("php");
         if candidate.is_file() {
-            Platform::put_env("PHP_BINARY", &candidate.to_string_lossy());
+            Platform::put_env("PHP_BINARY", candidate.to_str().unwrap());
             return true;
         }
     }
@@ -804,7 +804,7 @@ fn test_dispatcher_appends_dir_bin_on_path_for_every_listener() {
     std::env::set_current_dir(&php_test_dir).unwrap();
     Platform::put_env(
         "COMPOSER_BIN_DIR",
-        &format!("{}/vendor/bin", php_test_dir.display()),
+        php_test_dir.join("vendor/bin").to_str().unwrap(),
     );
 
     let (process, _process_guard) =

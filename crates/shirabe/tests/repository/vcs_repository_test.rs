@@ -190,7 +190,7 @@ fn test_load_versions() {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(composer_home.to_string_lossy().into_owned()),
+        PhpMixed::String(composer_home.to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
@@ -214,7 +214,7 @@ fn test_load_versions() {
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".to_string(),
-        PhpMixed::String(git_repo.to_string_lossy().into_owned()),
+        PhpMixed::String(git_repo.to_str().unwrap().to_string()),
     );
     repo_config.insert("type".to_string(), PhpMixed::String("vcs".to_string()));
 

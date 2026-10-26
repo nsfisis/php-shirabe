@@ -126,7 +126,7 @@ fn test_error_messages() {
     let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(test_dir.path().to_string_lossy().into_owned()),
+        PhpMixed::String(test_dir.path().to_str().unwrap().to_string()),
     );
     let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
     merged.insert("config".to_string(), PhpMixed::Array(config_options));
@@ -166,8 +166,9 @@ fn test_error_messages() {
 
     let path = std::env::temp_dir()
         .join("composer-zip-test")
-        .to_string_lossy()
-        .into_owned();
+        .to_str()
+        .unwrap()
+        .to_string();
 
     let result: anyhow::Result<()> = (|| {
         let loop_ = Loop::new(http_downloader.clone(), None);
@@ -205,7 +206,7 @@ fn test_zip_archive_only_failed() {
     });
     downloader.__set_zip_archive_object(Some(zip_archive));
 
-    let filename = set_up.filename.to_string_lossy().into_owned();
+    let filename = set_up.filename.to_str().unwrap().to_string();
     let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
 
     let e = result.expect_err("expected RuntimeException");
@@ -231,7 +232,7 @@ fn test_zip_archive_extract_only_failed() {
     });
     downloader.__set_zip_archive_object(Some(zip_archive));
 
-    let filename = set_up.filename.to_string_lossy().into_owned();
+    let filename = set_up.filename.to_str().unwrap().to_string();
     let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
 
     let e = result.expect_err("expected RuntimeException");
@@ -259,7 +260,7 @@ fn test_zip_archive_only_good() {
     });
     downloader.__set_zip_archive_object(Some(zip_archive));
 
-    let filename = set_up.filename.to_string_lossy().into_owned();
+    let filename = set_up.filename.to_str().unwrap().to_string();
     let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
 
     result.expect("extract should succeed");
@@ -297,7 +298,7 @@ fn test_system_unzip_only_failed() {
     );
     let downloader = make_downloader_with_process(&set_up, process);
 
-    let filename = set_up.filename.to_string_lossy().into_owned();
+    let filename = set_up.filename.to_str().unwrap().to_string();
     let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
 
     let e = result.expect_err("expected RuntimeException");
@@ -330,7 +331,7 @@ fn test_system_unzip_only_good() {
     );
     let downloader = make_downloader_with_process(&set_up, process);
 
-    let filename = set_up.filename.to_string_lossy().into_owned();
+    let filename = set_up.filename.to_str().unwrap().to_string();
     let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
 
     result.expect("extract should succeed");
@@ -364,7 +365,7 @@ fn test_non_windows_fallback_good() {
     });
     downloader.__set_zip_archive_object(Some(zip_archive));
 
-    let filename = set_up.filename.to_string_lossy().into_owned();
+    let filename = set_up.filename.to_str().unwrap().to_string();
     let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
 
     result.expect("extract should succeed");
@@ -398,7 +399,7 @@ fn test_non_windows_fallback_failed() {
     });
     downloader.__set_zip_archive_object(Some(zip_archive));
 
-    let filename = set_up.filename.to_string_lossy().into_owned();
+    let filename = set_up.filename.to_str().unwrap().to_string();
     let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
 
     let e = result.expect_err("expected RuntimeException");

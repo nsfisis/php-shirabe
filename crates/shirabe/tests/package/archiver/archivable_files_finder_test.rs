@@ -19,7 +19,7 @@ fn set_up() -> SetUp {
     let mut fs = Filesystem::new(None);
 
     let sources_dir = TempDir::new().unwrap();
-    let sources = fs.normalize_path(&sources_dir.path().canonicalize().unwrap().to_string_lossy());
+    let sources = fs.normalize_path(sources_dir.path().canonicalize().unwrap().to_str().unwrap());
 
     let file_tree = [
         ".foo",
@@ -69,9 +69,10 @@ fn set_up() -> SetUp {
     ];
 
     for relative_path in file_tree {
-        let path = format!("{}/{}", sources, relative_path);
-        fs.ensure_directory_exists(&dirname(&path)).unwrap();
-        file_put_contents(&path, b"");
+        let path = std::path::Path::new(&sources).join(relative_path);
+        fs.ensure_directory_exists(&dirname(path.to_str().unwrap()))
+            .unwrap();
+        file_put_contents(path.to_str().unwrap(), b"");
     }
 
     SetUp {
@@ -89,7 +90,7 @@ fn get_archivable_files(set_up: &SetUp, finder: ArchivableFilesFinder) -> Vec<St
             files.push(preg_replace(
                 format!("#^{}#", preg_quote(&set_up.sources, Some('#'))),
                 "",
-                &set_up.fs.normalize_path(&real_path.to_string_lossy()),
+                &set_up.fs.normalize_path(real_path.to_str().unwrap()),
             ));
         }
     }
@@ -182,7 +183,7 @@ fn get_archived_files(set_up: &SetUp, command: &str) -> Vec<String> {
     .unwrap();
     process.run(None, IndexMap::new()).unwrap();
 
-    let zip_path = format!("{}/archive.zip", set_up.sources);
+    let zip_path = std::path::Path::new(&set_up.sources).join("archive.zip");
     let mut archive = ZipArchive::new();
     archive.open(&zip_path, 0).unwrap();
 
@@ -232,7 +233,10 @@ fn test_git_excludes() {
     let set_up = set_up();
 
     file_put_contents(
-        &format!("{}/.gitattributes", set_up.sources),
+        std::path::Path::new(&set_up.sources)
+            .join(".gitattributes")
+            .to_str()
+            .unwrap(),
         [
             "",
             "# gitattributes rules with comments and blank lines",

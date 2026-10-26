@@ -62,12 +62,14 @@ fn test_dev_warning() {
 
     let expected_output = format!(
         "<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>{}",
-        PHP_SERVER
-            .lock()
-            .unwrap()
-            .get("PHP_SELF")
-            .unwrap_or_default()
-            .to_string_lossy(),
+        std::path::Path::new(
+            &PHP_SERVER
+                .lock()
+                .unwrap()
+                .get("PHP_SELF")
+                .unwrap_or_default()
+        )
+        .display(),
         PHP_EOL
     );
     assert!(output.borrow().fetch().contains(&expected_output));

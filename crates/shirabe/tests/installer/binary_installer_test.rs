@@ -14,8 +14,8 @@ use tempfile::TempDir;
 /// PHPUnit IOInterface mock with no expectations; a NullIO is the closest analogue.
 struct SetUp {
     root: TempDir,
-    vendor_dir: String,
-    bin_dir: String,
+    vendor_dir: std::path::PathBuf,
+    bin_dir: std::path::PathBuf,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     fs: Filesystem,
 }
@@ -24,15 +24,12 @@ fn set_up() -> SetUp {
     let fs = Filesystem::new(None);
 
     let root = TempDir::new().unwrap();
-    let root_dir = fs::canonicalize(root.path())
-        .unwrap()
-        .to_string_lossy()
-        .into_owned();
+    let root_dir = fs::canonicalize(root.path()).unwrap();
 
-    let vendor_dir = format!("{}/vendor", root_dir);
+    let vendor_dir = root_dir.join("vendor");
     fs::create_dir_all(&vendor_dir).unwrap();
 
-    let bin_dir = format!("{}/bin", root_dir);
+    let bin_dir = root_dir.join("bin");
     fs::create_dir_all(&bin_dir).unwrap();
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
@@ -85,25 +82,29 @@ fn run_install_and_exec_binary_with_full_compat(contents: &[u8]) {
     let package = get_package("foo/bar", "1.0.0");
     package.__set_binaries(vec!["binary".to_string()]);
 
-    let pkg_dir = format!("{}/foo/bar", setup.vendor_dir);
+    let pkg_dir = setup.vendor_dir.join("foo/bar");
     fs::create_dir_all(&pkg_dir).unwrap();
-    fs::write(format!("{}/binary", pkg_dir), contents).unwrap();
+    fs::write(pkg_dir.join("binary"), contents).unwrap();
 
     let mut installer = BinaryInstaller::new(
         setup.io.clone(),
-        setup.bin_dir.clone(),
+        setup.bin_dir.to_str().unwrap().to_string(),
         "full".to_string(),
         Some(std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(
             None,
         )))),
         None,
     );
-    installer.install_binaries(package, &pkg_dir, true);
+    installer.install_binaries(package, pkg_dir.to_str().unwrap(), true);
 
     let proc = ProcessExecutor::new(None);
     let mut output = String::new();
-    proc.execute(format!("{}/binary arg", setup.bin_dir), &mut output, None)
-        .unwrap();
+    proc.execute(
+        format!("{} arg", setup.bin_dir.join("binary").to_str().unwrap()),
+        &mut output,
+        None,
+    )
+    .unwrap();
     assert_eq!("", proc.get_error_output());
     assert_eq!("success arg", output);
 

@@ -29,7 +29,7 @@ fn set_up() -> SetUp {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(home.path().to_string_lossy().into_owned()),
+        PhpMixed::String(home.path().to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
@@ -76,7 +76,7 @@ fn test_get_root_identifier_from_remote_local_repository() {
         config,
         network_env,
     } = set_up();
-    let home_path = home.path().to_string_lossy().into_owned();
+    let home_path = home.path().to_str().unwrap().to_string();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
@@ -111,7 +111,7 @@ fn test_get_root_identifier_from_remote() {
         config,
         network_env,
     } = set_up();
-    let home_path = home.path().to_string_lossy().into_owned();
+    let home_path = home.path().to_str().unwrap().to_string();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
@@ -178,7 +178,7 @@ fn test_get_root_identifier_from_local_with_network_disabled() {
         config,
         network_env,
     } = set_up();
-    let home_path = home.path().to_string_lossy().into_owned();
+    let home_path = home.path().to_str().unwrap().to_string();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
     Platform::put_env("COMPOSER_DISABLE_NETWORK", "1");
@@ -217,7 +217,7 @@ fn test_get_branches_filter_invalid_branch_names() {
         config,
         network_env,
     } = set_up();
-    let home_path = home.path().to_string_lossy().into_owned();
+    let home_path = home.path().to_str().unwrap().to_string();
     let _tear_down = TearDown::new(home.path().to_path_buf(), network_env);
 
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));

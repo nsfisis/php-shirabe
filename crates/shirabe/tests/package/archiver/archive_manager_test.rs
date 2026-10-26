@@ -25,15 +25,15 @@ use tempfile::TempDir;
 // with the same archivers (ZipArchiver + PharArchiver) that Factory::createArchiveManager adds.
 struct TestCase {
     manager: ArchiveManager,
-    test_dir: String,
-    target_dir: String,
+    test_dir: std::path::PathBuf,
+    target_dir: std::path::PathBuf,
     _test_dir_guard: TempDir,
 }
 
 impl TestCase {
     fn set_up() -> Self {
         let guard = TempDir::new().unwrap();
-        let test_dir = guard.path().to_string_lossy().to_string();
+        let test_dir = guard.path().to_path_buf();
 
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
@@ -68,7 +68,7 @@ impl TestCase {
         manager.add_archiver(Box::new(ZipArchiver::new()));
         manager.add_archiver(Box::new(PharArchiver::new()));
 
-        let target_dir = format!("{}/composer_archiver_tests", test_dir);
+        let target_dir = test_dir.join("composer_archiver_tests");
 
         Self {
             manager,
@@ -93,9 +93,13 @@ impl TestCase {
     }
 
     // ref: ArchiveManagerTest::getTargetName.
-    fn get_target_name(&self, package: CompletePackageInterfaceHandle, format: &str) -> String {
+    fn get_target_name(
+        &self,
+        package: CompletePackageInterfaceHandle,
+        format: &str,
+    ) -> std::path::PathBuf {
         let package_name = self.manager.get_package_filename(package).unwrap();
-        format!("{}/{}.{}", self.target_dir, package_name, format)
+        self.target_dir.join(format!("{}.{}", package_name, format))
     }
 
     // ref: ArchiveManagerTest::setupGitRepo.
@@ -104,7 +108,7 @@ impl TestCase {
     // effect-equivalent for setting up the local repository the archive path clones from.
     fn setup_git_repo(&self) {
         file_put_contents(
-            &format!("{}/composer.json", self.test_dir),
+            self.test_dir.join("composer.json").to_str().unwrap(),
             br#"{"name":"faker/faker", "description": "description", "license": "MIT"}"#,
         );
 
@@ -116,7 +120,7 @@ impl TestCase {
              git config user.name \"Your Name\" && \
              git add composer.json && \
              git commit -m \"commit composer.json\" -q",
-            Some(&self.test_dir),
+            Some(self.test_dir.to_str().unwrap()),
             None,
             PhpMixed::Bool(false),
             Some(60.0),
@@ -154,7 +158,7 @@ fn test_unknown_format() {
     let result = shirabe::util::sync_executor::block_on(test_case.manager.archive(
         package,
         "__unknown_format__".to_string(),
-        test_case.target_dir.clone(),
+        test_case.target_dir.to_str().unwrap().to_string(),
         None,
         false,
     ));
@@ -179,7 +183,7 @@ fn test_archive_tar() {
     shirabe::util::sync_executor::block_on(test_case.manager.archive(
         package.clone(),
         "tar".to_string(),
-        test_case.target_dir.clone(),
+        test_case.target_dir.to_str().unwrap().to_string(),
         None,
         false,
     ))
@@ -213,13 +217,13 @@ fn test_archive_custom_file_name() {
     shirabe::util::sync_executor::block_on(test_case.manager.archive(
         package.clone(),
         "tar".to_string(),
-        test_case.target_dir.clone(),
+        test_case.target_dir.to_str().unwrap().to_string(),
         Some(file_name.to_string()),
         false,
     ))
     .unwrap();
 
-    let target = format!("{}/{}.tar", test_case.target_dir, file_name);
+    let target = test_case.target_dir.join(format!("{}.tar", file_name));
 
     assert!(file_exists(&target));
 

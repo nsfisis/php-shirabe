@@ -32,7 +32,7 @@ fn set_up() -> SetUp {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(home.path().to_string_lossy().into_owned()),
+        PhpMixed::String(home.path().to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
@@ -720,8 +720,9 @@ fn test_private_repository_no_interaction() {
     let _ = fs.remove_directory(&cache_dir);
     let cache_vcs_dir = std::env::temp_dir()
         .join("composer-test/cache")
-        .to_string_lossy()
-        .into_owned();
+        .to_str()
+        .unwrap()
+        .to_string();
     {
         let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
         let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();

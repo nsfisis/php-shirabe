@@ -31,7 +31,7 @@ fn create_config() -> (Config, TempDir) {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(home.path().to_string_lossy().into_owned()),
+        PhpMixed::String(home.path().to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     let mut repositories: IndexMap<String, PhpMixed> = IndexMap::new();

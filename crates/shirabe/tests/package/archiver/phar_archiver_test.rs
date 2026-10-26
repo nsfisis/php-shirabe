@@ -10,14 +10,14 @@ use tempfile::TempDir;
 // ref: ArchiverTestCase.
 struct ArchiverTestCase {
     filesystem: Filesystem,
-    test_dir: String,
+    test_dir: std::path::PathBuf,
     _test_dir_guard: TempDir,
 }
 
 impl ArchiverTestCase {
     fn set_up() -> Self {
         let guard = TempDir::new().unwrap();
-        let test_dir = guard.path().to_string_lossy().to_string();
+        let test_dir = guard.path().to_path_buf();
         Self {
             filesystem: Filesystem::new(None),
             test_dir,
@@ -72,10 +72,12 @@ fn test_tar_archive() {
     test_case.setup_dummy_repo();
     let package = test_case.setup_package();
     let target_dir = TempDir::new().unwrap();
-    let target = format!(
-        "{}/composer_archiver_test.tar",
-        target_dir.path().to_string_lossy()
-    );
+    let target = target_dir
+        .path()
+        .join("composer_archiver_test.tar")
+        .to_str()
+        .unwrap()
+        .to_string();
 
     let archiver = PharArchiver::new();
     archiver
@@ -107,10 +109,12 @@ fn test_zip_archive() {
     test_case.setup_dummy_repo();
     let package = test_case.setup_package();
     let target_dir = TempDir::new().unwrap();
-    let target = format!(
-        "{}/composer_archiver_test.zip",
-        target_dir.path().to_string_lossy()
-    );
+    let target = target_dir
+        .path()
+        .join("composer_archiver_test.zip")
+        .to_str()
+        .unwrap()
+        .to_string();
 
     let archiver = PharArchiver::new();
     archiver
