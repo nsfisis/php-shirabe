@@ -177,7 +177,12 @@ impl Finder {
     }
 
     pub fn r#in(&mut self, dirs: impl AsRef<Path>) -> &mut Self {
-        let dir = dirs.as_ref().to_string_lossy().into_owned();
+        // TODO(bytes): the directories are resolved as Strings.
+        let dir = dirs
+            .as_ref()
+            .to_str()
+            .unwrap_or_else(|| panic!("path is not valid UTF-8: {}", dirs.as_ref().display()))
+            .to_string();
         let mut resolved_dirs: Vec<String> = Vec::new();
 
         if is_dir(&dir) {
@@ -463,7 +468,11 @@ impl Finder {
         for entry in read {
             let Ok(entry) = entry else { continue };
 
-            let filename = entry.file_name().to_string_lossy().into_owned();
+            // TODO(bytes): Entry keeps the names as Strings.
+            let filename = entry
+                .file_name()
+                .into_string()
+                .unwrap_or_else(|name| panic!("file name is not valid UTF-8: {name:?}"));
             let pathname = entry.path();
             let relative_pathname = if relative_dir.is_empty() {
                 filename.clone()
@@ -530,7 +539,12 @@ impl Finder {
                 entries.sort_by(|a, b| {
                     let pa = realpath_or_pathname(&a.pathname);
                     let pb = realpath_or_pathname(&b.pathname);
-                    apply_order(pa.as_bytes().cmp(pb.as_bytes()), order)
+                    apply_order(
+                        pa.as_os_str()
+                            .as_encoded_bytes()
+                            .cmp(pb.as_os_str().as_encoded_bytes()),
+                        order,
+                    )
                 });
             }
             Sort::ByAccessedTime => {
@@ -740,10 +754,8 @@ fn apply_order(ordering: std::cmp::Ordering, order: i64) -> std::cmp::Ordering {
 }
 
 /// `$file->getRealPath() ?: $file->getPathname()`.
-fn realpath_or_pathname(path: &Path) -> String {
-    std::fs::canonicalize(path)
-        .map(|resolved| resolved.to_string_lossy().into_owned())
-        .unwrap_or_else(|_| path.to_string_lossy().into_owned())
+fn realpath_or_pathname(path: &Path) -> std::path::PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn mtime(path: &Path) -> i64 {
