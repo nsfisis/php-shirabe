@@ -62,14 +62,16 @@ impl Platform {
 
     /// getenv() equivalent but reads from the runtime global variables first
     pub fn get_env(name: &str) -> Option<String> {
-        if let Some(value) = PHP_SERVER.lock().unwrap().get(name) {
-            return Some(value.to_string_lossy().into_owned());
-        }
-        if let Some(value) = PHP_ENV.lock().unwrap().get(name) {
-            return Some(value.to_string_lossy().into_owned());
-        }
+        let value = PHP_SERVER.lock().unwrap().get(name);
+        let value = value.or_else(|| PHP_ENV.lock().unwrap().get(name));
+        let value = value.or_else(|| getenv(name))?;
 
-        getenv(name).map(|value| value.to_string_lossy().into_owned())
+        // TODO(bytes): the value is returned as a String.
+        Some(
+            value
+                .into_string()
+                .unwrap_or_else(|value| panic!("{name} is not valid UTF-8: {value:?}")),
+        )
     }
 
     /// putenv() equivalent but updates the runtime global variables too

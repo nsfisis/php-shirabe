@@ -55,8 +55,6 @@ $runner = new Runner($rootDir, [
     [new NoModRs(), []],
     [new NoStdCollectionsMaps(), []],
     [new NoToStringLossy(), [
-        'crates/shirabe/src/util/http/proxy_manager.rs',
-        'crates/shirabe/src/util/platform.rs',
         'crates/shirabe/tests/application_test.rs',
         'crates/shirabe/tests/command/global_command_test.rs',
         'crates/shirabe/tests/command/init_command_test.rs',
