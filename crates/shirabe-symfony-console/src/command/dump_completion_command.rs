@@ -86,13 +86,15 @@ impl DumpCompletionCommand {
     }
 
     fn guess_shell() -> String {
+        // TODO(bytes): basename takes the path as a &str.
         shirabe_php_shim::basename(
             &shirabe_php_shim::PHP_SERVER
                 .lock()
                 .unwrap()
                 .get("SHELL")
                 .unwrap_or_default()
-                .to_string_lossy(),
+                .into_string()
+                .unwrap_or_else(|shell| panic!("SHELL is not valid UTF-8: {shell:?}")),
         )
     }
 
@@ -144,13 +146,14 @@ impl DumpCompletionCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for DumpCompletionCommand {
     fn configure(&self) -> anyhow::Result<()> {
+        // TODO(bytes): basename and the help text work on Strings.
         let full_command = shirabe_php_shim::PHP_SERVER
             .lock()
             .unwrap()
             .php_self()
             .unwrap_or_default()
-            .to_string_lossy()
-            .into_owned();
+            .into_string()
+            .unwrap_or_else(|php_self| panic!("PHP_SELF is not valid UTF-8: {php_self:?}"));
         let command_name = shirabe_php_shim::basename(&full_command);
         // @realpath($fullCommand) ?: $fullCommand
         let full_command = match shirabe_php_shim::realpath(&full_command) {
@@ -208,6 +211,7 @@ impl Command for DumpCompletionCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
+        // TODO(bytes): basename takes the path as a &str.
         let command_name = shirabe_php_shim::basename(
             &shirabe_php_shim::PHP_SERVER
                 .lock()
@@ -215,7 +219,8 @@ impl Command for DumpCompletionCommand {
                 .argv()
                 .next()
                 .unwrap_or_default()
-                .to_string_lossy(),
+                .into_string()
+                .unwrap_or_else(|arg| panic!("argv[0] is not valid UTF-8: {arg:?}")),
         );
 
         if input.borrow().get_option("debug")?.to_bool() {
