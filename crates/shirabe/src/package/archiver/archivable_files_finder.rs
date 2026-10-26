@@ -55,10 +55,15 @@ impl ArchivableFilesFinder {
                 return false;
             }
 
+            // TODO(bytes): normalize_path and preg_replace work on Strings.
+            let realpath = realpath
+                .into_os_string()
+                .into_string()
+                .unwrap_or_else(|realpath| panic!("path is not valid UTF-8: {realpath:?}"));
             let relative_path = preg_replace(
                 format!("#^{}#", preg_quote(&sources_clone, Some('#'))),
                 "",
-                &fs.normalize_path(&realpath.to_string_lossy()),
+                &fs.normalize_path(&realpath),
             );
 
             let mut exclude = false;

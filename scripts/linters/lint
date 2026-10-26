@@ -55,10 +55,6 @@ $runner = new Runner($rootDir, [
     [new NoModRs(), []],
     [new NoStdCollectionsMaps(), []],
     [new NoToStringLossy(), [
-        'crates/shirabe/src/package/archiver/archivable_files_filter.rs',
-        'crates/shirabe/src/package/archiver/archivable_files_finder.rs',
-        'crates/shirabe/src/package/archiver/zip_archiver.rs',
-        'crates/shirabe/src/package/comparer/comparer.rs',
         'crates/shirabe/src/util/http/proxy_manager.rs',
         'crates/shirabe/src/util/platform.rs',
         'crates/shirabe/tests/application_test.rs',

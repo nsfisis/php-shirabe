@@ -117,7 +117,11 @@ impl Comparer {
     fn do_tree(dir: &str, array: &mut IndexMap<String, IndexMap<String, Option<String>>>) -> bool {
         if let Ok(read_dir) = std::fs::read_dir(dir) {
             for entry in read_dir.flatten() {
-                let file: String = entry.file_name().to_string_lossy().into_owned();
+                // TODO(bytes): the tree is built from Strings.
+                let file: String = entry
+                    .file_name()
+                    .into_string()
+                    .unwrap_or_else(|file| panic!("file name is not valid UTF-8: {file:?}"));
                 if file == "." || file == ".." {
                     continue;
                 }

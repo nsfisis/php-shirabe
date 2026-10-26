@@ -6,7 +6,6 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use indexmap::IndexMap;
 use shirabe_php_shim::{RuntimeException, ZipArchive, class_exists, fileperms, realpath};
-use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct ZipArchiver;
@@ -56,32 +55,27 @@ impl ArchiverInterface for ZipArchiver {
             let files = ArchivableFilesFinder::new(&sources, excludes, ignore_filters)?;
             for file in files {
                 let filepath = file;
+                // TODO(bytes): ZipArchive takes the local name as a &str.
                 let mut relative_path = filepath
                     .strip_prefix(&sources)
                     .unwrap_or(filepath.as_path())
-                    .to_path_buf();
+                    .to_str()
+                    .unwrap_or_else(|| panic!("path is not valid UTF-8: {}", filepath.display()))
+                    .to_string();
 
                 if Platform::is_windows() {
-                    relative_path = PathBuf::from(shirabe_php_shim::strtr(
-                        &relative_path.to_string_lossy(),
-                        "\\",
-                        "/",
-                    ));
+                    relative_path = shirabe_php_shim::strtr(&relative_path, "\\", "/");
                 }
 
                 // Ensure to preserve the permission umasks for the filepath in the archive.
                 let perms = fileperms(&filepath)?;
 
                 if filepath.is_dir() {
-                    zip.add_empty_dir(
-                        &relative_path.to_string_lossy(),
-                        ZipArchive::OPSYS_UNIX,
-                        perms << 16,
-                    );
+                    zip.add_empty_dir(&relative_path, ZipArchive::OPSYS_UNIX, perms << 16);
                 } else {
                     zip.add_file(
                         &filepath,
-                        &relative_path.to_string_lossy(),
+                        &relative_path,
                         ZipArchive::OPSYS_UNIX,
                         perms << 16,
                     );
