@@ -2258,7 +2258,11 @@ fn require_generated_php_array(file: &str) -> PhpMixed {
     // __DIR__ inside the generated file is the directory that contains it.
     let dir = std::path::Path::new(file)
         .parent()
-        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .map(|p| {
+            p.to_str()
+                .expect("the parent of a UTF-8 path is valid UTF-8")
+                .replace('\\', "/")
+        })
         .unwrap_or_default();
 
     let mut vendor_dir = String::new();
