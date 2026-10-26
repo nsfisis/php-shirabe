@@ -1,0 +1,15 @@
+{
+    "name": "acme/hello",
+    "version": "1.0.0",
+    "autoload": {
+        "psr-4": {
+            "Acme\\Hello\\": "src/"
+        },
+        "classmap": [
+            "lib/"
+        ],
+        "files": [
+            "functions.php"
+        ]
+    }
+}

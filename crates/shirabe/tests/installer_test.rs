@@ -255,7 +255,7 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
         &self,
         _autoloads: &IndexMap<String, PhpMixed>,
         _vendor_dir: Option<String>,
-    ) -> ClassLoader {
+    ) -> anyhow::Result<ClassLoader> {
         unimplemented!("create_loader is not reached by the installer test path")
     }
 }

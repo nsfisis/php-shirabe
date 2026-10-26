@@ -21,19 +21,24 @@ fn plugin_fetched() -> bool {
 }
 
 /// The two implementations under comparison: upstream Composer first, Shirabe second.
-fn implementations(composer_bin: &str) -> [(&str, Vec<&str>); 2] {
+pub(crate) fn implementations(composer_bin: &str) -> [(&str, Vec<&str>); 2] {
     [
         ("php", vec![composer_bin]),
         (env!("CARGO_BIN_EXE_shirabe"), vec![]),
     ]
 }
 
-struct CommandRun {
-    exit_code: i32,
-    stdout: Vec<String>,
+pub(crate) struct CommandRun {
+    pub(crate) exit_code: i32,
+    pub(crate) stdout: Vec<String>,
 }
 
-fn run_command(work: &Path, program: &str, prefix_args: &[&str], args: &[&str]) -> CommandRun {
+pub(crate) fn run_command(
+    work: &Path,
+    program: &str,
+    prefix_args: &[&str],
+    args: &[&str],
+) -> CommandRun {
     let output = std::process::Command::new(program)
         .args(prefix_args)
         .args(args)
@@ -68,7 +73,7 @@ fn normalize_output(stdout: &str, work: &Path) -> Vec<String> {
 }
 
 /// Every file under `dir` as (relative path, contents), so two project trees compare as a whole.
-fn tree(dir: &Path) -> Vec<(String, String)> {
+pub(crate) fn tree(dir: &Path) -> Vec<(String, String)> {
     let mut files = Vec::new();
     collect(dir, dir, &mut files);
     files.sort();

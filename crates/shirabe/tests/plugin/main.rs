@@ -7,6 +7,7 @@ mod php_worker;
 
 mod alias_package_test;
 mod e2e_async_test;
+mod e2e_autoload_generator_test;
 mod e2e_command_event_test;
 mod e2e_command_provider_test;
 mod e2e_exception_test;
@@ -16,6 +17,7 @@ mod e2e_http_downloader_test;
 mod e2e_installer_event_test;
 mod e2e_installer_test;
 mod e2e_installers_test;
+mod e2e_jetpack_autoloader_test;
 mod e2e_normalize_test;
 mod e2e_package_event_test;
 mod e2e_pre_pool_create_test;

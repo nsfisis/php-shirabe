@@ -944,6 +944,10 @@ const STUB_FILES: &[(&str, &str)] = &[
         include_str!("../php/stubs/Composer/Composer.php"),
     ),
     (
+        "Composer/Autoload/AutoloadGenerator.php",
+        include_str!("../php/stubs/Composer/Autoload/AutoloadGenerator.php"),
+    ),
+    (
         "Composer/Config.php",
         include_str!("../php/stubs/Composer/Config.php"),
     ),

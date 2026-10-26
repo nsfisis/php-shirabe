@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/autoload-generator-probe",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin driving the AutoloadGenerator Composer hands out.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\AutoloadGenerator\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\AutoloadGenerator\\Plugin"
+    }
+}

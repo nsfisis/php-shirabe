@@ -394,7 +394,7 @@ impl PluginManager {
             .get("vendor-dir")
             .as_string()
             .map(|s| s.to_string());
-        let mut class_loader = generator.borrow().create_loader(&map, vendor_dir);
+        let mut class_loader = generator.borrow().create_loader(&map, vendor_dir)?;
         class_loader.register(false);
 
         // The plugin code runs in the PHP worker: load the Composer PHP runtime (contracts like

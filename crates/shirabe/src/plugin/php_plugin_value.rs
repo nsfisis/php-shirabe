@@ -14,8 +14,10 @@
 //! constraint) has no faithful constructor call.
 
 use crate::package::Link;
+use crate::plugin::php_plugin_proxy::ToPluginValue;
 use crate::util::http::Response;
 use chrono::{DateTime, NaiveDateTime, TimeZone, Utc};
+use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_rpc::{PhpObject, PhpThrow, PluginValue};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
@@ -23,6 +25,7 @@ use shirabe_semver::constraint::{
 
 const LINK_CLASS: &str = "Composer\\Package\\Link";
 const RESPONSE_CLASS: &str = "Composer\\Util\\Http\\Response";
+const CLASS_MAP_CLASS: &str = "Composer\\ClassMapGenerator\\ClassMap";
 const CONSTRAINT_CLASS: &str = "Composer\\Semver\\Constraint\\Constraint";
 const MULTI_CONSTRAINT_CLASS: &str = "Composer\\Semver\\Constraint\\MultiConstraint";
 const MATCH_ALL_CLASS: &str = "Composer\\Semver\\Constraint\\MatchAllConstraint";
@@ -233,6 +236,46 @@ pub(crate) fn response_to_wire(response: &Response) -> PluginValue {
             Some(body) => PluginValue::string(body),
             None => PluginValue::Null,
         },
+    );
+    PluginValue::PhpObject(object)
+}
+
+/// The class map `AutoloadGenerator::dump()` returns. It is a `php-native` class, so the child
+/// owns the revived instance outright: the Rust side keeps no entity behind it.
+pub(crate) fn class_map_to_wire(class_map: &ClassMap) -> PluginValue {
+    let mut object = PhpObject::new(CLASS_MAP_CLASS);
+    object.set_public("map", class_map.get_map().clone().to_plugin_value());
+    let ambiguous_classes = class_map
+        .get_ambiguous_classes(None)
+        .expect("no duplicates filter is applied");
+    object.set_private(
+        CLASS_MAP_CLASS,
+        "ambiguousClasses",
+        ambiguous_classes.to_plugin_value(),
+    );
+    let psr_violations: indexmap::IndexMap<String, PluginValue> = class_map
+        .get_raw_psr_violations()
+        .iter()
+        .map(|(path, violations)| {
+            let violations = violations
+                .iter()
+                .map(|violation| {
+                    PluginValue::Array(indexmap::IndexMap::from([
+                        ("warning".into(), PluginValue::string(&violation.warning)),
+                        (
+                            "className".into(),
+                            PluginValue::string(&violation.class_name),
+                        ),
+                    ]))
+                })
+                .collect();
+            (path.clone(), PluginValue::List(violations))
+        })
+        .collect();
+    object.set_private(
+        CLASS_MAP_CLASS,
+        "psrViolations",
+        psr_violations.to_plugin_value(),
     );
     PluginValue::PhpObject(object)
 }

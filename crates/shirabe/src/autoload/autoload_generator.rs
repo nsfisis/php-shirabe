@@ -24,11 +24,12 @@ use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, PregMatches, array_keys, array_map, array_merge_map,
-    array_merge_recursive, array_shift, array_slice_strs, array_unique, bin2hex, explode,
-    file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim, php_regex,
-    preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback, random_bytes,
-    realpath, str_replace, strlen, strpos, strtr, substr, substr_count, trim, unlink, var_export,
+    Catch as _, InvalidArgumentException, PhpMixed, PregMatches, RuntimeException, array_keys,
+    array_map, array_merge_map, array_merge_recursive, array_shift, array_slice_strs, array_unique,
+    bin2hex, empty, explode, file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim,
+    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback,
+    random_bytes, realpath, str_replace, strlen, strpos, strtr, substr, substr_count, trim, unlink,
+    var_export,
 };
 use shirabe_semver::constraint::Bound;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -892,7 +893,7 @@ return array(
         &self,
         autoloads: &IndexMap<String, PhpMixed>,
         vendor_dir: Option<String>,
-    ) -> ClassLoader {
+    ) -> anyhow::Result<ClassLoader> {
         let mut loader = ClassLoader::new(vendor_dir);
 
         if let Some(psr0) = autoloads.get("psr-0").and_then(|v| v.as_array()) {
@@ -921,19 +922,18 @@ return array(
                     })
                     .or_else(|| path.as_string().map(|s| vec![s.to_string()]))
                     .unwrap_or_default();
-                loader.add_psr4(namespace, paths, false);
+                loader.add_psr4(namespace, paths, false)?;
             }
         }
 
-        if let Some(classmap) = autoloads.get("classmap").and_then(|v| v.as_array()) {
+        if let Some(classmap) = autoloads.get("classmap").filter(|v| !v.is_null()) {
             let mut excluded: Vec<String> = vec![];
-            if let Some(ex) = autoloads
-                .get("exclude-from-classmap")
-                .and_then(|v| v.as_array())
-                && !ex.is_empty()
+            if let Some(ex) = autoloads.get("exclude-from-classmap")
+                && !empty(ex)
             {
                 excluded = ex
                     .values()
+                    .into_iter()
                     .filter_map(|v| v.as_string().map(|s| s.to_string()))
                     .collect();
             }
@@ -946,26 +946,28 @@ return array(
             class_map_generator.avoid_duplicate_scans(None);
 
             for dir in classmap.values() {
-                let dir_str = dir.as_string().unwrap_or("");
-                let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    class_map_generator.scan_paths(
-                        dir_str,
-                        self.build_exclusion_regex(dir_str, excluded.clone()),
-                        "classmap",
-                        None,
-                        vec![],
-                    );
-                }));
-                if let Err(_e) = res {
-                    self.io
-                        .write_error(&format!("<warning>{}</warning>", "scan failure"));
+                let dir = dir.as_string().unwrap_or("");
+                if let Err(e) = class_map_generator.scan_paths(
+                    dir,
+                    self.build_exclusion_regex(dir, excluded.clone()),
+                    "classmap",
+                    None,
+                    vec![],
+                ) {
+                    let Some(runtime_exception) = e.catch::<RuntimeException>() else {
+                        return Err(e);
+                    };
+                    self.io.write_error(&format!(
+                        "<warning>{}</warning>",
+                        runtime_exception.get_message()
+                    ));
                 }
             }
 
             loader.add_class_map(class_map_generator.get_class_map().get_map().clone());
         }
 
-        loader
+        Ok(loader)
     }
 
     fn get_include_paths_file(
@@ -2155,7 +2157,7 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
         &self,
         autoloads: &IndexMap<String, PhpMixed>,
         vendor_dir: Option<String>,
-    ) -> ClassLoader;
+    ) -> anyhow::Result<ClassLoader>;
 }
 
 impl AutoloadGeneratorInterface for AutoloadGenerator {
@@ -2234,7 +2236,7 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
         &self,
         autoloads: &IndexMap<String, PhpMixed>,
         vendor_dir: Option<String>,
-    ) -> ClassLoader {
+    ) -> anyhow::Result<ClassLoader> {
         self.create_loader(autoloads, vendor_dir)
     }
 }

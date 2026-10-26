@@ -1,0 +1,38 @@
+#!/bin/sh
+# Fetches the external plugin the E2E test runs against, into the git-ignored ext/
+# directory. The plugin is pinned to an immutable upstream commit and the extracted
+# files are verified by hash, so the test stays deterministic without the third-party
+# source ever entering this repository. Requires network once; the E2E test skips
+# itself while ext/ is absent.
+set -eu
+
+# automattic/jetpack-autoloader v5.0.22
+commit=9c7627e832db897ebed54c0cb575eb089ab8d08a
+# GitHub archives are content-addressed by the commit, but the archive encoding is not
+# guaranteed stable; the extracted files are what the test consumes, so they are what
+# gets pinned, as one digest over the sorted per-file digests.
+expected=aea0b204634231264d1abad645aebc189dbcc6fec503e281b5ded0938749efd5
+
+ext="$(dirname "$0")/ext"
+dir="$ext/jetpack-autoloader-5.0.22"
+
+if [ -f "$dir/src/CustomAutoloaderPlugin.php" ]; then
+    exit 0
+fi
+
+# Staged next to the destination and only moved into place once verified, so a mismatched
+# tree is never observable under the name the test looks for.
+staging="$ext/.staging-$commit"
+mkdir -p "$staging"
+curl -fsSL "https://codeload.github.com/Automattic/jetpack-autoloader/tar.gz/$commit" \
+    | tar -xz -C "$staging" --strip-components=1
+
+actual=$(cd "$staging" && find . -type f | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+if [ "$actual" != "$expected" ]; then
+    echo "hash mismatch: expected $expected, got $actual" >&2
+    echo "the fetched tree was left in $staging for inspection; delete it before retrying" >&2
+    exit 1
+fi
+
+mv "$staging" "$dir"
+echo "fetched: $dir"

@@ -12,6 +12,7 @@
 
 namespace Shirabe;
 
+use Composer\ClassMapGenerator\ClassMap;
 use Composer\Package\Link;
 use Composer\Semver\Constraint\Constraint;
 use Composer\Semver\Constraint\MatchAllConstraint;
@@ -28,6 +29,7 @@ final class MaterializedValue
         MatchAllConstraint::class,
         MatchNoneConstraint::class,
         Response::class,
+        ClassMap::class,
         \DateTimeImmutable::class,
         \DateTime::class,
     ];

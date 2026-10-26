@@ -6,6 +6,7 @@ Composer\EventDispatcher\EventDispatcher
 Composer\Script\Event
 Composer\PartialComposer
 Composer\Composer
+Composer\Autoload\AutoloadGenerator
 Composer\Config
 Composer\Downloader\DownloadManager
 Composer\IO\BaseIO

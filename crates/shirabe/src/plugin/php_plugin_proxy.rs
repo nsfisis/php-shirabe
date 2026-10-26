@@ -5,7 +5,7 @@
 //! entity lives in the worker's P table; Rust-side entities the plugin can call back into
 //! (`$composer`, `$io`) live in the R table here.
 
-use crate::autoload::ClassLoader;
+use crate::autoload::{AutoloadGeneratorInterface, ClassLoader};
 use crate::command::BaseCommand;
 use crate::composer::ComposerHandle;
 use crate::dependency_resolver::AnyTransaction;
@@ -14,16 +14,18 @@ use crate::event_dispatcher::event_dispatcher::dispatch_event_method;
 use crate::event_dispatcher::{
     EventInterface, EventSubscriberInterface, SubscribedEventEntry, unwrap_php_result,
 };
+use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use crate::installer::InstallationManagerInterface;
 use crate::io::IOInterface;
 use crate::package::handle::AnyPackage;
-use crate::package::{DisplayMode, PackageInterfaceHandle};
+use crate::package::{DisplayMode, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::plugin::capability::{Capability, CommandProvider};
 use crate::plugin::capable::Capable;
 use crate::plugin::job_registry;
 use crate::plugin::job_registry::JobOwner;
 use crate::plugin::php_plugin_value::{
-    date_time_from_wire, date_time_to_wire, link_from_wire, link_to_wire, response_to_wire,
+    class_map_to_wire, date_time_from_wire, date_time_to_wire, link_from_wire, link_to_wire,
+    response_to_wire,
 };
 use crate::plugin::plugin_interface::PluginInterface;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
@@ -50,6 +52,7 @@ use shirabe_symfony_console::output::OutputInterface;
 #[derive(Debug, Clone)]
 enum RustEntity {
     Composer(ComposerHandle),
+    AutoloadGenerator(std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>),
     Config(std::rc::Rc<std::cell::RefCell<crate::config::Config>>),
     DownloadManager(
         std::rc::Rc<std::cell::RefCell<dyn crate::downloader::DownloadManagerInterface>>,
@@ -78,6 +81,9 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
     match entity {
         RustEntity::Composer(composer) => {
             std::rc::Rc::as_ptr(composer.as_rc()) as *const () as usize
+        }
+        RustEntity::AutoloadGenerator(generator) => {
+            std::rc::Rc::as_ptr(generator) as *const () as usize
         }
         RustEntity::Config(config) => std::rc::Rc::as_ptr(config) as *const () as usize,
         RustEntity::DownloadManager(dm) => std::rc::Rc::as_ptr(dm) as *const () as usize,
@@ -480,6 +486,9 @@ pub(crate) fn dispatch_r_table_method(
     match entity {
         Some(RustEntity::Io(io)) => dispatch_io_method(&io, method_name, args),
         Some(RustEntity::Composer(composer)) => dispatch_composer_method(&composer, method_name),
+        Some(RustEntity::AutoloadGenerator(generator)) => {
+            dispatch_autoload_generator_method(&generator, method_name, args)
+        }
         Some(RustEntity::Config(config)) => dispatch_config_method(&config, method_name, args),
         Some(RustEntity::DownloadManager(dm)) => {
             dispatch_download_manager_method(&dm, method_name, args)
@@ -729,6 +738,7 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
             )))
         }
         RustEntity::Composer(_)
+        | RustEntity::AutoloadGenerator(_)
         | RustEntity::Config(_)
         | RustEntity::DownloadManager(_)
         | RustEntity::Filesystem(_)
@@ -851,6 +861,14 @@ fn dispatch_composer_method(
             ))
         }
         "getConfig" => Ok(config_handle_value(&composer.borrow().get_config())),
+        "getAutoloadGenerator" => {
+            let generator = composer.borrow().get_autoload_generator();
+            let rhandle = register_entity(RustEntity::AutoloadGenerator(generator));
+            Ok(rust_handle_value(
+                rhandle,
+                "Composer\\Autoload\\AutoloadGenerator",
+            ))
+        }
         "getDownloadManager" => {
             let dm = composer.borrow().get_download_manager();
             let rhandle = register_entity(RustEntity::DownloadManager(dm));
@@ -885,6 +903,233 @@ fn dispatch_composer_method(
             "the Composer method `{other}` is not available over RPC yet"
         ))),
     }
+}
+
+fn dispatch_autoload_generator_method(
+    generator: &std::rc::Rc<std::cell::RefCell<dyn AutoloadGeneratorInterface>>,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    let flag = |position: usize| arg_or::<bool>(method_name, args, position, true);
+    match method_name {
+        "setDevMode" => generator.borrow().set_dev_mode(flag(0)?),
+        "setClassMapAuthoritative" => {
+            generator
+                .borrow()
+                .set_class_map_authoritative(arg::<bool>(method_name, args, 0)?)
+        }
+        "setApcu" => generator.borrow().set_apcu(
+            arg::<bool>(method_name, args, 0)?,
+            arg::<Option<String>>(method_name, args, 1)?,
+        ),
+        "setRunScripts" => generator.borrow().set_run_scripts(flag(0)?),
+        "setDryRun" => generator.borrow().set_dry_run(flag(0)?),
+        "setIgnorePlatformRequirements" => {
+            // TODO(php-runtime): upstream raises an E_USER_DEPRECATED here
+            // ("AutoloadGenerator::setIgnorePlatformRequirements is deprecated since Composer 2.2,
+            // use setPlatformRequirementFilter instead."), which Composer's ErrorHandler prints as
+            // a deprecation notice; the worker does not run that handler.
+            let filter = PlatformRequirementFilterFactory::from_bool_or_list(arg::<PhpMixed>(
+                method_name,
+                args,
+                0,
+            )?)
+            .map_err(|error| error_throw("setIgnorePlatformRequirements failed", &error))?;
+            generator.borrow().set_platform_requirement_filter(filter);
+        }
+        "dump" => {
+            let config = arg::<std::rc::Rc<std::cell::RefCell<crate::config::Config>>>(
+                method_name,
+                args,
+                0,
+            )?;
+            let local_repo = arg::<RepositoryInterfaceHandle>(method_name, args, 1)?;
+            let root_package = root_package_arg(method_name, args, 2)?;
+            let installation_manager = arg::<
+                std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+            >(method_name, args, 3)?;
+            let target_dir = arg::<String>(method_name, args, 4)?;
+            let scan_psr_packages = arg_or::<bool>(method_name, args, 5, false)?;
+            let suffix = arg::<Option<String>>(method_name, args, 6)?;
+            // TODO(plugin): `Locker` has no proxy stub, so a plugin holds no instance it could
+            // pass here.
+            if !matches!(args.get(7), None | Some(PluginValue::Null)) {
+                return Err(runtime_throw(
+                    "AutoloadGenerator::dump() cannot take a Locker over RPC yet".to_string(),
+                ));
+            }
+            let strict_ambiguous = arg_or::<bool>(method_name, args, 8, false)?;
+            let class_map = generator
+                .borrow()
+                .dump(
+                    &config.borrow(),
+                    local_repo,
+                    root_package,
+                    installation_manager,
+                    &target_dir,
+                    scan_psr_packages,
+                    suffix,
+                    None,
+                    strict_ambiguous,
+                )
+                .map_err(|error| error_throw("dump failed over RPC", &error))?;
+            return Ok(class_map_to_wire(&class_map));
+        }
+        "buildPackageMap" => {
+            let installation_manager = arg::<
+                std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
+            >(method_name, args, 0)?;
+            // TODO(type-model): PHP takes any PackageInterface as the root package here, while
+            // the Rust signature narrows it to a RootPackageInterface.
+            let root_package = root_package_arg(method_name, args, 1)?;
+            let packages = arg::<Vec<PackageInterfaceHandle>>(method_name, args, 2)?;
+            let package_map = generator
+                .borrow()
+                .build_package_map(installation_manager, root_package, packages)
+                .map_err(|error| error_throw("buildPackageMap failed over RPC", &error))?;
+            return Ok(package_map_value(package_map));
+        }
+        "parseAutoloads" => {
+            let package_map = package_map_arg(method_name, args, 0)?;
+            let root_package = root_package_arg(method_name, args, 1)?;
+            let filtered_dev_packages =
+                arg_or::<PhpMixed>(method_name, args, 2, PhpMixed::Bool(false))?;
+            return Ok(generator
+                .borrow()
+                .parse_autoloads(package_map, root_package, filtered_dev_packages)
+                .to_plugin_value());
+        }
+        "createLoader" => {
+            let autoloads = arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?;
+            let vendor_dir = arg::<Option<String>>(method_name, args, 1)?;
+            let loader = generator
+                .borrow()
+                .create_loader(&autoloads, vendor_dir.clone())
+                .map_err(|error| error_throw("createLoader failed over RPC", &error))?;
+            return class_loader_to_php(&loader, vendor_dir)
+                .map_err(|error| error_throw("createLoader failed over RPC", &error));
+        }
+        // TODO(plugin): no PlatformRequirementFilterInterface implementation crosses the boundary:
+        // the factory's filters are guarded in the worker, and a plugin-implemented filter has no
+        // Rust-side adapter.
+        "setPlatformRequirementFilter" => {
+            return Err(runtime_throw(
+                "AutoloadGenerator::setPlatformRequirementFilter() cannot take a filter over RPC yet"
+                    .to_string(),
+            ));
+        }
+        other => {
+            return Err(runtime_throw(format!(
+                "the AutoloadGenerator method `{other}` is not available over RPC yet"
+            )));
+        }
+    }
+    Ok(PluginValue::Null)
+}
+
+/// Resolves a package argument the PHP signature types as a root package.
+fn root_package_arg(
+    method: &str,
+    args: &[PluginValue],
+    position: usize,
+) -> Result<RootPackageInterfaceHandle, PhpThrow> {
+    arg::<PackageInterfaceHandle>(method, args, position)?
+        .as_root()
+        .ok_or_else(|| {
+            arg_throw(
+                method,
+                position,
+                "a RootPackageInterface",
+                args.get(position),
+            )
+        })
+}
+
+/// Decodes the `array{0: PackageInterface, 1: string|null}[]` package map `buildPackageMap()`
+/// returns.
+fn package_map_arg(
+    method: &str,
+    args: &[PluginValue],
+    position: usize,
+) -> Result<Vec<(PackageInterfaceHandle, Option<String>)>, PhpThrow> {
+    let entries: Vec<&PluginValue> = match args.get(position) {
+        Some(PluginValue::List(items)) => items.iter().collect(),
+        Some(PluginValue::Array(map)) => map.values().collect(),
+        other => return Err(arg_throw(method, position, "an array", other)),
+    };
+    entries
+        .into_iter()
+        .map(|entry| match entry {
+            PluginValue::List(pair) if pair.len() == 2 => Ok((
+                PackageInterfaceHandle::from_arg(method, position, pair.first())?,
+                Option::<String>::from_arg(method, position, pair.get(1))?,
+            )),
+            other => Err(arg_throw(
+                method,
+                position,
+                "a list of [package, install path] pairs",
+                Some(other),
+            )),
+        })
+        .collect()
+}
+
+fn package_map_value(package_map: Vec<(PackageInterfaceHandle, Option<String>)>) -> PluginValue {
+    PluginValue::List(
+        package_map
+            .into_iter()
+            .map(|(package, install_path)| {
+                PluginValue::List(vec![
+                    package.to_plugin_value(),
+                    install_path.to_plugin_value(),
+                ])
+            })
+            .collect(),
+    )
+}
+
+/// `ClassLoader` is the class the worker bootstraps its own autoloading with, so the child holds
+/// the real implementation and the loader is built there: a fresh instance receives the state the
+/// Rust-side loader ended up with, through the same methods `createLoader()` fills it with.
+fn class_loader_to_php(
+    loader: &ClassLoader,
+    vendor_dir: Option<String>,
+) -> anyhow::Result<PluginValue> {
+    let handle = new_php_object(
+        "Composer\\Autoload\\ClassLoader",
+        vec![vendor_dir.to_plugin_value()],
+    )?;
+    let add = |method: &str, prefix: &str, paths: &[String]| {
+        call_php_entity_method(
+            &handle,
+            method,
+            vec![
+                PluginValue::string(prefix),
+                paths.to_vec().to_plugin_value(),
+            ],
+        )
+        .map(|_| ())
+    };
+    for (prefix, paths) in loader.get_prefixes() {
+        add("add", &prefix, &paths)?;
+    }
+    if !loader.get_fallback_dirs().is_empty() {
+        add("add", "", loader.get_fallback_dirs())?;
+    }
+    for (prefix, paths) in loader.get_prefixes_psr4() {
+        add("addPsr4", prefix, paths)?;
+    }
+    if !loader.get_fallback_dirs_psr4().is_empty() {
+        add("addPsr4", "", loader.get_fallback_dirs_psr4())?;
+    }
+    if !loader.get_class_map().is_empty() {
+        call_php_entity_method(
+            &handle,
+            "addClassMap",
+            vec![loader.get_class_map().clone().to_plugin_value()],
+        )?;
+    }
+    Ok(PluginValue::PhpHandle(handle))
 }
 
 fn dispatch_config_method(
@@ -1826,6 +2071,21 @@ fn dispatch_repository_method(
             }
             Ok(PluginValue::List(items))
         }
+        "getCanonicalPackages" => {
+            let mut borrowed = repository.borrow_mut();
+            let writable = borrowed
+                .as_writable_repository_interface_mut()
+                .ok_or_else(|| {
+                    runtime_throw(
+                        "the repository behind this handle is not writable, so `getCanonicalPackages` cannot be called on it"
+                            .to_string(),
+                    )
+                })?;
+            let packages = writable
+                .get_canonical_packages()
+                .map_err(|error| error_throw("getCanonicalPackages failed over RPC", &error))?;
+            Ok(packages.to_plugin_value())
+        }
         // TODO(plugin): the remaining RepositoryInterface surface is widened on demand,
         // driven by explicit errors from real plugins.
         other => Err(runtime_throw(format!(
@@ -1845,7 +2105,7 @@ trait FromPluginArg: Sized {
 }
 
 /// Encodes a Rust value as the PHP value the calling proxy stub declares.
-trait ToPluginValue {
+pub(crate) trait ToPluginValue {
     fn to_plugin_value(self) -> PluginValue;
 }
 
@@ -2109,6 +2369,29 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::config::Config>> {
     }
 }
 
+/// Resolves an installation manager argument back to the Rust-side entity its proxy stub stands
+/// for.
+impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>> {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::RustHandle(handle)) => {
+                match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
+                    Some(RustEntity::InstallationManager(im)) => Ok(im),
+                    _ => Err(runtime_throw(format!(
+                        "{method} expects an InstallationManager handle, got Rust handle {}",
+                        handle.rhandle
+                    ))),
+                }
+            }
+            other => Err(arg_throw(method, position, "an InstallationManager", other)),
+        }
+    }
+}
+
 /// Resolves a downloader argument back to the Rust-side entity its proxy stub stands for.
 impl FromPluginArg for std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>> {
     fn from_arg(
@@ -2218,6 +2501,12 @@ impl FromPluginArg for DisplayMode {
                 other,
             )),
         }
+    }
+}
+
+impl ToPluginValue for PluginValue {
+    fn to_plugin_value(self) -> PluginValue {
+        self
     }
 }
 

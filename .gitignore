@@ -3,3 +3,4 @@
 /crates/shirabe/tests/plugin/fixtures/e2e/ext/
 /crates/shirabe/tests/plugin/fixtures/e2e-normalize/ext/
 /crates/shirabe/tests/plugin/fixtures/e2e-installers/ext/
+/crates/shirabe/tests/plugin/fixtures/e2e-jetpack-autoloader/ext/

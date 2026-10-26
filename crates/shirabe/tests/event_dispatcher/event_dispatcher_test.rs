@@ -496,7 +496,7 @@ mockall::mock! {
             &self,
             autoloads: &IndexMap<String, PhpMixed>,
             vendor_dir: Option<String>,
-        ) -> ClassLoader;
+        ) -> anyhow::Result<ClassLoader>;
     }
 }
 
@@ -583,7 +583,7 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
         });
         generator
             .expect_create_loader()
-            .returning(|_, _| ClassLoader::new(None));
+            .returning(|_, _| Ok(ClassLoader::new(None)));
         composer
             .borrow_mut()
             .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));

@@ -2326,7 +2326,7 @@ impl ApplicationHandle {
                                             .get("vendor-dir")
                                             .as_string()
                                             .map(|s| s.to_string()),
-                                    );
+                                    )?;
                                     loader.register(false);
                                 }
 

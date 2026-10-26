@@ -87,7 +87,9 @@ constructor call, and no field has to be read back out through reflection.
 `Composer\Package\Link` travels this way, together with the `composer/semver` constraint it
 holds, and so does the `\DateTimeInterface` release date, rebased on UTC because the Rust side
 carries no timezone database. So does the `Composer\Util\Http\Response` that `HttpDownloader`
-answers with. The two halves are
+answers with, and the `Composer\ClassMapGenerator\ClassMap` that `AutoloadGenerator::dump()`
+returns: the Rust side keeps neither after answering, so the child owns the revived instance
+outright. The two halves are
 `crates/shirabe/src/plugin/php_plugin_value.rs` and `Shirabe\MaterializedValue`; the set of
 classes that may cross is a closed list on both sides — the PHP one is the `allowed_classes`
 list of every `unserialize()` — so a record can never name an arbitrary class.

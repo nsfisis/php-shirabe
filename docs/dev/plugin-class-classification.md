@@ -455,6 +455,28 @@ and executor. `React\Promise\all()`, the rethrow of a rejection and the
 `SyncHelper` is `two-world` with it, being pure orchestration over
 `Loop::wait()`.
 
+### AutoloadGenerator
+
+`Composer::getAutoloadGenerator()` hands out the generator Composer's own
+dumps run on, so it is a `rust-proxy` stub: a setter a plugin calls is seen by
+the next dump the Rust side performs. Its return values cross without an
+entity of their own. `buildPackageMap()` answers with package handles,
+`parseAutoloads()` with plain arrays, and `dump()` with a
+`Composer\ClassMapGenerator\ClassMap` revived as a value (`php-native`, and
+the Rust side keeps none). `createLoader()` answers with a real
+`Composer\Autoload\ClassLoader` built in the worker. That class is
+`php-native` because the worker bootstraps itself with it (see "Bootstrap
+classes cannot be stub-shadowed"). The fresh instance is filled with the state
+of the Rust-side loader and is left unregistered, as upstream leaves it.
+
+Three parts of the surface are explicit errors. The constructor is one,
+because the Rust generator takes the concrete `EventDispatcher` and the R
+table holds the dispatcher only through its interface.
+`setPlatformRequirementFilter()` is another, because no filter crosses the
+boundary: the factory's filters are guarded, and a plugin-implemented one has
+no reverse adapter. The third is a non-null `$locker` for `dump()`, since
+`Locker` has no stub.
+
 ### Dual instantiation
 
 `Locker::getJsonFile(): JsonFile` makes `JsonFile` reachable, so it is

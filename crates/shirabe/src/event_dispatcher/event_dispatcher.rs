@@ -1578,7 +1578,7 @@ try {{
             .get("vendor-dir")
             .as_string()
             .map(|s| s.to_string());
-        let loader = generator.borrow().create_loader(&map, vendor_dir);
+        let loader = generator.borrow().create_loader(&map, vendor_dir)?;
         loader.register(false);
         self.loader = Some(loader);
         Ok(())

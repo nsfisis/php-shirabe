@@ -1,0 +1,9 @@
+{
+    "name": "acme/lib-b",
+    "version": "1.0.0",
+    "autoload": {
+        "psr-0": {
+            "AcmeB_": "lib/"
+        }
+    }
+}
