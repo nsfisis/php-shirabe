@@ -286,7 +286,13 @@ pub fn php_uname(mode: &str) -> String {
     let Ok(utsname) = nix::sys::utsname::uname() else {
         return String::new();
     };
-    let field = |value: &std::ffi::OsStr| value.to_string_lossy().into_owned();
+    // TODO(bytes): php_uname returns the fields as a String.
+    let field = |value: &std::ffi::OsStr| {
+        value
+            .to_str()
+            .unwrap_or_else(|| panic!("uname field is not valid UTF-8: {value:?}"))
+            .to_string()
+    };
     match mode {
         "s" => field(utsname.sysname()),
         "n" => field(utsname.nodename()),
