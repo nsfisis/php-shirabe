@@ -31,5 +31,5 @@ pub(crate) fn switches_xdebug_off() -> bool {
     // form is the handoff to a process xdebug-handler restarted. Nothing restarts here, so what
     // is left is PHP's truthiness of the value.
     let allow_xdebug = getenv(ALLOW).unwrap_or_default();
-    matches!(allow_xdebug.to_string_lossy().as_ref(), "" | "0")
+    allow_xdebug.is_empty() || allow_xdebug == std::ffi::OsStr::new("0")
 }
