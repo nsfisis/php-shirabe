@@ -22,56 +22,55 @@ impl CaBundle {
     // locations, returning the first that exists. Unlike the original it does
     // not consult OpenSSL's default cert locations, does not validate the
     // candidate before returning it, and has no bundled cacert.pem fallback.
-    pub fn get_system_ca_root_bundle_path(_logger: ()) -> String {
+    pub fn get_system_ca_root_bundle_path(_logger: ()) -> std::path::PathBuf {
         if let Some(file) = Self::get_env_variable("SSL_CERT_FILE")
             && std::path::Path::new(&file).is_file()
         {
-            return file;
+            return file.into();
         }
 
-        const CA_FILE_PATHS: &[&str] = &[
-            "/etc/pki/tls/certs/ca-bundle.crt",
-            "/etc/ssl/certs/ca-certificates.crt",
-            "/etc/ssl/ca-bundle.pem",
-            "/usr/local/share/certs/ca-root-nss.crt",
-            "/usr/ssl/certs/ca-bundle.crt",
-            "/opt/local/share/curl/curl-ca-bundle.crt",
-            "/usr/local/share/curl/curl-ca-bundle.crt",
-            "/usr/share/ssl/certs/ca-bundle.crt",
-            "/etc/ssl/cert.pem",
-            "/usr/local/etc/ssl/cert.pem",
-            "/usr/local/etc/openssl/cert.pem",
-            "/usr/local/etc/openssl@1.1/cert.pem",
+        let ca_file_paths = &[
+            std::path::Path::new("/etc/pki/tls/certs/ca-bundle.crt"),
+            std::path::Path::new("/etc/ssl/certs/ca-certificates.crt"),
+            std::path::Path::new("/etc/ssl/ca-bundle.pem"),
+            std::path::Path::new("/usr/local/share/certs/ca-root-nss.crt"),
+            std::path::Path::new("/usr/ssl/certs/ca-bundle.crt"),
+            std::path::Path::new("/opt/local/share/curl/curl-ca-bundle.crt"),
+            std::path::Path::new("/usr/local/share/curl/curl-ca-bundle.crt"),
+            std::path::Path::new("/usr/share/ssl/certs/ca-bundle.crt"),
+            std::path::Path::new("/etc/ssl/cert.pem"),
+            std::path::Path::new("/usr/local/etc/ssl/cert.pem"),
+            std::path::Path::new("/usr/local/etc/openssl/cert.pem"),
+            std::path::Path::new("/usr/local/etc/openssl@1.1/cert.pem"),
         ];
-        for path in CA_FILE_PATHS {
-            if std::path::Path::new(path).is_file() {
-                return path.to_string();
+        for path in ca_file_paths {
+            if path.is_file() {
+                return path.into();
             }
         }
 
         if let Some(dir) = Self::get_env_variable("SSL_CERT_DIR")
             && std::path::Path::new(&dir).is_dir()
         {
-            return dir;
+            return dir.into();
         }
 
-        const CA_DIR_PATHS: &[&str] = &["/etc/pki/tls/certs", "/etc/ssl/certs"];
-        for path in CA_DIR_PATHS {
-            if std::path::Path::new(path).is_dir() {
-                return path.to_string();
+        let ca_dir_paths = &[
+            std::path::Path::new("/etc/pki/tls/certs"),
+            std::path::Path::new("/etc/ssl/certs"),
+        ];
+        for path in ca_dir_paths {
+            if path.is_dir() {
+                return path.into();
             }
         }
 
-        String::new()
+        std::path::PathBuf::new()
     }
 
-    fn get_env_variable(name: &str) -> Option<String> {
-        if let Some(value) = shirabe_php_shim::PHP_SERVER.lock().unwrap().get(name) {
-            return Some(value.to_string_lossy().into_owned());
-        }
-
-        // PHP_SAPI is always 'cli' for this application
-        shirabe_php_shim::getenv(name).map(|value| value.to_string_lossy().into_owned())
+    fn get_env_variable(name: &str) -> Option<std::ffi::OsString> {
+        let value = shirabe_php_shim::PHP_SERVER.lock().unwrap().get(name);
+        value.or_else(|| shirabe_php_shim::getenv(name))
     }
 
     // TODO(http): Dummy stand-in until reqwest validates certificates itself.
