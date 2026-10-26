@@ -335,12 +335,12 @@ impl Filesystem {
             if shirabe_php_shim::is_link(&pathname) {
                 // PHP coerces the false getLinkTarget() returns on failure to the empty string.
                 // TODO(bytes): symlink() takes the link target as a &str.
-                self.symlink(
-                    &shirabe_php_shim::readlink(&pathname)
-                        .unwrap_or_default()
-                        .to_string_lossy(),
-                    &target,
-                )?;
+                let link_target = shirabe_php_shim::readlink(&pathname)
+                    .unwrap_or_default()
+                    .into_os_string()
+                    .into_string()
+                    .unwrap_or_else(|link| panic!("link target is not valid UTF-8: {link:?}"));
+                self.symlink(&link_target, &target)?;
             } else if shirabe_php_shim::is_dir(&pathname) {
                 self.mkdir(&target, 0o777)?;
             } else if shirabe_php_shim::is_file(&pathname) {
