@@ -96,10 +96,10 @@ fn read_archive_entries(path: &std::path::Path) -> anyhow::Result<(Vec<PharEntry
         if entry_type.is_pax_global_extensions() || entry_type.is_pax_local_extensions() {
             continue;
         }
-        let localname = entry
-            .path()
+        // TODO(bytes): PharEntry keeps the local name as a String, so an entry name that is not
+        // valid UTF-8 is rejected instead of being read as bytes.
+        let localname = String::from_utf8(entry.path_bytes().into_owned())
             .map_err(|e| corruption_error(path, &format!("invalid tar entry name: {}", e)))?
-            .to_string_lossy()
             .trim_end_matches('/')
             .to_string();
         let mode = entry.header().mode().ok().map(|m| m & 0o7777);
@@ -564,7 +564,7 @@ impl PharData {
                 path.display()
             )).into());
         }
-        let format = format.unwrap_or(if path.to_string_lossy().ends_with(".zip") {
+        let format = format.unwrap_or(if path.as_os_str().as_encoded_bytes().ends_with(b".zip") {
             Phar::ZIP
         } else {
             Phar::TAR
@@ -698,8 +698,10 @@ impl PharData {
                         ))
                         .into()
                     })?
-                    .to_string_lossy()
-                    .into_owned();
+                    .to_str()
+                    // TODO(bytes): PharEntry keeps the local name as a String.
+                    .unwrap_or_else(|| panic!("path is not valid UTF-8: {}", file.display()))
+                    .to_string();
                 entries.push(PharEntry {
                     localname,
                     data: PharEntryData::Disk(file),
