@@ -4,7 +4,7 @@
 
 The plugin PHP worker resolves proxied Composer FQCNs to thin stub classes whose
 public methods forward to the Rust-side entity over RPC (see
-`docs/dev/php-rpc.md`, "Proxy stubs"). These stub files, committed under
+`docs/dev/php-worker.md`, "Proxy stubs, runtime classes and guards"). These stub files, committed under
 `crates/shirabe-php-rpc/php/stubs/` and embedded into the binary by the
 `STUB_FILES` list in `crates/shirabe-php-rpc/src/lib.rs`, are *generated* by
 `scripts/plugin-stub-generator` — never edited by hand. Generating them from the

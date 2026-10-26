@@ -1,7 +1,7 @@
 //! PHP-backed `PluginInterface` adapter and the R table serving its RPC callbacks.
 //!
 //! This module has no Composer counterpart: it is the Rust half of the plugin runtime split
-//! (a real PHP child process executes the plugin code, see `docs/dev/php-rpc.md`). The plugin
+//! (a real PHP child process executes the plugin code, see `docs/dev/php-worker.md`). The plugin
 //! entity lives in the worker's P table; Rust-side entities the plugin can call back into
 //! (`$composer`, `$io`) live in the R table here.
 

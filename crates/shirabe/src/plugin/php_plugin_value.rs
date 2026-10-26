@@ -1,7 +1,7 @@
 //! Codec for the immutable values that cross the plugin boundary as real PHP objects.
 //!
 //! This module has no Composer counterpart: it is part of the plugin runtime split (see
-//! `docs/dev/php-rpc.md`). A proxied entity crosses as a handle, but a value object has no
+//! `docs/dev/php-worker.md`). A proxied entity crosses as a handle, but a value object has no
 //! entity to point at — the child has to hold a genuine instance of the real class. Each value
 //! therefore crosses as the object record PHP's `serialize()` writes for it: the class name and
 //! the property table, which `unserialize()` revives on the other side without running a
