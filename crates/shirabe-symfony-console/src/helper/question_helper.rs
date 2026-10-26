@@ -170,18 +170,15 @@ pub trait QuestionHelperInterface {
             }
 
             if matches!(r, PhpMixed::Bool(false)) {
-                let is_blocked = shirabe_php_shim::stream_get_meta_data(&input_stream)
-                    .get("blocked")
-                    .cloned()
-                    .unwrap_or(PhpMixed::Bool(true));
+                let is_blocked = shirabe_php_shim::stream_get_meta_data(&input_stream).blocked;
 
-                if !shirabe_php_shim::boolval(&is_blocked) {
+                if !is_blocked {
                     shirabe_php_shim::stream_set_blocking(&input_stream, true);
                 }
 
                 let read = self.inner().read_input(&input_stream, question);
 
-                if !shirabe_php_shim::boolval(&is_blocked) {
+                if !is_blocked {
                     shirabe_php_shim::stream_set_blocking(&input_stream, false);
                 }
 
@@ -446,9 +443,9 @@ impl QuestionHelper {
 
         let stty_mode = shirabe_php_shim::shell_exec("stty -g").unwrap_or_default();
         let is_stdin = shirabe_php_shim::stream_get_meta_data(input_stream)
-            .get("uri")
-            .map(|uri| uri.to_string() == "php://stdin")
-            .unwrap_or(false);
+            .uri
+            .as_deref()
+            == Some("php://stdin");
         let mut r = vec![input_stream.clone()];
         let w: Vec<shirabe_php_shim::PhpResource> = vec![];
 
@@ -752,9 +749,7 @@ impl QuestionHelper {
     }
 
     fn is_interactive_input(&self, input_stream: &shirabe_php_shim::PhpResource) -> bool {
-        let uri = shirabe_php_shim::stream_get_meta_data(input_stream)
-            .get("uri")
-            .map(|uri| uri.to_string());
+        let uri = shirabe_php_shim::stream_get_meta_data(input_stream).uri;
         if uri.as_deref() != Some("php://stdin") {
             return false;
         }
@@ -866,15 +861,9 @@ impl QuestionHelper {
         input_stream: &shirabe_php_shim::PhpResource,
     ) -> Option<shirabe_php_shim::PhpResource> {
         let stream_meta_data = shirabe_php_shim::stream_get_meta_data(input_stream);
-        let seekable = stream_meta_data
-            .get("seekable")
-            .cloned()
-            .unwrap_or(PhpMixed::Bool(false));
-        let mode = stream_meta_data
-            .get("mode")
-            .map(|m| m.to_string())
-            .unwrap_or_else(|| "rb".to_string());
-        let uri = stream_meta_data.get("uri").map(|u| u.to_string());
+        let seekable = stream_meta_data.seekable;
+        let mode = stream_meta_data.mode;
+        let uri = stream_meta_data.uri;
 
         let uri = uri?;
 
@@ -882,7 +871,7 @@ impl QuestionHelper {
 
         // For seekable and writable streams, add all the same data to the
         // cloned stream and then seek to the same offset.
-        if matches!(seekable, PhpMixed::Bool(true)) && !["r", "rb", "rt"].contains(&mode.as_str()) {
+        if seekable && !["r", "rb", "rt"].contains(&mode.as_str()) {
             let offset = shirabe_php_shim::ftell(input_stream).unwrap_or(0);
             shirabe_php_shim::rewind(input_stream);
             shirabe_php_shim::stream_copy_to_stream(input_stream, &clone_stream);

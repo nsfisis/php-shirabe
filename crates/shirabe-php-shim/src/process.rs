@@ -324,13 +324,24 @@ pub fn proc_close(process: &PhpResource) -> i64 {
     -1
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcStatus {
+    pub command: String,
+    pub pid: i64,
+    pub running: bool,
+    pub signaled: bool,
+    pub stopped: bool,
+    pub exitcode: i64,
+    pub termsig: i64,
+    pub stopsig: i64,
+}
+
 /// PHP `proc_get_status`. Reports the live status of the process behind the resource.
-pub fn proc_get_status(process: &PhpResource) -> IndexMap<String, PhpMixed> {
+pub fn proc_get_status(process: &PhpResource) -> ProcStatus {
     use std::os::unix::process::ExitStatusExt;
 
-    let mut status = IndexMap::new();
     let PhpResource::Process(state) = process else {
-        return status;
+        panic!("proc_get_status(): supplied resource is not a valid process resource");
     };
     let mut state = state.borrow_mut();
 
@@ -356,18 +367,16 @@ pub fn proc_get_status(process: &PhpResource) -> IndexMap<String, PhpMixed> {
         }
     }
 
-    status.insert(
-        "command".to_string(),
-        PhpMixed::String(state.command.clone()),
-    );
-    status.insert("pid".to_string(), PhpMixed::Int(pid));
-    status.insert("running".to_string(), PhpMixed::Bool(running));
-    status.insert("signaled".to_string(), PhpMixed::Bool(signaled));
-    status.insert("stopped".to_string(), PhpMixed::Bool(false));
-    status.insert("exitcode".to_string(), PhpMixed::Int(exitcode));
-    status.insert("termsig".to_string(), PhpMixed::Int(termsig));
-    status.insert("stopsig".to_string(), PhpMixed::Int(0));
-    status
+    ProcStatus {
+        command: state.command.clone(),
+        pid,
+        running,
+        signaled,
+        stopped: false,
+        exitcode,
+        termsig,
+        stopsig: 0,
+    }
 }
 
 /// PHP `proc_terminate`. Sends `signal` to the process behind the resource; returns PHP's `false`
@@ -484,15 +493,15 @@ mod tests {
         // Reading to EOF means the child has finished; the status converges to "not running".
         let status = loop {
             let status = proc_get_status(&process);
-            if !crate::php_truthy(status.get("running").unwrap()) {
+            if !status.running {
                 break status;
             }
             std::thread::sleep(std::time::Duration::from_millis(5));
         };
-        assert_eq!(status.get("command").unwrap().as_string(), Some("echo hi"));
-        assert!(status.get("pid").unwrap().as_int().unwrap() > 0);
-        assert_eq!(status.get("exitcode").unwrap().as_int(), Some(0));
-        assert_eq!(status.get("signaled").unwrap().as_bool(), Some(false));
+        assert_eq!(status.command, "echo hi");
+        assert!(status.pid > 0);
+        assert_eq!(status.exitcode, 0);
+        assert!(!status.signaled);
 
         for (_, pipe) in &pipes {
             fclose(pipe);
@@ -607,7 +616,7 @@ mod tests {
         // A child killed by a signal has no exit code, which proc_close reports as -1.
         assert_eq!(proc_close(&process), -1);
         let status = proc_get_status(&process);
-        assert_eq!(status.get("pid").unwrap().as_int(), Some(-1));
+        assert_eq!(status.pid, -1);
     }
 
     #[test]

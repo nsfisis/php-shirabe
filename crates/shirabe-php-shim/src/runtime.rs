@@ -1,5 +1,4 @@
 use crate::PhpMixed;
-use indexmap::IndexMap;
 use shirabe_php_src::standard::versioning::php_version_compare;
 
 pub const E_ALL: i64 = 32767;
@@ -156,7 +155,19 @@ pub fn get_loaded_extensions() -> Vec<String> {
 // TODO(php-runtime): the callback should be registered in PHP runtime.
 pub fn set_error_handler(_callback: fn(i64, &str, &str, i64) -> bool) {}
 
-pub fn debug_backtrace() -> Vec<IndexMap<String, PhpMixed>> {
+/// One frame of PHP `debug_backtrace()`. Every key but `function` may be absent from PHP's array.
+#[derive(Debug, Clone)]
+pub struct BacktraceFrame {
+    pub function: String,
+    pub line: Option<i64>,
+    pub file: Option<String>,
+    pub class: Option<String>,
+    pub object: Option<PhpMixed>,
+    pub r#type: Option<String>,
+    pub args: Option<Vec<PhpMixed>>,
+}
+
+pub fn debug_backtrace() -> Vec<BacktraceFrame> {
     // TODO(php-runtime): capturing a PHP-style call stack requires runtime introspection of the
     // interpreter frames, which has no equivalent in the compiled shim.
     todo!()

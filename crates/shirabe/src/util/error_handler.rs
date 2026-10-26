@@ -98,12 +98,7 @@ impl ErrorHandler {
                     .into_iter()
                     .skip(2)
                     .filter_map(|frame| {
-                        let line = frame.get("line").and_then(|v| v.as_int());
-                        let file = frame
-                            .get("file")
-                            .and_then(|v| v.as_string())
-                            .map(|s| s.to_string());
-                        if let (Some(line), Some(file)) = (line, file) {
+                        if let (Some(line), Some(file)) = (frame.line, frame.file) {
                             Some(format!("<warning> {}:{}</warning>", file, line))
                         } else {
                             None

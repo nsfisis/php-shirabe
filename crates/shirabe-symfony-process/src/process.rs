@@ -63,7 +63,7 @@ pub struct Process {
     starttime: Option<f64>,
     timeout: Option<f64>,
     exitcode: Option<i64>,
-    process_information: Option<IndexMap<String, PhpMixed>>,
+    process_information: Option<shirabe_php_shim::ProcStatus>,
     stdout: Option<PhpResource>,
     stderr: Option<PhpResource>,
     process: Option<PhpResource>,
@@ -407,14 +407,9 @@ impl Process {
         let signaled = self
             .process_information
             .as_ref()
-            .and_then(|i| i.get("signaled"))
-            .map(shirabe_php_shim::php_truthy)
+            .map(|i| i.signaled)
             .unwrap_or(false);
-        let termsig = self
-            .process_information
-            .as_ref()
-            .and_then(|i| i.get("termsig"))
-            .and_then(|v| v.as_int());
+        let termsig = self.process_information.as_ref().map(|i| i.termsig);
         if signaled && termsig != self.latest_signal {
             return Err(ProcessSignaledException::new(self)?.into());
         }
@@ -425,10 +420,7 @@ impl Process {
     /// Returns the Pid (process identifier), if applicable.
     pub fn get_pid(&mut self) -> Option<i64> {
         if self.is_running() {
-            self.process_information
-                .as_ref()
-                .and_then(|i| i.get("pid"))
-                .and_then(|v| v.as_int())
+            self.process_information.as_ref().map(|i| i.pid)
         } else {
             None
         }
@@ -500,8 +492,7 @@ impl Process {
         Ok(self
             .process_information
             .as_ref()
-            .and_then(|i| i.get("termsig"))
-            .and_then(|v| v.as_int())
+            .map(|i| i.termsig)
             .unwrap_or(0))
     }
 
@@ -512,8 +503,7 @@ impl Process {
         Ok(self
             .process_information
             .as_ref()
-            .and_then(|i| i.get("signaled"))
-            .map(shirabe_php_shim::php_truthy)
+            .map(|i| i.signaled)
             .unwrap_or(false))
     }
 
@@ -524,8 +514,7 @@ impl Process {
         Ok(self
             .process_information
             .as_ref()
-            .and_then(|i| i.get("stopped"))
-            .map(shirabe_php_shim::php_truthy)
+            .map(|i| i.stopped)
             .unwrap_or(false))
     }
 
@@ -536,8 +525,7 @@ impl Process {
         Ok(self
             .process_information
             .as_ref()
-            .and_then(|i| i.get("stopsig"))
-            .and_then(|v| v.as_int())
+            .map(|i| i.stopsig)
             .unwrap_or(0))
     }
 
@@ -551,8 +539,7 @@ impl Process {
 
         self.process_information
             .as_ref()
-            .and_then(|i| i.get("running"))
-            .map(shirabe_php_shim::php_truthy)
+            .map(|i| i.running)
             .unwrap_or(false)
     }
 
@@ -810,13 +797,7 @@ impl Process {
         self.process_information = Some(shirabe_php_shim::proc_get_status(
             self.process.as_ref().unwrap(),
         ));
-        let running = self
-            .process_information
-            .as_ref()
-            .unwrap()
-            .get("running")
-            .map(shirabe_php_shim::php_truthy)
-            .unwrap_or(false);
+        let running = self.process_information.as_ref().unwrap().running;
 
         self.read_pipes(running && blocking, !cfg!(windows) || !running);
 
@@ -896,25 +877,19 @@ impl Process {
             shirabe_php_shim::proc_close(self.process.as_ref().unwrap());
             self.process = None;
         }
-        self.exitcode = self
-            .process_information
-            .as_ref()
-            .and_then(|i| i.get("exitcode"))
-            .and_then(|v| v.as_int());
+        self.exitcode = self.process_information.as_ref().map(|i| i.exitcode);
         self.status = Self::STATUS_TERMINATED.to_string();
 
         if self.exitcode == Some(-1) {
             let signaled = self
                 .process_information
                 .as_ref()
-                .and_then(|i| i.get("signaled"))
-                .map(shirabe_php_shim::php_truthy)
+                .map(|i| i.signaled)
                 .unwrap_or(false);
             let termsig = self
                 .process_information
                 .as_ref()
-                .and_then(|i| i.get("termsig"))
-                .and_then(|v| v.as_int())
+                .map(|i| i.termsig)
                 .unwrap_or(0);
             if signaled && termsig > 0 {
                 // if process has been signaled, no exitcode but a valid termsig, apply Unix convention
