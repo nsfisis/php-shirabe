@@ -55,7 +55,6 @@ $runner = new Runner($rootDir, [
     [new NoModRs(), []],
     [new NoStdCollectionsMaps(), []],
     [new NoToStringLossy(), [
-        'crates/shirabe-symfony-console/src/terminal.rs',
         'crates/shirabe-symfony-filesystem/src/filesystem.rs',
         'crates/shirabe-symfony-finder/src/finder.rs',
         'crates/shirabe-symfony-process/src/executable_finder.rs',
