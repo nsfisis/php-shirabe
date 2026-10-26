@@ -1,20 +1,27 @@
 //! ref: composer/tests/Composer/Test/Autoload/ClassLoaderTest.php
 
 use shirabe::autoload::class_loader::ClassLoader;
-use shirabe_php_shim::class_exists;
 
-/// ref: ClassLoaderTest::getLoadClassTests
-fn get_load_class_tests() -> Vec<&'static str> {
+// ref: ClassLoaderTest::getLoadClassTests
+fn get_find_file_tests() -> Vec<(&'static str, &'static str)> {
     vec![
-        "Namespaced\\Foo",
-        "Pearlike_Foo",
-        "ShinyVendor\\ShinyPackage\\SubNamespace\\Foo",
+        ("Namespaced\\Foo", "Namespaced/Foo.php"),
+        ("Pearlike_Foo", "Pearlike/Foo.php"),
+        (
+            "ShinyVendor\\ShinyPackage\\SubNamespace\\Foo",
+            "SubNamespace/Foo.php",
+        ),
     ]
 }
 
+// Tests ClassLoader::findFile instead of ClassLoader::loadClass in Rust. ClassLoader::loadClass
+// calls `include`, which needs a PHP runtime. Shirabe resolves class files with findFile on the
+// Rust side and lets the PHP worker `include` them, so the test asserts which file each class
+// resolves to instead.
+//
+// ref: ClassLoaderTest::testLoadClass
 #[test]
-#[ignore = "loadClass reaches shirabe_php_shim::include_file, which is a todo!(): evaluating a PHP source file needs an interpreter. class_exists also models a fixed set of classes that loading a file cannot extend"]
-fn test_load_class() {
+fn test_find_file() {
     let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Autoload/Fixtures")
         .canonicalize()
@@ -22,15 +29,19 @@ fn test_load_class() {
         .display()
         .to_string();
 
-    for class in get_load_class_tests() {
+    for (class, file) in get_find_file_tests() {
         let mut loader = ClassLoader::new(None);
         loader.add("Namespaced\\", vec![fixtures.clone()], false);
         loader.add("Pearlike_", vec![fixtures.clone()], false);
         loader
             .add_psr4("ShinyVendor\\ShinyPackage\\", vec![fixtures.clone()], false)
             .unwrap();
-        loader.load_class(class);
-        assert!(class_exists(class), "->loadClass() loads '{}'", class);
+        assert_eq!(
+            loader.find_file(class),
+            Some(format!("{}/{}", fixtures, file)),
+            "->findFile() finds '{}'",
+            class
+        );
     }
 }
 
