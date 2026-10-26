@@ -423,11 +423,17 @@ impl DownloaderInterface for PathDownloader {
                 );
             }
             let iterator = ArchivableFilesFinder::new(&real_url, vec![], false)?;
+            // TODO(bytes): mirror takes the paths as Strings.
             symfony_filesystem.mirror(
                 &real_url,
                 &path,
                 iterator
-                    .map(|entry| entry.to_string_lossy().into_owned())
+                    .map(|entry| {
+                        entry
+                            .into_os_string()
+                            .into_string()
+                            .unwrap_or_else(|entry| panic!("path is not valid UTF-8: {entry:?}"))
+                    })
                     .collect(),
             )?;
         }
