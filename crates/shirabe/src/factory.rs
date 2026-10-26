@@ -554,6 +554,8 @@ impl Factory {
 
         // initialize composer
         let mut build_error: Option<anyhow::Error> = None;
+        let mut rm = None;
+        let mut im = None;
         let composer = std::rc::Rc::new_cyclic(
             |composer_weak: &std::rc::Weak<std::cell::RefCell<PartialOrFullComposer>>| {
                 let mut build = || -> anyhow::Result<PartialOrFullComposer> {
@@ -618,13 +620,17 @@ impl Factory {
                     composer.set_event_dispatcher(dispatcher.clone());
 
                     // initialize repository manager
-                    let rm = std::rc::Rc::new(std::cell::RefCell::new(RepositoryFactory::manager(
-                        io.clone(),
-                        &config,
-                        Some(http_downloader.clone()),
-                        Some(dispatcher.clone()),
-                        Some(process.clone()),
-                    )?));
+                    let rm = rm
+                        .insert(std::rc::Rc::new(std::cell::RefCell::new(
+                            RepositoryFactory::manager(
+                                io.clone(),
+                                &config,
+                                Some(http_downloader.clone()),
+                                Some(dispatcher.clone()),
+                                Some(process.clone()),
+                            )?,
+                        )))
+                        .clone();
 
                     // force-set the version of the global package if not defined as
                     // guessing it adds no value and only takes time
@@ -682,13 +688,15 @@ impl Factory {
                     composer.set_repository_manager(rm);
 
                     // initialize installation manager
-                    let im = std::rc::Rc::new(std::cell::RefCell::new(
-                        self.create_installation_manager(
-                            r#loop.clone(),
-                            io.clone(),
-                            Some(dispatcher.clone()),
-                        ),
-                    ));
+                    let im = im
+                        .insert(std::rc::Rc::new(std::cell::RefCell::new(
+                            self.create_installation_manager(
+                                r#loop.clone(),
+                                io.clone(),
+                                Some(dispatcher.clone()),
+                            ),
+                        )))
+                        .clone();
                     composer.set_installation_manager(im.clone());
 
                     if let PartialOrFullComposer::Full(ref mut composer_full) = composer {
@@ -730,13 +738,13 @@ impl Factory {
                                 .unwrap_or(true);
                             if !lock_enabled && file_exists(&lock_file) {
                                 io.write_error3(
-                        &format!(
-                            "<warning>{} is present but ignored as the \"lock\" config option is disabled.</warning>",
-                            lock_file
-                        ),
-                        true,
-                        crate::io::NORMAL,
-                    );
+                                    &format!(
+                                        "<warning>{} is present but ignored as the \"lock\" config option is disabled.</warning>",
+                                        lock_file
+                                    ),
+                                    true,
+                                    crate::io::NORMAL,
+                                );
                             }
 
                             let locker = Locker::new(
@@ -863,10 +871,15 @@ impl Factory {
 
             // once everything is initialized we can
             // purge packages from local repos if they have been deleted on the filesystem
-            // PHP: $this->purgePackages($rm->getLocalRepository(), $im);
-            // TODO(port): purge_packages' removal body (repo.removePackage for packages
-            // deleted on the filesystem) is still a stub; wire this call once implemented.
-            // self.purge_packages(&InstalledRepositoryInterfaceHandle::from_repository_handle(&rm.get_local_repository()), &mut im)?;
+            let rm = rm.expect("set by the successful composer build");
+            let im = im.expect("set by the successful composer build");
+            let local_repository = rm.borrow().get_local_repository();
+            self.purge_packages(
+                &crate::repository::InstalledRepositoryInterfaceHandle::from_repository_handle(
+                    &local_repository,
+                ),
+                &im.borrow(),
+            )?;
         }
 
         Ok(PartialComposerHandle::from_rc(composer))
@@ -1286,12 +1299,12 @@ impl Factory {
     fn purge_packages(
         &self,
         repo: &crate::repository::InstalledRepositoryInterfaceHandle,
-        im: &mut InstallationManager,
+        im: &InstallationManager,
     ) -> anyhow::Result<()> {
         let packages = repo.borrow_mut().get_packages()?;
         for package in packages {
             if !im.is_package_installed(repo, package.clone())? {
-                let _ = package;
+                repo.borrow_mut().remove_package(package)?;
             }
         }
         Ok(())
