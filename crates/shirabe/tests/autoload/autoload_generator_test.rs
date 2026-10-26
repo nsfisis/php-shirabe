@@ -29,7 +29,7 @@ use tempfile::TempDir;
 /// that supports every type so `InstallationManager::getInstallPath` routes to it.
 #[derive(Debug)]
 struct InstallPathStubInstaller {
-    vendor_dir: String,
+    vendor_dir: std::path::PathBuf,
 }
 
 #[async_trait::async_trait(?Send)]
@@ -102,18 +102,14 @@ impl InstallerInterface for InstallPathStubInstaller {
             return None;
         }
 
-        let target_dir = package.get_target_dir();
-        let suffix = match target_dir {
-            Some(dir) if !dir.is_empty() => format!("/{}", dir),
-            _ => String::new(),
-        };
+        let mut path = self.vendor_dir.join(package.get_name());
+        if let Some(dir) = package.get_target_dir()
+            && !dir.is_empty()
+        {
+            path = path.join(dir);
+        }
 
-        Some(format!(
-            "{}/{}{}",
-            self.vendor_dir,
-            package.get_name(),
-            suffix
-        ))
+        Some(path.to_str().unwrap().to_string())
     }
 }
 
@@ -123,8 +119,8 @@ impl InstallerInterface for InstallPathStubInstaller {
 struct SetUp {
     _temp_dir: TempDir,
     prev_cwd: std::path::PathBuf,
-    working_dir: String,
-    vendor_dir: String,
+    working_dir: std::path::PathBuf,
+    vendor_dir: std::path::PathBuf,
     repository: shirabe::repository::RepositoryInterfaceHandle,
     /// ref: `$this->configValueMap['use-include-path']`, which testUseGlobalIncludePath mutates.
     use_include_path: bool,
@@ -148,7 +144,7 @@ fn null_path(s: &str) -> String {
 /// `InstallPathStubInstaller`. The PHP loop mock has its constructor disabled and is never
 /// exercised here, so a mock HttpDownloader (no real curl backend) stands in for the loop.
 fn make_installation_manager(
-    vendor_dir: &str,
+    vendor_dir: &std::path::Path,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 ) -> InstallationManager {
     let config_for_downloader = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
@@ -160,15 +156,15 @@ fn make_installation_manager(
 
     let im = InstallationManager::new(loop_, io, None);
     im.add_installer(std::rc::Rc::new(InstallPathStubInstaller {
-        vendor_dir: vendor_dir.to_string(),
+        vendor_dir: vendor_dir.to_path_buf(),
     }));
     im
 }
 
 fn set_up() -> SetUp {
     let temp_dir = TempDir::new().unwrap();
-    let working_dir = temp_dir.path().to_str().unwrap().to_string();
-    let vendor_dir = format!("{}/composer-test-autoload", working_dir);
+    let working_dir = temp_dir.path().to_path_buf();
+    let vendor_dir = working_dir.join("composer-test-autoload");
     std::fs::create_dir_all(&vendor_dir).unwrap();
 
     let prev_cwd = std::env::current_dir().unwrap();
@@ -221,19 +217,22 @@ impl SetUp {
     /// the PHP `configValueMap`. Rebuilt per call because tests mutate `vendor_dir`.
     fn config(&self) -> Config {
         ConfigStubBuilder::new()
-            .with("vendor-dir", PhpMixed::String(self.vendor_dir.clone()))
+            .with(
+                "vendor-dir",
+                PhpMixed::String(self.vendor_dir.to_str().unwrap().to_string()),
+            )
             .with("platform-check", PhpMixed::Bool(true))
             .with("use-include-path", PhpMixed::Bool(self.use_include_path))
             .build()
     }
 
-    fn ensure_dir(&self, path: &str) {
+    fn ensure_dir(&self, path: impl AsRef<std::path::Path>) {
         std::fs::create_dir_all(path).unwrap();
     }
 
-    fn put(&self, path: &str, contents: &str) {
-        let p = std::path::Path::new(path);
-        if let Some(parent) = p.parent() {
+    fn put(&self, path: impl AsRef<std::path::Path>, contents: &str) {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).unwrap();
         }
         std::fs::write(path, contents).unwrap();
@@ -260,31 +259,42 @@ fn fixtures_dir() -> std::path::PathBuf {
 
 /// ref: AutoloadGeneratorTest::assertAutoloadFiles
 #[track_caller]
-fn assert_autoload_files(name: &str, dir: &str, r#type: &str) {
+fn assert_autoload_files(name: &str, dir: impl AsRef<std::path::Path>, r#type: &str) {
     let a = fixtures_dir().join(format!("autoload_{}.php", name));
-    let b = format!("{}/autoload_{}.php", dir, r#type);
-    assert_file_content_equals(a.to_str().unwrap(), &b);
+    let b = dir.as_ref().join(format!("autoload_{}.php", r#type));
+    assert_file_content_equals(a, b);
 }
 
 /// ref: AutoloadGeneratorTest::assertFileContentEquals
 #[track_caller]
-fn assert_file_content_equals(expected: &str, actual: &str) {
+fn assert_file_content_equals(
+    expected: impl AsRef<std::path::Path>,
+    actual: impl AsRef<std::path::Path>,
+) {
+    let (expected, actual) = (expected.as_ref(), actual.as_ref());
     let exp = std::fs::read_to_string(expected)
-        .unwrap_or_else(|e| panic!("read {}: {}", expected, e))
+        .unwrap_or_else(|e| panic!("read {}: {}", expected.display(), e))
         .replace('\r', "");
     let act = std::fs::read_to_string(actual)
-        .unwrap_or_else(|e| panic!("read {}: {}", actual, e))
+        .unwrap_or_else(|e| panic!("read {}: {}", actual.display(), e))
         .replace('\r', "");
-    assert_eq!(exp, act, "{} equals {}", expected, actual);
+    assert_eq!(
+        exp,
+        act,
+        "{} equals {}",
+        expected.display(),
+        actual.display()
+    );
 }
 
 /// ref: PHPUnit `assertStringEqualsFile`
 #[track_caller]
-fn assert_str_equals_file(expected: &str, actual_path: &str) {
+fn assert_str_equals_file(expected: &str, actual_path: impl AsRef<std::path::Path>) {
+    let actual_path = actual_path.as_ref();
     let act = std::fs::read_to_string(actual_path)
-        .unwrap_or_else(|e| panic!("read {}: {}", actual_path, e))
+        .unwrap_or_else(|e| panic!("read {}: {}", actual_path.display(), e))
         .replace('\r', "");
-    assert_eq!(expected, act, "content of {}", actual_path);
+    assert_eq!(expected, act, "content of {}", actual_path.display());
 }
 
 fn match_all() -> AnyConstraint {
@@ -399,33 +409,33 @@ fn test_root_package_autoloading() {
         ("classmap", str_list(&["composersrc/"])),
     ]));
 
-    s.ensure_dir(&format!("{}/composer", s.working_dir));
-    s.ensure_dir(&format!("{}/src/Lala/Test", s.working_dir));
-    s.ensure_dir(&format!("{}/lib", s.working_dir));
+    s.ensure_dir(s.working_dir.join("composer"));
+    s.ensure_dir(s.working_dir.join("src/Lala/Test"));
+    s.ensure_dir(s.working_dir.join("lib"));
     s.put(
-        &format!("{}/src/Lala/ClassMapMain.php", s.working_dir),
+        s.working_dir.join("src/Lala/ClassMapMain.php"),
         "<?php namespace Lala; class ClassMapMain {}",
     );
     s.put(
-        &format!("{}/src/Lala/Test/ClassMapMainTest.php", s.working_dir),
+        s.working_dir.join("src/Lala/Test/ClassMapMainTest.php"),
         "<?php namespace Lala\\Test; class ClassMapMainTest {}",
     );
 
-    s.ensure_dir(&format!("{}/src-fruit", s.working_dir));
-    s.ensure_dir(&format!("{}/src-cake", s.working_dir));
-    s.ensure_dir(&format!("{}/lib-cake", s.working_dir));
+    s.ensure_dir(s.working_dir.join("src-fruit"));
+    s.ensure_dir(s.working_dir.join("src-cake"));
+    s.ensure_dir(s.working_dir.join("lib-cake"));
     s.put(
-        &format!("{}/src-cake/ClassMapBar.php", s.working_dir),
+        s.working_dir.join("src-cake/ClassMapBar.php"),
         "<?php namespace Acme\\Cake; class ClassMapBar {}",
     );
 
-    s.ensure_dir(&format!("{}/composersrc", s.working_dir));
+    s.ensure_dir(s.working_dir.join("composersrc"));
     s.put(
-        &format!("{}/composersrc/foo.php", s.working_dir),
+        s.working_dir.join("composersrc/foo.php"),
         "<?php class ClassMapFoo {}",
     );
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), true, "_1").unwrap();
 
     assert_autoload_files("main", &composer_out, "namespaces");
@@ -447,19 +457,19 @@ fn test_root_package_dev_autoloading() {
         ("psr-0", str_map(&[("Main", pstr("tests/"))])),
     ]));
 
-    s.ensure_dir(&format!("{}/composer", s.working_dir));
-    s.ensure_dir(&format!("{}/src/Main", s.working_dir));
+    s.ensure_dir(s.working_dir.join("composer"));
+    s.ensure_dir(s.working_dir.join("src/Main"));
     s.put(
-        &format!("{}/src/Main/ClassMain.php", s.working_dir),
+        s.working_dir.join("src/Main/ClassMain.php"),
         "<?php namespace Main; class ClassMain {}",
     );
-    s.ensure_dir(&format!("{}/devfiles", s.working_dir));
+    s.ensure_dir(s.working_dir.join("devfiles"));
     s.put(
-        &format!("{}/devfiles/foo.php", s.working_dir),
+        s.working_dir.join("devfiles/foo.php"),
         "<?php function foo() { echo \"foo\"; }",
     );
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     s.generator.set_dev_mode(true);
     dump(&mut s, package.into(), true, "_1").unwrap();
 
@@ -479,24 +489,24 @@ fn test_root_package_dev_autoloading_disabled_by_default() {
     )]));
     package.set_dev_autoload(autoload(vec![("files", str_list(&["devfiles/foo.php"]))]));
 
-    s.ensure_dir(&format!("{}/composer", s.working_dir));
-    s.ensure_dir(&format!("{}/src/Main", s.working_dir));
+    s.ensure_dir(s.working_dir.join("composer"));
+    s.ensure_dir(s.working_dir.join("src/Main"));
     s.put(
-        &format!("{}/src/Main/ClassMain.php", s.working_dir),
+        s.working_dir.join("src/Main/ClassMain.php"),
         "<?php namespace Main; class ClassMain {}",
     );
-    s.ensure_dir(&format!("{}/devfiles", s.working_dir));
+    s.ensure_dir(s.working_dir.join("devfiles"));
     s.put(
-        &format!("{}/devfiles/foo.php", s.working_dir),
+        s.working_dir.join("devfiles/foo.php"),
         "<?php function foo() { echo \"foo\"; }",
     );
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), true, "_1").unwrap();
 
     assert_autoload_files("main4", &composer_out, "namespaces");
     assert_autoload_files("classmap7", &composer_out, "classmap");
-    assert!(!std::path::Path::new(&format!("{}/autoload_files.php", composer_out)).is_file());
+    assert!(!std::path::Path::new(&composer_out.join("autoload_files.php")).is_file());
 }
 
 #[test]
@@ -526,19 +536,19 @@ fn test_vendor_dir_same_as_working_dir() {
         ("classmap", str_list(&["composersrc/"])),
     ]));
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
-    s.ensure_dir(&format!("{}/src/Main", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
+    s.ensure_dir(s.vendor_dir.join("src/Main"));
     s.put(
-        &format!("{}/src/Main/Foo.php", s.vendor_dir),
+        s.vendor_dir.join("src/Main/Foo.php"),
         "<?php namespace Main; class Foo {}",
     );
-    s.ensure_dir(&format!("{}/composersrc", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composersrc"));
     s.put(
-        &format!("{}/composersrc/foo.php", s.vendor_dir),
+        s.vendor_dir.join("composersrc/foo.php"),
         "<?php class ClassMapFoo {}",
     );
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), true, "_2").unwrap();
     assert_autoload_files("main3", &composer_out, "namespaces");
     assert_autoload_files("psr4_3", &composer_out, "psr4");
@@ -565,21 +575,21 @@ fn test_root_package_autoloading_alternative_vendor_dir() {
         ("classmap", str_list(&["composersrc/"])),
     ]));
 
-    s.vendor_dir = format!("{}/subdir", s.vendor_dir);
+    s.vendor_dir = s.vendor_dir.join("subdir");
     s.im.borrow()
         .add_installer(std::rc::Rc::new(InstallPathStubInstaller {
             vendor_dir: s.vendor_dir.clone(),
         }));
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
-    s.ensure_dir(&format!("{}/src", s.working_dir));
-    s.ensure_dir(&format!("{}/composersrc", s.working_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
+    s.ensure_dir(s.working_dir.join("src"));
+    s.ensure_dir(s.working_dir.join("composersrc"));
     s.put(
-        &format!("{}/composersrc/foo.php", s.working_dir),
+        s.working_dir.join("composersrc/foo.php"),
         "<?php class ClassMapFoo {}",
     );
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), false, "_3").unwrap();
     assert_autoload_files("main2", &composer_out, "namespaces");
     assert_autoload_files("psr4_2", &composer_out, "psr4");
@@ -601,46 +611,40 @@ fn test_root_package_autoloading_with_target_dir() {
     ]));
     package.__set_target_dir(Some("Main/Foo/".to_string()));
 
-    s.ensure_dir(&format!("{}/a", s.vendor_dir));
-    s.ensure_dir(&format!("{}/src", s.working_dir));
-    s.ensure_dir(&format!("{}/lib", s.working_dir));
+    s.ensure_dir(s.vendor_dir.join("a"));
+    s.ensure_dir(s.working_dir.join("src"));
+    s.ensure_dir(s.working_dir.join("lib"));
     s.put(
-        &format!("{}/src/rootfoo.php", s.working_dir),
+        s.working_dir.join("src/rootfoo.php"),
         "<?php class ClassMapFoo {}",
     );
     s.put(
-        &format!("{}/lib/rootbar.php", s.working_dir),
+        s.working_dir.join("lib/rootbar.php"),
         "<?php class ClassMapBar {}",
     );
-    s.put(
-        &format!("{}/foo.php", s.working_dir),
-        "<?php class FilesFoo {}",
-    );
-    s.put(
-        &format!("{}/bar.php", s.working_dir),
-        "<?php class FilesBar {}",
-    );
+    s.put(s.working_dir.join("foo.php"), "<?php class FilesFoo {}");
+    s.put(s.working_dir.join("bar.php"), "<?php class FilesBar {}");
 
     let vendor = s.vendor_dir.clone();
-    let composer_out = format!("{}/composer", vendor);
+    let composer_out = vendor.join("composer");
     dump(&mut s, package.into(), false, "TargetDir").unwrap();
 
     let fx = fixtures_dir();
     assert_file_content_equals(
         fx.join("autoload_target_dir.php").to_str().unwrap(),
-        &format!("{}/autoload.php", vendor),
+        vendor.join("autoload.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_real_target_dir.php").to_str().unwrap(),
-        &format!("{}/autoload_real.php", composer_out),
+        composer_out.join("autoload_real.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_static_target_dir.php").to_str().unwrap(),
-        &format!("{}/autoload_static.php", composer_out),
+        composer_out.join("autoload_static.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_files_target_dir.php").to_str().unwrap(),
-        &format!("{}/autoload_files.php", composer_out),
+        composer_out.join("autoload_files.php"),
     );
     assert_autoload_files("classmap6", &composer_out, "classmap");
 }
@@ -655,20 +659,14 @@ fn test_duplicate_files_warning() {
         str_list(&["foo.php", "bar.php", "./foo.php", "././foo.php"]),
     )]));
 
-    s.ensure_dir(&format!("{}/a", s.vendor_dir));
-    s.ensure_dir(&format!("{}/src", s.working_dir));
-    s.ensure_dir(&format!("{}/lib", s.working_dir));
-    s.put(
-        &format!("{}/foo.php", s.working_dir),
-        "<?php class FilesFoo {}",
-    );
-    s.put(
-        &format!("{}/bar.php", s.working_dir),
-        "<?php class FilesBar {}",
-    );
+    s.ensure_dir(s.vendor_dir.join("a"));
+    s.ensure_dir(s.working_dir.join("src"));
+    s.ensure_dir(s.working_dir.join("lib"));
+    s.put(s.working_dir.join("foo.php"), "<?php class FilesFoo {}");
+    s.put(s.working_dir.join("bar.php"), "<?php class FilesBar {}");
 
     let vendor = s.vendor_dir.clone();
-    let composer_out = format!("{}/composer", vendor);
+    let composer_out = vendor.join("composer");
     dump(&mut s, package.into(), false, "FilesWarning").unwrap();
 
     assert_file_content_equals(
@@ -676,7 +674,7 @@ fn test_duplicate_files_warning() {
             .join("autoload_files_duplicates.php")
             .to_str()
             .unwrap(),
-        &format!("{}/autoload_files.php", composer_out),
+        composer_out.join("autoload_files.php"),
     );
     let expected = "<warning>The following \"files\" autoload rules are included multiple times, this may cause issues and should be resolved:</warning>\n<warning> - $baseDir . '/foo.php'</warning>\n";
     assert_eq!(expected, s.io.borrow().get_output());
@@ -706,15 +704,15 @@ fn test_vendors_autoloading() {
 
     s.set_canonical_packages(vec![a.into(), b.into(), c.into()]);
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/src", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/lib", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b/src", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
+    s.ensure_dir(s.vendor_dir.join("a/a/src"));
+    s.ensure_dir(s.vendor_dir.join("a/a/lib"));
+    s.ensure_dir(s.vendor_dir.join("b/b/src"));
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), false, "_5").unwrap();
     assert_autoload_files("vendors", &composer_out, "namespaces");
-    assert!(std::path::Path::new(&format!("{}/autoload_classmap.php", composer_out)).exists());
+    assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 }
 
 #[test]
@@ -743,15 +741,15 @@ fn test_vendors_autoloading_with_metapackages() {
 
     s.set_canonical_packages(vec![a.into(), b.into(), c.into()]);
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b/src", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/src", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/lib", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
+    s.ensure_dir(s.vendor_dir.join("b/b/src"));
+    s.ensure_dir(s.vendor_dir.join("a/a/src"));
+    s.ensure_dir(s.vendor_dir.join("a/a/lib"));
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), false, "_5").unwrap();
     assert_autoload_files("vendors_meta", &composer_out, "namespaces");
-    assert!(std::path::Path::new(&format!("{}/autoload_classmap.php", composer_out)).exists());
+    assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 }
 
 #[test]
@@ -782,15 +780,15 @@ fn test_non_dev_autoload_exclusion_with_recursion() {
 
     s.set_canonical_packages(vec![a.into(), b.into()]);
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/src", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/lib", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b/src", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
+    s.ensure_dir(s.vendor_dir.join("a/a/src"));
+    s.ensure_dir(s.vendor_dir.join("a/a/lib"));
+    s.ensure_dir(s.vendor_dir.join("b/b/src"));
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), false, "_5").unwrap();
     assert_autoload_files("vendors", &composer_out, "namespaces");
-    assert!(std::path::Path::new(&format!("{}/autoload_classmap.php", composer_out)).exists());
+    assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 }
 
 #[test]
@@ -819,9 +817,9 @@ fn test_non_dev_autoload_should_include_replaced_packages() {
 
     s.set_canonical_packages(vec![a.into(), b.into()]);
 
-    s.ensure_dir(&format!("{}/b/b/src/C", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("b/b/src/C"));
     s.put(
-        &format!("{}/b/b/src/C/C.php", s.vendor_dir),
+        s.vendor_dir.join("b/b/src/C/C.php"),
         "<?php namespace B\\C; class C {}",
     );
 
@@ -829,10 +827,17 @@ fn test_non_dev_autoload_should_include_replaced_packages() {
     let class_map = dump(&mut s, package.into(), true, "_5").unwrap();
 
     let mut expected: IndexMap<String, String> = IndexMap::new();
-    expected.insert("B\\C\\C".to_string(), format!("{}/b/b/src/C/C.php", vendor));
+    expected.insert(
+        "B\\C\\C".to_string(),
+        vendor.join("b/b/src/C/C.php").to_str().unwrap().to_string(),
+    );
     expected.insert(
         "Composer\\InstalledVersions".to_string(),
-        format!("{}/composer/InstalledVersions.php", vendor),
+        vendor
+            .join("composer/InstalledVersions.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     assert_eq!(&expected, class_map.get_map());
 }
@@ -865,15 +870,15 @@ fn test_non_dev_autoload_exclusion_with_recursion_replace() {
 
     s.set_canonical_packages(vec![a.into(), b.into()]);
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/src", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/lib", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b/src", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
+    s.ensure_dir(s.vendor_dir.join("a/a/src"));
+    s.ensure_dir(s.vendor_dir.join("a/a/lib"));
+    s.ensure_dir(s.vendor_dir.join("b/b/src"));
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), false, "_5").unwrap();
     assert_autoload_files("vendors", &composer_out, "namespaces");
-    assert!(std::path::Path::new(&format!("{}/autoload_classmap.php", composer_out)).exists());
+    assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 }
 
 #[test]
@@ -919,14 +924,17 @@ fn test_non_dev_autoload_replaces_nested_requirements() {
         ("d/d", "D", "D"),
         ("e/e", "E", "E"),
     ] {
-        s.ensure_dir(&format!("{}/{}/src", s.vendor_dir, name));
+        s.ensure_dir(s.vendor_dir.join(name).join("src"));
         s.put(
-            &format!("{}/{}/src/{}.php", s.vendor_dir, name, file),
+            s.vendor_dir
+                .join(name)
+                .join("src")
+                .join(format!("{}.php", file)),
             &format!("<?php class {} {{}}", class),
         );
     }
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), false, "_5").unwrap();
     assert_autoload_files("classmap9", &composer_out, "classmap");
 }
@@ -971,7 +979,7 @@ fn test_phar_autoload() {
 
     s.set_canonical_packages(vec![vendor_package.into()]);
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), true, "Phar").unwrap();
     assert_autoload_files("phar", &composer_out, "namespaces");
     assert_autoload_files("phar_psr4", &composer_out, "psr4");
@@ -995,14 +1003,18 @@ fn test_psr_to_class_map_ignores_non_existing_dir() {
     ]));
 
     let vendor = s.vendor_dir.clone();
-    let composer_out = format!("{}/composer", vendor);
+    let composer_out = vendor.join("composer");
     let class_map = dump(&mut s, package.into(), true, "_8").unwrap();
-    assert!(std::path::Path::new(&format!("{}/autoload_classmap.php", composer_out)).exists());
+    assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 
     let mut expected: IndexMap<String, String> = IndexMap::new();
     expected.insert(
         "Composer\\InstalledVersions".to_string(),
-        format!("{}/composer/InstalledVersions.php", vendor),
+        vendor
+            .join("composer/InstalledVersions.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     assert_eq!(&expected, class_map.get_map());
 }
@@ -1017,33 +1029,32 @@ fn test_psr_to_class_map_ignores_non_psr_classes() {
         ("psr-4", str_map(&[("psr4\\", pstr("psr4/"))])),
     ]));
 
-    s.ensure_dir(&format!("{}/psr0/psr0", s.working_dir));
-    s.ensure_dir(&format!("{}/psr4", s.working_dir));
+    s.ensure_dir(s.working_dir.join("psr0/psr0"));
+    s.ensure_dir(s.working_dir.join("psr4"));
     s.put(
-        &format!("{}/psr0/psr0/match.php", s.working_dir),
+        s.working_dir.join("psr0/psr0/match.php"),
         "<?php class psr0_match {}",
     );
     s.put(
-        &format!("{}/psr0/psr0/badfile.php", s.working_dir),
+        s.working_dir.join("psr0/psr0/badfile.php"),
         "<?php class psr0_badclass {}",
     );
     s.put(
-        &format!("{}/psr4/match.php", s.working_dir),
+        s.working_dir.join("psr4/match.php"),
         "<?php namespace psr4; class match {}",
     );
     s.put(
-        &format!("{}/psr4/badfile.php", s.working_dir),
+        s.working_dir.join("psr4/badfile.php"),
         "<?php namespace psr4; class badclass {}",
     );
 
     let vendor = s.vendor_dir.clone();
-    let composer_out = format!("{}/composer", vendor);
+    let composer_out = vendor.join("composer");
     dump(&mut s, package.into(), true, "_1").unwrap();
-    assert!(std::path::Path::new(&format!("{}/autoload_classmap.php", composer_out)).exists());
+    assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 
     let expected = "<?php\n\n// autoload_classmap.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir);\n\nreturn array(\n    'Composer\\\\InstalledVersions' => $vendorDir . '/composer/InstalledVersions.php',\n    'psr0_match' => $baseDir . '/psr0/psr0/match.php',\n    'psr4\\\\match' => $baseDir . '/psr4/match.php',\n);\n".to_string();
-    let actual =
-        std::fs::read_to_string(format!("{}/autoload_classmap.php", composer_out)).unwrap();
+    let actual = std::fs::read_to_string(composer_out.join("autoload_classmap.php")).unwrap();
     assert_eq!(expected, actual);
 }
 
@@ -1064,43 +1075,47 @@ fn test_vendors_class_map_autoloading() {
 
     s.set_canonical_packages(vec![a.into(), b.into()]);
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/src", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b/src", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b/lib", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
+    s.ensure_dir(s.vendor_dir.join("a/a/src"));
+    s.ensure_dir(s.vendor_dir.join("b/b/src"));
+    s.ensure_dir(s.vendor_dir.join("b/b/lib"));
     s.put(
-        &format!("{}/a/a/src/a.php", s.vendor_dir),
+        s.vendor_dir.join("a/a/src/a.php"),
         "<?php class ClassMapFoo {}",
     );
     s.put(
-        &format!("{}/b/b/src/b.php", s.vendor_dir),
+        s.vendor_dir.join("b/b/src/b.php"),
         "<?php class ClassMapBar {}",
     );
     s.put(
-        &format!("{}/b/b/lib/c.php", s.vendor_dir),
+        s.vendor_dir.join("b/b/lib/c.php"),
         "<?php class ClassMapBaz {}",
     );
 
     let vendor = s.vendor_dir.clone();
-    let composer_out = format!("{}/composer", vendor);
+    let composer_out = vendor.join("composer");
     let class_map = dump(&mut s, package.into(), false, "_6").unwrap();
 
     let mut expected: IndexMap<String, String> = IndexMap::new();
     expected.insert(
         "ClassMapBar".to_string(),
-        format!("{}/b/b/src/b.php", vendor),
+        vendor.join("b/b/src/b.php").to_str().unwrap().to_string(),
     );
     expected.insert(
         "ClassMapBaz".to_string(),
-        format!("{}/b/b/lib/c.php", vendor),
+        vendor.join("b/b/lib/c.php").to_str().unwrap().to_string(),
     );
     expected.insert(
         "ClassMapFoo".to_string(),
-        format!("{}/a/a/src/a.php", vendor),
+        vendor.join("a/a/src/a.php").to_str().unwrap().to_string(),
     );
     expected.insert(
         "Composer\\InstalledVersions".to_string(),
-        format!("{}/composer/InstalledVersions.php", vendor),
+        vendor
+            .join("composer/InstalledVersions.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     assert_eq!(&expected, class_map.get_map());
     assert_autoload_files("classmap4", &composer_out, "classmap");
@@ -1127,44 +1142,56 @@ fn test_vendors_class_map_autoloading_with_target_dir() {
 
     s.set_canonical_packages(vec![a.into(), b.into()]);
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/target/src", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/target/lib", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b/src", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
+    s.ensure_dir(s.vendor_dir.join("a/a/target/src"));
+    s.ensure_dir(s.vendor_dir.join("a/a/target/lib"));
+    s.ensure_dir(s.vendor_dir.join("b/b/src"));
     s.put(
-        &format!("{}/a/a/target/src/a.php", s.vendor_dir),
+        s.vendor_dir.join("a/a/target/src/a.php"),
         "<?php class ClassMapFoo {}",
     );
     s.put(
-        &format!("{}/a/a/target/lib/b.php", s.vendor_dir),
+        s.vendor_dir.join("a/a/target/lib/b.php"),
         "<?php class ClassMapBar {}",
     );
     s.put(
-        &format!("{}/b/b/src/c.php", s.vendor_dir),
+        s.vendor_dir.join("b/b/src/c.php"),
         "<?php class ClassMapBaz {}",
     );
 
     let vendor = s.vendor_dir.clone();
-    let composer_out = format!("{}/composer", vendor);
+    let composer_out = vendor.join("composer");
     let class_map = dump(&mut s, package.into(), false, "_6").unwrap();
-    assert!(std::path::Path::new(&format!("{}/autoload_classmap.php", composer_out)).exists());
+    assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 
     let mut expected: IndexMap<String, String> = IndexMap::new();
     expected.insert(
         "ClassMapBar".to_string(),
-        format!("{}/a/a/target/lib/b.php", vendor),
+        vendor
+            .join("a/a/target/lib/b.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     expected.insert(
         "ClassMapBaz".to_string(),
-        format!("{}/b/b/src/c.php", vendor),
+        vendor.join("b/b/src/c.php").to_str().unwrap().to_string(),
     );
     expected.insert(
         "ClassMapFoo".to_string(),
-        format!("{}/a/a/target/src/a.php", vendor),
+        vendor
+            .join("a/a/target/src/a.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     expected.insert(
         "Composer\\InstalledVersions".to_string(),
-        format!("{}/composer/InstalledVersions.php", vendor),
+        vendor
+            .join("composer/InstalledVersions.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     assert_eq!(&expected, class_map.get_map());
 }
@@ -1190,49 +1217,57 @@ fn test_class_map_autoloading_empty_dir_and_exact_file() {
 
     s.set_canonical_packages(vec![a.into(), b.into(), c.into()]);
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/src", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b", s.vendor_dir));
-    s.ensure_dir(&format!("{}/c/c/foo", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
+    s.ensure_dir(s.vendor_dir.join("a/a/src"));
+    s.ensure_dir(s.vendor_dir.join("b/b"));
+    s.ensure_dir(s.vendor_dir.join("c/c/foo"));
     s.put(
-        &format!("{}/a/a/src/a.php", s.vendor_dir),
+        s.vendor_dir.join("a/a/src/a.php"),
         "<?php class ClassMapFoo {}",
     );
     s.put(
-        &format!("{}/b/b/test.php", s.vendor_dir),
+        s.vendor_dir.join("b/b/test.php"),
         "<?php class ClassMapBar {}",
     );
     s.put(
-        &format!("{}/c/c/foo/test.php", s.vendor_dir),
+        s.vendor_dir.join("c/c/foo/test.php"),
         "<?php class ClassMapBaz {}",
     );
 
     let vendor = s.vendor_dir.clone();
-    let composer_out = format!("{}/composer", vendor);
+    let composer_out = vendor.join("composer");
     let class_map = dump(&mut s, package.into(), false, "_7").unwrap();
-    assert!(std::path::Path::new(&format!("{}/autoload_classmap.php", composer_out)).exists());
+    assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 
     let mut expected: IndexMap<String, String> = IndexMap::new();
     expected.insert(
         "ClassMapBar".to_string(),
-        format!("{}/b/b/test.php", vendor),
+        vendor.join("b/b/test.php").to_str().unwrap().to_string(),
     );
     expected.insert(
         "ClassMapBaz".to_string(),
-        format!("{}/c/c/foo/test.php", vendor),
+        vendor
+            .join("c/c/foo/test.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     expected.insert(
         "ClassMapFoo".to_string(),
-        format!("{}/a/a/src/a.php", vendor),
+        vendor.join("a/a/src/a.php").to_str().unwrap().to_string(),
     );
     expected.insert(
         "Composer\\InstalledVersions".to_string(),
-        format!("{}/composer/InstalledVersions.php", vendor),
+        vendor
+            .join("composer/InstalledVersions.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     assert_eq!(&expected, class_map.get_map());
     assert_autoload_files("classmap5", &composer_out, "classmap");
 
-    let real = std::fs::read_to_string(format!("{}/autoload_real.php", composer_out)).unwrap();
+    let real = std::fs::read_to_string(composer_out.join("autoload_real.php")).unwrap();
     assert!(!real.contains("$loader->setClassMapAuthoritative(true);"));
     assert!(!real.contains("$loader->setApcuPrefix("));
 }
@@ -1257,51 +1292,67 @@ fn test_class_map_autoloading_authoritative_and_apcu() {
 
     s.set_canonical_packages(vec![a.into(), b.into(), c.into()]);
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/src", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b", s.vendor_dir));
-    s.ensure_dir(&format!("{}/c/c/foo", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
+    s.ensure_dir(s.vendor_dir.join("a/a/src"));
+    s.ensure_dir(s.vendor_dir.join("b/b"));
+    s.ensure_dir(s.vendor_dir.join("c/c/foo"));
     s.put(
-        &format!("{}/a/a/src/ClassMapFoo.php", s.vendor_dir),
+        s.vendor_dir.join("a/a/src/ClassMapFoo.php"),
         "<?php class ClassMapFoo {}",
     );
     s.put(
-        &format!("{}/b/b/ClassMapBar.php", s.vendor_dir),
+        s.vendor_dir.join("b/b/ClassMapBar.php"),
         "<?php class ClassMapBar {}",
     );
     s.put(
-        &format!("{}/c/c/foo/ClassMapBaz.php", s.vendor_dir),
+        s.vendor_dir.join("c/c/foo/ClassMapBaz.php"),
         "<?php class ClassMapBaz {}",
     );
 
     s.generator.set_class_map_authoritative(true);
     s.generator.set_apcu(true, None);
     let vendor = s.vendor_dir.clone();
-    let composer_out = format!("{}/composer", vendor);
+    let composer_out = vendor.join("composer");
     let class_map = dump(&mut s, package.into(), false, "_7").unwrap();
-    assert!(std::path::Path::new(&format!("{}/autoload_classmap.php", composer_out)).exists());
+    assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 
     let mut expected: IndexMap<String, String> = IndexMap::new();
     expected.insert(
         "ClassMapBar".to_string(),
-        format!("{}/b/b/ClassMapBar.php", vendor),
+        vendor
+            .join("b/b/ClassMapBar.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     expected.insert(
         "ClassMapBaz".to_string(),
-        format!("{}/c/c/foo/ClassMapBaz.php", vendor),
+        vendor
+            .join("c/c/foo/ClassMapBaz.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     expected.insert(
         "ClassMapFoo".to_string(),
-        format!("{}/a/a/src/ClassMapFoo.php", vendor),
+        vendor
+            .join("a/a/src/ClassMapFoo.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     expected.insert(
         "Composer\\InstalledVersions".to_string(),
-        format!("{}/composer/InstalledVersions.php", vendor),
+        vendor
+            .join("composer/InstalledVersions.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     assert_eq!(&expected, class_map.get_map());
     assert_autoload_files("classmap8", &composer_out, "classmap");
 
-    let real = std::fs::read_to_string(format!("{}/autoload_real.php", composer_out)).unwrap();
+    let real = std::fs::read_to_string(composer_out.join("autoload_real.php")).unwrap();
     assert!(real.contains("$loader->setClassMapAuthoritative(true);"));
     assert!(real.contains("$loader->setApcuPrefix("));
 }
@@ -1326,20 +1377,20 @@ fn test_class_map_autoloading_authoritative_and_apcu_prefix() {
 
     s.set_canonical_packages(vec![a.into(), b.into(), c.into()]);
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/src", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b", s.vendor_dir));
-    s.ensure_dir(&format!("{}/c/c/foo", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
+    s.ensure_dir(s.vendor_dir.join("a/a/src"));
+    s.ensure_dir(s.vendor_dir.join("b/b"));
+    s.ensure_dir(s.vendor_dir.join("c/c/foo"));
     s.put(
-        &format!("{}/a/a/src/ClassMapFoo.php", s.vendor_dir),
+        s.vendor_dir.join("a/a/src/ClassMapFoo.php"),
         "<?php class ClassMapFoo {}",
     );
     s.put(
-        &format!("{}/b/b/ClassMapBar.php", s.vendor_dir),
+        s.vendor_dir.join("b/b/ClassMapBar.php"),
         "<?php class ClassMapBar {}",
     );
     s.put(
-        &format!("{}/c/c/foo/ClassMapBaz.php", s.vendor_dir),
+        s.vendor_dir.join("c/c/foo/ClassMapBaz.php"),
         "<?php class ClassMapBaz {}",
     );
 
@@ -1347,31 +1398,47 @@ fn test_class_map_autoloading_authoritative_and_apcu_prefix() {
     s.generator
         .set_apcu(true, Some("custom'Prefix".to_string()));
     let vendor = s.vendor_dir.clone();
-    let composer_out = format!("{}/composer", vendor);
+    let composer_out = vendor.join("composer");
     let class_map = dump(&mut s, package.into(), false, "_7").unwrap();
-    assert!(std::path::Path::new(&format!("{}/autoload_classmap.php", composer_out)).exists());
+    assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 
     let mut expected: IndexMap<String, String> = IndexMap::new();
     expected.insert(
         "ClassMapBar".to_string(),
-        format!("{}/b/b/ClassMapBar.php", vendor),
+        vendor
+            .join("b/b/ClassMapBar.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     expected.insert(
         "ClassMapBaz".to_string(),
-        format!("{}/c/c/foo/ClassMapBaz.php", vendor),
+        vendor
+            .join("c/c/foo/ClassMapBaz.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     expected.insert(
         "ClassMapFoo".to_string(),
-        format!("{}/a/a/src/ClassMapFoo.php", vendor),
+        vendor
+            .join("a/a/src/ClassMapFoo.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     expected.insert(
         "Composer\\InstalledVersions".to_string(),
-        format!("{}/composer/InstalledVersions.php", vendor),
+        vendor
+            .join("composer/InstalledVersions.php")
+            .to_str()
+            .unwrap()
+            .to_string(),
     );
     assert_eq!(&expected, class_map.get_map());
     assert_autoload_files("classmap8", &composer_out, "classmap");
 
-    let real = std::fs::read_to_string(format!("{}/autoload_real.php", composer_out)).unwrap();
+    let real = std::fs::read_to_string(composer_out.join("autoload_real.php")).unwrap();
     assert!(real.contains("$loader->setClassMapAuthoritative(true);"));
     assert!(real.contains("$loader->setApcuPrefix('custom\\'Prefix');"));
 }
@@ -1401,49 +1468,49 @@ fn test_files_autoload_generation() {
 
     s.set_canonical_packages(vec![a.into(), b.into(), c.into()]);
 
-    s.ensure_dir(&format!("{}/a/a", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b", s.vendor_dir));
-    s.ensure_dir(&format!("{}/c/c/foo/bar", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("a/a"));
+    s.ensure_dir(s.vendor_dir.join("b/b"));
+    s.ensure_dir(s.vendor_dir.join("c/c/foo/bar"));
     s.put(
-        &format!("{}/a/a/test.php", s.vendor_dir),
+        s.vendor_dir.join("a/a/test.php"),
         "<?php function testFilesAutoloadGeneration1() {}",
     );
     s.put(
-        &format!("{}/b/b/test2.php", s.vendor_dir),
+        s.vendor_dir.join("b/b/test2.php"),
         "<?php function testFilesAutoloadGeneration2() {}",
     );
     s.put(
-        &format!("{}/c/c/foo/bar/test3.php", s.vendor_dir),
+        s.vendor_dir.join("c/c/foo/bar/test3.php"),
         "<?php function testFilesAutoloadGeneration3() {}",
     );
     s.put(
-        &format!("{}/c/c/foo/bar/test4.php", s.vendor_dir),
+        s.vendor_dir.join("c/c/foo/bar/test4.php"),
         "<?php function testFilesAutoloadGeneration4() {}",
     );
     s.put(
-        &format!("{}/root.php", s.working_dir),
+        s.working_dir.join("root.php"),
         "<?php function testFilesAutoloadGenerationRoot() {}",
     );
 
     let vendor = s.vendor_dir.clone();
-    let composer_out = format!("{}/composer", vendor);
+    let composer_out = vendor.join("composer");
     dump(&mut s, package.into(), false, "FilesAutoload").unwrap();
     let fx = fixtures_dir();
     assert_file_content_equals(
         fx.join("autoload_functions.php").to_str().unwrap(),
-        &format!("{}/autoload.php", vendor),
+        vendor.join("autoload.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_real_functions.php").to_str().unwrap(),
-        &format!("{}/autoload_real.php", composer_out),
+        composer_out.join("autoload_real.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_static_functions.php").to_str().unwrap(),
-        &format!("{}/autoload_static.php", composer_out),
+        composer_out.join("autoload_static.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_files_functions.php").to_str().unwrap(),
-        &format!("{}/autoload_files.php", composer_out),
+        composer_out.join("autoload_files.php"),
     );
 }
 
@@ -1456,9 +1523,12 @@ fn test_override_vendors_autoloading() {
     root_package.set_autoload(autoload(vec![
         (
             "psr-0",
-            str_map(&[("A\\B", pstr(&format!("{}/lib", working_dir)))]),
+            str_map(&[("A\\B", pstr(working_dir.join("lib").to_str().unwrap()))]),
         ),
-        ("classmap", str_list(&[&format!("{}/src", working_dir)])),
+        (
+            "classmap",
+            str_list(&[working_dir.join("src").to_str().unwrap()]),
+        ),
     ]));
     root_package.set_requires(requires(vec![
         ("a/a", link("z", "a/a", match_all(), None)),
@@ -1481,32 +1551,32 @@ fn test_override_vendors_autoloading() {
 
     s.set_canonical_packages(vec![a.into(), b.into()]);
 
-    s.ensure_dir(&format!("{}/lib/A/B", s.working_dir));
-    s.ensure_dir(&format!("{}/src/", s.working_dir));
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/classmap", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/src", s.vendor_dir));
-    s.ensure_dir(&format!("{}/a/a/lib/A/B", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b/src", s.vendor_dir));
+    s.ensure_dir(s.working_dir.join("lib/A/B"));
+    s.ensure_dir(s.working_dir.join("src/"));
+    s.ensure_dir(s.vendor_dir.join("composer"));
+    s.ensure_dir(s.vendor_dir.join("a/a/classmap"));
+    s.ensure_dir(s.vendor_dir.join("a/a/src"));
+    s.ensure_dir(s.vendor_dir.join("a/a/lib/A/B"));
+    s.ensure_dir(s.vendor_dir.join("b/b/src"));
 
     s.put(
-        &format!("{}/lib/A/B/C.php", s.working_dir),
+        s.working_dir.join("lib/A/B/C.php"),
         "<?php namespace A\\B; class C {}",
     );
     s.put(
-        &format!("{}/src/classes.php", s.working_dir),
+        s.working_dir.join("src/classes.php"),
         "<?php namespace Foo; class Bar {}",
     );
     s.put(
-        &format!("{}/a/a/lib/A/B/C.php", s.vendor_dir),
+        s.vendor_dir.join("a/a/lib/A/B/C.php"),
         "<?php namespace A\\B; class C {}",
     );
     s.put(
-        &format!("{}/a/a/classmap/classes.php", s.vendor_dir),
+        s.vendor_dir.join("a/a/classmap/classes.php"),
         "<?php namespace Foo; class Bar {}",
     );
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, root_package.into(), true, "_9").unwrap();
 
     let expected_namespace = "<?php\n\n// autoload_namespaces.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir);\n\nreturn array(\n    'B\\\\Sub\\\\Name' => array($vendorDir . '/b/b/src'),\n    'A\\\\B' => array($baseDir . '/lib', $vendorDir . '/a/a/lib'),\n    'A' => array($vendorDir . '/a/a/src'),\n);\n";
@@ -1515,15 +1585,15 @@ fn test_override_vendors_autoloading() {
 
     assert_eq!(
         expected_namespace,
-        std::fs::read_to_string(format!("{}/autoload_namespaces.php", composer_out)).unwrap()
+        std::fs::read_to_string(composer_out.join("autoload_namespaces.php")).unwrap()
     );
     assert_eq!(
         expected_psr4,
-        std::fs::read_to_string(format!("{}/autoload_psr4.php", composer_out)).unwrap()
+        std::fs::read_to_string(composer_out.join("autoload_psr4.php")).unwrap()
     );
     assert_eq!(
         expected_classmap,
-        std::fs::read_to_string(format!("{}/autoload_classmap.php", composer_out)).unwrap()
+        std::fs::read_to_string(composer_out.join("autoload_classmap.php")).unwrap()
     );
 }
 
@@ -1542,14 +1612,14 @@ fn test_include_path_file_generation() {
 
     s.set_canonical_packages(vec![a.into(), b.into(), c.into()]);
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), false, "_10").unwrap();
 
     assert_file_content_equals(
         fixtures_dir().join("include_paths.php").to_str().unwrap(),
-        &format!("{}/include_paths.php", composer_out),
+        composer_out.join("include_paths.php"),
     );
 }
 
@@ -1561,12 +1631,12 @@ fn test_include_path_file_without_paths_is_skipped() {
     let a = new_pkg("a/a");
     s.set_canonical_packages(vec![a.into()]);
 
-    s.ensure_dir(&format!("{}/composer", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("composer"));
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), false, "_12").unwrap();
 
-    assert!(!std::path::Path::new(&format!("{}/include_paths.php", composer_out)).exists());
+    assert!(!std::path::Path::new(&composer_out.join("include_paths.php")).exists());
 }
 
 #[test]
@@ -1585,9 +1655,9 @@ fn test_vendor_substring_path() {
         ),
     ]));
 
-    s.ensure_dir(&format!("{}/a", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("a"));
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), false, "VendorSubstring").unwrap();
 
     let expected_namespace = "<?php\n\n// autoload_namespaces.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir);\n\nreturn array(\n    'Foo' => array($baseDir . '/composer-test-autoload-src/src'),\n);\n";
@@ -1595,11 +1665,11 @@ fn test_vendor_substring_path() {
 
     assert_eq!(
         expected_namespace,
-        std::fs::read_to_string(format!("{}/autoload_namespaces.php", composer_out)).unwrap()
+        std::fs::read_to_string(composer_out.join("autoload_namespaces.php")).unwrap()
     );
     assert_eq!(
         expected_psr4,
-        std::fs::read_to_string(format!("{}/autoload_psr4.php", composer_out)).unwrap()
+        std::fs::read_to_string(composer_out.join("autoload_psr4.php")).unwrap()
     );
 }
 
@@ -1614,17 +1684,17 @@ fn test_empty_paths() {
         ("classmap", str_list(&[""])),
     ]));
 
-    s.ensure_dir(&format!("{}/Foo", s.working_dir));
+    s.ensure_dir(s.working_dir.join("Foo"));
     s.put(
-        &format!("{}/Foo/Bar.php", s.working_dir),
+        s.working_dir.join("Foo/Bar.php"),
         "<?php namespace Foo; class Bar {}",
     );
     s.put(
-        &format!("{}/class.php", s.working_dir),
+        s.working_dir.join("class.php"),
         "<?php namespace Classmap; class Foo {}",
     );
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), true, "_15").unwrap();
 
     let expected_namespace = "<?php\n\n// autoload_namespaces.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir);\n\nreturn array(\n    'Foo' => array($baseDir . '/'),\n);\n";
@@ -1633,15 +1703,15 @@ fn test_empty_paths() {
 
     assert_eq!(
         expected_namespace,
-        std::fs::read_to_string(format!("{}/autoload_namespaces.php", composer_out)).unwrap()
+        std::fs::read_to_string(composer_out.join("autoload_namespaces.php")).unwrap()
     );
     assert_eq!(
         expected_psr4,
-        std::fs::read_to_string(format!("{}/autoload_psr4.php", composer_out)).unwrap()
+        std::fs::read_to_string(composer_out.join("autoload_psr4.php")).unwrap()
     );
     assert_eq!(
         expected_classmap,
-        std::fs::read_to_string(format!("{}/autoload_classmap.php", composer_out)).unwrap()
+        std::fs::read_to_string(composer_out.join("autoload_classmap.php")).unwrap()
     );
 }
 
@@ -1680,64 +1750,57 @@ fn test_exclude_from_classmap() {
         ),
     ]));
 
-    s.ensure_dir(&format!("{}/composer", s.working_dir));
-    s.ensure_dir(&format!("{}/src/Lala/Test", s.working_dir));
-    s.ensure_dir(&format!("{}/lib", s.working_dir));
+    s.ensure_dir(s.working_dir.join("composer"));
+    s.ensure_dir(s.working_dir.join("src/Lala/Test"));
+    s.ensure_dir(s.working_dir.join("lib"));
     s.put(
-        &format!("{}/src/Lala/ClassMapMain.php", s.working_dir),
+        s.working_dir.join("src/Lala/ClassMapMain.php"),
         "<?php namespace Lala; class ClassMapMain {}",
     );
     s.put(
-        &format!("{}/src/Lala/Test/ClassMapMainTest.php", s.working_dir),
+        s.working_dir.join("src/Lala/Test/ClassMapMainTest.php"),
         "<?php namespace Lala\\Test; class ClassMapMainTest {}",
     );
 
-    s.ensure_dir(&format!("{}/src-fruit", s.working_dir));
-    s.ensure_dir(&format!("{}/src-cake", s.working_dir));
-    s.ensure_dir(&format!("{}/lib-cake", s.working_dir));
+    s.ensure_dir(s.working_dir.join("src-fruit"));
+    s.ensure_dir(s.working_dir.join("src-cake"));
+    s.ensure_dir(s.working_dir.join("lib-cake"));
     s.put(
-        &format!("{}/src-cake/ClassMapBar.php", s.working_dir),
+        s.working_dir.join("src-cake/ClassMapBar.php"),
         "<?php namespace Acme\\Cake; class ClassMapBar {}",
     );
 
-    s.ensure_dir(&format!("{}/composersrc", s.working_dir));
-    s.ensure_dir(&format!("{}/composersrc/tests", s.working_dir));
+    s.ensure_dir(s.working_dir.join("composersrc"));
+    s.ensure_dir(s.working_dir.join("composersrc/tests"));
     s.put(
-        &format!("{}/composersrc/foo.php", s.working_dir),
+        s.working_dir.join("composersrc/foo.php"),
         "<?php class ClassMapFoo {}",
     );
 
-    s.ensure_dir(&format!("{}/composersrc/excludedTests", s.working_dir));
+    s.ensure_dir(s.working_dir.join("composersrc/excludedTests"));
     s.put(
-        &format!("{}/composersrc/excludedTests/bar.php", s.working_dir),
+        s.working_dir.join("composersrc/excludedTests/bar.php"),
         "<?php class ClassExcludeMapFoo {}",
     );
     s.put(
-        &format!("{}/composersrc/ClassToExclude.php", s.working_dir),
+        s.working_dir.join("composersrc/ClassToExclude.php"),
         "<?php class ClassClassToExclude {}",
     );
-    s.ensure_dir(&format!(
-        "{}/composersrc/long/excluded/excsubpath",
-        s.working_dir
-    ));
+    s.ensure_dir(s.working_dir.join("composersrc/long/excluded/excsubpath"));
     s.put(
-        &format!(
-            "{}/composersrc/long/excluded/excsubpath/foo.php",
-            s.working_dir
-        ),
+        s.working_dir
+            .join("composersrc/long/excluded/excsubpath/foo.php"),
         "<?php class ClassExcludeMapFoo2 {}",
     );
     s.put(
-        &format!(
-            "{}/composersrc/long/excluded/excsubpath/bar.php",
-            s.working_dir
-        ),
+        s.working_dir
+            .join("composersrc/long/excluded/excsubpath/bar.php"),
         "<?php class ClassExcludeMapBar {}",
     );
 
-    s.ensure_dir(&format!("{}/composersrc/foo", s.working_dir));
+    s.ensure_dir(s.working_dir.join("composersrc/foo"));
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), true, "_1").unwrap();
 
     assert_autoload_files("classmap", &composer_out, "classmap");
@@ -1796,32 +1859,32 @@ fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
         ]
     };
 
-    s.ensure_dir(&format!("{}/a/a", s.vendor_dir));
-    s.ensure_dir(&format!("{}/b/b", s.vendor_dir));
-    s.ensure_dir(&format!("{}/c/c/foo/bar", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("a/a"));
+    s.ensure_dir(s.vendor_dir.join("b/b"));
+    s.ensure_dir(s.vendor_dir.join("c/c/foo/bar"));
     s.put(
-        &format!("{}/a/a/test.php", s.vendor_dir),
+        s.vendor_dir.join("a/a/test.php"),
         "<?php function testFilesAutoloadGeneration1() {}",
     );
     s.put(
-        &format!("{}/b/b/test2.php", s.vendor_dir),
+        s.vendor_dir.join("b/b/test2.php"),
         "<?php function testFilesAutoloadGeneration2() {}",
     );
     s.put(
-        &format!("{}/c/c/foo/bar/test3.php", s.vendor_dir),
+        s.vendor_dir.join("c/c/foo/bar/test3.php"),
         "<?php function testFilesAutoloadGeneration3() {}",
     );
     s.put(
-        &format!("{}/c/c/foo/bar/test4.php", s.vendor_dir),
+        s.vendor_dir.join("c/c/foo/bar/test4.php"),
         "<?php function testFilesAutoloadGeneration4() {}",
     );
     s.put(
-        &format!("{}/root.php", s.working_dir),
+        s.working_dir.join("root.php"),
         "<?php function testFilesAutoloadGenerationRoot() {}",
     );
 
     let vendor = s.vendor_dir.clone();
-    let composer_out = format!("{}/composer", vendor);
+    let composer_out = vendor.join("composer");
     let fx = fixtures_dir();
 
     s.set_canonical_packages(autoload_packages);
@@ -1834,27 +1897,27 @@ fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
     .unwrap();
     assert_file_content_equals(
         fx.join("autoload_functions.php").to_str().unwrap(),
-        &format!("{}/autoload.php", vendor),
+        vendor.join("autoload.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_real_functions_with_include_paths.php")
             .to_str()
             .unwrap(),
-        &format!("{}/autoload_real.php", composer_out),
+        composer_out.join("autoload_real.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_static_functions_with_include_paths.php")
             .to_str()
             .unwrap(),
-        &format!("{}/autoload_static.php", composer_out),
+        composer_out.join("autoload_static.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_files_functions.php").to_str().unwrap(),
-        &format!("{}/autoload_files.php", composer_out),
+        composer_out.join("autoload_files.php"),
     );
     assert_file_content_equals(
         fx.join("include_paths_functions.php").to_str().unwrap(),
-        &format!("{}/include_paths.php", composer_out),
+        composer_out.join("include_paths.php"),
     );
 
     s.repository = shirabe::repository::RepositoryInterfaceHandle::new(
@@ -1870,25 +1933,25 @@ fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
     .unwrap();
     assert_file_content_equals(
         fx.join("autoload_functions.php").to_str().unwrap(),
-        &format!("{}/autoload.php", vendor),
+        vendor.join("autoload.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_real_functions_with_include_paths.php")
             .to_str()
             .unwrap(),
-        &format!("{}/autoload_real.php", composer_out),
+        composer_out.join("autoload_real.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_files_functions_with_removed_extra.php")
             .to_str()
             .unwrap(),
-        &format!("{}/autoload_files.php", composer_out),
+        composer_out.join("autoload_files.php"),
     );
     assert_file_content_equals(
         fx.join("include_paths_functions_with_removed_extra.php")
             .to_str()
             .unwrap(),
-        &format!("{}/include_paths.php", composer_out),
+        composer_out.join("include_paths.php"),
     );
 
     s.repository = shirabe::repository::RepositoryInterfaceHandle::new(
@@ -1898,22 +1961,22 @@ fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
     dump(&mut s, not_autoload_package.into(), false, "FilesAutoload").unwrap();
     assert_file_content_equals(
         fx.join("autoload_functions.php").to_str().unwrap(),
-        &format!("{}/autoload.php", vendor),
+        vendor.join("autoload.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_real_functions_with_removed_include_paths_and_autolad_files.php")
             .to_str()
             .unwrap(),
-        &format!("{}/autoload_real.php", composer_out),
+        composer_out.join("autoload_real.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_static_functions_with_removed_include_paths_and_autolad_files.php")
             .to_str()
             .unwrap(),
-        &format!("{}/autoload_static.php", composer_out),
+        composer_out.join("autoload_static.php"),
     );
-    assert!(!std::path::Path::new(&format!("{}/autoload_files.php", composer_out)).exists());
-    assert!(!std::path::Path::new(&format!("{}/include_paths.php", composer_out)).exists());
+    assert!(!std::path::Path::new(&composer_out.join("autoload_files.php")).exists());
+    assert!(!std::path::Path::new(&composer_out.join("include_paths.php")).exists());
 }
 
 #[test]
@@ -1979,20 +2042,20 @@ fn test_use_global_include_path() {
 
     s.use_include_path = true;
 
-    s.ensure_dir(&format!("{}/a", s.vendor_dir));
+    s.ensure_dir(s.vendor_dir.join("a"));
 
-    let composer_out = format!("{}/composer", s.vendor_dir);
+    let composer_out = s.vendor_dir.join("composer");
     dump(&mut s, package.into(), false, "IncludePath").unwrap();
     let fx = fixtures_dir();
     assert_file_content_equals(
         fx.join("autoload_real_include_path.php").to_str().unwrap(),
-        &format!("{}/autoload_real.php", composer_out),
+        composer_out.join("autoload_real.php"),
     );
     assert_file_content_equals(
         fx.join("autoload_static_include_path.php")
             .to_str()
             .unwrap(),
-        &format!("{}/autoload_static.php", composer_out),
+        composer_out.join("autoload_static.php"),
     );
 }
 
@@ -2000,8 +2063,8 @@ fn test_use_global_include_path() {
 #[serial]
 fn test_vendor_dir_excluded_from_working_dir() {
     let mut s = set_up();
-    let working_dir = format!("{}/working-dir", s.vendor_dir);
-    let vendor_dir = format!("{}/../vendor", working_dir);
+    let working_dir = s.vendor_dir.join("working-dir");
+    let vendor_dir = working_dir.join("../vendor");
 
     s.ensure_dir(&working_dir);
     std::env::set_current_dir(&working_dir).unwrap();
@@ -2031,32 +2094,29 @@ fn test_vendor_dir_excluded_from_working_dir() {
             s.io.clone(),
         )));
 
-    s.ensure_dir(&format!("{}/src/Foo", working_dir));
-    s.ensure_dir(&format!("{}/classmap", working_dir));
-    s.ensure_dir(&format!("{}/composer", vendor_dir));
-    s.ensure_dir(&format!("{}/b/b/lib/Bar", vendor_dir));
-    s.ensure_dir(&format!("{}/b/b/classmaps", vendor_dir));
+    s.ensure_dir(working_dir.join("src/Foo"));
+    s.ensure_dir(working_dir.join("classmap"));
+    s.ensure_dir(vendor_dir.join("composer"));
+    s.ensure_dir(vendor_dir.join("b/b/lib/Bar"));
+    s.ensure_dir(vendor_dir.join("b/b/classmaps"));
     s.put(
-        &format!("{}/src/Foo/Bar.php", working_dir),
+        working_dir.join("src/Foo/Bar.php"),
         "<?php namespace Foo; class Bar {}",
     );
     s.put(
-        &format!("{}/classmap/classes.php", working_dir),
+        working_dir.join("classmap/classes.php"),
         "<?php namespace Foo; class Foo {}",
     );
-    s.put(&format!("{}/test.php", working_dir), "<?php class Foo {}");
+    s.put(working_dir.join("test.php"), "<?php class Foo {}");
     s.put(
-        &format!("{}/b/b/lib/Bar/Foo.php", vendor_dir),
+        vendor_dir.join("b/b/lib/Bar/Foo.php"),
         "<?php namespace Bar; class Foo {}",
     );
     s.put(
-        &format!("{}/b/b/classmaps/classes.php", vendor_dir),
+        vendor_dir.join("b/b/classmaps/classes.php"),
         "<?php namespace Bar; class Bar {}",
     );
-    s.put(
-        &format!("{}/b/b/bootstrap.php", vendor_dir),
-        "<?php class Bar {}",
-    );
+    s.put(vendor_dir.join("b/b/bootstrap.php"), "<?php class Bar {}");
 
     s.vendor_dir = vendor_dir.clone();
     let config = s.config();
@@ -2082,17 +2142,14 @@ fn test_vendor_dir_excluded_from_working_dir() {
 
     assert_str_equals_file(
         expected_namespace,
-        &format!("{}/composer/autoload_namespaces.php", vendor_dir),
+        vendor_dir.join("composer/autoload_namespaces.php"),
     );
-    assert_str_equals_file(
-        expected_psr4,
-        &format!("{}/composer/autoload_psr4.php", vendor_dir),
-    );
+    assert_str_equals_file(expected_psr4, vendor_dir.join("composer/autoload_psr4.php"));
     assert_str_equals_file(
         expected_classmap,
-        &format!("{}/composer/autoload_classmap.php", vendor_dir),
+        vendor_dir.join("composer/autoload_classmap.php"),
     );
-    let files = std::fs::read_to_string(format!("{}/composer/autoload_files.php", vendor_dir))
+    let files = std::fs::read_to_string(vendor_dir.join("composer/autoload_files.php"))
         .unwrap()
         .replace('\r', "");
     assert!(files.contains("$vendorDir . '/b/b/bootstrap.php',\n"));
@@ -2103,7 +2160,7 @@ fn test_vendor_dir_excluded_from_working_dir() {
 #[serial]
 fn test_up_level_relative_paths() {
     let mut s = set_up();
-    let working_dir = format!("{}/working-dir", s.working_dir);
+    let working_dir = s.working_dir.join("working-dir");
     std::fs::create_dir_all(&working_dir).unwrap();
     std::env::set_current_dir(&working_dir).unwrap();
 
@@ -2135,36 +2192,36 @@ fn test_up_level_relative_paths() {
         ),
     ]));
 
-    s.ensure_dir(&format!("{}/src/Foo", s.working_dir));
-    s.ensure_dir(&format!("{}/classmap/excluded", s.working_dir));
-    s.ensure_dir(&format!("{}/classmap2/subdir", s.working_dir));
-    s.ensure_dir(&format!("{}/working-dir/classmap3", s.working_dir));
-    s.ensure_dir(&format!("{}/working-dir/classmap4/foo/", s.working_dir));
+    s.ensure_dir(s.working_dir.join("src/Foo"));
+    s.ensure_dir(s.working_dir.join("classmap/excluded"));
+    s.ensure_dir(s.working_dir.join("classmap2/subdir"));
+    s.ensure_dir(s.working_dir.join("working-dir/classmap3"));
+    s.ensure_dir(s.working_dir.join("working-dir/classmap4/foo/"));
     s.put(
-        &format!("{}/src/Foo/Bar.php", s.working_dir),
+        s.working_dir.join("src/Foo/Bar.php"),
         "<?php namespace Foo; class Bar {}",
     );
     s.put(
-        &format!("{}/classmap/classes.php", s.working_dir),
+        s.working_dir.join("classmap/classes.php"),
         "<?php namespace Foo; class Foo {}",
     );
     s.put(
-        &format!("{}/classmap/excluded/classes.php", s.working_dir),
+        s.working_dir.join("classmap/excluded/classes.php"),
         "<?php namespace Foo; class Boo {}",
     );
     s.put(
-        &format!("{}/classmap2/subdir/classes.php", s.working_dir),
+        s.working_dir.join("classmap2/subdir/classes.php"),
         "<?php namespace Foo; class Boo2 {}",
     );
     s.put(
-        &format!("{}/working-dir/classmap3/classes.php", s.working_dir),
+        s.working_dir.join("working-dir/classmap3/classes.php"),
         "<?php namespace Foo; class Boo3 {}",
     );
     s.put(
-        &format!("{}/working-dir/classmap4/foo/classes.php", s.working_dir),
+        s.working_dir.join("working-dir/classmap4/foo/classes.php"),
         "<?php namespace Foo; class Boo4 {}",
     );
-    s.put(&format!("{}/test.php", s.working_dir), "<?php class Foo {}");
+    s.put(s.working_dir.join("test.php"), "<?php class Foo {}");
 
     dump(&mut s, package.into(), true, "_14").unwrap();
 
@@ -2176,17 +2233,17 @@ fn test_up_level_relative_paths() {
 
     assert_str_equals_file(
         expected_namespace,
-        &format!("{}/composer/autoload_namespaces.php", s.vendor_dir),
+        s.vendor_dir.join("composer/autoload_namespaces.php"),
     );
     assert_str_equals_file(
         expected_psr4,
-        &format!("{}/composer/autoload_psr4.php", s.vendor_dir),
+        s.vendor_dir.join("composer/autoload_psr4.php"),
     );
     assert_str_equals_file(
         expected_classmap,
-        &format!("{}/composer/autoload_classmap.php", s.vendor_dir),
+        s.vendor_dir.join("composer/autoload_classmap.php"),
     );
-    let files = std::fs::read_to_string(format!("{}/composer/autoload_files.php", s.vendor_dir))
+    let files = std::fs::read_to_string(s.vendor_dir.join("composer/autoload_files.php"))
         .unwrap()
         .replace('\r', "");
     assert!(files.contains("$baseDir . '/../test.php',\n"));
@@ -2214,7 +2271,7 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
     let expected_namespace = "<?php\n\n// autoload_namespaces.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir);\n\nreturn array(\n    'Foo' => array($vendorDir . '/dep/a/src'),\n);\n";
     assert_str_equals_file(
         expected_namespace,
-        &format!("{}/composer/autoload_namespaces.php", s.vendor_dir),
+        s.vendor_dir.join("composer/autoload_namespaces.php"),
     );
 
     dep.__set_autoload(autoload(vec![(
@@ -2226,13 +2283,13 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
     let expected_psr4 = "<?php\n\n// autoload_psr4.php @generated by Composer\n\n$vendorDir = dirname(__DIR__);\n$baseDir = dirname($vendorDir);\n\nreturn array(\n    'Acme\\\\Foo\\\\' => array($vendorDir . '/dep/a/src-psr4'),\n);\n";
     assert_str_equals_file(
         expected_psr4,
-        &format!("{}/composer/autoload_psr4.php", s.vendor_dir),
+        s.vendor_dir.join("composer/autoload_psr4.php"),
     );
 
     dep.__set_autoload(autoload(vec![("classmap", str_list(&["classmap"]))]));
     let expected_message = format!(
         "Could not scan for classes inside \"{}/dep/a/classmap\" which does not appear to be a file nor a folder",
-        s.vendor_dir
+        s.vendor_dir.to_str().unwrap()
     );
     if let Err(e) = dump(&mut s, package.clone().into(), true, "_19") {
         assert_eq!(expected_message, e.to_string());
@@ -2240,8 +2297,7 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
 
     dep.__set_autoload(autoload(vec![("files", str_list(&["./test.php"]))]));
     dump(&mut s, package.clone().into(), true, "_19").unwrap();
-    let files =
-        std::fs::read_to_string(format!("{}/composer/autoload_files.php", s.vendor_dir)).unwrap();
+    let files = std::fs::read_to_string(s.vendor_dir.join("composer/autoload_files.php")).unwrap();
     assert!(files.contains("$vendorDir . '/dep/a/test.php',\n"));
 
     package.set_autoload(autoload(vec![(
@@ -2267,7 +2323,7 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
         "{}/excludedroot($|/)",
         preg_quote(
             &strtr(
-                &realpath(dirname(&s.working_dir)).unwrap_or_default(),
+                &realpath(dirname(s.working_dir.to_str().unwrap())).unwrap_or_default(),
                 "\\",
                 "/"
             ),
@@ -2469,9 +2525,9 @@ fn test_generates_platform_check() {
         );
         dump(&mut s, package.into(), true, "_1").unwrap();
 
-        let platform_check = format!("{}/composer/platform_check.php", s.vendor_dir);
+        let platform_check = s.vendor_dir.join("composer/platform_check.php");
         let autoload_real =
-            std::fs::read_to_string(format!("{}/composer/autoload_real.php", s.vendor_dir))
+            std::fs::read_to_string(s.vendor_dir.join("composer/autoload_real.php"))
                 .unwrap()
                 .replace('\r', "");
         match scenario.expected_fixture {
@@ -2513,21 +2569,19 @@ fn test_absolute_symlink_with_psr4_does_not_generate_warnings() {
     let package = new_root_pkg("test/package");
 
     // Create a directory structure with PSR-4 autoloading
-    s.ensure_dir(&format!(
-        "{}/tools-real/vendor/phpunit/phpunit/src/Framework/Exception",
+    s.ensure_dir(
         s.working_dir
-    ));
+            .join("tools-real/vendor/phpunit/phpunit/src/Framework/Exception"),
+    );
     s.put(
-        &format!(
-            "{}/tools-real/vendor/phpunit/phpunit/src/Framework/Exception/Exception.php",
-            s.working_dir
-        ),
+        s.working_dir
+            .join("tools-real/vendor/phpunit/phpunit/src/Framework/Exception/Exception.php"),
         "<?php namespace PHPUnit\\Framework; class Exception extends \\Exception {}",
     );
 
     // Create an absolute symlink
-    let target = format!("{}/tools-real", s.working_dir);
-    let r#link = format!("{}/tools", s.working_dir);
+    let target = s.working_dir.join("tools-real");
+    let r#link = s.working_dir.join("tools");
     assert!(shirabe_php_shim::symlink(&target, &r#link).is_ok());
 
     package.set_autoload(autoload(vec![
@@ -2550,25 +2604,23 @@ fn test_absolute_symlink_with_classmap_exclude_from_classmap() {
     let package = new_root_pkg("test/package");
 
     // Create a directory structure with files
-    s.ensure_dir(&format!(
-        "{}/tools-real/vendor/phpunit/phpunit/src/Framework",
+    s.ensure_dir(
         s.working_dir
-    ));
+            .join("tools-real/vendor/phpunit/phpunit/src/Framework"),
+    );
     s.put(
-        &format!(
-            "{}/tools-real/vendor/phpunit/phpunit/src/Framework/Exception.php",
-            s.working_dir
-        ),
+        s.working_dir
+            .join("tools-real/vendor/phpunit/phpunit/src/Framework/Exception.php"),
         "<?php namespace PHPUnit\\Framework; class Exception extends \\Exception {}",
     );
     s.put(
-        &format!("{}/tools-real/MyClass.php", s.working_dir),
+        s.working_dir.join("tools-real/MyClass.php"),
         "<?php class MyClass {}",
     );
 
     // Create an absolute symlink
-    let target = format!("{}/tools-real", s.working_dir);
-    let r#link = format!("{}/tools", s.working_dir);
+    let target = s.working_dir.join("tools-real");
+    let r#link = s.working_dir.join("tools");
     assert!(shirabe_php_shim::symlink(&target, &r#link).is_ok());
 
     package.set_autoload(autoload(vec![

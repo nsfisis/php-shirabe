@@ -112,7 +112,7 @@ pub fn init_temp_composer(
     let prev_cwd = std::env::current_dir().unwrap();
     let prev_composer_home = Platform::get_env("COMPOSER_HOME");
 
-    Platform::put_env("COMPOSER_HOME", &format!("{}/composer-home", dir.display()));
+    Platform::put_env("COMPOSER_HOME", dir.join("composer-home").to_str().unwrap());
     Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1");
 
     let mut composer_json = composer_json

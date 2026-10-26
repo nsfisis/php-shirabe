@@ -4,11 +4,12 @@ use shirabe::util::zip::Zip;
 
 /// Reuses the PHP fixtures under composer/tests/Composer/Test/Util/Fixtures/Zip.
 fn fixture(name: &str) -> String {
-    format!(
-        "{}/../../composer/tests/Composer/Test/Util/Fixtures/Zip/{}",
-        env!("CARGO_MANIFEST_DIR"),
-        name
-    )
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../composer/tests/Composer/Test/Util/Fixtures/Zip")
+        .join(name)
+        .to_str()
+        .unwrap()
+        .to_string()
 }
 
 // TODO(php-runtime): PHP runs this test only when the zip extension is NOT loaded (it is

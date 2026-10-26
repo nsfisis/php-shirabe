@@ -4,11 +4,12 @@ use shirabe::util::tar::Tar;
 
 /// Reuses the PHP fixtures under composer/tests/Composer/Test/Util/Fixtures/Tar.
 fn fixture(name: &str) -> String {
-    format!(
-        "{}/../../composer/tests/Composer/Test/Util/Fixtures/Tar/{}",
-        env!("CARGO_MANIFEST_DIR"),
-        name
-    )
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../composer/tests/Composer/Test/Util/Fixtures/Tar")
+        .join(name)
+        .to_str()
+        .unwrap()
+        .to_string()
 }
 
 #[test]

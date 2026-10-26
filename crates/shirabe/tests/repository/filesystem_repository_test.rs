@@ -124,24 +124,27 @@ fn test_repository_write() {
     // and read back. write() never reads the file (it dumps the in-memory packages), so the mocked
     // read()/exists() return values are irrelevant to the result.
     let base = std::fs::canonicalize(std::env::temp_dir()).unwrap();
-    let repo_dir = format!(
-        "{}/shirabe_repo_write_test_{}_{}",
-        base.display(),
+    let repo_dir = base.join(format!(
+        "shirabe_repo_write_test_{}_{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos()
-    );
+    ));
     let mut fs = Filesystem::new(None);
     fs.remove_directory(&repo_dir).ok();
 
-    let json_path = format!("{}/vendor/composer/installed.json", repo_dir);
-    let json = JsonFile::new(json_path.clone(), None, None).unwrap();
+    let json_path = repo_dir.join("vendor/composer/installed.json");
+    let json = JsonFile::new(json_path.to_str().unwrap().to_string(), None, None).unwrap();
     let mut repository = FilesystemRepository::new(json, false, None, None).unwrap();
 
     let mut im = MockInstallationManager::new();
-    let fixed_path = format!("{}/vendor/woop/woop", repo_dir);
+    let fixed_path = repo_dir
+        .join("vendor/woop/woop")
+        .to_str()
+        .unwrap()
+        .to_string();
     im.expect_get_install_path()
         .times(2)
         .returning(move |_| Some(fixed_path.clone()));
@@ -223,9 +226,13 @@ fn configure_links(
 fn test_repository_writes_installed_php() {
     let guard = CwdGuard::new();
     let dir = guard.path();
-    let dir = dir.to_str().unwrap();
 
-    let json = JsonFile::new(format!("{}/installed.json", dir), None, None).unwrap();
+    let json = JsonFile::new(
+        dir.join("installed.json").to_str().unwrap().to_string(),
+        None,
+        None,
+    )
+    .unwrap();
 
     let root_package = RootPackageHandle::new(
         "__root__".to_string(),
@@ -296,7 +303,7 @@ fn test_repository_writes_installed_php() {
     repository.add_package(pkg).unwrap();
 
     let mut im = MockInstallationManager::new();
-    let cwd = dir.to_string();
+    let cwd = dir.to_str().unwrap().to_string();
     im.expect_get_install_path().returning(move |package| {
         // check for empty paths handling
         if package.get_type() == "metapackage" {
@@ -319,12 +326,12 @@ fn test_repository_writes_installed_php() {
 
     repository.write(true, &im).unwrap();
 
-    let expected = std::fs::read_to_string(format!(
-        "{}/../../composer/tests/Composer/Test/Repository/Fixtures/installed.php",
-        env!("CARGO_MANIFEST_DIR")
-    ))
+    let expected = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../composer/tests/Composer/Test/Repository/Fixtures/installed.php"),
+    )
     .unwrap();
-    let actual = std::fs::read_to_string(format!("{}/installed.php", dir)).unwrap();
+    let actual = std::fs::read_to_string(dir.join("installed.php")).unwrap();
     assert_eq!(expected, actual);
 }
 
@@ -352,10 +359,12 @@ fn test_safely_load_installed_versions() {
     let result = php_call_static(
         "Composer\\Repository\\FilesystemRepository",
         "safelyLoadInstalledVersions",
-        vec![PluginValue::string(format!(
-            "{}/installed_complex.php",
-            fixtures_dir
-        ))],
+        vec![PluginValue::string(
+            std::path::Path::new(&fixtures_dir)
+                .join("installed_complex.php")
+                .to_str()
+                .unwrap(),
+        )],
     );
     assert_eq!(
         PluginValue::Bool(true),

@@ -383,8 +383,12 @@ fn test_inconsistent_require_keys() {
             app_tester.get_display()
         );
 
-        let composer_content =
-            JsonFile::new(format!("{}/composer.json", dir.display()), None, None).unwrap();
+        let composer_content = JsonFile::new(
+            dir.join("composer.json").to_str().unwrap().to_string(),
+            None,
+            None,
+        )
+        .unwrap();
         let content = composer_content.read().unwrap();
         let content: serde_json::Value =
             serde_json::from_str(&JsonFile::encode(&content).unwrap()).unwrap();
