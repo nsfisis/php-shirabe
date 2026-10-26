@@ -1,18 +1,15 @@
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
 
-pub fn gethostname() -> String {
+pub fn gethostname() -> std::ffi::OsString {
     // PHP's gethostname() wraps gethostname(2). On Linux the kernel exposes the
     // same value via /proc; fall back to the HOSTNAME env var, then to "localhost".
     std::fs::read_to_string("/proc/sys/kernel/hostname")
         .ok()
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
-        .or_else(|| {
-            crate::getenv("HOSTNAME")
-                .map(|s| s.to_string_lossy().into_owned())
-                .filter(|s| !s.is_empty())
-        })
-        .unwrap_or_else(|| "localhost".to_string())
+        .map(std::ffi::OsString::from)
+        .or_else(|| crate::getenv("HOSTNAME").filter(|s| !s.is_empty()))
+        .unwrap_or_else(|| "localhost".into())
 }
 
 // Resolves the first IPv4 address for the host name, mirroring PHP's gethostbyname
