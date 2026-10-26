@@ -162,13 +162,6 @@ pub fn debug_backtrace() -> Vec<IndexMap<String, PhpMixed>> {
     todo!()
 }
 
-/// Equivalent to PHP `include $file;`
-pub fn include_file(file: &str) -> PhpMixed {
-    let _ = file;
-    // TODO(php-runtime): `include` evaluates a PHP source file at runtime; there is no PHP interpreter.
-    todo!()
-}
-
 pub fn spl_autoload_register(
     callback: Box<dyn Fn(&str) -> PhpMixed + Send + Sync>,
     throw: bool,

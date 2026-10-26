@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 use shirabe_php_rpc::stream_resolve_include_path;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, file_exists, include_file, spl_autoload_register,
+    InvalidArgumentException, PhpMixed, file_exists, spl_autoload_register,
     spl_autoload_unregister, strlen, strpos, strrpos, strtr, substr,
 };
 use std::sync::{LazyLock, Mutex};
@@ -13,11 +13,12 @@ static REGISTERED_LOADERS: LazyLock<Mutex<IndexMap<String, ClassLoader>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 /// ClassLoader implements a PSR-0, PSR-4 and classmap class loader.
+///
+/// `loadClass` is intentionally not ported. This function resolves class names to concrete files
+/// and `include`s them. Shirabe resolves files on the Rust side and lets the PHP worker `include`
+/// them. `$includeFile` and `initializeIncludeClosure` are not ported for the same reason.
 #[derive(Debug, Clone)]
 pub struct ClassLoader {
-    // PHP holds a `private static $includeFile` closure purely to run `include $file` in an
-    // isolated scope. The `include_file` shim is a free function with no `self`/`Self` access, so
-    // that scope isolation is inherent and there is no static state to keep on the Rust side.
     /// @var string|null
     vendor_dir: Option<String>,
 
@@ -57,7 +58,7 @@ pub struct ClassLoader {
 
 impl ClassLoader {
     pub fn new(vendor_dir: Option<String>) -> Self {
-        let this = Self {
+        Self {
             vendor_dir,
             prefix_lengths_psr4: IndexMap::new(),
             prefix_dirs_psr4: IndexMap::new(),
@@ -69,9 +70,7 @@ impl ClassLoader {
             class_map_authoritative: false,
             missing_classes: IndexMap::new(),
             apcu_prefix: None,
-        };
-        Self::initialize_include_closure();
-        this
+        }
     }
 
     pub fn get_prefixes(&self) -> IndexMap<String, Vec<String>> {
@@ -311,20 +310,6 @@ impl ClassLoader {
         }
     }
 
-    /// Loads the given class or interface.
-    ///
-    /// @return true|null True if loaded, null otherwise
-    pub fn load_class(&mut self, class: &str) -> Option<bool> {
-        let file = self.find_file(class);
-        if let Some(file) = file {
-            include_file(&file);
-
-            return Some(true);
-        }
-
-        None
-    }
-
     /// Finds the path to the file where the class is defined.
     ///
     /// @return string|false The path if found, false otherwise
@@ -468,12 +453,6 @@ impl ClassLoader {
         }
 
         None
-    }
-
-    fn initialize_include_closure() {
-        // PHP lazily binds `self::$includeFile` to a scope-isolated `include $file` closure. The
-        // Rust `include_file` shim already provides that isolation as a free function, so there is
-        // no closure to bind and this is intentionally a no-op.
     }
 
     /// PHP `(array) $loader`. Every property is private, so keys are mangled as
