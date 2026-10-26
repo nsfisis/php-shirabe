@@ -1161,11 +1161,14 @@ impl Process {
     }
 
     fn get_default_env(&self) -> IndexMap<String, PhpMixed> {
+        // TODO(bytes): the environment is kept as Strings.
         let env: IndexMap<String, String> = shirabe_php_shim::getenv_all()
             .map(|(k, v)| {
                 (
-                    k.to_string_lossy().into_owned(),
-                    v.to_string_lossy().into_owned(),
+                    k.into_string()
+                        .unwrap_or_else(|k| panic!("env name is not valid UTF-8: {k:?}")),
+                    v.into_string()
+                        .unwrap_or_else(|v| panic!("env value is not valid UTF-8: {v:?}")),
                 )
             })
             .collect();
@@ -1191,10 +1194,15 @@ impl Process {
             .lock()
             .unwrap()
             .get_all()
+            // TODO(bytes): the environment is kept as Strings.
             .map(|(k, v)| {
                 (
-                    k.to_string_lossy().into_owned(),
-                    PhpMixed::String(v.to_string_lossy().into_owned()),
+                    k.into_string()
+                        .unwrap_or_else(|k| panic!("env name is not valid UTF-8: {k:?}")),
+                    PhpMixed::String(
+                        v.into_string()
+                            .unwrap_or_else(|v| panic!("env value is not valid UTF-8: {v:?}")),
+                    ),
                 )
             })
             .collect();
