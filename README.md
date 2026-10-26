@@ -18,6 +18,13 @@ Shirabe runs Composer plugins using the system-provided real PHP. The plugin API
 
 ## Requirements
 
+Running Shirabe requires:
+
+* Linux (see [platform support](./docs/known-incompatibilities.md#platform-support))
+* PHP, found on `PATH` or pointed at by the `PHP_BINARY` environment variable
+
+Shirabe is tested with PHP 8.5. Older PHP versions have not been tested.
+
 Building Shirabe requires:
 
 * Rust toolchain
