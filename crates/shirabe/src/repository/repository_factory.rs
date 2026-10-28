@@ -11,6 +11,7 @@ use crate::repository::RepositoryManager;
 use crate::repository::RepositoryManagerInterface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, get_debug_type, json_encode,
@@ -28,8 +29,8 @@ impl RepositoryFactory {
     ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
         if repository.starts_with("http") {
             let mut repo_config = IndexMap::new();
-            repo_config.insert("type".to_string(), PhpMixed::String("composer".to_string()));
-            repo_config.insert("url".to_string(), PhpMixed::String(repository.to_string()));
+            repo_config.insert("type".to_string(), PhpMixed::string("composer".to_string()));
+            repo_config.insert("url".to_string(), PhpMixed::string(repository.to_string()));
             return Ok(repo_config);
         }
 
@@ -57,19 +58,19 @@ impl RepositoryFactory {
                     .unwrap_or_else(|| repository.to_string())
                     .replace('\\', "/");
                 let mut repo_config = IndexMap::new();
-                repo_config.insert("type".to_string(), PhpMixed::String("composer".to_string()));
+                repo_config.insert("type".to_string(), PhpMixed::string("composer".to_string()));
                 repo_config.insert(
                     "url".to_string(),
-                    PhpMixed::String(format!("file://{}", real_path)),
+                    PhpMixed::string(format!("file://{}", real_path)),
                 );
                 return Ok(repo_config);
             } else if allow_filesystem {
                 let mut repo_config = IndexMap::new();
                 repo_config.insert(
                     "type".to_string(),
-                    PhpMixed::String("filesystem".to_string()),
+                    PhpMixed::string("filesystem".to_string()),
                 );
-                repo_config.insert("json".to_string(), PhpMixed::String(repository.to_string()));
+                repo_config.insert("json".to_string(), PhpMixed::string(repository.to_string()));
                 return Ok(repo_config);
             } else {
                 return Err(InvalidArgumentException::new(format!("Invalid repository URL ({}) given. This file does not contain a valid composer repository.", repository)).into());
@@ -247,7 +248,7 @@ impl RepositoryFactory {
                     let repo_type = repo_arr
                         .get("type")
                         .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_string();
                     let repo_config_map: IndexMap<String, PhpMixed> = repo_arr
                         .iter()
@@ -260,7 +261,7 @@ impl RepositoryFactory {
                         let json_path = repo_arr
                             .get("json")
                             .and_then(|v| v.as_string())
-                            .unwrap_or("")
+                            .unwrap_or_default()
                             .to_string();
                         let created: RepositoryInterfaceHandle =
                             RepositoryInterfaceHandle::new(FilesystemRepository::new(
@@ -300,8 +301,11 @@ impl RepositoryFactory {
         existing_repos: &IndexMap<String, T>,
     ) -> String {
         let mut name = if matches!(index, PhpMixed::Int(_)) && repo.contains_key("url") {
-            let url = repo.get("url").and_then(|v| v.as_string()).unwrap_or("");
-            preg_replace(php_regex!("{^https?://}i"), "", url)
+            let url = repo
+                .get("url")
+                .and_then(|v| v.as_string())
+                .unwrap_or_default();
+            preg_replace(php_regex!("{^https?://}i"), "", &url.to_str_lossy())
         } else {
             php_to_string(index)
         };
@@ -317,7 +321,7 @@ impl RepositoryFactory {
         existing_repos: &IndexMap<String, RepositoryInterfaceHandle>,
     ) -> String {
         let mut name = if let Some(url) = repo.get("url").and_then(|v| v.as_string()) {
-            preg_replace(php_regex!("{^https?://}i"), "", url)
+            preg_replace(php_regex!("{^https?://}i"), "", &url.to_str_lossy())
         } else {
             index.to_string()
         };

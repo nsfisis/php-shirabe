@@ -235,7 +235,7 @@ impl BumpCommand {
                         .entry(key.to_string())
                         .or_insert_with(|| PhpMixed::Array(indexmap::IndexMap::new()));
                     if let PhpMixed::Array(map) = section {
-                        map.insert(package.clone(), PhpMixed::String(version.clone()));
+                        map.insert(package.clone(), PhpMixed::string(version.clone()));
                     }
                 }
             }

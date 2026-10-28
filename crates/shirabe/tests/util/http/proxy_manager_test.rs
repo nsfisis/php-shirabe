@@ -239,10 +239,10 @@ fn test_get_proxy_for_request() {
             server.clone(),
             "http://repo.org",
             http_options(&[
-                ("proxy", PhpMixed::String("tcp://proxy.com:80".to_string())),
+                ("proxy", PhpMixed::string("tcp://proxy.com:80".to_string())),
                 (
                     "header",
-                    PhpMixed::String("Proxy-Authorization: Basic dXNlcjpwQHNz".to_string()),
+                    PhpMixed::string("Proxy-Authorization: Basic dXNlcjpwQHNz".to_string()),
                 ),
                 ("request_fulluri", PhpMixed::Bool(true)),
             ]),
@@ -252,7 +252,7 @@ fn test_get_proxy_for_request() {
         (
             server.clone(),
             "https://repo.org",
-            http_options(&[("proxy", PhpMixed::String("ssl://proxy.com:443".to_string()))]),
+            http_options(&[("proxy", PhpMixed::string("ssl://proxy.com:443".to_string()))]),
             "https://proxy.com:443",
             false,
         ),

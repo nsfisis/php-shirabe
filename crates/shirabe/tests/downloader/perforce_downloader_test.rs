@@ -50,7 +50,7 @@ fn get_config(test_path: &std::path::Path) -> Config {
     let mut section: IndexMap<String, PhpMixed> = IndexMap::new();
     section.insert(
         "home".to_string(),
-        PhpMixed::String(test_path.to_str().unwrap().to_string()),
+        PhpMixed::string(test_path.to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(section));
     config.merge(&top, Config::SOURCE_UNKNOWN);

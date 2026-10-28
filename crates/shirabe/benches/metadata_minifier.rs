@@ -34,7 +34,7 @@ fn minified_versions(package: &str) -> Vec<IndexMap<String, PhpMixed>> {
     let response = response.as_array().expect("the fixture is not an object");
     assert_eq!(
         response.get("minified").and_then(|v| v.as_string()),
-        Some("composer/2.0"),
+        Some("composer/2.0".into()),
         "{package} is not served in the minified format",
     );
 

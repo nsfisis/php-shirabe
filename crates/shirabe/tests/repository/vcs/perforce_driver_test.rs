@@ -54,7 +54,7 @@ fn get_test_config(test_path: &std::path::Path) -> Config {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(test_path.to_str().unwrap().to_string()),
+        PhpMixed::string(test_path.to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
@@ -66,14 +66,14 @@ fn set_up() -> SetUp {
     let test_path = TempDir::new().unwrap();
     let config = get_test_config(test_path.path());
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(TEST_URL.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(TEST_URL.to_string()));
     repo_config.insert(
         "depot".to_string(),
-        PhpMixed::String(TEST_DEPOT.to_string()),
+        PhpMixed::string(TEST_DEPOT.to_string()),
     );
     repo_config.insert(
         "branch".to_string(),
-        PhpMixed::String(TEST_BRANCH.to_string()),
+        PhpMixed::string(TEST_BRANCH.to_string()),
     );
 
     SetUp {
@@ -231,7 +231,7 @@ fn test_has_composer_file_returns_true_with_one_or_more_composer_files() {
         .returning(|_| {
             // ref: returnValue(['']) — a non-empty list with one empty-string element.
             let mut info: IndexMap<String, PhpMixed> = IndexMap::new();
-            info.insert("0".to_string(), PhpMixed::String(String::new()));
+            info.insert("0".to_string(), PhpMixed::string(String::new()));
             Ok(Some(info))
         });
     driver.__override_perforce(Box::new(perforce));

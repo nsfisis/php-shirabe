@@ -118,7 +118,7 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
     let package_name = "foo/bar";
 
     let mut overrides: IndexMap<String, PhpMixed> = IndexMap::new();
-    overrides.insert("php".to_string(), PhpMixed::String("5.5.0".to_string()));
+    overrides.insert("php".to_string(), PhpMixed::string("5.5.0".to_string()));
     let mut platform = PlatformRepository::new(vec![], overrides, None, None).unwrap();
 
     let package0 = get_package("foo/bar", "0.9.0");
@@ -214,7 +214,7 @@ fn test_latest_version_is_returned_that_matches_ext_requirements() {
     let package_name = "foo/bar";
 
     let mut overrides: IndexMap<String, PhpMixed> = IndexMap::new();
-    overrides.insert("ext-zip".to_string(), PhpMixed::String("5.3.0".to_string()));
+    overrides.insert("ext-zip".to_string(), PhpMixed::string("5.3.0".to_string()));
     let mut platform = PlatformRepository::new(vec![], overrides, None, None).unwrap();
 
     let package1 = get_package("foo/bar", "1.0.0");
@@ -308,7 +308,7 @@ fn test_latest_version_is_returned_that_matches_composer_requirements() {
     let mut overrides: IndexMap<String, PhpMixed> = IndexMap::new();
     overrides.insert(
         "composer-runtime-api".to_string(),
-        PhpMixed::String("1.0.0".to_string()),
+        PhpMixed::string("1.0.0".to_string()),
     );
     let mut platform = PlatformRepository::new(vec![], overrides, None, None).unwrap();
 
@@ -636,7 +636,7 @@ fn test_find_recommended_require_version() {
             let mut alias_map: IndexMap<String, PhpMixed> = IndexMap::new();
             alias_map.insert(
                 pretty_version.clone(),
-                PhpMixed::String(branch_alias.to_string()),
+                PhpMixed::string(branch_alias.to_string()),
             );
             let mut extra: IndexMap<String, PhpMixed> = IndexMap::new();
             extra.insert("branch-alias".to_string(), PhpMixed::Array(alias_map));

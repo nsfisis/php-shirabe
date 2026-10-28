@@ -16,6 +16,7 @@ use crate::util::Url;
 use crate::util::http::NativeHttpDownloader;
 use crate::util::http::Response;
 use crate::util::sync_executor;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -132,7 +133,7 @@ impl HttpDownloader {
         let mut max_jobs: i64 = 12;
         let max_jobs_env = Platform::get_env("COMPOSER_MAX_PARALLEL_HTTP");
         let max_jobs_env_mixed = match &max_jobs_env {
-            Some(s) => PhpMixed::String(s.clone()),
+            Some(s) => PhpMixed::string(s.clone()),
             None => PhpMixed::Bool(false),
         };
         if is_numeric(&max_jobs_env_mixed) {
@@ -380,7 +381,7 @@ impl HttpDownloader {
                         "",
                         &list
                             .iter()
-                            .map(|v| v.as_string().unwrap_or("").to_string())
+                            .map(|v| v.as_string().unwrap_or_default().to_string())
                             .collect::<Vec<_>>(),
                     );
                     stripos(&joined, "if-modified-since").is_some()
@@ -388,7 +389,7 @@ impl HttpDownloader {
                     let joined = implode(
                         "",
                         &m.values()
-                            .map(|v| v.as_string().unwrap_or("").to_string())
+                            .map(|v| v.as_string().unwrap_or_default().to_string())
                             .collect::<Vec<_>>(),
                     );
                     stripos(&joined, "if-modified-since").is_some()
@@ -512,8 +513,12 @@ impl HttpDownloader {
                 && !shirabe_php_shim::empty(versions_value)
             {
                 let version_parser: VersionParser = VersionParser::new();
-                let constraint =
-                    version_parser.parse_constraints(versions_value.as_string().unwrap_or(""))?;
+                let constraint = version_parser.parse_constraints(
+                    &versions_value
+                        .as_string()
+                        .unwrap_or_default()
+                        .to_str_lossy(),
+                )?;
                 let composer_constraint = SimpleConstraint::new(
                     "==".to_string(),
                     version_parser
@@ -531,7 +536,13 @@ impl HttpDownloader {
                 tp = r#type,
                 capitalized = ucfirst(r#type),
                 url = Url::sanitize(url.to_string()),
-                msg = clean_message(entry.unwrap().as_string().unwrap_or(""))?
+                msg = clean_message(
+                    &entry
+                        .unwrap()
+                        .as_string()
+                        .unwrap_or_default()
+                        .to_str_lossy()
+                )?
             ));
         }
 
@@ -548,10 +559,11 @@ impl HttpDownloader {
                     let r#type = substr(key, 0, Some(-1));
                     if let PhpMixed::Array(spec_map) = spec {
                         let constraint = version_parser.parse_constraints(
-                            spec_map
+                            &spec_map
                                 .get("versions")
                                 .and_then(|v| v.as_string())
-                                .unwrap_or(""),
+                                .unwrap_or_default()
+                                .to_str_lossy(),
                         )?;
                         let composer_constraint = SimpleConstraint::new(
                             "==".to_string(),
@@ -570,10 +582,11 @@ impl HttpDownloader {
                             capitalized = ucfirst(&r#type),
                             url = Url::sanitize(url.to_string()),
                             msg = clean_message(
-                                spec_map
+                                &spec_map
                                     .get("message")
                                     .and_then(|v| v.as_string())
-                                    .unwrap_or("")
+                                    .unwrap_or_default()
+                                    .to_str_lossy()
                             )?
                         ));
                     }

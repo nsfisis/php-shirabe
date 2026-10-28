@@ -33,7 +33,7 @@ fn get_archive_downloader(vendor_dir: Option<&str>) -> FileDownloader {
         let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
         config_options.insert(
             "vendor-dir".to_string(),
-            PhpMixed::String(vendor_dir.to_string()),
+            PhpMixed::string(vendor_dir.to_string()),
         );
         let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
         merged.insert("config".to_string(), PhpMixed::Array(config_options));

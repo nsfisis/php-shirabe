@@ -77,7 +77,7 @@ pub trait CompletionTrait: BaseCommand {
                         .borrow_mut()
                         .get_platform_overrides()?
                         .into_iter()
-                        .map(|(k, v)| (k, PhpMixed::String(v)))
+                        .map(|(k, v)| (k, PhpMixed::string(v)))
                         .collect();
                     PlatformRepository::new(vec![], overrides, None, None)?
                 } else {

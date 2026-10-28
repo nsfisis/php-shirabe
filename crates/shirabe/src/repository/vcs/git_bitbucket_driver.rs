@@ -13,6 +13,7 @@ use crate::repository::vcs::VcsDriverBase;
 use crate::repository::vcs::VcsDriverInterface;
 use crate::util::Bitbucket;
 use crate::util::http::Response;
+use bstr::ByteSlice;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
@@ -93,7 +94,7 @@ impl GitBitbucketDriver {
                         .borrow_mut()
                         .get("cache-repo-dir")
                         .as_string()
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_string(),
                     self.inner.origin_url.clone(),
                     self.owner.clone(),
@@ -163,7 +164,10 @@ impl GitBitbucketDriver {
                 _ => None,
             })
             .and_then(|v| match v {
-                PhpMixed::Array(m) => m.get("href").and_then(|v| v.as_string()).map(String::from),
+                PhpMixed::Array(m) => m
+                    .get("href")
+                    .and_then(|v| v.as_string())
+                    .map(|s| s.to_str_lossy().into_owned()),
                 _ => None,
             })
             .unwrap_or_default();
@@ -174,7 +178,10 @@ impl GitBitbucketDriver {
                 _ => None,
             })
             .and_then(|v| match v {
-                PhpMixed::Array(m) => m.get("href").and_then(|v| v.as_string()).map(String::from),
+                PhpMixed::Array(m) => m
+                    .get("href")
+                    .and_then(|v| v.as_string())
+                    .map(|s| s.to_str_lossy().into_owned()),
                 _ => None,
             })
             .unwrap_or_default();
@@ -185,19 +192,22 @@ impl GitBitbucketDriver {
                 _ => None,
             })
             .and_then(|v| match v {
-                PhpMixed::Array(m) => m.get("href").and_then(|v| v.as_string()).map(String::from),
+                PhpMixed::Array(m) => m
+                    .get("href")
+                    .and_then(|v| v.as_string())
+                    .map(|s| s.to_str_lossy().into_owned()),
                 _ => None,
             })
             .unwrap_or_default();
         self.website = repo_data
             .get("website")
             .and_then(|v| v.as_string())
-            .map(String::from)
+            .map(|s| s.to_str_lossy().into_owned())
             .unwrap_or_default();
         self.vcs_type = repo_data
             .get("scm")
             .and_then(|v| v.as_string())
-            .map(String::from);
+            .map(|s| s.to_str_lossy().into_owned());
 
         self.repo_data = match repo_data {
             PhpMixed::Array(m) => m,
@@ -269,27 +279,27 @@ impl GitBitbucketDriver {
                     let tags = self.get_tags()?;
                     let branches_for_search = self.get_branches()?;
                     let label = array_search_mixed(
-                        &PhpMixed::String(identifier.to_string()),
+                        &PhpMixed::string(identifier.to_string()),
                         &PhpMixed::Array(
                             tags.iter()
-                                .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
+                                .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                                 .collect(),
                         ),
                         false,
                     )
                     .or_else(|| {
                         array_search_mixed(
-                            &PhpMixed::String(identifier.to_string()),
+                            &PhpMixed::string(identifier.to_string()),
                             &PhpMixed::Array(
                                 branches_for_search
                                     .iter()
-                                    .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
+                                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                                     .collect(),
                             ),
                             false,
                         )
                     })
-                    .map(|v| v.as_string().unwrap_or("").to_string())
+                    .map(|v| v.as_string().unwrap_or_default().to_string())
                     .unwrap_or_else(|| identifier.to_string());
 
                     let tags2 = self.get_tags()?;
@@ -309,7 +319,7 @@ impl GitBitbucketDriver {
                             if let PhpMixed::Array(support_map) = support_entry {
                                 support_map.insert(
                                     "source".to_string(),
-                                    PhpMixed::String(format!(
+                                    PhpMixed::string(format!(
                                         "https://{}/{}/{}/src",
                                         self.inner.origin_url.clone(),
                                         self.owner.clone(),
@@ -322,7 +332,7 @@ impl GitBitbucketDriver {
                             if let PhpMixed::Array(support_map) = support_entry {
                                 support_map.insert(
                                     "source".to_string(),
-                                    PhpMixed::String(format!(
+                                    PhpMixed::string(format!(
                                         "https://{}/{}/{}/src/{}/?at={}",
                                         self.inner.origin_url.clone(),
                                         self.owner.clone(),
@@ -349,7 +359,7 @@ impl GitBitbucketDriver {
                     if let PhpMixed::Array(support_map) = support_entry {
                         support_map.insert(
                             "issues".to_string(),
-                            PhpMixed::String(format!(
+                            PhpMixed::string(format!(
                                 "https://{}/{}/{}/issues",
                                 self.inner.origin_url.clone(),
                                 self.owner.clone(),
@@ -362,9 +372,9 @@ impl GitBitbucketDriver {
                     composer_map.insert(
                         "homepage".to_string(),
                         if self.website.is_empty() {
-                            PhpMixed::String(self.home_url.clone())
+                            PhpMixed::string(self.home_url.clone())
                         } else {
-                            PhpMixed::String(self.website.clone())
+                            PhpMixed::string(self.website.clone())
                         },
                     );
                 }
@@ -436,8 +446,11 @@ impl GitBitbucketDriver {
             .fetch_with_oauth_credentials(&resource, false)?
             .decode_json()?;
 
-        let date_str = commit.get("date").and_then(|v| v.as_string()).unwrap_or("");
-        let date: DateTime<FixedOffset> = shirabe_php_shim::date_create(date_str)?;
+        let date_str = commit
+            .get("date")
+            .and_then(|v| v.as_string())
+            .unwrap_or_default();
+        let date: DateTime<FixedOffset> = shirabe_php_shim::date_create(&date_str.to_str_lossy())?;
         Ok(Some(date))
     }
 
@@ -504,7 +517,7 @@ impl GitBitbucketDriver {
                             let name = m
                                 .get("name")
                                 .and_then(|v| v.as_string())
-                                .unwrap_or("")
+                                .unwrap_or_default()
                                 .to_string();
                             let hash = m
                                 .get("target")
@@ -513,7 +526,7 @@ impl GitBitbucketDriver {
                                     _ => None,
                                 })
                                 .and_then(|v| v.as_string())
-                                .unwrap_or("")
+                                .unwrap_or_default()
                                 .to_string();
                             tags.insert(name, hash);
                         }
@@ -531,7 +544,7 @@ impl GitBitbucketDriver {
                     resource = tags_data
                         .get("next")
                         .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_string();
                 }
             }
@@ -570,7 +583,7 @@ impl GitBitbucketDriver {
                             let name = m
                                 .get("name")
                                 .and_then(|v| v.as_string())
-                                .unwrap_or("")
+                                .unwrap_or_default()
                                 .to_string();
                             let hash = m
                                 .get("target")
@@ -579,7 +592,7 @@ impl GitBitbucketDriver {
                                     _ => None,
                                 })
                                 .and_then(|v| v.as_string())
-                                .unwrap_or("")
+                                .unwrap_or_default()
                                 .to_string();
                             branches.insert(name, hash);
                         }
@@ -597,7 +610,7 @@ impl GitBitbucketDriver {
                     resource = branch_data
                         .get("next")
                         .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_string();
                 }
             }
@@ -680,7 +693,7 @@ impl GitBitbucketDriver {
 
     fn setup_fallback_driver(&mut self, url: &str) -> anyhow::Result<()> {
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
+        repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
         let mut driver = GitDriver::new(
             repo_config,
             self.inner.io.clone(),
@@ -700,14 +713,17 @@ impl GitBitbucketDriver {
         };
         for clone_link in list {
             if let PhpMixed::Array(m) = clone_link
-                && m.get("name").and_then(|v| v.as_string()) == Some("https")
+                && m.get("name").and_then(|v| v.as_string()) == Some("https".into())
             {
                 // Format: https://(user@)bitbucket.org/{user}/{repo}
                 // Strip username from URL (only present in clone URL's for private repositories)
                 self.clone_https_url = preg_replace(
                     php_regex!(r"/https:\/\/([^@]+@)?/"),
                     "https://",
-                    m.get("href").and_then(|v| v.as_string()).unwrap_or(""),
+                    &m.get("href")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default()
+                        .to_str_lossy(),
                 );
             }
         }
@@ -747,7 +763,7 @@ impl GitBitbucketDriver {
                     _ => None,
                 })
                 .and_then(|v| v.as_string())
-                .map(String::from)
+                .map(|s| s.to_str_lossy().into_owned())
                 .or_else(|| Some("master".to_string()));
         }
 

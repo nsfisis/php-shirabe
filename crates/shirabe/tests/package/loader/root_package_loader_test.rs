@@ -68,7 +68,7 @@ fn make_manager(
 fn require_map(entries: &[(&str, &str)]) -> PhpMixed {
     let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        m.insert(k.to_string(), PhpMixed::String(v.to_string()));
+        m.insert(k.to_string(), PhpMixed::string(v.to_string()));
     }
     PhpMixed::Array(m)
 }
@@ -131,42 +131,42 @@ fn test_stability_flags_parsing() {
             let mut m = IndexMap::new();
             m.insert(
                 "foo/bar".to_string(),
-                PhpMixed::String("~2.1.0-beta2".to_string()),
+                PhpMixed::string("~2.1.0-beta2".to_string()),
             );
             m.insert(
                 "bar/baz".to_string(),
-                PhpMixed::String("1.0.x-dev as 1.2.0".to_string()),
+                PhpMixed::string("1.0.x-dev as 1.2.0".to_string()),
             );
             m.insert(
                 "qux/quux".to_string(),
-                PhpMixed::String("1.0.*@rc".to_string()),
+                PhpMixed::string("1.0.*@rc".to_string()),
             );
             m.insert(
                 "zux/complex".to_string(),
-                PhpMixed::String("~1.0,>=1.0.2@dev".to_string()),
+                PhpMixed::string("~1.0,>=1.0.2@dev".to_string()),
             );
             m.insert(
                 "or/op".to_string(),
-                PhpMixed::String("^2.0@dev || ^2.0@dev".to_string()),
+                PhpMixed::string("^2.0@dev || ^2.0@dev".to_string()),
             );
             m.insert(
                 "multi/lowest-wins".to_string(),
-                PhpMixed::String("^2.0@rc || >=3.0@dev , ~3.5@alpha".to_string()),
+                PhpMixed::string("^2.0@rc || >=3.0@dev , ~3.5@alpha".to_string()),
             );
             m.insert(
                 "or/op-without-flags".to_string(),
-                PhpMixed::String("dev-master || 2.0 , ~3.5-alpha".to_string()),
+                PhpMixed::string("dev-master || 2.0 , ~3.5-alpha".to_string()),
             );
             m.insert(
                 "or/op-without-flags2".to_string(),
-                PhpMixed::String("3.0-beta || 2.0 , ~3.5-alpha".to_string()),
+                PhpMixed::string("3.0-beta || 2.0 , ~3.5-alpha".to_string()),
             );
             m
         }),
     );
     data.insert(
         "minimum-stability".to_string(),
-        PhpMixed::String("alpha".to_string()),
+        PhpMixed::string("alpha".to_string()),
     );
 
     let package = loader
@@ -323,7 +323,7 @@ fn test_non_feature_branch_pretty_version() {
     );
     data.insert(
         "non-feature-branches".to_string(),
-        PhpMixed::List(vec![PhpMixed::String("latest-.*".to_string())]),
+        PhpMixed::List(vec![PhpMixed::string("latest-.*".to_string())]),
     );
 
     let package = loader

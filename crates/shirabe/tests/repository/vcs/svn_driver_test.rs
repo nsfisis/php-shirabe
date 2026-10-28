@@ -27,7 +27,7 @@ fn set_up() -> SetUp {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(home.path().to_str().unwrap().to_string()),
+        PhpMixed::string(home.path().to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
@@ -125,7 +125,7 @@ fn test_wrong_credentials_in_url() {
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".to_string(),
-        PhpMixed::String("https://till:secret@corp.svn.local/repo".to_string()),
+        PhpMixed::string("https://till:secret@corp.svn.local/repo".to_string()),
     );
 
     let mut svn = SvnDriver::new(repo_config, console, config, http_downloader, process);

@@ -9,6 +9,7 @@ use crate::console::input::InputArgument;
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class, parse_url, php_regex,
@@ -59,12 +60,12 @@ impl RepositoryCommand {
                 let has_type_and_url =
                     repo_map.contains_key("type") && repo_map.contains_key("url");
                 let is_composer_type =
-                    repo_map.get("type").and_then(|v| v.as_string()) == Some("composer");
+                    repo_map.get("type").and_then(|v| v.as_string()) == Some("composer".into());
                 let url_host_ends_with_packagist = repo_map
                     .get("url")
                     .and_then(|v| v.as_string())
                     .map(|url| {
-                        parse_url(url)
+                        parse_url(&url.to_str_lossy())
                             .and_then(|parsed| parsed.host)
                             .unwrap_or_default()
                             .ends_with("packagist.org")
@@ -106,11 +107,11 @@ impl RepositoryCommand {
                 let name = repo_map
                     .get("name")
                     .and_then(|v| v.as_string())
-                    .unwrap_or(key.as_str());
+                    .unwrap_or(key.as_str().into());
                 let r#type = repo_map
                     .get("type")
                     .and_then(|v| v.as_string())
-                    .unwrap_or("unknown");
+                    .unwrap_or("unknown".into());
                 let url = match repo_map
                     .get("url")
                     .and_then(|v| v.as_string())
@@ -323,7 +324,7 @@ impl Command for RepositoryCommand {
                 .borrow()
                 .get_argument("action")?
                 .as_string()
-                .unwrap_or(""),
+                .unwrap_or_default(),
         );
         let name = input
             .borrow()
@@ -377,8 +378,8 @@ impl Command for RepositoryCommand {
                         return Err(RuntimeException::new("You must pass the type and a url. Example: shirabe repo add foo vcs https://example.org".to_string()).into());
                     }
                     let mut m = IndexMap::new();
-                    m.insert("type".to_string(), PhpMixed::String(arg1_str.to_string()));
-                    m.insert("url".to_string(), PhpMixed::String(arg2.unwrap()));
+                    m.insert("type".to_string(), PhpMixed::string(arg1_str.to_string()));
+                    m.insert("url".to_string(), PhpMixed::string(arg2.unwrap()));
                     PhpMixed::Array(m)
                 };
 
@@ -483,7 +484,7 @@ impl Command for RepositoryCommand {
                 {
                     let url = repo_map.get("url").and_then(|v| v.as_string());
                     if let Some(url) = url {
-                        self.get_io().write(url);
+                        self.get_io().write(&url.to_str_lossy());
                         return Ok(0);
                     }
                     return Err(InvalidArgumentException::new(format!(
@@ -499,7 +500,7 @@ impl Command for RepositoryCommand {
                     {
                         let url = repo_map.get("url").and_then(|v| v.as_string());
                         if let Some(url) = url {
-                            self.get_io().write(url);
+                            self.get_io().write(&url.to_str_lossy());
                             return Ok(0);
                         }
                         return Err(InvalidArgumentException::new(format!(

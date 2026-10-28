@@ -67,7 +67,7 @@ impl FossilDriver {
                 .borrow_mut()
                 .get("cache-repo-dir")
                 .as_string()
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             let cache_vcs_dir = self
                 .inner
@@ -75,7 +75,7 @@ impl FossilDriver {
                 .borrow_mut()
                 .get("cache-vcs-dir")
                 .as_string()
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             if !Cache::is_usable(&cache_repo_dir) || !Cache::is_usable(&cache_vcs_dir) {
                 return Err(RuntimeException::new("FossilDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string())

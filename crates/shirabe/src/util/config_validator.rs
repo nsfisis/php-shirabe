@@ -7,6 +7,7 @@ use crate::package::loader::ArrayLoader;
 use crate::package::loader::InvalidPackageException;
 use crate::package::loader::LoaderInterface;
 use crate::package::loader::ValidatingArrayLoader;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use serde::de::Error as _;
 use shirabe_php_shim::Catch as _;
@@ -97,12 +98,12 @@ impl ConfigValidator {
         } else {
             let license_val = manifest.get("license").unwrap();
             let licenses: Vec<String> = match license_val {
-                PhpMixed::String(s) => vec![s.clone()],
+                PhpMixed::String(s) => vec![s.to_str_lossy().into_owned()],
                 PhpMixed::List(list) => list
                     .iter()
                     .filter_map(|v| {
                         if let PhpMixed::String(s) = v {
-                            Some(s.clone())
+                            Some(s.to_str_lossy().into_owned())
                         } else {
                             None
                         }
@@ -148,12 +149,12 @@ impl ConfigValidator {
 
         if let Some(PhpMixed::String(name)) = manifest.get("name")
             && !name.is_empty()
-            && preg_is_match(php_regex!(r"{[A-Z]}"), name)
+            && preg_is_match(php_regex!(r"{[A-Z]}"), &name.to_str_lossy())
         {
             let suggest_name = preg_replace(
                 php_regex!(r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
                 r"\1\3-\2\4",
-                name,
+                &name.to_str_lossy(),
             );
             let suggest_name = suggest_name.to_lowercase();
 
@@ -225,7 +226,7 @@ impl ConfigValidator {
         packages.extend(require_dev);
         for (package, version) in &packages {
             if let PhpMixed::String(version_str) = version
-                && preg_is_match(php_regex!(r"{#}"), version_str)
+                && preg_is_match(php_regex!(r"{#}"), &version_str.to_str_lossy())
             {
                 warnings.push(format!(
                         "The package \"{}\" is pointing to a commit-ref, this is bad practice and can cause unforeseen issues.",
@@ -288,12 +289,12 @@ impl ConfigValidator {
         );
         let mut manifest_for_load = manifest;
         if !manifest_for_load.contains_key("version") {
-            manifest_for_load.insert("version".to_string(), PhpMixed::String("1.0.0".to_string()));
+            manifest_for_load.insert("version".to_string(), PhpMixed::string("1.0.0".to_string()));
         }
         if !manifest_for_load.contains_key("name") {
             manifest_for_load.insert(
                 "name".to_string(),
-                PhpMixed::String("dummy/dummy".to_string()),
+                PhpMixed::string("dummy/dummy".to_string()),
             );
         }
         match loader.load(

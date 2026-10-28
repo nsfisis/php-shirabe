@@ -49,6 +49,7 @@ use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::r#loop::Loop;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -237,14 +238,14 @@ impl Factory {
         let home = Self::get_home_dir()?;
         let mut defaults: IndexMap<String, PhpMixed> = IndexMap::new();
         let mut inner: IndexMap<String, PhpMixed> = IndexMap::new();
-        inner.insert("home".to_string(), PhpMixed::String(home.clone()));
+        inner.insert("home".to_string(), PhpMixed::string(home.clone()));
         inner.insert(
             "cache-dir".to_string(),
-            PhpMixed::String(Self::get_cache_dir(&home)?),
+            PhpMixed::string(Self::get_cache_dir(&home)?),
         );
         inner.insert(
             "data-dir".to_string(),
-            PhpMixed::String(Self::get_data_dir(&home)?),
+            PhpMixed::string(Self::get_data_dir(&home)?),
         );
         defaults.insert(
             "config".to_string(),
@@ -636,7 +637,7 @@ impl Factory {
                     // guessing it adds no value and only takes time
                     if !full_load && !local_config_data.contains_key("version") {
                         local_config_data
-                            .insert("version".to_string(), PhpMixed::String("1.0.0".to_string()));
+                            .insert("version".to_string(), PhpMixed::string("1.0.0".to_string()));
                     }
 
                     // load package
@@ -1012,7 +1013,7 @@ impl Factory {
 
         let mut dm = DownloadManager::new(io.clone(), false, Some(fs.clone()));
         let preferred = config.borrow_mut().get("preferred-install");
-        match preferred.as_string() {
+        match preferred.as_string().map(|s| s.to_str_lossy()).as_deref() {
             Some("dist") => {
                 dm.set_prefer_dist(true);
             }
@@ -1032,7 +1033,7 @@ impl Factory {
                         (
                             k,
                             match v {
-                                PhpMixed::String(s) => s,
+                                PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                                 _ => String::new(),
                             },
                         )
@@ -1406,8 +1407,8 @@ impl Factory {
         let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
         config_section.insert(
             "home".to_string(),
-            // TODO(bytes): PhpMixed::String carries the path as a String.
-            PhpMixed::String(
+            // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
+            PhpMixed::string(
                 home.into_os_string()
                     .into_string()
                     .unwrap_or_else(|home| panic!("temp dir is not valid UTF-8: {home:?}")),
@@ -1466,7 +1467,7 @@ impl Factory {
                 let mut ssl_map: IndexMap<String, PhpMixed> = IndexMap::new();
                 ssl_map.insert(
                     "cafile".to_string(),
-                    PhpMixed::String(config.borrow_mut().get_str("cafile").unwrap_or_default()),
+                    PhpMixed::string(config.borrow_mut().get_str("cafile").unwrap_or_default()),
                 );
                 http_downloader_options.insert(
                     "ssl".to_string(),
@@ -1482,7 +1483,7 @@ impl Factory {
                 let mut ssl_map = existing_ssl;
                 ssl_map.insert(
                     "capath".to_string(),
-                    PhpMixed::String(config.borrow_mut().get_str("capath").unwrap_or_default()),
+                    PhpMixed::string(config.borrow_mut().get_str("capath").unwrap_or_default()),
                 );
                 http_downloader_options.insert("ssl".to_string(), PhpMixed::Array(ssl_map));
             }

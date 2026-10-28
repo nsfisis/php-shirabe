@@ -8,7 +8,7 @@ use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::PhpMixed;
 
 fn s(v: &str) -> PhpMixed {
-    PhpMixed::String(v.to_string())
+    PhpMixed::string(v.to_string())
 }
 
 fn i(v: i64) -> PhpMixed {

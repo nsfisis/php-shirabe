@@ -28,14 +28,14 @@ fn test_required_information() {
     let mut expected: IndexMap<String, PhpMixed> = IndexMap::new();
     expected.insert(
         "name".to_string(),
-        PhpMixed::String("dummy/pkg".to_string()),
+        PhpMixed::string("dummy/pkg".to_string()),
     );
-    expected.insert("version".to_string(), PhpMixed::String("1.0.0".to_string()));
+    expected.insert("version".to_string(), PhpMixed::string("1.0.0".to_string()));
     expected.insert(
         "version_normalized".to_string(),
-        PhpMixed::String("1.0.0.0".to_string()),
+        PhpMixed::string("1.0.0.0".to_string()),
     );
-    expected.insert("type".to_string(), PhpMixed::String("library".to_string()));
+    expected.insert("type".to_string(), PhpMixed::string("library".to_string()));
 
     assert_eq!(expected, config);
 }
@@ -49,7 +49,7 @@ fn test_root_package() {
     let config = dumper.dump(package.into());
 
     assert_eq!(
-        Some(&PhpMixed::String("dev".to_string())),
+        Some(&PhpMixed::string("dev".to_string())),
         config.get("minimum-stability")
     );
 }
@@ -69,12 +69,12 @@ fn test_dump_abandoned() {
 fn test_dump_abandoned_replacement() {
     let dumper = set_up();
     let package = complete_package();
-    package.set_abandoned(PhpMixed::String("foo/bar".to_string()));
+    package.set_abandoned(PhpMixed::string("foo/bar".to_string()));
 
     let config = dumper.dump(package.into());
 
     assert_eq!(
-        Some(&PhpMixed::String("foo/bar".to_string())),
+        Some(&PhpMixed::string("foo/bar".to_string())),
         config.get("abandoned")
     );
 }

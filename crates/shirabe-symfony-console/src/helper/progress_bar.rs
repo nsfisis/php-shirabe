@@ -8,6 +8,7 @@ use crate::output::ConsoleSectionOutput;
 use crate::output::OutputInterface;
 use crate::output::output_interface;
 use crate::terminal::Terminal;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PregMatches, preg_replace_callback};
 
@@ -619,7 +620,7 @@ impl ProgressBar {
                         ));
                     }
 
-                    Ok(Ok(shirabe_php_shim::PhpMixed::String(display)))
+                    Ok(Ok(shirabe_php_shim::PhpMixed::string(display)))
                 },
             ),
         );
@@ -629,7 +630,7 @@ impl ProgressBar {
             Box::new(
                 |bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
-                    Ok(Ok(shirabe_php_shim::PhpMixed::String(
+                    Ok(Ok(shirabe_php_shim::PhpMixed::string(
                         Helper::format_time(
                             (shirabe_php_shim::time() - bar.get_start_time()) as f64,
                         )
@@ -646,9 +647,7 @@ impl ProgressBar {
                     return Ok(Err(LogicException::new("Unable to display the remaining time if the maximum number of steps is not set.".to_string())));
                 }
 
-                Ok(Ok(shirabe_php_shim::PhpMixed::String(
-                    Helper::format_time(bar.get_remaining()).unwrap_or_default(),
-                )))
+                Ok(Ok(shirabe_php_shim::PhpMixed::string(Helper::format_time(bar.get_remaining()).unwrap_or_default())))
             }),
         );
 
@@ -659,9 +658,7 @@ impl ProgressBar {
                     return Ok(Err(LogicException::new("Unable to display the estimated time if the maximum number of steps is not set.".to_string())));
                 }
 
-                Ok(Ok(shirabe_php_shim::PhpMixed::String(
-                    Helper::format_time(bar.get_estimated()).unwrap_or_default(),
-                )))
+                Ok(Ok(shirabe_php_shim::PhpMixed::string(Helper::format_time(bar.get_estimated()).unwrap_or_default())))
             }),
         );
 
@@ -670,7 +667,7 @@ impl ProgressBar {
             Box::new(
                 |_bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
-                    Ok(Ok(shirabe_php_shim::PhpMixed::String(
+                    Ok(Ok(shirabe_php_shim::PhpMixed::string(
                         Helper::format_memory(shirabe_php_shim::memory_get_usage()),
                     )))
                 },
@@ -682,7 +679,7 @@ impl ProgressBar {
             Box::new(
                 |bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
-                    Ok(Ok(shirabe_php_shim::PhpMixed::String(
+                    Ok(Ok(shirabe_php_shim::PhpMixed::string(
                         shirabe_php_shim::str_pad(
                             &bar.get_progress().to_string(),
                             bar.get_step_width() as usize,
@@ -811,7 +808,7 @@ impl ProgressBar {
                     });
                     formatter_result??
                 } else if let Some(message) = self.messages.get(&name) {
-                    shirabe_php_shim::PhpMixed::String(message.clone())
+                    shirabe_php_shim::PhpMixed::string(message.clone())
                 } else {
                     return Ok(matches.get(0).unwrap_or_default().to_string());
                 };
@@ -822,7 +819,7 @@ impl ProgressBar {
 
             // PHP implicitly casts the formatter result to string here.
             Ok(match text {
-                shirabe_php_shim::PhpMixed::String(s) => s,
+                shirabe_php_shim::PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                 shirabe_php_shim::PhpMixed::Int(i) => i.to_string(),
                 shirabe_php_shim::PhpMixed::Float(f) => {
                     format!("{}", f)

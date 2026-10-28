@@ -6,6 +6,7 @@ use crate::io::IOInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::util::HttpDownloader;
+use bstr::ByteSlice;
 use shirabe_php_shim::Catch as _;
 
 #[derive(Debug)]
@@ -83,7 +84,7 @@ impl Forgejo {
             .io
             .ask("Username: ".to_string(), shirabe_php_shim::PhpMixed::Null)?
             .as_string()
-            .map(|s| s.trim().to_string())
+            .map(|s| s.to_str_lossy().trim().to_string())
             .unwrap_or_default();
         let token = self
             .io

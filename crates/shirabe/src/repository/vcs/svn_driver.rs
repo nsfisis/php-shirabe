@@ -11,6 +11,7 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use crate::util::Url;
+use bstr::ByteSlice;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
@@ -68,20 +69,20 @@ impl SvnDriver {
 
         match self.inner.repo_config.get("trunk-path") {
             Some(PhpMixed::Bool(false)) => self.trunk_path = None,
-            Some(PhpMixed::String(v)) => self.trunk_path = Some(v.clone()),
+            Some(PhpMixed::String(v)) => self.trunk_path = Some(v.to_str_lossy().into_owned()),
             _ => {}
         }
         if let Some(PhpMixed::String(v)) = self.inner.repo_config.get("branches-path").cloned() {
-            self.branches_path = v;
+            self.branches_path = v.to_str_lossy().into_owned();
         }
         if let Some(PhpMixed::String(v)) = self.inner.repo_config.get("tags-path").cloned() {
-            self.tags_path = v;
+            self.tags_path = v.to_str_lossy().into_owned();
         }
         if let Some(v) = self.inner.repo_config.get("svn-cache-credentials") {
             self.cache_credentials = v.to_bool();
         }
         if let Some(PhpMixed::String(v)) = self.inner.repo_config.get("package-path").cloned() {
-            self.package_path = format!("/{}", trim(&v, Some("/")));
+            self.package_path = format!("/{}", trim(&v.to_str_lossy(), Some("/")));
         }
 
         if let Some(pos) = strrpos(
@@ -100,7 +101,7 @@ impl SvnDriver {
                     .borrow_mut()
                     .get("cache-repo-dir")
                     .as_string()
-                    .unwrap_or(""),
+                    .unwrap_or_default(),
                 preg_replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(self.base_url.clone())),
             ),
             None,

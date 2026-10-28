@@ -90,7 +90,7 @@ impl Command for ClearCacheCommand {
                 config
                     .get("cache-vcs-dir")
                     .as_string()
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string(),
             ),
             (
@@ -98,7 +98,7 @@ impl Command for ClearCacheCommand {
                 config
                     .get("cache-repo-dir")
                     .as_string()
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string(),
             ),
             (
@@ -106,7 +106,7 @@ impl Command for ClearCacheCommand {
                 config
                     .get("cache-files-dir")
                     .as_string()
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string(),
             ),
             (
@@ -114,7 +114,7 @@ impl Command for ClearCacheCommand {
                 config
                     .get("cache-dir")
                     .as_string()
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string(),
             ),
         ];

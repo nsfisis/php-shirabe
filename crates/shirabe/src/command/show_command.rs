@@ -35,6 +35,7 @@ use crate::repository::RepositorySet;
 use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
 use crate::util::PackageInfo;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
@@ -293,7 +294,11 @@ impl ShowCommand {
     )> {
         let name = strtolower(name);
         let constraint: Option<AnyConstraint> = match &version {
-            PhpMixed::String(s) => Some(self.version_parser.borrow().parse_constraints(s)?),
+            PhpMixed::String(s) => Some(
+                self.version_parser
+                    .borrow()
+                    .parse_constraints(&s.to_str_lossy())?,
+            ),
             PhpMixed::Null => None,
             _ => None, // already a ConstraintInterface
         };
@@ -522,7 +527,9 @@ impl ShowCommand {
                                     .filter_map(|p| p.as_string().map(|s| s.to_string()))
                                     .collect::<Vec<_>>()
                                     .join(", "),
-                                PhpMixed::String(s) if !s.is_empty() => s.clone(),
+                                PhpMixed::String(s) if !s.is_empty() => {
+                                    s.to_str_lossy().into_owned()
+                                }
                                 _ => ".".to_string(),
                             };
                             let name_disp = if name.is_empty() { "*" } else { name };
@@ -808,7 +815,7 @@ impl ShowCommand {
                                 _ => false,
                             };
                             if is_empty_path {
-                                path_val = PhpMixed::String(".".to_string());
+                                path_val = PhpMixed::string(".".to_string());
                             }
 
                             let key = if name.is_empty() {
@@ -1045,7 +1052,7 @@ impl ShowCommand {
             // pass the ConstraintInterface object — signal via Null in this scalar shape
             PhpMixed::Null
         } else {
-            PhpMixed::String(link.get_pretty_constraint().to_string())
+            PhpMixed::string(link.get_pretty_constraint().to_string())
         };
         let (package, _) = self.get_package(installed_repo, remote_repos, name, version_arg)?;
         if let Some(package) = package {
@@ -1556,8 +1563,8 @@ impl Command for ShowCommand {
         if !in_array_loose(
             format.clone(),
             &[
-                PhpMixed::String("text".to_string()),
-                PhpMixed::String("json".to_string()),
+                PhpMixed::string("text".to_string()),
+                PhpMixed::string("json".to_string()),
             ],
         ) {
             self.get_io().write_error(&format!(
@@ -1881,7 +1888,7 @@ impl Command for ShowCommand {
                     &self
                         .get_root_requires()
                         .into_iter()
-                        .map(PhpMixed::String)
+                        .map(PhpMixed::string)
                         .collect::<Vec<_>>(),
                 )
             {
@@ -1901,7 +1908,7 @@ impl Command for ShowCommand {
                 if let Some(working_dir) = options.get("working-dir").filter(|v| !v.is_null()) {
                     hint.push_str(&format!(
                         " in {}/composer.json",
-                        working_dir.as_string().unwrap_or("")
+                        working_dir.as_string().unwrap_or_default()
                     ));
                 }
                 if PlatformRepository::is_platform_package(pf)
@@ -2040,7 +2047,7 @@ impl Command for ShowCommand {
                     package.get_name(),
                     &root_requires
                         .iter()
-                        .map(|s| PhpMixed::String(s.clone()))
+                        .map(|s| PhpMixed::string(s.clone()))
                         .collect::<Vec<_>>(),
                 ) {
                     array_tree.push(self.generate_package_tree(
@@ -2144,7 +2151,7 @@ impl Command for ShowCommand {
                                     p.get_name(),
                                     &list
                                         .iter()
-                                        .map(|s| PhpMixed::String(s.clone()))
+                                        .map(|s| PhpMixed::string(s.clone()))
                                         .collect::<Vec<_>>(),
                                 ),
                             };
@@ -2300,7 +2307,7 @@ impl Command for ShowCommand {
                             &self
                                 .get_root_requires()
                                 .into_iter()
-                                .map(PhpMixed::String)
+                                .map(PhpMixed::string)
                                 .collect::<Vec<_>>(),
                         ));
                         if format != "json"

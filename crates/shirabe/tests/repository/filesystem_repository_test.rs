@@ -211,7 +211,7 @@ fn configure_links(
     for (target, constraint) in links {
         map.insert(
             (*target).to_string(),
-            PhpMixed::String((*constraint).to_string()),
+            PhpMixed::string((*constraint).to_string()),
         );
     }
     ArrayLoader::new(None, false)
@@ -381,16 +381,16 @@ fn test_safely_load_installed_versions() {
     let root = PhpMixed::Array(IndexMap::from([
         (
             "install_path".to_string(),
-            PhpMixed::String(format!("{}/./", fixtures_dir)),
+            PhpMixed::string(format!("{}/./", fixtures_dir)),
         ),
         (
             "aliases".to_string(),
             PhpMixed::List(vec![
-                PhpMixed::String("1.10.x-dev".to_string()),
-                PhpMixed::String("2.10.x-dev".to_string()),
+                PhpMixed::string("1.10.x-dev".to_string()),
+                PhpMixed::string("2.10.x-dev".to_string()),
             ]),
         ),
-        ("name".to_string(), PhpMixed::String("__root__".to_string())),
+        ("name".to_string(), PhpMixed::string("__root__".to_string())),
         ("true".to_string(), PhpMixed::Bool(true)),
         ("false".to_string(), PhpMixed::Bool(false)),
         ("null".to_string(), PhpMixed::Null),
@@ -399,11 +399,11 @@ fn test_safely_load_installed_versions() {
     let a_provider = PhpMixed::Array(IndexMap::from([
         (
             "foo".to_string(),
-            PhpMixed::String("simple string/no backslash".to_string()),
+            PhpMixed::string("simple string/no backslash".to_string()),
         ),
         (
             "install_path".to_string(),
-            PhpMixed::String(format!(
+            PhpMixed::string(format!(
                 "{}/vendor/{{${{passthru('bash -i')}}}}",
                 fixtures_dir
             )),
@@ -414,12 +414,12 @@ fn test_safely_load_installed_versions() {
     let c_c = PhpMixed::Array(IndexMap::from([
         (
             "install_path".to_string(),
-            PhpMixed::String("/foo/bar/ven/do{}r/c/c${}".to_string()),
+            PhpMixed::string("/foo/bar/ven/do{}r/c/c${}".to_string()),
         ),
         ("aliases".to_string(), PhpMixed::List(vec![])),
         (
             "reference".to_string(),
-            PhpMixed::String(
+            PhpMixed::string(
                 "{${passthru('bash -i')}} Foo\\Bar\n\ttab\u{0b}verticaltab\0".to_string(),
             ),
         ),

@@ -126,7 +126,7 @@ fn test_error_messages() {
     let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(test_dir.path().to_str().unwrap().to_string()),
+        PhpMixed::string(test_dir.path().to_str().unwrap().to_string()),
     );
     let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
     merged.insert("config".to_string(), PhpMixed::Array(config_options));

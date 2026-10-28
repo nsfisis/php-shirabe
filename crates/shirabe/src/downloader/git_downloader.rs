@@ -763,7 +763,7 @@ impl VcsDownloader for GitDownloader {
                 .borrow_mut()
                 .get("cache-vcs-dir")
                 .as_string()
-                .unwrap_or(""),
+                .unwrap_or_default(),
             preg_replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string())),
         );
         let git_version = GitUtil::get_version(&self.inner.process)?;
@@ -828,7 +828,7 @@ impl VcsDownloader for GitDownloader {
                 .borrow_mut()
                 .get("cache-vcs-dir")
                 .as_string()
-                .unwrap_or(""),
+                .unwrap_or_default(),
             preg_replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string())),
         );
         let r#ref = package.get_source_reference().unwrap_or_default();
@@ -988,7 +988,7 @@ impl VcsDownloader for GitDownloader {
                 .borrow_mut()
                 .get("cache-vcs-dir")
                 .as_string()
-                .unwrap_or(""),
+                .unwrap_or_default(),
             preg_replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string())),
         );
         let r#ref = target.get_source_reference().unwrap_or_default();
@@ -1145,7 +1145,7 @@ impl VcsDownloader for GitDownloader {
             if discard_changes.as_bool() == Some(true) {
                 return self.discard_changes(&path).await;
             }
-            if discard_changes.as_string() == Some("stash") {
+            if discard_changes.as_string() == Some("stash".into()) {
                 if !update {
                     self.fail_on_local_changes(package.clone(), &path).await?;
                     return Ok(None);
@@ -1194,7 +1194,7 @@ impl VcsDownloader for GitDownloader {
                         "    <info>Discard changes [y,n,v,{}?]?</info> ",
                         if update { "s," } else { "" }
                     ),
-                    PhpMixed::String("?".to_string()),
+                    PhpMixed::string("?".to_string()),
                 )?
                 .as_string()
                 .map(|s| s.to_string());

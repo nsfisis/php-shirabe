@@ -10,6 +10,7 @@ use crate::pipes::pipes_interface::PipesInterface;
 use crate::pipes::unix_pipes::UnixPipes;
 use crate::pipes::windows_pipes::WindowsPipes;
 use crate::process_utils::ProcessUtils;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Descriptor, PhpMixed, PhpResource, PregMatches, php_regex, preg_is_match, preg_replace,
@@ -100,7 +101,7 @@ fn descriptor(items: &[&str]) -> Descriptor {
 /// PHP `(string)` cast for an environment value or stream payload.
 fn to_php_string(value: &PhpMixed) -> String {
     match value {
-        PhpMixed::String(s) => s.clone(),
+        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
         PhpMixed::Int(i) => i.to_string(),
         PhpMixed::Float(f) => f.to_string(),
         PhpMixed::Bool(b) => {
@@ -243,7 +244,7 @@ impl Process {
         if let Some(env) = env {
             this.set_env(
                 env.into_iter()
-                    .map(|(k, v)| (k, PhpMixed::String(v)))
+                    .map(|(k, v)| (k, PhpMixed::string(v)))
                     .collect(),
             );
         }
@@ -1043,7 +1044,7 @@ impl Process {
                 var_count += 1;
                 let var = format!("{}{}", uid, var_count);
 
-                env.insert(var.clone(), PhpMixed::String(value));
+                env.insert(var.clone(), PhpMixed::string(value));
 
                 let replacement = format!("!{}!", var);
                 var_cache.insert(m0, replacement.clone());
@@ -1178,12 +1179,12 @@ impl Process {
         let mut intersect: IndexMap<String, PhpMixed> = IndexMap::new();
         for (k, v) in &env {
             if server.get(k).is_some() {
-                intersect.insert(k.clone(), PhpMixed::String(v.clone()));
+                intersect.insert(k.clone(), PhpMixed::string(v.clone()));
             }
         }
         let env_map: IndexMap<String, PhpMixed> = if intersect.is_empty() {
             env.into_iter()
-                .map(|(k, v)| (k, PhpMixed::String(v)))
+                .map(|(k, v)| (k, PhpMixed::string(v)))
                 .collect()
         } else {
             intersect
@@ -1199,7 +1200,7 @@ impl Process {
                 (
                     k.into_string()
                         .unwrap_or_else(|k| panic!("env name is not valid UTF-8: {k:?}")),
-                    PhpMixed::String(
+                    PhpMixed::string(
                         v.into_string()
                             .unwrap_or_else(|v| panic!("env value is not valid UTF-8: {v:?}")),
                     ),

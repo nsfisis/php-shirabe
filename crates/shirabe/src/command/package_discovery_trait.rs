@@ -18,6 +18,7 @@ use crate::repository::RepositoryFactory;
 use crate::repository::RepositorySet;
 use crate::repository::{RepositoryInterface, SearchResult};
 use crate::util::Filesystem;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -116,7 +117,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 && let Some(ms) = arr.get("minimum-stability")
                 && let Some(s) = ms.as_string()
             {
-                return VersionParser::normalize_stability(s).unwrap_or_default();
+                return VersionParser::normalize_stability(&s.to_str_lossy()).unwrap_or_default();
             }
         }
 
@@ -241,7 +242,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         found_package.name.clone(),
                         &existing_packages
                             .iter()
-                            .map(|s| PhpMixed::String(s.clone()))
+                            .map(|s| PhpMixed::string(s.clone()))
                             .collect::<Vec<_>>(),
                     )
                 });
@@ -315,15 +316,16 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     let version_parser_clone = version_parser.clone();
                     let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> = Box::new(
                         move |selection_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
-                            let selection = selection_mixed.as_string().unwrap_or("").to_string();
+                            let selection =
+                                selection_mixed.as_string().unwrap_or_default().to_string();
                             if selection.is_empty() {
                                 return Ok(PhpMixed::Bool(false));
                             }
 
-                            if is_numeric(&PhpMixed::String(selection.clone())) {
+                            if is_numeric(&PhpMixed::string(selection.clone())) {
                                 let idx: usize = selection.parse().unwrap_or(0);
                                 if let Some(p) = matches_clone.get(idx) {
-                                    return Ok(PhpMixed::String(p.name.clone()));
+                                    return Ok(PhpMixed::string(p.name.clone()));
                                 }
                             }
 
@@ -336,7 +338,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                     // validate version constraint
                                     version_parser_clone.parse_constraints(&v)?;
 
-                                    return Ok(PhpMixed::String(format!(
+                                    return Ok(PhpMixed::string(format!(
                                         "{} {}",
                                         m.name("name").unwrap_or_default(),
                                         v,
@@ -344,7 +346,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                 }
 
                                 // parsing `acme/example`
-                                return Ok(PhpMixed::String(
+                                return Ok(PhpMixed::string(
                                     m.name("name").unwrap_or_default().to_string(),
                                 ));
                             }
@@ -358,7 +360,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             "Enter package # to add, or the complete package name if it is not listed: ".to_string(),
                             validator,
                             Some(3),
-                            PhpMixed::String(String::new()),
+                            PhpMixed::string(String::new()),
                         )?
                         .as_string()
                         .map(|s| s.to_string())
@@ -369,9 +371,12 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 if !package.is_empty() && strpos(&package, " ").is_none() {
                     let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> =
                         Box::new(|input_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
-                            let input = trim(input_mixed.as_string().unwrap_or(""), None);
+                            let input = trim(
+                                &input_mixed.as_string().unwrap_or_default().to_str_lossy(),
+                                None,
+                            );
                             if strlen(&input) > 0 {
-                                Ok(PhpMixed::String(input))
+                                Ok(PhpMixed::string(input))
                             } else {
                                 Ok(PhpMixed::Bool(false))
                             }
@@ -381,7 +386,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         "Enter the version constraint to require (or leave blank to use the latest version): ".to_string(),
                         validator,
                         Some(3),
-                        PhpMixed::String(String::new()),
+                        PhpMixed::string(String::new()),
                     )?;
 
                     let constraint: String = match &constraint_mixed {
@@ -408,7 +413,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                             c
                         }
-                        PhpMixed::String(s) => s.clone(),
+                        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                         _ => String::new(),
                     };
 
@@ -482,11 +487,11 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     let name_owned = name.to_string();
                     let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> =
                         Box::new(move |value_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
-                            let value = value_mixed.as_string().unwrap_or("").to_string();
+                            let value = value_mixed.as_string().unwrap_or_default().to_string();
                             let parser = VersionParser::new();
                             parser.parse_constraints(&value)?;
 
-                            Ok(PhpMixed::String(value))
+                            Ok(PhpMixed::string(value))
                         });
                     constraint = self
                         .get_io()
@@ -497,7 +502,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             ),
                             validator,
                             Some(3),
-                            PhpMixed::String("*".to_string()),
+                            PhpMixed::string("*".to_string()),
                         )?
                         .as_string()
                         .map(|s| s.to_string())
@@ -633,7 +638,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     name.to_string(),
                     &similar
                         .iter()
-                        .map(|s| PhpMixed::String(s.clone()))
+                        .map(|s| PhpMixed::string(s.clone()))
                         .collect::<Vec<_>>(),
                 ) {
                     return Err(InvalidArgumentException::new(format!(
@@ -650,7 +655,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             name,
                         ),
                         PhpMixed::List(
-                            similar.iter().map(|s| PhpMixed::String(s.clone())).collect(),
+                            similar.iter().map(|s| PhpMixed::string(s.clone())).collect(),
                         ),
                         PhpMixed::Bool(false),
                         PhpMixed::Int(1),
@@ -658,7 +663,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         false,
                     )?;
                     if let Some(idx_str) = result_mixed.as_string()
-                        && let Ok(idx) = idx_str.parse::<usize>()
+                        && let Ok(idx) = idx_str.to_str_lossy().parse::<usize>()
                         && let Some(selected) = similar.get(idx)
                     {
                         return self.find_best_version_and_name_for_package(

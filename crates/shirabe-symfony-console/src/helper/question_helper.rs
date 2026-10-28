@@ -133,7 +133,7 @@ pub trait QuestionHelperInterface {
                 Ok(value) => value,
                 Err(exception) => return Ok(Err(exception)),
             };
-            ret = PhpMixed::String(if question.is_trimmable() {
+            ret = PhpMixed::string(if question.is_trimmable() {
                 shirabe_php_shim::trim(&autocomplete, None)
             } else {
                 autocomplete
@@ -147,7 +147,7 @@ pub trait QuestionHelperInterface {
                     question.is_trimmable(),
                 )? {
                     Ok(hidden_response) => {
-                        r = PhpMixed::String(if question.is_trimmable() {
+                        r = PhpMixed::string(if question.is_trimmable() {
                             shirabe_php_shim::trim(&hidden_response, None)
                         } else {
                             hidden_response
@@ -179,7 +179,7 @@ pub trait QuestionHelperInterface {
                 }
                 r = read;
                 if question.is_trimmable() {
-                    r = PhpMixed::String(shirabe_php_shim::trim(&r.to_string(), None));
+                    r = PhpMixed::string(shirabe_php_shim::trim(&r.to_string(), None));
                 }
             }
             ret = r;
@@ -325,7 +325,7 @@ impl QuestionHelper {
                 } else {
                     v.clone()
                 };
-                let value = choices.get(&v).cloned().unwrap_or(PhpMixed::String(v));
+                let value = choices.get(&v).cloned().unwrap_or(PhpMixed::string(v));
                 resolved.insert(k.to_string(), value);
             }
 
@@ -762,11 +762,9 @@ impl QuestionHelper {
             let cp = self.set_io_codepage();
             let ret = shirabe_php_shim::fgets(input_stream, Some(4096));
 
-            // TODO(bytes): PhpMixed::String carries the input as a String.
             return self.reset_io_codepage(
                 cp,
-                ret.map(|ret| PhpMixed::String(String::from_utf8_lossy(&ret).into_owned()))
-                    .unwrap_or(PhpMixed::Bool(false)),
+                ret.map(PhpMixed::String).unwrap_or(PhpMixed::Bool(false)),
             );
         }
 
@@ -790,11 +788,7 @@ impl QuestionHelper {
             ret.extend_from_slice(&char);
         }
 
-        // TODO(bytes): PhpMixed::String carries the input as a String.
-        self.reset_io_codepage(
-            cp,
-            PhpMixed::String(String::from_utf8_lossy(&ret).into_owned()),
-        )
+        self.reset_io_codepage(cp, PhpMixed::String(ret))
     }
 
     /// Sets console I/O to the host code page.
@@ -818,7 +812,7 @@ impl QuestionHelper {
             shirabe_php_shim::sapi_windows_cp_set(cp);
 
             if !matches!(input, PhpMixed::Bool(false)) && input.to_string() != "" {
-                input = PhpMixed::String(shirabe_php_shim::sapi_windows_cp_conv(
+                input = PhpMixed::string(shirabe_php_shim::sapi_windows_cp_conv(
                     shirabe_php_shim::sapi_windows_cp_get(Some("oem")),
                     cp,
                     &input.to_string(),

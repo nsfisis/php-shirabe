@@ -11,6 +11,7 @@ use crate::input::InputArgument;
 use crate::input::InputDefinition;
 use crate::input::InputOption;
 use crate::output::OutputInterface;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, preg_replace};
 
@@ -255,7 +256,7 @@ impl TextDescriptor {
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         let described_namespace = match options.get("namespace") {
-            Some(PhpMixed::String(s)) => Some(s.clone()),
+            Some(PhpMixed::String(s)) => Some(s.to_str_lossy().into_owned()),
             _ => None,
         };
         let mut description =
@@ -331,9 +332,11 @@ impl TextDescriptor {
                     if let Some(PhpMixed::List(ns_commands)) = namespace.get("commands") {
                         for c in ns_commands {
                             if let PhpMixed::String(name) = c
-                                && command_keys.contains(name)
+                                && command_keys.iter().any(|key| name == key)
                             {
-                                merged.push(CommandOrString::String(name.clone()));
+                                merged.push(CommandOrString::String(
+                                    name.to_str_lossy().into_owned(),
+                                ));
                             }
                         }
                     }
@@ -358,8 +361,10 @@ impl TextDescriptor {
                     Some(PhpMixed::List(names)) => names
                         .iter()
                         .filter_map(|n| match n {
-                            PhpMixed::String(name) if commands.contains_key(name) => {
-                                Some(name.clone())
+                            PhpMixed::String(name)
+                                if commands.contains_key(&*name.to_str_lossy()) =>
+                            {
+                                Some(name.to_str_lossy().into_owned())
                             }
                             _ => None,
                         })
@@ -372,7 +377,7 @@ impl TextDescriptor {
                 }
 
                 let namespace_id = match namespace.get("id") {
-                    Some(PhpMixed::String(s)) => s.clone(),
+                    Some(PhpMixed::String(s)) => s.to_str_lossy().into_owned(),
                     _ => String::new(),
                 };
 
@@ -445,12 +450,12 @@ impl TextDescriptor {
         }
 
         let default = match default {
-            PhpMixed::String(s) => PhpMixed::String(OutputFormatter::escape(s)?),
+            PhpMixed::String(s) => PhpMixed::string(OutputFormatter::escape(&s.to_str_lossy())?),
             PhpMixed::Array(arr) => {
                 let mut arr = arr.clone();
                 for (_key, value) in arr.iter_mut() {
                     if let PhpMixed::String(s) = &*value {
-                        *value = PhpMixed::String(OutputFormatter::escape(s)?);
+                        *value = PhpMixed::string(OutputFormatter::escape(&s.to_str_lossy())?);
                     }
                 }
                 PhpMixed::Array(arr)
@@ -459,7 +464,7 @@ impl TextDescriptor {
                 let mut list = list.clone();
                 for value in list.iter_mut() {
                     if let PhpMixed::String(s) = &*value {
-                        *value = PhpMixed::String(OutputFormatter::escape(s)?);
+                        *value = PhpMixed::string(OutputFormatter::escape(&s.to_str_lossy())?);
                     }
                 }
                 PhpMixed::List(list)

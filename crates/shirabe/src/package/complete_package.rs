@@ -5,6 +5,7 @@ use crate::package::DisplayMode;
 use crate::package::Mirror;
 use crate::package::Package;
 use crate::package::PackageInterface;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -136,7 +137,7 @@ impl CompletePackageInterface for CompletePackage {
 
     fn get_replacement_package(&self) -> Option<String> {
         match &self.abandoned {
-            PhpMixed::String(s) => Some(s.clone()),
+            PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
             _ => None,
         }
     }

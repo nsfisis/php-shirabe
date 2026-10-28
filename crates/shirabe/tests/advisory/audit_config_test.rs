@@ -15,7 +15,7 @@ fn list(items: Vec<PhpMixed>) -> PhpMixed {
 }
 
 fn s(v: &str) -> PhpMixed {
-    PhpMixed::String(v.to_string())
+    PhpMixed::string(v.to_string())
 }
 
 fn ignore_list(pairs: Vec<(&str, Option<&str>)>) -> IndexMap<String, Option<String>> {

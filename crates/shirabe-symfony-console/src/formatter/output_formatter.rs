@@ -254,7 +254,7 @@ impl OutputFormatterInterface for OutputFormatter {
         if !self.has_style(name) {
             return Err(InvalidArgumentException::new(format!(
                 "Undefined style: \"{}\".",
-                shirabe_php_shim::PhpMixed::String(name.to_string()),
+                shirabe_php_shim::PhpMixed::string(name.to_string()),
             ))
             .into());
         }

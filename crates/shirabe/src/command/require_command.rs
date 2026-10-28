@@ -138,19 +138,19 @@ impl RequireCommand {
                 PhpMixed::List(
                     array_keys(&require)
                         .into_iter()
-                        .map(PhpMixed::String)
+                        .map(PhpMixed::string)
                         .collect(),
                 ),
-                PhpMixed::String("require".to_string()),
+                PhpMixed::string("require".to_string()),
             ),
             array_fill_keys(
                 PhpMixed::List(
                     array_keys(&require_dev)
                         .into_iter()
-                        .map(PhpMixed::String)
+                        .map(PhpMixed::string)
                         .collect(),
                 ),
-                PhpMixed::String("require-dev".to_string()),
+                PhpMixed::string("require-dev".to_string()),
             ),
         )
         .as_array()
@@ -209,7 +209,7 @@ impl RequireCommand {
             let loader = ArrayLoader::new(None, false);
             let requirements_mixed: IndexMap<String, PhpMixed> = requirements
                 .iter()
-                .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
+                .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                 .collect();
             let new_links = loader.parse_links(
                 &root_package.get_name(),
@@ -626,7 +626,7 @@ impl RequireCommand {
                 .entry(require_key.to_string())
                 .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
             if let Some(section) = section.as_array_mut() {
-                section.insert(package.clone(), PhpMixed::String(version.clone()));
+                section.insert(package.clone(), PhpMixed::string(version.clone()));
             }
             if let Some(section) = composer_definition
                 .get_mut(remove_key)
@@ -874,7 +874,7 @@ impl Command for RequireCommand {
                 config
                     .get("type")
                     .and_then(|v| v.as_string())
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string()
             };
 

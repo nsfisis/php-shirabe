@@ -223,7 +223,7 @@ impl Command for AuditCommand {
                 abandoned.clone().unwrap(),
                 &Auditor::ABANDONEDS
                     .iter()
-                    .map(|s| PhpMixed::String(s.to_string()))
+                    .map(|s| PhpMixed::string(s.to_string()))
                     .collect::<Vec<_>>(),
             )
         {

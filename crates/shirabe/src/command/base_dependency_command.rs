@@ -87,7 +87,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             let platform_overrides: IndexMap<String, PhpMixed> = locker
                 .get_platform_overrides()?
                 .into_iter()
-                .map(|(k, v)| (k, PhpMixed::String(v)))
+                .map(|(k, v)| (k, PhpMixed::string(v)))
                 .collect();
             repos.push(crate::repository::RepositoryInterfaceHandle::new(
                 PlatformRepository::new(vec![], platform_overrides, None, None)?,
@@ -393,7 +393,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
         let table_as_mixed: Vec<PhpMixed> = table
             .into_iter()
-            .map(|row| PhpMixed::List(row.into_iter().map(PhpMixed::String).collect()))
+            .map(|row| PhpMixed::List(row.into_iter().map(PhpMixed::string).collect()))
             .collect();
         self.render_table(table_as_mixed, output);
     }

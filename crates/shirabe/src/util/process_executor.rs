@@ -657,7 +657,7 @@ impl ProcessExecutor {
     pub fn reset_max_jobs(&self) {
         let max_jobs_env = Platform::get_env("COMPOSER_MAX_PARALLEL_PROCESSES");
         let max_jobs_env_mixed = match &max_jobs_env {
-            Some(s) => PhpMixed::String(s.clone()),
+            Some(s) => PhpMixed::string(s.clone()),
             None => PhpMixed::Null,
         };
         if is_numeric(&max_jobs_env_mixed) {
@@ -848,7 +848,7 @@ impl ProcessExecutor {
             strtolower(name),
             &Self::BUILTIN_CMD_COMMANDS
                 .iter()
-                .map(|s| PhpMixed::String(s.to_string()))
+                .map(|s| PhpMixed::string(s.to_string()))
                 .collect::<Vec<_>>(),
         ) {
             return name.to_string();
@@ -1023,7 +1023,7 @@ impl<'a> IntoExecOutput<'a> for &'a mut PhpMixed {
     }
 
     fn write_back(&mut self, value: String) {
-        **self = PhpMixed::String(value);
+        **self = PhpMixed::string(value);
     }
 }
 

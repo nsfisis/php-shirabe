@@ -127,10 +127,10 @@ impl ApplicationDescription {
             }
 
             let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
-            entry.insert("id".to_string(), PhpMixed::String(namespace.clone()));
+            entry.insert("id".to_string(), PhpMixed::string(namespace.clone()));
             entry.insert(
                 "commands".to_string(),
-                PhpMixed::List(names.into_iter().map(PhpMixed::String).collect()),
+                PhpMixed::List(names.into_iter().map(PhpMixed::string).collect()),
             );
             self.namespaces.as_mut().unwrap().insert(namespace, entry);
         }

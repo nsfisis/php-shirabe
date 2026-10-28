@@ -27,6 +27,7 @@ use crate::script::Event as ScriptEvent;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use bstr::BString;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
@@ -478,7 +479,7 @@ impl EventDispatcher {
                             let cls = if is_object(first.as_ref()) {
                                 get_class(first.as_ref())
                             } else if let PhpMixed::String(s) = first.as_ref() {
-                                s.clone()
+                                s.to_str_lossy().into_owned()
                             } else {
                                 "?".to_string()
                             };
@@ -497,7 +498,7 @@ impl EventDispatcher {
                     let prefix = if is_object(first.as_ref()) {
                         get_class(first.as_ref())
                     } else if let PhpMixed::String(s) = first.as_ref() {
-                        s.clone()
+                        s.to_str_lossy().into_owned()
                     } else {
                         "?".to_string()
                     };
@@ -558,11 +559,11 @@ impl EventDispatcher {
                             let existing = flags
                                 .get("script-alias-input")
                                 .and_then(|v| v.as_string())
-                                .unwrap_or("")
+                                .unwrap_or_default()
                                 .to_string();
                             flags.insert(
                                 "script-alias-input".to_string(),
-                                PhpMixed::String(format!("{} {}", args_string, existing)),
+                                PhpMixed::string(format!("{} {}", args_string, existing)),
                             );
                         }
                         if strpos(callable_str, "@composer ") == Some(0) {
@@ -696,7 +697,7 @@ impl EventDispatcher {
                         self.make_autoloader(
                             event,
                             &Callable::ArrayCallable(
-                                Box::new(PhpMixed::String(callable_str.clone())),
+                                Box::new(PhpMixed::string(callable_str.clone())),
                                 "run".to_string(),
                             ),
                         )?;
@@ -1405,7 +1406,7 @@ try {{
         if self.event_stack.iter().any(|n| n == &event_name) {
             return Err(RuntimeException::new(format!(
                 "Circular call to script handler '{}' detected",
-                PhpMixed::String(event_name),
+                PhpMixed::string(event_name),
             ))
             .into());
         }
@@ -1472,7 +1473,7 @@ try {{
                 let second = entries[1];
                 let prefix = if is_string(first) {
                     if let PhpMixed::String(s) = first {
-                        s.clone()
+                        s.to_str_lossy().into_owned()
                     } else {
                         "?".to_string()
                     }
@@ -1480,7 +1481,7 @@ try {{
                     format!("{}#{}", get_class(first), spl_object_hash(first))
                 };
                 let suffix = if let PhpMixed::String(s) = second {
-                    s.clone()
+                    s.to_str_lossy().into_owned()
                 } else {
                     "?".to_string()
                 };

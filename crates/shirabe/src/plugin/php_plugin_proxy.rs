@@ -38,6 +38,7 @@ use crate::repository::{
     LockArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
 use bstr::BString;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle,
@@ -4571,7 +4572,7 @@ impl PhpCommandProxy {
                 mode |= InputOption::VALUE_NEGATABLE;
             }
             let shortcut = match field(&mut row, "shortcut").to_php_mixed()? {
-                PhpMixed::String(shortcut) => Some(shortcut),
+                PhpMixed::String(shortcut) => Some(shortcut.to_str_lossy().into_owned()),
                 _ => None,
             };
             // `getDefault()` exposes the stored representation (`false` for VALUE_NONE), while

@@ -31,7 +31,7 @@ fn create_config() -> (Config, TempDir) {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(home.path().to_str().unwrap().to_string()),
+        PhpMixed::string(home.path().to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     let mut repositories: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -57,7 +57,7 @@ fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
 
 fn repo_config(url: &str) -> IndexMap<String, PhpMixed> {
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
     repo_config
 }
 
@@ -82,14 +82,14 @@ fn load_data_provider() -> Vec<(Vec<(&'static str, &'static str)>, PhpMixed)> {
             str_kv(&[(
                 "foo/bar",
                 str_kv(&[
-                    ("name", PhpMixed::String("foo/bar".to_string())),
+                    ("name", PhpMixed::string("foo/bar".to_string())),
                     (
                         "versions",
                         str_kv(&[(
                             "1.0.0",
                             str_kv(&[
-                                ("name", PhpMixed::String("foo/bar".to_string())),
-                                ("version", PhpMixed::String("1.0.0".to_string())),
+                                ("name", PhpMixed::string("foo/bar".to_string())),
+                                ("version", PhpMixed::string("1.0.0".to_string())),
                             ]),
                         )]),
                     ),
@@ -107,15 +107,15 @@ fn load_data_provider() -> Vec<(Vec<(&'static str, &'static str)>, PhpMixed)> {
                         (
                             "3.14",
                             str_kv(&[
-                                ("name", PhpMixed::String("bar/foo".to_string())),
-                                ("version", PhpMixed::String("3.14".to_string())),
+                                ("name", PhpMixed::string("bar/foo".to_string())),
+                                ("version", PhpMixed::string("3.14".to_string())),
                             ]),
                         ),
                         (
                             "3.145",
                             str_kv(&[
-                                ("name", PhpMixed::String("bar/foo".to_string())),
-                                ("version", PhpMixed::String("3.145".to_string())),
+                                ("name", PhpMixed::string("bar/foo".to_string())),
+                                ("version", PhpMixed::string("3.145".to_string())),
                             ]),
                         ),
                     ]),
@@ -131,12 +131,12 @@ fn load_data_provider() -> Vec<(Vec<(&'static str, &'static str)>, PhpMixed)> {
                     "bar/foo",
                     PhpMixed::List(vec![
                         str_kv(&[
-                            ("name", PhpMixed::String("bar/foo".to_string())),
-                            ("version", PhpMixed::String("3.14".to_string())),
+                            ("name", PhpMixed::string("bar/foo".to_string())),
+                            ("version", PhpMixed::string("3.14".to_string())),
                         ]),
                         str_kv(&[
-                            ("name", PhpMixed::String("bar/foo".to_string())),
-                            ("version", PhpMixed::String("3.145".to_string())),
+                            ("name", PhpMixed::string("bar/foo".to_string())),
+                            ("version", PhpMixed::string("3.145".to_string())),
                         ]),
                     ]),
                 )]),
@@ -197,32 +197,32 @@ fn test_what_provides() {
         PhpMixed::List(vec![
             PhpMixed::List(vec![str_kv(&[
                 ("uid", PhpMixed::Int(1)),
-                ("name", PhpMixed::String("a".to_string())),
-                ("version", PhpMixed::String("dev-master".to_string())),
+                ("name", PhpMixed::string("a".to_string())),
+                ("version", PhpMixed::string("dev-master".to_string())),
                 (
                     "extra",
                     str_kv(&[(
                         "branch-alias",
-                        str_kv(&[("dev-master", PhpMixed::String("1.0.x-dev".to_string()))]),
+                        str_kv(&[("dev-master", PhpMixed::string("1.0.x-dev".to_string()))]),
                     )]),
                 ),
             ])]),
             PhpMixed::List(vec![str_kv(&[
                 ("uid", PhpMixed::Int(2)),
-                ("name", PhpMixed::String("a".to_string())),
-                ("version", PhpMixed::String("dev-develop".to_string())),
+                ("name", PhpMixed::string("a".to_string())),
+                ("version", PhpMixed::string("dev-develop".to_string())),
                 (
                     "extra",
                     str_kv(&[(
                         "branch-alias",
-                        str_kv(&[("dev-develop", PhpMixed::String("1.1.x-dev".to_string()))]),
+                        str_kv(&[("dev-develop", PhpMixed::string("1.1.x-dev".to_string()))]),
                     )]),
                 ),
             ])]),
             PhpMixed::List(vec![str_kv(&[
                 ("uid", PhpMixed::Int(3)),
-                ("name", PhpMixed::String("a".to_string())),
-                ("version", PhpMixed::String("0.6".to_string())),
+                ("name", PhpMixed::string("a".to_string())),
+                ("version", PhpMixed::string("0.6".to_string())),
             ])]),
         ]),
     )]));
@@ -273,7 +273,7 @@ fn test_search_with_type() {
     let result = str_kv(&[(
         "results",
         PhpMixed::List(vec![str_kv(&[
-            ("name", PhpMixed::String("foo".to_string())),
+            ("name", PhpMixed::string("foo".to_string())),
             ("description", PhpMixed::Null),
         ])]),
     )]);
@@ -284,7 +284,7 @@ fn test_search_with_type() {
                 "http://example.org/packages.json",
                 json_encode(&str_kv(&[(
                     "search",
-                    PhpMixed::String("/search.json?q=%query%&type=%type%".to_string()),
+                    PhpMixed::string("/search.json?q=%query%&type=%type%".to_string()),
                 )])),
             ),
             http_body(
@@ -318,7 +318,7 @@ fn test_search_with_type() {
         .unwrap();
     assert_eq!(1, plugin_results.len());
     assert_eq!(
-        Some("foo"),
+        Some("foo".into()),
         plugin_results[0].get("name").and_then(|v| v.as_string())
     );
     assert!(matches!(
@@ -346,7 +346,7 @@ fn test_search_with_special_chars() {
                 "http://example.org/packages.json",
                 json_encode(&str_kv(&[(
                     "search",
-                    PhpMixed::String("/search.json?q=%query%&type=%type%".to_string()),
+                    PhpMixed::string("/search.json?q=%query%&type=%type%".to_string()),
                 )])),
             ),
             http_body(
@@ -381,14 +381,14 @@ fn test_search_with_abandoned_packages() {
         "results",
         PhpMixed::List(vec![
             str_kv(&[
-                ("name", PhpMixed::String("foo1".to_string())),
+                ("name", PhpMixed::string("foo1".to_string())),
                 ("description", PhpMixed::Null),
                 ("abandoned", PhpMixed::Bool(true)),
             ]),
             str_kv(&[
-                ("name", PhpMixed::String("foo2".to_string())),
+                ("name", PhpMixed::string("foo2".to_string())),
                 ("description", PhpMixed::Null),
-                ("abandoned", PhpMixed::String("bar".to_string())),
+                ("abandoned", PhpMixed::string("bar".to_string())),
             ]),
         ]),
     )]);
@@ -399,7 +399,7 @@ fn test_search_with_abandoned_packages() {
                 "http://example.org/packages.json",
                 json_encode(&str_kv(&[(
                     "search",
-                    PhpMixed::String("/search.json?q=%query%".to_string()),
+                    PhpMixed::string("/search.json?q=%query%".to_string()),
                 )])),
             ),
             http_body("http://example.org/search.json?q=foo", json_encode(&result)),
@@ -423,7 +423,7 @@ fn test_search_with_abandoned_packages() {
 
     assert_eq!(2, results.len());
     assert_eq!(
-        Some("foo1"),
+        Some("foo1".into()),
         results[0].get("name").and_then(|v| v.as_string())
     );
     assert!(matches!(
@@ -435,7 +435,7 @@ fn test_search_with_abandoned_packages() {
         Some(PhpMixed::Bool(true))
     ));
     assert_eq!(
-        Some("foo2"),
+        Some("foo2".into()),
         results[1].get("name").and_then(|v| v.as_string())
     );
     assert!(matches!(
@@ -443,7 +443,7 @@ fn test_search_with_abandoned_packages() {
         Some(PhpMixed::Null)
     ));
     assert_eq!(
-        Some("bar"),
+        Some("bar".into()),
         results[1].get("abandoned").and_then(|v| v.as_string())
     );
 }
@@ -512,7 +512,7 @@ fn test_get_provider_names_will_return_partial_package_names() {
             json_encode(&str_kv(&[
                 (
                     "providers-lazy-url",
-                    PhpMixed::String("/foo/p/%package%.json".to_string()),
+                    PhpMixed::string("/foo/p/%package%.json".to_string()),
                 ),
                 (
                     "packages",
@@ -521,11 +521,11 @@ fn test_get_provider_names_will_return_partial_package_names() {
                         str_kv(&[
                             (
                                 "dev-branch",
-                                str_kv(&[("name", PhpMixed::String("foo/bar".to_string()))]),
+                                str_kv(&[("name", PhpMixed::string("foo/bar".to_string()))]),
                             ),
                             (
                                 "v1.0.0",
-                                str_kv(&[("name", PhpMixed::String("foo/bar".to_string()))]),
+                                str_kv(&[("name", PhpMixed::string("foo/bar".to_string()))]),
                             ),
                         ]),
                     )]),
@@ -564,24 +564,24 @@ fn test_get_security_advisories_assert_repository_http_options_are_used() {
                             str_kv(&[
                                 (
                                     "dev-branch",
-                                    str_kv(&[("name", PhpMixed::String("foo/bar".to_string()))]),
+                                    str_kv(&[("name", PhpMixed::string("foo/bar".to_string()))]),
                                 ),
                                 (
                                     "v1.0.0",
-                                    str_kv(&[("name", PhpMixed::String("foo/bar".to_string()))]),
+                                    str_kv(&[("name", PhpMixed::string("foo/bar".to_string()))]),
                                 ),
                             ]),
                         )]),
                     ),
                     (
                         "metadata-url",
-                        PhpMixed::String("https://example.org/p2/%package%.json".to_string()),
+                        PhpMixed::string("https://example.org/p2/%package%.json".to_string()),
                     ),
                     (
                         "security-advisories",
                         str_kv(&[(
                             "api-url",
-                            PhpMixed::String("https://example.org/security-advisories".to_string()),
+                            PhpMixed::string("https://example.org/security-advisories".to_string()),
                         )]),
                     ),
                 ])),
@@ -598,7 +598,7 @@ fn test_get_security_advisories_assert_repository_http_options_are_used() {
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".to_string(),
-        PhpMixed::String("https://example.org/packages.json".to_string()),
+        PhpMixed::string("https://example.org/packages.json".to_string()),
     );
     repo_config.insert(
         "options".to_string(),
@@ -625,37 +625,37 @@ fn generate_security_advisory(
 ) -> (String, PhpMixed) {
     let advisory_id = shirabe_php_shim::uniqid("PKSA-", false);
     let advisory = str_kv(&[
-        ("advisoryId", PhpMixed::String(advisory_id.clone())),
-        ("packageName", PhpMixed::String(package_name.to_string())),
-        ("remoteId", PhpMixed::String("test".to_string())),
-        ("title", PhpMixed::String("Security Advisory".to_string())),
+        ("advisoryId", PhpMixed::string(advisory_id.clone())),
+        ("packageName", PhpMixed::string(package_name.to_string())),
+        ("remoteId", PhpMixed::string("test".to_string())),
+        ("title", PhpMixed::string("Security Advisory".to_string())),
         ("link", PhpMixed::Null),
         (
             "cve",
             match cve {
-                Some(c) => PhpMixed::String(c.to_string()),
+                Some(c) => PhpMixed::string(c.to_string()),
                 None => PhpMixed::Null,
             },
         ),
         (
             "affectedVersions",
-            PhpMixed::String(affected_versions.to_string()),
+            PhpMixed::string(affected_versions.to_string()),
         ),
-        ("source", PhpMixed::String("Tests".to_string())),
+        ("source", PhpMixed::string("Tests".to_string())),
         (
             "reportedAt",
-            PhpMixed::String("2024-04-31 12:37:47".to_string()),
+            PhpMixed::string("2024-04-31 12:37:47".to_string()),
         ),
         (
             "composerRepository",
-            PhpMixed::String("Package Repository".to_string()),
+            PhpMixed::string("Package Repository".to_string()),
         ),
-        ("severity", PhpMixed::String("high".to_string())),
+        ("severity", PhpMixed::string("high".to_string())),
         (
             "sources",
             PhpMixed::List(vec![str_kv(&[
-                ("name", PhpMixed::String("Security Advisory".to_string())),
-                ("remoteId", PhpMixed::String("test".to_string())),
+                ("name", PhpMixed::string("Security Advisory".to_string())),
+                ("remoteId", PhpMixed::string("test".to_string())),
             ])]),
         ),
     ]);
@@ -692,24 +692,24 @@ fn test_get_security_advisories_assert_repository_advisories_is_zero_indexed_arr
                             str_kv(&[
                                 (
                                     "dev-branch",
-                                    str_kv(&[("name", PhpMixed::String(package_name.to_string()))]),
+                                    str_kv(&[("name", PhpMixed::string(package_name.to_string()))]),
                                 ),
                                 (
                                     "v1.0.0",
-                                    str_kv(&[("name", PhpMixed::String(package_name.to_string()))]),
+                                    str_kv(&[("name", PhpMixed::string(package_name.to_string()))]),
                                 ),
                             ]),
                         )]),
                     ),
                     (
                         "metadata-url",
-                        PhpMixed::String("https://example.org/p2/%package%.json".to_string()),
+                        PhpMixed::string("https://example.org/p2/%package%.json".to_string()),
                     ),
                     (
                         "security-advisories",
                         str_kv(&[(
                             "api-url",
-                            PhpMixed::String("https://example.org/security-advisories".to_string()),
+                            PhpMixed::string("https://example.org/security-advisories".to_string()),
                         )]),
                     ),
                 ])),
@@ -732,7 +732,7 @@ fn test_get_security_advisories_assert_repository_advisories_is_zero_indexed_arr
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".to_string(),
-        PhpMixed::String("https://example.org/packages.json".to_string()),
+        PhpMixed::string("https://example.org/packages.json".to_string()),
     );
     repo_config.insert(
         "options".to_string(),

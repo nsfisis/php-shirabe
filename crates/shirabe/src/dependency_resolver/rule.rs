@@ -98,7 +98,7 @@ impl Rule {
         match self {
             Rule::Generic(r) => Ok(PhpMixed::Int(r.get_hash()?)),
             Rule::MultiConflict(r) => Ok(PhpMixed::Int(r.get_hash()?)),
-            Rule::TwoLiterals(r) => Ok(PhpMixed::String(r.get_hash())),
+            Rule::TwoLiterals(r) => Ok(PhpMixed::string(r.get_hash())),
         }
     }
 

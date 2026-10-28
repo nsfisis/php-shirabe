@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolBuilderTest.php
 
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
@@ -199,7 +200,7 @@ fn php_sort_mixed(values: &mut [PhpMixed]) {
             match m {
                 PhpMixed::Int(i) => Some(*i as f64),
                 PhpMixed::Float(f) => Some(*f),
-                PhpMixed::String(s) => s.trim().parse::<f64>().ok(),
+                PhpMixed::String(s) => s.to_str_lossy().trim().parse::<f64>().ok(),
                 _ => None,
             }
         };
@@ -207,7 +208,7 @@ fn php_sort_mixed(values: &mut [PhpMixed]) {
             match m {
                 PhpMixed::Int(i) => i.to_string(),
                 PhpMixed::Float(f) => f.to_string(),
-                PhpMixed::String(s) => s.clone(),
+                PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                 _ => String::new(),
             }
         };
@@ -275,7 +276,7 @@ fn get_package_result_set(
                     }
                 }
                 if let Some(id) = matched {
-                    return PhpMixed::String(format!(
+                    return PhpMixed::string(format!(
                         "{}-{}{} (alias of {})",
                         package.get_name(),
                         package.get_version(),
@@ -284,7 +285,7 @@ fn get_package_result_set(
                     ));
                 }
 
-                return PhpMixed::String(format!(
+                return PhpMixed::string(format!(
                     "{}-{}{} (alias of {})",
                     package.get_name(),
                     package.get_version(),
@@ -293,7 +294,7 @@ fn get_package_result_set(
                 ));
             }
 
-            PhpMixed::String(format!(
+            PhpMixed::string(format!(
                 "{}-{}{}",
                 package.get_name(),
                 package.get_version(),
@@ -350,7 +351,7 @@ fn run_test_pool_builder(
     let minimum_stability: String = if !is_empty(get_root("minimum-stability")) {
         get_root("minimum-stability")
             .and_then(|v| v.as_string())
-            .unwrap_or("stable")
+            .unwrap_or("stable".into())
             .to_string()
     } else {
         "stable".to_string()
@@ -399,25 +400,30 @@ fn run_test_pool_builder(
         let package = alias
             .get("package")
             .and_then(|v| v.as_string())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         let version = parser
             .normalize(
-                alias
+                &alias
                     .get("version")
                     .and_then(|v| v.as_string())
-                    .unwrap_or(""),
+                    .unwrap_or_default()
+                    .to_str_lossy(),
                 None,
             )
             .unwrap();
         let alias_str = alias
             .get("alias")
             .and_then(|v| v.as_string())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         let alias_normalized = parser
             .normalize(
-                alias.get("alias").and_then(|v| v.as_string()).unwrap_or(""),
+                &alias
+                    .get("alias")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default()
+                    .to_str_lossy(),
                 None,
             )
             .unwrap();
@@ -541,7 +547,7 @@ fn run_test_pool_builder(
                 package,
                 Some(
                     parser
-                        .parse_constraints(constraint.as_string().unwrap())
+                        .parse_constraints(&constraint.as_string().unwrap().to_str_lossy())
                         .unwrap(),
                 ),
             )

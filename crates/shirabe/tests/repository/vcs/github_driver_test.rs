@@ -32,7 +32,7 @@ fn set_up() -> SetUp {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(home.path().to_str().unwrap().to_string()),
+        PhpMixed::string(home.path().to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
@@ -199,7 +199,7 @@ fn test_private_repository() {
         .set_auth_config_source(Box::new(null_config_source()));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(repo_url.to_string()));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
@@ -210,24 +210,30 @@ fn test_private_repository() {
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
 
     let dist = git_hub_driver.get_dist(sha).unwrap();
-    assert_eq!(Some("zip"), dist.get("type").and_then(|v| v.as_string()));
     assert_eq!(
-        Some("https://api.github.com/repos/composer/packagist/zipball/SOMESHA"),
+        Some("zip".into()),
+        dist.get("type").and_then(|v| v.as_string())
+    );
+    assert_eq!(
+        Some("https://api.github.com/repos/composer/packagist/zipball/SOMESHA".into()),
         dist.get("url").and_then(|v| v.as_string())
     );
     assert_eq!(
-        Some("SOMESHA"),
+        Some("SOMESHA".into()),
         dist.get("reference").and_then(|v| v.as_string())
     );
 
     let source = git_hub_driver.get_source(sha);
-    assert_eq!(Some("git"), source.get("type").and_then(|v| v.as_string()));
     assert_eq!(
-        Some(repo_ssh_url),
+        Some("git".into()),
+        source.get("type").and_then(|v| v.as_string())
+    );
+    assert_eq!(
+        Some(repo_ssh_url.into()),
         source.get("url").and_then(|v| v.as_string())
     );
     assert_eq!(
-        Some("SOMESHA"),
+        Some("SOMESHA".into()),
         source.get("reference").and_then(|v| v.as_string())
     );
 }
@@ -259,7 +265,7 @@ fn test_public_repository() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(repo_url.to_string()));
     let repo_url = "https://github.com/composer/packagist.git";
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
@@ -271,21 +277,30 @@ fn test_public_repository() {
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
 
     let dist = git_hub_driver.get_dist(sha).unwrap();
-    assert_eq!(Some("zip"), dist.get("type").and_then(|v| v.as_string()));
     assert_eq!(
-        Some("https://api.github.com/repos/composer/packagist/zipball/SOMESHA"),
+        Some("zip".into()),
+        dist.get("type").and_then(|v| v.as_string())
+    );
+    assert_eq!(
+        Some("https://api.github.com/repos/composer/packagist/zipball/SOMESHA".into()),
         dist.get("url").and_then(|v| v.as_string())
     );
-    assert_eq!(Some(sha), dist.get("reference").and_then(|v| v.as_string()));
+    assert_eq!(
+        Some(sha.into()),
+        dist.get("reference").and_then(|v| v.as_string())
+    );
 
     let source = git_hub_driver.get_source(sha);
-    assert_eq!(Some("git"), source.get("type").and_then(|v| v.as_string()));
     assert_eq!(
-        Some(repo_url),
+        Some("git".into()),
+        source.get("type").and_then(|v| v.as_string())
+    );
+    assert_eq!(
+        Some(repo_url.into()),
         source.get("url").and_then(|v| v.as_string())
     );
     assert_eq!(
-        Some(sha),
+        Some(sha.into()),
         source.get("reference").and_then(|v| v.as_string())
     );
 }
@@ -337,7 +352,7 @@ fn test_public_repository2() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(repo_url.to_string()));
     let repo_url = "https://github.com/composer/packagist.git";
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
@@ -349,21 +364,30 @@ fn test_public_repository2() {
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
 
     let dist = git_hub_driver.get_dist(sha).unwrap();
-    assert_eq!(Some("zip"), dist.get("type").and_then(|v| v.as_string()));
     assert_eq!(
-        Some("https://api.github.com/repos/composer/packagist/zipball/SOMESHA"),
+        Some("zip".into()),
+        dist.get("type").and_then(|v| v.as_string())
+    );
+    assert_eq!(
+        Some("https://api.github.com/repos/composer/packagist/zipball/SOMESHA".into()),
         dist.get("url").and_then(|v| v.as_string())
     );
-    assert_eq!(Some(sha), dist.get("reference").and_then(|v| v.as_string()));
+    assert_eq!(
+        Some(sha.into()),
+        dist.get("reference").and_then(|v| v.as_string())
+    );
 
     let source = git_hub_driver.get_source(sha);
-    assert_eq!(Some("git"), source.get("type").and_then(|v| v.as_string()));
     assert_eq!(
-        Some(repo_url),
+        Some("git".into()),
+        source.get("type").and_then(|v| v.as_string())
+    );
+    assert_eq!(
+        Some(repo_url.into()),
         source.get("url").and_then(|v| v.as_string())
     );
     assert_eq!(
-        Some(sha),
+        Some(sha.into()),
         source.get("reference").and_then(|v| v.as_string())
     );
 
@@ -421,7 +445,7 @@ fn test_invalid_support_data() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(repo_url.to_string()));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
@@ -439,7 +463,7 @@ fn test_invalid_support_data() {
 
     let support = data.get("support").and_then(|v| v.as_array()).unwrap();
     assert_eq!(
-        Some("https://github.com/composer/packagist/tree/feature/3.2-foo"),
+        Some("https://github.com/composer/packagist/tree/feature/3.2-foo".into()),
         support.get("source").and_then(|v| v.as_string())
     );
 }
@@ -562,7 +586,7 @@ fn test_funding_format() {
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
+        repo_config.insert("url".to_string(), PhpMixed::string(repo_url.to_string()));
 
         let mut git_hub_driver =
             GitHubDriver::new(repo_config, io, config, http_downloader, process);
@@ -594,11 +618,11 @@ fn test_funding_format() {
                         (
                             m.get("type")
                                 .and_then(|v| v.as_string())
-                                .unwrap_or("")
+                                .unwrap_or_default()
                                 .to_string(),
                             m.get("url")
                                 .and_then(|v| v.as_string())
-                                .unwrap_or("")
+                                .unwrap_or_default()
                                 .to_string(),
                         )
                     })
@@ -667,7 +691,7 @@ fn test_public_repository_archived() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(repo_url.to_string()));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
@@ -726,7 +750,7 @@ fn test_private_repository_no_interaction() {
     {
         let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
         let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
-        config_section.insert("cache-vcs-dir".to_string(), PhpMixed::String(cache_vcs_dir));
+        config_section.insert("cache-vcs-dir".to_string(), PhpMixed::string(cache_vcs_dir));
         top.insert("config".to_string(), PhpMixed::Array(config_section));
         config.borrow_mut().merge(&top, Config::SOURCE_UNKNOWN);
     }
@@ -734,7 +758,7 @@ fn test_private_repository_no_interaction() {
         .borrow_mut()
         .get("cache-vcs-dir")
         .as_string()
-        .unwrap_or("")
+        .unwrap_or_default()
         .to_string();
 
     let (process, _process_guard): (_, ProcessExecutorMockGuard) = get_process_executor_mock(
@@ -772,7 +796,7 @@ fn test_private_repository_no_interaction() {
     );
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(repo_url.to_string()));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();
@@ -780,32 +804,44 @@ fn test_private_repository_no_interaction() {
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
 
     let dist = git_hub_driver.get_dist(sha).unwrap();
-    assert_eq!(Some("zip"), dist.get("type").and_then(|v| v.as_string()));
     assert_eq!(
-        Some("https://api.github.com/repos/composer/packagist/zipball/SOMESHA"),
+        Some("zip".into()),
+        dist.get("type").and_then(|v| v.as_string())
+    );
+    assert_eq!(
+        Some("https://api.github.com/repos/composer/packagist/zipball/SOMESHA".into()),
         dist.get("url").and_then(|v| v.as_string())
     );
-    assert_eq!(Some(sha), dist.get("reference").and_then(|v| v.as_string()));
+    assert_eq!(
+        Some(sha.into()),
+        dist.get("reference").and_then(|v| v.as_string())
+    );
 
     let source = git_hub_driver.get_source(identifier);
-    assert_eq!(Some("git"), source.get("type").and_then(|v| v.as_string()));
     assert_eq!(
-        Some(repo_ssh_url),
+        Some("git".into()),
+        source.get("type").and_then(|v| v.as_string())
+    );
+    assert_eq!(
+        Some(repo_ssh_url.into()),
         source.get("url").and_then(|v| v.as_string())
     );
     assert_eq!(
-        Some(identifier),
+        Some(identifier.into()),
         source.get("reference").and_then(|v| v.as_string())
     );
 
     let source = git_hub_driver.get_source(sha);
-    assert_eq!(Some("git"), source.get("type").and_then(|v| v.as_string()));
     assert_eq!(
-        Some(repo_ssh_url),
+        Some("git".into()),
+        source.get("type").and_then(|v| v.as_string())
+    );
+    assert_eq!(
+        Some(repo_ssh_url.into()),
         source.get("url").and_then(|v| v.as_string())
     );
     assert_eq!(
-        Some(sha),
+        Some(sha.into()),
         source.get("reference").and_then(|v| v.as_string())
     );
 }
@@ -833,7 +869,7 @@ fn test_initialize_invalid_repo_url() {
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
+        repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
 
         let mut git_hub_driver =
             GitHubDriver::new(repo_config, io, config, http_downloader, process);
@@ -876,7 +912,7 @@ fn test_get_empty_file_content() {
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(repo_url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(repo_url.to_string()));
 
     let mut git_hub_driver = GitHubDriver::new(repo_config, io, config, http_downloader, process);
     git_hub_driver.initialize().unwrap();

@@ -136,7 +136,7 @@ impl PluginValue {
             PhpMixed::Bool(b) => PluginValue::Bool(*b),
             PhpMixed::Int(n) => PluginValue::Int(*n),
             PhpMixed::Float(f) => PluginValue::Float(*f),
-            PhpMixed::String(s) => PluginValue::String(s.as_str().into()),
+            PhpMixed::String(s) => PluginValue::String(s.clone()),
             PhpMixed::List(items) => {
                 PluginValue::List(items.iter().map(PluginValue::from_php_mixed).collect())
             }
@@ -154,17 +154,15 @@ impl PluginValue {
     }
 
     /// Converts back to `PhpMixed` for callers outside the plugin boundary. Handles have no
-    /// `PhpMixed` counterpart and fail. Non-UTF-8 bytes are replaced, matching how the previous
-    /// scalar-only response parser exposed PHP strings to `PhpMixed` consumers.
+    /// `PhpMixed` counterpart and fail. String values keep their bytes; non-UTF-8 bytes in array
+    /// keys are replaced because `PhpMixed` array keys are `String`.
     pub fn to_php_mixed(&self) -> anyhow::Result<PhpMixed> {
         Ok(match self {
             PluginValue::Null => PhpMixed::Null,
             PluginValue::Bool(b) => PhpMixed::Bool(*b),
             PluginValue::Int(n) => PhpMixed::Int(*n),
             PluginValue::Float(f) => PhpMixed::Float(*f),
-            PluginValue::String(bytes) => {
-                PhpMixed::String(String::from_utf8_lossy(bytes).into_owned())
-            }
+            PluginValue::String(bytes) => PhpMixed::String(bytes.clone()),
             PluginValue::List(items) => PhpMixed::List(
                 items
                     .iter()

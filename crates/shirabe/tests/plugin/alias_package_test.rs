@@ -84,7 +84,7 @@ fn test_alias_packages_cross_the_plugin_boundary() {
     // `RootAliasPackage`'s setters write through to the package it aliases.
     assert_eq!("dev", real_root.get_minimum_stability());
     assert_eq!(
-        Some(&PhpMixed::String("alias-v1".to_string())),
+        Some(&PhpMixed::string("alias-v1".to_string())),
         real_root.get_extra().get("seen-by")
     );
 }

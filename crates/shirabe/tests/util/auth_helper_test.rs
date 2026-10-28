@@ -59,7 +59,7 @@ fn header_strings(options: &IndexMap<String, PhpMixed>) -> Vec<String> {
         .and_then(|v| v.as_list())
         .map(|list| {
             list.iter()
-                .map(|v| v.as_string().unwrap_or("").to_string())
+                .map(|v| v.as_string().unwrap_or_default().to_string())
                 .collect()
         })
         .unwrap_or_default()
@@ -67,8 +67,8 @@ fn header_strings(options: &IndexMap<String, PhpMixed>) -> Vec<String> {
 
 fn base_headers() -> Vec<PhpMixed> {
     vec![
-        PhpMixed::String("Accept-Encoding: gzip".to_string()),
-        PhpMixed::String("Connection: close".to_string()),
+        PhpMixed::string("Accept-Encoding: gzip".to_string()),
+        PhpMixed::string("Connection: close".to_string()),
     ]
 }
 
@@ -155,7 +155,7 @@ fn test_add_authentication_header_with_gitlab_oath_token() {
     let config = ConfigStubBuilder::new()
         .with(
             "gitlab-domains",
-            PhpMixed::List(vec![PhpMixed::String("gitlab.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("gitlab.com".to_string())]),
         )
         .build_shared();
     let mut f = set_up_with_config(config);
@@ -195,15 +195,15 @@ fn test_add_authentication_options_for_client_certificate() {
     let mut certificate_configuration = IndexMap::new();
     certificate_configuration.insert(
         "local_cert".to_string(),
-        PhpMixed::String("certificate value".to_string()),
+        PhpMixed::string("certificate value".to_string()),
     );
     certificate_configuration.insert(
         "local_pk".to_string(),
-        PhpMixed::String("key value".to_string()),
+        PhpMixed::string("key value".to_string()),
     );
     certificate_configuration.insert(
         "passphrase".to_string(),
-        PhpMixed::String("passphrase value".to_string()),
+        PhpMixed::string("passphrase value".to_string()),
     );
     let password = json_encode(&PhpMixed::Array(certificate_configuration.clone())).unwrap();
     expects_authentication(&f.io, origin, "client-certificate", &password);
@@ -223,7 +223,7 @@ fn add_authentication_header_with_gitlab_private_token(password: &str) {
     let config = ConfigStubBuilder::new()
         .with(
             "gitlab-domains",
-            PhpMixed::List(vec![PhpMixed::String("gitlab.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("gitlab.com".to_string())]),
         )
         .build_shared();
     let mut f = set_up_with_config(config);
@@ -425,11 +425,11 @@ fn expected_auth_setting(username: &str, password: &str) -> PhpMixed {
     let mut auth = IndexMap::new();
     auth.insert(
         "username".to_string(),
-        PhpMixed::String(username.to_string()),
+        PhpMixed::string(username.to_string()),
     );
     auth.insert(
         "password".to_string(),
-        PhpMixed::String(password.to_string()),
+        PhpMixed::string(password.to_string()),
     );
     PhpMixed::Array(auth)
 }
@@ -542,7 +542,7 @@ fn test_store_auth_with_prompt_invalid_answer() {
     let config_source_name = "https://api.gitlab.com/source";
 
     let io = std::rc::Rc::new(std::cell::RefCell::new(
-        IOStub::new().with_ask_and_validate_answer(PhpMixed::String("invalid".to_string())),
+        IOStub::new().with_ask_and_validate_answer(PhpMixed::string("invalid".to_string())),
     ));
     let config = ConfigStubBuilder::new().build_shared();
 
@@ -571,7 +571,7 @@ fn test_store_auth_with_prompt_invalid_answer() {
                 "Do you want to store credentials for {origin} in {config_source_name} ? [Yn] "
             ),
             None,
-            PhpMixed::String("y".to_string()),
+            PhpMixed::string("y".to_string()),
         )],
         io.borrow().ask_and_validate_calls()
     );
@@ -607,11 +607,11 @@ fn test_prompt_auth_if_needed_git_lab_no_auth_change() {
     let mut token_entry = IndexMap::new();
     token_entry.insert(
         "username".to_string(),
-        PhpMixed::String("gitlab-user".to_string()),
+        PhpMixed::string("gitlab-user".to_string()),
     );
     token_entry.insert(
         "token".to_string(),
-        PhpMixed::String("gitlab-password".to_string()),
+        PhpMixed::string("gitlab-password".to_string()),
     );
     gitlab_token.insert("gitlab.com".to_string(), PhpMixed::Array(token_entry));
 
@@ -619,7 +619,7 @@ fn test_prompt_auth_if_needed_git_lab_no_auth_change() {
         .with("github-domains", PhpMixed::List(vec![]))
         .with(
             "gitlab-domains",
-            PhpMixed::List(vec![PhpMixed::String("gitlab.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("gitlab.com".to_string())]),
         )
         .with("gitlab-token", PhpMixed::Array(gitlab_token))
         .build_shared();
@@ -664,7 +664,7 @@ fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
     let mut token_entry = IndexMap::new();
     token_entry.insert(
         "access-token".to_string(),
-        PhpMixed::String("bitbucket_access_token".to_string()),
+        PhpMixed::string("bitbucket_access_token".to_string()),
     );
     token_entry.insert(
         "access-token-expiration".to_string(),
@@ -775,7 +775,7 @@ fn test_add_authentication_header_with_custom_headers() {
     let headers_json = json_encode(&PhpMixed::List(
         custom_headers
             .iter()
-            .map(|h| PhpMixed::String(h.clone()))
+            .map(|h| PhpMixed::string(h.clone()))
             .collect(),
     ))
     .unwrap();

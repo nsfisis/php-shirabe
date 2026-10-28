@@ -7,6 +7,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::IOInterfaceMutable;
 use crate::io::io_interface;
 use crate::question::StrictConfirmationQuestion;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use indexmap::indexmap;
 use shirabe_php_shim::{
@@ -316,8 +317,8 @@ impl IOInterfaceImmutable for ConsoleIO {
     fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {
         let sanitized_question = Self::sanitize(&question, true);
         let sanitized_default = if is_string(&default) {
-            Some(PhpMixed::String(Self::sanitize(
-                default.as_string().unwrap_or(""),
+            Some(PhpMixed::string(Self::sanitize(
+                &default.as_string().unwrap_or_default().to_str_lossy(),
                 true,
             )))
         } else {
@@ -350,8 +351,8 @@ impl IOInterfaceImmutable for ConsoleIO {
     ) -> anyhow::Result<PhpMixed> {
         let sanitized_question = Self::sanitize(&question, true);
         let sanitized_default = if is_string(&default) {
-            Some(PhpMixed::String(Self::sanitize(
-                default.as_string().unwrap_or(""),
+            Some(PhpMixed::string(Self::sanitize(
+                &default.as_string().unwrap_or_default().to_str_lossy(),
                 true,
             )))
         } else {
@@ -406,7 +407,10 @@ impl IOInterfaceImmutable for ConsoleIO {
         // ChoiceQuestion::new expects an IndexMap<String, PhpMixed>; project the
         // sanitized choice list/map into the keyed form, preserving keys.
         let sanitize_choice = |choice: &PhpMixed| {
-            PhpMixed::String(Self::sanitize(choice.as_string().unwrap_or(""), true))
+            PhpMixed::string(Self::sanitize(
+                &choice.as_string().unwrap_or_default().to_str_lossy(),
+                true,
+            ))
         };
         let sanitized_choices: IndexMap<String, PhpMixed> = match &choices {
             PhpMixed::List(l) => l
@@ -421,8 +425,8 @@ impl IOInterfaceImmutable for ConsoleIO {
             other => indexmap! { "0".to_string() => sanitize_choice(other) },
         };
         let sanitized_default = if is_string(&default) {
-            Some(PhpMixed::String(Self::sanitize(
-                default.as_string().unwrap_or(""),
+            Some(PhpMixed::string(Self::sanitize(
+                &default.as_string().unwrap_or_default().to_str_lossy(),
                 true,
             )))
         } else {
@@ -459,7 +463,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         }
 
         if !is_array(&result) {
-            let result_str = result.as_string().unwrap_or("").to_string();
+            let result_str = result.as_string().unwrap_or_default().to_string();
             let haystack: IndexMap<String, String> = match &choices {
                 PhpMixed::List(l) => l
                     .iter()
@@ -472,7 +476,7 @@ impl IOInterfaceImmutable for ConsoleIO {
                     .collect(),
                 _ => IndexMap::new(),
             };
-            return Ok(PhpMixed::String(
+            return Ok(PhpMixed::string(
                 array_search(&result_str, &haystack).unwrap_or_default(),
             ));
         }
@@ -495,7 +499,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         }
 
         Ok(PhpMixed::List(
-            results.into_iter().map(PhpMixed::String).collect(),
+            results.into_iter().map(PhpMixed::string).collect(),
         ))
     }
 

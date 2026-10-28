@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Util/ForgejoRepositoryData.php
 
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -39,7 +40,7 @@ impl ForgejoRepositoryData {
         let get_string = |key: &str| {
             data.get(key)
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_owned())
+                .map(|s| s.to_str_lossy().into_owned())
                 .ok_or_else(|| anyhow::anyhow!("missing or invalid string field: {key}"))
         };
         let get_bool = |key: &str| {

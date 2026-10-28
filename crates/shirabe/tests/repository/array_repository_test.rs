@@ -13,8 +13,8 @@ use shirabe_php_shim::PhpMixed;
 /// such setters on root packages, so packages carrying extra config are built via ArrayLoader.
 fn loaded(name: &str, version: &str, extra: Vec<(&str, PhpMixed)>) -> PackageInterfaceHandle {
     let mut config: IndexMap<String, PhpMixed> = IndexMap::new();
-    config.insert("name".to_string(), PhpMixed::String(name.to_string()));
-    config.insert("version".to_string(), PhpMixed::String(version.to_string()));
+    config.insert("name".to_string(), PhpMixed::string(name.to_string()));
+    config.insert("version".to_string(), PhpMixed::string(version.to_string()));
     for (key, value) in extra {
         config.insert(key.to_string(), value);
     }
@@ -158,7 +158,7 @@ fn test_search_with_package_type() {
     let package = loaded(
         "foobar",
         "1",
-        vec![("type", PhpMixed::String("composer-plugin".to_string()))],
+        vec![("type", PhpMixed::string("composer-plugin".to_string()))],
     );
     repo.add_package(package).unwrap();
 
@@ -204,7 +204,7 @@ fn test_search_with_abandoned_packages() {
     let package2 = loaded(
         "foo2",
         "1",
-        vec![("abandoned", PhpMixed::String("bar".to_string()))],
+        vec![("abandoned", PhpMixed::string("bar".to_string()))],
     );
     repo.add_package(package2).unwrap();
 

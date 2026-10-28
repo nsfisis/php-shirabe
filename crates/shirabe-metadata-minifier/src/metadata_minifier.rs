@@ -208,7 +208,7 @@ mod tests {
     fn version(fields: &[(&str, &str)]) -> IndexMap<String, PhpMixed> {
         fields
             .iter()
-            .map(|(key, val)| (key.to_string(), PhpMixed::String(val.to_string())))
+            .map(|(key, val)| (key.to_string(), PhpMixed::string(val.to_string())))
             .collect()
     }
 
@@ -276,21 +276,21 @@ mod tests {
     #[test]
     fn set_overrides_a_field_of_one_version_only() {
         let mut versions = MetadataMinifier::expand(versions());
-        versions.set(1, "version", PhpMixed::String("2.0.0.0".to_string()));
+        versions.set(1, "version", PhpMixed::string("2.0.0.0".to_string()));
 
         assert_eq!(
             versions.version(1).get("version"),
-            Some(&PhpMixed::String("2.0.0.0".to_string())),
+            Some(&PhpMixed::string("2.0.0.0".to_string())),
         );
         assert_eq!(
             versions.version(2).get("version"),
-            Some(&PhpMixed::String("1.0".to_string())),
+            Some(&PhpMixed::string("1.0".to_string())),
         );
 
         let mut expected = expanded();
         expected[1].insert(
             "version".to_string(),
-            PhpMixed::String("2.0.0.0".to_string()),
+            PhpMixed::string("2.0.0.0".to_string()),
         );
         assert_eq!(versions.into_vec(), expected);
     }
@@ -301,13 +301,13 @@ mod tests {
         versions.set(
             0,
             "version_normalized",
-            PhpMixed::String("3.0.0.0".to_string()),
+            PhpMixed::string("3.0.0.0".to_string()),
         );
 
         let mut expected = expanded();
         expected[0].insert(
             "version_normalized".to_string(),
-            PhpMixed::String("3.0.0.0".to_string()),
+            PhpMixed::string("3.0.0.0".to_string()),
         );
         assert_eq!(versions.into_vec(), expected);
     }

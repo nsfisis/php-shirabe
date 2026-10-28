@@ -45,7 +45,7 @@ impl ExecCommand {
             .borrow_mut()
             .get("bin-dir")
             .as_string()
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         let bins = glob(&format!("{}/*", bin_dir));
         let local_bins_raw: Vec<String> = composer_ref.get_package().get_binaries();
@@ -133,10 +133,10 @@ impl Command for ExecCommand {
                 PhpMixed::List(
                     binaries
                         .iter()
-                        .map(|b| PhpMixed::String(b.clone()))
+                        .map(|b| PhpMixed::string(b.clone()))
                         .collect(),
                 ),
-                PhpMixed::String(String::new()),
+                PhpMixed::string(String::new()),
                 PhpMixed::Int(1),
                 "Invalid binary name \"%s\"".to_string(),
                 false,
@@ -173,7 +173,7 @@ impl Command for ExecCommand {
                     .borrow_mut()
                     .get("bin-dir")
                     .as_string()
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string();
                 return Err(RuntimeException::new(format!(
                     "No binaries found in composer.json or in bin-dir ({})",
@@ -195,7 +195,7 @@ impl Command for ExecCommand {
             .borrow()
             .get_argument("binary")?
             .as_string()
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
 
         let dispatcher = crate::composer::composer_full(&composer)

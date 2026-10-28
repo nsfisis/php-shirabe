@@ -50,6 +50,7 @@ pub use var::*;
 pub use xml::*;
 pub use zip::*;
 
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 
 // Re-exported at the crate root so `php_regex!` can reach it via `$crate::regex!` regardless of
@@ -64,7 +65,7 @@ pub enum PhpMixed {
     Bool(bool),
     Int(i64),
     Float(f64),
-    String(String),
+    String(bstr::BString),
     List(Vec<PhpMixed>),
     Array(IndexMap<String, PhpMixed>),
     // TODO(type-model): consolidate Object to Array.
@@ -84,7 +85,8 @@ impl serde::Serialize for PhpMixed {
             PhpMixed::Bool(b) => serializer.serialize_bool(*b),
             PhpMixed::Int(i) => serializer.serialize_i64(*i),
             PhpMixed::Float(f) => serializer.serialize_f64(*f),
-            PhpMixed::String(s) => serializer.serialize_str(s),
+            // TODO(bytes): serde serializes strings as UTF-8, so non-UTF-8 bytes are replaced.
+            PhpMixed::String(s) => serializer.serialize_str(&s.to_str_lossy()),
             PhpMixed::List(items) => {
                 let mut seq = serializer.serialize_seq(Some(items.len()))?;
                 for item in items {
@@ -144,6 +146,10 @@ impl PartialEq for PhpMixed {
 }
 
 impl PhpMixed {
+    pub fn string(s: impl Into<String>) -> PhpMixed {
+        PhpMixed::String(s.into().into())
+    }
+
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             PhpMixed::Bool(b) => Some(*b),
@@ -165,9 +171,9 @@ impl PhpMixed {
         }
     }
 
-    pub fn as_string(&self) -> Option<&str> {
+    pub fn as_string(&self) -> Option<&bstr::BStr> {
         match self {
-            PhpMixed::String(s) => Some(s.as_str()),
+            PhpMixed::String(s) => Some(s.as_bstr()),
             _ => None,
         }
     }
@@ -334,13 +340,19 @@ impl From<f64> for PhpMixed {
 
 impl From<String> for PhpMixed {
     fn from(value: String) -> Self {
-        PhpMixed::String(value)
+        PhpMixed::string(value)
     }
 }
 
 impl From<&str> for PhpMixed {
     fn from(value: &str) -> Self {
-        PhpMixed::String(value.to_string())
+        PhpMixed::string(value)
+    }
+}
+
+impl From<&bstr::BStr> for PhpMixed {
+    fn from(value: &bstr::BStr) -> Self {
+        PhpMixed::String(value.to_owned())
     }
 }
 

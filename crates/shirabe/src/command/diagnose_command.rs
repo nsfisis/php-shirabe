@@ -32,6 +32,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::http::ProxyManager;
 use crate::util::http::RequestProxy;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpClass as _;
 use shirabe_php_shim::{
@@ -358,7 +359,7 @@ impl DiagnoseCommand {
                     .unwrap_or(PhpMixed::Null);
                 let path = str_replace(
                     "%hash%",
-                    hash_val.as_string().unwrap_or(""),
+                    &hash_val.as_string().unwrap_or_default().to_str_lossy(),
                     &provider_includes
                         .as_array()
                         .and_then(|a| a.keys().next().cloned())
@@ -376,7 +377,7 @@ impl DiagnoseCommand {
                     )?;
                 let provider = response.get_body().unwrap_or_default().to_string();
 
-                if hash("sha256", &provider) != hash_val.as_string().unwrap_or("") {
+                if hash("sha256", &provider) != hash_val.as_string().unwrap_or_default() {
                     return Ok(CheckResult::Message(format!(
                         "<warning>It seems that your proxy ({}) is modifying {} traffic on the fly</>",
                         proxy_status, protocol
@@ -504,11 +505,15 @@ impl DiagnoseCommand {
         }
 
         let min_space_free: f64 = (1024 * 1024) as f64;
-        let home_dir = config.get("home").as_string().unwrap_or("").to_string();
+        let home_dir = config
+            .get("home")
+            .as_string()
+            .unwrap_or_default()
+            .to_string();
         let vendor_dir = config
             .get("vendor-dir")
             .as_string()
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         let mut dir = home_dir.clone();
         let df_home = disk_free_space(&home_dir);
@@ -531,7 +536,11 @@ impl DiagnoseCommand {
     }
 
     fn check_pub_keys(&self, config: &Config) -> anyhow::Result<CheckResult> {
-        let home = config.get("home").as_string().unwrap_or("").to_string();
+        let home = config
+            .get("home")
+            .as_string()
+            .unwrap_or_default()
+            .to_string();
         let mut errors: Vec<String> = vec![];
         let io = self.get_io();
 
@@ -594,7 +603,7 @@ impl DiagnoseCommand {
         let latest_version = latest
             .get("version")
             .and_then(|v| v.as_string())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         if composer::VERSION != latest_version && composer::VERSION != "@package_version@" {
             return Ok(CheckResult::Message(format!(
@@ -654,10 +663,10 @@ impl DiagnoseCommand {
             packages.push(crate::package::RootPackageHandle::from_root_package(root_pkg).into());
         }
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-        repo_config.insert("type".to_string(), PhpMixed::String("composer".to_string()));
+        repo_config.insert("type".to_string(), PhpMixed::string("composer".to_string()));
         repo_config.insert(
             "url".to_string(),
-            PhpMixed::String("https://packagist.org".to_string()),
+            PhpMixed::string("https://packagist.org".to_string()),
         );
         let composer_repo_as_repo =
             crate::repository::RepositoryInterfaceHandle::new(ComposerRepository::new(
@@ -1376,7 +1385,7 @@ impl Command for DiagnoseCommand {
         let repositories = config.borrow().get_repositories();
         for repo in repositories {
             let repo_arr = repo.1.as_array().cloned().unwrap_or_default();
-            if repo_arr.get("type").and_then(|v| v.as_string()) == Some("composer")
+            if repo_arr.get("type").and_then(|v| v.as_string()) == Some("composer".into())
                 && repo_arr.get("url").is_some()
             {
                 let repo_arr_unboxed: indexmap::IndexMap<String, PhpMixed> = repo_arr
@@ -1406,7 +1415,7 @@ impl Command for DiagnoseCommand {
                     repo_arr
                         .get("url")
                         .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                        .unwrap_or_default()
                 ));
                 let r = self.check_composer_repo(&url, &config)?;
                 self.output_result(r);
@@ -1457,7 +1466,10 @@ impl Command for DiagnoseCommand {
         if oauth.len() as i64 > 0 {
             for (domain, token) in &oauth {
                 io.write_no_newline(&format!("Checking {} oauth access: ", domain));
-                let r = self.check_github_oauth(domain, token.as_string().unwrap_or(""))?;
+                let r = self.check_github_oauth(
+                    domain,
+                    &token.as_string().unwrap_or_default().to_str_lossy(),
+                )?;
                 self.output_result(r);
             }
         } else {

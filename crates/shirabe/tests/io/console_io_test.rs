@@ -197,9 +197,9 @@ fn test_ask() {
     // stream yields the answer makes ConsoleIO::ask return that answer.
     let (console_io, _output) = make_console_io_with_answer("answer\n");
     let result = console_io
-        .ask("Why?".to_string(), PhpMixed::String("default".to_string()))
+        .ask("Why?".to_string(), PhpMixed::string("default".to_string()))
         .unwrap();
-    assert_eq!(PhpMixed::String("answer".to_string()), result);
+    assert_eq!(PhpMixed::string("answer".to_string()), result);
 }
 
 #[test]
@@ -232,10 +232,10 @@ fn test_ask_and_validate() {
             "Why?".to_string(),
             validator,
             Some(10),
-            PhpMixed::String("default".to_string()),
+            PhpMixed::string("default".to_string()),
         )
         .unwrap();
-    assert_eq!(PhpMixed::String("answer".to_string()), result);
+    assert_eq!(PhpMixed::string("answer".to_string()), result);
 }
 
 #[test]
@@ -247,16 +247,16 @@ fn test_select() {
     let result = console_io.select(
         "Select item".to_string(),
         PhpMixed::List(vec![
-            PhpMixed::String("item1".to_string()),
-            PhpMixed::String("item2".to_string()),
+            PhpMixed::string("item1".to_string()),
+            PhpMixed::string("item2".to_string()),
         ]),
-        PhpMixed::String("item1".to_string()),
+        PhpMixed::string("item1".to_string()),
         PhpMixed::Bool(false),
         "Error message".to_string(),
         true,
     );
     assert_eq!(
-        PhpMixed::List(vec![PhpMixed::String("1".to_string())]),
+        PhpMixed::List(vec![PhpMixed::string("1".to_string())]),
         result.unwrap()
     );
 }

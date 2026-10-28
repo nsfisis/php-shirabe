@@ -1,5 +1,6 @@
 use crate::PhpMixed;
 use bstr::BString;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::string::{addcslashes, strip_tags, stripcslashes};
 use shirabe_php_src::standard::string::{php_trim_mask, php_wordwrap};
@@ -818,8 +819,7 @@ fn php_to_float(v: &PhpMixed) -> f64 {
         }
         PhpMixed::String(s) => {
             // PHP's (float) cast reads the leading numeric portion of the string.
-            let t = s.trim_start();
-            let bytes = t.as_bytes();
+            let bytes = s.trim_start();
             let mut end = 0;
             if end < bytes.len() && (bytes[end] == b'+' || bytes[end] == b'-') {
                 end += 1;
@@ -845,7 +845,11 @@ fn php_to_float(v: &PhpMixed) -> f64 {
                     end = e;
                 }
             }
-            t[..end].parse::<f64>().unwrap_or(0.0)
+            bytes[..end]
+                .to_str()
+                .expect("the numeric prefix is ASCII")
+                .parse::<f64>()
+                .unwrap_or(0.0)
         }
         _ => 0.0,
     }

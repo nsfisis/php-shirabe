@@ -14,6 +14,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
 use crate::util::{AuthHelper, StoreAuth};
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
@@ -308,7 +309,7 @@ impl Git {
             "ssh".to_string(),
             &protocols_list
                 .iter()
-                .map(|s| PhpMixed::String(s.clone()))
+                .map(|s| PhpMixed::string(s.clone()))
                 .collect::<Vec<_>>(),
         );
 
@@ -667,7 +668,7 @@ impl Git {
                             .ask(
                                 "      Username: ".to_string(),
                                 default_username
-                                    .map(PhpMixed::String)
+                                    .map(PhpMixed::string)
                                     .unwrap_or(PhpMixed::Null),
                             )?
                             .as_string()
@@ -1106,7 +1107,7 @@ impl Git {
                     &mut output,
                     Some(dir),
                 )?;
-                output_mixed = PhpMixed::String(output);
+                output_mixed = PhpMixed::string(output);
             } else {
                 let commands = vec![
                     vec![
@@ -1139,7 +1140,7 @@ impl Git {
             let lines = self
                 .process
                 .borrow()
-                .split_lines(output_mixed.as_string().unwrap_or(""));
+                .split_lines(&output_mixed.as_string().unwrap_or_default().to_str_lossy());
             for line in lines {
                 if let Some(matches) =
                     preg_match(php_regex!(r"{^\s*HEAD branch:\s(.+)\s*$}m"), &line)
@@ -1296,11 +1297,11 @@ impl Git {
             if in_array_loose(
                 credential.clone(),
                 &[
-                    PhpMixed::String("private-token".to_string()),
-                    PhpMixed::String("x-token-auth".to_string()),
-                    PhpMixed::String("oauth2".to_string()),
-                    PhpMixed::String("gitlab-ci-token".to_string()),
-                    PhpMixed::String("x-oauth-basic".to_string()),
+                    PhpMixed::string("private-token".to_string()),
+                    PhpMixed::string("x-token-auth".to_string()),
+                    PhpMixed::string("oauth2".to_string()),
+                    PhpMixed::string("gitlab-ci-token".to_string()),
+                    PhpMixed::string("x-oauth-basic".to_string()),
                 ],
             ) {
                 masked_credentials.push(credential.clone());
@@ -1370,7 +1371,7 @@ impl RunCommandOutput for &mut PhpMixed {
     }
 
     fn write_back(&mut self, value: String) {
-        **self = PhpMixed::String(value);
+        **self = PhpMixed::string(value);
     }
 }
 

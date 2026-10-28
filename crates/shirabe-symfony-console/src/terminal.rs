@@ -27,11 +27,11 @@ impl Terminal {
     pub fn get_width(&self) -> i64 {
         let width = shirabe_php_shim::getenv("COLUMNS");
         if let Some(width) = width {
-            // TODO(bytes): PhpMixed::String carries the value as a String.
+            // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
             let width = width
                 .into_string()
                 .unwrap_or_else(|width| panic!("COLUMNS is not valid UTF-8: {width:?}"));
-            return shirabe_php_shim::intval(&PhpMixed::String(shirabe_php_shim::trim(
+            return shirabe_php_shim::intval(&PhpMixed::string(shirabe_php_shim::trim(
                 &width, None,
             )));
         }
@@ -47,11 +47,11 @@ impl Terminal {
     pub fn get_height(&self) -> i64 {
         let height = shirabe_php_shim::getenv("LINES");
         if let Some(height) = height {
-            // TODO(bytes): PhpMixed::String carries the value as a String.
+            // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
             let height = height
                 .into_string()
                 .unwrap_or_else(|height| panic!("LINES is not valid UTF-8: {height:?}"));
-            return shirabe_php_shim::intval(&PhpMixed::String(shirabe_php_shim::trim(
+            return shirabe_php_shim::intval(&PhpMixed::string(shirabe_php_shim::trim(
                 &height, None,
             )));
         }
@@ -94,17 +94,17 @@ impl Terminal {
                 // extract [w, H] from "wxh (WxH)"
                 // or [w, h] from "wxh"
                 WIDTH.with(|w| {
-                    w.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
+                    w.set(Some(shirabe_php_shim::intval(&PhpMixed::string(
                         matches.get(1).unwrap_or_default().to_string(),
                     ))))
                 });
                 HEIGHT.with(|h| {
                     let value = if matches.get(4).is_some() {
-                        shirabe_php_shim::intval(&PhpMixed::String(
+                        shirabe_php_shim::intval(&PhpMixed::string(
                             matches.get(4).unwrap_or_default().to_string(),
                         ))
                     } else {
-                        shirabe_php_shim::intval(&PhpMixed::String(
+                        shirabe_php_shim::intval(&PhpMixed::string(
                             matches.get(2).unwrap_or_default().to_string(),
                         ))
                     };
@@ -146,12 +146,12 @@ impl Terminal {
             {
                 // extract [w, h] from "rows h; columns w;"
                 WIDTH.with(|w| {
-                    w.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
+                    w.set(Some(shirabe_php_shim::intval(&PhpMixed::string(
                         matches.get(2).unwrap_or_default().to_string(),
                     ))))
                 });
                 HEIGHT.with(|h| {
-                    h.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
+                    h.set(Some(shirabe_php_shim::intval(&PhpMixed::string(
                         matches.get(1).unwrap_or_default().to_string(),
                     ))))
                 });
@@ -160,12 +160,12 @@ impl Terminal {
             {
                 // extract [w, h] from "; h rows; w columns"
                 WIDTH.with(|w| {
-                    w.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
+                    w.set(Some(shirabe_php_shim::intval(&PhpMixed::string(
                         matches.get(2).unwrap_or_default().to_string(),
                     ))))
                 });
                 HEIGHT.with(|h| {
-                    h.set(Some(shirabe_php_shim::intval(&PhpMixed::String(
+                    h.set(Some(shirabe_php_shim::intval(&PhpMixed::string(
                         matches.get(1).unwrap_or_default().to_string(),
                     ))))
                 });
@@ -186,10 +186,10 @@ impl Terminal {
         )?;
 
         Some(vec![
-            shirabe_php_shim::intval(&PhpMixed::String(
+            shirabe_php_shim::intval(&PhpMixed::string(
                 matches.get(2).unwrap_or_default().to_string(),
             )),
-            shirabe_php_shim::intval(&PhpMixed::String(
+            shirabe_php_shim::intval(&PhpMixed::string(
                 matches.get(1).unwrap_or_default().to_string(),
             )),
         ])

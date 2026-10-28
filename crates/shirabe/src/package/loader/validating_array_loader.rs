@@ -6,6 +6,7 @@ use crate::package::loader::LoaderInterface;
 use crate::package::version::VersionParser;
 use crate::package::{STABILITIES, SUPPORTED_LINK_TYPES};
 use crate::repository::PlatformRepository;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values,
@@ -136,7 +137,7 @@ impl ValidatingArrayLoader {
 
         let value = self.config.borrow()[property]
             .as_string()
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         if !preg_is_match(format!("{{^{}$}}u", regex), &value) {
             let message = format!(
@@ -172,7 +173,10 @@ impl ValidatingArrayLoader {
 
         let is_empty = !self.config.borrow().contains_key(property)
             || trim(
-                self.config.borrow()[property].as_string().unwrap_or(""),
+                &self.config.borrow()[property]
+                    .as_string()
+                    .unwrap_or_default()
+                    .to_str_lossy(),
                 Some(" \t\n\r\0\u{0B}"),
             )
             .is_empty();
@@ -276,7 +280,7 @@ impl ValidatingArrayLoader {
 
         let value = self.config.borrow()[property]
             .as_string()
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         if !self.filter_url(&value, &["http", "https"]) {
             self.warnings.borrow_mut().push(format!(
@@ -345,7 +349,7 @@ impl LoaderInterface for ValidatingArrayLoader {
 
         self.validate_string("name", true);
         if let Some(name_val) = config.get("name").and_then(|v| v.as_string())
-            && let Some(err) = Self::has_package_naming_error(name_val, false)
+            && let Some(err) = Self::has_package_naming_error(&name_val.to_str_lossy(), false)
         {
             self.errors.borrow_mut().push(format!("name : {}", err));
         }
@@ -358,7 +362,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 if !is_string(&version_val) {
                     self.config.borrow_mut().insert(
                         "version".to_string(),
-                        PhpMixed::String(php_to_string(&version_val)),
+                        PhpMixed::string(php_to_string(&version_val)),
                     );
                 }
                 let version_str = self
@@ -366,7 +370,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .borrow()
                     .get("version")
                     .and_then(|v| v.as_string())
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string();
                 match self.version_parser.normalize(&version_str, None) {
                     Ok(_) => {}
@@ -409,7 +413,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     ));
                     continue;
                 }
-                let platform_str = platform.as_string().unwrap_or("").to_string();
+                let platform_str = platform.as_string().unwrap_or_default().to_string();
                 if let Err(e) = self.version_parser.normalize(&platform_str, None) {
                     self.errors.borrow_mut().push(format!(
                         "config.platform.{} : invalid value ({}): {}",
@@ -441,7 +445,7 @@ impl LoaderInterface for ValidatingArrayLoader {
         if self.config.borrow().contains_key("time") {
             let time_str = self.config.borrow()["time"]
                 .as_string()
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             match shirabe_php_shim::date_create::<chrono::Utc>(&time_str) {
                 Ok(dt) => {
@@ -493,7 +497,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 if release_date.is_none() || release_date.unwrap().timestamp() >= cutoff {
                     let license_validator = SpdxLicenses::new();
                     for license in licenses.values() {
-                        let license_str = license.as_string().unwrap_or("").to_string();
+                        let license_str = license.as_string().unwrap_or_default().to_string();
                         // replace proprietary by MIT for validation purposes since it's not a valid SPDX identifier, but is accepted by composer
                         if license_str == "proprietary" {
                             continue;
@@ -505,14 +509,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                             {
                                 self.warnings.borrow_mut().push(format!(
                                     "License {} must not contain extra spaces, make sure to trim it.",
-                                        json_encode(&PhpMixed::String(license_str.clone()))
+                                        json_encode(&PhpMixed::string(license_str.clone()))
                                             .unwrap_or_default(),
                                 ));
                             } else {
                                 self.warnings.borrow_mut().push(format!(
                                     "License {} is not a valid SPDX license identifier, see https://spdx.org/licenses/ if you use an open license.{}If the software is closed-source, you may use \"proprietary\" as license.",
 
-                                        json_encode(&PhpMixed::String(license_str.clone()))
+                                        json_encode(&PhpMixed::string(license_str.clone()))
                                             .unwrap_or_default(),
                                     PHP_EOL
                                 ));
@@ -836,7 +840,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 .borrow()
                 .get("type")
                 .and_then(|v| v.as_string())
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             if !["php-ext", "php-ext-zend"].contains(&pkg_type.as_str()) {
                 self.errors.borrow_mut().push(
@@ -941,13 +945,16 @@ impl LoaderInterface for ValidatingArrayLoader {
                                         get_debug_type(download_url_method)
                                     ));
                                     php_ext.shift_remove("download-url-method");
-                                } else if !valid_download_url_methods
-                                    .contains(&download_url_method.as_string().unwrap_or(""))
-                                {
+                                } else if !valid_download_url_methods.contains(
+                                    &&*download_url_method
+                                        .as_string()
+                                        .unwrap_or_default()
+                                        .to_str_lossy(),
+                                ) {
                                     self.errors.borrow_mut().push(format!(
                                         "php-ext.download-url-method.{} : invalid value ({}), must be one of {}",
                                         key,
-                                        download_url_method.as_string().unwrap_or(""),
+                                        download_url_method.as_string().unwrap_or_default(),
                                         valid_download_url_methods.join(", ")
                                     ));
                                     php_ext.shift_remove("download-url-method");
@@ -1002,14 +1009,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                                         {
                                             arr.shift_remove(key);
                                         }
-                                    } else if !valid_os_families
-                                        .contains(&os_family.as_string().unwrap_or(""))
-                                    {
+                                    } else if !valid_os_families.contains(
+                                        &&*os_family.as_string().unwrap_or_default().to_str_lossy(),
+                                    ) {
                                         self.errors.borrow_mut().push(format!(
                                             "php-ext.{}.{} : invalid value ({}), must be one of {}",
                                             field_name,
                                             key,
-                                            os_family.as_string().unwrap_or(""),
+                                            os_family.as_string().unwrap_or_default(),
                                             valid_os_families.join(", ")
                                         ));
                                         if let Some(PhpMixed::Array(arr)) =
@@ -1165,7 +1172,9 @@ impl LoaderInterface for ValidatingArrayLoader {
                         .borrow()
                         .get("name")
                         .and_then(|v| v.as_string())
-                        .is_some_and(|name_val| strcasecmp(&package, name_val) == 0);
+                        .is_some_and(|name_val| {
+                            strcasecmp(&package, &name_val.to_str_lossy()) == 0
+                        });
                     if conflicts_with_own_name {
                         self.errors.borrow_mut().push(format!(
                             "{}.{} : a package cannot set a {} on itself",
@@ -1198,8 +1207,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                         {
                             arr.shift_remove(&package);
                         }
-                    } else if constraint.as_string().unwrap_or("") != "self.version" {
-                        let constraint_str = constraint.as_string().unwrap_or("").to_string();
+                    } else if constraint.as_string().unwrap_or_default() != "self.version" {
+                        let constraint_str = constraint.as_string().unwrap_or_default().to_string();
                         let link_constraint =
                             match self.version_parser.parse_constraints(&constraint_str) {
                                 Ok(c) => c,
@@ -1312,7 +1321,7 @@ impl LoaderInterface for ValidatingArrayLoader {
         {
             let min_stability = self.config.borrow()["minimum-stability"]
                 .as_string()
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             if !STABILITIES.contains_key(strtolower(&min_stability).as_str())
                 && min_stability != "RC"
@@ -1505,7 +1514,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                         continue;
                     }
 
-                    let target_branch_str = target_branch.as_string().unwrap_or("").to_string();
+                    let target_branch_str =
+                        target_branch.as_string().unwrap_or_default().to_string();
 
                     // ensure it is an alias to a -dev package
                     if substr(&target_branch_str, -4, None) != "-dev" {

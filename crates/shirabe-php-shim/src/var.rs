@@ -1,4 +1,5 @@
 use crate::PhpMixed;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 
 pub fn empty(value: &PhpMixed) -> bool {
@@ -107,7 +108,7 @@ pub fn is_scalar(value: &PhpMixed) -> bool {
 pub fn is_numeric(value: &PhpMixed) -> bool {
     match value {
         PhpMixed::Int(_) | PhpMixed::Float(_) => true,
-        PhpMixed::String(s) => is_numeric_string(s),
+        PhpMixed::String(s) => is_numeric_string(&s.to_str_lossy()),
         _ => false,
     }
 }
@@ -167,7 +168,8 @@ pub fn is_numeric_to_int(value: &PhpMixed) -> i64 {
     match value {
         PhpMixed::Int(n) => *n,
         PhpMixed::Float(f) => *f as i64,
-        PhpMixed::String(s) if is_numeric_string(s) => {
+        PhpMixed::String(s) if is_numeric_string(&s.to_str_lossy()) => {
+            let s = s.to_str_lossy();
             let trimmed = s.trim();
             trimmed
                 .parse::<i64>()
@@ -229,7 +231,8 @@ pub fn php_to_string(value: &PhpMixed) -> String {
         PhpMixed::Bool(false) => String::new(),
         PhpMixed::Int(i) => i.to_string(),
         PhpMixed::Float(f) => float_to_string(*f),
-        PhpMixed::String(s) => s.clone(),
+        // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
+        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
         // PHP renders any array as the literal string "Array".
         PhpMixed::List(_) | PhpMixed::Array(_) => "Array".to_string(),
         // TODO(php-runtime): PHP casts an object to string via its __toString() method; PhpMixed::Object
@@ -378,7 +381,8 @@ fn var_export_into(out: &mut String, value: &PhpMixed, level: usize) {
         PhpMixed::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
         PhpMixed::Int(i) => out.push_str(&i.to_string()),
         PhpMixed::Float(f) => out.push_str(&var_export_float(*f)),
-        PhpMixed::String(s) => out.push_str(&var_export_string(s)),
+        // TODO(bytes): the output is a String, so non-UTF-8 bytes are replaced.
+        PhpMixed::String(s) => out.push_str(&var_export_string(&s.to_str_lossy())),
         PhpMixed::List(items) => {
             out.push_str("array (\n");
             for (i, item) in items.iter().enumerate() {

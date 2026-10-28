@@ -25,7 +25,7 @@ fn test_bump_requirement() {
             let mut alias_map: IndexMap<String, PhpMixed> = IndexMap::new();
             alias_map.insert(
                 pretty_version.to_string(),
-                PhpMixed::String(branch_alias.to_string()),
+                PhpMixed::string(branch_alias.to_string()),
             );
             let mut extra: IndexMap<String, PhpMixed> = IndexMap::new();
             extra.insert("branch-alias".to_string(), PhpMixed::Array(alias_map));

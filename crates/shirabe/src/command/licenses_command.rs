@@ -216,12 +216,12 @@ impl Command for LicensesCommand {
                     };
                     table.add_row(
                         PhpMixed::List(vec![
-                            PhpMixed::String(name),
-                            PhpMixed::String(package.get_full_pretty_version(
+                            PhpMixed::string(name),
+                            PhpMixed::string(package.get_full_pretty_version(
                                 true,
                                 crate::package::DisplayMode::SourceRefIfDev,
                             )),
-                            PhpMixed::String(licenses_str),
+                            PhpMixed::string(licenses_str),
                         ])
                         .into(),
                     );
@@ -239,14 +239,14 @@ impl Command for LicensesCommand {
                     let mut dep_info: IndexMap<String, PhpMixed> = IndexMap::new();
                     dep_info.insert(
                         "version".to_string(),
-                        PhpMixed::String(package.get_full_pretty_version(
+                        PhpMixed::string(package.get_full_pretty_version(
                             true,
                             crate::package::DisplayMode::SourceRefIfDev,
                         )),
                     );
                     dep_info.insert(
                         "license".to_string(),
-                        PhpMixed::List(pkg_licenses.into_iter().map(PhpMixed::String).collect()),
+                        PhpMixed::List(pkg_licenses.into_iter().map(PhpMixed::string).collect()),
                     );
                     dependencies.insert(
                         package.get_pretty_name().to_string(),
@@ -255,10 +255,10 @@ impl Command for LicensesCommand {
                 }
 
                 let mut output_map: IndexMap<String, PhpMixed> = IndexMap::new();
-                output_map.insert("name".to_string(), PhpMixed::String(root.get_pretty_name()));
+                output_map.insert("name".to_string(), PhpMixed::string(root.get_pretty_name()));
                 output_map.insert(
                     "version".to_string(),
-                    PhpMixed::String(root.get_full_pretty_version(
+                    PhpMixed::string(root.get_full_pretty_version(
                         true,
                         crate::package::DisplayMode::SourceRefIfDev,
                     )),
@@ -266,7 +266,7 @@ impl Command for LicensesCommand {
                 let root_licenses = root.get_license();
                 output_map.insert(
                     "license".to_string(),
-                    PhpMixed::List(root_licenses.into_iter().map(PhpMixed::String).collect()),
+                    PhpMixed::List(root_licenses.into_iter().map(PhpMixed::string).collect()),
                 );
                 output_map.insert("dependencies".to_string(), PhpMixed::Array(dependencies));
                 io.write(&JsonFile::encode(&PhpMixed::Array(

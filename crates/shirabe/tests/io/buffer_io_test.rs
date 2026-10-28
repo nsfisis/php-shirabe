@@ -26,11 +26,11 @@ fn test_set_user_inputs() {
             .unwrap()
     );
     assert_eq!(
-        PhpMixed::String("default".to_string()),
+        PhpMixed::string("default".to_string()),
         buffer_io
             .ask(
                 "Empty string last".to_string(),
-                PhpMixed::String("default".to_string())
+                PhpMixed::string("default".to_string())
             )
             .unwrap()
     );

@@ -104,7 +104,7 @@ fn test_repo_creation() {
             "config",
             PhpMixed::Array(str_config(&[(
                 "cache-repo-dir",
-                PhpMixed::String(tmpdir.path().to_str().unwrap().to_string()),
+                PhpMixed::string(tmpdir.path().to_str().unwrap().to_string()),
             )])),
         )]),
         "unknown",
@@ -123,34 +123,34 @@ fn test_repo_creation() {
     let cases: Vec<(&str, IndexMap<String, PhpMixed>)> = vec![
         (
             "composer",
-            str_config(&[("url", PhpMixed::String("http://example.org".to_string()))]),
+            str_config(&[("url", PhpMixed::string("http://example.org".to_string()))]),
         ),
         (
             "vcs",
             str_config(&[(
                 "url",
-                PhpMixed::String("http://github.com/foo/bar".to_string()),
+                PhpMixed::string("http://github.com/foo/bar".to_string()),
             )]),
         ),
         (
             "git",
             str_config(&[(
                 "url",
-                PhpMixed::String("http://github.com/foo/bar".to_string()),
+                PhpMixed::string("http://github.com/foo/bar".to_string()),
             )]),
         ),
         (
             "git",
             str_config(&[(
                 "url",
-                PhpMixed::String("git@example.org:foo/bar.git".to_string()),
+                PhpMixed::string("git@example.org:foo/bar.git".to_string()),
             )]),
         ),
         (
             "svn",
             str_config(&[(
                 "url",
-                PhpMixed::String("svn://example.org/foo/bar".to_string()),
+                PhpMixed::string("svn://example.org/foo/bar".to_string()),
             )]),
         ),
         (
@@ -159,14 +159,14 @@ fn test_repo_creation() {
         ),
         (
             "artifact",
-            str_config(&[("url", PhpMixed::String("/path/to/zips".to_string()))]),
+            str_config(&[("url", PhpMixed::string("/path/to/zips".to_string()))]),
         ),
     ];
 
     for (r#type, options) in cases {
         rm.create_repository(
             "composer",
-            str_config(&[("url", PhpMixed::String("http://example.org".to_string()))]),
+            str_config(&[("url", PhpMixed::string("http://example.org".to_string()))]),
             None,
         )
         .unwrap();
@@ -188,7 +188,7 @@ fn test_invalid_repo_creation_throws() {
             "config",
             PhpMixed::Array(str_config(&[(
                 "cache-repo-dir",
-                PhpMixed::String(tmpdir.path().to_str().unwrap().to_string()),
+                PhpMixed::string(tmpdir.path().to_str().unwrap().to_string()),
             )])),
         )]),
         "unknown",
@@ -199,7 +199,7 @@ fn test_invalid_repo_creation_throws() {
             "pear",
             str_config(&[(
                 "url",
-                PhpMixed::String("http://pear.example.org/foo".to_string()),
+                PhpMixed::string("http://pear.example.org/foo".to_string()),
             )]),
         ),
         ("invalid", IndexMap::new()),
@@ -224,10 +224,10 @@ fn test_filter_repo_wrapping() {
         .create_repository(
             "path",
             str_config(&[
-                ("type", PhpMixed::String("path".to_string())),
+                ("type", PhpMixed::string("path".to_string())),
                 (
                     "url",
-                    PhpMixed::String(
+                    PhpMixed::string(
                         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                             .join("tests/repository")
                             .to_str()
@@ -237,7 +237,7 @@ fn test_filter_repo_wrapping() {
                 ),
                 (
                     "only",
-                    PhpMixed::List(vec![PhpMixed::String("foo/bar".to_string())]),
+                    PhpMixed::List(vec![PhpMixed::string("foo/bar".to_string())]),
                 ),
             ]),
             None,

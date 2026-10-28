@@ -15,6 +15,7 @@ use crate::package::RootPackageHandle;
 use crate::package::SUPPORTED_LINK_TYPES;
 use crate::package::loader::LoaderInterface;
 use crate::package::version::VersionParser;
+use bstr::ByteSlice;
 use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -97,13 +98,16 @@ impl ArrayLoader {
         if !config.contains_key("version") || !is_scalar(config.get("version").unwrap()) {
             return Err(UnexpectedValueException::new(format!(
                 "Package {} has no version defined.",
-                config.get("name").and_then(|v| v.as_string()).unwrap_or("")
+                config
+                    .get("name")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default()
             ))
             .into());
         }
         let mut config_version = config.get("version").cloned().unwrap_or(PhpMixed::Null);
         if !is_string(&config_version) {
-            config_version = PhpMixed::String(strval(&config_version));
+            config_version = PhpMixed::string(strval(&config_version));
         }
 
         // handle already normalized versions
@@ -114,26 +118,36 @@ impl ArrayLoader {
             let mut v = config
                 .get("version_normalized")
                 .and_then(|v| v.as_string())
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
 
             // handling of existing repos which need to remain composer v1 compatible, in case the version_normalized contained VersionParser::DEFAULT_BRANCH_ALIAS, we renormalize it
             if v == VersionParser::DEFAULT_BRANCH_ALIAS {
-                v = self
-                    .version_parser
-                    .normalize(config_version.as_string().unwrap_or(""), None)?;
+                v = self.version_parser.normalize(
+                    &config_version
+                        .as_string()
+                        .unwrap_or_default()
+                        .to_str_lossy(),
+                    None,
+                )?;
             }
             version = v;
         } else {
-            match self
-                .version_parser
-                .normalize(config_version.as_string().unwrap_or(""), None)
-            {
+            match self.version_parser.normalize(
+                &config_version
+                    .as_string()
+                    .unwrap_or_default()
+                    .to_str_lossy(),
+                None,
+            ) {
                 Ok(v) => version = v,
                 Err(e) => {
                     let message = format!(
                         "Failed to normalize version for package \"{}\": {}",
-                        config.get("name").and_then(|v| v.as_string()).unwrap_or(""),
+                        config
+                            .get("name")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
                         e
                     );
                     let code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code);
@@ -150,9 +164,9 @@ impl ArrayLoader {
         let name = config
             .get("name")
             .and_then(|v| v.as_string())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
-        let pretty_version = config_version.as_string().unwrap_or("").to_string();
+        let pretty_version = config_version.as_string().unwrap_or_default().to_string();
 
         if class == "Composer\\Package\\RootPackage" {
             Ok(CompleteOrRootPackage::Root(RootPackage::new(
@@ -177,7 +191,7 @@ impl ArrayLoader {
         package
             .package_mut()
             .set_type(if let Some(t) = config.get("type") {
-                strtolower(t.as_string().unwrap_or(""))
+                strtolower(&t.as_string().unwrap_or_default().to_str_lossy())
             } else {
                 "library".to_string()
             });
@@ -203,13 +217,13 @@ impl ArrayLoader {
             if let PhpMixed::List(ref mut list) = bin_list {
                 for item in list.iter_mut() {
                     if let Some(s) = item.as_string() {
-                        *item = PhpMixed::String(ltrim(s, Some("/")));
+                        *item = PhpMixed::string(ltrim(&s.to_str_lossy(), Some("/")));
                     }
                 }
             } else if let PhpMixed::Array(ref mut map) = bin_list {
                 for (_k, v) in map.iter_mut() {
                     if let Some(s) = v.as_string() {
-                        *v = PhpMixed::String(ltrim(s, Some("/")));
+                        *v = PhpMixed::string(ltrim(&s.to_str_lossy(), Some("/")));
                     }
                 }
             }
@@ -247,7 +261,7 @@ impl ArrayLoader {
                     config
                         .get("name")
                         .and_then(|v| v.as_string())
-                        .unwrap_or(""),
+                        .unwrap_or_default(),
                     json_encode(&source).unwrap_or_default(),
                 ))
                 .into());
@@ -287,7 +301,7 @@ impl ArrayLoader {
                     config
                         .get("name")
                         .and_then(|v| v.as_string())
-                        .unwrap_or(""),
+                        .unwrap_or_default(),
                     json_encode(&dist).unwrap_or_default(),
                 ))
                 .into());
@@ -320,9 +334,9 @@ impl ArrayLoader {
         {
             for (target, reason) in suggest_map.iter_mut() {
                 if let Some(r) = reason.as_string()
-                    && trim(r, None) == "self.version"
+                    && trim(&r.to_str_lossy(), None) == "self.version"
                 {
-                    *reason = PhpMixed::String(package.get_pretty_version().to_string());
+                    *reason = PhpMixed::string(package.get_pretty_version().to_string());
                     let _ = target;
                 }
             }
@@ -357,8 +371,8 @@ impl ArrayLoader {
         if let Some(time_value) = config.get("time")
             && !shirabe_php_shim::empty(time_value)
         {
-            let time_str = time_value.as_string().unwrap_or("");
-            let time = if preg_is_match(php_regex!(r"/^\d++$/D"), time_str) {
+            let time_str = time_value.as_string().unwrap_or_default();
+            let time = if preg_is_match(php_regex!(r"/^\d++$/D"), &time_str.to_str_lossy()) {
                 format!("@{}", time_str)
             } else {
                 time_str.to_string()
@@ -430,7 +444,7 @@ impl ArrayLoader {
         {
             package
                 .complete_mut()
-                .set_description(description.as_string().unwrap_or("").to_string());
+                .set_description(description.as_string().unwrap_or_default().to_string());
         }
 
         if let Some(homepage) = config.get("homepage")
@@ -439,7 +453,7 @@ impl ArrayLoader {
         {
             package
                 .complete_mut()
-                .set_homepage(homepage.as_string().unwrap_or("").to_string());
+                .set_homepage(homepage.as_string().unwrap_or_default().to_string());
         }
 
         if let Some(keywords) = config.get("keywords")
@@ -460,13 +474,13 @@ impl ArrayLoader {
             let license_vec: Vec<String> = match license {
                 PhpMixed::Array(map) => map
                     .values()
-                    .map(|v| v.as_string().unwrap_or("").to_string())
+                    .map(|v| v.as_string().unwrap_or_default().to_string())
                     .collect(),
                 PhpMixed::List(list) => list
                     .iter()
-                    .map(|v| v.as_string().unwrap_or("").to_string())
+                    .map(|v| v.as_string().unwrap_or_default().to_string())
                     .collect(),
-                other => vec![other.as_string().unwrap_or("").to_string()],
+                other => vec![other.as_string().unwrap_or_default().to_string()],
             };
             package.complete_mut().set_license(license_vec);
         }
@@ -480,7 +494,9 @@ impl ArrayLoader {
                 .filter_map(|v| match v {
                     PhpMixed::Array(m) => Some(
                         m.iter()
-                            .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
+                            .map(|(k, v)| {
+                                (k.clone(), v.as_string().unwrap_or_default().to_string())
+                            })
                             .collect(),
                     ),
                     _ => None,
@@ -494,7 +510,7 @@ impl ArrayLoader {
         {
             let support_map: IndexMap<String, String> = map
                 .iter()
-                .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
+                .map(|(k, v)| (k.clone(), v.as_string().unwrap_or_default().to_string()))
                 .collect();
             package.complete_mut().set_support(support_map);
         }
@@ -576,7 +592,7 @@ impl ArrayLoader {
                         continue;
                     }
 
-                    let constraint_str = constraint.as_string().unwrap_or("").to_string();
+                    let constraint_str = constraint.as_string().unwrap_or_default().to_string();
                     if constraint_str == "self.version" {
                         let link = self.create_link(
                             &name,
@@ -643,7 +659,7 @@ impl ArrayLoader {
                 source_version,
                 description,
                 &target,
-                constraint.as_string().unwrap_or(""),
+                &constraint.as_string().unwrap_or_default().to_str_lossy(),
             )?;
             res.insert(target, link);
         }
@@ -703,10 +719,10 @@ impl ArrayLoader {
         }
         let mut config_version = config.get("version").cloned().unwrap_or(PhpMixed::Null);
         if !is_string(&config_version) {
-            config_version = PhpMixed::String(strval(&config_version));
+            config_version = PhpMixed::string(strval(&config_version));
         }
 
-        let version_str = config_version.as_string().unwrap_or("").to_string();
+        let version_str = config_version.as_string().unwrap_or_default().to_string();
         if strpos(&version_str, "dev-") != Some(0) && "-dev" != substr(&version_str, -4, None) {
             return Ok(None);
         }
@@ -724,8 +740,11 @@ impl ArrayLoader {
 
         if let Some(branch_alias_map) = extra_branch_alias {
             for (source_branch, target_branch_value) in branch_alias_map {
-                let source_branch = strval(&PhpMixed::String(source_branch));
-                let target_branch = target_branch_value.as_string().unwrap_or("").to_string();
+                let source_branch = strval(&PhpMixed::string(source_branch));
+                let target_branch = target_branch_value
+                    .as_string()
+                    .unwrap_or_default()
+                    .to_string();
 
                 // ensure it is an alias to a -dev package
                 if "-dev" != substr(&target_branch, -4, None) {
@@ -872,7 +891,7 @@ fn php_to_mirrors(value: &PhpMixed) -> Vec<Mirror> {
                 url: m
                     .get("url")
                     .and_then(|v| v.as_string())
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string(),
                 preferred: m.get("preferred").is_some_and(|v| v.to_bool()),
             }),

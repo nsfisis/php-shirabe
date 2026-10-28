@@ -139,11 +139,11 @@ impl<'de> Visitor<'de> for PhpMixedSeed {
     }
 
     fn visit_str<E>(self, v: &str) -> Result<PhpMixed, E> {
-        Ok(PhpMixed::String(v.to_owned()))
+        Ok(PhpMixed::string(v.to_owned()))
     }
 
     fn visit_string<E>(self, v: String) -> Result<PhpMixed, E> {
-        Ok(PhpMixed::String(v))
+        Ok(PhpMixed::string(v))
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<PhpMixed, A::Error>

@@ -307,8 +307,8 @@ impl Problem {
                         result.push(sprintf(
                             &message_var,
                             &[
-                                PhpMixed::String(package.clone()),
-                                PhpMixed::String(format!("[{}]", implode(", ", &versions_list))),
+                                PhpMixed::string(package.clone()),
+                                PhpMixed::string(format!("[{}]", implode(", ", &versions_list))),
                             ],
                         ));
                     } else {
@@ -316,8 +316,8 @@ impl Problem {
                         result.push(sprintf(
                             message,
                             &[
-                                PhpMixed::String(package.clone()),
-                                PhpMixed::String(format!(" {}", first)),
+                                PhpMixed::string(package.clone()),
+                                PhpMixed::string(format!(" {}", first)),
                             ],
                         ));
                     }

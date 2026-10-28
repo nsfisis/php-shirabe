@@ -8,6 +8,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -132,17 +133,17 @@ impl GitLab {
                     let username = arr
                         .get("username")
                         .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_string();
                     let password = arr
                         .get("token")
                         .and_then(|v| v.as_string())
-                        .unwrap_or("private-token")
+                        .unwrap_or("private-token".into())
                         .to_string();
                     (username, password)
                 }
                 _ => {
-                    let username = token.as_string().unwrap_or("").to_string();
+                    let username = token.as_string().unwrap_or_default().to_string();
                     let password = "private-token".to_string();
                     (username, password)
                 }
@@ -259,7 +260,7 @@ impl GitLab {
                                     .and_then(|r| r.as_array())
                                     .and_then(|arr| arr.get("error"))
                                     .and_then(|v| v.as_string())
-                                    == Some("invalid_grant");
+                                    == Some("invalid_grant".into());
                                 if is_invalid_grant {
                                     self.io.write_error3(
                                         "Bad credentials. If you have two factor authentication enabled you will have to manually create a personal access token",
@@ -311,7 +312,7 @@ impl GitLab {
                 .as_array()
                 .and_then(|arr| arr.get("access_token"))
                 .and_then(|v| v.as_string())
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
 
             self.io.borrow_mut().set_authentication(
@@ -338,7 +339,7 @@ impl GitLab {
                 } else {
                     auth_config_source.add_config_setting(
                         &format!("gitlab-oauth.{}", origin_url),
-                        PhpMixed::String(access_token),
+                        PhpMixed::string(access_token),
                     )?;
                 }
             } else {
@@ -352,7 +353,7 @@ impl GitLab {
                 } else {
                     auth_config_source.add_config_setting(
                         &format!("gitlab-oauth.{}", origin_url),
-                        PhpMixed::String(access_token),
+                        PhpMixed::string(access_token),
                     )?;
                 }
             }
@@ -391,7 +392,7 @@ impl GitLab {
             .as_array()
             .and_then(|arr| arr.get("access_token"))
             .and_then(|v| v.as_string())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
 
         self.io.borrow_mut().set_authentication(
@@ -414,7 +415,7 @@ impl GitLab {
 
     fn create_token(&mut self, scheme: &str, origin_url: &str) -> anyhow::Result<PhpMixed> {
         let username = match self.io.ask("Username: ".to_string(), PhpMixed::Null)? {
-            PhpMixed::String(s) => s,
+            PhpMixed::String(s) => s.to_str_lossy().into_owned(),
             _ => String::new(),
         };
         let password = self
@@ -431,12 +432,12 @@ impl GitLab {
             ("grant_type", "password"),
         ]);
         let mut http_inner: IndexMap<String, PhpMixed> = IndexMap::new();
-        http_inner.insert("method".to_string(), PhpMixed::String("POST".to_string()));
+        http_inner.insert("method".to_string(), PhpMixed::string("POST".to_string()));
         http_inner.insert(
             "header".to_string(),
-            PhpMixed::List(headers.into_iter().map(PhpMixed::String).collect()),
+            PhpMixed::List(headers.into_iter().map(PhpMixed::string).collect()),
         );
-        http_inner.insert("content".to_string(), PhpMixed::String(data));
+        http_inner.insert("content".to_string(), PhpMixed::string(data));
         let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
         options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
         options.insert("http".to_string(), PhpMixed::Array(http_inner));
@@ -499,12 +500,12 @@ impl GitLab {
             ("grant_type", "refresh_token"),
         ]);
         let mut http_inner = IndexMap::new();
-        http_inner.insert("method".to_string(), PhpMixed::String("POST".to_string()));
+        http_inner.insert("method".to_string(), PhpMixed::string("POST".to_string()));
         http_inner.insert(
             "header".to_string(),
-            PhpMixed::List(headers.into_iter().map(PhpMixed::String).collect()),
+            PhpMixed::List(headers.into_iter().map(PhpMixed::string).collect()),
         );
-        http_inner.insert("content".to_string(), PhpMixed::String(data));
+        http_inner.insert("content".to_string(), PhpMixed::string(data));
         let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
         options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
         options.insert("http".to_string(), PhpMixed::Array(http_inner));
@@ -550,17 +551,17 @@ impl GitLab {
             .as_array()
             .and_then(|arr| arr.get("refresh_token"))
             .and_then(|v| v.as_string())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         let mut setting = IndexMap::new();
         setting.insert(
             "expires-at".to_string(),
             PhpMixed::Int(created_at + expires_in),
         );
-        setting.insert("refresh-token".to_string(), PhpMixed::String(refresh_token));
+        setting.insert("refresh-token".to_string(), PhpMixed::string(refresh_token));
         setting.insert(
             "token".to_string(),
-            PhpMixed::String(access_token.to_string()),
+            PhpMixed::string(access_token.to_string()),
         );
         PhpMixed::Array(setting)
     }

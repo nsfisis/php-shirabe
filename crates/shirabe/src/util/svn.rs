@@ -196,9 +196,9 @@ impl Svn {
         self.credentials = Some(SvnCredentials {
             username: self
                 .io
-                .ask("Username: ".to_string(), PhpMixed::String("".to_string()))?
+                .ask("Username: ".to_string(), PhpMixed::string("".to_string()))?
                 .as_string()
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string(),
             password: self
                 .io
@@ -321,12 +321,12 @@ impl Svn {
                 username: entry_arr
                     .get("username")
                     .and_then(|v| v.as_string())
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string(),
                 password: entry_arr
                     .get("password")
                     .and_then(|v| v.as_string())
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string(),
             });
 

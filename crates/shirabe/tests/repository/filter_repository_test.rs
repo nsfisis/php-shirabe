@@ -31,7 +31,7 @@ fn config(
             "only".to_string(),
             PhpMixed::List(
                 only.iter()
-                    .map(|s| PhpMixed::String(s.to_string()))
+                    .map(|s| PhpMixed::string(s.to_string()))
                     .collect(),
             ),
         );
@@ -42,7 +42,7 @@ fn config(
             PhpMixed::List(
                 exclude
                     .iter()
-                    .map(|s| PhpMixed::String(s.to_string()))
+                    .map(|s| PhpMixed::string(s.to_string()))
                     .collect(),
             ),
         );

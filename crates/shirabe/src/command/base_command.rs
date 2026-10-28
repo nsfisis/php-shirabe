@@ -17,6 +17,7 @@ use crate::package::version::VersionParser;
 use crate::plugin::PluginEvents;
 use crate::plugin::PreCommandRunEvent;
 use crate::util::Platform;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
@@ -426,7 +427,12 @@ impl BaseCommand for BaseCommandData {
         let mut prefer_source = false;
         let mut prefer_dist = false;
 
-        match config.get("preferred-install").as_string().unwrap_or("") {
+        match &*config
+            .get("preferred-install")
+            .as_string()
+            .unwrap_or_default()
+            .to_str_lossy()
+        {
             "source" => {
                 prefer_source = true;
             }
@@ -473,7 +479,7 @@ impl BaseCommand for BaseCommandData {
                 .into());
             }
             let prefer_install = input.borrow().get_option("prefer-install")?;
-            match prefer_install.as_string().unwrap_or("") {
+            match prefer_install.as_string().unwrap_or_default() {
                 "dist" => {
                     input
                         .borrow_mut()
@@ -645,7 +651,7 @@ impl BaseCommand for BaseCommandData {
         let val = input.borrow().get_option(opt_name)?;
         let formats: Vec<PhpMixed> = Auditor::FORMATS
             .iter()
-            .map(|s| PhpMixed::String(s.to_string()))
+            .map(|s| PhpMixed::string(s.to_string()))
             .collect();
         if !in_array_strict(val.clone(), &formats) {
             return Err(InvalidArgumentException::new(format!(
@@ -656,7 +662,7 @@ impl BaseCommand for BaseCommandData {
             .into());
         }
 
-        Ok(val.as_string().unwrap_or("").to_string())
+        Ok(val.as_string().unwrap_or_default().to_string())
     }
 
     fn create_audit_config(

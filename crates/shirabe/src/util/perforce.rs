@@ -372,9 +372,8 @@ impl Perforce {
             p4_create_client_command,
             None,
             None,
-            // TODO(bytes): Process carries its stdin as a PhpMixed::String.
             file_get_contents(self.get_p4_client_spec())
-                .map(|s| PhpMixed::String(String::from_utf8_lossy(&s).into_owned()))
+                .map(|s| PhpMixed::String(s.into()))
                 .unwrap_or(PhpMixed::Null),
             None,
         )?;
@@ -506,7 +505,7 @@ impl Perforce {
             None,
             None,
             password
-                .map(|s| PhpMixed::String(s.to_string()))
+                .map(|s| PhpMixed::string(s.to_string()))
                 .unwrap_or(PhpMixed::Null),
             None,
         )?;
@@ -528,7 +527,7 @@ impl Perforce {
                     command,
                     None,
                     None,
-                    password.map(PhpMixed::String).unwrap_or(PhpMixed::Null),
+                    password.map(PhpMixed::string).unwrap_or(PhpMixed::Null),
                     None,
                 )?;
                 process.run(None, indexmap::IndexMap::new())?;

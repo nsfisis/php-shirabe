@@ -617,14 +617,14 @@ impl Filesystem {
 
         // no commonality at all
         if Some(0) != strpos(&from, &common_path) || "." == common_path {
-            return Ok(var_export(&PhpMixed::String(to), true));
+            return Ok(var_export(&PhpMixed::string(to), true));
         }
 
         common_path = format!("{}/", rtrim(&common_path, Some("/")));
         if to.starts_with(&format!("{}/", from)) {
             return Ok(format!(
                 "__DIR__ . {}",
-                var_export(&PhpMixed::String(substr(&to, strlen(&from), None)), true)
+                var_export(&PhpMixed::string(substr(&to, strlen(&from), None)), true)
             ));
         }
         let source_path_depth = (substr_count(&substr(&from, strlen(&common_path), None), "/")
@@ -633,7 +633,7 @@ impl Filesystem {
 
         // allow top level /foo & /bar dirs to be addressed relatively as this is common in Docker setups
         if !prefer_relative && "/" == common_path && source_path_depth > 1 {
-            return Ok(var_export(&PhpMixed::String(to), true));
+            return Ok(var_export(&PhpMixed::string(to), true));
         }
 
         let common_path_code = if static_code {
@@ -657,7 +657,7 @@ impl Filesystem {
             if strlen(&rel_target) > 0 {
                 format!(
                     ".{}",
-                    var_export(&PhpMixed::String(format!("/{}", rel_target)), true)
+                    var_export(&PhpMixed::string(format!("/{}", rel_target)), true)
                 )
             } else {
                 String::new()

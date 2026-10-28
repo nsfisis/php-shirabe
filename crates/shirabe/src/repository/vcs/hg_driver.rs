@@ -53,7 +53,7 @@ impl HgDriver {
                 .borrow_mut()
                 .get("cache-vcs-dir")
                 .as_string()
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             if !Cache::is_usable(&cache_vcs_dir) {
                 return Err(RuntimeException::new("HgDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string()).into());

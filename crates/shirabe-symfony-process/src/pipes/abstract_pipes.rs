@@ -1,5 +1,6 @@
 //! ref: composer/vendor/symfony/process/Pipes/AbstractPipes.php
 
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, PhpResource};
 
@@ -20,7 +21,9 @@ impl AbstractPipes {
         // TODO(plugin): `$input instanceof \Iterator` is not modeled. The PHP `is_resource($input)`
         // branch never applies: a PhpMixed is never a resource, so input is never stored as-is here.
         if let PhpMixed::String(s) = &input {
-            input_buffer = s.clone();
+            // TODO(bytes): input_buffer is a String, so non-UTF-8 input is replaced before it
+            // reaches the child's stdin.
+            input_buffer = s.to_str_lossy().into_owned();
             stored_input = PhpMixed::Null;
         } else {
             input_buffer = input.as_string().map(|s| s.to_string()).unwrap_or_default();

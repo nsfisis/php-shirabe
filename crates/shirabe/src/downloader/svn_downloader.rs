@@ -14,6 +14,7 @@ use crate::repository::VcsRepository;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, preg_is_match,
@@ -308,9 +309,11 @@ impl VcsDownloader for SvnDownloader {
                 .io
                 .ask(
                     "    <info>Discard changes [y,n,v,?]?</info> ".to_string(),
-                    PhpMixed::String("?".to_string()),
+                    PhpMixed::string("?".to_string()),
                 )?
                 .as_string()
+                .map(|s| s.to_str_lossy())
+                .as_deref()
             {
                 Some("y") => {
                     self.discard_changes(path).await?;

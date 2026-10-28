@@ -76,7 +76,7 @@ pub trait ArchiveDownloader {
             .borrow_mut()
             .get("vendor-dir")
             .as_string()
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains

@@ -294,7 +294,7 @@ impl FileDownloader {
                     .borrow_mut()
                     .get("vendor-dir")
                     .as_string()
-                    .unwrap_or(""),
+                    .unwrap_or_default(),
                 hash(
                     "md5",
                     format!("{}{}", package, spl_object_hash(&PhpMixed::Null))
@@ -512,7 +512,7 @@ impl DownloaderInterface for FileDownloader {
                         let cache_key = urls[0].cache_key.clone();
                         let file_size = match filesize(&file_name) {
                             Some(size) => PhpMixed::Int(size),
-                            None => PhpMixed::String(
+                            None => PhpMixed::string(
                                 response
                                     .get_header("Content-Length")
                                     .unwrap_or_else(|| "?".to_string()),
@@ -656,7 +656,7 @@ impl DownloaderInterface for FileDownloader {
                 )?;
             }
 
-            return Ok(Some(PhpMixed::String(file_name)));
+            return Ok(Some(PhpMixed::string(file_name)));
         }
     }
 
@@ -687,7 +687,7 @@ impl DownloaderInterface for FileDownloader {
             .borrow_mut()
             .get("vendor-dir")
             .as_string()
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         let first_segment = package
             .get_pretty_name()
@@ -743,7 +743,7 @@ impl DownloaderInterface for FileDownloader {
             .borrow_mut()
             .get("vendor-dir")
             .as_string()
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains

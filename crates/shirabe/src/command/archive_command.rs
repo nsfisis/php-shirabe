@@ -365,7 +365,7 @@ impl Command for ArchiveCommand {
                     .borrow_mut()
                     .get("archive-format")
                     .as_string()
-                    .unwrap_or("tar")
+                    .unwrap_or("tar".into())
                     .to_string()
             });
 
@@ -379,7 +379,7 @@ impl Command for ArchiveCommand {
                     .borrow_mut()
                     .get("archive-dir")
                     .as_string()
-                    .unwrap_or(".")
+                    .unwrap_or(".".into())
                     .to_string()
             });
 

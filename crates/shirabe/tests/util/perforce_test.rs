@@ -21,19 +21,19 @@ fn get_test_repo_config() -> IndexMap<String, PhpMixed> {
     let mut config = IndexMap::new();
     config.insert(
         "depot".to_string(),
-        PhpMixed::String(TEST_DEPOT.to_string()),
+        PhpMixed::string(TEST_DEPOT.to_string()),
     );
     config.insert(
         "branch".to_string(),
-        PhpMixed::String(TEST_BRANCH.to_string()),
+        PhpMixed::string(TEST_BRANCH.to_string()),
     );
     config.insert(
         "p4user".to_string(),
-        PhpMixed::String(TEST_P4USER.to_string()),
+        PhpMixed::string(TEST_P4USER.to_string()),
     );
     config.insert(
         "unique_perforce_client_name".to_string(),
-        PhpMixed::String(TEST_CLIENT_NAME.to_string()),
+        PhpMixed::string(TEST_CLIENT_NAME.to_string()),
     );
     config
 }
@@ -78,15 +78,15 @@ fn expected_composer_information() -> IndexMap<String, PhpMixed> {
     let mut expected = IndexMap::new();
     expected.insert(
         "name".to_string(),
-        PhpMixed::String("test/perforce".to_string()),
+        PhpMixed::string("test/perforce".to_string()),
     );
     expected.insert(
         "description".to_string(),
-        PhpMixed::String("Basic project for testing".to_string()),
+        PhpMixed::string("Basic project for testing".to_string()),
     );
     expected.insert(
         "minimum-stability".to_string(),
-        PhpMixed::String("dev".to_string()),
+        PhpMixed::string("dev".to_string()),
     );
     expected.insert("autoload".to_string(), PhpMixed::Array(autoload));
     expected
@@ -243,7 +243,7 @@ fn test_query_p4_user_queries_for_user() {
     let (process, _guard) = get_process_executor_mock(vec![], false, MockHandler::default());
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask(PhpMixed::String("TEST_QUERY_USER".to_string())),
+            IOStub::new().with_ask(PhpMixed::string("TEST_QUERY_USER".to_string())),
         ));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
@@ -265,7 +265,7 @@ fn test_query_p4_user_stores_response_to_query_for_user_with_windows() {
     );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask(PhpMixed::String("TEST_QUERY_USER".to_string())),
+            IOStub::new().with_ask(PhpMixed::string("TEST_QUERY_USER".to_string())),
         ));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
@@ -286,7 +286,7 @@ fn test_query_p4_user_stores_response_to_query_for_user_without_windows() {
     );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask(PhpMixed::String("TEST_QUERY_USER".to_string())),
+            IOStub::new().with_ask(PhpMixed::string("TEST_QUERY_USER".to_string())),
         ));
     let mut perforce = create_perforce(false, process, io);
     perforce.set_user(None);
@@ -307,7 +307,7 @@ fn test_query_p4_user_escapes_injection_on_windows() {
     );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
-            IOStub::new().with_ask(PhpMixed::String("foo && calc.exe".to_string())),
+            IOStub::new().with_ask(PhpMixed::string("foo && calc.exe".to_string())),
         ));
     let mut perforce = create_perforce(true, process, io);
     perforce.set_user(None);
@@ -324,7 +324,7 @@ fn test_query_p4_user_escapes_injection_on_unix() {
         MockHandler::default(),
     );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = std::rc::Rc::new(
-        std::cell::RefCell::new(IOStub::new().with_ask(PhpMixed::String("foo; id".to_string()))),
+        std::cell::RefCell::new(IOStub::new().with_ask(PhpMixed::string("foo; id".to_string()))),
     );
     let mut perforce = create_perforce(false, process, io);
     perforce.set_user(None);
@@ -335,12 +335,12 @@ fn test_query_p4_user_escapes_injection_on_unix() {
 #[test]
 fn test_query_p4_password_with_password_already_set() {
     let mut repo_config = IndexMap::new();
-    repo_config.insert("depot".to_string(), PhpMixed::String("depot".to_string()));
-    repo_config.insert("branch".to_string(), PhpMixed::String("branch".to_string()));
-    repo_config.insert("p4user".to_string(), PhpMixed::String("user".to_string()));
+    repo_config.insert("depot".to_string(), PhpMixed::string("depot".to_string()));
+    repo_config.insert("branch".to_string(), PhpMixed::string("branch".to_string()));
+    repo_config.insert("p4user".to_string(), PhpMixed::string("user".to_string()));
     repo_config.insert(
         "p4password".to_string(),
-        PhpMixed::String("TEST_PASSWORD".to_string()),
+        PhpMixed::string("TEST_PASSWORD".to_string()),
     );
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =

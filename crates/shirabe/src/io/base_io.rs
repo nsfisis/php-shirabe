@@ -29,7 +29,7 @@ impl LogLevel {
 fn log_context(context: &[(&str, &str)]) -> IndexMap<String, PhpMixed> {
     context
         .iter()
-        .map(|(k, v)| (k.to_string(), PhpMixed::String(v.to_string())))
+        .map(|(k, v)| (k.to_string(), PhpMixed::string(v.to_string())))
         .collect()
 }
 
@@ -113,7 +113,7 @@ pub trait BaseIO: IOInterface {
                     let consumer_key = cred_map
                         .get("consumer-key")
                         .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_string();
                     let consumer_secret = cred_map
                         .get("consumer-secret")
@@ -126,7 +126,7 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = github_oauth.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
-                let token_str = token.as_string().unwrap_or("").to_string();
+                let token_str = token.as_string().unwrap_or_default().to_string();
                 let github_domains = config.get("github-domains");
                 if domain != "github.com"
                     && !in_array_strict(
@@ -147,7 +147,7 @@ pub trait BaseIO: IOInterface {
                     );
                     let merged = array_merge(
                         github_domains.unwrap_or(PhpMixed::List(vec![])),
-                        PhpMixed::List(vec![PhpMixed::String(domain.clone())]),
+                        PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
                     );
                     let mut inner = IndexMap::new();
                     inner.insert("github-domains".to_string(), merged);
@@ -193,7 +193,7 @@ pub trait BaseIO: IOInterface {
                     );
                     let merged = array_merge(
                         gitlab_domains.unwrap_or(PhpMixed::List(vec![])),
-                        PhpMixed::List(vec![PhpMixed::String(domain.clone())]),
+                        PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
                     );
                     let mut inner = IndexMap::new();
                     inner.insert("gitlab-domains".to_string(), merged);
@@ -205,10 +205,10 @@ pub trait BaseIO: IOInterface {
                 let token_str = if let Some(arr) = token.as_array() {
                     arr.get("token")
                         .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_string()
                 } else {
-                    token.as_string().unwrap_or("").to_string()
+                    token.as_string().unwrap_or_default().to_string()
                 };
                 self.check_and_set_authentication(domain, token_str, Some("oauth2".to_string()));
             }
@@ -236,7 +236,7 @@ pub trait BaseIO: IOInterface {
                     );
                     let merged = array_merge(
                         gitlab_domains.unwrap_or(PhpMixed::List(vec![])),
-                        PhpMixed::List(vec![PhpMixed::String(domain.clone())]),
+                        PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
                     );
                     let mut inner = IndexMap::new();
                     inner.insert("gitlab-domains".to_string(), merged);
@@ -249,16 +249,16 @@ pub trait BaseIO: IOInterface {
                     (
                         arr.get("username")
                             .and_then(|v| v.as_string())
-                            .unwrap_or("")
+                            .unwrap_or_default()
                             .to_string(),
                         arr.get("token")
                             .and_then(|v| v.as_string())
-                            .unwrap_or("")
+                            .unwrap_or_default()
                             .to_string(),
                     )
                 } else {
                     (
-                        token.as_string().unwrap_or("").to_string(),
+                        token.as_string().unwrap_or_default().to_string(),
                         "private-token".to_string(),
                     )
                 };
@@ -286,7 +286,7 @@ pub trait BaseIO: IOInterface {
                     );
                     let merged = array_merge(
                         forgejo_domains.unwrap_or(PhpMixed::List(vec![])),
-                        PhpMixed::List(vec![PhpMixed::String(domain.clone())]),
+                        PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
                     );
                     let mut inner = IndexMap::new();
                     inner.insert("forgejo-domains".to_string(), merged);
@@ -299,7 +299,7 @@ pub trait BaseIO: IOInterface {
                     let username = cred_map
                         .get("username")
                         .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_string();
                     let token = cred_map
                         .get("token")
@@ -316,7 +316,7 @@ pub trait BaseIO: IOInterface {
                     let username = cred_map
                         .get("username")
                         .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_string();
                     let password = cred_map
                         .get("password")
@@ -329,7 +329,7 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = bearer_token.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
-                let token_str = token.as_string().unwrap_or("").to_string();
+                let token_str = token.as_string().unwrap_or_default().to_string();
                 self.check_and_set_authentication(domain, token_str, Some("bearer".to_string()));
             }
         }
@@ -365,13 +365,13 @@ pub trait BaseIO: IOInterface {
 
                     let mut ssl_options = IndexMap::new();
                     if let Some(cert) = local_cert {
-                        ssl_options.insert("local_cert".to_string(), PhpMixed::String(cert));
+                        ssl_options.insert("local_cert".to_string(), PhpMixed::string(cert));
                     }
                     if let Some(pk) = local_pk {
-                        ssl_options.insert("local_pk".to_string(), PhpMixed::String(pk));
+                        ssl_options.insert("local_pk".to_string(), PhpMixed::string(pk));
                     }
                     if let Some(pass) = passphrase {
-                        ssl_options.insert("passphrase".to_string(), PhpMixed::String(pass));
+                        ssl_options.insert("passphrase".to_string(), PhpMixed::string(pass));
                     }
 
                     if !ssl_options.contains_key("local_cert") {

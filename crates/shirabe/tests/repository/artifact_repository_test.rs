@@ -25,8 +25,8 @@ fn artifacts_dir() -> String {
 
 fn create_repo(url: &str) -> ArtifactRepository {
     let mut coordinates: IndexMap<String, PhpMixed> = IndexMap::new();
-    coordinates.insert("type".to_string(), PhpMixed::String("artifact".to_string()));
-    coordinates.insert("url".to_string(), PhpMixed::String(url.to_string()));
+    coordinates.insert("type".to_string(), PhpMixed::string("artifact".to_string()));
+    coordinates.insert("url".to_string(), PhpMixed::string(url.to_string()));
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));

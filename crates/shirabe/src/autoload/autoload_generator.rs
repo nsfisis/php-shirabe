@@ -20,6 +20,7 @@ use crate::script::ScriptEvents;
 use crate::util::Filesystem;
 use crate::util::PackageSorter;
 use crate::util::Platform;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
@@ -133,7 +134,7 @@ impl AutoloadGenerator {
             let installed_json = JsonFile::new(
                 format!(
                     "{}/composer/installed.json",
-                    config.get("vendor-dir").as_string().unwrap_or("")
+                    config.get("vendor-dir").as_string().unwrap_or_default()
                 ),
                 None,
                 None,
@@ -181,7 +182,13 @@ impl AutoloadGenerator {
         class_map_generator.avoid_duplicate_scans(None);
 
         let mut filesystem = Filesystem::new(None);
-        filesystem.ensure_directory_exists(config.get("vendor-dir").as_string().unwrap_or(""))?;
+        filesystem.ensure_directory_exists(
+            &config
+                .get("vendor-dir")
+                .as_string()
+                .unwrap_or_default()
+                .to_str_lossy(),
+        )?;
         // Do not remove double realpath() calls.
         // Fixes failing Windows realpath() implementation.
         // See https://bugs.php.net/bug.php?id=72738
@@ -191,7 +198,14 @@ impl AutoloadGenerator {
         );
         let vendor_path = filesystem.normalize_path(
             &realpath(
-                realpath(config.get("vendor-dir").as_string().unwrap_or("")).unwrap_or_default(),
+                realpath(
+                    &*config
+                        .get("vendor-dir")
+                        .as_string()
+                        .unwrap_or_default()
+                        .to_str_lossy(),
+                )
+                .unwrap_or_default(),
             )
             .unwrap_or_default(),
         );
@@ -265,7 +279,7 @@ return array(
                 PhpMixed::List(
                     dev_package_names
                         .iter()
-                        .map(|s| PhpMixed::String(s.clone()))
+                        .map(|s| PhpMixed::string(s.clone()))
                         .collect(),
                 )
             } else {
@@ -294,11 +308,11 @@ return array(
                         &filesystem,
                         &base_path,
                         &vendor_path,
-                        path.as_string().unwrap_or(""),
+                        &path.as_string().unwrap_or_default().to_str_lossy(),
                     )?);
                 }
             }
-            let exported_prefix = var_export(&PhpMixed::String(namespace.clone()), true);
+            let exported_prefix = var_export(&PhpMixed::string(namespace.clone()), true);
             namespaces_file.push_str(&format!("    {} => ", exported_prefix));
             namespaces_file.push_str(&format!("array({}),\n", implode(", ", &exported_paths)));
         }
@@ -317,11 +331,11 @@ return array(
                         &filesystem,
                         &base_path,
                         &vendor_path,
-                        path.as_string().unwrap_or(""),
+                        &path.as_string().unwrap_or_default().to_str_lossy(),
                     )?);
                 }
             }
-            let exported_prefix = var_export(&PhpMixed::String(namespace.clone()), true);
+            let exported_prefix = var_export(&PhpMixed::string(namespace.clone()), true);
             psr4_file.push_str(&format!("    {} => ", exported_prefix));
             psr4_file.push_str(&format!("array({}),\n", implode(", ", &exported_paths)));
         }
@@ -348,7 +362,7 @@ return array(
             let prefixes = implode(
                 ", ",
                 &array_map(
-                    |prefix: &String| var_export(&PhpMixed::String(prefix.clone()), true),
+                    |prefix: &String| var_export(&PhpMixed::string(prefix.clone()), true),
                     &array_keys(&psr0_keys),
                 ),
             );
@@ -397,10 +411,10 @@ return array(
             .map(|m| m.values().cloned().collect())
             .unwrap_or_default();
         for dir in &classmap_list {
-            let dir_str = dir.as_string().unwrap_or("");
+            let dir_str = dir.as_string().unwrap_or_default();
             class_map_generator.scan_paths(
-                dir_str,
-                self.build_exclusion_regex(dir_str, excluded.clone()),
+                &dir_str.to_str_lossy(),
+                self.build_exclusion_regex(&dir_str.to_str_lossy(), excluded.clone()),
                 "classmap",
                 None,
                 vec![],
@@ -421,7 +435,7 @@ return array(
                 for (namespace, paths) in &map {
                     let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
                     entry.insert("paths".to_string(), paths.clone());
-                    entry.insert("type".to_string(), PhpMixed::String(psr_type.to_string()));
+                    entry.insert("type".to_string(), PhpMixed::string(psr_type.to_string()));
                     namespaces_to_scan
                         .entry(namespace.clone())
                         .or_default()
@@ -441,10 +455,10 @@ return array(
                     let group_type = group
                         .get("type")
                         .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_string();
                     for dir in &paths {
-                        let dir_str = dir.as_string().unwrap_or("").to_string();
+                        let dir_str = dir.as_string().unwrap_or_default().to_string();
                         let joined = format!("{}/{}", base_path, dir_str);
                         let dir_str =
                             filesystem.normalize_path(if filesystem.is_absolute_path(&dir_str) {
@@ -539,7 +553,7 @@ return array(
             );
             classmap_file.push_str(&format!(
                 "    {} => {}",
-                var_export(&PhpMixed::String(class_name.clone()), true),
+                var_export(&PhpMixed::string(class_name.clone()), true),
                 path_code
             ));
         }
@@ -578,7 +592,7 @@ return array(
                             .get_lock_data()?
                             .get("content-hash")
                             .and_then(|v| v.as_string())
-                            .unwrap_or("")
+                            .unwrap_or_default()
                             .to_string()
                     } else {
                         bin2hex(&random_bytes(16))
@@ -628,7 +642,7 @@ return array(
             .unwrap_or_default();
         let mut files_str_map: IndexMap<String, String> = IndexMap::new();
         for (k, v) in &files_map {
-            files_str_map.insert(k.clone(), v.as_string().unwrap_or("").to_string());
+            files_str_map.insert(k.clone(), v.as_string().unwrap_or_default().to_string());
         }
         let include_files_file_contents = self.get_include_files_file(
             &files_str_map,
@@ -946,10 +960,10 @@ return array(
             class_map_generator.avoid_duplicate_scans(None);
 
             for dir in classmap.values() {
-                let dir = dir.as_string().unwrap_or("");
+                let dir = dir.as_string().unwrap_or_default();
                 if let Err(e) = class_map_generator.scan_paths(
-                    dir,
-                    self.build_exclusion_regex(dir, excluded.clone()),
+                    &dir.to_str_lossy(),
+                    self.build_exclusion_regex(&dir.to_str_lossy(), excluded.clone()),
                     "classmap",
                     None,
                     vec![],
@@ -1078,7 +1092,7 @@ return array(
         for (file_identifier, function_file) in &files {
             files_code.push_str(&format!(
                 "    {} => {},\n",
-                var_export(&PhpMixed::String(file_identifier.clone()), true),
+                var_export(&PhpMixed::string(file_identifier.clone()), true),
                 function_file
             ));
         }
@@ -1138,7 +1152,7 @@ return array(
         Ok(format!(
             "{}{}",
             base_dir,
-            var_export(&PhpMixed::String(path), true)
+            var_export(&PhpMixed::string(path), true)
         ))
     }
 
@@ -1225,7 +1239,7 @@ return array(
                         ext_key.clone()
                     };
 
-                    let extension = var_export(&PhpMixed::String(ext_name.clone()), true);
+                    let extension = var_export(&PhpMixed::string(ext_name.clone()), true);
                     if ext_name == "pcntl" || ext_name == "readline" {
                         required_extensions.insert(
                             extension.clone(),
@@ -1261,7 +1275,7 @@ return array(
             let version = str_replace("-", ".", bound.get_version());
             let chunks: Vec<i64> = explode(".", &version)
                 .into_iter()
-                .map(|s| shirabe_php_shim::intval(&PhpMixed::String(s)))
+                .map(|s| shirabe_php_shim::intval(&PhpMixed::string(s)))
                 .collect();
 
             chunks[0] * 10000 + chunks[1] * 100 + chunks[2]
@@ -1280,7 +1294,7 @@ return array(
             let chunks = explode(".", &version);
             let chunks = array_slice_strs(&chunks, 0, Some(3));
 
-            PhpMixed::String(implode(".", &chunks))
+            PhpMixed::string(implode(".", &chunks))
         };
 
         let mut required_php = String::new();
@@ -1301,7 +1315,7 @@ return array(
                 "\"{} {}\"",
                 operator,
                 match &human_readable {
-                    PhpMixed::String(s) => s.clone(),
+                    PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                     PhpMixed::Int(i) => i.to_string(),
                     _ => String::new(),
                 }
@@ -1508,7 +1522,7 @@ class ComposerAutoloaderInit{}
 
         if self.apcu.get() {
             let apcu_prefix = var_export(
-                &PhpMixed::String(if let Some(ref prefix) = *self.apcu_prefix.borrow() {
+                &PhpMixed::string(if let Some(ref prefix) = *self.apcu_prefix.borrow() {
                     prefix.clone()
                 } else {
                     bin2hex(&random_bytes(10))
@@ -1602,7 +1616,7 @@ class ComposerStaticInit{}
                 let paths: Vec<String> = if let PhpMixed::List(items) = path.clone() {
                     items
                         .iter()
-                        .map(|i| i.as_string().unwrap_or("").to_string())
+                        .map(|i| i.as_string().unwrap_or_default().to_string())
                         .collect()
                 } else {
                     vec![]
@@ -1617,7 +1631,7 @@ class ComposerStaticInit{}
                 let paths: Vec<String> = if let PhpMixed::List(items) = path.clone() {
                     items
                         .iter()
-                        .map(|i| i.as_string().unwrap_or("").to_string())
+                        .map(|i| i.as_string().unwrap_or_default().to_string())
                         .collect()
                 } else {
                     vec![]
@@ -1634,7 +1648,7 @@ class ComposerStaticInit{}
         {
             let cm_str: IndexMap<String, String> = cm
                 .iter()
-                .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
+                .map(|(k, v)| (k.clone(), v.as_string().unwrap_or_default().to_string()))
                 .collect();
             loader.add_class_map(cm_str);
         }
@@ -1687,7 +1701,7 @@ class ComposerStaticInit{}
             " => {}",
             substr(
                 &var_export(
-                    &PhpMixed::String(format!(
+                    &PhpMixed::string(format!(
                         "{}/",
                         shirabe_php_shim::rtrim(vendor_path, Some("\\/"))
                     )),
@@ -1701,7 +1715,7 @@ class ComposerStaticInit{}
             " => {}",
             substr(
                 &var_export(
-                    &PhpMixed::String(format!(
+                    &PhpMixed::string(format!(
                         "{}/",
                         shirabe_php_shim::rtrim(&format!("phar://{}", vendor_path), Some("\\/"))
                     )),
@@ -1715,7 +1729,7 @@ class ComposerStaticInit{}
             " => {}",
             substr(
                 &var_export(
-                    &PhpMixed::String(format!(
+                    &PhpMixed::string(format!(
                         "{}/",
                         shirabe_php_shim::rtrim(base_path, Some("\\/"))
                     )),
@@ -1729,7 +1743,7 @@ class ComposerStaticInit{}
             " => {}",
             substr(
                 &var_export(
-                    &PhpMixed::String(format!(
+                    &PhpMixed::string(format!(
                         "{}/",
                         shirabe_php_shim::rtrim(&format!("phar://{}", base_path), Some("\\/"))
                     )),
@@ -1884,7 +1898,7 @@ class ComposerStaticInit{}
                     other => vec![other.clone()],
                 };
                 for path in path_list {
-                    let mut path_str = path.as_string().unwrap_or("").to_string();
+                    let mut path_str = path.as_string().unwrap_or_default().to_string();
                     if (r#type == "files"
                         || r#type == "classmap"
                         || r#type == "exclude-from-classmap")
@@ -1978,7 +1992,7 @@ class ComposerStaticInit{}
                             preg_quote(&strtr(&resolved_path, "\\", "/"), None),
                             p
                         );
-                        autoloads.insert(numeric_index.to_string(), PhpMixed::String(entry));
+                        autoloads.insert(numeric_index.to_string(), PhpMixed::string(entry));
                         numeric_index += 1;
                         continue;
                     }
@@ -1996,13 +2010,13 @@ class ComposerStaticInit{}
                     if r#type == "files" {
                         autoloads.insert(
                             self.get_file_identifier(package.clone(), &path_str),
-                            PhpMixed::String(relative_path),
+                            PhpMixed::string(relative_path),
                         );
                         continue;
                     }
                     if r#type == "classmap" {
                         autoloads
-                            .insert(numeric_index.to_string(), PhpMixed::String(relative_path));
+                            .insert(numeric_index.to_string(), PhpMixed::string(relative_path));
                         numeric_index += 1;
                         continue;
                     }
@@ -2012,7 +2026,7 @@ class ComposerStaticInit{}
                         .entry(namespace.clone())
                         .or_insert_with(|| PhpMixed::List(vec![]));
                     if let PhpMixed::List(l) = entry {
-                        l.push(PhpMixed::String(relative_path));
+                        l.push(PhpMixed::string(relative_path));
                     }
                 }
             }
@@ -2307,12 +2321,12 @@ fn require_generated_php_array(file: &str) -> PhpMixed {
                 .into_iter()
                 .filter(|p| !p.trim().is_empty())
                 .map(|p| {
-                    PhpMixed::String(eval_php_path_expr(p.trim(), &dir, &vendor_dir, &base_dir))
+                    PhpMixed::string(eval_php_path_expr(p.trim(), &dir, &vendor_dir, &base_dir))
                 })
                 .collect();
             PhpMixed::List(items)
         } else {
-            PhpMixed::String(eval_php_path_expr(value_expr, &dir, &vendor_dir, &base_dir))
+            PhpMixed::string(eval_php_path_expr(value_expr, &dir, &vendor_dir, &base_dir))
         };
         map.insert(key, value);
     }

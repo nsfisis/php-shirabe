@@ -39,7 +39,7 @@ impl VcsDriverBase {
         let url = repo_config
             .get("url")
             .and_then(|v| v.as_string())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         let origin_url = url.clone();
         Self {
@@ -125,7 +125,7 @@ impl VcsDriverBase {
         {
             composer.insert(
                 "time".to_string(),
-                PhpMixed::String(d.format(DATE_RFC3339).to_string()),
+                PhpMixed::string(d.format(DATE_RFC3339).to_string()),
             );
         }
 
@@ -280,7 +280,7 @@ pub trait VcsDriver: VcsDriverInterface {
         {
             composer.insert(
                 "time".to_string(),
-                PhpMixed::String(change_date.format(DATE_RFC3339).to_string()),
+                PhpMixed::string(change_date.format(DATE_RFC3339).to_string()),
             );
         }
 

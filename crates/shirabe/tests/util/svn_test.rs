@@ -15,8 +15,8 @@ fn map(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
 /// map for `Config::merge`.
 fn http_basic_config(host: &str, username: &str, password: &str) -> IndexMap<String, PhpMixed> {
     let creds = map(vec![
-        ("username", PhpMixed::String(username.to_string())),
-        ("password", PhpMixed::String(password.to_string())),
+        ("username", PhpMixed::string(username.to_string())),
+        ("password", PhpMixed::string(password.to_string())),
     ]);
     let http_basic = map(vec![(host, PhpMixed::Array(creds))]);
     let config = map(vec![("http-basic", PhpMixed::Array(http_basic))]);

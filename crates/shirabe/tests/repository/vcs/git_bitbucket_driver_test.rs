@@ -26,7 +26,7 @@ fn set_up() -> SetUp {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(home.path().to_str().unwrap().to_string()),
+        PhpMixed::string(home.path().to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
@@ -74,7 +74,7 @@ fn get_driver(
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 ) -> anyhow::Result<GitBitbucketDriver> {
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
 
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
@@ -191,26 +191,27 @@ fn test_driver() {
 
     let data = driver.get_composer_information("main").unwrap().unwrap();
     assert_eq!(
-        Some("user/repo"),
+        Some("user/repo".into()),
         data.get("name").and_then(|v| v.as_string())
     );
     assert_eq!(
-        Some("test repo"),
+        Some("test repo".into()),
         data.get("description").and_then(|v| v.as_string())
     );
     assert_eq!(
-        Some("2016-05-17T13:19:52+00:00"),
+        Some("2016-05-17T13:19:52+00:00".into()),
         data.get("time").and_then(|v| v.as_string())
     );
     let support = data.get("support").and_then(|v| v.as_array()).unwrap();
     assert_eq!(
         Some(
             "https://bitbucket.org/user/repo/src/937992d19d72b5116c3e8c4a04f960e5fa270b22/?at=main"
+                .into()
         ),
         support.get("source").and_then(|v| v.as_string())
     );
     assert_eq!(
-        Some("https://bitbucket.org/user/repo"),
+        Some("https://bitbucket.org/user/repo".into()),
         data.get("homepage").and_then(|v| v.as_string())
     );
 
@@ -304,6 +305,7 @@ fn test_invalid_support_data() {
     assert_eq!(
         Some(
             "https://bitbucket.org/user/repo/src/937992d19d72b5116c3e8c4a04f960e5fa270b22/?at=main"
+                .into()
         ),
         support.get("source").and_then(|v| v.as_string())
     );

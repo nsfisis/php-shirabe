@@ -19,11 +19,11 @@ fn make_config() -> Config {
     config_section.insert(
         "gitlab-domains".to_string(),
         PhpMixed::List(vec![
-            PhpMixed::String("mycompany.com/gitlab".to_string()),
-            PhpMixed::String("gitlab.mycompany.com".to_string()),
-            PhpMixed::String("othercompany.com/nested/gitlab".to_string()),
-            PhpMixed::String("gitlab.com".to_string()),
-            PhpMixed::String("gitlab.mycompany.local".to_string()),
+            PhpMixed::string("mycompany.com/gitlab".to_string()),
+            PhpMixed::string("gitlab.mycompany.com".to_string()),
+            PhpMixed::string("othercompany.com/nested/gitlab".to_string()),
+            PhpMixed::string("gitlab.com".to_string()),
+            PhpMixed::string("gitlab.mycompany.local".to_string()),
         ]),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
@@ -114,7 +114,7 @@ fn do_test_initialize(
     let (http_downloader, guard) = http_mock_with_body(api_url, project_data);
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),
@@ -168,7 +168,7 @@ fn do_test_initialize_public_project(
     let (http_downloader, guard) = http_mock_with_body(api_url, project_data);
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),
@@ -235,7 +235,7 @@ fn test_initialize_public_project_as_anonymous() {
         let (http_downloader, _guard) = http_mock_with_body(api_url, project_data);
 
         let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
+        repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
         let mut driver = GitLabDriver::new(
             repo_config,
             fixtures.io.clone(),
@@ -294,7 +294,7 @@ fn test_initialize_with_port_number() {
     let (http_downloader, _guard) = http_mock_with_body(&api_url, &project_data);
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(url.clone()));
+    repo_config.insert("url".to_string(), PhpMixed::string(url.clone()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),
@@ -372,19 +372,19 @@ fn test_get_dist() {
 
     let reference = "c3ebdbf9cceddb82cd2089aaef8c7b992e536363";
     let mut expected: IndexMap<String, PhpMixed> = IndexMap::new();
-    expected.insert("type".to_string(), PhpMixed::String("zip".to_string()));
+    expected.insert("type".to_string(), PhpMixed::string("zip".to_string()));
     expected.insert(
         "url".to_string(),
-        PhpMixed::String(format!(
+        PhpMixed::string(format!(
             "https://gitlab.com/api/v4/projects/mygroup%2Fmyproject/repository/archive.zip?sha={}",
             reference
         )),
     );
     expected.insert(
         "reference".to_string(),
-        PhpMixed::String(reference.to_string()),
+        PhpMixed::string(reference.to_string()),
     );
-    expected.insert("shasum".to_string(), PhpMixed::String(String::new()));
+    expected.insert("shasum".to_string(), PhpMixed::string(String::new()));
 
     assert_eq!(Some(expected), driver.get_dist(reference));
 }
@@ -400,14 +400,14 @@ fn test_get_source() {
 
     let reference = "c3ebdbf9cceddb82cd2089aaef8c7b992e536363";
     let mut expected: IndexMap<String, PhpMixed> = IndexMap::new();
-    expected.insert("type".to_string(), PhpMixed::String("git".to_string()));
+    expected.insert("type".to_string(), PhpMixed::string("git".to_string()));
     expected.insert(
         "url".to_string(),
-        PhpMixed::String("git@gitlab.com:mygroup/myproject.git".to_string()),
+        PhpMixed::string("git@gitlab.com:mygroup/myproject.git".to_string()),
     );
     expected.insert(
         "reference".to_string(),
-        PhpMixed::String(reference.to_string()),
+        PhpMixed::string(reference.to_string()),
     );
 
     assert_eq!(expected, driver.get_source(reference));
@@ -424,14 +424,14 @@ fn test_get_source_given_public_project() {
 
     let reference = "c3ebdbf9cceddb82cd2089aaef8c7b992e536363";
     let mut expected: IndexMap<String, PhpMixed> = IndexMap::new();
-    expected.insert("type".to_string(), PhpMixed::String("git".to_string()));
+    expected.insert("type".to_string(), PhpMixed::string("git".to_string()));
     expected.insert(
         "url".to_string(),
-        PhpMixed::String("https://gitlab.com/mygroup/myproject.git".to_string()),
+        PhpMixed::string("https://gitlab.com/mygroup/myproject.git".to_string()),
     );
     expected.insert(
         "reference".to_string(),
-        PhpMixed::String(reference.to_string()),
+        PhpMixed::string(reference.to_string()),
     );
 
     assert_eq!(expected, driver.get_source(reference));
@@ -561,13 +561,13 @@ fn test_get_paginated_refs() {
 
 fn branch_entry(name: &str, id: &str, committed_date: &str) -> PhpMixed {
     let mut commit: IndexMap<String, PhpMixed> = IndexMap::new();
-    commit.insert("id".to_string(), PhpMixed::String(id.to_string()));
+    commit.insert("id".to_string(), PhpMixed::string(id.to_string()));
     commit.insert(
         "committed_date".to_string(),
-        PhpMixed::String(committed_date.to_string()),
+        PhpMixed::string(committed_date.to_string()),
     );
     let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
-    entry.insert("name".to_string(), PhpMixed::String(name.to_string()));
+    entry.insert("name".to_string(), PhpMixed::string(name.to_string()));
     entry.insert("commit".to_string(), PhpMixed::Array(commit));
     PhpMixed::Array(entry)
 }
@@ -696,7 +696,7 @@ fn test_gitlab_sub_directory() {
     let (http_downloader, _guard) = http_mock_with_body(api_url, project_data);
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),
@@ -736,7 +736,7 @@ fn test_gitlab_sub_group() {
     let (http_downloader, _guard) = http_mock_with_body(api_url, project_data);
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),
@@ -776,7 +776,7 @@ fn test_gitlab_sub_directory_sub_group() {
     let (http_downloader, _guard) = http_mock_with_body(api_url, project_data);
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),
@@ -823,7 +823,7 @@ fn test_forwards_options() {
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".to_string(),
-        PhpMixed::String("https://gitlab.mycompany.local/mygroup/myproject".to_string()),
+        PhpMixed::string("https://gitlab.mycompany.local/mygroup/myproject".to_string()),
     );
     repo_config.insert("options".to_string(), PhpMixed::Array(options));
     let mut driver = GitLabDriver::new(
@@ -865,14 +865,14 @@ fn test_protocol_override_repository_url_generation() {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "gitlab-protocol".to_string(),
-        PhpMixed::String("http".to_string()),
+        PhpMixed::string("http".to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::String(url.to_string()));
+    repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
     let mut driver = GitLabDriver::new(
         repo_config,
         fixtures.io.clone(),

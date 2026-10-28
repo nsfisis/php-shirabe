@@ -14,8 +14,8 @@ use shirabe_php_shim::PhpMixed;
 /// link setters on root packages, so packages carrying links are built via ArrayLoader.
 fn loaded(name: &str, version: &str, extra: Vec<(&str, PhpMixed)>) -> PackageInterfaceHandle {
     let mut config: IndexMap<String, PhpMixed> = IndexMap::new();
-    config.insert("name".to_string(), PhpMixed::String(name.to_string()));
-    config.insert("version".to_string(), PhpMixed::String(version.to_string()));
+    config.insert("name".to_string(), PhpMixed::string(name.to_string()));
+    config.insert("version".to_string(), PhpMixed::string(version.to_string()));
     for (key, value) in extra {
         config.insert(key.to_string(), value);
     }
@@ -28,7 +28,7 @@ fn loaded(name: &str, version: &str, extra: Vec<(&str, PhpMixed)>) -> PackageInt
 
 fn provided_link() -> PhpMixed {
     let mut links: IndexMap<String, PhpMixed> = IndexMap::new();
-    links.insert("provided".to_string(), PhpMixed::String("*".to_string()));
+    links.insert("provided".to_string(), PhpMixed::string("*".to_string()));
     PhpMixed::Array(links)
 }
 

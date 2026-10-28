@@ -430,7 +430,7 @@ impl Installer {
         let fund_env = Platform::get_env("COMPOSER_FUND");
         let mut show_funding = true;
         if let Some(ref s) = fund_env {
-            let mixed = PhpMixed::String(s.to_string());
+            let mixed = PhpMixed::string(s.to_string());
             if is_numeric(&mixed) {
                 show_funding = intval(&mixed) != 0;
             }
@@ -876,7 +876,7 @@ impl Installer {
             .into_iter()
             .map(|m| {
                 m.into_iter()
-                    .map(|(k, v)| (k, PhpMixed::String(v)))
+                    .map(|(k, v)| (k, PhpMixed::string(v)))
                     .collect::<IndexMap<String, PhpMixed>>()
             })
             .collect();
@@ -1269,7 +1269,7 @@ impl Installer {
                     .borrow_mut()
                     .get("vendor-dir")
                     .as_string()
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string();
                 if is_dir(&vendor_dir) {
                     // suppress errors as this fails sometimes on OSX for no apparent reason
@@ -1309,7 +1309,7 @@ impl Installer {
                 .get_platform_overrides()
                 .unwrap_or_default()
                 .into_iter()
-                .map(|(k, v)| (k, PhpMixed::String(v)))
+                .map(|(k, v)| (k, PhpMixed::string(v)))
                 .collect()
         };
 

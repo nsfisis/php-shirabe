@@ -7,6 +7,7 @@ pub use config_source_interface::*;
 pub use json_config_source::*;
 
 use crate::io::io_interface;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, PregMatches, RuntimeException, array_key_exists, array_merge,
@@ -54,67 +55,67 @@ impl Config {
         );
         c.insert(
             "use-parent-dir".to_string(),
-            PhpMixed::String("prompt".to_string()),
+            PhpMixed::string("prompt".to_string()),
         );
         c.insert(
             "preferred-install".to_string(),
-            PhpMixed::String("dist".to_string()),
+            PhpMixed::string("dist".to_string()),
         );
         let mut audit: IndexMap<String, PhpMixed> = IndexMap::new();
         audit.insert("ignore".to_string(), PhpMixed::Array(IndexMap::new()));
         audit.insert(
             "abandoned".to_string(),
-            PhpMixed::String(Auditor::ABANDONED_FAIL.to_string()),
+            PhpMixed::string(Auditor::ABANDONED_FAIL.to_string()),
         );
         c.insert("audit".to_string(), PhpMixed::Array(audit));
         c.insert("notify-on-install".to_string(), PhpMixed::Bool(true));
         c.insert(
             "github-protocols".to_string(),
             PhpMixed::List(vec![
-                PhpMixed::String("https".to_string()),
-                PhpMixed::String("ssh".to_string()),
-                PhpMixed::String("git".to_string()),
+                PhpMixed::string("https".to_string()),
+                PhpMixed::string("ssh".to_string()),
+                PhpMixed::string("git".to_string()),
             ]),
         );
         c.insert("gitlab-protocol".to_string(), PhpMixed::Null);
         c.insert(
             "vendor-dir".to_string(),
-            PhpMixed::String("vendor".to_string()),
+            PhpMixed::string("vendor".to_string()),
         );
         c.insert(
             "bin-dir".to_string(),
-            PhpMixed::String("{$vendor-dir}/bin".to_string()),
+            PhpMixed::string("{$vendor-dir}/bin".to_string()),
         );
         c.insert(
             "cache-dir".to_string(),
-            PhpMixed::String("{$home}/cache".to_string()),
+            PhpMixed::string("{$home}/cache".to_string()),
         );
         c.insert(
             "data-dir".to_string(),
-            PhpMixed::String("{$home}".to_string()),
+            PhpMixed::string("{$home}".to_string()),
         );
         c.insert(
             "cache-files-dir".to_string(),
-            PhpMixed::String("{$cache-dir}/files".to_string()),
+            PhpMixed::string("{$cache-dir}/files".to_string()),
         );
         c.insert(
             "cache-repo-dir".to_string(),
-            PhpMixed::String("{$cache-dir}/repo".to_string()),
+            PhpMixed::string("{$cache-dir}/repo".to_string()),
         );
         c.insert(
             "cache-vcs-dir".to_string(),
-            PhpMixed::String("{$cache-dir}/vcs".to_string()),
+            PhpMixed::string("{$cache-dir}/vcs".to_string()),
         );
         c.insert("cache-ttl".to_string(), PhpMixed::Int(15552000)); // 6 months
         c.insert("cache-files-ttl".to_string(), PhpMixed::Null); // fallback to cache-ttl
         c.insert(
             "cache-files-maxsize".to_string(),
-            PhpMixed::String("300MiB".to_string()),
+            PhpMixed::string("300MiB".to_string()),
         );
         c.insert("cache-read-only".to_string(), PhpMixed::Bool(false));
         c.insert(
             "bin-compat".to_string(),
-            PhpMixed::String("auto".to_string()),
+            PhpMixed::string("auto".to_string()),
         );
         c.insert("discard-changes".to_string(), PhpMixed::Bool(false));
         c.insert("autoloader-suffix".to_string(), PhpMixed::Null);
@@ -129,7 +130,7 @@ impl Config {
         );
         c.insert(
             "github-domains".to_string(),
-            PhpMixed::List(vec![PhpMixed::String("github.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("github.com".to_string())]),
         );
         c.insert(
             "bitbucket-expose-hostname".to_string(),
@@ -143,24 +144,24 @@ impl Config {
         c.insert("github-expose-hostname".to_string(), PhpMixed::Bool(true));
         c.insert(
             "gitlab-domains".to_string(),
-            PhpMixed::List(vec![PhpMixed::String("gitlab.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("gitlab.com".to_string())]),
         );
         c.insert(
             "store-auths".to_string(),
-            PhpMixed::String("prompt".to_string()),
+            PhpMixed::string("prompt".to_string()),
         );
         c.insert("platform".to_string(), PhpMixed::Array(IndexMap::new()));
         c.insert(
             "archive-format".to_string(),
-            PhpMixed::String("tar".to_string()),
+            PhpMixed::string("tar".to_string()),
         );
-        c.insert("archive-dir".to_string(), PhpMixed::String(".".to_string()));
+        c.insert("archive-dir".to_string(), PhpMixed::string(".".to_string()));
         c.insert("htaccess-protect".to_string(), PhpMixed::Bool(true));
         c.insert("use-github-api".to_string(), PhpMixed::Bool(true));
         c.insert("lock".to_string(), PhpMixed::Bool(true));
         c.insert(
             "platform-check".to_string(),
-            PhpMixed::String("php-only".to_string()),
+            PhpMixed::string("php-only".to_string()),
         );
         c.insert(
             "bitbucket-oauth".to_string(),
@@ -186,7 +187,7 @@ impl Config {
         );
         c.insert(
             "forgejo-domains".to_string(),
-            PhpMixed::List(vec![PhpMixed::String("codeberg.org".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("codeberg.org".to_string())]),
         );
         c.insert(
             "forgejo-token".to_string(),
@@ -198,10 +199,10 @@ impl Config {
     pub fn default_repositories() -> IndexMap<String, PhpMixed> {
         let mut r: IndexMap<String, PhpMixed> = IndexMap::new();
         let mut packagist: IndexMap<String, PhpMixed> = IndexMap::new();
-        packagist.insert("type".to_string(), PhpMixed::String("composer".to_string()));
+        packagist.insert("type".to_string(), PhpMixed::string("composer".to_string()));
         packagist.insert(
             "url".to_string(),
-            PhpMixed::String("https://repo.packagist.org".to_string()),
+            PhpMixed::string("https://repo.packagist.org".to_string()),
         );
         r.insert("packagist.org".to_string(), PhpMixed::Array(packagist));
         r
@@ -213,7 +214,7 @@ impl Config {
             config: Self::default_config(),
             repositories: Self::default_repositories(),
             use_environment,
-            base_dir: base_dir.filter(|s| is_string(&PhpMixed::String(s.clone())) && !s.is_empty()),
+            base_dir: base_dir.filter(|s| is_string(&PhpMixed::string(s.clone())) && !s.is_empty()),
             config_source: None,
             auth_config_source: None,
             local_auth_config_source: None,
@@ -341,7 +342,7 @@ impl Config {
                     let deduped = array_unique(&unique_list);
                     self.config.insert(
                         key.clone(),
-                        PhpMixed::List(deduped.into_iter().map(PhpMixed::String).collect()),
+                        PhpMixed::List(deduped.into_iter().map(PhpMixed::string).collect()),
                     );
                     self.set_source_of_config_value(&val, key, source);
                 } else if key == "preferred-install" && self.config.contains_key(key) {
@@ -465,12 +466,12 @@ impl Config {
                     .as_array()
                     .and_then(|m| m.get("type"))
                     .and_then(|v| v.as_string())
-                    == Some("composer");
+                    == Some("composer".into());
                 let repo_url = repository
                     .as_array()
                     .and_then(|m| m.get("url"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string();
                 if is_composer
                     && preg_is_match(
@@ -582,10 +583,10 @@ impl Config {
                 val_str = Platform::expand_path(&val_str);
 
                 if substr(key, -4, None) != "-dir" {
-                    return Ok(PhpMixed::String(val_str));
+                    return Ok(PhpMixed::string(val_str));
                 }
 
-                Ok(PhpMixed::String(
+                Ok(PhpMixed::string(
                     if (flags & Self::RELATIVE_PATHS) == Self::RELATIVE_PATHS {
                         val_str
                     } else {
@@ -608,7 +609,7 @@ impl Config {
                 };
 
                 Ok(PhpMixed::Bool(
-                    val.as_string() != Some("false") && val.to_bool(),
+                    val.as_string() != Some("false".into()) && val.to_bool(),
                 ))
             }
 
@@ -623,7 +624,7 @@ impl Config {
 
                 let v = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                 Ok(PhpMixed::Bool(
-                    v.as_string() != Some("false") && v.to_bool(),
+                    v.as_string() != Some("false".into()) && v.to_bool(),
                 ))
             }
 
@@ -687,10 +688,11 @@ impl Config {
 
             "home" => {
                 let v = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                let expanded = Platform::expand_path(v.as_string().unwrap_or(""));
-                let processed = self.process(PhpMixed::String(expanded), flags)?;
-                Ok(PhpMixed::String(rtrim(
-                    processed.as_string().unwrap_or(""),
+                let expanded =
+                    Platform::expand_path(&v.as_string().unwrap_or_default().to_str_lossy());
+                let processed = self.process(PhpMixed::string(expanded), flags)?;
+                Ok(PhpMixed::string(rtrim(
+                    &processed.as_string().unwrap_or_default().to_str_lossy(),
                     Some("/\\"),
                 )))
             }
@@ -702,18 +704,18 @@ impl Config {
                         .config
                         .get(key)
                         .and_then(|v| v.as_string())
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_string(),
-                    other => other.as_string().unwrap_or("").to_string(),
+                    other => other.as_string().unwrap_or_default().to_string(),
                 };
 
                 if !in_array_loose(
                     value.clone(),
                     &[
-                        PhpMixed::String("auto".to_string()),
-                        PhpMixed::String("full".to_string()),
-                        PhpMixed::String("proxy".to_string()),
-                        PhpMixed::String("symlink".to_string()),
+                        PhpMixed::string("auto".to_string()),
+                        PhpMixed::string("full".to_string()),
+                        PhpMixed::string("proxy".to_string()),
+                        PhpMixed::string("symlink".to_string()),
                     ],
                 ) {
                     return Err(RuntimeException::new(format!(
@@ -730,13 +732,13 @@ impl Config {
                     );
                 }
 
-                Ok(PhpMixed::String(value))
+                Ok(PhpMixed::string(value))
             }
 
             "discard-changes" => {
                 let env = self.get_composer_env("COMPOSER_DISCARD_CHANGES");
                 if !matches!(env, PhpMixed::Bool(false)) {
-                    let env_str = env.as_string().unwrap_or("").to_string();
+                    let env_str = env.as_string().unwrap_or_default().to_string();
                     if !matches!(env_str.as_str(), "stash" | "true" | "false" | "1" | "0") {
                         return Err(RuntimeException::new(format!(
                             "Invalid value for COMPOSER_DISCARD_CHANGES: {}. Expected 1, 0, true, false or stash",
@@ -745,7 +747,7 @@ impl Config {
                         .into());
                     }
                     if env_str == "stash" {
-                        return Ok(PhpMixed::String("stash".to_string()));
+                        return Ok(PhpMixed::string("stash".to_string()));
                     }
 
                     // convert string value to bool
@@ -755,7 +757,8 @@ impl Config {
                 }
 
                 let val = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                let allowed = matches!(&val, PhpMixed::Bool(_)) || val.as_string() == Some("stash");
+                let allowed =
+                    matches!(&val, PhpMixed::Bool(_)) || val.as_string() == Some("stash".into());
                 if !allowed {
                     return Err(RuntimeException::new(format!(
                         "Invalid value for 'discard-changes': {:?}. Expected true, false or stash",
@@ -785,8 +788,8 @@ impl Config {
                     .unwrap_or(false);
                 if secure_http {
                     let found = array_search_mixed(
-                        &PhpMixed::String("git".to_string()),
-                        &PhpMixed::List(protos.iter().cloned().map(PhpMixed::String).collect()),
+                        &PhpMixed::string("git".to_string()),
+                        &PhpMixed::List(protos.iter().cloned().map(PhpMixed::string).collect()),
                         false,
                     );
                     if let Some(idx_val) = found {
@@ -801,13 +804,13 @@ impl Config {
                 }
 
                 Ok(PhpMixed::List(
-                    protos.into_iter().map(PhpMixed::String).collect(),
+                    protos.into_iter().map(PhpMixed::string).collect(),
                 ))
             }
 
             "autoloader-suffix" => {
                 let v = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
-                if v.as_string() == Some("") {
+                if v.as_string() == Some("".into()) {
                     // we need to guarantee null or non-empty-string
                     return Ok(PhpMixed::Null);
                 }
@@ -819,14 +822,15 @@ impl Config {
                 let mut result = self.config.get(key).cloned().unwrap_or(PhpMixed::Null);
                 let abandoned_env = self.get_composer_env("COMPOSER_AUDIT_ABANDONED");
                 if !matches!(abandoned_env, PhpMixed::Bool(false)) {
-                    let abandoned_env_str = abandoned_env.as_string().unwrap_or("").to_string();
+                    let abandoned_env_str =
+                        abandoned_env.as_string().unwrap_or_default().to_string();
                     let valid_choices: Vec<String> =
                         Auditor::ABANDONEDS.iter().map(|s| s.to_string()).collect();
                     if !in_array_strict(
                         abandoned_env_str.clone(),
                         &valid_choices
                             .iter()
-                            .map(|s| PhpMixed::String(s.clone()))
+                            .map(|s| PhpMixed::string(s.clone()))
                             .collect::<Vec<_>>(),
                     ) {
                         return Err(RuntimeException::new(format!(
@@ -837,14 +841,17 @@ impl Config {
                         .into());
                     }
                     if let PhpMixed::Array(ref mut m) = result {
-                        m.insert("abandoned".to_string(), PhpMixed::String(abandoned_env_str));
+                        m.insert("abandoned".to_string(), PhpMixed::string(abandoned_env_str));
                     }
                 }
 
                 let block_abandoned_env =
                     self.get_composer_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
                 if !matches!(block_abandoned_env, PhpMixed::Bool(false)) {
-                    let env_str = block_abandoned_env.as_string().unwrap_or("").to_string();
+                    let env_str = block_abandoned_env
+                        .as_string()
+                        .unwrap_or_default()
+                        .to_string();
                     if !matches!(env_str.as_str(), "0" | "1") {
                         return Err(RuntimeException::new(format!(
                             "Invalid value for COMPOSER_SECURITY_BLOCKING_ABANDONED: {}. Expected 0 or 1.",
@@ -940,7 +947,7 @@ impl Config {
             return Ok(value);
         }
 
-        let value_str = value.as_string().unwrap_or("").to_string();
+        let value_str = value.as_string().unwrap_or_default().to_string();
         let result = preg_replace_callback(
             php_regex!(r"#\{\$(.+)\}#"),
             |m: &PregMatches| -> anyhow::Result<String> {
@@ -949,7 +956,7 @@ impl Config {
             },
             &value_str,
         )?;
-        Ok(PhpMixed::String(result))
+        Ok(PhpMixed::string(result))
     }
 
     /// Turns relative paths in absolute paths without realpath()
@@ -973,7 +980,7 @@ impl Config {
     fn get_composer_env(&self, var: &str) -> PhpMixed {
         if self.use_environment {
             return match Platform::get_env(var) {
-                Some(v) => PhpMixed::String(v),
+                Some(v) => PhpMixed::string(v),
                 None => PhpMixed::Bool(false),
             };
         }
@@ -1010,7 +1017,7 @@ impl Config {
             if self.get_with_flags("secure-http", 0)?.as_bool() == Some(true) {
                 if scheme.as_deref() == Some("svn") {
                     if in_array_strict(
-                        hostname.map(PhpMixed::String).unwrap_or(PhpMixed::Null),
+                        hostname.map(PhpMixed::string).unwrap_or(PhpMixed::Null),
                         self.get_with_flags("secure-svn-domains", 0)?.values(),
                     ) {
                         return Ok(());

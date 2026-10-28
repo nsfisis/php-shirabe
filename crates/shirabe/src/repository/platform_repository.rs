@@ -15,6 +15,7 @@ use crate::platform::Version;
 use crate::plugin::plugin_interface::{self};
 use crate::repository::ArrayRepository;
 use crate::repository::RepositoryInterface;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
@@ -205,7 +206,7 @@ impl PlatformRepository {
 
         let php_version_const = platform_info.get_constant("PHP_VERSION", None);
         let php_version_str = match &php_version_const {
-            PhpMixed::String(s) => s.clone(),
+            PhpMixed::String(s) => s.to_str_lossy().into_owned(),
             _ => "".to_string(),
         };
         match self
@@ -558,7 +559,7 @@ impl PlatformRepository {
                 "gd" => {
                     let gd_version = platform_info.get_constant("GD_VERSION", None);
                     let gd_version_str = match &gd_version {
-                        PhpMixed::String(s) => Some(s.clone()),
+                        PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
                         _ => None,
                     };
                     self.add_library(
@@ -640,7 +641,7 @@ impl PlatformRepository {
                 "gmp" => {
                     let gmp_version = platform_info.get_constant("GMP_VERSION", None);
                     let gmp_version_str = match &gmp_version {
-                        PhpMixed::String(s) => Some(s.clone()),
+                        PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
                         _ => None,
                     };
                     self.add_library(
@@ -656,7 +657,7 @@ impl PlatformRepository {
                 "iconv" => {
                     let iconv_version = platform_info.get_constant("ICONV_VERSION", None);
                     let iconv_version_str = match &iconv_version {
-                        PhpMixed::String(s) => Some(s.clone()),
+                        PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
                         _ => None,
                     };
                     self.add_library(
@@ -677,7 +678,7 @@ impl PlatformRepository {
                     if platform_info.has_constant("INTL_ICU_VERSION", None) {
                         let intl_icu_version = platform_info.get_constant("INTL_ICU_VERSION", None);
                         let intl_icu_str = match &intl_icu_version {
-                            PhpMixed::String(s) => Some(s.clone()),
+                            PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
                             _ => None,
                         };
                         self.add_library(
@@ -731,7 +732,7 @@ impl PlatformRepository {
                             let version_value =
                                 Self::resource_bundle_get(resource_bundle, "Version");
                             let version_str = match version_value {
-                                PhpMixed::String(s) => Some(s),
+                                PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
                                 _ => None,
                             };
                             self.add_library(
@@ -829,7 +830,7 @@ impl PlatformRepository {
                         array_map_str_fn(|extension| format!("{}-libxml", extension), &intersected);
                     let libxml_dotted = platform_info.get_constant("LIBXML_DOTTED_VERSION", None);
                     let libxml_dotted_str = match &libxml_dotted {
-                        PhpMixed::String(s) => Some(s.clone()),
+                        PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
                         _ => None,
                     };
                     self.add_library(
@@ -862,7 +863,7 @@ impl PlatformRepository {
                     if platform_info.has_constant("MB_ONIGURUMA_VERSION", None) {
                         let oniguruma = platform_info.get_constant("MB_ONIGURUMA_VERSION", None);
                         let oniguruma_str = match &oniguruma {
-                            PhpMixed::String(s) => Some(s.clone()),
+                            PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
                             _ => None,
                         };
                         self.add_library(
@@ -917,7 +918,7 @@ impl PlatformRepository {
                 "openssl" => {
                     let openssl_text = platform_info.get_constant("OPENSSL_VERSION_TEXT", None);
                     let openssl_text_str = match &openssl_text {
-                        PhpMixed::String(s) => s.clone(),
+                        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                         _ => "".to_string(),
                     };
                     // OpenSSL 1.1.1g  21 Apr 2020
@@ -947,7 +948,7 @@ impl PlatformRepository {
                 "pcre" => {
                     let pcre_version = platform_info.get_constant("PCRE_VERSION", None);
                     let pcre_version_str = match &pcre_version {
-                        PhpMixed::String(s) => s.clone(),
+                        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                         _ => "".to_string(),
                     };
                     let stripped = preg_replace(php_regex!("{^(\\S+).*}"), "$1", &pcre_version_str);
@@ -1027,7 +1028,7 @@ impl PlatformRepository {
                     if platform_info.has_constant("PGSQL_LIBPQ_VERSION", None) {
                         let pq_version = platform_info.get_constant("PGSQL_LIBPQ_VERSION", None);
                         let pq_version_str = match &pq_version {
-                            PhpMixed::String(s) => Some(s.clone()),
+                            PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
                             _ => None,
                         };
                         self.add_library(
@@ -1130,7 +1131,7 @@ impl PlatformRepository {
                     if platform_info.has_constant("SODIUM_LIBRARY_VERSION", None) {
                         let sodium = platform_info.get_constant("SODIUM_LIBRARY_VERSION", None);
                         let sodium_str = match &sodium {
-                            PhpMixed::String(s) => Some(s.clone()),
+                            PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
                             _ => None,
                         };
                         self.add_library(
@@ -1190,7 +1191,7 @@ impl PlatformRepository {
                     let libxslt_version =
                         platform_info.get_constant("LIBXSLT_DOTTED_VERSION", None);
                     let libxslt_str = match &libxslt_version {
-                        PhpMixed::String(s) => Some(s.clone()),
+                        PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
                         _ => None,
                     };
                     self.add_library(
@@ -1242,7 +1243,7 @@ impl PlatformRepository {
                         let libzip =
                             platform_info.get_constant("LIBZIP_VERSION", Some("ZipArchive"));
                         let libzip_str = match &libzip {
-                            PhpMixed::String(s) => Some(s.clone()),
+                            PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
                             _ => None,
                         };
                         self.add_library(
@@ -1260,7 +1261,7 @@ impl PlatformRepository {
                     if platform_info.has_constant("ZLIB_VERSION", None) {
                         let zlib = platform_info.get_constant("ZLIB_VERSION", None);
                         let zlib_str = match &zlib {
-                            PhpMixed::String(s) => Some(s.clone()),
+                            PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
                             _ => None,
                         };
                         self.add_library(
@@ -1400,7 +1401,7 @@ impl PlatformRepository {
         name: Option<String>,
     ) -> anyhow::Result<CompletePackageHandle> {
         let version_str = match &r#override.version {
-            PhpMixed::String(s) => s.clone(),
+            PhpMixed::String(s) => s.to_str_lossy().into_owned(),
             _ => "".to_string(),
         };
         let version = self
@@ -1646,7 +1647,7 @@ impl PlatformRepository {
     /// PHP `$imagick->getVersion()['versionString']`, read the same way.
     fn imagick_get_version_string(value: &PhpMixed) -> String {
         match Self::php_object_field(value, "versionString") {
-            Some(PhpMixed::String(version)) => version,
+            Some(PhpMixed::String(version)) => version.to_str_lossy().into_owned(),
             _ => String::new(),
         }
     }
@@ -1663,7 +1664,7 @@ impl PlatformRepository {
             PhpMixed::List(list) => list
                 .iter()
                 .map(|v| match v {
-                    PhpMixed::String(s) => s.clone(),
+                    PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                     PhpMixed::Int(i) => i.to_string(),
                     PhpMixed::Float(f) => f.to_string(),
                     _ => "".to_string(),
@@ -1672,7 +1673,7 @@ impl PlatformRepository {
             PhpMixed::Array(m) => m
                 .values()
                 .map(|v| match v {
-                    PhpMixed::String(s) => s.clone(),
+                    PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                     PhpMixed::Int(i) => i.to_string(),
                     PhpMixed::Float(f) => f.to_string(),
                     _ => "".to_string(),

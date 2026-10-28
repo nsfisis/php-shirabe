@@ -12,7 +12,7 @@ fn set_up() -> ArrayLoader {
 }
 
 fn s(value: &str) -> PhpMixed {
-    PhpMixed::String(value.to_string())
+    PhpMixed::string(value.to_string())
 }
 
 fn map(entries: Vec<(&str, PhpMixed)>) -> PhpMixed {

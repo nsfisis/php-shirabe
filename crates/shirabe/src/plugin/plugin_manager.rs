@@ -24,6 +24,7 @@ use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RepositoryUtils;
 use crate::repository::RootPackageRepository;
 use crate::util::PackageSorter;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PluginValue, call_function_with_dispatcher};
 use shirabe_php_shim::{
@@ -418,7 +419,7 @@ impl PluginManager {
                 let file = file.as_string().unwrap_or_else(|| {
                     panic!("autoload files entry `{file_identifier}` is not a string path")
                 });
-                self.php_runtime_composer_require(file_identifier, file)?;
+                self.php_runtime_composer_require(file_identifier, &file.to_str_lossy())?;
             }
         }
 
@@ -1004,7 +1005,7 @@ impl PluginManager {
             && !empty(value)
             && let PhpMixed::String(s) = value
         {
-            let trimmed = trim(s, Some(" \t\n\r\0\u{0B}"));
+            let trimmed = trim(&s.to_str_lossy(), Some(" \t\n\r\0\u{0B}"));
             // PHP evaluates trim(...) in boolean context: "" and "0" are falsy.
             if !trimmed.is_empty() && trimmed != "0" {
                 return Ok(Some(trimmed));
@@ -1265,10 +1266,10 @@ impl PluginManager {
 
                 let answer = self.io.ask(
                     format!("Do you trust \"<fg=green;options=bold>{}</>\" to execute code and wish to enable it now? (writes \"allow-plugins\" to composer.json) [<comment>y,n,d,?</comment>] ", package),
-                    PhpMixed::String(default.to_string()),
+                    PhpMixed::string(default.to_string()),
                 )?;
-                let answer_str = answer.as_string().unwrap_or("");
-                match answer_str {
+                let answer_str = answer.as_string().unwrap_or_default().to_str_lossy();
+                match &*answer_str {
                     "y" | "n" | "d" => {
                         let allow = answer_str == "y";
 

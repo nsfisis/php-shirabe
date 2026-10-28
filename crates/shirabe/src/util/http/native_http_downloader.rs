@@ -391,7 +391,7 @@ impl NativeHttpDownloader {
                     "storeAuth".to_string(),
                     match prompt.store_auth {
                         StoreAuth::Bool(b) => PhpMixed::Bool(b),
-                        StoreAuth::Prompt => PhpMixed::String("prompt".to_string()),
+                        StoreAuth::Prompt => PhpMixed::string("prompt".to_string()),
                     },
                 );
                 let retries = attributes
@@ -516,12 +516,12 @@ impl NativeHttpDownloader {
         let method = http
             .and_then(|h| h.get("method"))
             .and_then(|v| v.as_string())
-            .unwrap_or("GET")
+            .unwrap_or("GET".into())
             .to_string();
         let body = http
             .and_then(|h| h.get("content"))
             .and_then(|v| v.as_string())
-            .map(|s| s.as_bytes().to_vec());
+            .map(|s| s.to_vec());
         let timeout_secs = http
             .and_then(|h| h.get("timeout"))
             .and_then(|v| v.as_int())

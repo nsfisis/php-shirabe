@@ -14,6 +14,7 @@ use crate::util::Forgejo;
 use crate::util::ForgejoRepositoryData;
 use crate::util::ForgejoUrl;
 use crate::util::http::Response;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -60,7 +61,7 @@ impl ForgejoDriver {
                 .borrow_mut()
                 .get("cache-repo-dir")
                 .as_string()
-                .unwrap_or(""),
+                .unwrap_or_default(),
             forgejo_url.origin_url,
             forgejo_url.owner,
             forgejo_url.repository
@@ -115,7 +116,8 @@ impl ForgejoDriver {
             let content_empty = arr
                 .get("content")
                 .is_none_or(|v| v.as_string().is_none_or(|s| s.is_empty()));
-            let encoding_none = arr.get("encoding").and_then(|v| v.as_string()) == Some("none");
+            let encoding_none =
+                arr.get("encoding").and_then(|v| v.as_string()) == Some("none".into());
             let has_git_url = arr.contains_key("git_url");
             content_empty && encoding_none && has_git_url
         } else {
@@ -126,7 +128,7 @@ impl ForgejoDriver {
             let git_url = if let PhpMixed::Array(ref arr) = resource {
                 arr.get("git_url")
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_owned())
+                    .map(|s| s.to_str_lossy().into_owned())
             } else {
                 None
             };
@@ -137,11 +139,12 @@ impl ForgejoDriver {
 
         let content_b64 = if let PhpMixed::Array(ref arr) = resource {
             let has_content = arr.contains_key("content");
-            let encoding_ok = arr.get("encoding").and_then(|v| v.as_string()) == Some("base64");
+            let encoding_ok =
+                arr.get("encoding").and_then(|v| v.as_string()) == Some("base64".into());
             if has_content && encoding_ok {
                 arr.get("content")
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_owned())
+                    .map(|s| s.to_str_lossy().into_owned())
             } else {
                 None
             }
@@ -196,7 +199,7 @@ impl ForgejoDriver {
                 .and_then(|v| v.as_array())
                 .and_then(|c| c.get("date"))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_owned())
+                .map(|s| s.to_str_lossy().into_owned())
         } else {
             None
         };
@@ -241,13 +244,13 @@ impl ForgejoDriver {
                             let name = arr
                                 .get("name")
                                 .and_then(|v| v.as_string())
-                                .map(|s| s.to_owned());
+                                .map(|s| s.to_str_lossy().into_owned());
                             let id = arr
                                 .get("commit")
                                 .and_then(|v| v.as_array())
                                 .and_then(|c| c.get("id"))
                                 .and_then(|v| v.as_string())
-                                .map(|s| s.to_owned());
+                                .map(|s| s.to_str_lossy().into_owned());
                             if let (Some(n), Some(i)) = (name, id) {
                                 branches.insert(n, i);
                             }
@@ -282,13 +285,13 @@ impl ForgejoDriver {
                             let name = arr
                                 .get("name")
                                 .and_then(|v| v.as_string())
-                                .map(|s| s.to_owned());
+                                .map(|s| s.to_str_lossy().into_owned());
                             let sha = arr
                                 .get("commit")
                                 .and_then(|v| v.as_array())
                                 .and_then(|c| c.get("sha"))
                                 .and_then(|v| v.as_string())
-                                .map(|s| s.to_owned());
+                                .map(|s| s.to_str_lossy().into_owned());
                             if let (Some(n), Some(s)) = (name, sha) {
                                 tags.insert(n, s);
                             }
@@ -410,7 +413,7 @@ impl ForgejoDriver {
                     };
 
                     if let Some(PhpMixed::Array(support)) = composer_map.get_mut("support") {
-                        support.insert("source".to_string(), PhpMixed::String(source_url));
+                        support.insert("source".to_string(), PhpMixed::string(source_url));
                     }
                 }
 
@@ -428,7 +431,7 @@ impl ForgejoDriver {
                             .unwrap_or_default()
                     );
                     if let Some(PhpMixed::Array(support)) = composer_map.get_mut("support") {
-                        support.insert("issues".to_string(), PhpMixed::String(issues_url));
+                        support.insert("issues".to_string(), PhpMixed::string(issues_url));
                     }
                 }
 
@@ -491,8 +494,9 @@ impl ForgejoDriver {
         let forgejo_domains = config.borrow().get("forgejo-domains");
         let in_domains = if let Some(list) = forgejo_domains.as_list() {
             list.iter().any(|d| {
-                d.as_string()
-                    .is_some_and(|s| s.to_lowercase() == forgejo_url.origin_url.to_lowercase())
+                d.as_string().is_some_and(|s| {
+                    s.to_str_lossy().to_lowercase() == forgejo_url.origin_url.to_lowercase()
+                })
             })
         } else {
             false
@@ -522,7 +526,7 @@ impl ForgejoDriver {
             inner: VcsDriverBase::new(
                 {
                     let mut m = IndexMap::new();
-                    m.insert("url".to_string(), PhpMixed::String(url.to_string()));
+                    m.insert("url".to_string(), PhpMixed::string(url.to_string()));
                     m
                 },
                 self.inner.io.clone(),

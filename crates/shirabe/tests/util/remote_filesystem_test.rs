@@ -2,6 +2,7 @@
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_stub::IOStub;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::util::{GetResult, RemoteFilesystem};
@@ -41,7 +42,7 @@ fn http_header_list(res: &IndexMap<String, PhpMixed>) -> Option<Vec<String>> {
         .and_then(|v| v.as_list())
         .map(|list| {
             list.iter()
-                .map(|v| v.as_string().unwrap_or("").to_string())
+                .map(|v| v.as_string().unwrap_or_default().to_string())
                 .collect()
         })
 }
@@ -163,7 +164,7 @@ fn test_get_options_for_url_with_call_options_keeps_header() {
     let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
     http.insert(
         "header".to_string(),
-        PhpMixed::String("Foo: bar".to_string()),
+        PhpMixed::string("Foo: bar".to_string()),
     );
     let mut additional_options: IndexMap<String, PhpMixed> = IndexMap::new();
     additional_options.insert("http".to_string(), PhpMixed::Array(http));
@@ -278,7 +279,7 @@ fn test_get_options_for_url_creates_secure_tls_defaults() {
     let mut ssl: IndexMap<String, PhpMixed> = IndexMap::new();
     ssl.insert(
         "cafile".to_string(),
-        PhpMixed::String("/some/path/file.crt".to_string()),
+        PhpMixed::string("/some/path/file.crt".to_string()),
     );
     let mut additional_options: IndexMap<String, PhpMixed> = IndexMap::new();
     additional_options.insert("ssl".to_string(), PhpMixed::Array(ssl));
@@ -293,7 +294,7 @@ fn test_get_options_for_url_creates_secure_tls_defaults() {
 
     let ssl_res = res.get("ssl").and_then(|v| v.as_array()).unwrap();
     let ciphers = ssl_res.get("ciphers").and_then(|v| v.as_string()).unwrap();
-    assert!(ciphers.contains(
+    assert!(ciphers.contains_str(
         "!aNULL:!eNULL:!EXPORT:!DES:!3DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA"
     ));
     assert_eq!(
@@ -309,7 +310,7 @@ fn test_get_options_for_url_creates_secure_tls_defaults() {
         ssl_res.get("verify_depth").and_then(|v| v.as_int())
     );
     assert_eq!(
-        Some("/some/path/file.crt"),
+        Some("/some/path/file.crt".into()),
         ssl_res.get("cafile").and_then(|v| v.as_string())
     );
     assert_eq!(

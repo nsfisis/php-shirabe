@@ -76,8 +76,8 @@ impl RunScriptCommand {
             .iter()
             .map(|(name, desc)| {
                 PhpMixed::List(vec![
-                    PhpMixed::String(format!("  {}", name)),
-                    PhpMixed::String(desc.clone()),
+                    PhpMixed::string(format!("  {}", name)),
+                    PhpMixed::string(desc.clone()),
                 ])
             })
             .collect();
@@ -223,14 +223,14 @@ impl Command for RunScriptCommand {
 
             let mut options = indexmap::IndexMap::new();
             for script in &scripts {
-                options.insert(script.0.clone(), PhpMixed::String(script.1.clone()));
+                options.insert(script.0.clone(), PhpMixed::string(script.1.clone()));
             }
 
             let io = self.get_io();
             let script = io.select(
                 "Script to run: ".to_string(),
                 PhpMixed::Array(options),
-                PhpMixed::String(String::new()),
+                PhpMixed::string(String::new()),
                 PhpMixed::Int(1),
                 "Invalid script name \"%s\"".to_string(),
                 false,

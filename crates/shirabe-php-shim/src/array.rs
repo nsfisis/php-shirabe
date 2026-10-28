@@ -1,5 +1,6 @@
 use crate::PhpMixed;
 use crate::php_to_string;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 
 pub fn array_values<V: Clone>(array: &IndexMap<String, V>) -> Vec<V> {
@@ -347,8 +348,10 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
                     PhpMixed::Int(n) => {
                         result.insert(n.to_string(), PhpMixed::Int(i as i64));
                     }
+                    // TODO(bytes): array keys are Strings, so distinct non-UTF-8 values can
+                    // collapse into the same key.
                     PhpMixed::String(s) => {
-                        result.insert(s.clone(), PhpMixed::Int(i as i64));
+                        result.insert(s.to_str_lossy().into_owned(), PhpMixed::Int(i as i64));
                     }
                     // Non int/string values cannot be array keys and are skipped.
                     _ => {}
@@ -361,8 +364,9 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
                     PhpMixed::Int(n) => {
                         result.insert(n.to_string(), php_key_to_mixed(key));
                     }
+                    // TODO(bytes): same key collapse as the list case above.
                     PhpMixed::String(s) => {
-                        result.insert(s.clone(), php_key_to_mixed(key));
+                        result.insert(s.to_str_lossy().into_owned(), php_key_to_mixed(key));
                     }
                     _ => {}
                 }
@@ -555,7 +559,7 @@ fn php_key_to_mixed(key: &str) -> PhpMixed {
     {
         return PhpMixed::Int(n);
     }
-    PhpMixed::String(key.to_string())
+    PhpMixed::string(key.to_string())
 }
 
 /// Resolve PHP array_slice/substr-style (offset, length) into a `[start, end)`
@@ -627,15 +631,18 @@ pub fn loose_eq(a: &PhpMixed, b: &PhpMixed) -> bool {
         (other, Bool(y)) => crate::var::to_bool(other) == *y,
         (Int(x), Int(y)) => x == y,
         (Int(_) | Float(_), Int(_) | Float(_)) => loose_num_value(a) == loose_num_value(b),
-        (String(x), String(y)) => match (loose_to_number(x), loose_to_number(y)) {
+        (String(x), String(y)) => match (
+            loose_to_number(&x.to_str_lossy()),
+            loose_to_number(&y.to_str_lossy()),
+        ) {
             (Some(nx), Some(ny)) => nx == ny,
             _ => x == y,
         },
-        (Int(_) | Float(_), String(s)) => match loose_to_number(s) {
+        (Int(_) | Float(_), String(s)) => match loose_to_number(&s.to_str_lossy()) {
             Some(ns) => loose_num_value(a) == ns,
             None => loose_num_to_string(a) == *s,
         },
-        (String(s), Int(_) | Float(_)) => match loose_to_number(s) {
+        (String(s), Int(_) | Float(_)) => match loose_to_number(&s.to_str_lossy()) {
             Some(ns) => loose_num_value(b) == ns,
             None => *s == loose_num_to_string(b),
         },

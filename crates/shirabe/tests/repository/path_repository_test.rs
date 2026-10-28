@@ -58,7 +58,7 @@ fn test_load_package_from_file_system_with_incorrect_path() {
         .into_string()
         .unwrap();
     let mut repository =
-        create_path_repo(coordinates(vec![("url", PhpMixed::String(repository_url))]));
+        create_path_repo(coordinates(vec![("url", PhpMixed::string(repository_url))]));
     assert!(repository.__get_packages().is_err());
 }
 
@@ -71,7 +71,7 @@ fn test_load_package_from_file_system_with_version() {
         .into_string()
         .unwrap();
     let mut repository =
-        create_path_repo(coordinates(vec![("url", PhpMixed::String(repository_url))]));
+        create_path_repo(coordinates(vec![("url", PhpMixed::string(repository_url))]));
     repository.__get_packages().unwrap();
 
     assert_eq!(1, repository.__count().unwrap());
@@ -91,7 +91,7 @@ fn test_load_package_from_file_system_without_version() {
         .into_string()
         .unwrap();
     let mut repository =
-        create_path_repo(coordinates(vec![("url", PhpMixed::String(repository_url))]));
+        create_path_repo(coordinates(vec![("url", PhpMixed::string(repository_url))]));
     let packages = repository.__get_packages().unwrap();
 
     assert!(repository.__count().unwrap() >= 1);
@@ -112,7 +112,7 @@ fn test_load_package_from_file_system_with_wildcard() {
         .into_string()
         .unwrap();
     let mut repository =
-        create_path_repo(coordinates(vec![("url", PhpMixed::String(repository_url))]));
+        create_path_repo(coordinates(vec![("url", PhpMixed::string(repository_url))]));
     let packages = repository.__get_packages().unwrap();
     let mut names: Vec<String> = Vec::new();
 
@@ -139,11 +139,11 @@ fn test_load_package_with_explicit_versions() {
     let mut versions: IndexMap<String, PhpMixed> = IndexMap::new();
     versions.insert(
         "test/path-unversioned".to_string(),
-        PhpMixed::String("4.3.2.1".to_string()),
+        PhpMixed::string("4.3.2.1".to_string()),
     );
     versions.insert(
         "test/path-versioned".to_string(),
-        PhpMixed::String("3.2.1.0".to_string()),
+        PhpMixed::string("3.2.1.0".to_string()),
     );
     let options = coordinates(vec![("versions", PhpMixed::Array(versions))]);
 
@@ -154,7 +154,7 @@ fn test_load_package_with_explicit_versions() {
         .into_string()
         .unwrap();
     let mut repository = create_path_repo(coordinates(vec![
-        ("url", PhpMixed::String(repository_url)),
+        ("url", PhpMixed::string(repository_url)),
         ("options", PhpMixed::Array(options)),
     ]));
     let packages = repository.__get_packages().unwrap();
@@ -232,7 +232,7 @@ fn test_url_remains_relative() {
 
     let mut repository = create_path_repo(coordinates(vec![(
         "url",
-        PhpMixed::String(relative_url.clone()),
+        PhpMixed::string(relative_url.clone()),
     )]));
     let packages = repository.__get_packages().unwrap();
 
@@ -248,7 +248,7 @@ fn test_url_remains_relative() {
 
 #[test]
 fn test_reference_none() {
-    let options = coordinates(vec![("reference", PhpMixed::String("none".to_string()))]);
+    let options = coordinates(vec![("reference", PhpMixed::string("none".to_string()))]);
     let repository_url = Path::new(&fixtures_dir())
         .join("path")
         .join("*")
@@ -256,7 +256,7 @@ fn test_reference_none() {
         .into_string()
         .unwrap();
     let mut repository = create_path_repo(coordinates(vec![
-        ("url", PhpMixed::String(repository_url)),
+        ("url", PhpMixed::string(repository_url)),
         ("options", PhpMixed::Array(options)),
     ]));
     let packages = repository.__get_packages().unwrap();
@@ -271,7 +271,7 @@ fn test_reference_none() {
 #[test]
 fn test_reference_config() {
     let options = coordinates(vec![
-        ("reference", PhpMixed::String("config".to_string())),
+        ("reference", PhpMixed::string("config".to_string())),
         ("relative", PhpMixed::Bool(true)),
     ]);
     let repository_url = Path::new(&fixtures_dir())
@@ -281,7 +281,7 @@ fn test_reference_config() {
         .into_string()
         .unwrap();
     let mut repository = create_path_repo(coordinates(vec![
-        ("url", PhpMixed::String(repository_url)),
+        ("url", PhpMixed::string(repository_url)),
         ("options", PhpMixed::Array(options.clone())),
     ]));
     let packages = repository.__get_packages().unwrap();

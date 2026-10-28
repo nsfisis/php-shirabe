@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolOptimizerTest.php
 
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
 use shirabe::dependency_resolver::pool::Pool;
@@ -207,7 +208,7 @@ fn run_test_pool_optimizer(
                 package,
                 Some(
                     parser
-                        .parse_constraints(constraint.as_string().unwrap())
+                        .parse_constraints(&constraint.as_string().unwrap().to_str_lossy())
                         .unwrap(),
                 ),
             )

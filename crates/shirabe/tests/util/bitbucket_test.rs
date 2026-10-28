@@ -103,10 +103,10 @@ fn set_up_with_config_and_http(
 // The OAuth2 token request as built by Bitbucket::request_access_token.
 fn access_token_request_options() -> IndexMap<String, PhpMixed> {
     let mut http = IndexMap::new();
-    http.insert("method".to_string(), PhpMixed::String("POST".to_string()));
+    http.insert("method".to_string(), PhpMixed::string("POST".to_string()));
     http.insert(
         "content".to_string(),
-        PhpMixed::String("grant_type=client_credentials".to_string()),
+        PhpMixed::string("grant_type=client_credentials".to_string()),
     );
     let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
     options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
@@ -171,15 +171,15 @@ fn expected_stored_token(time: i64) -> PhpMixed {
     let mut consumer = IndexMap::new();
     consumer.insert(
         "consumer-key".to_string(),
-        PhpMixed::String(CONSUMER_KEY.to_string()),
+        PhpMixed::string(CONSUMER_KEY.to_string()),
     );
     consumer.insert(
         "consumer-secret".to_string(),
-        PhpMixed::String(CONSUMER_SECRET.to_string()),
+        PhpMixed::string(CONSUMER_SECRET.to_string()),
     );
     consumer.insert(
         "access-token".to_string(),
-        PhpMixed::String(TOKEN.to_string()),
+        PhpMixed::string(TOKEN.to_string()),
     );
     consumer.insert(
         "access-token-expiration".to_string(),
@@ -229,7 +229,7 @@ fn test_request_access_token_with_valid_oauth_consumer_and_valid_stored_access_t
     let mut stored = IndexMap::new();
     stored.insert(
         "access-token".to_string(),
-        PhpMixed::String(TOKEN.to_string()),
+        PhpMixed::string(TOKEN.to_string()),
     );
     stored.insert(
         "access-token-expiration".to_string(),
@@ -237,11 +237,11 @@ fn test_request_access_token_with_valid_oauth_consumer_and_valid_stored_access_t
     );
     stored.insert(
         "consumer-key".to_string(),
-        PhpMixed::String(CONSUMER_KEY.to_string()),
+        PhpMixed::string(CONSUMER_KEY.to_string()),
     );
     stored.insert(
         "consumer-secret".to_string(),
-        PhpMixed::String(CONSUMER_SECRET.to_string()),
+        PhpMixed::string(CONSUMER_SECRET.to_string()),
     );
     let mut oauth = IndexMap::new();
     oauth.insert(ORIGIN.to_string(), PhpMixed::Array(stored));
@@ -269,7 +269,7 @@ fn test_request_access_token_with_valid_oauth_consumer_and_expired_access_token(
     let mut stored = IndexMap::new();
     stored.insert(
         "access-token".to_string(),
-        PhpMixed::String("randomExpiredToken".to_string()),
+        PhpMixed::string("randomExpiredToken".to_string()),
     );
     stored.insert(
         "access-token-expiration".to_string(),
@@ -277,11 +277,11 @@ fn test_request_access_token_with_valid_oauth_consumer_and_expired_access_token(
     );
     stored.insert(
         "consumer-key".to_string(),
-        PhpMixed::String(CONSUMER_KEY.to_string()),
+        PhpMixed::string(CONSUMER_KEY.to_string()),
     );
     stored.insert(
         "consumer-secret".to_string(),
-        PhpMixed::String(CONSUMER_SECRET.to_string()),
+        PhpMixed::string(CONSUMER_SECRET.to_string()),
     );
     let mut oauth = IndexMap::new();
     oauth.insert(ORIGIN.to_string(), PhpMixed::Array(stored));

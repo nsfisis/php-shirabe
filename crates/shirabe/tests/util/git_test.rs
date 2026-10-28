@@ -84,11 +84,11 @@ fn mock_config(protocol: &str) -> Config {
     ConfigStubBuilder::new()
         .with(
             "github-domains",
-            PhpMixed::List(vec![PhpMixed::String("github.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("github.com".to_string())]),
         )
         .with(
             "github-protocols",
-            PhpMixed::List(vec![PhpMixed::String(protocol.to_string())]),
+            PhpMixed::List(vec![PhpMixed::string(protocol.to_string())]),
         )
         .build()
 }
@@ -97,15 +97,15 @@ fn mock_sync_mirror_config() -> Config {
     ConfigStubBuilder::new()
         .with(
             "github-domains",
-            PhpMixed::List(vec![PhpMixed::String("github.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("github.com".to_string())]),
         )
         .with(
             "gitlab-domains",
-            PhpMixed::List(vec![PhpMixed::String("gitlab.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("gitlab.com".to_string())]),
         )
         .with(
             "github-protocols",
-            PhpMixed::List(vec![PhpMixed::String("https".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("https".to_string())]),
         )
         .build()
 }
@@ -279,11 +279,11 @@ fn run_command_private_bitbucket_with_authentication(
     let config = ConfigStubBuilder::new()
         .with(
             "gitlab-domains",
-            PhpMixed::List(vec![PhpMixed::String("gitlab.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("gitlab.com".to_string())]),
         )
         .with(
             "github-domains",
-            PhpMixed::List(vec![PhpMixed::String("github.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("github.com".to_string())]),
         )
         .build();
 
@@ -422,11 +422,11 @@ fn run_command_private_bitbucket_interactive_with_oauth(
     let mut config = ConfigStubBuilder::new()
         .with(
             "gitlab-domains",
-            PhpMixed::List(vec![PhpMixed::String("gitlab.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("gitlab.com".to_string())]),
         )
         .with(
             "github-domains",
-            PhpMixed::List(vec![PhpMixed::String("github.com".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("github.com".to_string())]),
         )
         .build();
     config.set_config_source(Box::new(NullConfigSource));

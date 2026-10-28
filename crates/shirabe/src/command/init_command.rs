@@ -17,6 +17,7 @@ use crate::repository::PlatformRepositoryHandle;
 use crate::repository::RepositoryFactory;
 use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -122,10 +123,10 @@ impl InitCommand {
         let name = parsed.get("name").cloned().unwrap_or(None);
         let email = parsed.get("email").cloned().unwrap_or(None);
         if let Some(name) = name {
-            author_map.insert("name".to_string(), PhpMixed::String(name));
+            author_map.insert("name".to_string(), PhpMixed::string(name));
         }
         if let Some(email) = email {
-            author_map.insert("email".to_string(), PhpMixed::String(email));
+            author_map.insert("email".to_string(), PhpMixed::string(email));
         }
 
         Ok(vec![author_map])
@@ -346,7 +347,7 @@ impl InitCommand {
         let name = self.sanitize_package_name_component(&name);
 
         let mut vendor = name.clone();
-        // TODO(bytes): PhpMixed::String carries the value as a String.
+        // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
         let composer_default_vendor = PHP_SERVER
             .lock()
             .unwrap()
@@ -356,13 +357,13 @@ impl InitCommand {
                     panic!("COMPOSER_DEFAULT_VENDOR is not valid UTF-8: {value:?}")
                 })
             });
-        // TODO(bytes): PhpMixed::String carries the value as a String.
+        // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
         let server_username = PHP_SERVER.lock().unwrap().get("USERNAME").map(|value| {
             value
                 .into_string()
                 .unwrap_or_else(|value| panic!("USERNAME is not valid UTF-8: {value:?}"))
         });
-        // TODO(bytes): PhpMixed::String carries the value as a String.
+        // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
         let server_user = PHP_SERVER.lock().unwrap().get("USER").map(|value| {
             value
                 .into_string()
@@ -371,7 +372,7 @@ impl InitCommand {
         if !empty(
             &composer_default_vendor
                 .clone()
-                .map(PhpMixed::String)
+                .map(PhpMixed::string)
                 .unwrap_or(PhpMixed::Null),
         ) {
             vendor = composer_default_vendor.unwrap_or_default();
@@ -380,14 +381,14 @@ impl InitCommand {
         } else if !empty(
             &server_username
                 .clone()
-                .map(PhpMixed::String)
+                .map(PhpMixed::string)
                 .unwrap_or(PhpMixed::Null),
         ) {
             vendor = server_username.unwrap_or_default();
         } else if !empty(
             &server_user
                 .clone()
-                .map(PhpMixed::String)
+                .map(PhpMixed::string)
                 .unwrap_or(PhpMixed::Null),
         ) {
             vendor = server_user.unwrap_or_default();
@@ -404,7 +405,7 @@ impl InitCommand {
         let git = self.get_git_config()?;
 
         let mut author_name: Option<String> = None;
-        // TODO(bytes): PhpMixed::String carries the value as a String.
+        // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
         let composer_default_author = PHP_SERVER
             .lock()
             .unwrap()
@@ -417,7 +418,7 @@ impl InitCommand {
         if !empty(
             &composer_default_author
                 .clone()
-                .map(PhpMixed::String)
+                .map(PhpMixed::string)
                 .unwrap_or(PhpMixed::Null),
         ) {
             author_name = composer_default_author;
@@ -426,7 +427,7 @@ impl InitCommand {
         }
 
         let mut author_email: Option<String> = None;
-        // TODO(bytes): PhpMixed::String carries the value as a String.
+        // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
         let composer_default_email = PHP_SERVER
             .lock()
             .unwrap()
@@ -439,7 +440,7 @@ impl InitCommand {
         if !empty(
             &composer_default_email
                 .clone()
-                .map(PhpMixed::String)
+                .map(PhpMixed::string)
                 .unwrap_or(PhpMixed::Null),
         ) {
             author_email = composer_default_email;
@@ -520,15 +521,16 @@ impl Command for InitCommand {
         if options.contains_key("name")
             && !preg_is_match(
                 php_regex!(r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"),
-                options
+                &options
                     .get("name")
                     .and_then(|v| v.as_string())
-                    .unwrap_or(""),
+                    .unwrap_or_default()
+                    .to_str_lossy(),
             )
         {
             return Err(InvalidArgumentException::new(format!(
                 "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
-                options.get("name").and_then(|v| v.as_string()).unwrap_or("")
+                options.get("name").and_then(|v| v.as_string()).unwrap_or_default()
             ))
             .into());
         }
@@ -537,7 +539,7 @@ impl Command for InitCommand {
             let author = options
                 .get("author")
                 .and_then(|v| v.as_string())
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             options.insert(
                 "authors".to_string(),
@@ -597,7 +599,7 @@ impl Command for InitCommand {
                 PhpMixed::Array(
                     formatted
                         .into_iter()
-                        .map(|(k, v)| (k, PhpMixed::String(v)))
+                        .map(|(k, v)| (k, PhpMixed::string(v)))
                         .collect(),
                 )
             }
@@ -624,7 +626,7 @@ impl Command for InitCommand {
                 PhpMixed::Array(
                     formatted
                         .into_iter()
-                        .map(|(k, v)| (k, PhpMixed::String(v)))
+                        .map(|(k, v)| (k, PhpMixed::string(v)))
                         .collect(),
                 )
             };
@@ -637,18 +639,18 @@ impl Command for InitCommand {
             let ap = options
                 .get("autoload")
                 .and_then(|v| v.as_string())
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             autoload_path = Some(ap.clone());
             let name = input
                 .borrow()
                 .get_option("name")?
                 .as_string()
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             let namespace = self.namespace_from_package_name(&name).unwrap_or_default();
             let mut psr4 = IndexMap::new();
-            psr4.insert(format!("{}\\", namespace), PhpMixed::String(ap));
+            psr4.insert(format!("{}\\", namespace), PhpMixed::string(ap));
             let mut autoload_obj = IndexMap::new();
             autoload_obj.insert("psr-4".to_string(), PhpMixed::Array(psr4));
             options.insert("autoload".to_string(), PhpMixed::Array(autoload_obj));
@@ -744,7 +746,7 @@ impl Command for InitCommand {
                 .borrow()
                 .get_option("name")?
                 .as_string()
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             let namespace = self.namespace_from_package_name(&name).unwrap_or_default();
 
@@ -855,10 +857,10 @@ impl Command for InitCommand {
                 if create_default_packagist_repo {
                     let mut default_config: IndexMap<String, PhpMixed> = IndexMap::new();
                     default_config
-                        .insert("type".to_string(), PhpMixed::String("composer".to_string()));
+                        .insert("type".to_string(), PhpMixed::string("composer".to_string()));
                     default_config.insert(
                         "url".to_string(),
-                        PhpMixed::String("https://repo.packagist.org".to_string()),
+                        PhpMixed::string("https://repo.packagist.org".to_string()),
                     );
                     repos.push(RepositoryFactory::create_repo(
                         io.clone(),
@@ -916,18 +918,18 @@ impl Command for InitCommand {
                 ),
                 Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                     if value.is_null() {
-                        return Ok(PhpMixed::String(name_for_validate.clone()));
+                        return Ok(PhpMixed::string(name_for_validate.clone()));
                     }
 
                     if !preg_is_match(
                         php_regex!(
                             r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"
                         ),
-                        value.as_string().unwrap_or(""),
+                        &value.as_string().unwrap_or_default().to_str_lossy(),
                     ) {
                         return Err(InvalidArgumentException::new(format!(
                             "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
-                            value.as_string().unwrap_or("")
+                            value.as_string().unwrap_or_default()
                         ))
                         .into());
                     }
@@ -935,10 +937,10 @@ impl Command for InitCommand {
                     Ok(value)
                 }),
                 None,
-                PhpMixed::String(name.clone()),
+                PhpMixed::string(name.clone()),
             )?
             .as_string()
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
             input
                 .borrow_mut()
@@ -956,7 +958,7 @@ impl Command for InitCommand {
                     description.unwrap_or_default()
                 ),
                 description_default
-                    .map(PhpMixed::String)
+                    .map(PhpMixed::string)
                     .unwrap_or(PhpMixed::Null),
             )?;
             input
@@ -979,7 +981,7 @@ impl Command for InitCommand {
             let author_value = io.ask_and_validate(
                 format!(
                     "Author [{} n to skip]: ",
-                    if is_string(&PhpMixed::String(author.clone())) {
+                    if is_string(&PhpMixed::string(author.clone())) {
                         format!("<comment>{}</comment>, ", author)
                     } else {
                         String::new()
@@ -1002,12 +1004,12 @@ impl Command for InitCommand {
                     let parsed = InitCommand::new().parse_author_string(&value)?;
                     let name = parsed.get("name").cloned().flatten().unwrap_or_default();
                     match parsed.get("email").cloned().flatten() {
-                        None => Ok(PhpMixed::String(name)),
-                        Some(email) => Ok(PhpMixed::String(format!("{} <{}>", name, email))),
+                        None => Ok(PhpMixed::string(name)),
+                        Some(email) => Ok(PhpMixed::string(format!("{} <{}>", name, email))),
                     }
                 }),
                 None,
-                PhpMixed::String(author_default),
+                PhpMixed::string(author_default),
             )?;
             input
                 .borrow_mut()
@@ -1029,14 +1031,16 @@ impl Command for InitCommand {
                     if value.is_null() {
                         return Ok(minimum_stability_for_validate
                             .clone()
-                            .map(PhpMixed::String)
+                            .map(PhpMixed::string)
                             .unwrap_or(PhpMixed::Null));
                     }
 
-                    if !base_package::STABILITIES.contains_key(value.as_string().unwrap_or("")) {
+                    if !base_package::STABILITIES
+                        .contains_key(&*value.as_string().unwrap_or_default().to_str_lossy())
+                    {
                         return Err(InvalidArgumentException::new(format!(
                             "Invalid minimum stability \"{}\". Must be empty or one of: {}",
-                            value.as_string().unwrap_or(""),
+                            value.as_string().unwrap_or_default(),
                             implode(
                                 ", ",
                                 &base_package::STABILITIES
@@ -1053,7 +1057,7 @@ impl Command for InitCommand {
                 None,
                 minimum_stability_default
                     .clone()
-                    .map(PhpMixed::String)
+                    .map(PhpMixed::string)
                     .unwrap_or(PhpMixed::Null),
             )?;
             input.borrow_mut().set_option(
@@ -1062,7 +1066,7 @@ impl Command for InitCommand {
             );
 
             let type_val = input.borrow().get_option("type")?;
-            let type_str = type_val.as_string().unwrap_or("").to_string();
+            let type_str = type_val.as_string().unwrap_or_default().to_string();
             let mut type_value = io.ask(
             format!(
                 "Package Type (e.g. library, project, metapackage, composer-plugin) [<comment>{}</comment>]: ",
@@ -1070,7 +1074,9 @@ impl Command for InitCommand {
             ),
             type_val.into(),
         )?;
-            if type_value.as_string() == Some("") || matches!(type_value, PhpMixed::Bool(false)) {
+            if type_value.as_string() == Some("".into())
+                || matches!(type_value, PhpMixed::Bool(false))
+            {
                 type_value = PhpMixed::Null;
             }
             input
@@ -1083,7 +1089,7 @@ impl Command for InitCommand {
                 .as_string()
                 .map(|s| s.to_string());
             if license.is_none() {
-                // TODO(bytes): PhpMixed::String carries the value as a String.
+                // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
                 let default_license = PHP_SERVER
                     .lock()
                     .unwrap()
@@ -1096,7 +1102,7 @@ impl Command for InitCommand {
                 if !empty(
                     &default_license
                         .clone()
-                        .map(PhpMixed::String)
+                        .map(PhpMixed::string)
                         .unwrap_or(PhpMixed::Null),
                 ) {
                     license = default_license;
@@ -1108,16 +1114,16 @@ impl Command for InitCommand {
                     "License [<comment>{}</comment>]: ",
                     license.clone().unwrap_or_default()
                 ),
-                license.map(PhpMixed::String).unwrap_or(PhpMixed::Null),
+                license.map(PhpMixed::string).unwrap_or(PhpMixed::Null),
             )?;
             let spdx = SpdxLicenses::new();
             if !license.is_null()
-                && !spdx.validate(license.as_string().unwrap_or(""))
-                && license.as_string() != Some("proprietary")
+                && !spdx.validate(&license.as_string().unwrap_or_default().to_str_lossy())
+                && license.as_string() != Some("proprietary".into())
             {
                 return Err(InvalidArgumentException::new(format!(
                     "Invalid license provided: {}. Only SPDX license identifiers (https://spdx.org/licenses/) or \"proprietary\" are accepted.",
-                    license.as_string().unwrap_or("")
+                    license.as_string().unwrap_or_default()
                 ))
             .into());
             }
@@ -1213,7 +1219,7 @@ impl Command for InitCommand {
                 .borrow()
                 .get_option("name")?
                 .as_string()
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             let namespace = self
                 .namespace_from_package_name(&name_str)
@@ -1227,10 +1233,10 @@ impl Command for InitCommand {
             ),
             Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
                 if value.is_null() {
-                    return Ok(PhpMixed::String(autoload_for_validate.clone()));
+                    return Ok(PhpMixed::string(autoload_for_validate.clone()));
                 }
 
-                let value_str = value.as_string().unwrap_or("").to_string();
+                let value_str = value.as_string().unwrap_or_default().to_string();
                 if value_str == "n" || value_str == "no" {
                     return Ok(PhpMixed::Null);
                 }
@@ -1250,10 +1256,10 @@ impl Command for InitCommand {
                     .into());
                 }
 
-                Ok(PhpMixed::String(value_or_default))
+                Ok(PhpMixed::string(value_or_default))
             }),
             None,
-            PhpMixed::String(autoload_default),
+            PhpMixed::string(autoload_default),
         )?;
             input
                 .borrow_mut()

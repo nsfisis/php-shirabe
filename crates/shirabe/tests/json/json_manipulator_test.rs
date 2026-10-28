@@ -5,7 +5,7 @@ use shirabe::json::{JsonFile, JsonManipulator};
 use shirabe_php_shim::PhpMixed;
 
 fn s(v: &str) -> PhpMixed {
-    PhpMixed::String(v.to_string())
+    PhpMixed::string(v.to_string())
 }
 
 fn arr(pairs: &[(&str, PhpMixed)]) -> PhpMixed {

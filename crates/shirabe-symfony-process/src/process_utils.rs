@@ -27,7 +27,7 @@ impl ProcessUtils {
                     PhpMixed::Float(f) => f.to_string(),
                     other => other.as_string().map(|s| s.to_string()).unwrap_or_default(),
                 };
-                return Ok(PhpMixed::String(s));
+                return Ok(PhpMixed::string(s));
             }
             // TODO(plugin): Process / \Iterator / \Traversable inputs are not modeled by PhpMixed.
 

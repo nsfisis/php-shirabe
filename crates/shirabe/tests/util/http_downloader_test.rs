@@ -69,35 +69,35 @@ fn test_output_warnings() {
     let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
     data.insert(
         "warning".to_string(),
-        PhpMixed::String("old warning msg".to_string()),
+        PhpMixed::string("old warning msg".to_string()),
     );
     data.insert(
         "warning-versions".to_string(),
-        PhpMixed::String(">=2.0".to_string()),
+        PhpMixed::string(">=2.0".to_string()),
     );
     data.insert(
         "info".to_string(),
-        PhpMixed::String("old info msg".to_string()),
+        PhpMixed::string("old info msg".to_string()),
     );
     data.insert(
         "info-versions".to_string(),
-        PhpMixed::String(">=2.0".to_string()),
+        PhpMixed::string(">=2.0".to_string()),
     );
 
     let mut warning_should_not = IndexMap::new();
     warning_should_not.insert(
         "message".to_string(),
-        PhpMixed::String("should not appear".to_string()),
+        PhpMixed::string("should not appear".to_string()),
     );
-    warning_should_not.insert("versions".to_string(), PhpMixed::String("<2.2".to_string()));
+    warning_should_not.insert("versions".to_string(), PhpMixed::string("<2.2".to_string()));
     let mut warning_visible = IndexMap::new();
     warning_visible.insert(
         "message".to_string(),
-        PhpMixed::String("visible warning".to_string()),
+        PhpMixed::string("visible warning".to_string()),
     );
     warning_visible.insert(
         "versions".to_string(),
-        PhpMixed::String(">=2.2-dev".to_string()),
+        PhpMixed::string(">=2.2-dev".to_string()),
     );
     data.insert(
         "warnings".to_string(),
@@ -110,17 +110,17 @@ fn test_output_warnings() {
     let mut info_should_not = IndexMap::new();
     info_should_not.insert(
         "message".to_string(),
-        PhpMixed::String("should not appear".to_string()),
+        PhpMixed::string("should not appear".to_string()),
     );
-    info_should_not.insert("versions".to_string(), PhpMixed::String("<2.2".to_string()));
+    info_should_not.insert("versions".to_string(), PhpMixed::string("<2.2".to_string()));
     let mut info_visible = IndexMap::new();
     info_visible.insert(
         "message".to_string(),
-        PhpMixed::String("visible info".to_string()),
+        PhpMixed::string("visible info".to_string()),
     );
     info_visible.insert(
         "versions".to_string(),
-        PhpMixed::String(">=2.2-dev".to_string()),
+        PhpMixed::string(">=2.2-dev".to_string()),
     );
     data.insert(
         "infos".to_string(),

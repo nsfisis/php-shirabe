@@ -269,12 +269,12 @@ impl GitHub {
         if use_local {
             let mut cfg = self.config.borrow_mut();
             if let Some(local) = cfg.get_local_auth_config_source_mut() {
-                local.add_config_setting(&key, PhpMixed::String(token))?;
+                local.add_config_setting(&key, PhpMixed::string(token))?;
             }
         } else {
             let mut cfg = self.config.borrow_mut();
             cfg.get_auth_config_source_mut()
-                .add_config_setting(&key, PhpMixed::String(token))?;
+                .add_config_setting(&key, PhpMixed::string(token))?;
         }
 
         self.io.write_error3(
@@ -288,8 +288,8 @@ impl GitHub {
 
     pub fn get_rate_limit(&self, headers: &[String]) -> indexmap::IndexMap<String, PhpMixed> {
         let mut rate_limit = indexmap::IndexMap::new();
-        rate_limit.insert("limit".to_string(), PhpMixed::String("?".to_string()));
-        rate_limit.insert("reset".to_string(), PhpMixed::String("?".to_string()));
+        rate_limit.insert("limit".to_string(), PhpMixed::string("?".to_string()));
+        rate_limit.insert("reset".to_string(), PhpMixed::string("?".to_string()));
 
         for header in headers {
             let header = header.trim();
@@ -310,7 +310,7 @@ impl GitHub {
                     let ts: i64 = value.trim().parse().unwrap_or(0);
                     rate_limit.insert(
                         "reset".to_string(),
-                        PhpMixed::String(date_local("Y-m-d H:i:s", Some(ts))),
+                        PhpMixed::string(date_local("Y-m-d H:i:s", Some(ts))),
                     );
                 }
                 _ => {}

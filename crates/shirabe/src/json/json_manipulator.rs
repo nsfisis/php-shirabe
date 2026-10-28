@@ -77,7 +77,7 @@ impl JsonManipulator {
             let mut arr: IndexMap<String, PhpMixed> = IndexMap::new();
             arr.insert(
                 package.to_string(),
-                PhpMixed::String(constraint.to_string()),
+                PhpMixed::string(constraint.to_string()),
             );
             return self.add_main_key(r#type, PhpMixed::Array(arr));
         }
@@ -197,12 +197,12 @@ impl JsonManipulator {
         }
 
         let final_config = if is_array(&config)
-            && !is_numeric(&PhpMixed::String(name.to_string()))
+            && !is_numeric(&PhpMixed::string(name.to_string()))
             && !name.is_empty()
         {
             // PHP: ['name' => $name] + $config — preserve $config keys
             let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
-            merged.insert("name".to_string(), PhpMixed::String(name.to_string()));
+            merged.insert("name".to_string(), PhpMixed::string(name.to_string()));
             if let Some(arr) = config.as_array() {
                 for (k, v) in arr {
                     if !merged.contains_key(k) {
@@ -258,7 +258,7 @@ impl JsonManipulator {
                     if !self.add_list_item("repositories", PhpMixed::Array(m), true)? {
                         return Ok(false);
                     }
-                } else if is_numeric(&PhpMixed::String(repository_name.clone())) {
+                } else if is_numeric(&PhpMixed::string(repository_name.clone())) {
                     if !self.add_list_item("repositories", repository.clone(), true)? {
                         return Ok(false);
                     }
@@ -272,7 +272,7 @@ impl JsonManipulator {
                     let mut prepended: IndexMap<String, PhpMixed> = IndexMap::new();
                     prepended.insert(
                         "name".to_string(),
-                        PhpMixed::String(repository_name.clone()),
+                        PhpMixed::string(repository_name.clone()),
                     );
                     for (k, v) in &repo {
                         if !prepended.contains_key(k) {
@@ -319,7 +319,7 @@ impl JsonManipulator {
             let index_value = if is_list {
                 PhpMixed::Int(index.parse::<i64>().unwrap_or(0))
             } else {
-                PhpMixed::String(index.clone())
+                PhpMixed::string(index.clone())
             };
             if name == index.as_str() {
                 repository_index = Some(index_value);
@@ -330,7 +330,7 @@ impl JsonManipulator {
                 .as_array()
                 .and_then(|a| a.get("name"))
                 .and_then(|v| v.as_string());
-            if Some(name) == repo_name {
+            if Some(name.into()) == repo_name {
                 repository_index = Some(index_value);
                 break;
             }
@@ -454,7 +454,7 @@ impl JsonManipulator {
                 .as_array()
                 .and_then(|a| a.get("name"))
                 .and_then(|v| v.as_string());
-            if Some(reference_name) == repo_name {
+            if Some(reference_name.into()) == repo_name {
                 index_to_insert = Some(i as i64);
                 break;
             }
@@ -479,11 +479,11 @@ impl JsonManipulator {
         };
 
         let final_config = if is_array(&config)
-            && !is_numeric(&PhpMixed::String(name.to_string()))
+            && !is_numeric(&PhpMixed::string(name.to_string()))
             && !name.is_empty()
         {
             let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
-            merged.insert("name".to_string(), PhpMixed::String(name.to_string()));
+            merged.insert("name".to_string(), PhpMixed::string(name.to_string()));
             if let Some(arr) = config.as_array() {
                 for (k, v) in arr {
                     if !merged.contains_key(k) {
@@ -655,9 +655,9 @@ impl JsonManipulator {
         if in_array_loose(
             main_node.to_string(),
             &[
-                PhpMixed::String("config".to_string()),
-                PhpMixed::String("extra".to_string()),
-                PhpMixed::String("scripts".to_string()),
+                PhpMixed::string("config".to_string()),
+                PhpMixed::string("extra".to_string()),
+                PhpMixed::string("scripts".to_string()),
             ],
         ) && strpos(name, ".").is_some()
         {
@@ -858,9 +858,9 @@ impl JsonManipulator {
         if in_array_loose(
             main_node.to_string(),
             &[
-                PhpMixed::String("config".to_string()),
-                PhpMixed::String("extra".to_string()),
-                PhpMixed::String("scripts".to_string()),
+                PhpMixed::string("config".to_string()),
+                PhpMixed::string("extra".to_string()),
+                PhpMixed::string("scripts".to_string()),
             ],
         ) && strpos(name, ".").is_some()
         {

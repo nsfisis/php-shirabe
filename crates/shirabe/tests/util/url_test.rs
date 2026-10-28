@@ -13,7 +13,7 @@ fn conf(entries: &[(&str, &[&str])]) -> IndexMap<String, PhpMixed> {
                 k.to_string(),
                 PhpMixed::List(
                     vals.iter()
-                        .map(|v| PhpMixed::String(v.to_string()))
+                        .map(|v| PhpMixed::string(v.to_string()))
                         .collect(),
                 ),
             )

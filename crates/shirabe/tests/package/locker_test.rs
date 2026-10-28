@@ -23,11 +23,11 @@ fn get_json_content(custom_data: &[(&str, &str)]) -> String {
     let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
     data.insert(
         "minimum-stability".to_string(),
-        PhpMixed::String("beta".to_string()),
+        PhpMixed::string("beta".to_string()),
     );
-    data.insert("name".to_string(), PhpMixed::String("test".to_string()));
+    data.insert("name".to_string(), PhpMixed::string("test".to_string()));
     for (k, v) in custom_data {
-        data.insert(k.to_string(), PhpMixed::String(v.to_string()));
+        data.insert(k.to_string(), PhpMixed::string(v.to_string()));
     }
     data.sort_keys();
 
@@ -136,7 +136,7 @@ fn test_set_lock_data() {
     let content_hash = hash("md5", json_content.trim());
 
     let mut platform_overrides: IndexMap<String, PhpMixed> = IndexMap::new();
-    platform_overrides.insert("foo/bar".to_string(), PhpMixed::String("1.0".to_string()));
+    platform_overrides.insert("foo/bar".to_string(), PhpMixed::string("1.0".to_string()));
 
     locker
         .set_lock_data(
@@ -243,7 +243,7 @@ fn test_is_fresh_false() {
     let lock = JsonFile::encode_with_options(
         &PhpMixed::Array({
             let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-            m.insert("hash".to_string(), PhpMixed::String(other));
+            m.insert("hash".to_string(), PhpMixed::string(other));
             m
         }),
         JsonEncodeOptions::none(),

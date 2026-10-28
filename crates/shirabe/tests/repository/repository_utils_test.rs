@@ -16,12 +16,12 @@ fn load_with(
     deps: Vec<(&str, &str)>,
 ) -> PackageInterfaceHandle {
     let mut config: IndexMap<String, PhpMixed> = IndexMap::new();
-    config.insert("name".to_string(), PhpMixed::String(name.to_string()));
-    config.insert("version".to_string(), PhpMixed::String(version.to_string()));
+    config.insert("name".to_string(), PhpMixed::string(name.to_string()));
+    config.insert("version".to_string(), PhpMixed::string(version.to_string()));
 
     let mut links: IndexMap<String, PhpMixed> = IndexMap::new();
     for (dep, constraint) in deps {
-        links.insert(dep.to_string(), PhpMixed::String(constraint.to_string()));
+        links.insert(dep.to_string(), PhpMixed::string(constraint.to_string()));
     }
     config.insert(link_type.to_string(), PhpMixed::Array(links));
 

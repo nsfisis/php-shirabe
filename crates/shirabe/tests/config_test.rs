@@ -31,8 +31,8 @@ fn assert_map_equals(expected: &IndexMap<String, PhpMixed>, actual: &IndexMap<St
 
 fn repo(r#type: &str, url: &str) -> PhpMixed {
     let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-    m.insert("type".to_string(), PhpMixed::String(r#type.to_string()));
-    m.insert("url".to_string(), PhpMixed::String(url.to_string()));
+    m.insert("type".to_string(), PhpMixed::string(r#type.to_string()));
+    m.insert("url".to_string(), PhpMixed::string(url.to_string()));
     PhpMixed::Array(m)
 }
 
@@ -152,12 +152,12 @@ fn data_add_packagist_repository() -> Vec<Case> {
         Case {
             expected: map(vec![
                 ("packagist.org", packagist()),
-                ("type", PhpMixed::String("vcs".to_string())),
-                ("url", PhpMixed::String("http://example.com".to_string())),
+                ("type", PhpMixed::string("vcs".to_string())),
+                ("url", PhpMixed::string("http://example.com".to_string())),
             ]),
             local: map(vec![
-                ("type", PhpMixed::String("vcs".to_string())),
-                ("url", PhpMixed::String("http://example.com".to_string())),
+                ("type", PhpMixed::string("vcs".to_string())),
+                ("url", PhpMixed::string("http://example.com".to_string())),
             ]),
             system: None,
         },
@@ -197,20 +197,20 @@ fn test_preferred_install_as_string() {
     config.merge(
         &config_section(vec![(
             "preferred-install",
-            PhpMixed::String("source".to_string()),
+            PhpMixed::string("source".to_string()),
         )]),
         "test",
     );
     config.merge(
         &config_section(vec![(
             "preferred-install",
-            PhpMixed::String("dist".to_string()),
+            PhpMixed::string("dist".to_string()),
         )]),
         "test",
     );
 
     assert_eq!(
-        PhpMixed::String("dist".to_string()),
+        PhpMixed::string("dist".to_string()),
         config.get("preferred-install")
     );
 }
@@ -221,14 +221,14 @@ fn test_merge_preferred_install() {
     config.merge(
         &config_section(vec![(
             "preferred-install",
-            PhpMixed::String("dist".to_string()),
+            PhpMixed::string("dist".to_string()),
         )]),
         "test",
     );
     config.merge(
         &config_section(vec![(
             "preferred-install",
-            PhpMixed::Array(map(vec![("foo/*", PhpMixed::String("source".to_string()))])),
+            PhpMixed::Array(map(vec![("foo/*", PhpMixed::string("source".to_string()))])),
         )]),
         "test",
     );
@@ -237,8 +237,8 @@ fn test_merge_preferred_install() {
     // Handled by composer because we convert string preferences for BC, all other
     // care for ordering and collision prevention is up to the user
     let expected = map(vec![
-        ("foo/*", PhpMixed::String("source".to_string())),
-        ("*", PhpMixed::String("dist".to_string())),
+        ("foo/*", PhpMixed::string("source".to_string())),
+        ("*", PhpMixed::string("dist".to_string())),
     ]);
     match config.get("preferred-install") {
         PhpMixed::Array(actual) => assert_map_equals(&expected, &actual),
@@ -252,21 +252,21 @@ fn test_merge_github_oauth() {
     config.merge(
         &config_section(vec![(
             "github-oauth",
-            PhpMixed::Array(map(vec![("foo", PhpMixed::String("bar".to_string()))])),
+            PhpMixed::Array(map(vec![("foo", PhpMixed::string("bar".to_string()))])),
         )]),
         "test",
     );
     config.merge(
         &config_section(vec![(
             "github-oauth",
-            PhpMixed::Array(map(vec![("bar", PhpMixed::String("baz".to_string()))])),
+            PhpMixed::Array(map(vec![("bar", PhpMixed::string("baz".to_string()))])),
         )]),
         "test",
     );
 
     let expected = map(vec![
-        ("foo", PhpMixed::String("bar".to_string())),
-        ("bar", PhpMixed::String("baz".to_string())),
+        ("foo", PhpMixed::string("bar".to_string())),
+        ("bar", PhpMixed::string("baz".to_string())),
     ]);
     match config.get("github-oauth") {
         PhpMixed::Array(actual) => assert_map_equals(&expected, &actual),
@@ -279,15 +279,15 @@ fn test_var_replacement() {
     let mut config = Config::new(false, None);
     config.merge(
         &config_section(vec![
-            ("a", PhpMixed::String("b".to_string())),
-            ("c", PhpMixed::String("{$a}".to_string())),
+            ("a", PhpMixed::string("b".to_string())),
+            ("c", PhpMixed::string("{$a}".to_string())),
         ]),
         "test",
     );
     config.merge(
         &config_section(vec![
-            ("bin-dir", PhpMixed::String("$HOME".to_string())),
-            ("cache-dir", PhpMixed::String("~/foo/".to_string())),
+            ("bin-dir", PhpMixed::string("$HOME".to_string())),
+            ("cache-dir", PhpMixed::string("~/foo/".to_string())),
         ]),
         "test",
     );
@@ -297,10 +297,10 @@ fn test_var_replacement() {
         .or_else(|| Platform::get_env("USERPROFILE"))
         .unwrap_or_default();
     let home = home_raw.trim_end_matches(['\\', '/']).to_string();
-    assert_eq!(PhpMixed::String("b".to_string()), config.get("c"));
-    assert_eq!(PhpMixed::String(home.clone()), config.get("bin-dir"));
+    assert_eq!(PhpMixed::string("b".to_string()), config.get("c"));
+    assert_eq!(PhpMixed::string(home.clone()), config.get("bin-dir"));
     assert_eq!(
-        PhpMixed::String(format!("{}/foo", home)),
+        PhpMixed::string(format!("{}/foo", home)),
         config.get("cache-dir")
     );
 }
@@ -310,9 +310,9 @@ fn test_realpath_replacement() {
     let mut config = Config::new(false, Some("/foo/bar".to_string()));
     config.merge(
         &config_section(vec![
-            ("bin-dir", PhpMixed::String("$HOME/foo".to_string())),
-            ("cache-dir", PhpMixed::String("/baz/".to_string())),
-            ("vendor-dir", PhpMixed::String("vendor".to_string())),
+            ("bin-dir", PhpMixed::string("$HOME/foo".to_string())),
+            ("cache-dir", PhpMixed::string("/baz/".to_string())),
+            ("vendor-dir", PhpMixed::string("vendor".to_string())),
         ]),
         "test",
     );
@@ -323,15 +323,15 @@ fn test_realpath_replacement() {
         .unwrap_or_default();
     let home = home_raw.trim_end_matches(['\\', '/']).to_string();
     assert_eq!(
-        PhpMixed::String("/foo/bar/vendor".to_string()),
+        PhpMixed::string("/foo/bar/vendor".to_string()),
         config.get("vendor-dir")
     );
     assert_eq!(
-        PhpMixed::String(format!("{}/foo", home)),
+        PhpMixed::string(format!("{}/foo", home)),
         config.get("bin-dir")
     );
     assert_eq!(
-        PhpMixed::String("/baz".to_string()),
+        PhpMixed::string("/baz".to_string()),
         config.get("cache-dir")
     );
 }
@@ -342,13 +342,13 @@ fn test_stream_wrapper_dirs() {
     config.merge(
         &config_section(vec![(
             "cache-dir",
-            PhpMixed::String("s3://baz/".to_string()),
+            PhpMixed::string("s3://baz/".to_string()),
         )]),
         "test",
     );
 
     assert_eq!(
-        PhpMixed::String("s3://baz".to_string()),
+        PhpMixed::string("s3://baz".to_string()),
         config.get("cache-dir")
     );
 }
@@ -358,28 +358,28 @@ fn test_fetching_relative_paths() {
     let mut config = Config::new(false, Some("/foo/bar".to_string()));
     config.merge(
         &config_section(vec![
-            ("bin-dir", PhpMixed::String("{$vendor-dir}/foo".to_string())),
-            ("vendor-dir", PhpMixed::String("vendor".to_string())),
+            ("bin-dir", PhpMixed::string("{$vendor-dir}/foo".to_string())),
+            ("vendor-dir", PhpMixed::string("vendor".to_string())),
         ]),
         "test",
     );
 
     assert_eq!(
-        PhpMixed::String("/foo/bar/vendor".to_string()),
+        PhpMixed::string("/foo/bar/vendor".to_string()),
         config.get("vendor-dir")
     );
     assert_eq!(
-        PhpMixed::String("/foo/bar/vendor/foo".to_string()),
+        PhpMixed::string("/foo/bar/vendor/foo".to_string()),
         config.get("bin-dir")
     );
     assert_eq!(
-        PhpMixed::String("vendor".to_string()),
+        PhpMixed::string("vendor".to_string()),
         config
             .get_with_flags("vendor-dir", Config::RELATIVE_PATHS)
             .unwrap()
     );
     assert_eq!(
-        PhpMixed::String("vendor/foo".to_string()),
+        PhpMixed::string("vendor/foo".to_string()),
         config
             .get_with_flags("bin-dir", Config::RELATIVE_PATHS)
             .unwrap()
@@ -393,8 +393,8 @@ fn test_override_github_protocols() {
         &config_section(vec![(
             "github-protocols",
             PhpMixed::List(vec![
-                PhpMixed::String("https".to_string()),
-                PhpMixed::String("ssh".to_string()),
+                PhpMixed::string("https".to_string()),
+                PhpMixed::string("ssh".to_string()),
             ]),
         )]),
         "test",
@@ -402,13 +402,13 @@ fn test_override_github_protocols() {
     config.merge(
         &config_section(vec![(
             "github-protocols",
-            PhpMixed::List(vec![PhpMixed::String("https".to_string())]),
+            PhpMixed::List(vec![PhpMixed::string("https".to_string())]),
         )]),
         "test",
     );
 
     assert_eq!(
-        PhpMixed::List(vec![PhpMixed::String("https".to_string())]),
+        PhpMixed::List(vec![PhpMixed::string("https".to_string())]),
         config.get("github-protocols")
     );
 }
@@ -420,14 +420,14 @@ fn test_git_disabled_by_default_in_github_protocols() {
         &config_section(vec![(
             "github-protocols",
             PhpMixed::List(vec![
-                PhpMixed::String("https".to_string()),
-                PhpMixed::String("git".to_string()),
+                PhpMixed::string("https".to_string()),
+                PhpMixed::string("git".to_string()),
             ]),
         )]),
         "test",
     );
     assert_eq!(
-        PhpMixed::List(vec![PhpMixed::String("https".to_string())]),
+        PhpMixed::List(vec![PhpMixed::string("https".to_string())]),
         config.get("github-protocols")
     );
 
@@ -437,8 +437,8 @@ fn test_git_disabled_by_default_in_github_protocols() {
     );
     assert_eq!(
         PhpMixed::List(vec![
-            PhpMixed::String("https".to_string()),
-            PhpMixed::String("git".to_string()),
+            PhpMixed::string("https".to_string()),
+            PhpMixed::string("git".to_string()),
         ]),
         config.get("github-protocols")
     );
@@ -524,12 +524,12 @@ fn test_prohibited_urls_warning_verify_peer() {
 fn test_disable_tls_can_be_overridden() {
     let mut config = Config::new(true, None);
     config.merge(
-        &config_section(vec![("disable-tls", PhpMixed::String("false".to_string()))]),
+        &config_section(vec![("disable-tls", PhpMixed::string("false".to_string()))]),
         "test",
     );
     assert_eq!(PhpMixed::Bool(false), config.get("disable-tls"));
     config.merge(
-        &config_section(vec![("disable-tls", PhpMixed::String("true".to_string()))]),
+        &config_section(vec![("disable-tls", PhpMixed::string("true".to_string()))]),
         "test",
     );
     assert_eq!(PhpMixed::Bool(true), config.get("disable-tls"));
@@ -600,7 +600,7 @@ fn test_audit() {
     assert!(result.contains_key("abandoned"));
     assert!(result.contains_key("ignore"));
     assert_eq!(
-        Some(&PhpMixed::String(Auditor::ABANDONED_FAIL.to_string())),
+        Some(&PhpMixed::string(Auditor::ABANDONED_FAIL.to_string())),
         result.get("abandoned")
     );
     assert_eq!(
@@ -615,7 +615,7 @@ fn test_audit() {
     assert!(result.contains_key("abandoned"));
     assert!(result.contains_key("ignore"));
     assert_eq!(
-        Some(&PhpMixed::String(Auditor::ABANDONED_IGNORE.to_string())),
+        Some(&PhpMixed::string(Auditor::ABANDONED_IGNORE.to_string())),
         result.get("abandoned")
     );
     assert_eq!(
@@ -629,8 +629,8 @@ fn test_audit() {
             PhpMixed::Array(map(vec![(
                 "ignore",
                 PhpMixed::List(vec![
-                    PhpMixed::String("A".to_string()),
-                    PhpMixed::String("B".to_string()),
+                    PhpMixed::string("A".to_string()),
+                    PhpMixed::string("B".to_string()),
                 ]),
             )])),
         )]),
@@ -642,8 +642,8 @@ fn test_audit() {
             PhpMixed::Array(map(vec![(
                 "ignore",
                 PhpMixed::List(vec![
-                    PhpMixed::String("A".to_string()),
-                    PhpMixed::String("C".to_string()),
+                    PhpMixed::string("A".to_string()),
+                    PhpMixed::string("C".to_string()),
                 ]),
             )])),
         )]),
@@ -654,10 +654,10 @@ fn test_audit() {
     assert!(result.contains_key("ignore"));
     assert_eq!(
         Some(&PhpMixed::List(vec![
-            PhpMixed::String("A".to_string()),
-            PhpMixed::String("B".to_string()),
-            PhpMixed::String("A".to_string()),
-            PhpMixed::String("C".to_string()),
+            PhpMixed::string("A".to_string()),
+            PhpMixed::string("B".to_string()),
+            PhpMixed::string("A".to_string()),
+            PhpMixed::string("C".to_string()),
         ])),
         result.get("ignore")
     );

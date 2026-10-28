@@ -35,7 +35,7 @@ impl ScriptAliasCommand {
             .unwrap_or_else(|| format!("Runs the {} script as defined in composer.json", script));
 
         for alias in &aliases {
-            if !is_string(&PhpMixed::String(alias.clone())) {
+            if !is_string(&PhpMixed::string(alias.clone())) {
                 return Err(InvalidArgumentException::new(
                     r#""scripts-aliases" element array values should contain only strings"#
                         .to_string(),
@@ -140,7 +140,7 @@ impl Command for ScriptAliasCommand {
         let mut flags = indexmap::IndexMap::new();
         flags.insert(
             "script-alias-input".to_string(),
-            PhpMixed::String(script_alias_input),
+            PhpMixed::string(script_alias_input),
         );
 
         let args_value: Vec<String> = args

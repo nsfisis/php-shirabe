@@ -129,7 +129,7 @@ impl Command for SuggestsCommand {
                 .get_platform_overrides()?;
             let platform_overrides: IndexMap<String, PhpMixed> = platform_overrides
                 .into_iter()
-                .map(|(k, v)| (k, PhpMixed::String(v)))
+                .map(|(k, v)| (k, PhpMixed::string(v)))
                 .collect();
             installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],
@@ -173,7 +173,7 @@ impl Command for SuggestsCommand {
             .as_array()
             .unwrap_or_default()
             .iter()
-            .map(|value| PhpMixed::String(value.clone()))
+            .map(|value| PhpMixed::string(value.clone()))
             .collect();
         let mut packages = RepositoryInterface::get_packages(&mut installed_repo)?;
         let root_pkg_as_base: crate::package::BasePackageHandle =

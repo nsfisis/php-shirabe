@@ -51,7 +51,7 @@ impl Versions {
                 .borrow_mut()
                 .get("home")
                 .as_string()
-                .unwrap_or("")
+                .unwrap_or_default()
         );
         if std::path::Path::new(&channel_file).exists() {
             let channel = std::fs::read_to_string(&channel_file)?.trim().to_string();
@@ -84,7 +84,7 @@ impl Versions {
                 .borrow_mut()
                 .get("home")
                 .as_string()
-                .unwrap_or("")
+                .unwrap_or_default()
         );
         self.channel = Some(channel.clone());
 

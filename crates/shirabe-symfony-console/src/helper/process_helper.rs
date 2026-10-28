@@ -99,7 +99,7 @@ impl ProcessHelper {
             None => {
                 anyhow::bail!(shirabe_php_shim::InvalidArgumentException::new(format!(
                     "Invalid command provided to \"{}()\": the command should be an array whose first element is either the path to the binary to run or a \"Process\" object.",
-                    shirabe_php_shim::PhpMixed::String("ProcessHelper::run".to_string()),
+                    shirabe_php_shim::PhpMixed::string("ProcessHelper::run".to_string()),
                 )));
             }
         }
@@ -127,7 +127,7 @@ impl ProcessHelper {
             .enumerate()
             .filter_map(|(i, element)| match element {
                 ProcessHelperCmdElement::String(s) => {
-                    Some((i.to_string(), shirabe_php_shim::PhpMixed::String(s.clone())))
+                    Some((i.to_string(), shirabe_php_shim::PhpMixed::string(s.clone())))
                 }
                 ProcessHelperCmdElement::Process(_) => None,
             })

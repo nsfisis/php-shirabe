@@ -53,7 +53,7 @@ fn root_file() -> String {
     root.insert("packages".to_string(), PhpMixed::Array(IndexMap::new()));
     root.insert(
         "metadata-url".to_string(),
-        PhpMixed::String(METADATA_URL.to_string()),
+        PhpMixed::string(METADATA_URL.to_string()),
     );
     JsonFile::encode(&PhpMixed::Array(root)).expect("failed to encode the root file")
 }
@@ -64,7 +64,7 @@ fn config(home: &TempDir) -> Config {
     let mut settings: IndexMap<String, PhpMixed> = IndexMap::new();
     settings.insert(
         "home".to_string(),
-        PhpMixed::String(home.path().display().to_string()),
+        PhpMixed::string(home.path().display().to_string()),
     );
     settings.insert("cache-read-only".to_string(), PhpMixed::Bool(true));
     let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -108,7 +108,7 @@ fn repository(package: &str, root: &str, metadata: &str, config: &Config) -> Com
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".to_string(),
-        PhpMixed::String(REPOSITORY_URL.to_string()),
+        PhpMixed::string(REPOSITORY_URL.to_string()),
     );
 
     ComposerRepository::new(repo_config, io, config, http_downloader, None)

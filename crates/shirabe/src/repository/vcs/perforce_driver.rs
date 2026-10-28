@@ -43,7 +43,7 @@ impl PerforceDriver {
             .repo_config
             .get("depot")
             .and_then(|v| v.as_string())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         self.branch = String::new();
         if let Some(branch) = self
@@ -77,7 +77,7 @@ impl PerforceDriver {
             .borrow_mut()
             .get("cache-vcs-dir")
             .as_string()
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         if !Cache::is_usable(&cache_vcs_dir) {
             return Err(RuntimeException::new("PerforceDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string()).into());
@@ -138,7 +138,7 @@ impl PerforceDriver {
 
     pub fn get_source(&self, identifier: &str) -> IndexMap<String, PhpMixed> {
         let mut source = IndexMap::new();
-        source.insert("type".to_string(), PhpMixed::String("perforce".to_string()));
+        source.insert("type".to_string(), PhpMixed::string("perforce".to_string()));
         source.insert(
             "url".to_string(),
             self.inner
@@ -149,11 +149,11 @@ impl PerforceDriver {
         );
         source.insert(
             "reference".to_string(),
-            PhpMixed::String(identifier.to_string()),
+            PhpMixed::string(identifier.to_string()),
         );
         source.insert(
             "p4user".to_string(),
-            PhpMixed::String(
+            PhpMixed::string(
                 self.perforce
                     .as_ref()
                     .unwrap()
@@ -266,7 +266,7 @@ impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
     fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
         PerforceDriver::get_dist(self, identifier).map(|m| {
             m.into_iter()
-                .map(|(k, v)| (k, v.as_string().unwrap_or("").to_string()))
+                .map(|(k, v)| (k, v.as_string().unwrap_or_default().to_string()))
                 .collect()
         })
     }
@@ -274,7 +274,7 @@ impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
     fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
         PerforceDriver::get_source(self, identifier)
             .into_iter()
-            .map(|(k, v)| (k, v.as_string().unwrap_or("").to_string()))
+            .map(|(k, v)| (k, v.as_string().unwrap_or_default().to_string()))
             .collect()
     }
 

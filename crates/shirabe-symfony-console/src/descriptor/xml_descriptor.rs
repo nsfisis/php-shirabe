@@ -9,6 +9,7 @@ use crate::input::InputArgument;
 use crate::input::InputDefinition;
 use crate::input::InputOption;
 use crate::output::OutputInterface;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{DOMDocument, DOMNode, PhpMixed};
 
@@ -130,17 +131,18 @@ impl XmlDescriptor {
                 let namespace_array_xml =
                     namespaces_xml.append_child(dom.create_element("namespace"));
                 let id = match namespace_description.get("id") {
-                    Some(PhpMixed::String(s)) => s.as_str(),
-                    _ => "",
+                    Some(PhpMixed::String(s)) => s.to_str_lossy(),
+                    _ => "".into(),
                 };
-                namespace_array_xml.set_attribute("id", id);
+                namespace_array_xml.set_attribute("id", &id);
 
                 if let Some(PhpMixed::List(names)) = namespace_description.get("commands") {
                     for name in names {
                         let command_xml =
                             namespace_array_xml.append_child(dom.create_element("command"));
-                        command_xml
-                            .append_child(dom.create_text_node(name.as_string().unwrap_or("")));
+                        command_xml.append_child(dom.create_text_node(
+                            &name.as_string().unwrap_or_default().to_str_lossy(),
+                        ));
                     }
                 }
             }
@@ -192,7 +194,7 @@ impl XmlDescriptor {
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         let namespace = match options.get("namespace") {
-            Some(PhpMixed::String(s)) => Some(s.clone()),
+            Some(PhpMixed::String(s)) => Some(s.to_str_lossy().into_owned()),
             _ => None,
         };
         let short = matches!(options.get("short"), Some(PhpMixed::Bool(true)));

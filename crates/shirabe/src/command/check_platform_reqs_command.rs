@@ -108,14 +108,14 @@ impl CheckPlatformReqsCommand {
                 .iter()
                 .map(|result| {
                     PhpMixed::List(vec![
-                        PhpMixed::String(result.platform_package.clone()),
-                        PhpMixed::String(result.version.clone()),
+                        PhpMixed::string(result.platform_package.clone()),
+                        PhpMixed::string(result.version.clone()),
                         match &result.link {
-                            Some(link) => PhpMixed::String(link.to_string()),
-                            None => PhpMixed::String(String::new()),
+                            Some(link) => PhpMixed::string(link.to_string()),
+                            None => PhpMixed::string(String::new()),
                         },
                         if let Some(link) = &result.link {
-                            PhpMixed::String(format!(
+                            PhpMixed::string(format!(
                                 "{} {} {} ({})",
                                 link.get_source(),
                                 link.get_description(),
@@ -123,9 +123,9 @@ impl CheckPlatformReqsCommand {
                                 link.get_pretty_constraint(),
                             ))
                         } else {
-                            PhpMixed::String(String::new())
+                            PhpMixed::string(String::new())
                         },
-                        PhpMixed::String(
+                        PhpMixed::string(
                             format!("{} {}", result.status, result.provider)
                                 .trim_end()
                                 .to_string(),

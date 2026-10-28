@@ -175,7 +175,7 @@ impl UpdateCommand {
             PhpMixed::Array(
                 autocompleter_values
                     .iter()
-                    .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
+                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                     .collect(),
             ),
             PhpMixed::Bool(false),
@@ -194,7 +194,7 @@ impl UpdateCommand {
         let mut table = Table::new(output);
         table.set_headers(vec!["Selected packages".into()]);
         for package in &packages {
-            table.add_row(PhpMixed::List(vec![PhpMixed::String(package.clone())]).into());
+            table.add_row(PhpMixed::List(vec![PhpMixed::string(package.clone())]).into());
         }
         table.render();
 
@@ -715,8 +715,8 @@ impl Command for UpdateCommand {
                 bump_command.set_composer(composer_handle.clone());
                 result = bump_command.do_bump(
                     io.clone(),
-                    bump_after_update.as_string() == Some("dev"),
-                    bump_after_update.as_string() == Some("no-dev"),
+                    bump_after_update.as_string() == Some("dev".into()),
+                    bump_after_update.as_string() == Some("no-dev".into()),
                     input
                         .borrow()
                         .get_option("dry-run")?

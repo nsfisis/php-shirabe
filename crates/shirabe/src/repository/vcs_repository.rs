@@ -26,6 +26,7 @@ use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -99,16 +100,17 @@ impl VcsRepository {
         });
 
         let url = Platform::expand_path(
-            repo_config
+            &repo_config
                 .get("url")
                 .and_then(|v| v.as_string())
-                .unwrap_or(""),
+                .unwrap_or_default()
+                .to_str_lossy(),
         );
-        repo_config.insert("url".to_string(), PhpMixed::String(url.clone()));
+        repo_config.insert("url".to_string(), PhpMixed::string(url.clone()));
         let r#type = repo_config
             .get("type")
             .and_then(|v| v.as_string())
-            .unwrap_or("vcs")
+            .unwrap_or("vcs".into())
             .to_string();
         let is_verbose = io.is_verbose();
         let is_very_verbose = io.is_very_verbose();
@@ -321,7 +323,7 @@ impl VcsRepository {
                                     .get("name")
                                     .and_then(|v| v.as_string())
                                     .filter(|s| !s.is_empty())
-                                    .map(String::from);
+                                    .map(|s| s.to_str_lossy().into_owned());
                             }
                             Ok(None) => {}
                             Err(e) => {
@@ -431,43 +433,49 @@ impl VcsRepository {
                 // manually versioned package
                 if data.contains_key("version") {
                     let normalized = self.version_parser.borrow().as_ref().unwrap().normalize(
-                        data.get("version")
+                        &data
+                            .get("version")
                             .and_then(|v| v.as_string())
-                            .unwrap_or(""),
+                            .unwrap_or_default()
+                            .to_str_lossy(),
                         None,
                     )?;
                     data.insert(
                         "version_normalized".to_string(),
-                        PhpMixed::String(normalized),
+                        PhpMixed::string(normalized),
                     );
                 } else {
                     // auto-versioned package, read value from tag
-                    data.insert("version".to_string(), PhpMixed::String(tag.clone()));
+                    data.insert("version".to_string(), PhpMixed::string(tag.clone()));
                     data.insert(
                         "version_normalized".to_string(),
-                        PhpMixed::String(parsed_tag.clone()),
+                        PhpMixed::string(parsed_tag.clone()),
                     );
                 }
 
                 // make sure tag packages have no -dev flag
                 data.insert(
                     "version".to_string(),
-                    PhpMixed::String(preg_replace(
+                    PhpMixed::string(preg_replace(
                         php_regex!(r"{[.-]?dev$}i"),
                         "",
-                        data.get("version")
+                        &data
+                            .get("version")
                             .and_then(|v| v.as_string())
-                            .unwrap_or(""),
+                            .unwrap_or_default()
+                            .to_str_lossy(),
                     )),
                 );
                 data.insert(
                     "version_normalized".to_string(),
-                    PhpMixed::String(preg_replace(
+                    PhpMixed::string(preg_replace(
                         php_regex!(r"{(^dev-|[.-]?dev$)}i"),
                         "",
-                        data.get("version_normalized")
+                        &data
+                            .get("version_normalized")
                             .and_then(|v| v.as_string())
-                            .unwrap_or(""),
+                            .unwrap_or_default()
+                            .to_str_lossy(),
                     )),
                 );
 
@@ -477,7 +485,7 @@ impl VcsRepository {
                 let version_normalized = data
                     .get("version_normalized")
                     .and_then(|v| v.as_string())
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string();
 
                 // broken package, version doesn't match tag
@@ -506,7 +514,7 @@ impl VcsRepository {
                     .unwrap_or_else(|| {
                         data.get("name")
                             .and_then(|v| v.as_string())
-                            .unwrap_or("")
+                            .unwrap_or_default()
                             .to_string()
                     });
                 if let Some(existing_package) = self.inner.find_package_internal(
@@ -701,10 +709,10 @@ impl VcsRepository {
                 let mut data = data_opt.unwrap();
 
                 // branches are always auto-versioned, read value from branch name
-                data.insert("version".to_string(), PhpMixed::String(version.clone()));
+                data.insert("version".to_string(), PhpMixed::string(version.clone()));
                 data.insert(
                     "version_normalized".to_string(),
-                    PhpMixed::String(parsed_branch.clone()),
+                    PhpMixed::string(parsed_branch.clone()),
                 );
 
                 data.shift_remove("default-branch");
@@ -725,7 +733,7 @@ impl VcsRepository {
                         branch,
                         data.get("version")
                             .and_then(|v| v.as_string())
-                            .unwrap_or("")
+                            .unwrap_or_default()
                     ));
                 }
 
@@ -819,7 +827,7 @@ impl VcsRepository {
         let data_package_name = data
             .get("name")
             .and_then(|v| v.as_string())
-            .map(String::from);
+            .map(|s| s.to_str_lossy().into_owned());
         let name_value = self
             .package_name
             .borrow()
@@ -829,7 +837,7 @@ impl VcsRepository {
         data.insert(
             "name".to_string(),
             match name_value {
-                Some(n) => PhpMixed::String(n),
+                Some(n) => PhpMixed::string(n),
                 None => PhpMixed::Null,
             },
         );
@@ -841,7 +849,7 @@ impl VcsRepository {
                 match dist {
                     Some(m) => PhpMixed::Array(
                         m.into_iter()
-                            .map(|(k, v)| (k, PhpMixed::String(v)))
+                            .map(|(k, v)| (k, PhpMixed::string(v)))
                             .collect(),
                     ),
                     None => PhpMixed::Null,
@@ -855,7 +863,7 @@ impl VcsRepository {
                 PhpMixed::Array(
                     source
                         .into_iter()
-                        .map(|(k, v)| (k, PhpMixed::String(v)))
+                        .map(|(k, v)| (k, PhpMixed::string(v)))
                         .collect(),
                 ),
             );
@@ -970,12 +978,12 @@ impl VcsRepository {
             let name = data
                 .get("name")
                 .and_then(|v| v.as_string())
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             let version_normalized = data
                 .get("version_normalized")
                 .and_then(|v| v.as_string())
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_string();
             if let Some(existing_package) = self.inner.find_package_internal(
                 &name,

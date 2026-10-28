@@ -61,7 +61,7 @@ impl FundCommand {
             let r#type = funding_option
                 .get("type")
                 .and_then(|v| v.as_string())
-                .unwrap_or("");
+                .unwrap_or_default();
             if r#type == "github"
                 && let Some(matches) =
                     preg_match(php_regex!(r"{^https://github.com/([^/]+)$}"), &url)

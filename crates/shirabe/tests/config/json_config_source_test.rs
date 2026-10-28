@@ -65,10 +65,10 @@ fn test_add_repository() {
     let mut json_config_source = json_config_source(&config);
 
     let mut repo = IndexMap::new();
-    repo.insert("type".to_string(), PhpMixed::String("git".to_string()));
+    repo.insert("type".to_string(), PhpMixed::string("git".to_string()));
     repo.insert(
         "url".to_string(),
-        PhpMixed::String("example.tld".to_string()),
+        PhpMixed::string("example.tld".to_string()),
     );
     json_config_source
         .add_repository("example_tld", PhpMixed::Array(repo), true)
@@ -88,10 +88,10 @@ fn test_add_repository_as_list() {
     let mut json_config_source = json_config_source(&config);
 
     let mut repo = IndexMap::new();
-    repo.insert("type".to_string(), PhpMixed::String("git".to_string()));
+    repo.insert("type".to_string(), PhpMixed::string("git".to_string()));
     repo.insert(
         "url".to_string(),
-        PhpMixed::String("example.tld".to_string()),
+        PhpMixed::string("example.tld".to_string()),
     );
     json_config_source
         .add_repository("", PhpMixed::Array(repo), true)
@@ -111,16 +111,16 @@ fn test_add_repository_with_options() {
     let mut json_config_source = json_config_source(&config);
 
     let mut repo = IndexMap::new();
-    repo.insert("type".to_string(), PhpMixed::String("composer".to_string()));
+    repo.insert("type".to_string(), PhpMixed::string("composer".to_string()));
     repo.insert(
         "url".to_string(),
-        PhpMixed::String("https://example.tld".to_string()),
+        PhpMixed::string("https://example.tld".to_string()),
     );
     {
         let mut local_cert = IndexMap::new();
         local_cert.insert(
             "local_cert".to_string(),
-            PhpMixed::String("/home/composer/.ssl/composer.pem".to_string()),
+            PhpMixed::string("/home/composer/.ssl/composer.pem".to_string()),
         );
         let mut ssl = IndexMap::new();
         ssl.insert("ssl".to_string(), PhpMixed::Array(local_cert));

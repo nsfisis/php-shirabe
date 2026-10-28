@@ -8,6 +8,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{LogicException, PhpMixed, time};
@@ -83,7 +84,12 @@ impl Bitbucket {
             None,
         )? == 0
         {
-            let output_str = output.as_string().unwrap_or("").trim().to_string();
+            let output_str = output
+                .as_string()
+                .unwrap_or_default()
+                .to_str_lossy()
+                .trim()
+                .to_string();
             self.io.borrow_mut().set_authentication(
                 origin_url.to_string(),
                 "x-token-auth".to_string(),
@@ -97,10 +103,10 @@ impl Bitbucket {
 
     fn request_access_token(&mut self) -> anyhow::Result<bool> {
         let mut http = IndexMap::new();
-        http.insert("method".to_string(), PhpMixed::String("POST".to_string()));
+        http.insert("method".to_string(), PhpMixed::string("POST".to_string()));
         http.insert(
             "content".to_string(),
-            PhpMixed::String("grant_type=client_credentials".to_string()),
+            PhpMixed::string("grant_type=client_credentials".to_string()),
         );
         let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
         options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
@@ -377,11 +383,11 @@ impl Bitbucket {
         let mut consumer = IndexMap::new();
         consumer.insert(
             "consumer-key".to_string(),
-            PhpMixed::String(consumer_key.to_string()),
+            PhpMixed::string(consumer_key.to_string()),
         );
         consumer.insert(
             "consumer-secret".to_string(),
-            PhpMixed::String(consumer_secret.to_string()),
+            PhpMixed::string(consumer_secret.to_string()),
         );
         consumer.insert(
             "access-token".to_string(),

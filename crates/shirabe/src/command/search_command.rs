@@ -125,8 +125,8 @@ impl Command for SearchCommand {
         if !in_array_loose(
             format.clone(),
             &[
-                PhpMixed::String("text".to_string()),
-                PhpMixed::String("json".to_string()),
+                PhpMixed::string("text".to_string()),
+                PhpMixed::string("json".to_string()),
             ],
         ) {
             io.write_error(&format!(
@@ -266,25 +266,25 @@ impl Command for SearchCommand {
                 .into_iter()
                 .map(|result| {
                     let mut entry = IndexMap::new();
-                    entry.insert("name".to_string(), PhpMixed::String(result.name));
+                    entry.insert("name".to_string(), PhpMixed::string(result.name));
                     entry.insert(
                         "description".to_string(),
                         result
                             .description
-                            .map(PhpMixed::String)
+                            .map(PhpMixed::string)
                             .unwrap_or(PhpMixed::Null),
                     );
                     if let Some(abandoned) = result.abandoned {
                         entry.insert(
                             "abandoned".to_string(),
                             match abandoned {
-                                AbandonedInfo::Replacement(s) => PhpMixed::String(s),
+                                AbandonedInfo::Replacement(s) => PhpMixed::string(s),
                                 AbandonedInfo::Abandoned => PhpMixed::Bool(true),
                             },
                         );
                     }
                     if let Some(url) = result.url {
-                        entry.insert("url".to_string(), PhpMixed::String(url));
+                        entry.insert("url".to_string(), PhpMixed::string(url));
                     }
                     PhpMixed::Array(entry)
                 })

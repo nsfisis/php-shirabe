@@ -56,16 +56,16 @@ impl RequestProxy {
         let mut options: IndexMap<i64, PhpMixed> = IndexMap::new();
         options.insert(
             CURLOPT_PROXY,
-            PhpMixed::String(self.url.as_deref().unwrap_or("").to_string()),
+            PhpMixed::string(self.url.as_deref().unwrap_or("").to_string()),
         );
 
         if self.url.is_some() {
-            options.insert(CURLOPT_NOPROXY, PhpMixed::String(String::new()));
+            options.insert(CURLOPT_NOPROXY, PhpMixed::string(String::new()));
         }
 
         if let Some(auth) = &self.auth {
             options.insert(CURLOPT_PROXYAUTH, PhpMixed::Int(CURLAUTH_BASIC));
-            options.insert(CURLOPT_PROXYUSERPWD, PhpMixed::String(auth.clone()));
+            options.insert(CURLOPT_PROXYUSERPWD, PhpMixed::string(auth.clone()));
         }
 
         if self.is_secure() {

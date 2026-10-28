@@ -219,7 +219,7 @@ impl SetUp {
         ConfigStubBuilder::new()
             .with(
                 "vendor-dir",
-                PhpMixed::String(self.vendor_dir.to_str().unwrap().to_string()),
+                PhpMixed::string(self.vendor_dir.to_str().unwrap().to_string()),
             )
             .with("platform-check", PhpMixed::Bool(true))
             .with("use-include-path", PhpMixed::Bool(self.use_include_path))
@@ -334,7 +334,7 @@ fn str_list(items: &[&str]) -> PhpMixed {
     PhpMixed::List(
         items
             .iter()
-            .map(|s| PhpMixed::String(s.to_string()))
+            .map(|s| PhpMixed::string(s.to_string()))
             .collect(),
     )
 }
@@ -349,7 +349,7 @@ fn str_map(entries: &[(&str, PhpMixed)]) -> PhpMixed {
 }
 
 fn pstr(v: &str) -> PhpMixed {
-    PhpMixed::String(v.to_string())
+    PhpMixed::string(v.to_string())
 }
 
 fn new_root_pkg(name: &str) -> RootPackageHandle {

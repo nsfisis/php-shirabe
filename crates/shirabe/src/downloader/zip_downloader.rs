@@ -258,7 +258,7 @@ impl ZipDownloader {
                             .unwrap();
                         match response_headers.get(&package.get_name()) {
                             Some(list) => PhpMixed::List(
-                                list.iter().map(|s| PhpMixed::String(s.clone())).collect(),
+                                list.iter().map(|s| PhpMixed::string(s.clone())).collect(),
                             ),
                             None => PhpMixed::List(vec![]),
                         }

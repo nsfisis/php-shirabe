@@ -585,11 +585,11 @@ fn test_format_authors() {
     let mut expected: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
     expected.insert(
         "name".to_string(),
-        PhpMixed::String("John Smith".to_string()),
+        PhpMixed::string("John Smith".to_string()),
     );
     expected.insert(
         "email".to_string(),
-        PhpMixed::String("john@example.com".to_string()),
+        PhpMixed::string("john@example.com".to_string()),
     );
     assert_eq!(expected, authors[0]);
 
@@ -597,7 +597,7 @@ fn test_format_authors() {
     let mut expected: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
     expected.insert(
         "name".to_string(),
-        PhpMixed::String("John Smith".to_string()),
+        PhpMixed::string("John Smith".to_string()),
     );
     assert_eq!(expected, authors[0]);
 }

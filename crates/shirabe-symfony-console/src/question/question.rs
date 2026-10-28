@@ -176,7 +176,7 @@ impl Question {
                     };
                     // array_merge(array_keys($values), array_values($values))
                     let mut merged: Vec<PhpMixed> =
-                        array.keys().map(|k| PhpMixed::String(k.clone())).collect();
+                        array.keys().map(|k| PhpMixed::string(k.clone())).collect();
                     merged.extend(array.values().cloned());
                     merged
                 } else {

@@ -386,7 +386,7 @@ fn test_installer() {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_buffer.clone();
 
         let config = ConfigStubBuilder::new()
-            .with("vendor-dir", PhpMixed::String("foo".to_string()))
+            .with("vendor-dir", PhpMixed::string("foo".to_string()))
             .with("lock", PhpMixed::Bool(true))
             .with("notify-on-install", PhpMixed::Bool(true))
             .build_shared();

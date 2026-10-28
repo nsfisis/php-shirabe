@@ -111,7 +111,7 @@ fn php_flavor_test_cases() -> Vec<(
     Vec<(PhpMixed, Vec<PhpMixed>, PhpMixed)>,
 )> {
     let ubuntu = "7.2.31-1+ubuntu16.04.1+deb.sury.org+1";
-    let s = |v: &str| PhpMixed::String(v.to_string());
+    let s = |v: &str| PhpMixed::string(v.to_string());
 
     vec![
         (
@@ -208,8 +208,8 @@ fn test_inet_pton_regression() {
     // TODO(mock): the payload reports the result of `@inet_pton('::')` instead of answering a
     // call, so there is nothing left for the once() call-count check to observe.
     let functions = [(
-        PhpMixed::String("inet_pton".to_string()),
-        vec![PhpMixed::String("::".to_string())],
+        PhpMixed::string("inet_pton".to_string()),
+        vec![PhpMixed::string("::".to_string())],
         PhpMixed::Bool(false),
     )];
 
@@ -217,7 +217,7 @@ fn test_inet_pton_regression() {
     let constants: IndexMap<String, PhpMixed> = IndexMap::from([
         (
             "PHP_VERSION".to_string(),
-            PhpMixed::String("7.0.0".to_string()),
+            PhpMixed::string("7.0.0".to_string()),
         ),
         ("PHP_DEBUG".to_string(), PhpMixed::Bool(false)),
     ]);
@@ -288,7 +288,7 @@ struct LibCase {
 // PhpMixed::Object holding the version they would expose); their runtime read paths are
 // still `TODO(plugin)` stubs, but the data is ported faithfully.
 fn library_test_cases() -> Vec<LibCase> {
-    let s = |v: &str| PhpMixed::String(v.to_string());
+    let s = |v: &str| PhpMixed::string(v.to_string());
     let curl = |v: &str| -> (PhpMixed, Vec<PhpMixed>, PhpMixed) {
         (
             s("curl_version"),
@@ -1626,7 +1626,7 @@ fn test_library_information() {
         constants.push((
             "PHP_VERSION".to_string(),
             None,
-            PhpMixed::String("7.1.0".to_string()),
+            PhpMixed::string("7.1.0".to_string()),
         ));
 
         let platform_info = platform_info(
@@ -1726,7 +1726,7 @@ fn test_composer_platform_version() {
     let constants: IndexMap<String, PhpMixed> = IndexMap::from([
         (
             "PHP_VERSION".to_string(),
-            PhpMixed::String("7.0.0".to_string()),
+            PhpMixed::string("7.0.0".to_string()),
         ),
         ("PHP_DEBUG".to_string(), PhpMixed::Bool(false)),
     ]);

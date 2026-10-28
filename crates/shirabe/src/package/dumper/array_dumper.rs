@@ -9,7 +9,7 @@ use shirabe_php_shim::{DATE_RFC3339, PhpMixed};
 /// Serializes a Mirror back into the PHP array shape `{url, preferred}`.
 fn mirror_to_php(mirror: Mirror) -> PhpMixed {
     let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
-    entry.insert("url".to_string(), PhpMixed::String(mirror.url));
+    entry.insert("url".to_string(), PhpMixed::string(mirror.url));
     entry.insert("preferred".to_string(), PhpMixed::Bool(mirror.preferred));
     PhpMixed::Array(entry)
 }
@@ -32,30 +32,30 @@ impl ArrayDumper {
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
         data.insert(
             "name".to_string(),
-            PhpMixed::String(package.get_pretty_name()),
+            PhpMixed::string(package.get_pretty_name()),
         );
         data.insert(
             "version".to_string(),
-            PhpMixed::String(package.get_pretty_version()),
+            PhpMixed::string(package.get_pretty_version()),
         );
         data.insert(
             "version_normalized".to_string(),
-            PhpMixed::String(package.get_version()),
+            PhpMixed::string(package.get_version()),
         );
 
         if let Some(target_dir) = package.get_target_dir() {
-            data.insert("target-dir".to_string(), PhpMixed::String(target_dir));
+            data.insert("target-dir".to_string(), PhpMixed::string(target_dir));
         }
 
         if let Some(source_type) = package.get_source_type() {
             let mut source = IndexMap::new();
-            source.insert("type".to_string(), PhpMixed::String(source_type));
+            source.insert("type".to_string(), PhpMixed::string(source_type));
             source.insert(
                 "url".to_string(),
-                PhpMixed::String(package.get_source_url().unwrap_or_default()),
+                PhpMixed::string(package.get_source_url().unwrap_or_default()),
             );
             if let Some(reference) = package.get_source_reference() {
-                source.insert("reference".to_string(), PhpMixed::String(reference));
+                source.insert("reference".to_string(), PhpMixed::string(reference));
             }
             if let Some(mirrors) = package.get_source_mirrors()
                 && !mirrors.is_empty()
@@ -70,16 +70,16 @@ impl ArrayDumper {
 
         if let Some(dist_type) = package.get_dist_type() {
             let mut dist: IndexMap<String, PhpMixed> = IndexMap::new();
-            dist.insert("type".to_string(), PhpMixed::String(dist_type));
+            dist.insert("type".to_string(), PhpMixed::string(dist_type));
             dist.insert(
                 "url".to_string(),
-                PhpMixed::String(package.get_dist_url().unwrap_or_default()),
+                PhpMixed::string(package.get_dist_url().unwrap_or_default()),
             );
             if let Some(reference) = package.get_dist_reference() {
-                dist.insert("reference".to_string(), PhpMixed::String(reference));
+                dist.insert("reference".to_string(), PhpMixed::string(reference));
             }
             if let Some(shasum) = package.get_dist_sha1_checksum() {
-                dist.insert("shasum".to_string(), PhpMixed::String(shasum));
+                dist.insert("shasum".to_string(), PhpMixed::string(shasum));
             }
             if let Some(mirrors) = package.get_dist_mirrors()
                 && !mirrors.is_empty()
@@ -101,7 +101,7 @@ impl ArrayDumper {
             for link in links.values() {
                 link_map.insert(
                     link.get_target().to_string(),
-                    PhpMixed::String(link.get_pretty_constraint().to_string()),
+                    PhpMixed::string(link.get_pretty_constraint().to_string()),
                 );
             }
             link_map.sort_keys();
@@ -117,7 +117,7 @@ impl ArrayDumper {
                 PhpMixed::Array(
                     sorted_suggests
                         .into_iter()
-                        .map(|(k, v)| (k, PhpMixed::String(v)))
+                        .map(|(k, v)| (k, PhpMixed::string(v)))
                         .collect(),
                 ),
             );
@@ -126,7 +126,7 @@ impl ArrayDumper {
         if let Some(release_date) = package.get_release_date() {
             data.insert(
                 "time".to_string(),
-                PhpMixed::String(release_date.format(DATE_RFC3339).to_string()),
+                PhpMixed::string(release_date.format(DATE_RFC3339).to_string()),
             );
         }
 
@@ -139,12 +139,12 @@ impl ArrayDumper {
         if !binaries.is_empty() {
             data.insert(
                 "bin".to_string(),
-                PhpMixed::List(binaries.into_iter().map(PhpMixed::String).collect()),
+                PhpMixed::List(binaries.into_iter().map(PhpMixed::string).collect()),
             );
         }
         let pkg_type = package.get_type();
         if !pkg_type.is_empty() {
-            data.insert("type".to_string(), PhpMixed::String(pkg_type));
+            data.insert("type".to_string(), PhpMixed::string(pkg_type));
         }
         let extra = package.get_extra();
         if !extra.is_empty() {
@@ -156,7 +156,7 @@ impl ArrayDumper {
         if let Some(installation_source) = package.get_installation_source() {
             data.insert(
                 "installation-source".to_string(),
-                PhpMixed::String(installation_source),
+                PhpMixed::string(installation_source),
             );
         }
         let autoload = package.get_autoload();
@@ -176,14 +176,14 @@ impl ArrayDumper {
         if let Some(notification_url) = package.get_notification_url() {
             data.insert(
                 "notification-url".to_string(),
-                PhpMixed::String(notification_url),
+                PhpMixed::string(notification_url),
             );
         }
         let include_paths = package.get_include_paths();
         if !include_paths.is_empty() {
             data.insert(
                 "include-path".to_string(),
-                PhpMixed::List(include_paths.into_iter().map(PhpMixed::String).collect()),
+                PhpMixed::List(include_paths.into_iter().map(PhpMixed::string).collect()),
             );
         }
         let php_ext = package.get_php_ext();
@@ -205,7 +205,7 @@ impl ArrayDumper {
                     .entry("archive".to_string())
                     .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
                 if let PhpMixed::Array(archive) = entry {
-                    archive.insert("name".to_string(), PhpMixed::String(archive_name));
+                    archive.insert("name".to_string(), PhpMixed::string(archive_name));
                 }
             }
             let archive_excludes = complete_pkg.get_archive_excludes();
@@ -217,7 +217,7 @@ impl ArrayDumper {
                     archive.insert(
                         "exclude".to_string(),
                         PhpMixed::List(
-                            archive_excludes.into_iter().map(PhpMixed::String).collect(),
+                            archive_excludes.into_iter().map(PhpMixed::string).collect(),
                         ),
                     );
                 }
@@ -234,7 +234,7 @@ impl ArrayDumper {
                             .map(|(k, v)| {
                                 (
                                     k,
-                                    PhpMixed::List(v.into_iter().map(PhpMixed::String).collect()),
+                                    PhpMixed::List(v.into_iter().map(PhpMixed::string).collect()),
                                 )
                             })
                             .collect(),
@@ -245,7 +245,7 @@ impl ArrayDumper {
             if !license.is_empty() {
                 data.insert(
                     "license".to_string(),
-                    PhpMixed::List(license.into_iter().map(PhpMixed::String).collect()),
+                    PhpMixed::List(license.into_iter().map(PhpMixed::string).collect()),
                 );
             }
             let authors = complete_pkg.get_authors();
@@ -258,7 +258,7 @@ impl ArrayDumper {
                             .map(|a| {
                                 PhpMixed::Array(
                                     a.into_iter()
-                                        .map(|(k, v)| (k, PhpMixed::String(v)))
+                                        .map(|(k, v)| (k, PhpMixed::string(v)))
                                         .collect(),
                                 )
                             })
@@ -267,17 +267,17 @@ impl ArrayDumper {
                 );
             }
             if let Some(description) = complete_pkg.get_description() {
-                data.insert("description".to_string(), PhpMixed::String(description));
+                data.insert("description".to_string(), PhpMixed::string(description));
             }
             if let Some(homepage) = complete_pkg.get_homepage() {
-                data.insert("homepage".to_string(), PhpMixed::String(homepage));
+                data.insert("homepage".to_string(), PhpMixed::string(homepage));
             }
             let mut keywords = complete_pkg.get_keywords();
             if !keywords.is_empty() {
                 keywords.sort();
                 data.insert(
                     "keywords".to_string(),
-                    PhpMixed::List(keywords.into_iter().map(PhpMixed::String).collect()),
+                    PhpMixed::List(keywords.into_iter().map(PhpMixed::string).collect()),
                 );
             }
             let repositories = complete_pkg.get_repositories();
@@ -294,7 +294,7 @@ impl ArrayDumper {
                     PhpMixed::Array(
                         support
                             .into_iter()
-                            .map(|(k, v)| (k, PhpMixed::String(v)))
+                            .map(|(k, v)| (k, PhpMixed::string(v)))
                             .collect(),
                     ),
                 );
@@ -315,7 +315,7 @@ impl ArrayDumper {
             if complete_pkg.is_abandoned() {
                 let abandoned_value = complete_pkg
                     .get_replacement_package()
-                    .map(PhpMixed::String)
+                    .map(PhpMixed::string)
                     .unwrap_or(PhpMixed::Bool(true));
                 data.insert("abandoned".to_string(), abandoned_value);
             }
@@ -326,7 +326,7 @@ impl ArrayDumper {
             if !minimum_stability.is_empty() {
                 data.insert(
                     "minimum-stability".to_string(),
-                    PhpMixed::String(minimum_stability),
+                    PhpMixed::string(minimum_stability),
                 );
             }
         }

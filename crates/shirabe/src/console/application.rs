@@ -251,7 +251,7 @@ impl Application {
                     .borrow_mut()
                     .get("home")
                     .as_string()
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string();
                 let df = disk_free_space(&dir);
                 let mut hit = df.map(|d| d < min_space_free).unwrap_or(false);
@@ -260,7 +260,7 @@ impl Application {
                         .borrow_mut()
                         .get("vendor-dir")
                         .as_string()
-                        .unwrap_or("")
+                        .unwrap_or_default()
                         .to_string();
                     let df = disk_free_space(&dir);
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
@@ -309,7 +309,7 @@ impl Application {
             let avast_detect_pm = PhpMixed::List(
                 avast_detect
                     .iter()
-                    .map(|s| PhpMixed::String(s.clone()))
+                    .map(|s| PhpMixed::string(s.clone()))
                     .collect(),
             );
             if is_array(&avast_detect_pm) && !avast_detect.is_empty() {
@@ -2342,7 +2342,7 @@ impl ApplicationHandle {
                                 }
 
                                 // if the command is not an array of commands, and points to a valid SymfonyCommand subclass, import its details directly
-                                let dummy_str = dummy.as_string().unwrap_or("").to_string();
+                                let dummy_str = dummy.as_string().unwrap_or_default().to_string();
                                 // The class lives in the PHP worker, which cannot even declare
                                 // a subclass of Symfony's Command before the Composer PHP
                                 // runtime is loaded there. That load is skipped for a class the

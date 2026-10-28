@@ -98,7 +98,7 @@ impl LocalFilesystem {
                 "{}{}access_token={}",
                 file_url,
                 separator,
-                token.as_string().unwrap_or("")
+                token.as_string().unwrap_or_default()
             );
         }
 

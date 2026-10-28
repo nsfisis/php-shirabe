@@ -125,11 +125,11 @@ fn set_up() -> SetUp {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(vendor_dir.to_str().unwrap().to_string()),
+        PhpMixed::string(vendor_dir.to_str().unwrap().to_string()),
     );
     config_section.insert(
         "bin-dir".to_string(),
-        PhpMixed::String(bin_dir.to_str().unwrap().to_string()),
+        PhpMixed::string(bin_dir.to_str().unwrap().to_string()),
     );
     let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
     merged.insert("config".to_string(), PhpMixed::Array(config_section));

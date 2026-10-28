@@ -417,7 +417,7 @@ impl DownloadManager {
                 prev_source.clone().unwrap_or_default(),
                 &sources
                     .iter()
-                    .map(|s| PhpMixed::String(s.clone()))
+                    .map(|s| PhpMixed::string(s.clone()))
                     .collect::<Vec<_>>(),
             )
                 // unless the previous package was stable dist (by default) and the new package is dev, then we allow the new default to take over

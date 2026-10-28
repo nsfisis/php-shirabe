@@ -8,6 +8,7 @@ use crate::io::io_interface;
 use crate::util::Bitbucket;
 use crate::util::GitHub;
 use crate::util::GitLab;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, base64_encode, explode, in_array_loose, in_array_strict, is_array,
@@ -63,26 +64,26 @@ impl AuthHelper {
                 ),
                 Box::new(|value: PhpMixed| -> anyhow::Result<PhpMixed> {
                     let input = strtolower(&substr(
-                        &trim(value.as_string().unwrap_or(""), None),
+                        &trim(&value.as_string().unwrap_or_default().to_str_lossy(), None),
                         0,
                         Some(1),
                     ));
                     if in_array_loose(
                         input.clone(),
                         &[
-                            PhpMixed::String("y".to_string()),
-                            PhpMixed::String("n".to_string()),
+                            PhpMixed::string("y".to_string()),
+                            PhpMixed::string("n".to_string()),
                         ],
                     ) {
-                        return Ok(PhpMixed::String(input));
+                        return Ok(PhpMixed::string(input));
                     }
                     Err(RuntimeException::new("Please answer (y)es or (n)o".to_string()).into())
                 }),
                 None,
-                PhpMixed::String("y".to_string()),
+                PhpMixed::string("y".to_string()),
             )?;
 
-            if answer.as_string() == Some("y") {
+            if answer.as_string() == Some("y".into()) {
                 store = Some(());
             }
         }
@@ -94,7 +95,7 @@ impl AuthHelper {
                         .borrow()
                         .get_authentication(origin)
                         .into_iter()
-                        .map(|(k, v)| (k, v.map_or(PhpMixed::Null, PhpMixed::String)))
+                        .map(|(k, v)| (k, v.map_or(PhpMixed::Null, PhpMixed::string)))
                         .collect(),
                 ),
             )?;
@@ -122,7 +123,7 @@ impl AuthHelper {
         };
         let in_github_domains = github_domain_list
             .values()
-            .any(|v| v.as_string() == Some(origin));
+            .any(|v| v.as_string() == Some(origin.into()));
 
         let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
         let gitlab_domain_list = match gitlab_domains.as_array() {
@@ -131,7 +132,7 @@ impl AuthHelper {
         };
         let in_gitlab_domains = gitlab_domain_list
             .values()
-            .any(|v| v.as_string() == Some(origin));
+            .any(|v| v.as_string() == Some(origin.into()));
 
         if in_github_domains {
             let mut git_hub_util = GitHub::new(self.io.clone(), self.config.clone(), None, None)?;
@@ -413,7 +414,7 @@ impl AuthHelper {
                 .ask_and_hide_answer("      Password: ".to_string())?;
             self.io.borrow_mut().set_authentication(
                 origin.to_string(),
-                username.as_string().unwrap_or("").to_string(),
+                username.as_string().unwrap_or_default().to_string(),
                 password,
             );
             // PHP: $this->config->get('store-auths') returns 'prompt'|bool
@@ -444,7 +445,7 @@ impl AuthHelper {
         let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
         http.insert(
             "header".to_string(),
-            PhpMixed::List(headers.into_iter().map(PhpMixed::String).collect()),
+            PhpMixed::List(headers.into_iter().map(PhpMixed::string).collect()),
         );
         let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
         options.insert("http".to_string(), PhpMixed::Array(http));
@@ -456,7 +457,7 @@ impl AuthHelper {
             .and_then(|header| header.as_list())
             .expect("addAuthenticationOptions always leaves http.header a list")
             .iter()
-            .map(|v| v.as_string().unwrap_or("").to_string())
+            .map(|v| v.as_string().unwrap_or_default().to_string())
             .collect())
     }
 
@@ -505,7 +506,7 @@ impl AuthHelper {
                 .and_then(|v| v.clone())
                 .unwrap_or_default();
             if password == "bearer" {
-                headers.push(PhpMixed::String(format!(
+                headers.push(PhpMixed::string(format!(
                     "Authorization: Bearer {}",
                     username,
                 )));
@@ -532,7 +533,7 @@ impl AuthHelper {
             } else if origin == "github.com" && password == "x-oauth-basic" {
                 // only add the access_token if it is actually a github API URL
                 if preg_is_match(php_regex!(r"{^https?://api\.github\.com/}"), url) {
-                    headers.push(PhpMixed::String(format!(
+                    headers.push(PhpMixed::string(format!(
                         "Authorization: token {}",
                         username,
                     )));
@@ -551,14 +552,14 @@ impl AuthHelper {
                 }
             }) {
                 if password == "oauth2" {
-                    headers.push(PhpMixed::String(format!(
+                    headers.push(PhpMixed::string(format!(
                         "Authorization: Bearer {}",
                         username,
                     )));
                     authentication_display_message =
                         Some("Using GitLab OAuth token authentication".to_string());
                 } else {
-                    headers.push(PhpMixed::String(format!("PRIVATE-TOKEN: {}", username)));
+                    headers.push(PhpMixed::string(format!("PRIVATE-TOKEN: {}", username)));
                     authentication_display_message =
                         Some("Using GitLab private token authentication".to_string());
                 }
@@ -567,7 +568,7 @@ impl AuthHelper {
                 && username == "x-token-auth"
             {
                 if !self.is_public_bit_bucket_download(url) {
-                    headers.push(PhpMixed::String(format!(
+                    headers.push(PhpMixed::string(format!(
                         "Authorization: Bearer {}",
                         password,
                     )));
@@ -588,7 +589,7 @@ impl AuthHelper {
                 authentication_display_message = Some("Using SSL client certificate".to_string());
             } else {
                 let auth_str = base64_encode(format!("{}:{}", username, password));
-                headers.push(PhpMixed::String(format!(
+                headers.push(PhpMixed::string(format!(
                     "Authorization: Basic {}",
                     auth_str,
                 )));

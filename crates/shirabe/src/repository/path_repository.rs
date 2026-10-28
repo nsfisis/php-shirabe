@@ -64,7 +64,7 @@ impl PathRepository {
         let url_str = repo_config
             .get("url")
             .and_then(|v| v.as_string())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         let url = Platform::expand_path(&url_str);
         let process = process.unwrap_or_else(|| {
@@ -109,7 +109,7 @@ impl PathRepository {
                 self.repo_config
                     .get("url")
                     .and_then(|v| v.as_string())
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string()
             )
         )
@@ -192,8 +192,8 @@ impl PathRepository {
             };
             let dist = {
                 let mut dist: IndexMap<String, PhpMixed> = IndexMap::new();
-                dist.insert("type".to_string(), PhpMixed::String("path".to_string()));
-                dist.insert("url".to_string(), PhpMixed::String(url.clone()));
+                dist.insert("type".to_string(), PhpMixed::string("path".to_string()));
+                dist.insert("url".to_string(), PhpMixed::string(url.clone()));
                 dist
             };
             package.insert("dist".to_string(), PhpMixed::Array(dist));
@@ -202,7 +202,7 @@ impl PathRepository {
                 .options
                 .get("reference")
                 .and_then(|v| v.as_string())
-                .unwrap_or("auto")
+                .unwrap_or("auto".into())
                 .to_string();
             if reference == "none" {
                 if let Some(PhpMixed::Array(dist)) = package.get_mut("dist") {
@@ -220,7 +220,7 @@ impl PathRepository {
                     [json.as_slice(), serialize(&options_mixed).as_bytes()].concat(),
                 );
                 if let Some(PhpMixed::Array(dist)) = package.get_mut("dist") {
-                    dist.insert("reference".to_string(), PhpMixed::String(ref_hash));
+                    dist.insert("reference".to_string(), PhpMixed::string(ref_hash));
                 }
             }
 
@@ -249,7 +249,7 @@ impl PathRepository {
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string())
             {
-                package.insert("version".to_string(), PhpMixed::String(version));
+                package.insert("version".to_string(), PhpMixed::string(version));
             }
 
             // carry over the root package version if this path repo is in the same git repository as root package
@@ -273,7 +273,7 @@ impl PathRepository {
                 if code1 == 0 && code2 == 0 && ref1.as_string() == ref2.as_string() {
                     package.insert(
                         "version".to_string(),
-                        PhpMixed::String(
+                        PhpMixed::string(
                             self.version_guesser.borrow().get_root_version_from_env()?,
                         ),
                     );
@@ -299,12 +299,12 @@ impl PathRepository {
                     .unwrap_or(1)
                     == 0
             {
-                let output_str = output.as_string().unwrap_or("").to_string();
+                let output_str = output.as_string().unwrap_or_default().to_string();
                 let ref_val = GitUtil::parse_rev_list_output(&output_str, &self.process)?
                     .trim()
                     .to_string();
                 if let Some(PhpMixed::Array(dist)) = package.get_mut("dist") {
-                    dist.insert("reference".to_string(), PhpMixed::String(ref_val));
+                    dist.insert("reference".to_string(), PhpMixed::string(ref_val));
                 }
             }
 
@@ -329,23 +329,23 @@ impl PathRepository {
                         {
                             package.insert(
                                 "version".to_string(),
-                                PhpMixed::String(feature_pretty_version),
+                                PhpMixed::string(feature_pretty_version),
                             );
                             self.inner
                                 .add_package(self.loader.load(package.clone(), None)?);
                         }
 
-                        package.insert("version".to_string(), PhpMixed::String(pretty_version));
+                        package.insert("version".to_string(), PhpMixed::string(pretty_version));
                     } else {
                         package.insert(
                             "version".to_string(),
-                            PhpMixed::String("dev-main".to_string()),
+                            PhpMixed::string("dev-main".to_string()),
                         );
                     }
                 } else {
                     package.insert(
                         "version".to_string(),
-                        PhpMixed::String("dev-main".to_string()),
+                        PhpMixed::string("dev-main".to_string()),
                     );
                 }
             }

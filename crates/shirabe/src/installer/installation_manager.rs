@@ -842,10 +842,10 @@ impl InstallationManager {
                         let mut opts: IndexMap<String, PhpMixed> = IndexMap::new();
                         opts.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
                         let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
-                        http.insert("method".to_string(), PhpMixed::String("POST".to_string()));
+                        http.insert("method".to_string(), PhpMixed::string("POST".to_string()));
                         http.insert(
                             "header".to_string(),
-                            PhpMixed::List(vec![PhpMixed::String(
+                            PhpMixed::List(vec![PhpMixed::string(
                                 "Content-type: application/x-www-form-urlencoded".to_string(),
                             )]),
                         );
@@ -855,7 +855,7 @@ impl InstallationManager {
                             .collect();
                         http.insert(
                             "content".to_string(),
-                            PhpMixed::String(http_build_query(&params_vec)),
+                            PhpMixed::string(http_build_query(&params_vec)),
                         );
                         http.insert("timeout".to_string(), PhpMixed::Int(3));
                         opts.insert(
@@ -878,11 +878,11 @@ impl InstallationManager {
                     let mut package_notification: IndexMap<String, PhpMixed> = IndexMap::new();
                     package_notification.insert(
                         "name".to_string(),
-                        PhpMixed::String(package.get_pretty_name()),
+                        PhpMixed::string(package.get_pretty_name()),
                     );
                     package_notification.insert(
                         "version".to_string(),
-                        PhpMixed::String(package.get_version()),
+                        PhpMixed::string(package.get_version()),
                     );
                     if strpos(repo_url, "packagist.org/").is_some() {
                         if let Some(metadata) =
@@ -902,16 +902,16 @@ impl InstallationManager {
                 let mut opts: IndexMap<String, PhpMixed> = IndexMap::new();
                 opts.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
                 let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
-                http.insert("method".to_string(), PhpMixed::String("POST".to_string()));
+                http.insert("method".to_string(), PhpMixed::string("POST".to_string()));
                 http.insert(
                     "header".to_string(),
-                    PhpMixed::List(vec![PhpMixed::String(
+                    PhpMixed::List(vec![PhpMixed::string(
                         "Content-Type: application/json".to_string(),
                     )]),
                 );
                 http.insert(
                     "content".to_string(),
-                    PhpMixed::String(
+                    PhpMixed::string(
                         json_encode(&PhpMixed::Array(post_data.into_iter().collect()))
                             .unwrap_or_default(),
                     ),

@@ -9,6 +9,7 @@ use crate::input::InputArgument;
 use crate::input::InputDefinition;
 use crate::input::InputOption;
 use crate::output::OutputInterface;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, php_regex, preg_replace};
 
@@ -65,7 +66,7 @@ impl JsonDescriptor {
         options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
         let described_namespace = match options.get("namespace") {
-            Some(PhpMixed::String(s)) => Some(s.clone()),
+            Some(PhpMixed::String(s)) => Some(s.to_str_lossy().into_owned()),
             _ => None,
         };
         let mut description =
@@ -87,12 +88,12 @@ impl JsonDescriptor {
             let mut application_data: IndexMap<String, PhpMixed> = IndexMap::new();
             application_data.insert(
                 "name".to_string(),
-                PhpMixed::String(application.borrow().get_name()),
+                PhpMixed::string(application.borrow().get_name()),
             );
             if "UNKNOWN" != application.borrow().get_version() {
                 application_data.insert(
                     "version".to_string(),
-                    PhpMixed::String(application.borrow().get_version()),
+                    PhpMixed::string(application.borrow().get_version()),
                 );
             }
             data.insert("application".to_string(), PhpMixed::Array(application_data));
@@ -103,7 +104,7 @@ impl JsonDescriptor {
         if let Some(described_namespace) = described_namespace {
             data.insert(
                 "namespace".to_string(),
-                PhpMixed::String(described_namespace),
+                PhpMixed::string(described_namespace),
             );
         } else {
             data.insert(
@@ -148,7 +149,7 @@ impl JsonDescriptor {
         let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
         data.insert(
             "name".to_string(),
-            PhpMixed::String(argument.get_name().to_string()),
+            PhpMixed::string(argument.get_name().to_string()),
         );
         data.insert(
             "is_required".to_string(),
@@ -157,7 +158,7 @@ impl JsonDescriptor {
         data.insert("is_array".to_string(), PhpMixed::Bool(argument.is_array()));
         data.insert(
             "description".to_string(),
-            PhpMixed::String(preg_replace(
+            PhpMixed::string(preg_replace(
                 php_regex!("/\\s*[\\r\\n]\\s*/"),
                 " ",
                 argument.get_description(),
@@ -178,25 +179,25 @@ impl JsonDescriptor {
         if negated {
             data.insert(
                 "name".to_string(),
-                PhpMixed::String(format!("--no-{}", option.get_name())),
+                PhpMixed::string(format!("--no-{}", option.get_name())),
             );
-            data.insert("shortcut".to_string(), PhpMixed::String(String::new()));
+            data.insert("shortcut".to_string(), PhpMixed::string(String::new()));
             data.insert("accept_value".to_string(), PhpMixed::Bool(false));
             data.insert("is_value_required".to_string(), PhpMixed::Bool(false));
             data.insert("is_multiple".to_string(), PhpMixed::Bool(false));
             data.insert(
                 "description".to_string(),
-                PhpMixed::String(format!("Negate the \"--{}\" option", option.get_name())),
+                PhpMixed::string(format!("Negate the \"--{}\" option", option.get_name())),
             );
             data.insert("default".to_string(), PhpMixed::Bool(false));
         } else {
             data.insert(
                 "name".to_string(),
-                PhpMixed::String(format!("--{}", option.get_name())),
+                PhpMixed::string(format!("--{}", option.get_name())),
             );
             data.insert(
                 "shortcut".to_string(),
-                PhpMixed::String(if let Some(shortcut) = option.get_shortcut() {
+                PhpMixed::string(if let Some(shortcut) = option.get_shortcut() {
                     format!("-{}", shirabe_php_shim::str_replace("|", "|-", shortcut))
                 } else {
                     String::new()
@@ -213,7 +214,7 @@ impl JsonDescriptor {
             data.insert("is_multiple".to_string(), PhpMixed::Bool(option.is_array()));
             data.insert(
                 "description".to_string(),
-                PhpMixed::String(preg_replace(
+                PhpMixed::string(preg_replace(
                     php_regex!("/\\s*[\\r\\n]\\s*/"),
                     " ",
                     option.get_description(),
@@ -279,13 +280,13 @@ impl JsonDescriptor {
         data.insert(
             "name".to_string(),
             match command.get_name() {
-                Some(name) => PhpMixed::String(name),
+                Some(name) => PhpMixed::string(name),
                 None => PhpMixed::Null,
             },
         );
         data.insert(
             "description".to_string(),
-            PhpMixed::String(command.get_description()),
+            PhpMixed::string(command.get_description()),
         );
 
         if short {
@@ -295,20 +296,20 @@ impl JsonDescriptor {
                     command
                         .get_aliases()
                         .into_iter()
-                        .map(PhpMixed::String)
+                        .map(PhpMixed::string)
                         .collect(),
                 ),
             );
         } else {
             command.merge_application_definition(false);
 
-            let mut usage = vec![PhpMixed::String(command.get_synopsis(false))];
-            usage.extend(command.get_usages().into_iter().map(PhpMixed::String));
-            usage.extend(command.get_aliases().into_iter().map(PhpMixed::String));
+            let mut usage = vec![PhpMixed::string(command.get_synopsis(false))];
+            usage.extend(command.get_usages().into_iter().map(PhpMixed::string));
+            usage.extend(command.get_aliases().into_iter().map(PhpMixed::string));
             data.insert("usage".to_string(), PhpMixed::List(usage));
             data.insert(
                 "help".to_string(),
-                PhpMixed::String(command.get_processed_help()),
+                PhpMixed::string(command.get_processed_help()),
             );
             data.insert(
                 "definition".to_string(),

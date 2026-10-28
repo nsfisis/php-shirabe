@@ -53,7 +53,10 @@ impl ArtifactRepository {
             .into());
         }
 
-        let url = repo_config["url"].as_string().unwrap_or("").to_string();
+        let url = repo_config["url"]
+            .as_string()
+            .unwrap_or_default()
+            .to_string();
         let lookup = Platform::expand_path(&url);
         Ok(Self {
             inner: ArrayRepository::new(Vec::new())?,
@@ -210,9 +213,9 @@ impl ArtifactRepository {
         let shasum = hash_file("sha1", &real_path).unwrap_or_default();
 
         let mut dist = IndexMap::new();
-        dist.insert("type".to_string(), PhpMixed::String(file_type.to_string()));
-        dist.insert("url".to_string(), PhpMixed::String(url_normalized));
-        dist.insert("shasum".to_string(), PhpMixed::String(shasum));
+        dist.insert("type".to_string(), PhpMixed::string(file_type.to_string()));
+        dist.insert("url".to_string(), PhpMixed::string(url_normalized));
+        dist.insert("shasum".to_string(), PhpMixed::string(shasum));
         if let Some(arr) = package.as_array_mut() {
             arr.insert("dist".to_string(), PhpMixed::Array(dist));
         }

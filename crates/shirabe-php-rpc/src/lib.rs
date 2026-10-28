@@ -9,6 +9,7 @@ pub mod xdebug;
 
 pub use value::{PhpClassHandle, PhpObjHandle, PhpObject, PluginValue, RustObjHandle};
 
+use bstr::ByteSlice;
 use frame::Frame;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
@@ -58,7 +59,8 @@ fn get_constant(name: &str) -> PhpMixed {
 
 fn string_constant(name: &str) -> String {
     match get_constant(name) {
-        PhpMixed::String(s) => s,
+        // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
+        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
         other => panic!("PHP RPC: {name} constant did not resolve to a string: {other:?}"),
     }
 }
@@ -430,7 +432,8 @@ impl Payload<'_> {
 
     fn string(&self, key: &str) -> String {
         match self.field(key) {
-            PhpMixed::String(s) => s.clone(),
+            // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
+            PhpMixed::String(s) => s.to_str_lossy().into_owned(),
             other => panic!(
                 "PHP RPC: `{}` payload entry `{key}` is not a string: {other:?}",
                 self.what
@@ -481,7 +484,8 @@ impl Payload<'_> {
     fn string_map(&self, key: &str) -> IndexMap<String, String> {
         self.entries(key)
             .map(|(name, value)| match value {
-                PhpMixed::String(s) => (name.clone(), s.clone()),
+                // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
+                PhpMixed::String(s) => (name.clone(), s.to_str_lossy().into_owned()),
                 other => panic!(
                     "PHP RPC: `{}` payload entry `{key}[{name}]` is not a string: {other:?}",
                     self.what
@@ -495,7 +499,8 @@ impl Payload<'_> {
             PhpMixed::List(items) => items
                 .iter()
                 .map(|item| match item {
-                    PhpMixed::String(s) => s.clone(),
+                    // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
+                    PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                     other => panic!(
                         "PHP RPC: `{}` payload entry `{key}` has a non-string element: {other:?}",
                         self.what
@@ -519,7 +524,8 @@ fn as_bool(value: &PhpMixed, what: &str, key: &str) -> bool {
 
 fn as_nullable_string(value: &PhpMixed, what: &str, key: &str) -> Option<String> {
     match value {
-        PhpMixed::String(s) => Some(s.clone()),
+        // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
+        PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
         PhpMixed::Null => None,
         other => {
             panic!("PHP RPC: `{what}` payload entry `{key}` is not a string or null: {other:?}")
@@ -565,7 +571,8 @@ fn curl_field(payload: &Payload, key: &str) -> Option<Curl> {
 /// PHP `phpversion($extension)`.
 pub fn phpversion(extension: &str) -> Option<String> {
     match call("phpversion", extension) {
-        PhpMixed::String(s) => Some(s),
+        // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
+        PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
         PhpMixed::Bool(false) => None,
         other => panic!("PHP RPC: `phpversion` returned an unexpected value: {other:?}"),
     }
@@ -576,7 +583,8 @@ pub fn phpversion(extension: &str) -> Option<String> {
 /// put there with `set_include_path()`.
 pub fn stream_resolve_include_path(filename: &str) -> Option<String> {
     match call("stream_resolve_include_path", filename) {
-        PhpMixed::String(s) => Some(s),
+        // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
+        PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
         PhpMixed::Bool(false) => None,
         other => {
             panic!("PHP RPC: `stream_resolve_include_path` returned an unexpected value: {other:?}")
@@ -606,7 +614,8 @@ fn string_list(value: PhpMixed, name: &str) -> Vec<String> {
         PhpMixed::List(items) => items
             .into_iter()
             .map(|item| match item {
-                PhpMixed::String(s) => s,
+                // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
+                PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                 other => panic!("PHP RPC: `{name}` returned a non-string element: {other:?}"),
             })
             .collect(),
@@ -1430,7 +1439,7 @@ mod tests {
         match reply {
             Frame::Return { value, .. } => assert_eq!(
                 value.to_php_mixed().expect("unusable reply"),
-                PhpMixed::String("off".to_string())
+                PhpMixed::string("off".to_string())
             ),
             other => panic!("unexpected reply: {other:?}"),
         }

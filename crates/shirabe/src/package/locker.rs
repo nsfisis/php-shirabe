@@ -23,6 +23,7 @@ use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use crate::util::Git as GitUtil;
 use crate::util::ProcessExecutor;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
@@ -153,7 +154,7 @@ impl Locker {
             && !shirabe_php_shim::empty(content_hash)
         {
             // There is a content hash key, use that instead of the file hash
-            return Ok(self.content_hash == content_hash.as_string().unwrap_or(""));
+            return Ok(self.content_hash == content_hash.as_string().unwrap_or_default());
         }
 
         // BC support for old lock files without content-hash
@@ -161,7 +162,7 @@ impl Locker {
         if let Some(lock_hash) = lock_hash
             && !shirabe_php_shim::empty(lock_hash)
         {
-            return Ok(self.hash == lock_hash.as_string().unwrap_or(""));
+            return Ok(self.hash == lock_hash.as_string().unwrap_or_default());
         }
 
         // should not be reached unless the lock file is corrupted, so assume it's out of date
@@ -231,7 +232,7 @@ impl Locker {
                         let alias_pkg_name = m
                             .get("package")
                             .and_then(|v| v.as_string())
-                            .unwrap_or("")
+                            .unwrap_or_default()
                             .to_string();
                         if let Some(base_pkg) = package_by_name.get(&alias_pkg_name) {
                             let alias_of = base_pkg.as_complete_package().expect(
@@ -241,11 +242,11 @@ impl Locker {
                                 alias_of,
                                 m.get("alias_normalized")
                                     .and_then(|v| v.as_string())
-                                    .unwrap_or("")
+                                    .unwrap_or_default()
                                     .to_string(),
                                 m.get("alias")
                                     .and_then(|v| v.as_string())
-                                    .unwrap_or("")
+                                    .unwrap_or_default()
                                     .to_string(),
                             );
                             alias_pkg.set_root_package_alias(true);
@@ -272,7 +273,10 @@ impl Locker {
             for package in list {
                 if let PhpMixed::Array(m) = package {
                     names.push(strtolower(
-                        m.get("name").and_then(|v| v.as_string()).unwrap_or(""),
+                        &m.get("name")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default()
+                            .to_str_lossy(),
                     ));
                 }
             }
@@ -333,7 +337,7 @@ impl Locker {
         Ok(lock_data
             .get("minimum-stability")
             .and_then(|v| v.as_string())
-            .unwrap_or("stable")
+            .unwrap_or("stable".into())
             .to_string())
     }
 
@@ -377,7 +381,7 @@ impl Locker {
             .and_then(|v| match v {
                 PhpMixed::Array(m) => Some(
                     m.iter()
-                        .map(|(k, v)| (k.clone(), v.as_string().unwrap_or("").to_string()))
+                        .map(|(k, v)| (k.clone(), v.as_string().unwrap_or_default().to_string()))
                         .collect(),
                 ),
                 _ => None,
@@ -397,7 +401,7 @@ impl Locker {
                             PhpMixed::Array(m) => Some(
                                 m.iter()
                                     .map(|(k, v)| {
-                                        (k.clone(), v.as_string().unwrap_or("").to_string())
+                                        (k.clone(), v.as_string().unwrap_or_default().to_string())
                                     })
                                     .collect(),
                             ),
@@ -416,7 +420,7 @@ impl Locker {
         Ok(lock_data
             .get("plugin-api-version")
             .and_then(|v| v.as_string())
-            .unwrap_or("1.1.0")
+            .unwrap_or("1.1.0".into())
             .to_string())
     }
 
@@ -464,15 +468,16 @@ impl Locker {
             |alias: &IndexMap<String, PhpMixed>| {
                 let mut alias = alias.clone();
                 if matches!(
-                    alias
+                    &*alias
                         .get("version")
                         .and_then(|v| v.as_string())
-                        .unwrap_or(""),
+                        .unwrap_or_default()
+                        .to_str_lossy(),
                     "dev-master" | "dev-trunk" | "dev-default"
                 ) {
                     alias.insert(
                         "version".to_string(),
-                        PhpMixed::String(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()),
+                        PhpMixed::string(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()),
                     );
                 }
                 alias
@@ -484,20 +489,20 @@ impl Locker {
         lock.insert(
             "_readme".to_string(),
             PhpMixed::List(vec![
-                PhpMixed::String(
+                PhpMixed::string(
                     "This file locks the dependencies of your project to a known state".to_string(),
                 ),
-                PhpMixed::String(
+                PhpMixed::string(
                     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies".to_string(),
                 ),
-                PhpMixed::String(
+                PhpMixed::string(
                     format!("This file is @{}ated automatically", "gener"),
                 ),
             ]),
         );
         lock.insert(
             "content-hash".to_string(),
-            PhpMixed::String(self.content_hash.clone()),
+            PhpMixed::string(self.content_hash.clone()),
         );
         lock.insert("packages".to_string(), self.lock_packages(&packages)?);
         lock.insert("packages-dev".to_string(), PhpMixed::Null);
@@ -514,7 +519,7 @@ impl Locker {
         );
         lock.insert(
             "minimum-stability".to_string(),
-            PhpMixed::String(minimum_stability.to_string()),
+            PhpMixed::string(minimum_stability.to_string()),
         );
         lock.insert(
             "stability-flags".to_string(),
@@ -540,7 +545,7 @@ impl Locker {
             PhpMixed::Array(
                 platform_reqs
                     .iter()
-                    .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
+                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                     .collect(),
             ),
         );
@@ -549,7 +554,7 @@ impl Locker {
             PhpMixed::Array(
                 platform_dev_reqs
                     .iter()
-                    .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
+                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                     .collect(),
             ),
         );
@@ -561,7 +566,7 @@ impl Locker {
         }
         lock.insert(
             "plugin-api-version".to_string(),
-            PhpMixed::String(plugin_interface::PLUGIN_API_VERSION.to_string()),
+            PhpMixed::string(plugin_interface::PLUGIN_API_VERSION.to_string()),
         );
 
         let lock = self.fixup_json_data_type(lock);
@@ -643,7 +648,7 @@ impl Locker {
         };
         lock_data.insert(
             "content-hash".to_string(),
-            PhpMixed::String(Self::get_content_hash(&contents)?),
+            PhpMixed::string(Self::get_content_hash(&contents)?),
         );
         if let Some(processor) = data_processor {
             lock_data = processor(lock_data);
@@ -721,7 +726,7 @@ impl Locker {
             {
                 // use the exact commit time of the current reference if it's a dev package
                 let pkg_time = self.get_package_time(package.clone())?;
-                pkg_time.map(PhpMixed::String).or(time)
+                pkg_time.map(PhpMixed::string).or(time)
             } else {
                 time
             };
@@ -736,8 +741,14 @@ impl Locker {
 
         usort(&mut locked, |a, b| {
             let comparison = strcmp(
-                a.get("name").and_then(|v| v.as_string()).unwrap_or(""),
-                b.get("name").and_then(|v| v.as_string()).unwrap_or(""),
+                &a.get("name")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default()
+                    .to_str_lossy(),
+                &b.get("name")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default()
+                    .to_str_lossy(),
             );
 
             if 0 != comparison {
@@ -746,8 +757,14 @@ impl Locker {
 
             // If it is the same package, compare the versions to make the order deterministic
             strcmp(
-                a.get("version").and_then(|v| v.as_string()).unwrap_or(""),
-                b.get("version").and_then(|v| v.as_string()).unwrap_or(""),
+                &a.get("version")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default()
+                    .to_str_lossy(),
+                &b.get("version")
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default()
+                    .to_str_lossy(),
             )
         });
 
@@ -779,8 +796,8 @@ impl Locker {
             && in_array_loose(
                 source_type.clone().unwrap_or_default(),
                 &[
-                    PhpMixed::String("git".to_string()),
-                    PhpMixed::String("hg".to_string()),
+                    PhpMixed::string("git".to_string()),
+                    PhpMixed::string("hg".to_string()),
                 ],
             )
         {
@@ -806,7 +823,7 @@ impl Locker {
                     )? {
                         let output_str = trim(
                             &GitUtil::parse_rev_list_output(
-                                output.as_string().unwrap_or(""),
+                                &output.as_string().unwrap_or_default().to_str_lossy(),
                                 &self.process,
                             )?,
                             None,
@@ -832,7 +849,7 @@ impl Locker {
                         path.as_deref(),
                     )? && let Some(m) = preg_match(
                         php_regex!(r"{^\s*(\d+)\s*}"),
-                        output.as_string().unwrap_or(""),
+                        &output.as_string().unwrap_or_default().to_str_lossy(),
                     ) {
                         let ts = m
                             .get(1)

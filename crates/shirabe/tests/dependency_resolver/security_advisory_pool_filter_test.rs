@@ -360,46 +360,46 @@ fn generate_security_advisory(
     let mut source: IndexMap<String, PhpMixed> = IndexMap::new();
     source.insert(
         "name".to_string(),
-        PhpMixed::String("Security Advisory".to_string()),
+        PhpMixed::string("Security Advisory".to_string()),
     );
-    source.insert("remoteId".to_string(), PhpMixed::String("test".to_string()));
+    source.insert("remoteId".to_string(), PhpMixed::string("test".to_string()));
 
     let mut advisory: IndexMap<String, PhpMixed> = IndexMap::new();
     advisory.insert(
         "advisoryId".to_string(),
-        PhpMixed::String(uniqid("PKSA-", false)),
+        PhpMixed::string(uniqid("PKSA-", false)),
     );
     advisory.insert(
         "packageName".to_string(),
-        PhpMixed::String(package_name.to_string()),
+        PhpMixed::string(package_name.to_string()),
     );
-    advisory.insert("remoteId".to_string(), PhpMixed::String("test".to_string()));
+    advisory.insert("remoteId".to_string(), PhpMixed::string("test".to_string()));
     advisory.insert(
         "title".to_string(),
-        PhpMixed::String("Security Advisory".to_string()),
+        PhpMixed::string("Security Advisory".to_string()),
     );
     advisory.insert("link".to_string(), PhpMixed::Null);
     advisory.insert(
         "cve".to_string(),
         match cve {
-            Some(cve) => PhpMixed::String(cve.to_string()),
+            Some(cve) => PhpMixed::string(cve.to_string()),
             None => PhpMixed::Null,
         },
     );
     advisory.insert(
         "affectedVersions".to_string(),
-        PhpMixed::String(affected_versions.to_string()),
+        PhpMixed::string(affected_versions.to_string()),
     );
-    advisory.insert("source".to_string(), PhpMixed::String("Tests".to_string()));
+    advisory.insert("source".to_string(), PhpMixed::string("Tests".to_string()));
     advisory.insert(
         "reportedAt".to_string(),
-        PhpMixed::String("2024-04-31 12:37:47".to_string()),
+        PhpMixed::string("2024-04-31 12:37:47".to_string()),
     );
     advisory.insert(
         "composerRepository".to_string(),
-        PhpMixed::String("Package Repository".to_string()),
+        PhpMixed::string("Package Repository".to_string()),
     );
-    advisory.insert("severity".to_string(), PhpMixed::String("high".to_string()));
+    advisory.insert("severity".to_string(), PhpMixed::string("high".to_string()));
     advisory.insert(
         "sources".to_string(),
         PhpMixed::List(vec![PhpMixed::Array(source)]),

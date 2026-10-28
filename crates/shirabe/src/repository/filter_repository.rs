@@ -8,6 +8,7 @@ use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
     RepositoryInterfaceHandle, SearchResult,
 };
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, preg_is_match};
 use shirabe_semver::constraint::AnyConstraint;
@@ -36,7 +37,7 @@ impl FilterRepository {
                         .iter()
                         .filter_map(|v| {
                             if let PhpMixed::String(s) = v {
-                                Some(s.clone())
+                                Some(s.to_str_lossy().into_owned())
                             } else {
                                 None
                             }
@@ -63,7 +64,7 @@ impl FilterRepository {
                         .iter()
                         .filter_map(|v| {
                             if let PhpMixed::String(s) = v {
-                                Some(s.clone())
+                                Some(s.to_str_lossy().into_owned())
                             } else {
                                 None
                             }

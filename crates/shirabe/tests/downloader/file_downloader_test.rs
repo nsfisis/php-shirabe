@@ -126,7 +126,7 @@ fn test_get_file_name() {
     let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String("/vendor".to_string()),
+        PhpMixed::string("/vendor".to_string()),
     );
     let config = get_config(config_options);
 
@@ -151,7 +151,7 @@ fn test_download_but_file_is_unsaved() {
     let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(tmp_dir.path().join("vendor").to_str().unwrap().to_string()),
+        PhpMixed::string(tmp_dir.path().join("vendor").to_str().unwrap().to_string()),
     );
     let config = get_config(config_options);
 
@@ -207,11 +207,11 @@ fn test_cache_garbage_collection_is_called() {
     let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
     config_options.insert(
         "cache-files-ttl".to_string(),
-        PhpMixed::String("99999999".to_string()),
+        PhpMixed::string("99999999".to_string()),
     );
     config_options.insert(
         "cache-files-maxsize".to_string(),
-        PhpMixed::String("500M".to_string()),
+        PhpMixed::string("500M".to_string()),
     );
     let config = get_config(config_options);
 
@@ -270,7 +270,7 @@ fn test_download_file_with_invalid_checksum() {
     let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(tmp_dir.path().join("vendor").to_str().unwrap().to_string()),
+        PhpMixed::string(tmp_dir.path().join("vendor").to_str().unwrap().to_string()),
     );
     let config = get_config(config_options);
 
@@ -328,7 +328,7 @@ fn test_downgrade_shows_appropriate_message() {
     let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(tmp_dir.path().join("vendor").to_str().unwrap().to_string()),
+        PhpMixed::string(tmp_dir.path().join("vendor").to_str().unwrap().to_string()),
     );
     let config = get_config(config_options);
 

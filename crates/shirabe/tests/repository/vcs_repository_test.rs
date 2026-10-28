@@ -118,9 +118,9 @@ fn set_up() -> Option<SetUp> {
 
 fn composer(version: Option<&str>) -> PhpMixed {
     let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-    m.insert("name".to_string(), PhpMixed::String("a/b".to_string()));
+    m.insert("name".to_string(), PhpMixed::string("a/b".to_string()));
     if let Some(version) = version {
-        m.insert("version".to_string(), PhpMixed::String(version.to_string()));
+        m.insert("version".to_string(), PhpMixed::string(version.to_string()));
     }
     PhpMixed::Array(m)
 }
@@ -190,7 +190,7 @@ fn test_load_versions() {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(composer_home.to_str().unwrap().to_string()),
+        PhpMixed::string(composer_home.to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
@@ -214,9 +214,9 @@ fn test_load_versions() {
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".to_string(),
-        PhpMixed::String(git_repo.to_str().unwrap().to_string()),
+        PhpMixed::string(git_repo.to_str().unwrap().to_string()),
     );
-    repo_config.insert("type".to_string(), PhpMixed::String("vcs".to_string()));
+    repo_config.insert("type".to_string(), PhpMixed::string("vcs".to_string()));
 
     let mut repo = VcsRepository::new(
         repo_config,

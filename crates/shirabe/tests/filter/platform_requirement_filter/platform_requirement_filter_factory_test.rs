@@ -29,8 +29,8 @@ fn test_from_bool_or_list() {
 
     // 'list creates IgnoreListFilter'
     let filter = PlatformRequirementFilterFactory::from_bool_or_list(PhpMixed::List(vec![
-        PhpMixed::String("php".to_string()),
-        PhpMixed::String("ext-json".to_string()),
+        PhpMixed::string("php".to_string()),
+        PhpMixed::string("ext-json".to_string()),
     ]))
     .unwrap();
     assert!(

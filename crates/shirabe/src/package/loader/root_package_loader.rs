@@ -14,6 +14,7 @@ use crate::repository::RepositoryFactory;
 use crate::repository::RepositoryManager;
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, UnexpectedValueException, php_regex, preg_is_match, preg_match,
@@ -73,9 +74,12 @@ impl RootPackageLoader {
         let mut config = config;
 
         if !config.contains_key("name") {
-            config.insert("name".to_string(), PhpMixed::String("__root__".to_string()));
+            config.insert("name".to_string(), PhpMixed::string("__root__".to_string()));
         } else if let Some(err) = ValidatingArrayLoader::has_package_naming_error(
-            config["name"].as_string().unwrap_or(""),
+            &config["name"]
+                .as_string()
+                .unwrap_or_default()
+                .to_str_lossy(),
             false,
         ) {
             return Err(RuntimeException::new(format!("Your package name {}", err)).into());
@@ -87,7 +91,7 @@ impl RootPackageLoader {
 
             if Platform::get_env("COMPOSER_ROOT_VERSION").is_some() {
                 let version = self.version_guesser.get_root_version_from_env()?;
-                config.insert("version".to_string(), PhpMixed::String(version));
+                config.insert("version".to_string(), PhpMixed::string(version));
             } else {
                 let cwd_str = cwd
                     .map(|s| s.to_string())
@@ -96,11 +100,11 @@ impl RootPackageLoader {
                 if let Some(data) = version_data {
                     config.insert(
                         "version".to_string(),
-                        PhpMixed::String(data.pretty_version.clone().unwrap_or_default()),
+                        PhpMixed::string(data.pretty_version.clone().unwrap_or_default()),
                     );
                     config.insert(
                         "version_normalized".to_string(),
-                        PhpMixed::String(data.version.clone().unwrap_or_default()),
+                        PhpMixed::string(data.version.clone().unwrap_or_default()),
                     );
                     commit = data.commit;
                 }
@@ -108,8 +112,11 @@ impl RootPackageLoader {
 
             if !config.contains_key("version") {
                 if let Some(ref io) = self.io {
-                    let name = config["name"].as_string().unwrap_or("");
-                    let package_type = config.get("type").and_then(|v| v.as_string()).unwrap_or("");
+                    let name = config["name"].as_string().unwrap_or_default();
+                    let package_type = config
+                        .get("type")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default();
                     if name != "__root__" && package_type != "project" {
                         io.warning(&format!(
                             "Shirabe could not detect the root package ({}) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version",
@@ -117,24 +124,24 @@ impl RootPackageLoader {
                         ), &[]);
                     }
                 }
-                config.insert("version".to_string(), PhpMixed::String("1.0.0".to_string()));
+                config.insert("version".to_string(), PhpMixed::string("1.0.0".to_string()));
                 auto_versioned = true;
             }
 
             if let Some(commit_hash) = commit {
                 let mut source = IndexMap::new();
-                source.insert("type".to_string(), PhpMixed::String(String::new()));
-                source.insert("url".to_string(), PhpMixed::String(String::new()));
+                source.insert("type".to_string(), PhpMixed::string(String::new()));
+                source.insert("url".to_string(), PhpMixed::string(String::new()));
                 source.insert(
                     "reference".to_string(),
-                    PhpMixed::String(commit_hash.clone()),
+                    PhpMixed::string(commit_hash.clone()),
                 );
                 config.insert("source".to_string(), PhpMixed::Array(source));
 
                 let mut dist = IndexMap::new();
-                dist.insert("type".to_string(), PhpMixed::String(String::new()));
-                dist.insert("url".to_string(), PhpMixed::String(String::new()));
-                dist.insert("reference".to_string(), PhpMixed::String(commit_hash));
+                dist.insert("type".to_string(), PhpMixed::string(String::new()));
+                dist.insert("url".to_string(), PhpMixed::string(String::new()));
+                dist.insert("reference".to_string(), PhpMixed::string(commit_hash));
                 config.insert("dist".to_string(), PhpMixed::Array(dist));
             }
         }
@@ -161,7 +168,8 @@ impl RootPackageLoader {
 
         if let Some(min_stability) = config.get("minimum-stability").and_then(|v| v.as_string()) {
             real_package.set_minimum_stability(
-                VersionParser::normalize_stability(min_stability).unwrap_or_default(),
+                VersionParser::normalize_stability(&min_stability.to_str_lossy())
+                    .unwrap_or_default(),
             );
         }
 
@@ -192,7 +200,7 @@ impl RootPackageLoader {
                 );
                 references = Self::extract_references(&links, references);
 
-                let package_name = config["name"].as_string().unwrap_or("").to_string();
+                let package_name = config["name"].as_string().unwrap_or_default().to_string();
                 if links.contains_key(&package_name) {
                     return Err(RuntimeException::new(format!(
                         "Root package '{}' cannot require itself in its composer.json\nDid you accidentally name your root package after an external package?",

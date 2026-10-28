@@ -27,7 +27,7 @@ fn set_up() -> SetUp {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(home.path().to_str().unwrap().to_string()),
+        PhpMixed::string(home.path().to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
@@ -104,7 +104,7 @@ fn test_get_branches_filter_invalid_branch_names() {
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".to_string(),
-        PhpMixed::String("https://example.org/acme.git".to_string()),
+        PhpMixed::string("https://example.org/acme.git".to_string()),
     );
 
     let mut driver = HgDriver::new(repo_config, io, config, http_downloader, process);
@@ -134,7 +134,7 @@ fn test_file_get_content_invalid_identifier() {
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".to_string(),
-        PhpMixed::String("https://example.org/acme.git".to_string()),
+        PhpMixed::string("https://example.org/acme.git".to_string()),
     );
 
     let driver = HgDriver::new(repo_config, io, config, http_downloader, process);
@@ -163,7 +163,7 @@ fn test_get_change_date_invalid_identifier() {
     let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
     repo_config.insert(
         "url".to_string(),
-        PhpMixed::String("https://example.org/acme.git".to_string()),
+        PhpMixed::string("https://example.org/acme.git".to_string()),
     );
 
     let driver = HgDriver::new(repo_config, io, config, http_downloader, process);

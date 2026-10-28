@@ -17,7 +17,7 @@ use shirabe_php_shim::{
 };
 
 fn s(value: &str) -> PhpMixed {
-    PhpMixed::String(value.to_string())
+    PhpMixed::string(value.to_string())
 }
 
 fn arr(entries: Vec<(&str, PhpMixed)>) -> PhpMixed {

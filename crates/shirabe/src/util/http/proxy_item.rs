@@ -118,11 +118,11 @@ impl ProxyItem {
         let mut http_options: IndexMap<String, PhpMixed> = IndexMap::new();
         http_options.insert(
             "proxy".to_string(),
-            PhpMixed::String(self.options_proxy.clone()),
+            PhpMixed::string(self.options_proxy.clone()),
         );
 
         if let Some(ref auth) = self.options_auth {
-            http_options.insert("header".to_string(), PhpMixed::String(auth.clone()));
+            http_options.insert("header".to_string(), PhpMixed::string(auth.clone()));
         }
 
         if scheme == "http" {

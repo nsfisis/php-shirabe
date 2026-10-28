@@ -436,14 +436,14 @@ impl ClassLoader {
     pub fn as_array_iter(&self) -> Vec<(String, PhpMixed)> {
         let key = |name: &str| format!("\0Composer\\Autoload\\ClassLoader\0{}", name);
         let str_list = |v: &Vec<String>| {
-            PhpMixed::List(v.iter().map(|s| PhpMixed::String(s.clone())).collect())
+            PhpMixed::List(v.iter().map(|s| PhpMixed::string(s.clone())).collect())
         };
 
         vec![
             (
                 key("vendorDir"),
                 match &self.vendor_dir {
-                    Some(s) => PhpMixed::String(s.clone()),
+                    Some(s) => PhpMixed::string(s.clone()),
                     None => PhpMixed::Null,
                 },
             ),
@@ -502,7 +502,7 @@ impl ClassLoader {
                 PhpMixed::Array(
                     self.class_map
                         .iter()
-                        .map(|(k, v)| (k.clone(), PhpMixed::String(v.clone())))
+                        .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                         .collect(),
                 ),
             ),
@@ -522,7 +522,7 @@ impl ClassLoader {
             (
                 key("apcuPrefix"),
                 match &self.apcu_prefix {
-                    Some(s) => PhpMixed::String(s.clone()),
+                    Some(s) => PhpMixed::string(s.clone()),
                     None => PhpMixed::Null,
                 },
             ),

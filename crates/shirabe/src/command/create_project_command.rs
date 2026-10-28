@@ -118,7 +118,7 @@ impl CreateProjectCommand {
                     .filter_map(|(_, v)| v.as_string().map(|s| s.to_string()))
                     .collect(),
             ),
-            Some(other) => Some(vec![other.as_string().unwrap_or("").to_string()]),
+            Some(other) => Some(vec![other.as_string().unwrap_or_default().to_string()]),
         };
 
         let platform_requirement_filter = platform_requirement_filter
@@ -603,7 +603,7 @@ impl CreateProjectCommand {
 
                 // disable symlinking for the root package by default as that most likely makes no sense
                 let is_path_type =
-                    repo_config.get("type").and_then(|v| v.as_string()) == Some("path");
+                    repo_config.get("type").and_then(|v| v.as_string()) == Some("path".into());
                 let has_symlink_option = repo_config
                     .get("options")
                     .and_then(|v| match v {
@@ -651,7 +651,7 @@ impl CreateProjectCommand {
                     .map(|(k, v)| {
                         (
                             k.clone(),
-                            PhpMixed::String(v.as_string().unwrap_or("").to_string()),
+                            PhpMixed::string(v.as_string().unwrap_or_default().to_string()),
                         )
                     })
                     .collect(),
@@ -918,7 +918,7 @@ impl Command for CreateProjectCommand {
                 .into());
             }
             let mut parts =
-                explode_with_limit("/", &strtolower(package.as_string().unwrap_or("")), 2);
+                explode_with_limit("/", &strtolower(package.as_string().unwrap_or_default()), 2);
             let prompt = format!(
                 "New project directory [<comment>{}</comment>]: ",
                 array_pop(&mut parts).unwrap_or_default()

@@ -86,7 +86,7 @@ fn setup_config(config: Config) -> Config {
         let mut section: IndexMap<String, PhpMixed> = IndexMap::new();
         section.insert(
             "home".to_string(),
-            PhpMixed::String(tmp_dir.to_str().unwrap().to_string()),
+            PhpMixed::string(tmp_dir.to_str().unwrap().to_string()),
         );
         top.insert("config".to_string(), PhpMixed::Array(section));
         config.merge(&top, Config::SOURCE_UNKNOWN);
@@ -227,7 +227,7 @@ fn test_download_with_cache() {
     let cache_vcs_dir = config
         .get("cache-vcs-dir")
         .as_string()
-        .unwrap_or("")
+        .unwrap_or_default()
         .to_string();
     // ref: GitDownloaderTest cachePath = cache-vcs-dir.'/'.preg_replace('{[^a-z0-9.]}i', '-', url).'/'
     let sanitized: String = url
@@ -526,7 +526,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
             PhpMixed::List(
                 protocols
                     .iter()
-                    .map(|p| PhpMixed::String(p.to_string()))
+                    .map(|p| PhpMixed::string(p.to_string()))
                     .collect(),
             ),
         );

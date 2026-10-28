@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/console/Helper/TableCellStyle.php
 
 use crate::exception::InvalidArgumentException;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 
 pub const DEFAULT_ALIGN: &str = "left";
@@ -33,16 +34,16 @@ impl TableCellStyle {
         let mut this_options: IndexMap<String, shirabe_php_shim::PhpMixed> = IndexMap::new();
         this_options.insert(
             "fg".to_string(),
-            shirabe_php_shim::PhpMixed::String("default".to_string()),
+            shirabe_php_shim::PhpMixed::string("default".to_string()),
         );
         this_options.insert(
             "bg".to_string(),
-            shirabe_php_shim::PhpMixed::String("default".to_string()),
+            shirabe_php_shim::PhpMixed::string("default".to_string()),
         );
         this_options.insert("options".to_string(), shirabe_php_shim::PhpMixed::Null);
         this_options.insert(
             "align".to_string(),
-            shirabe_php_shim::PhpMixed::String(DEFAULT_ALIGN.to_string()),
+            shirabe_php_shim::PhpMixed::string(DEFAULT_ALIGN.to_string()),
         );
         this_options.insert("cellFormat".to_string(), shirabe_php_shim::PhpMixed::Null);
 
@@ -60,7 +61,7 @@ impl TableCellStyle {
 
         if let Some(align) = options.get("align") {
             let align = match align {
-                shirabe_php_shim::PhpMixed::String(align) => align.clone(),
+                shirabe_php_shim::PhpMixed::String(align) => align.to_str_lossy().into_owned(),
                 _ => String::new(),
             };
             if align_map(&align).is_none() {
@@ -99,7 +100,7 @@ impl TableCellStyle {
 
     pub fn get_pad_by_align(&self) -> i64 {
         let align = match &self.get_options()["align"] {
-            shirabe_php_shim::PhpMixed::String(align) => align.clone(),
+            shirabe_php_shim::PhpMixed::String(align) => align.to_str_lossy().into_owned(),
             _ => String::new(),
         };
         align_map(&align).unwrap()
@@ -107,7 +108,7 @@ impl TableCellStyle {
 
     pub fn get_cell_format(&self) -> Option<String> {
         match &self.get_options()["cellFormat"] {
-            shirabe_php_shim::PhpMixed::String(format) => Some(format.clone()),
+            shirabe_php_shim::PhpMixed::String(format) => Some(format.to_str_lossy().into_owned()),
             _ => None,
         }
     }

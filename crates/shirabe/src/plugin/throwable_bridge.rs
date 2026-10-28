@@ -10,6 +10,7 @@ use crate::json::JsonValidationException;
 use crate::package::loader::InvalidPackageException;
 use crate::plugin::PluginBlockedException;
 use crate::repository::{InvalidRepositoryException, RepositorySecurityException};
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue};
 use shirabe_php_shim::{
@@ -69,7 +70,7 @@ pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
     if let Some(PhpMixed::List(parents)) = fields.get(6) {
         throw.parents = parents
             .iter()
-            .filter_map(|parent| parent.as_string().map(str::to_string))
+            .filter_map(|parent| parent.as_string().map(|s| s.to_str_lossy().into_owned()))
             .collect();
     }
     throw
@@ -118,7 +119,11 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
             if let PhpMixed::List(_) | PhpMixed::Array(_) = property("headers") {
                 exception.set_headers(strings("headers"));
             }
-            exception.set_response(property("response").as_string().map(str::to_string));
+            exception.set_response(
+                property("response")
+                    .as_string()
+                    .map(|s| s.to_str_lossy().into_owned()),
+            );
             exception.set_status_code(property("statusCode").as_int());
             exception.set_response_info(match property("responseInfo") {
                 PhpMixed::List(items) => items,

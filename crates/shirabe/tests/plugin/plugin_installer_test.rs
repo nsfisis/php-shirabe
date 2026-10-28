@@ -2,6 +2,7 @@
 
 use crate::async_runtime::run;
 use crate::php_worker::{load_composer_php_runtime, lock_php_worker, php_runtime_available};
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe::autoload::AutoloadGenerator;
 use shirabe::composer::{Composer, ComposerHandle, PartialOrFullComposer};
@@ -294,7 +295,7 @@ pub(crate) fn set_up() -> SetUp {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(
+        PhpMixed::string(
             directory_path
                 .join("Fixtures/")
                 .to_str()
@@ -304,7 +305,7 @@ pub(crate) fn set_up() -> SetUp {
     );
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(
+        PhpMixed::string(
             directory_path
                 .join("Fixtures")
                 .to_str()
@@ -314,7 +315,7 @@ pub(crate) fn set_up() -> SetUp {
     );
     config_section.insert(
         "bin-dir".to_string(),
-        PhpMixed::String(
+        PhpMixed::string(
             directory_path
                 .join("Fixtures/bin")
                 .to_str()
@@ -401,7 +402,7 @@ fn plugin_property(
         .__as_php_plugin_proxy()
         .expect("registered plugins are PHP-backed proxies");
     match proxy.__get_property(name).unwrap() {
-        PhpMixed::String(s) => s,
+        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
         other => panic!("property `{name}` is not a string: {other:?}"),
     }
 }
@@ -454,7 +455,7 @@ fn test_install_plugin_with_root_package_having_files_autoload() {
     let mut autoload: IndexMap<String, PhpMixed> = IndexMap::new();
     autoload.insert(
         "files".to_string(),
-        PhpMixed::List(vec![PhpMixed::String(files_autoload)]),
+        PhpMixed::List(vec![PhpMixed::string(files_autoload)]),
     );
     let root = set_up.composer.borrow().get_package().clone();
     root.set_autoload(autoload.clone());
@@ -851,7 +852,7 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
         std::rc::Rc::new(std::cell::RefCell::new(CapablePlugin {
             capabilities: IndexMap::from([(
                 capability_api.to_string(),
-                PhpMixed::String(capability_implementation.to_string()),
+                PhpMixed::string(capability_implementation.to_string()),
             )]),
             get_capabilities_calls: get_capabilities_calls.clone(),
         }));
@@ -900,10 +901,10 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
 fn invalid_implementation_class_names() -> Vec<PhpMixed> {
     vec![
         PhpMixed::Null,
-        PhpMixed::String(String::new()),
+        PhpMixed::string(String::new()),
         PhpMixed::Int(0),
         PhpMixed::Int(1000),
-        PhpMixed::String("   ".to_string()),
+        PhpMixed::string("   ".to_string()),
         PhpMixed::List(vec![PhpMixed::Int(1)]),
         PhpMixed::List(vec![]),
         // PHP: new \stdClass()
@@ -1050,7 +1051,7 @@ fn test_querying_with_non_existing_or_wrong_capability_class_types_throws() {
     load_composer_php_runtime();
     for wrong_implementation_class_type in non_existing_or_invalid_implementation_class_types() {
         assert_querying_with_invalid_capability_class_name_throws(
-            &PhpMixed::String(wrong_implementation_class_type.to_string()),
+            &PhpMixed::string(wrong_implementation_class_type.to_string()),
             |err| err.is_instanceof::<shirabe_php_shim::RuntimeException>(),
             "RuntimeException",
         );

@@ -16,7 +16,7 @@ fn test_factory_none() {
     let proxy = RequestProxy::none();
 
     // extension_loaded('curl') is always true in the php-shim.
-    let options = curl_options(&[(CURLOPT_PROXY, PhpMixed::String(String::new()))]);
+    let options = curl_options(&[(CURLOPT_PROXY, PhpMixed::string(String::new()))]);
     assert_eq!(options, proxy.get_curl_options(&IndexMap::new()).unwrap());
     assert!(proxy.get_context_options().is_none());
     assert_eq!("", proxy.get_status(None).unwrap());
@@ -26,7 +26,7 @@ fn test_factory_none() {
 fn test_factory_no_proxy() {
     let proxy = RequestProxy::no_proxy();
 
-    let options = curl_options(&[(CURLOPT_PROXY, PhpMixed::String(String::new()))]);
+    let options = curl_options(&[(CURLOPT_PROXY, PhpMixed::string(String::new()))]);
     assert_eq!(options, proxy.get_curl_options(&IndexMap::new()).unwrap());
     assert!(proxy.get_context_options().is_none());
     assert_eq!("excluded by no_proxy", proxy.get_status(None).unwrap());
@@ -90,7 +90,7 @@ fn test_get_curl_options() {
         (
             None,
             None,
-            curl_options(&[(CURLOPT_PROXY, PhpMixed::String(String::new()))]),
+            curl_options(&[(CURLOPT_PROXY, PhpMixed::string(String::new()))]),
         ),
         (
             Some("http://proxy.com:80"),
@@ -98,9 +98,9 @@ fn test_get_curl_options() {
             curl_options(&[
                 (
                     CURLOPT_PROXY,
-                    PhpMixed::String("http://proxy.com:80".to_string()),
+                    PhpMixed::string("http://proxy.com:80".to_string()),
                 ),
-                (CURLOPT_NOPROXY, PhpMixed::String(String::new())),
+                (CURLOPT_NOPROXY, PhpMixed::string(String::new())),
             ]),
         ),
         (
@@ -109,13 +109,13 @@ fn test_get_curl_options() {
             curl_options(&[
                 (
                     CURLOPT_PROXY,
-                    PhpMixed::String("http://proxy.com:80".to_string()),
+                    PhpMixed::string("http://proxy.com:80".to_string()),
                 ),
-                (CURLOPT_NOPROXY, PhpMixed::String(String::new())),
+                (CURLOPT_NOPROXY, PhpMixed::string(String::new())),
                 (CURLOPT_PROXYAUTH, PhpMixed::Int(CURLAUTH_BASIC)),
                 (
                     CURLOPT_PROXYUSERPWD,
-                    PhpMixed::String("user:p%40ss".to_string()),
+                    PhpMixed::string("user:p%40ss".to_string()),
                 ),
             ]),
         ),
@@ -132,11 +132,11 @@ fn test_get_curl_options_with_ssl() {
     let mut cafile_opts: IndexMap<String, PhpMixed> = IndexMap::new();
     cafile_opts.insert(
         "cafile".to_string(),
-        PhpMixed::String("/certs/bundle.pem".to_string()),
+        PhpMixed::string("/certs/bundle.pem".to_string()),
     );
 
     let mut capath_opts: IndexMap<String, PhpMixed> = IndexMap::new();
-    capath_opts.insert("capath".to_string(), PhpMixed::String("/certs".to_string()));
+    capath_opts.insert("capath".to_string(), PhpMixed::string("/certs".to_string()));
 
     let cases: Vec<(
         &str,
@@ -151,12 +151,12 @@ fn test_get_curl_options_with_ssl() {
             curl_options(&[
                 (
                     CURLOPT_PROXY,
-                    PhpMixed::String("https://proxy.com:443".to_string()),
+                    PhpMixed::string("https://proxy.com:443".to_string()),
                 ),
-                (CURLOPT_NOPROXY, PhpMixed::String(String::new())),
+                (CURLOPT_NOPROXY, PhpMixed::string(String::new())),
                 (
                     CURLOPT_PROXY_CAINFO,
-                    PhpMixed::String("/certs/bundle.pem".to_string()),
+                    PhpMixed::string("/certs/bundle.pem".to_string()),
                 ),
             ]),
         ),
@@ -167,15 +167,15 @@ fn test_get_curl_options_with_ssl() {
             curl_options(&[
                 (
                     CURLOPT_PROXY,
-                    PhpMixed::String("https://proxy.com:443".to_string()),
+                    PhpMixed::string("https://proxy.com:443".to_string()),
                 ),
-                (CURLOPT_NOPROXY, PhpMixed::String(String::new())),
+                (CURLOPT_NOPROXY, PhpMixed::string(String::new())),
                 (CURLOPT_PROXYAUTH, PhpMixed::Int(CURLAUTH_BASIC)),
                 (
                     CURLOPT_PROXYUSERPWD,
-                    PhpMixed::String("user:p%40ss".to_string()),
+                    PhpMixed::string("user:p%40ss".to_string()),
                 ),
-                (CURLOPT_PROXY_CAPATH, PhpMixed::String("/certs".to_string())),
+                (CURLOPT_PROXY_CAPATH, PhpMixed::string("/certs".to_string())),
             ]),
         ),
     ];

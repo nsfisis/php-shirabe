@@ -134,7 +134,7 @@ impl ChoiceQuestion {
 
                 shirabe_php_shim::explode(",", &shirabe_php_shim::strval(&selected))
                     .into_iter()
-                    .map(PhpMixed::String)
+                    .map(PhpMixed::string)
                     .collect()
             } else {
                 vec![selected]
@@ -143,7 +143,7 @@ impl ChoiceQuestion {
             let mut selected_choices = selected_choices;
             if trimmable {
                 for v in selected_choices.iter_mut() {
-                    *v = PhpMixed::String(shirabe_php_shim::trim(
+                    *v = PhpMixed::string(shirabe_php_shim::trim(
                         &shirabe_php_shim::strval(v),
                         None,
                     ));
@@ -192,7 +192,7 @@ impl ChoiceQuestion {
                     }
                 } else {
                     // associative, found: keep the matched key
-                    result = PhpMixed::String(result_key.clone().unwrap());
+                    result = PhpMixed::string(result_key.clone().unwrap());
                 }
 
                 // false === $result
@@ -205,7 +205,7 @@ impl ChoiceQuestion {
 
                 // For associative choices, consistently return the key as string:
                 if is_assoc {
-                    result = PhpMixed::String(shirabe_php_shim::strval(&result));
+                    result = PhpMixed::string(shirabe_php_shim::strval(&result));
                 }
                 multiselect_choices.push(result);
             }

@@ -62,30 +62,30 @@ fn generate_repository_name_provider() -> Vec<(
         (PhpMixed::Int(0), vec![], vec!["0"], "02"),
         (
             PhpMixed::Int(0),
-            vec![("url", PhpMixed::String("https://example.org".to_string()))],
+            vec![("url", PhpMixed::string("https://example.org".to_string()))],
             vec![],
             "example.org",
         ),
         (
             PhpMixed::Int(0),
-            vec![("url", PhpMixed::String("https://example.org".to_string()))],
+            vec![("url", PhpMixed::string("https://example.org".to_string()))],
             vec!["example.org"],
             "example.org2",
         ),
         (
-            PhpMixed::String("example.org".to_string()),
+            PhpMixed::string("example.org".to_string()),
             vec![(
                 "url",
-                PhpMixed::String("https://example.org/repository".to_string()),
+                PhpMixed::string("https://example.org/repository".to_string()),
             )],
             vec![],
             "example.org",
         ),
         (
-            PhpMixed::String("example.org".to_string()),
+            PhpMixed::string("example.org".to_string()),
             vec![(
                 "url",
-                PhpMixed::String("https://example.org/repository".to_string()),
+                PhpMixed::string("https://example.org/repository".to_string()),
             )],
             vec!["example.org"],
             "example.org2",

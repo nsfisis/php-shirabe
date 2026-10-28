@@ -55,7 +55,7 @@ fn string_list(items: &[&str]) -> PhpMixed {
     PhpMixed::List(
         items
             .iter()
-            .map(|s| PhpMixed::String(s.to_string()))
+            .map(|s| PhpMixed::string(s.to_string()))
             .collect(),
     )
 }
@@ -174,7 +174,7 @@ fn test_guess_version_does_not_see_custom_default_branch_as_non_feature_branch()
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
         .guess_version(
-            &package_config(&[("version", PhpMixed::String("self.version".to_string()))]),
+            &package_config(&[("version", PhpMixed::string("self.version".to_string()))]),
             "dummy/path",
         )
         .unwrap()
@@ -217,7 +217,7 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
     let version_data = guesser
         .guess_version(
             &package_config(&[
-                ("version", PhpMixed::String("self.version".to_string())),
+                ("version", PhpMixed::string("self.version".to_string())),
                 ("non-feature-branches", string_list(&["arbitrary"])),
             ]),
             "dummy/path",
@@ -271,7 +271,7 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
     let version_data = guesser
         .guess_version(
             &package_config(&[
-                ("version", PhpMixed::String("self.version".to_string())),
+                ("version", PhpMixed::string("self.version".to_string())),
                 ("non-feature-branches", string_list(&["latest-.*"])),
             ]),
             "dummy/path",
@@ -319,7 +319,7 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
     let version_data = guesser
         .guess_version(
             &package_config(&[
-                ("version", PhpMixed::String("self.version".to_string())),
+                ("version", PhpMixed::string("self.version".to_string())),
                 ("non-feature-branches", string_list(&["latest-.*"])),
             ]),
             "dummy/path",
@@ -585,7 +585,7 @@ fn test_remote_branches_are_selected() {
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
         .guess_version(
-            &package_config(&[("version", PhpMixed::String("self.version".to_string()))]),
+            &package_config(&[("version", PhpMixed::string("self.version".to_string()))]),
             "dummy/path",
         )
         .unwrap()

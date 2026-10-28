@@ -1,4 +1,5 @@
 use crate::PhpMixed;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -77,7 +78,9 @@ fn append_query_pairs(pairs: &mut Vec<(String, String)>, key: String, value: &Ph
         PhpMixed::Bool(b) => pairs.push((key, if *b { "1" } else { "0" }.to_string())),
         PhpMixed::Int(i) => pairs.push((key, i.to_string())),
         PhpMixed::Float(f) => pairs.push((key, f.to_string())),
-        PhpMixed::String(s) => pairs.push((key, s.clone())),
+        // TODO(bytes): pairs hold Strings, so non-UTF-8 bytes are replaced instead of being
+        // percent-encoded as-is.
+        PhpMixed::String(s) => pairs.push((key, s.to_str_lossy().into_owned())),
         PhpMixed::List(items) => {
             for (i, item) in items.iter().enumerate() {
                 append_query_pairs(pairs, format!("{key}[{i}]"), item);

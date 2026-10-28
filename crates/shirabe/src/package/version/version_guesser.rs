@@ -11,6 +11,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Svn as SvnUtil;
 use crate::util::sync_executor;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, implode, is_string,
@@ -296,14 +297,14 @@ impl VersionGuesser {
                 &self.process,
                 array_merge(
                     PhpMixed::List(vec![
-                        PhpMixed::String("--format=%H".to_string()),
-                        PhpMixed::String("-n1".to_string()),
-                        PhpMixed::String("HEAD".to_string()),
+                        PhpMixed::string("--format=%H".to_string()),
+                        PhpMixed::string("-n1".to_string()),
+                        PhpMixed::string("HEAD".to_string()),
                     ]),
                     PhpMixed::List(
                         GitUtil::get_no_show_signature_flags(&self.process)?
                             .into_iter()
-                            .map(PhpMixed::String)
+                            .map(PhpMixed::string)
                             .collect(),
                     ),
                 )
@@ -402,7 +403,7 @@ impl VersionGuesser {
 
             // re-use the HgDriver to fetch branches (this properly includes bookmarks)
             let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-            repo_config.insert("url".to_string(), PhpMixed::String(path.to_string()));
+            repo_config.insert("url".to_string(), PhpMixed::string(path.to_string()));
             let io: std::rc::Rc<std::cell::RefCell<dyn crate::io::IOInterface>> =
                 std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
             let http_io: std::rc::Rc<std::cell::RefCell<dyn crate::io::IOInterface>> =
@@ -665,17 +666,17 @@ impl VersionGuesser {
             let trunk_path = package_config
                 .get("trunk-path")
                 .and_then(|v| v.as_string())
-                .map(|s| preg_quote(s, Some('#')))
+                .map(|s| preg_quote(&s.to_str_lossy(), Some('#')))
                 .unwrap_or_else(|| "trunk".to_string());
             let branches_path = package_config
                 .get("branches-path")
                 .and_then(|v| v.as_string())
-                .map(|s| preg_quote(s, Some('#')))
+                .map(|s| preg_quote(&s.to_str_lossy(), Some('#')))
                 .unwrap_or_else(|| "branches".to_string());
             let tags_path = package_config
                 .get("tags-path")
                 .and_then(|v| v.as_string())
-                .map(|s| preg_quote(s, Some('#')))
+                .map(|s| preg_quote(&s.to_str_lossy(), Some('#')))
                 .unwrap_or_else(|| "tags".to_string());
 
             let url_pattern = format!(
@@ -704,7 +705,7 @@ impl VersionGuesser {
                     }));
                 }
 
-                assert!(is_string(&PhpMixed::String(m1.to_string())));
+                assert!(is_string(&PhpMixed::string(m1.to_string())));
                 let pretty_version = trim(m1, None);
                 let version = if pretty_version == "trunk" {
                     "dev-trunk".to_string()

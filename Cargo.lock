@@ -2524,6 +2524,7 @@ name = "shirabe-symfony-process"
 version = "0.2.0-dev"
 dependencies = [
  "anyhow",
+ "bstr",
  "indexmap",
  "shirabe-php-shim",
 ]

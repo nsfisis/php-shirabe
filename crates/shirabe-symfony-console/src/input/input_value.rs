@@ -1,5 +1,7 @@
 //! ref: composer/vendor/symfony/console/Input/InputInterface.php
 
+use bstr::ByteSlice;
+
 /// The value an option or an argument can hold.
 ///
 /// Symfony declares the domain as `string|bool|int|float|array|null` and only ever narrows it in
@@ -22,13 +24,13 @@ impl InputValue {
         match value {
             PhpMixed::Null => Self::Null,
             PhpMixed::Bool(b) => Self::Bool(*b),
-            PhpMixed::String(s) => Self::String(s.clone()),
+            PhpMixed::String(s) => Self::String(s.to_str_lossy().into_owned()),
             PhpMixed::List(_) | PhpMixed::Array(_) => Self::Array(
                 value
                     .values()
                     .into_iter()
                     .map(|item| match item {
-                        PhpMixed::String(s) => s.clone(),
+                        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                         other => panic!("an input array holds {:?}, not a string", other),
                     })
                     .collect(),
@@ -106,8 +108,8 @@ impl From<InputValue> for shirabe_php_shim::PhpMixed {
         match value {
             InputValue::Null => Self::Null,
             InputValue::Bool(b) => Self::Bool(b),
-            InputValue::String(s) => Self::String(s),
-            InputValue::Array(items) => Self::List(items.into_iter().map(Self::String).collect()),
+            InputValue::String(s) => Self::string(s),
+            InputValue::Array(items) => Self::List(items.into_iter().map(Self::string).collect()),
         }
     }
 }

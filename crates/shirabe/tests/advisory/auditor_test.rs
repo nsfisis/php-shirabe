@@ -405,7 +405,7 @@ fn test_audit() {
 
     let abandoned_with_replacement = || {
         let p = get_complete_package("vendor/abandoned", "1.0.0");
-        p.set_abandoned(shirabe_php_shim::PhpMixed::String("foo/bar".to_string()));
+        p.set_abandoned(shirabe_php_shim::PhpMixed::string("foo/bar".to_string()));
         let handle: PackageInterfaceHandle = p.into();
         handle
     };

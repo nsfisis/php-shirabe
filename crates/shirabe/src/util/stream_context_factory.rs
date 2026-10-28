@@ -6,6 +6,7 @@ use crate::repository::PlatformRepository;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use crate::util::http::ProxyManager;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
@@ -54,7 +55,7 @@ impl StreamContextFactory {
             let fixed = Self::fix_http_header_field(&header);
             http.insert(
                 "header".to_string(),
-                PhpMixed::List(fixed.into_iter().map(PhpMixed::String).collect()),
+                PhpMixed::List(fixed.into_iter().map(PhpMixed::string).collect()),
             );
         }
 
@@ -87,8 +88,8 @@ impl StreamContextFactory {
             && let Some(PhpMixed::String(header_str)) = http.get("header").cloned()
         {
             let parts: Vec<PhpMixed> = header_str
-                .split("\r\n")
-                .map(|s| PhpMixed::String(s.to_string()))
+                .split_str("\r\n")
+                .map(|s| PhpMixed::String(s.into()))
                 .collect();
             http.insert("header".to_string(), PhpMixed::List(parts));
         }
@@ -167,6 +168,7 @@ impl StreamContextFactory {
                     let joined: String = list
                         .iter()
                         .filter_map(|item| item.as_string())
+                        .map(|s| s.to_str_lossy())
                         .collect::<Vec<_>>()
                         .join("");
                     Some(joined.to_lowercase().contains("user-agent"))
@@ -197,7 +199,7 @@ impl StreamContextFactory {
             if let Some(PhpMixed::Array(http)) = options.get_mut("http")
                 && let Some(PhpMixed::List(headers)) = http.get_mut("header")
             {
-                headers.push(PhpMixed::String(user_agent));
+                headers.push(PhpMixed::string(user_agent));
             }
         }
 
@@ -261,7 +263,7 @@ impl StreamContextFactory {
         // cafile or capath can be overridden by passing in those options to constructor.
         let ssl_defaults: IndexMap<String, PhpMixed> = {
             let mut ssl = IndexMap::new();
-            ssl.insert("ciphers".to_string(), PhpMixed::String(ciphers));
+            ssl.insert("ciphers".to_string(), PhpMixed::string(ciphers));
             ssl.insert("verify_peer".to_string(), PhpMixed::Bool(true));
             ssl.insert("verify_depth".to_string(), PhpMixed::Int(7));
             ssl.insert("SNI_enabled".to_string(), PhpMixed::Bool(true));
@@ -302,18 +304,18 @@ impl StreamContextFactory {
         if !has_cafile && !has_capath {
             let result = CaBundle::get_system_ca_root_bundle_path(logger);
             let is_dir = shirabe_php_shim::is_dir(&result);
-            // TODO(bytes): PhpMixed::String carries the path as a String.
+            // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
             let result = result
                 .into_os_string()
                 .into_string()
                 .unwrap_or_else(|path| panic!("CA bundle path is not valid UTF-8: {path:?}"));
             if is_dir {
                 if let Some(PhpMixed::Array(ssl)) = defaults.get_mut("ssl") {
-                    ssl.insert("capath".to_string(), PhpMixed::String(result));
+                    ssl.insert("capath".to_string(), PhpMixed::string(result));
                 }
             } else {
                 if let Some(PhpMixed::Array(ssl)) = defaults.get_mut("ssl") {
-                    ssl.insert("cafile".to_string(), PhpMixed::String(result));
+                    ssl.insert("cafile".to_string(), PhpMixed::string(result));
                 }
             }
         }
@@ -361,7 +363,10 @@ impl StreamContextFactory {
     /// content-type header to the end.
     fn fix_http_header_field(header: &PhpMixed) -> Vec<String> {
         let mut headers: Vec<String> = match header {
-            PhpMixed::String(s) => s.split("\r\n").map(|p| p.to_string()).collect(),
+            PhpMixed::String(s) => s
+                .split_str("\r\n")
+                .map(|p| p.to_str_lossy().into_owned())
+                .collect(),
             PhpMixed::List(list) => list
                 .iter()
                 .filter_map(|v| v.as_string())

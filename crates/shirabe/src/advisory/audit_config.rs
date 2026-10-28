@@ -2,6 +2,7 @@
 
 use crate::advisory::Auditor;
 use crate::config::Config;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, canonical_int_key};
 
@@ -86,16 +87,24 @@ impl AuditConfig {
                     // TODO(type-model): PHP's `array` type must be modeled more precisely. This is
                     // escape hatch.
                     if canonical_int_key(key).is_some() {
-                        (reason_str.clone(), "all".to_string(), None)
+                        (
+                            reason_str.to_str_lossy().into_owned(),
+                            "all".to_string(),
+                            None,
+                        )
                     } else {
-                        (key.clone(), "all".to_string(), Some(reason_str.clone()))
+                        (
+                            key.clone(),
+                            "all".to_string(),
+                            Some(reason_str.to_str_lossy().into_owned()),
+                        )
                     }
                 }
                 PhpMixed::Array(detail) => {
                     let apply = detail
                         .get("apply")
                         .and_then(|v| v.as_string())
-                        .unwrap_or("all")
+                        .unwrap_or("all".into())
                         .to_string();
                     let reason = detail
                         .get("reason")
@@ -160,7 +169,7 @@ impl AuditConfig {
         let audit_abandoned = audit_config
             .and_then(|m| m.get("abandoned"))
             .and_then(|v| v.as_string())
-            .unwrap_or(Auditor::ABANDONED_FAIL)
+            .unwrap_or(Auditor::ABANDONED_FAIL.into())
             .to_string();
 
         let block_insecure = audit_config

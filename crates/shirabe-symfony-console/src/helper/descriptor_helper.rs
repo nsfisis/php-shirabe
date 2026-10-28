@@ -10,6 +10,7 @@ use crate::helper::Helper;
 use crate::helper::HelperInterface;
 use crate::helper::HelperSet;
 use crate::output::OutputInterface;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 
 /// This class adds helper method to describe objects in various formats.
@@ -61,7 +62,7 @@ impl DescriptorHelper {
         );
         merged.insert(
             "format".to_string(),
-            shirabe_php_shim::PhpMixed::String("txt".to_string()),
+            shirabe_php_shim::PhpMixed::string("txt".to_string()),
         );
         for (key, value) in options {
             merged.insert(key, value);
@@ -69,7 +70,7 @@ impl DescriptorHelper {
         let options = merged;
 
         let format = match &options["format"] {
-            shirabe_php_shim::PhpMixed::String(format) => format.clone(),
+            shirabe_php_shim::PhpMixed::String(format) => format.to_str_lossy().into_owned(),
             _ => String::new(),
         };
 

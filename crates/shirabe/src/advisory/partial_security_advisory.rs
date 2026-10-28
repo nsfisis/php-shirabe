@@ -3,6 +3,7 @@
 use crate::advisory::AnySecurityAdvisory;
 use crate::advisory::SecurityAdvisory;
 use crate::package::version::VersionParser;
+use bstr::ByteSlice;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, php_regex, preg_replace};
@@ -31,36 +32,41 @@ impl PartialSecurityAdvisory {
         data: &IndexMap<String, PhpMixed>,
         parser: &VersionParser,
     ) -> anyhow::Result<AnySecurityAdvisory> {
-        let affected_versions_str = data["affectedVersions"].as_string().unwrap_or("");
+        let affected_versions_str = data["affectedVersions"].as_string().unwrap_or_default();
 
-        let constraint: AnyConstraint = match parser.parse_constraints(affected_versions_str) {
-            Ok(c) => c,
-            Err(_) => {
-                let affected_version = preg_replace(
-                    php_regex!(r"{(^[>=<^~]*[\d.]+).*}"),
-                    "$1",
-                    affected_versions_str,
-                );
-                match parser.parse_constraints(&affected_version) {
-                    Ok(c) => c,
-                    Err(_) => SimpleConstraint::new(
-                        "==".to_string(),
-                        "0.0.0-invalid-version".to_string(),
-                        None,
-                    )
-                    .into(),
+        let constraint: AnyConstraint =
+            match parser.parse_constraints(&affected_versions_str.to_str_lossy()) {
+                Ok(c) => c,
+                Err(_) => {
+                    let affected_version = preg_replace(
+                        php_regex!(r"{(^[>=<^~]*[\d.]+).*}"),
+                        "$1",
+                        &affected_versions_str.to_str_lossy(),
+                    );
+                    match parser.parse_constraints(&affected_version) {
+                        Ok(c) => c,
+                        Err(_) => SimpleConstraint::new(
+                            "==".to_string(),
+                            "0.0.0-invalid-version".to_string(),
+                            None,
+                        )
+                        .into(),
+                    }
                 }
-            }
-        };
+            };
 
         let has_full_data = data.contains_key("title")
             && data.contains_key("sources")
             && data.contains_key("reportedAt");
 
         if has_full_data {
-            let reported_at: DateTime<Utc> =
-                shirabe_php_shim::date_create(data["reportedAt"].as_string().unwrap_or(""))
-                    .unwrap_or_default();
+            let reported_at: DateTime<Utc> = shirabe_php_shim::date_create(
+                &data["reportedAt"]
+                    .as_string()
+                    .unwrap_or_default()
+                    .to_str_lossy(),
+            )
+            .unwrap_or_default();
             let sources: Vec<IndexMap<String, String>> = data["sources"]
                 .as_list()
                 .map(|list| {
@@ -78,9 +84,12 @@ impl PartialSecurityAdvisory {
                 .unwrap_or_default();
             let advisory = SecurityAdvisory::new(
                 package_name.to_string(),
-                data["advisoryId"].as_string().unwrap_or("").to_string(),
+                data["advisoryId"]
+                    .as_string()
+                    .unwrap_or_default()
+                    .to_string(),
                 constraint,
-                data["title"].as_string().unwrap_or("").to_string(),
+                data["title"].as_string().unwrap_or_default().to_string(),
                 sources,
                 reported_at,
                 data.get("cve")
@@ -97,7 +106,10 @@ impl PartialSecurityAdvisory {
         }
 
         Ok(AnySecurityAdvisory::Partial(Self {
-            advisory_id: data["advisoryId"].as_string().unwrap_or("").to_string(),
+            advisory_id: data["advisoryId"]
+                .as_string()
+                .unwrap_or_default()
+                .to_string(),
             package_name: package_name.to_string(),
             affected_versions: constraint,
         }))
