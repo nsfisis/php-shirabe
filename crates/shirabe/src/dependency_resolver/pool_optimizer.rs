@@ -4,7 +4,7 @@ use crate::dependency_resolver::{PolicyInterface, Pool, Request};
 use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, implode, ksort};
+use shirabe_php_shim::{CmpOp, implode, ksort, legacy_lossy};
 use shirabe_semver::constraint::{AnyConstraint, MultiConstraint, SimpleConstraint};
 use shirabe_semver::{CompilingMatcher, Intervals};
 
@@ -275,7 +275,7 @@ impl PoolOptimizer {
                         continue;
                     }
 
-                    let group_hash = implode("", &group_hash_parts);
+                    let group_hash = legacy_lossy(&implode("", &group_hash_parts)).into_owned();
                     identical_definitions_per_package
                         .entry(package_name.clone())
                         .or_default()

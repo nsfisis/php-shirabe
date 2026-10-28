@@ -8,7 +8,7 @@ use shirabe_php_shim::{
     Catch as _, Error, InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
     JSON_UNESCAPED_UNICODE, PhpMixed, PregMatches, RuntimeException, UnexpectedValueException,
     dirname, file_exists, file_get_contents, file_put_contents, is_dir, is_file, json_decode_assoc,
-    json_decode_obj, json_encode_ex, mkdir, php_regex, preg_is_match, preg_match,
+    json_decode_obj, json_encode_ex, legacy_lossy, mkdir, php_regex, preg_is_match, preg_match,
     preg_replace_callback, preg_replace2, realpath, str_repeat, strlen, strpos, usleep,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
@@ -419,7 +419,10 @@ impl JsonFile {
                 php_regex!(r"#^ {4,}#m"),
                 move |m: &PregMatches| -> anyhow::Result<String> {
                     let whole = m.get(0).unwrap_or("");
-                    Ok(str_repeat(&indent_owned, (strlen(whole) / 4) as usize))
+                    Ok(
+                        legacy_lossy(&str_repeat(&indent_owned, (strlen(whole) / 4) as usize))
+                            .into_owned(),
+                    )
                 },
                 &json,
             )

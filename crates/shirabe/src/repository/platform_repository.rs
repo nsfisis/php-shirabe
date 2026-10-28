@@ -15,8 +15,8 @@ use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
     array_slice_mixed, array_slice_strs, explode, get_class, get_debug_type, implode, is_string,
-    php_regex, preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower,
-    var_export,
+    legacy_lossy, php_regex, preg_is_match, preg_match, preg_replace, str_replace, strpos,
+    strtolower, var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 use std::sync::{LazyLock, Mutex};
@@ -77,7 +77,7 @@ impl PlatformRepository {
                 .into());
             }
             overrides_map.insert(
-                strtolower(&name),
+                legacy_lossy(&strtolower(&name)).into_owned(),
                 PlatformOverride {
                     name: name.clone(),
                     version,
@@ -339,7 +339,7 @@ impl PlatformRepository {
                         self.add_library(
                             &mut libraries,
                             &format!("{}-protocol", name),
-                            Some(&str_replace("-", ".", &version_str)),
+                            Some(&*legacy_lossy(&str_replace("-", ".", &version_str))),
                             Some("AMQP protocol version"),
                             &[],
                             &[],
@@ -387,7 +387,7 @@ impl PlatformRepository {
                             ssl_matches.name("library").unwrap_or_default().to_string();
                         let ssl_version =
                             ssl_matches.name("version").unwrap_or_default().to_string();
-                        let library = strtolower(&ssl_library_raw);
+                        let library = legacy_lossy(&strtolower(&ssl_library_raw)).into_owned();
                         if library == "openssl" {
                             let mut is_fips = false;
                             let parsed_version = Version::parse_openssl(&ssl_version, &mut is_fips)
@@ -746,7 +746,9 @@ impl PlatformRepository {
                     if platform_info.has_class("IntlChar") {
                         let intl_char_versions = &platform_info.intl_char_unicode_version;
                         let sliced = array_slice_mixed(intl_char_versions, 0, Some(3));
-                        let joined = implode(".", &Self::php_array_to_string_vec(&sliced));
+                        let joined =
+                            legacy_lossy(&implode(".", &Self::php_array_to_string_vec(&sliced)))
+                                .into_owned();
                         self.add_library(
                             &mut libraries,
                             "icu-unicode",
@@ -1420,9 +1422,17 @@ impl PlatformRepository {
         self.inner.add_package(package.clone().into())?;
 
         if package.get_name() == "php" {
-            let parts = explode(".", &package.get_version());
-            let head = array_slice_strs(&parts, 0, Some(3));
-            *LAST_SEEN_PLATFORM_PHP.lock().unwrap() = Some(implode(".", &head));
+            let parts = explode(".", package.get_version());
+            let head = array_slice_strs(
+                &parts
+                    .iter()
+                    .map(|s| legacy_lossy(s).into_owned())
+                    .collect::<Vec<_>>(),
+                0,
+                Some(3),
+            );
+            *LAST_SEEN_PLATFORM_PHP.lock().unwrap() =
+                Some(legacy_lossy(&implode(".", &head)).into_owned());
         }
 
         Ok(package)
@@ -1514,7 +1524,7 @@ impl PlatformRepository {
     }
 
     fn build_package_name(&self, name: &str) -> String {
-        format!("ext-{}", str_replace(" ", "-", &strtolower(name)))
+        format!("ext-{}", str_replace(" ", "-", strtolower(name)))
     }
 
     fn add_library(
@@ -1560,7 +1570,7 @@ impl PlatformRepository {
 
         let mut replace_links: IndexMap<String, Link> = IndexMap::new();
         for replace in replaces {
-            let replace_lower = strtolower(replace);
+            let replace_lower = legacy_lossy(&strtolower(replace)).into_owned();
             replace_links.insert(
                 replace_lower.clone(),
                 Link::new(
@@ -1574,7 +1584,7 @@ impl PlatformRepository {
         }
         let mut provide_links: IndexMap<String, Link> = IndexMap::new();
         for provide in provides {
-            let provide_lower = strtolower(provide);
+            let provide_lower = legacy_lossy(&strtolower(provide)).into_owned();
             provide_links.insert(
                 provide_lower.clone(),
                 Link::new(

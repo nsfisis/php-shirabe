@@ -9,7 +9,7 @@ use shirabe::io::null_io::NullIO;
 use shirabe::repository::composer_repository::{ComposerRepository, ProviderListingEntry};
 use shirabe::repository::{RepositoryInterface, SEARCH_FULLTEXT};
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
-use shirabe_php_shim::{PhpMixed, hash, uniqid};
+use shirabe_php_shim::{PhpMixed, hash, legacy_lossy, uniqid};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use tempfile::TempDir;
 
@@ -227,7 +227,7 @@ fn test_what_provides() {
         ]),
     )]));
 
-    let sha256 = hash("sha256", &body);
+    let sha256 = legacy_lossy(&hash("sha256", &body)).into_owned();
 
     let (http_downloader, _http_guard): (_, HttpDownloaderMockGuard) = get_http_downloader_mock(
         vec![http_body("https://dummy.test.link/to/a/file", body)],
@@ -623,7 +623,7 @@ fn generate_security_advisory(
     cve: Option<&str>,
     affected_versions: &str,
 ) -> (String, PhpMixed) {
-    let advisory_id = uniqid("PKSA-", false);
+    let advisory_id = legacy_lossy(&uniqid("PKSA-", false)).into_owned();
     let advisory = str_kv(&[
         ("advisoryId", PhpMixed::string(advisory_id.clone())),
         ("packageName", PhpMixed::string(package_name.to_string())),

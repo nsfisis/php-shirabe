@@ -8,7 +8,7 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, date_local, in_array_loose, php_regex, preg_is_match, preg_match,
-    rawurlencode, stripos, strtolower,
+    rawurlencode, str_replace, stripos, strtolower,
 };
 
 #[derive(Debug)]
@@ -132,7 +132,7 @@ impl GitHub {
         self.io
             .write_error3(&lines.join("\n"), true, io_interface::NORMAL);
 
-        let encoded_note = rawurlencode(&note).replace("%20", "+");
+        let encoded_note = str_replace("%20", "+", rawurlencode(&note));
         let lines = [
             "1. When you don't use 'vcs'  type 'repositories'  in composer.json and do not need to clone source or download dist files".to_string(),
             "from private GitHub repositories over HTTPS, use a fine-grained token with read-only access to public information.".to_string(),
@@ -299,12 +299,12 @@ impl GitHub {
                 continue;
             }
             let (r#type, value) = (parts[0], parts[1]);
-            match strtolower(r#type).as_str() {
-                "x-ratelimit-limit" => {
+            match strtolower(r#type).as_slice() {
+                b"x-ratelimit-limit" => {
                     let v: i64 = value.trim().parse().unwrap_or(0);
                     rate_limit.insert("limit".into(), PhpMixed::Int(v));
                 }
-                "x-ratelimit-reset" => {
+                b"x-ratelimit-reset" => {
                     let ts: i64 = value.trim().parse().unwrap_or(0);
                     rate_limit.insert(
                         "reset".into(),

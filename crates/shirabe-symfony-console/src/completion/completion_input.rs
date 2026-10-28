@@ -1,7 +1,9 @@
 //! ref: composer/vendor/symfony/console/Completion/CompletionInput.php
 
 use crate::input::{ArgvInput, InputDefinition, InputOption, InputValue};
-use shirabe_php_shim::{explode_with_limit, ltrim, php_regex, preg_match_all, rtrim, substr, trim};
+use shirabe_php_shim::{
+    explode_with_limit, legacy_lossy, ltrim2, php_regex, preg_match_all, rtrim, substr, trim2,
+};
 
 /// An input specialized for shell completion.
 ///
@@ -77,7 +79,7 @@ impl CompletionInput {
             let option_token = parts.first().cloned().unwrap_or_default();
             let option_value = parts.get(1).cloned().unwrap_or_default();
 
-            let option = self.get_option_from_token(&option_token);
+            let option = self.get_option_from_token(&legacy_lossy(&option_token));
             if option.is_none() && !self.is_cursor_free() {
                 self.completion_type = Self::TYPE_OPTION_NAME.to_string();
                 self.completion_value = relevant_token;
@@ -91,9 +93,9 @@ impl CompletionInput {
                 self.completion_type = Self::TYPE_OPTION_VALUE.to_string();
                 self.completion_name = Some(option.get_name().to_string());
                 self.completion_value = if !option_value.is_empty() {
-                    option_value
-                } else if !option_token.starts_with("--") {
-                    substr(&option_token, 2, None)
+                    legacy_lossy(&option_value).into_owned()
+                } else if !option_token.starts_with("--".as_bytes()) {
+                    legacy_lossy(&substr(&option_token, 2, None)).into_owned()
                 } else {
                     String::new()
                 };
@@ -103,7 +105,7 @@ impl CompletionInput {
         }
 
         let previous_token = self.tokens[(self.current_index - 1) as usize].clone();
-        if "-" == &previous_token[0..1] && !trim(&previous_token, Some("-")).is_empty() {
+        if "-" == &previous_token[0..1] && !trim2(&previous_token, "-").is_empty() {
             // check if previous option accepted a value
             let previous_option = self.get_option_from_token(&previous_token);
             if let Some(previous_option) = &previous_option
@@ -224,7 +226,7 @@ impl CompletionInput {
     }
 
     fn get_option_from_token(&self, option_token: &str) -> Option<std::rc::Rc<InputOption>> {
-        let option_name = ltrim(option_token, Some("-"));
+        let option_name = ltrim2(option_token, "-");
         if option_name.is_empty() {
             return None;
         }
@@ -237,8 +239,17 @@ impl CompletionInput {
                 .unwrap_or_else(|| " ".to_string())
         {
             // long option name
-            return if self.inner.inner.definition.has_option(&option_name) {
-                self.inner.inner.definition.get_option(&option_name).ok()
+            return if self
+                .inner
+                .inner
+                .definition
+                .has_option(&legacy_lossy(&option_name))
+            {
+                self.inner
+                    .inner
+                    .definition
+                    .get_option(&legacy_lossy(&option_name))
+                    .ok()
             } else {
                 None
             };
@@ -246,11 +257,16 @@ impl CompletionInput {
 
         // short option name
         let first = &option_name[0..1];
-        if self.inner.inner.definition.has_shortcut(first) {
+        if self
+            .inner
+            .inner
+            .definition
+            .has_shortcut(&legacy_lossy(first))
+        {
             self.inner
                 .inner
                 .definition
-                .get_option_for_shortcut(first)
+                .get_option_for_shortcut(&legacy_lossy(first))
                 .ok()
         } else {
             None
@@ -390,6 +406,6 @@ impl std::fmt::Display for CompletionInput {
             str += "|";
         }
 
-        write!(f, "{}", rtrim(&str, None))
+        write!(f, "{}", rtrim(&str))
     }
 }

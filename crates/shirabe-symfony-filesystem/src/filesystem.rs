@@ -4,8 +4,8 @@ use crate::exception::IOException;
 use shirabe_php_shim::{
     Catch as _, FilesystemIterator, PHP_MAXPATHLEN, base64_encode, chmod, copy, dirname,
     file_exists, filemtime, fileperms, filesize, filesystem_iterator, is_dir, is_file, is_link,
-    mkdir, parse_url, random_bytes, readlink, realpath, rename, rmdir, rtrim, stream_is_local,
-    stripos, strrev, strtr, symlink, touch2, umask, unlink,
+    legacy_lossy, mkdir, parse_url, random_bytes, readlink, realpath, rename, rmdir, rtrim2,
+    stream_is_local, stripos, strrev, strtr, symlink, touch2, umask, unlink,
 };
 
 #[derive(Debug, Clone)]
@@ -179,7 +179,7 @@ impl Filesystem {
                     let tmp_name = format!(
                         "{}/.!{}",
                         dirname(&realpath(&file).unwrap_or_default()),
-                        strrev(&strtr(&base64_encode(random_bytes(2)), "/=", "-!"))
+                        strrev(strtr(base64_encode(random_bytes(2)), "/=", "-!"))
                     );
 
                     if file_exists(&tmp_name)
@@ -247,8 +247,8 @@ impl Filesystem {
         let mut target_dir = target_dir.to_string();
 
         if cfg!(windows) {
-            origin_dir = strtr(&origin_dir, "/", "\\");
-            target_dir = strtr(&target_dir, "/", "\\");
+            origin_dir = legacy_lossy(&strtr(&origin_dir, "/", "\\")).into_owned();
+            target_dir = legacy_lossy(&strtr(&target_dir, "/", "\\")).into_owned();
         }
 
         self.mkdir(&dirname(&target_dir), 0o777)?;
@@ -284,8 +284,8 @@ impl Filesystem {
         target_dir: &str,
         iterator: Vec<String>,
     ) -> anyhow::Result<()> {
-        let target_dir = rtrim(target_dir, Some("/\\"));
-        let origin_dir = rtrim(origin_dir, Some("/\\"));
+        let target_dir = legacy_lossy(&rtrim2(target_dir, "/\\")).into_owned();
+        let origin_dir = legacy_lossy(&rtrim2(origin_dir, "/\\")).into_owned();
         let origin_dir_len = origin_dir.len();
 
         if !self.exists(&origin_dir)? {

@@ -13,7 +13,7 @@ use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, file_get_contents, file_get_contents_with_max_length,
-    file_put_contents, parse_url, php_regex, preg_is_match, strpos, strtr,
+    file_put_contents, legacy_lossy, parse_url, php_regex, preg_is_match, strpos, strtr,
 };
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ impl LocalFilesystem {
 
     /// Whether `url` names a local file: a `file://` URL, or a path with no scheme.
     pub fn handles(url: &str) -> bool {
-        let scheme = parse_url(&strtr(url, "\\", "/"))
+        let scheme = parse_url(&legacy_lossy(&strtr(url, "\\", "/")))
             .and_then(|parsed| parsed.scheme)
             .unwrap_or_default();
         if scheme.is_empty() || scheme.eq_ignore_ascii_case("file") {

@@ -11,7 +11,7 @@ use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::plugin::plugin_interface;
 use shirabe::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
 use shirabe::util::process_executor::ProcessExecutor;
-use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, hash};
+use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, hash, legacy_lossy};
 use tempfile::TempDir;
 
 fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
@@ -159,7 +159,10 @@ fn test_set_lock_data() {
     let written = std::fs::read_to_string(temp_dir.path().join("composer.lock")).unwrap();
     let value: serde_json::Value = serde_json::from_str(&written).unwrap();
 
-    assert_eq!(value["content-hash"], serde_json::json!(content_hash));
+    assert_eq!(
+        value["content-hash"],
+        serde_json::json!(legacy_lossy(&content_hash))
+    );
     assert_eq!(
         value["packages"],
         serde_json::json!([

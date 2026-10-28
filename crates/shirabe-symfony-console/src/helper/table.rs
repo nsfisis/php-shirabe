@@ -6,9 +6,10 @@ use crate::helper::{
     Helper, TableCell, TableCellOption, TableCellStyle, TableRows, TableSeparator, TableStyle,
 };
 use crate::output::OutputInterface;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, array_splice, explode, get_debug_type, http_build_query_mixed, implode,
+    PhpMixed, array_splice, explode, get_debug_type, http_build_query_mixed, implode, legacy_lossy,
     mb_detect_encoding, mb_str_split, mb_strwidth, php_regex, preg_is_match, sprintf, str_pad,
     str_repeat, str_replace, strlen, strstr, substr_count, to_string,
 };
@@ -553,10 +554,10 @@ impl Table {
         let mut markup = left_char;
         let mut column = 0;
         while column < count {
-            markup.push_str(&str_repeat(
+            markup.push_str(&legacy_lossy(&str_repeat(
                 &horizontal,
                 self.effective_column_widths[&column] as usize,
-            ));
+            )));
             markup.push_str(if column == count - 1 {
                 &right_char
             } else {
@@ -566,10 +567,11 @@ impl Table {
         }
 
         self.output.borrow().writeln(
-            &[sprintf(
-                &self.style.get_border_format(),
+            &[legacy_lossy(&sprintf(
+                self.style.get_border_format(),
                 &[PhpMixed::from(markup)],
-            )],
+            ))
+            .into_owned()],
             crate::output::OUTPUT_NORMAL,
         );
     }
@@ -578,14 +580,15 @@ impl Table {
     fn render_column_separator(&self, r#type: i64) -> String {
         let borders = self.style.get_border_chars();
 
-        sprintf(
-            &self.style.get_border_format(),
+        legacy_lossy(&sprintf(
+            self.style.get_border_format(),
             &[PhpMixed::from(if BORDER_OUTSIDE == r#type {
                 borders[1].clone()
             } else {
                 borders[3].clone()
             })],
-        )
+        ))
+        .into_owned()
     }
 
     /// Renders table row.
@@ -633,24 +636,25 @@ impl Table {
         // str_pad won't work properly with multi-byte strings, we need to fix the padding
         let cell_str = cell.to_php_string();
         if let Some(encoding) = mb_detect_encoding(&cell_str, None, true) {
-            width += strlen(&cell_str) - mb_strwidth(&cell_str, Some(&encoding));
+            width += strlen(&cell_str) - mb_strwidth(&cell_str, Some(encoding.as_bstr()));
         }
 
         let style = self.get_style();
 
         if cell.is_table_separator() {
-            return sprintf(
-                &style.get_border_format(),
+            return legacy_lossy(&sprintf(
+                style.get_border_format(),
                 &[PhpMixed::from(str_repeat(
                     &style.get_border_chars()[2],
                     width as usize,
                 ))],
-            );
+            ))
+            .into_owned();
         }
 
         width += Helper::length(&cell_str) - Helper::length(&self.remove_decoration(&cell_str));
         let mut content = sprintf(
-            &style.get_cell_row_content_format(),
+            style.get_cell_row_content_format(),
             &[PhpMixed::from(cell_str.clone())],
         );
 
@@ -684,15 +688,16 @@ impl Table {
             pad_type = cell.style().unwrap().get_pad_by_align();
         }
 
-        sprintf(
+        legacy_lossy(&sprintf(
             &cell_format,
             &[PhpMixed::from(str_pad(
                 &content,
                 width as usize,
-                &style.get_padding_char(),
+                style.get_padding_char(),
                 pad_type,
             ))],
-        )
+        ))
+        .into_owned()
     }
 
     /// Calculate number of columns for this table.
@@ -750,28 +755,28 @@ impl Table {
                     eol,
                     &explode(eol, &cell_str)
                         .iter()
-                        .map(|line| OutputFormatter::escape_trailing_backslash(line))
+                        .map(|line| OutputFormatter::escape_trailing_backslash(&legacy_lossy(line)))
                         .collect::<Vec<_>>(),
                 );
                 cell = if cell.is_table_cell() {
                     Cell::Cell(TableCell::new2(
-                        &escaped,
+                        &legacy_lossy(&escaped),
                         Self::table_cell_options_colspan(cell.colspan()),
                     ))
                 } else {
-                    Cell::Value(escaped.clone())
+                    Cell::Value(legacy_lossy(&escaped.clone()).into_owned())
                 };
                 let lines = explode(
                     eol,
-                    &str_replace(
+                    str_replace(
                         eol,
-                        &format!("<fg=default;bg=default></>{}", eol),
-                        &cell.to_php_string(),
+                        format!("<fg=default;bg=default></>{}", eol),
+                        cell.to_php_string(),
                     ),
                 );
                 for (line_key, line) in lines.into_iter().enumerate() {
                     let line_key = line_key as i64;
-                    let mut line = Cell::Value(line);
+                    let mut line = Cell::Value(legacy_lossy(&line).into_owned());
                     if colspan > 1 {
                         line = Cell::Cell(TableCell::new2(
                             &line.to_php_string(),
@@ -849,13 +854,12 @@ impl Table {
                     };
                     let exploded = explode(
                         eol,
-                        &str_replace(
-                            eol,
-                            &format!("<fg=default;bg=default>{}</>", eol),
-                            &cell_str,
-                        ),
+                        str_replace(eol, format!("<fg=default;bg=default>{}</>", eol), &cell_str),
                     );
-                    lines = exploded.into_iter().map(Cell::Value).collect();
+                    lines = exploded
+                        .iter()
+                        .map(|line| Cell::Value(legacy_lossy(line).into_owned()))
+                        .collect();
                     nb_lines = if (lines.len() as i64) > nb_lines {
                         substr_count(&cell_str, eol)
                     } else {
@@ -1022,7 +1026,7 @@ impl Table {
                                     set_cell(
                                         &mut row_arr,
                                         i as i64 + position as i64,
-                                        Cell::Value(content),
+                                        Cell::Value(legacy_lossy(&content).into_owned()),
                                     );
                                 }
                             }
@@ -1044,10 +1048,10 @@ impl Table {
     }
 
     fn get_column_separator_width(&self) -> i64 {
-        Helper::width(&sprintf(
-            &self.style.get_border_format(),
+        Helper::width(&legacy_lossy(&sprintf(
+            self.style.get_border_format(),
             &[PhpMixed::from(self.style.get_border_chars()[3].clone())],
-        ))
+        )))
     }
 
     fn get_cell_width(&self, row: &[Cell], column: i64) -> i64 {

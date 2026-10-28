@@ -21,7 +21,7 @@ use crate::installer::Installer;
 use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable, NullIO, io_interface};
 use crate::json::JsonValidationException;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
-use bstr::{B, ByteSlice};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
@@ -30,12 +30,12 @@ use shirabe_php_shim::{
     disk_free_space, exec, explode, explode_limit, extension_loaded, file_exists,
     file_get_contents, file_put_contents, function_exists, get_debug_type_obj, getcwd, getenv,
     getmypid, glob, implode, ini_set, is_array, is_dir, is_file, is_numeric_string, is_string,
-    json_decode_assoc, levenshtein, ltrim, mb_convert_encoding, mb_convert_variables,
-    mb_detect_encoding, mb_strwidth, memory_get_peak_usage, memory_get_usage, microtime, php_regex,
-    php_to_string, php_truthy, php_uname, posix_getuid, preg_grep, preg_match, preg_quote,
-    preg_split, putenv, random_bytes, realpath, restore_error_handler, round,
-    sort_natural_flag_case, str_pad, str_repeat, str_replace, str_split, strlen, strpos, strrpos,
-    strtoupper, substr, substr_count, sys_get_temp_dir, time, trim, unlink,
+    json_decode_assoc, legacy_lossy, levenshtein, ltrim2, mb_convert_encoding,
+    mb_convert_variables, mb_detect_encoding, mb_strwidth, memory_get_peak_usage, memory_get_usage,
+    microtime, php_regex, php_to_string, php_truthy, php_uname, posix_getuid, preg_grep,
+    preg_match, preg_quote, preg_split, putenv, random_bytes, realpath, restore_error_handler,
+    round, sort_natural_flag_case, str_pad, str_repeat, str_replace, str_split, strlen, strpos,
+    strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time, trim, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::application::Application as BaseApplication;
@@ -908,7 +908,7 @@ impl Application {
         // implode('[^:]*:', array_map('preg_quote', explode(':', $namespace))).'[^:]*'
         let parts: Vec<String> = explode(":", namespace)
             .into_iter()
-            .map(|p| preg_quote(&p, None))
+            .map(|p| preg_quote(&legacy_lossy(&p), None))
             .collect();
         let expr = format!("{}{}", implode("[^:]*:", &parts), "[^:]*");
         let namespaces: Vec<String> =
@@ -928,7 +928,7 @@ impl Application {
                     message.push_str("\n\nDid you mean one of these?\n    ");
                 }
 
-                message.push_str(&implode("\n    ", &alternatives));
+                message.push_str(&legacy_lossy(&implode("\n    ", &alternatives)));
             }
 
             return Err(NamespaceNotFoundException::new(message, alternatives, 0).into());
@@ -1006,7 +1006,7 @@ impl Application {
 
         let parts: Vec<String> = explode(":", name)
             .into_iter()
-            .map(|p| preg_quote(&p, None))
+            .map(|p| preg_quote(&legacy_lossy(&p), None))
             .collect();
         let expr = format!("{}{}", implode("[^:]*:", &parts), "[^:]*");
         let mut commands: Vec<String> =
@@ -1048,7 +1048,7 @@ impl Application {
                 } else {
                     message.push_str("\n\nDid you mean one of these?\n    ");
                 }
-                message.push_str(&implode("\n    ", &alternatives));
+                message.push_str(&legacy_lossy(&implode("\n    ", &alternatives)));
             }
 
             return Err(CommandNotFoundException::new(message, alternatives, 0).into());
@@ -1213,7 +1213,7 @@ impl Application {
         for name in names {
             let mut len = strlen(&name);
             while len > 0 {
-                let abbrev = substr(&name, 0, Some(len));
+                let abbrev = legacy_lossy(&substr(&name, 0, Some(len))).into_owned();
                 abbrevs.entry(abbrev).or_default().push(name.clone());
                 len -= 1;
             }
@@ -1259,7 +1259,7 @@ impl Application {
         let mut current = Some(e);
         while let Some(e) = current {
             let exception = AnyThrowable::of(e);
-            let message = trim(&e.to_string(), None);
+            let message = legacy_lossy(&trim(e.to_string())).into_owned();
             let verbosity = output.borrow().get_verbosity();
 
             let mut len;
@@ -1599,10 +1599,10 @@ impl Application {
 
         // implode(':', null === $limit ? $parts : array_slice($parts, 0, $limit))
         match limit {
-            None => implode(":", &parts),
+            None => legacy_lossy(&implode(":", &parts)).into_owned(),
             Some(limit) => {
-                let sliced: Vec<String> = parts.into_iter().take(limit.max(0) as usize).collect();
-                implode(":", &sliced)
+                let sliced: Vec<BString> = parts.into_iter().take(limit.max(0) as usize).collect();
+                legacy_lossy(&implode(":", &sliced)).into_owned()
             }
         }
     }
@@ -1615,7 +1615,13 @@ impl Application {
 
         let mut collection_parts: IndexMap<String, Vec<String>> = IndexMap::new();
         for item in collection {
-            collection_parts.insert(item.clone(), explode(":", item));
+            collection_parts.insert(
+                item.clone(),
+                explode(":", item)
+                    .iter()
+                    .map(|s| legacy_lossy(s).into_owned())
+                    .collect::<Vec<_>>(),
+            );
         }
 
         for (i, subname) in explode(":", name).into_iter().enumerate() {
@@ -1630,7 +1636,7 @@ impl Application {
 
                 let lev = levenshtein(&subname, &parts[i]) as f64;
                 if lev <= strlen(&subname) as f64 / 3.0
-                    || (!subname.is_empty() && parts[i].contains(&subname))
+                    || (!subname.is_empty() && parts[i].contains(&*legacy_lossy(&subname)))
                 {
                     let v = if exists {
                         alternatives[collection_name] + lev
@@ -1672,11 +1678,14 @@ impl Application {
         is_single_command: bool,
     ) -> anyhow::Result<&mut Self> {
         // $this->defaultCommand = explode('|', ltrim($commandName, '|'))[0];
-        let trimmed = ltrim(command_name, Some("|"));
-        self.default_command = explode("|", &trimmed)
-            .into_iter()
-            .next()
-            .unwrap_or_default();
+        let trimmed = ltrim2(command_name, "|");
+        self.default_command = legacy_lossy(
+            &explode("|", &trimmed)
+                .into_iter()
+                .next()
+                .unwrap_or_default(),
+        )
+        .into_owned();
 
         if is_single_command {
             // Ensure the command exist
@@ -1695,16 +1704,24 @@ impl Application {
     fn split_string_by_width(&self, string: &str, width: i64) -> Vec<String> {
         // str_split is not suitable for multi-byte characters, we should use preg_split to get char array properly.
         let encoding = match mb_detect_encoding(string, None, true) {
-            None => return str_split(string, width),
+            None => {
+                return str_split(string, width)
+                    .iter()
+                    .map(|s| legacy_lossy(s).into_owned())
+                    .collect::<Vec<_>>();
+            }
             Some(encoding) => encoding,
         };
 
-        let utf8_string = mb_convert_encoding(string.into(), "utf8", &encoding);
+        let utf8_string = mb_convert_encoding(string, "utf8", &encoding);
         let mut lines: Vec<String> = Vec::new();
         let mut line = String::new();
 
         let mut offset = 0usize;
-        while let Some(m) = preg_match(php_regex!(r"/.{1,10000}/u"), &utf8_string[offset..]) {
+        while let Some(m) = preg_match(
+            php_regex!(r"/.{1,10000}/u"),
+            &legacy_lossy(&utf8_string[offset..]),
+        ) {
             let m0 = m.get(0).unwrap_or("");
             offset += strlen(m0) as usize;
 
@@ -1714,25 +1731,29 @@ impl Application {
                 .map(|(i, c)| &chunk[i..i + c.len_utf8()])
             {
                 // test if $char could be appended to current line
-                if mb_strwidth(&format!("{}{}", line, char), Some("utf8")) <= width {
+                if mb_strwidth(format!("{}{}", line, char), Some(bstr::BStr::new("utf8"))) <= width
+                {
                     line.push_str(char);
                     continue;
                 }
                 // if not, push current line to array and make new line
-                lines.push(str_pad(&line, width as usize, " ", STR_PAD_RIGHT));
+                lines.push(
+                    legacy_lossy(&str_pad(&line, width as usize, " ", STR_PAD_RIGHT)).into_owned(),
+                );
                 line = char.to_string();
             }
         }
 
         lines.push(if !lines.is_empty() {
-            str_pad(&line, width as usize, " ", STR_PAD_RIGHT)
+            legacy_lossy(&str_pad(&line, width as usize, " ", STR_PAD_RIGHT)).into_owned()
         } else {
             line.clone()
         });
 
+        let mut lines: Vec<BString> = lines.into_iter().map(BString::from).collect();
         mb_convert_variables(&encoding, "utf8", &mut lines);
 
-        lines
+        lines.iter().map(|l| legacy_lossy(l).into_owned()).collect()
     }
 
     /// Returns all namespaces of the command name.
@@ -1746,7 +1767,7 @@ impl Application {
                 let last = namespaces.last().unwrap().clone();
                 namespaces.push(format!("{}:{}", last, part));
             } else {
-                namespaces.push(part);
+                namespaces.push(legacy_lossy(&part).into_owned());
             }
         }
 
@@ -2188,7 +2209,7 @@ impl ApplicationHandle {
                     .into_string()
                     .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}")),
                 pid,
-                bin2hex(&random_bytes(5))
+                bin2hex(random_bytes(5))
             );
             if !(file_put_contents(&tempfile, file!().as_bytes()).is_some_and(|n| n > 0)
                 && file_get_contents(&tempfile).as_deref().ok() == Some(file!().as_bytes())
@@ -2212,7 +2233,7 @@ impl ApplicationHandle {
                         let script: &str = &script.to_str_lossy();
                         let script_event_const = format!(
                             "Composer\\Script\\ScriptEvents::{}",
-                            str_replace("-", "_", &strtoupper(script))
+                            str_replace("-", "_", strtoupper(script))
                         );
                         if !defined(&script_event_const) {
                             if application.borrow_mut().has(script) {

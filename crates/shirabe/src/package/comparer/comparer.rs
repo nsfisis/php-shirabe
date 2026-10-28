@@ -2,7 +2,7 @@
 
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_php_shim::{chdir, hash_file};
+use shirabe_php_shim::{chdir, hash_file, legacy_lossy};
 use std::path::Path;
 
 #[derive(Debug)]
@@ -146,7 +146,10 @@ impl Comparer {
                     let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
                     if size > 0 {
                         let hash = hash_file("xxh3", &path);
-                        array.entry(dir.to_string()).or_default().insert(file, hash);
+                        array
+                            .entry(dir.to_string())
+                            .or_default()
+                            .insert(file, hash.map(|s| legacy_lossy(&s).into_owned()));
                     }
                 }
             }

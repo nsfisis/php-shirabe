@@ -353,7 +353,7 @@ impl fmt::Display for Pool {
         for package in &self.packages {
             str.push_str(&format!(
                 "- {}: {}\n",
-                str_pad(&package.id().to_string(), 6, " ", STR_PAD_LEFT),
+                str_pad(package.id().to_string(), 6, " ", STR_PAD_LEFT),
                 package.get_name()
             ));
         }

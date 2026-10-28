@@ -8,7 +8,7 @@ use crate::package::{BasePackageHandle, Link};
 use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySet};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, array_keys, array_shift, implode,
+    LogicException, PhpMixed, RuntimeException, array_keys, array_shift, implode, legacy_lossy,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
@@ -598,7 +598,7 @@ impl Rule {
                         ));
                     }
 
-                    implode(" | ", &rule_texts)
+                    legacy_lossy(&implode(" | ", &rule_texts)).into_owned()
                 };
 
                 format!("Conclusion: {}{}", rule_text, learned_string)

@@ -19,7 +19,7 @@ use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterface
 use shirabe::script::ScriptEvents;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_php_shim::{PhpMixed, dirname, preg_quote, realpath, strtr, symlink};
+use shirabe_php_shim::{PhpMixed, dirname, legacy_lossy, preg_quote, realpath, strtr, symlink};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 use shirabe_symfony_console::output::output_interface;
@@ -2323,18 +2323,22 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
     let excluded_root = format!(
         "{}/excludedroot($|/)",
         preg_quote(
-            &strtr(
-                &realpath(dirname(s.working_dir.to_str().unwrap())).unwrap_or_default(),
+            &legacy_lossy(&strtr(
+                realpath(dirname(s.working_dir.to_str().unwrap())).unwrap_or_default(),
                 "\\",
                 "/"
-            ),
+            )),
             None
         )
     );
     let root_excl = format!(
         "{}/root/excl($|/)",
         preg_quote(
-            &strtr(&realpath(&s.working_dir).unwrap_or_default(), "\\", "/"),
+            &legacy_lossy(&strtr(
+                realpath(&s.working_dir).unwrap_or_default(),
+                "\\",
+                "/"
+            )),
             None
         )
     );

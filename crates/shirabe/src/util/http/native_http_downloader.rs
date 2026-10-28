@@ -188,7 +188,7 @@ impl NativeHttpDownloader {
         // send_once(), so the auth/stream-context merge happens once per attempt inside the loop.
 
         let header_strings = Self::header_list(&options);
-        let if_modified = if stripos(&implode(",", &header_strings), "if-modified-since:").is_some()
+        let if_modified = if stripos(implode(",", &header_strings), "if-modified-since:").is_some()
         {
             " if modified"
         } else {

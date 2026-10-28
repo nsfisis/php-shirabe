@@ -12,9 +12,9 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, PregMatches, RuntimeException, array_key_exists, array_merge,
     array_search_mixed, array_unique, canonical_int_key, empty, filter_var_url, implode,
-    in_array_loose, in_array_strict, intval, is_array, is_string, parse_url, php_regex,
-    php_to_string, preg_is_match, preg_match, preg_replace_callback, rtrim, strtolower, strtoupper,
-    strtr, substr, trigger_error,
+    in_array_loose, in_array_strict, intval, is_array, is_string, legacy_lossy, parse_url,
+    php_regex, php_to_string, preg_is_match, preg_match, preg_replace_callback, rtrim2, strtolower,
+    strtoupper, strtr, substr, trigger_error,
 };
 
 use crate::advisory::Auditor;
@@ -533,7 +533,7 @@ impl Config {
             "vendor-dir" | "bin-dir" | "process-timeout" | "data-dir" | "cache-dir"
             | "cache-files-dir" | "cache-repo-dir" | "cache-vcs-dir" | "cafile" | "capath" => {
                 // convert foo-bar to COMPOSER_FOO_BAR and check if it exists since it overrides the local config
-                let env = format!("COMPOSER_{}", strtoupper(&strtr(key, "-", "_")));
+                let env = format!("COMPOSER_{}", strtoupper(strtr(key, "-", "_")));
 
                 let val = self.get_composer_env(&env);
                 if !matches!(val, PhpMixed::Bool(false)) {
@@ -555,8 +555,10 @@ impl Config {
                     val
                 };
                 let processed = self.process(raw_val, flags)?;
-                let mut val_str = rtrim(&php_to_string(&processed), Some("/\\"));
-                val_str = Platform::expand_path(&val_str);
+                let mut val_str =
+                    legacy_lossy(&rtrim2(php_to_string(&processed), "/\\")).into_owned();
+                val_str = legacy_lossy(&bstr::BString::from(Platform::expand_path(&val_str)))
+                    .into_owned();
 
                 if substr(key, -4, None) != "-dir" {
                     return Ok(PhpMixed::string(val_str));
@@ -566,7 +568,7 @@ impl Config {
                     if (flags & Self::RELATIVE_PATHS) == Self::RELATIVE_PATHS {
                         val_str
                     } else {
-                        self.realpath(&val_str)
+                        legacy_lossy(&bstr::BString::from(self.realpath(&val_str))).into_owned()
                     },
                 ))
             }
@@ -574,7 +576,7 @@ impl Config {
             // booleans with env var support
             "cache-read-only" | "htaccess-protect" => {
                 // convert foo-bar to COMPOSER_FOO_BAR and check if it exists since it overrides the local config
-                let env = format!("COMPOSER_{}", strtoupper(&strtr(key, "-", "_")));
+                let env = format!("COMPOSER_{}", strtoupper(strtr(key, "-", "_")));
 
                 let val = self.get_composer_env(&env);
                 let val = if matches!(val, PhpMixed::Bool(false)) {
@@ -634,17 +636,17 @@ impl Config {
                     .unwrap_or(0.0);
                 let unit = matches.get(2).map(str::to_string);
                 if let Some(unit) = unit {
-                    match strtolower(&unit).as_str() {
-                        "g" => {
+                    match strtolower(&unit).as_slice() {
+                        b"g" => {
                             size *= 1024.0;
                             size *= 1024.0;
                             size *= 1024.0;
                         }
-                        "m" => {
+                        b"m" => {
                             size *= 1024.0;
                             size *= 1024.0;
                         }
-                        "k" => {
+                        b"k" => {
                             size *= 1024.0;
                         }
                         _ => {}
@@ -671,9 +673,9 @@ impl Config {
                 let expanded =
                     Platform::expand_path(&v.as_string().unwrap_or_default().to_str_lossy());
                 let processed = self.process(PhpMixed::string(expanded), flags)?;
-                Ok(PhpMixed::string(rtrim(
-                    &processed.as_string().unwrap_or_default().to_str_lossy(),
-                    Some("/\\"),
+                Ok(PhpMixed::string(rtrim2(
+                    processed.as_string().unwrap_or_default(),
+                    "/\\",
                 )))
             }
 

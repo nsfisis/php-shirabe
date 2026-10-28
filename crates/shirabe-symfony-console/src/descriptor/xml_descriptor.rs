@@ -10,8 +10,8 @@ use crate::output::OutputInterface;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    DOMDocument, DOMNode, PhpMixed, php_to_string, php_truthy, str_replace, strpos, substr,
-    var_export,
+    DOMDocument, DOMNode, PhpMixed, legacy_lossy, php_to_string, php_truthy, str_replace, strpos,
+    substr, var_export,
 };
 
 /// XML descriptor.
@@ -52,11 +52,11 @@ impl XmlDescriptor {
         let usages_xml = command_xml.append_child(dom.create_element("usages"));
 
         let description_xml = command_xml.append_child(dom.create_element("description"));
-        description_xml.append_child(dom.create_text_node(&str_replace(
+        description_xml.append_child(dom.create_text_node(&legacy_lossy(&str_replace(
             "\n",
             "\n ",
-            &command.get_description(),
-        )));
+            command.get_description(),
+        ))));
 
         if short {
             for usage in command.get_aliases() {
@@ -73,11 +73,11 @@ impl XmlDescriptor {
             }
 
             let help_xml = command_xml.append_child(dom.create_element("help"));
-            help_xml.append_child(dom.create_text_node(&str_replace(
+            help_xml.append_child(dom.create_text_node(&legacy_lossy(&str_replace(
                 "\n",
                 "\n ",
-                &command.get_processed_help(),
-            )));
+                command.get_processed_help(),
+            ))));
 
             let command_definition = command.get_definition().clone();
             let definition_xml = self.get_input_definition_document(&command_definition);

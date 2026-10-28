@@ -5,7 +5,8 @@ use crate::question::{Question, QuestionInterface};
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, array_search, explode, implode, php_regex, preg_is_match, sprintf, strval, trim,
+    PhpMixed, array_search, explode, implode, legacy_lossy, php_regex, preg_is_match, sprintf,
+    strval, trim,
 };
 
 /// Represents a choice question.
@@ -124,13 +125,13 @@ impl ChoiceQuestion {
             let selected_choices: Vec<PhpMixed> = if multiselect {
                 // Check for a separated comma values
                 if !preg_is_match(php_regex!("/^[^,]+(?:,[^,]+)*$/"), &strval(&selected)) {
-                    return Err(InvalidArgumentException::new(sprintf(
-                        &error_message,
-                        std::slice::from_ref(&selected),
-                    )));
+                    return Err(InvalidArgumentException::new(
+                        legacy_lossy(&sprintf(&error_message, std::slice::from_ref(&selected)))
+                            .into_owned(),
+                    ));
                 }
 
-                explode(",", &strval(&selected))
+                explode(",", strval(&selected))
                     .into_iter()
                     .map(PhpMixed::string)
                     .collect()
@@ -141,7 +142,7 @@ impl ChoiceQuestion {
             let mut selected_choices = selected_choices;
             if trimmable {
                 for v in selected_choices.iter_mut() {
-                    *v = PhpMixed::string(trim(&strval(v), None));
+                    *v = PhpMixed::string(trim(strval(v)));
                 }
             }
 
@@ -190,10 +191,10 @@ impl ChoiceQuestion {
 
                 // false === $result
                 if matches!(result, PhpMixed::Bool(false)) {
-                    return Err(InvalidArgumentException::new(sprintf(
-                        &error_message,
-                        std::slice::from_ref(value),
-                    )));
+                    return Err(InvalidArgumentException::new(
+                        legacy_lossy(&sprintf(&error_message, std::slice::from_ref(value)))
+                            .into_owned(),
+                    ));
                 }
 
                 // For associative choices, consistently return the key as string:

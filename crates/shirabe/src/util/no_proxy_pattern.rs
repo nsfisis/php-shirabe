@@ -3,8 +3,8 @@
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     RuntimeException, array_key_exists, explode, filter_var_int_with_range, filter_var_ip,
-    inet_pton, ltrim, parse_url, php_regex, preg_split, stripos, strlen, strpbrk, strpos, substr,
-    substr_count,
+    inet_pton, legacy_lossy, ltrim2, parse_url, php_regex, preg_split, stripos, strlen, strpbrk,
+    strpos, substr, substr_count,
 };
 
 /// Tests URLs against NO_PROXY patterns
@@ -224,8 +224,8 @@ impl NoProxyPattern {
         // Check for a CIDR prefix-length
         if strpos(&host, "/").is_some() {
             let parts = explode("/", &host);
-            host = parts.first().cloned().unwrap_or_default();
-            let prefix_str = parts.get(1).cloned().unwrap_or_default();
+            host = legacy_lossy(&parts.first().cloned().unwrap_or_default()).into_owned();
+            let prefix_str = legacy_lossy(&parts.get(1).cloned().unwrap_or_default()).into_owned();
 
             if !allow_prefix || !self.validate_int(&prefix_str, 0, 128) {
                 return Ok(false);
@@ -341,7 +341,7 @@ impl NoProxyPattern {
     fn make_data(&self, host: &str, port: i64, ipdata: Option<IpData>) -> UrlData {
         UrlData {
             host: host.to_string(),
-            name: format!(".{}", ltrim(host, Some("."))),
+            name: format!(".{}", ltrim2(host, ".")),
             port,
             ipdata,
         }
@@ -377,8 +377,8 @@ impl NoProxyPattern {
                 Some(i) => i,
             };
 
-            ip6 = substr(&host_name, 1, Some((index as i64) - 1));
-            host_name = substr(&host_name, (index as i64) + 1, None);
+            ip6 = legacy_lossy(&substr(&host_name, 1, Some((index as i64) - 1))).into_owned();
+            host_name = legacy_lossy(&substr(&host_name, (index as i64) + 1, None)).into_owned();
 
             if strpbrk(&host_name, "[]").is_some() || substr_count(&host_name, ":") > 1 {
                 return Ok(error);
@@ -387,8 +387,8 @@ impl NoProxyPattern {
 
         if substr_count(&host_name, ":") == 1 {
             let index = strpos(&host_name, ":").unwrap_or(0);
-            let port_str = substr(&host_name, (index as i64) + 1, None);
-            host_name = substr(&host_name, 0, Some(index as i64));
+            let port_str = legacy_lossy(&substr(&host_name, (index as i64) + 1, None)).into_owned();
+            host_name = legacy_lossy(&substr(&host_name, 0, Some(index as i64))).into_owned();
 
             if !self.validate_int(&port_str, 1, 65535) {
                 return Ok(error);

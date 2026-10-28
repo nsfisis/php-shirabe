@@ -21,8 +21,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect,
     array_keys, array_map, array_merge, empty, file_get_contents, filemtime, hash, in_array_loose,
-    is_int, ksort, php_regex, preg_is_match, preg_match, realpath, strcmp, strtolower, touch2,
-    trim, usort,
+    is_int, ksort, legacy_lossy, php_regex, preg_is_match, preg_match, realpath, strcmp,
+    strtolower, touch2, trim, usort,
 };
 use shirabe_seld_json_lint::ParsingException;
 
@@ -53,7 +53,7 @@ impl Locker {
         Self {
             lock_file,
             installation_manager,
-            hash: hash("md5", composer_file_contents),
+            hash: legacy_lossy(&hash("md5", composer_file_contents)).into_owned(),
             content_hash: Self::get_content_hash(composer_file_contents).unwrap_or_default(),
             loader: ArrayLoader::new(None, true),
             dumper: ArrayDumper::new(),
@@ -112,13 +112,14 @@ impl Locker {
 
         ksort(&mut relevant_content);
 
-        Ok(hash(
+        Ok(legacy_lossy(&hash(
             "md5",
             &JsonFile::encode_with_options(
                 &PhpMixed::Array(relevant_content.into_iter().collect()),
                 JsonEncodeOptions::none(),
             )?,
         ))
+        .into_owned())
     }
 
     /// Checks whether locker has been locked (lockfile found).
@@ -265,12 +266,14 @@ impl Locker {
         if let Some(PhpMixed::List(list)) = lock_data.get(B("packages-dev")) {
             for package in list {
                 if let PhpMixed::Array(m) = package {
-                    names.push(strtolower(
-                        &m.get(B("name"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_str_lossy(),
-                    ));
+                    names.push(
+                        legacy_lossy(&strtolower(
+                            m.get(B("name"))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        ))
+                        .into_owned(),
+                    );
                 }
             }
         }
@@ -742,14 +745,12 @@ impl Locker {
 
         usort(&mut locked, |a, b| {
             let comparison = strcmp(
-                &a.get(B("name"))
+                a.get(B("name"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_str_lossy(),
-                &b.get(B("name"))
+                    .unwrap_or_default(),
+                b.get(B("name"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_str_lossy(),
+                    .unwrap_or_default(),
             );
 
             if 0 != comparison {
@@ -758,14 +759,12 @@ impl Locker {
 
             // If it is the same package, compare the versions to make the order deterministic
             strcmp(
-                &a.get(B("version"))
+                a.get(B("version"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_str_lossy(),
-                &b.get(B("version"))
+                    .unwrap_or_default(),
+                b.get(B("version"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_str_lossy(),
+                    .unwrap_or_default(),
             )
         });
 
@@ -822,15 +821,13 @@ impl Locker {
                         &mut output,
                         path.as_deref(),
                     )? {
-                        let output_str = trim(
-                            &GitUtil::parse_rev_list_output(
-                                &output.as_string().unwrap_or_default().to_str_lossy(),
-                                &self.process,
-                            )?,
-                            None,
-                        );
+                        let output_str = legacy_lossy(&trim(&GitUtil::parse_rev_list_output(
+                            &output.as_string().unwrap_or_default().to_str_lossy(),
+                            &self.process,
+                        )?))
+                        .into_owned();
                         if preg_is_match(php_regex!(r"{^\s*\d+\s*$}"), &output_str) {
-                            let ts = trim(&output_str, None).parse::<i64>().unwrap_or(0);
+                            let ts = legacy_lossy(&trim(&output_str)).parse::<i64>().unwrap_or(0);
                             datetime = chrono::DateTime::from_timestamp(ts, 0);
                         }
                     }

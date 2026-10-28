@@ -2,7 +2,7 @@
 
 use shirabe_php_shim::{
     PATHINFO_EXTENSION, PHP_EOL, basename, escapeshellarg, exec, getenv, is_dir, is_executable,
-    is_file, pathinfo, strcspn, strpos, strtolower, substr,
+    is_file, legacy_lossy, path_from_bytes, pathinfo, strcspn, strpos, strtolower, substr,
 };
 
 const CMD_BUILTINS: &[&str] = &[
@@ -30,7 +30,7 @@ impl ExecutableFinder {
 
     pub fn find(&self, name: &str, default: Option<&str>, extra_dirs: &[String]) -> Option<String> {
         // windows built-in commands that are present in cmd.exe should not be resolved using PATH as they do not exist as exes
-        if cfg!(windows) && CMD_BUILTINS.contains(&strtolower(name).as_str()) {
+        if cfg!(windows) && CMD_BUILTINS.iter().any(|b| strtolower(name) == *b) {
             return Some(name.to_string());
         }
 
@@ -86,8 +86,7 @@ impl ExecutableFinder {
             }
         }
 
-        if cfg!(windows) || name.len() != strcspn(name, &format!("/{}", std::path::MAIN_SEPARATOR))
-        {
+        if cfg!(windows) || name.len() != strcspn(name, format!("/{}", std::path::MAIN_SEPARATOR)) {
             return default.map(ToString::to_string);
         }
 
@@ -103,8 +102,8 @@ impl ExecutableFinder {
             0,
             strpos(&exec_result, PHP_EOL).map(|i| i as i64),
         );
-        if !executable_path.is_empty() && is_executable(&executable_path) {
-            return Some(executable_path);
+        if !executable_path.is_empty() && is_executable(path_from_bytes(&executable_path)) {
+            return Some(legacy_lossy(&executable_path).into_owned());
         }
 
         default.map(ToString::to_string)

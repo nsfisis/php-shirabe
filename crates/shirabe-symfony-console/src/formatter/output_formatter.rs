@@ -7,9 +7,9 @@ use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInte
 use crate::formatter::output_formatter_style_stack::OutputFormatterStyleStack;
 use crate::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
 use shirabe_php_shim::{
-    PhpMixed, PregMatches, byte_at, explode, implode, ltrim, mb_detect_encoding, php_regex,
-    preg_match, preg_match_all, preg_replace, rtrim, str_repeat, str_replace, strlen, strtolower,
-    strtr_array, substr,
+    PhpMixed, PregMatches, byte_at, explode, implode, legacy_lossy, ltrim, mb_detect_encoding,
+    php_regex, preg_match, preg_match_all, preg_replace, rtrim2, str_repeat, str_replace, strlen,
+    strtolower, strtr_array, substr,
 };
 use shirabe_symfony_string::b;
 
@@ -37,9 +37,12 @@ impl OutputFormatter {
         let mut text = text.to_string();
         if text.ends_with('\\') {
             let len = strlen(&text);
-            text = rtrim(&text, Some("\\"));
-            text = str_replace("\0", "", &text);
-            text.push_str(&str_repeat("\0", (len - strlen(&text)) as usize));
+            text = legacy_lossy(&rtrim2(&text, "\\")).into_owned();
+            text = legacy_lossy(&str_replace("\0", "", &text)).into_owned();
+            text.push_str(&legacy_lossy(&str_repeat(
+                "\0",
+                (len - strlen(&text)) as usize,
+            )));
         }
 
         text
@@ -123,14 +126,14 @@ impl OutputFormatter {
                 .expect("every group participates whenever the pattern matches");
 
             if key == "fg" {
-                style.set_foreground(Some(&strtolower(value)));
+                style.set_foreground(Some(&*legacy_lossy(&strtolower(value))));
             } else if key == "bg" {
-                style.set_background(Some(&strtolower(value)));
+                style.set_background(Some(&*legacy_lossy(&strtolower(value))));
             } else if key == "href" {
                 let url = preg_replace(php_regex!("{\\\\([<>])}"), "$1", value);
                 style.set_href(&url);
             } else if key == "options" {
-                let value = strtolower(value);
+                let value = legacy_lossy(&strtolower(value)).into_owned();
                 let options = preg_match_all(php_regex!("([^,;]+)"), &value);
                 for option in options {
                     style.set_option(
@@ -170,14 +173,14 @@ impl OutputFormatter {
         let mut text = text.to_string();
 
         if *current_line_length == 0 && !current.is_empty() {
-            text = ltrim(&text, None);
+            text = legacy_lossy(&ltrim(&text)).into_owned();
         }
 
         let prefix;
         if *current_line_length != 0 {
             let i = width - *current_line_length;
             prefix = format!("{}\n", substr(&text, 0, Some(i)));
-            text = substr(&text, i, None);
+            text = legacy_lossy(&substr(&text, i, None)).into_owned();
         } else {
             prefix = String::new();
         }
@@ -187,7 +190,7 @@ impl OutputFormatter {
             .unwrap_or("")
             .to_string();
         text = format!("{}{}", prefix, self.add_line_breaks(&text, width));
-        text = format!("{}{}", rtrim(&text, Some("\n")), trailing);
+        text = format!("{}{}", rtrim2(&text, "\n"), trailing);
 
         if *current_line_length == 0 && !current.is_empty() && substr(current, -1, None) != "\n" {
             text = format!("\n{text}");
@@ -204,22 +207,26 @@ impl OutputFormatter {
 
         if self.is_decorated() {
             for line in lines.iter_mut() {
-                *line = self.style_stack.get_current_mut().apply(line);
+                *line = bstr::BString::from(
+                    self.style_stack
+                        .get_current_mut()
+                        .apply(&legacy_lossy(line)),
+                );
             }
         }
 
-        implode("\n", &lines)
+        legacy_lossy(&implode("\n", &lines)).into_owned()
     }
 
     fn add_line_breaks(&self, text: &str, width: i64) -> String {
         let encoding = mb_detect_encoding(text, None, true)
             .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "UTF-8".to_string());
+            .unwrap_or_else(|| bstr::BString::from("UTF-8".to_string()));
 
         b(text)
-            .to_code_point_string(&encoding)
+            .to_code_point_string(&legacy_lossy(&encoding))
             .wordwrap(width, "\n", true)
-            .to_byte_string(&encoding)
+            .to_byte_string(&legacy_lossy(&encoding))
     }
 }
 
@@ -234,13 +241,13 @@ impl OutputFormatterInterface for OutputFormatter {
 
     fn set_style(&mut self, name: &str, style: Box<dyn OutputFormatterStyleInterface>) {
         self.styles.insert(
-            strtolower(name),
+            legacy_lossy(&strtolower(name)).into_owned(),
             std::rc::Rc::new(std::cell::RefCell::new(style)),
         );
     }
 
     fn has_style(&self, name: &str) -> bool {
-        self.styles.contains_key(&strtolower(name))
+        self.styles.contains_key(&*legacy_lossy(&strtolower(name)))
     }
 
     fn get_style(
@@ -256,7 +263,9 @@ impl OutputFormatterInterface for OutputFormatter {
             .into());
         }
 
-        Ok(std::rc::Rc::clone(&self.styles[&strtolower(name)]))
+        Ok(std::rc::Rc::clone(
+            &self.styles[&*legacy_lossy(&strtolower(name))],
+        ))
     }
 
     fn format(&mut self, message: Option<&str>) -> anyhow::Result<Option<String>> {
@@ -299,8 +308,12 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
 
             // add the text up to the next tag
             let segment = substr(message, offset, Some(pos - offset));
-            let applied =
-                self.apply_current_style(&segment, &output, width, &mut current_line_length);
+            let applied = self.apply_current_style(
+                &legacy_lossy(&segment),
+                &output,
+                width,
+                &mut current_line_length,
+            );
             output.push_str(&applied);
             offset = pos + strlen(text);
 
@@ -331,13 +344,20 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
         }
 
         let segment = substr(message, offset, None);
-        let applied = self.apply_current_style(&segment, &output, width, &mut current_line_length);
+        let applied = self.apply_current_style(
+            &legacy_lossy(&segment),
+            &output,
+            width,
+            &mut current_line_length,
+        );
         output.push_str(&applied);
 
         let mut pairs = indexmap::IndexMap::new();
         pairs.insert("\0".to_string(), "\\".to_string());
         pairs.insert("\\<".to_string(), "<".to_string());
         pairs.insert("\\>".to_string(), ">".to_string());
-        Ok(Some(strtr_array(&output, &pairs)))
+        Ok(Some(
+            legacy_lossy(&strtr_array(&output, &pairs)).into_owned(),
+        ))
     }
 }

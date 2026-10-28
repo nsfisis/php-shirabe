@@ -3,7 +3,7 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::{InputArgument, InputOption, InputValue};
 use indexmap::IndexMap;
-use shirabe_php_shim::{explode, implode, strtoupper};
+use shirabe_php_shim::{explode, implode, legacy_lossy, strtoupper};
 
 /// A InputDefinition represents a set of valid command line arguments and options.
 ///
@@ -255,7 +255,7 @@ impl InputDefinition {
 
         if let Some(shortcut) = option.get_shortcut() {
             for shortcut in explode("|", shortcut) {
-                if let Some(existing_name) = self.shortcuts.get(&shortcut)
+                if let Some(existing_name) = self.shortcuts.get(&*legacy_lossy(&shortcut))
                     && !option.equals(&self.options[existing_name])
                 {
                     return Err(LogicException::new(format!(
@@ -271,8 +271,10 @@ impl InputDefinition {
             .insert(option.get_name().to_string(), std::rc::Rc::clone(&option));
         if let Some(shortcut) = option.get_shortcut() {
             for shortcut in explode("|", shortcut) {
-                self.shortcuts
-                    .insert(shortcut, option.get_name().to_string());
+                self.shortcuts.insert(
+                    legacy_lossy(&shortcut).into_owned(),
+                    option.get_name().to_string(),
+                );
             }
         }
 

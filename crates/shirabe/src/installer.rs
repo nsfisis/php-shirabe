@@ -31,7 +31,7 @@ pub use plugin_installer::*;
 pub use project_installer::*;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, array_map, array_unique, implode, intval, is_dir,
-    is_numeric, strcmp, strpos, strtolower, touch, usort,
+    is_numeric, legacy_lossy, strcmp, strpos, strtolower, touch, usort,
 };
 pub use suggested_packages_reporter::*;
 
@@ -810,8 +810,8 @@ impl Installer {
 
         let sort_by_name = |a: &std::rc::Rc<AnyOperation>, b: &std::rc::Rc<AnyOperation>| -> i64 {
             strcmp(
-                &a.get_target_package().get_name(),
-                &b.get_target_package().get_name(),
+                a.get_target_package().get_name(),
+                b.get_target_package().get_name(),
             )
         };
         usort(&mut uninstalls, &sort_by_name);
@@ -1886,7 +1886,10 @@ impl Installer {
         if packages.is_empty() {
             self.update_allow_list = None;
         } else {
-            let lowered: Vec<String> = array_map(|s: &String| strtolower(s), &packages);
+            let lowered: Vec<String> = array_map(|s: &String| strtolower(s), &packages)
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<_>>();
             let unique: Vec<String> = array_unique(&lowered);
             self.update_allow_list = Some(unique);
         }

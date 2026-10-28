@@ -8,8 +8,8 @@ use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, SyncHelper};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, RuntimeException, bin2hex, file_exists, hash, php_regex,
-    preg_is_match, preg_replace, random_bytes, realpath, sys_get_temp_dir,
+    InvalidArgumentException, RuntimeException, bin2hex, file_exists, hash, legacy_lossy,
+    php_regex, preg_is_match, preg_replace, random_bytes, realpath, sys_get_temp_dir,
 };
 
 pub struct ArchiveManager {
@@ -77,7 +77,10 @@ impl ArchiveManager {
 
         if let Some(source_reference) = package.get_source_reference() {
             let hash = hash("sha1", &source_reference);
-            parts.insert("source_reference".to_string(), hash[..6].to_string());
+            parts.insert(
+                "source_reference".to_string(),
+                legacy_lossy(&hash[..6]).into_owned(),
+            );
         }
 
         // array_filter removed null values; replace '/' with '-' in each value
@@ -147,7 +150,7 @@ impl ArchiveManager {
                 .into_os_string()
                 .into_string()
                 .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
-            let random_suffix = bin2hex(&random_bytes(5));
+            let random_suffix = bin2hex(random_bytes(5));
             source_path = format!("{}/composer_archive{}", tmp_dir, random_suffix);
             filesystem.ensure_directory_exists(&source_path)?;
 
@@ -236,7 +239,7 @@ impl ArchiveManager {
             return Ok(target);
         }
 
-        let tmp_suffix = bin2hex(&random_bytes(5));
+        let tmp_suffix = bin2hex(random_bytes(5));
         // TODO(bytes): the target path is kept as a String.
         let temp_target = format!(
             "{}/composer_archive{}.{}",

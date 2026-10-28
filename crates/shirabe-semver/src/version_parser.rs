@@ -2,8 +2,8 @@
 
 use crate::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint};
 use shirabe_php_shim::{
-    PregMatches, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_split,
-    strtolower, trim,
+    PregMatches, legacy_lossy, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
+    preg_split, strtolower, trim,
 };
 
 // Regex to match pre-release data (sort of).
@@ -32,7 +32,7 @@ impl VersionParser {
         }
 
         let pattern = format!("{{{}(?:\\+.*)?$}}i", MODIFIER_REGEX);
-        let lower = strtolower(&version);
+        let lower = legacy_lossy(&strtolower(&version)).into_owned();
         let match_ = preg_match(&pattern, &lower);
 
         // match_[3] = the ([.-]?dev)? capture
@@ -62,7 +62,7 @@ impl VersionParser {
     }
 
     pub fn normalize_stability(stability: &str) -> anyhow::Result<String> {
-        let stability = strtolower(stability);
+        let stability = legacy_lossy(&strtolower(stability)).into_owned();
 
         if !["stable", "rc", "beta", "alpha", "dev"].contains(&stability.as_str()) {
             anyhow::bail!(
@@ -79,7 +79,7 @@ impl VersionParser {
     }
 
     pub fn normalize(&self, version: &str, full_version: Option<&str>) -> anyhow::Result<String> {
-        let version = trim(version, None);
+        let version = legacy_lossy(&trim(version)).into_owned();
         let orig_version = version.clone();
         let full_version = full_version.unwrap_or(&version).to_string();
         let mut version = version;
@@ -244,7 +244,7 @@ impl VersionParser {
     }
 
     pub fn normalize_branch(&self, name: &str) -> anyhow::Result<String> {
-        let name = trim(name, None);
+        let name = legacy_lossy(&trim(name)).into_owned();
 
         // Groups: 1=major, 2=".minor"(outer), 3=minor(inner), 4=".patch"(outer),
         // 5=patch(inner), 6=".fourth"(outer), 7=fourth(inner).
@@ -283,7 +283,10 @@ impl VersionParser {
     pub fn parse_constraints(&self, constraints: &str) -> anyhow::Result<AnyConstraint> {
         let pretty_constraint = constraints.to_string();
 
-        let or_constraints = preg_split(php_regex!("{\\s*\\|\\|?\\s*}"), &trim(constraints, None));
+        let or_constraints = preg_split(
+            php_regex!("{\\s*\\|\\|?\\s*}"),
+            &legacy_lossy(&trim(constraints)),
+        );
 
         let mut or_groups: Vec<AnyConstraint> = Vec::new();
 
@@ -633,7 +636,7 @@ impl VersionParser {
                 }
                 if op == "<" || op == ">=" {
                     let modifier_pattern = format!("{{-{}$}}", MODIFIER_REGEX);
-                    if !preg_is_match(&modifier_pattern, &strtolower(&version_str))
+                    if !preg_is_match(&modifier_pattern, &legacy_lossy(&strtolower(&version_str)))
                         && !version_str.starts_with("dev-")
                     {
                         version = format!("{}-dev", version);

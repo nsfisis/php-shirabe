@@ -8,9 +8,9 @@ use crate::repository::{LockArrayRepository, PlatformRepository, RepositorySet};
 use bstr::B;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, LogicException, PhpMixed, extension_loaded, implode, loosely_compare, php_regex,
-    preg_is_match, preg_match, preg_replace, spl_object_hash, sprintf, str_replace, stripos,
-    strpos, strtolower, substr, substr_count, version_compare,
+    CmpOp, LogicException, PhpMixed, extension_loaded, implode, legacy_lossy, loosely_compare,
+    php_regex, preg_is_match, preg_match, preg_replace, spl_object_hash, sprintf, str_replace,
+    stripos, strpos, strtolower, substr, substr_count, version_compare,
 };
 use shirabe_semver::constraint::{AnyConstraint, MultiConstraint, SimpleConstraint};
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -158,14 +158,15 @@ impl Problem {
                 rule::ReasonData::BasePackage(p) => p.to_string(),
                 _ => unreachable!(),
             },
-            rule::RULE_LEARNED => implode(
+            rule::RULE_LEARNED => legacy_lossy(&implode(
                 "-",
                 &rule
                     .get_literals()
                     .iter()
                     .map(|l| l.to_string())
                     .collect::<Vec<_>>(),
-            ),
+            ))
+            .into_owned(),
             _ => {
                 panic!("Unknown rule type: {}", rule.get_reason());
             }
@@ -228,7 +229,7 @@ impl Problem {
             if let Some(m) = matched {
                 let pkg_key = m.get(1).unwrap_or_default().to_string();
                 let m2 = m.get(2).unwrap_or_default().to_string();
-                message = str_replace("%", "%%", &message);
+                message = legacy_lossy(&str_replace("%", "%%", &message)).into_owned();
                 let template = preg_replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &message);
                 messages.push(template.clone());
                 let version_key = parser.normalize(&m2, Some("")).unwrap_or_default();
@@ -299,22 +300,31 @@ impl Problem {
                             "$1",
                             message,
                         );
-                        result.push(sprintf(
-                            &message_var,
-                            &[
-                                PhpMixed::string(package.clone()),
-                                PhpMixed::string(format!("[{}]", implode(", ", &versions_list))),
-                            ],
-                        ));
+                        result.push(
+                            legacy_lossy(&sprintf(
+                                &message_var,
+                                &[
+                                    PhpMixed::string(package.clone()),
+                                    PhpMixed::string(format!(
+                                        "[{}]",
+                                        implode(", ", &versions_list)
+                                    )),
+                                ],
+                            ))
+                            .into_owned(),
+                        );
                     } else {
                         let first = versions_list.first().cloned().unwrap_or_default();
-                        result.push(sprintf(
-                            message,
-                            &[
-                                PhpMixed::string(package.clone()),
-                                PhpMixed::string(format!(" {}", first)),
-                            ],
-                        ));
+                        result.push(
+                            legacy_lossy(&sprintf(
+                                message,
+                                &[
+                                    PhpMixed::string(package.clone()),
+                                    PhpMixed::string(format!(" {}", first)),
+                                ],
+                            ))
+                            .into_owned(),
+                        );
                     }
                 }
             } else {
@@ -325,7 +335,7 @@ impl Problem {
         Ok(format!(
             "\n{}- {}",
             indent,
-            implode(&format!("\n{}- ", indent), &result)
+            implode(format!("\n{}- ", indent), &result)
         ))
     }
 
@@ -435,7 +445,7 @@ impl Problem {
                     ));
                 }
 
-                let ext = substr(package_name, 4, None);
+                let ext = legacy_lossy(&substr(package_name, 4, None)).into_owned();
                 let msg = format!(
                     "- Root composer.json requires PHP extension {}{} but ",
                     package_name,
@@ -567,7 +577,7 @@ impl Problem {
                             )),
                             AnyConstraint::Simple(SimpleConstraint::new(
                                 "==".to_string(),
-                                str_replace("#", "+", &new_constraint),
+                                legacy_lossy(&str_replace("#", "+", &new_constraint)).into_owned(),
                                 None,
                             )),
                         ],
@@ -594,7 +604,7 @@ impl Problem {
                             constraint,
                             false
                         ),
-                        str_replace("#", "+", &c.get_pretty_string())
+                        str_replace("#", "+", c.get_pretty_string())
                     ),
                 ));
             }
@@ -1110,7 +1120,7 @@ impl Problem {
             ));
         }
 
-        implode(", ", &prepared_strings)
+        legacy_lossy(&implode(", ", &prepared_strings)).into_owned()
     }
 
     fn get_platform_package_version(
@@ -1420,7 +1430,7 @@ impl Problem {
             } else {
                 providers.values().cloned().collect::<Vec<_>>()
             };
-            let mut providers_str = implode(
+            let mut providers_str = legacy_lossy(&implode(
                 "",
                 &slice
                     .iter()
@@ -1433,7 +1443,8 @@ impl Problem {
                         format!("      - {}{}\n", p.name, description)
                     })
                     .collect::<Vec<_>>(),
-            );
+            ))
+            .into_owned();
             if provider_count > max_providers + 1 {
                 providers_str.push_str(&format!(
                     "      ... and {} more.\n",

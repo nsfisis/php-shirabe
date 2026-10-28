@@ -6,8 +6,8 @@ use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, chdir, date_local, explode, fclose, feof, fgets,
-    file_get_contents, fopen, fwrite, gethostname, json_decode_assoc, php_regex, preg_replace,
-    str_replace_array, strcmp, strlen, strpos, strrpos, substr, time, trim,
+    file_get_contents, fopen, fwrite, gethostname, json_decode_assoc, legacy_lossy, php_regex,
+    preg_replace, str_replace_array, strcmp, strlen, strpos, strrpos, substr, time, trim,
 };
 use shirabe_symfony_process::{ExecutableFinder, Process};
 
@@ -223,7 +223,7 @@ impl Perforce {
         let index = strpos(stream, "@");
         match index {
             None => stream.to_string(),
-            Some(idx) => substr(stream, 0, Some(idx as i64)),
+            Some(idx) => legacy_lossy(&substr(stream, 0, Some(idx as i64))).into_owned(),
         }
     }
 
@@ -275,18 +275,22 @@ impl Perforce {
         if self.windows_flag {
             let command = format!("{} set", Self::get_p4_executable());
             self.execute_command(CommandLine::Shell(command));
-            let result = trim(&self.command_result, None);
+            let result = trim(&self.command_result);
             let res_array = explode(PHP_EOL, &result);
             for line in &res_array {
                 let fields = explode("=", line);
-                if strcmp(name, fields.first().map(|s| s.as_str()).unwrap_or("")) == 0 {
+                if strcmp(
+                    name,
+                    fields.first().map(|s| s.as_slice()).unwrap_or_default(),
+                ) == 0
+                {
                     let field1 = fields.get(1).cloned().unwrap_or_default();
                     let index = strpos(&field1, " ");
                     let value = match index {
                         None => field1,
                         Some(idx) => substr(&field1, 0, Some(idx as i64)),
                     };
-                    let value = trim(&value, None);
+                    let value = legacy_lossy(&trim(&value)).into_owned();
 
                     return Some(value);
                 }
@@ -297,7 +301,7 @@ impl Perforce {
 
         let command = format!("echo ${}", name);
         self.execute_command(CommandLine::Shell(command));
-        let result = trim(&self.command_result, None);
+        let result = legacy_lossy(&trim(&self.command_result)).into_owned();
 
         Some(result)
     }
@@ -567,7 +571,7 @@ impl Perforce {
         self.execute_command(CommandLine::Args(command));
         let result = self.command_result.clone();
 
-        if trim(&result, None).is_empty() {
+        if trim(&result).is_empty() {
             return None;
         }
 
@@ -594,7 +598,7 @@ impl Perforce {
         if index2.is_none() {
             let index3 = strpos(&result, "change");
             if let Some(i3) = index3 {
-                let phrase = trim(&substr(&result, i3 as i64, None), None);
+                let phrase = trim(substr(&result, i3 as i64, None));
                 let fields = explode(" ", &phrase);
 
                 return Some(format!(
@@ -633,9 +637,12 @@ impl Perforce {
                     let branch = preg_replace(
                         php_regex!(r"/[^A-Za-z0-9 ]/"),
                         "",
-                        &res_bits.get(4).cloned().unwrap_or_default(),
+                        &legacy_lossy(&res_bits.get(4).cloned().unwrap_or_default()),
                     );
-                    possible_branches.insert(branch, res_bits.get(1).cloned().unwrap_or_default());
+                    possible_branches.insert(
+                        branch,
+                        legacy_lossy(&res_bits.get(1).cloned().unwrap_or_default()).into_owned(),
+                    );
                 }
             }
         }
@@ -676,7 +683,7 @@ impl Perforce {
         for line in &res_array {
             if strpos(line, "Label").is_some() {
                 let fields = explode(" ", line);
-                let key = fields.get(1).cloned().unwrap_or_default();
+                let key = legacy_lossy(&fields.get(1).cloned().unwrap_or_default()).into_owned();
                 tags.insert(key.clone(), format!("{}@{}", stream, key));
             }
         }
@@ -694,10 +701,12 @@ impl Perforce {
                 let fields = explode(" ", line);
                 if strcmp(
                     self.p4_depot.as_deref().unwrap_or(""),
-                    fields.get(1).map(|s| s.as_str()).unwrap_or(""),
+                    &*legacy_lossy(fields.get(1).map(|s| s.as_slice()).unwrap_or_default()),
                 ) == 0
                 {
-                    self.p4_depot_type = Some(fields.get(3).cloned().unwrap_or_default());
+                    self.p4_depot_type = Some(
+                        legacy_lossy(&fields.get(3).cloned().unwrap_or_default()).into_owned(),
+                    );
 
                     return self.is_stream();
                 }
@@ -709,7 +718,7 @@ impl Perforce {
 
     fn get_change_list(&mut self, reference: &str) -> Option<String> {
         let index = strpos(reference, "@")?;
-        let label = substr(reference, index as i64, None);
+        let label = legacy_lossy(&substr(reference, index as i64, None)).into_owned();
         let command =
             self.generate_p4_command(vec!["changes".to_string(), "-m1".to_string(), label], true);
         self.execute_command(CommandLine::Args(command));
@@ -719,7 +728,7 @@ impl Perforce {
         }
         let fields = explode(" ", &changes);
 
-        Some(fields.get(1).cloned().unwrap_or_default())
+        Some(legacy_lossy(&fields.get(1).cloned().unwrap_or_default()).into_owned())
     }
 
     pub fn get_commit_logs(&mut self, from_reference: &str, to_reference: &str) -> Option<String> {

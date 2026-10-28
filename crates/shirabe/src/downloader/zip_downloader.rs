@@ -9,7 +9,7 @@ use shirabe_php_shim::{
     Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
     ZipArchive, bin2hex, class_exists, file_exists, file_get_contents, filesize, hash_file,
     impl_php_class, is_file, json_encode, php_regex, preg_match, random_int, str_replace, strlen,
-    substr_bytes, version_compare,
+    substr, version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
@@ -143,7 +143,7 @@ impl ZipDownloader {
 
                     let output = process.get_error_output()?;
                     let output =
-                        str_replace(&format!(", {}.zip or {}.ZIP", file, file), "", &output);
+                        str_replace(format!(", {}.zip or {}.ZIP", file, file), "", &output);
 
                     return self
                         .try_fallback(
@@ -226,16 +226,16 @@ impl ZipDownloader {
                 ));
                 self.inner.io.borrow().write_error(&format!(
                     "First 100 bytes (hex): {}",
-                    bin2hex(&substr_bytes(
-                        &file_get_contents(file).unwrap_or_default(),
+                    bin2hex(substr(
+                        file_get_contents(file).unwrap_or_default(),
                         0,
                         Some(100)
                     ))
                 ));
                 self.inner.io.borrow().write_error(&format!(
                     "Last 100 bytes (hex): {}",
-                    bin2hex(&substr_bytes(
-                        &file_get_contents(file).unwrap_or_default(),
+                    bin2hex(substr(
+                        file_get_contents(file).unwrap_or_default(),
                         -100,
                         None
                     ))

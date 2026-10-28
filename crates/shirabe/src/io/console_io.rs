@@ -6,8 +6,8 @@ use crate::question::StrictConfirmationQuestion;
 use bstr::{BString, ByteSlice};
 use indexmap::{IndexMap, indexmap};
 use shirabe_php_shim::{
-    PhpMixed, array_search, in_array_strict, is_array, is_string, memory_get_usage, microtime,
-    preg_replace, str_repeat, strip_tags, strlen,
+    PhpMixed, array_search, in_array_strict, is_array, is_string, legacy_lossy, memory_get_usage,
+    microtime, preg_replace, str_repeat, strip_tags, strlen,
 };
 use shirabe_symfony_console::helper::{
     ProgressBar, QuestionHelper, QuestionHelperInterface, Table,
@@ -132,7 +132,7 @@ impl ConsoleIO {
         });
         // ...let's fill its length with backspaces
         self.do_write(
-            &str_repeat("\x08", size as usize),
+            &legacy_lossy(&str_repeat("\x08", size as usize)),
             false,
             stderr,
             verbosity,
@@ -149,7 +149,7 @@ impl ConsoleIO {
         if fill > 0 {
             // whitespace whatever has left
             self.do_write(
-                &str_repeat(" ", fill as usize),
+                &legacy_lossy(&str_repeat(" ", fill as usize)),
                 false,
                 stderr,
                 verbosity,
@@ -157,7 +157,7 @@ impl ConsoleIO {
             );
             // move the cursor back
             self.do_write(
-                &str_repeat("\x08", fill as usize),
+                &legacy_lossy(&str_repeat("\x08", fill as usize)),
                 false,
                 stderr,
                 verbosity,

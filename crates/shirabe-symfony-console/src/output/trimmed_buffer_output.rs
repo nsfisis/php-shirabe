@@ -3,7 +3,7 @@
 use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatterInterface;
 use crate::output::{DoWrite, Output, OutputInterface};
-use shirabe_php_shim::{PHP_EOL, substr};
+use shirabe_php_shim::{PHP_EOL, legacy_lossy, substr};
 
 /// A BufferedOutput that keeps only the last N chars.
 #[derive(Debug)]
@@ -51,8 +51,8 @@ impl DoWrite for TrimmedBufferOutput {
             self.buffer.borrow_mut().push_str(PHP_EOL);
         }
 
-        let trimmed = substr(&self.buffer.borrow(), 0 - self.max_length, None);
-        *self.buffer.borrow_mut() = trimmed;
+        let trimmed = substr(&*self.buffer.borrow(), 0 - self.max_length, None);
+        *self.buffer.borrow_mut() = legacy_lossy(&trimmed).into_owned();
     }
 }
 

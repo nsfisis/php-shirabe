@@ -68,10 +68,10 @@ impl Transaction {
                 }
 
                 // if names are the same, compare version, e.g. to sort aliases reliably, actual order does not matter
-                return strcmp(&b.get_version(), &a.get_version());
+                return strcmp(b.get_version(), a.get_version());
             }
 
-            strcmp(&b.get_name(), &a.get_name())
+            strcmp(b.get_name(), a.get_name())
         };
 
         self.result_package_map = IndexMap::new();

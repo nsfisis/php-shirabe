@@ -14,7 +14,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
     array_key_exists, array_search_mixed, date_create, empty, extension_loaded, http_build_query,
-    implode, is_array, php_regex, preg_is_match, preg_match, preg_replace, strpos,
+    implode, is_array, legacy_lossy, php_regex, preg_is_match, preg_match, preg_replace, strpos,
 };
 
 #[derive(Debug)]
@@ -80,7 +80,7 @@ impl GitBitbucketDriver {
         self.inner.origin_url = "bitbucket.org".to_string();
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            &implode(
+            &legacy_lossy(&implode(
                 "/",
                 &[
                     self.inner
@@ -94,7 +94,7 @@ impl GitBitbucketDriver {
                     self.owner.clone(),
                     self.repository.clone(),
                 ],
-            ),
+            )),
             None,
             None,
             false,

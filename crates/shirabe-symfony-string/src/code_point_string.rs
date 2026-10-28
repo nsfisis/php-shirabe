@@ -1,6 +1,6 @@
 //! ref: composer/vendor/symfony/string/CodePointString.php
 
-use shirabe_php_shim::{mb_convert_encoding, wordwrap};
+use shirabe_php_shim::{legacy_lossy, mb_convert_encoding, wordwrap};
 
 #[derive(Debug, Clone)]
 pub struct CodePointString {
@@ -45,7 +45,7 @@ impl CodePointString {
         // PHP seeds both `$b` and `$i` at -1; mirror with signed indices.
         let mut i: i64 = -1;
         let mask = wordwrap(&mask, width, "#", cut);
-        let mask_bytes = mask.as_bytes();
+        let mask_bytes: &[u8] = &mask;
 
         let mut b: i64 = -1;
         loop {
@@ -86,6 +86,6 @@ impl CodePointString {
         }
 
         // PHP falls back to iconv() only when mb_convert_encoding() rejects the target encoding.
-        mb_convert_encoding(self.string.clone().into(), to_encoding, "UTF-8")
+        legacy_lossy(&mb_convert_encoding(&self.string, to_encoding, "UTF-8")).into_owned()
     }
 }

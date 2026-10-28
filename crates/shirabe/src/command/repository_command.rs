@@ -353,12 +353,12 @@ impl Command for RepositoryCommand {
             .merge(&config_data_map, &config_file_path);
         let repos = config.borrow().get_repositories();
 
-        match action.as_str() {
-            "list" | "ls" | "show" => {
+        match action.as_slice() {
+            b"list" | b"ls" | b"show" => {
                 self.list_repositories(repos)?;
                 Ok(0)
             }
-            "add" => {
+            b"add" => {
                 if name.is_none() {
                     return Err(RuntimeException::new("You must pass a repository name. Example: shirabe repo add foo vcs https://example.org".to_string()).into());
                 }
@@ -433,7 +433,7 @@ impl Command for RepositoryCommand {
                     .add_repository(name.as_deref().unwrap(), repo_config, append)?;
                 Ok(0)
             }
-            "remove" | "rm" | "delete" => {
+            b"remove" | b"rm" | b"delete" => {
                 if name.is_none() {
                     return Err(RuntimeException::new(
                         "You must pass the repository name to remove.".to_string(),
@@ -455,7 +455,7 @@ impl Command for RepositoryCommand {
                 }
                 Ok(0)
             }
-            "set-url" | "seturl" => {
+            b"set-url" | b"seturl" => {
                 if name.is_none() || arg1.is_none() {
                     return Err(RuntimeException::new(
                         "Usage: shirabe repo set-url <name> <new-url>".to_string(),
@@ -469,7 +469,7 @@ impl Command for RepositoryCommand {
                     .set_repository_url(name.as_deref().unwrap(), arg1.as_deref().unwrap());
                 Ok(0)
             }
-            "get-url" | "geturl" => {
+            b"get-url" | b"geturl" => {
                 if name.is_none() {
                     return Err(RuntimeException::new(
                         "Usage: shirabe repo get-url <name>".to_string(),
@@ -514,7 +514,7 @@ impl Command for RepositoryCommand {
                 ))
                 .into())
             }
-            "disable" => {
+            b"disable" => {
                 if name.is_none() {
                     return Err(RuntimeException::new(
                         "Usage: shirabe repo disable packagist.org".to_string(),
@@ -537,7 +537,7 @@ impl Command for RepositoryCommand {
                 }
                 Err(RuntimeException::new("Only packagist.org can be enabled/disabled using this command. Use add/remove for other repositories.".to_string()).into())
             }
-            "enable" => {
+            b"enable" => {
                 if name.is_none() {
                     return Err(RuntimeException::new(
                         "Usage: shirabe repo enable packagist.org".to_string(),

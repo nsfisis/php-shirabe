@@ -6,10 +6,10 @@ use shirabe_php_shim::{
     SELF_FIRST, SKIP_DOTS, array_pop, basename, chdir, clearstatcache, clearstatcache2, copy,
     dirname, explode, fclose, feof, file_exists, file_get_contents, file_put_contents, fileatime,
     filemtime, filesize, fopen, fread, fwrite, implode, is_dir, is_file, is_link, is_readable,
-    lstat, mkdir, php_regex, preg_is_match, preg_match, preg_replace, preg_replace_callback,
-    recursive_directory_iterator, recursive_iterator_iterator, rename, rmdir, rtrim, str_repeat,
-    str_replace, stream_copy_to_stream, strlen, strpos, strtoupper, strtr, substr, substr_count,
-    symlink, touch, unlink, usleep, var_export,
+    legacy_lossy, lstat, mkdir, php_regex, preg_is_match, preg_match, preg_replace,
+    preg_replace_callback, recursive_directory_iterator, recursive_iterator_iterator, rename,
+    rmdir, rtrim2, str_repeat, str_replace, stream_copy_to_stream, strlen, strpos, strtoupper,
+    strtr, substr, substr_count, symlink, touch, unlink, usleep, var_export,
 };
 use shirabe_symfony_filesystem::exception::IOException;
 use shirabe_symfony_finder::Finder;
@@ -408,7 +408,10 @@ impl Filesystem {
                                 _ => return Err(e.into()),
                             };
                         while !feof(&source_handle) {
-                            let chunk = fread(&source_handle, 1024 * 1024).unwrap_or_default();
+                            let chunk = legacy_lossy(
+                                &fread(&source_handle, 1024 * 1024).unwrap_or_default(),
+                            )
+                            .into_owned();
                             if fwrite(&target_handle, &chunk, None).is_none() {
                                 return Err(e.into());
                             }
@@ -534,7 +537,7 @@ impl Filesystem {
         let to = self.normalize_path(to);
 
         if directories {
-            from = format!("{}/dummy_file", rtrim(&from, Some("/")));
+            from = format!("{}/dummy_file", rtrim2(&from, "/"));
         }
 
         if dirname(&from) == dirname(&to) {
@@ -542,11 +545,11 @@ impl Filesystem {
         }
 
         let mut common_path = to.clone();
-        while strpos(&format!("{}/", from), &format!("{}/", common_path)) != Some(0)
+        while strpos(format!("{}/", from), format!("{}/", common_path)) != Some(0)
             && "/" != common_path
             && !preg_is_match(php_regex!("{^[A-Z]:/?$}i"), &common_path)
         {
-            common_path = strtr(&dirname(&common_path), "\\", "/");
+            common_path = legacy_lossy(&strtr(dirname(&common_path), "\\", "/")).into_owned();
         }
 
         // no commonality at all
@@ -554,8 +557,8 @@ impl Filesystem {
             return Ok(to);
         }
 
-        common_path = format!("{}/", rtrim(&common_path, Some("/")));
-        let source_path_depth = substr_count(&substr(&from, strlen(&common_path), None), "/");
+        common_path = format!("{}/", rtrim2(&common_path, "/"));
+        let source_path_depth = substr_count(substr(&from, strlen(&common_path), None), "/");
         let common_path_code = str_repeat("../", source_path_depth as usize);
 
         // allow top level /foo & /bar dirs to be addressed relatively as this is common in Docker setups
@@ -600,12 +603,12 @@ impl Filesystem {
         }
 
         let mut common_path = to.clone();
-        while strpos(&format!("{}/", from), &format!("{}/", common_path)) != Some(0)
+        while strpos(format!("{}/", from), format!("{}/", common_path)) != Some(0)
             && "/" != common_path
             && !preg_is_match(php_regex!("{^[A-Z]:/?$}i"), &common_path)
             && "." != common_path
         {
-            common_path = strtr(&dirname(&common_path), "\\", "/");
+            common_path = legacy_lossy(&strtr(dirname(&common_path), "\\", "/")).into_owned();
         }
 
         // no commonality at all
@@ -613,14 +616,14 @@ impl Filesystem {
             return Ok(var_export(&PhpMixed::string(to), true));
         }
 
-        common_path = format!("{}/", rtrim(&common_path, Some("/")));
+        common_path = format!("{}/", rtrim2(&common_path, "/"));
         if to.starts_with(&format!("{}/", from)) {
             return Ok(format!(
                 "__DIR__ . {}",
                 var_export(&PhpMixed::string(substr(&to, strlen(&from), None)), true)
             ));
         }
-        let source_path_depth = (substr_count(&substr(&from, strlen(&common_path), None), "/")
+        let source_path_depth = (substr_count(substr(&from, strlen(&common_path), None), "/")
             as i64)
             + (if directories { 1 } else { 0 });
 
@@ -692,14 +695,14 @@ impl Filesystem {
         }
 
         let mut parts: Vec<String> = vec![];
-        let mut path = strtr(path, "\\", "/");
+        let mut path = legacy_lossy(&strtr(path, "\\", "/")).into_owned();
         let mut prefix = String::new();
         let mut absolute = String::new();
 
         // extract windows UNC paths e.g. \\foo\bar
         if strpos(&path, "//") == Some(0) && strlen(&path) > 2 {
             absolute = "//".to_string();
-            path = substr(&path, 2, None);
+            path = legacy_lossy(&substr(&path, 2, None)).into_owned();
         }
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
@@ -708,12 +711,12 @@ impl Filesystem {
             &path,
         ) {
             prefix = prefix_match.get(1).unwrap_or_default().to_string();
-            path = substr(&path, strlen(&prefix), None);
+            path = legacy_lossy(&substr(&path, strlen(&prefix), None)).into_owned();
         }
 
         if strpos(&path, "/") == Some(0) {
             absolute = "/".to_string();
-            path = substr(&path, 1, None);
+            path = legacy_lossy(&substr(&path, 1, None)).into_owned();
         }
 
         let mut up = false;
@@ -722,7 +725,7 @@ impl Filesystem {
                 array_pop(&mut parts);
                 up = !(parts.is_empty() || ".." == parts.last().cloned().unwrap_or_default());
             } else if "." != chunk && !chunk.is_empty() {
-                parts.push(chunk.clone());
+                parts.push(legacy_lossy(&chunk.clone()).into_owned());
                 up = ".." != chunk;
             }
         }
@@ -732,7 +735,7 @@ impl Filesystem {
             php_regex!("{(^|://)[a-z]:$}i"),
             |m: &PregMatches| -> anyhow::Result<String> {
                 let s = m.get(0).unwrap_or_default().to_string();
-                Ok(strtoupper(&s))
+                Ok(legacy_lossy(&strtoupper(&s)).into_owned())
             },
             &prefix,
         )
@@ -747,7 +750,7 @@ impl Filesystem {
     pub fn trim_trailing_slash(path: &str) -> String {
         let mut path = path.to_string();
         if !preg_is_match(php_regex!("{^[/\\\\]+$}"), &path) {
-            path = rtrim(&path, Some("/\\"));
+            path = legacy_lossy(&rtrim2(&path, "/\\")).into_owned();
         }
 
         path
@@ -885,7 +888,7 @@ impl Filesystem {
             return pathname.to_string();
         }
 
-        let resolved = rtrim(pathname, Some("/"));
+        let resolved = legacy_lossy(&rtrim2(pathname, "/")).into_owned();
 
         if 0 == strlen(&resolved) {
             return pathname.to_string();
@@ -924,7 +927,7 @@ impl Filesystem {
         let cmd = vec![
             "mklink".to_string(),
             "/J".to_string(),
-            str_replace("/", std::path::MAIN_SEPARATOR_STR, junction),
+            legacy_lossy(&str_replace("/", std::path::MAIN_SEPARATOR_STR, junction)).into_owned(),
             Platform::realpath(target),
         ];
         let mut output = String::new();
@@ -985,10 +988,11 @@ impl Filesystem {
         if !Platform::is_windows() {
             return Ok(false);
         }
-        let junction = rtrim(
-            &str_replace("/", std::path::MAIN_SEPARATOR_STR, junction),
-            Some(std::path::MAIN_SEPARATOR_STR),
-        );
+        let junction = legacy_lossy(&rtrim2(
+            str_replace("/", std::path::MAIN_SEPARATOR_STR, junction),
+            std::path::MAIN_SEPARATOR_STR,
+        ))
+        .into_owned();
         if !self.is_junction(&junction) {
             return Err(IOException::new(
                 format!(

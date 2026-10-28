@@ -5,7 +5,7 @@ use crate::input::{
     ArgumentName, Input, InputDefinition, InputInterface, InputValue, StreamableInputInterface,
 };
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpResource, implode, substr};
+use shirabe_php_shim::{PhpResource, implode, legacy_lossy, substr};
 
 /// ArrayInput represents an input provided as an array.
 ///
@@ -134,9 +134,9 @@ impl ArrayInput {
                 return Ok(());
             }
             if key_string.starts_with("--") {
-                self.add_long_option(&substr(&key_string, 2, None), value)?;
+                self.add_long_option(&legacy_lossy(&substr(&key_string, 2, None)), value)?;
             } else if key_string.starts_with("-") {
-                self.add_short_option(&substr(&key_string, 1, None), value)?;
+                self.add_short_option(&legacy_lossy(&substr(&key_string, 1, None)), value)?;
             } else {
                 self.add_argument(&key.to_argument_name(), value)?;
             }
@@ -262,7 +262,7 @@ impl std::fmt::Display for ArrayInput {
             } else if let InputValue::Array(list) = val {
                 let escaped: Vec<String> =
                     list.iter().map(|v| self.inner.escape_token(v)).collect();
-                params.push(implode(" ", &escaped));
+                params.push(legacy_lossy(&implode(" ", &escaped)).into_owned());
             } else {
                 params.push(self.inner.escape_token(&val.to_php_string()));
             }

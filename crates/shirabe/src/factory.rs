@@ -33,8 +33,8 @@ use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
     PhpMixed, RuntimeException, UnexpectedValueException, array_replace_recursive, class_exists,
     dirname, extension_loaded, file_exists, file_get_contents, file_put_contents, implode, is_dir,
-    is_file, json_decode_assoc, json_decode_obj, mkdir, pathinfo, realpath, rename, rtrim, strpos,
-    strtr, substr, trim,
+    is_file, json_decode_assoc, json_decode_obj, legacy_lossy, mkdir, pathinfo, realpath, rename,
+    rtrim2, strpos, strtr, substr, trim2,
 };
 use shirabe_symfony_console::formatter::{
     OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface,
@@ -91,7 +91,7 @@ impl Factory {
             let appdata = Platform::get_env("APPDATA").unwrap_or_default();
             return Ok(format!(
                 "{}/Shirabe",
-                rtrim(&strtr(&appdata, "\\", "/"), Some("/"))
+                rtrim2(strtr(&appdata, "\\", "/"), "/")
             ));
         }
 
@@ -140,7 +140,7 @@ impl Factory {
                 cache_dir = format!("{}/cache", home);
             }
 
-            return Ok(rtrim(&strtr(&cache_dir, "\\", "/"), Some("/")));
+            return Ok(legacy_lossy(&rtrim2(strtr(&cache_dir, "\\", "/"), "/")).into_owned());
         }
 
         let user_dir = Self::get_user_dir()?;
@@ -182,7 +182,7 @@ impl Factory {
         }
 
         if Platform::is_windows() {
-            return Ok(strtr(home, "\\", "/"));
+            return Ok(legacy_lossy(&strtr(home, "\\", "/")).into_owned());
         }
 
         let user_dir = Self::get_user_dir()?;
@@ -322,7 +322,7 @@ impl Factory {
     pub fn get_composer_file() -> anyhow::Result<String> {
         let env = Platform::get_env("COMPOSER");
         if let Some(env_str) = env {
-            let env_trimmed = trim(&env_str, Some(" \t\n\r\0\u{0B}"));
+            let env_trimmed = legacy_lossy(&trim2(&env_str, " \t\n\r\0\u{0B}")).into_owned();
             if !env_trimmed.is_empty() {
                 if is_dir(&env_trimmed) {
                     return Err(RuntimeException::new(format!(
@@ -442,7 +442,7 @@ impl Factory {
                 if let Some(jve) = e.catch::<JsonValidationException>() {
                     let errors = format!(
                         " - {}",
-                        implode(&format!("{} - ", PHP_EOL), jve.get_errors())
+                        implode(format!("{} - ", PHP_EOL), jve.get_errors())
                     );
                     let message = format!("{}:{}{}", jve.get_message(), PHP_EOL, errors);
                     return Err(
@@ -1226,21 +1226,23 @@ impl Factory {
                 .expect("Composer must outlive create_default_installers");
             let composer_ref = composer_rc.borrow_partial();
             let config = composer_ref.get_config();
-            let bin_dir = rtrim(
-                &config.borrow_mut().get_str("bin-dir").unwrap_or_default(),
-                Some("/"),
-            );
+            let bin_dir = legacy_lossy(&rtrim2(
+                config.borrow_mut().get_str("bin-dir").unwrap_or_default(),
+                "/",
+            ))
+            .into_owned();
             let bin_compat = config
                 .borrow_mut()
                 .get_str("bin-compat")
                 .unwrap_or_default();
-            let vendor_dir = rtrim(
-                &config
+            let vendor_dir = legacy_lossy(&rtrim2(
+                config
                     .borrow_mut()
                     .get_str("vendor-dir")
                     .unwrap_or_default(),
-                Some("/"),
-            );
+                "/",
+            ))
+            .into_owned();
             (bin_dir, bin_compat, vendor_dir)
         };
 
@@ -1564,7 +1566,7 @@ impl Factory {
                         .to_string()).into());
         }
 
-        Ok(rtrim(&strtr(&home, "\\", "/"), Some("/")))
+        Ok(legacy_lossy(&rtrim2(strtr(&home, "\\", "/"), "/")).into_owned())
     }
 
     fn validate_json_schema(
@@ -1597,7 +1599,7 @@ impl Factory {
                     "{}, this may result in errors and should be resolved:{} - {}",
                     jve.get_message(),
                     PHP_EOL,
-                    implode(&format!("{} - ", PHP_EOL), jve.get_errors())
+                    implode(format!("{} - ", PHP_EOL), jve.get_errors())
                 );
                 if let Some(io_ref) = io {
                     io_ref.write_error3(&format!("<warning>{}</>", msg), true, crate::io::NORMAL);

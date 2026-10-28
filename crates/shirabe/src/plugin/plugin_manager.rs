@@ -25,8 +25,9 @@ use indexmap::IndexMap;
 use shirabe_php_rpc::{PluginValue, call_function_with_dispatcher};
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, dirname, empty,
-    file_get_contents, implode, ksort, php_regex, preg_is_match, preg_quote, preg_replace2,
-    strrpos, strtr_array, substr, trigger_error, trim, var_export, var_export_str, version_compare,
+    file_get_contents, implode, ksort, legacy_lossy, php_regex, preg_is_match, preg_quote,
+    preg_replace2, strrpos, strtr_array, substr, trigger_error, trim2, var_export, var_export_str,
+    version_compare,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -426,7 +427,7 @@ impl PluginManager {
         for class in classes {
             let mut class = class;
             if self.php_runtime_class_exists(&class, false)? {
-                class = trim(&class, Some("\\")).to_string();
+                class = trim2(&class, "\\").to_string();
                 let path = class_loader.find_file(&class).unwrap_or_else(|| {
                     panic!("plugin class `{class}` is already defined but has no autoloadable file")
                 });
@@ -444,7 +445,8 @@ impl PluginManager {
                 if let Some(separator_pos) = separator_pos
                     && separator_pos != 0
                 {
-                    class_name = substr(&class, (separator_pos + 1) as i64, None);
+                    class_name = legacy_lossy(&substr(&class, (separator_pos + 1) as i64, None))
+                        .into_owned();
                 }
                 let code = preg_replace2(
                     format!(
@@ -461,7 +463,14 @@ impl PluginManager {
                 replacements.insert("__DIR__".to_string(), var_export_str(&dirname(&path), true));
                 replacements.insert("__CLASS__".to_string(), var_export_str(&class, true));
                 let code = strtr_array(&code, &replacements);
-                let code = preg_replace2(r"/^\s*<\?(php)?/i", "", &code, 1, None);
+                let code = legacy_lossy(&preg_replace2(
+                    r"/^\s*<\?(php)?/i",
+                    "",
+                    &legacy_lossy(&code),
+                    1,
+                    None,
+                ))
+                .into_owned();
                 self.php_runtime_eval(&code)?;
                 class = format!("{}_composer_tmp{}", class, class_counter);
                 CLASS_COUNTER.store(class_counter + 1, std::sync::atomic::Ordering::Relaxed);
@@ -1005,7 +1014,7 @@ impl PluginManager {
             && !empty(value)
             && let PhpMixed::String(s) = value
         {
-            let trimmed = trim(&s.to_str_lossy(), Some(" \t\n\r\0\u{0B}"));
+            let trimmed = legacy_lossy(&trim2(s, " \t\n\r\0\u{0B}")).into_owned();
             // PHP evaluates trim(...) in boolean context: "" and "0" are falsy.
             if !trimmed.is_empty() && trimmed != "0" {
                 return Ok(Some(trimmed));

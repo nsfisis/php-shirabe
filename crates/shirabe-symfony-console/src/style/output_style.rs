@@ -3,7 +3,7 @@
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::ProgressBar;
 use crate::output::{ConsoleOutputInterface, OUTPUT_NORMAL, OutputInterface};
-use shirabe_php_shim::{AsAny, PHP_EOL, str_repeat};
+use shirabe_php_shim::{AsAny, PHP_EOL, legacy_lossy, str_repeat};
 
 /// Decorates output to add console style guide helpers.
 #[derive(Debug)]
@@ -21,9 +21,11 @@ impl OutputStyle {
     }
 
     pub fn new_line(&self, count: i64) {
-        self.output
-            .borrow()
-            .write(&[str_repeat(PHP_EOL, count as usize)], false, OUTPUT_NORMAL);
+        self.output.borrow().write(
+            &[legacy_lossy(&str_repeat(PHP_EOL, count as usize)).into_owned()],
+            false,
+            OUTPUT_NORMAL,
+        );
     }
 
     pub(crate) fn get_error_output(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> {

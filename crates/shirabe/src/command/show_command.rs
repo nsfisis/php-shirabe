@@ -24,8 +24,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
     array_search, date_format_to_strftime, date_local, extension_loaded, get_class, impl_php_class,
-    in_array_loose, in_array_strict, php_regex, preg_is_match, preg_match, preg_quote,
-    preg_replace, realpath, strtolower, version_compare,
+    in_array_loose, in_array_strict, legacy_lossy, php_regex, preg_is_match, preg_match,
+    preg_quote, preg_replace, realpath, strtolower, version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -246,7 +246,10 @@ impl ShowCommand {
         for (k, v) in root_package.get_dev_requires().iter() {
             combined.insert(k.clone(), v.clone());
         }
-        combined.keys().map(|k| strtolower(k)).collect()
+        combined
+            .keys()
+            .map(|k| legacy_lossy(&strtolower(k)).into_owned())
+            .collect()
     }
 
     fn get_version_style(
@@ -274,7 +277,7 @@ impl ShowCommand {
         Option<crate::package::CompletePackageInterfaceHandle>,
         IndexMap<String, String>,
     )> {
-        let name = strtolower(name);
+        let name = legacy_lossy(&strtolower(name)).into_owned();
         let constraint: Option<AnyConstraint> = match &version {
             PhpMixed::String(s) => Some(
                 self.version_parser
@@ -2171,8 +2174,11 @@ impl Command for ShowCommand {
                 .borrow()
                 .get_option("ignore")?
                 .as_array()
-                .map(|l| l.iter().map(|v| strtolower(v)).collect::<Vec<_>>())
-                .unwrap_or_default(),
+                .map(|l| l.iter().map(strtolower).collect::<Vec<_>>())
+                .unwrap_or_default()
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<_>>(),
             "{^(?:%s)$}iD",
         );
         let indent = if show_all_types { "  " } else { "" };

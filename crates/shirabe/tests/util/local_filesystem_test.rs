@@ -51,7 +51,7 @@ fn test_get_contents() {
             IndexMap::new(),
         )
         .unwrap();
-    assert!(strpos(&get_result_to_string(&res), "testGetContents").is_some());
+    assert!(strpos(get_result_to_string(&res), "testGetContents").is_some());
 }
 
 #[test]
@@ -75,12 +75,6 @@ fn test_copy() {
     ));
     assert!(std::path::Path::new(&file).exists());
     // TODO(bytes)
-    assert!(
-        strpos(
-            &String::from_utf8_lossy(&file_get_contents(&file).unwrap_or_default()),
-            "testCopy"
-        )
-        .is_some()
-    );
+    assert!(strpos(file_get_contents(&file).unwrap_or_default(), "testCopy").is_some());
     unlink(&file);
 }

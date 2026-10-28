@@ -11,12 +11,13 @@ use crate::repository::{
     ProviderInfo, RepositoryInterface, SearchResult, WritableArrayRepository,
 };
 use crate::util::{Filesystem, Platform};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed,
     UnexpectedValueException, array_flip, dirname, get_debug_type, in_array_strict, is_array,
-    is_null, is_string, ksort, realpath, str_repeat, strcmp, strnatcmp, usort, var_export,
+    is_null, is_string, ksort, legacy_lossy, realpath, str_repeat, strcmp, strnatcmp, usort,
+    var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -282,8 +283,8 @@ impl FilesystemRepository {
         if let Some(PhpMixed::List(list)) = data.get_mut(B("dev-package-names")) {
             usort(list, |a: &PhpMixed, b: &PhpMixed| -> i64 {
                 strcmp(
-                    &a.as_string().unwrap_or_default().to_str_lossy(),
-                    &b.as_string().unwrap_or_default().to_str_lossy(),
+                    a.as_string().unwrap_or_default(),
+                    b.as_string().unwrap_or_default(),
                 )
             });
         }
@@ -300,7 +301,7 @@ impl FilesystemRepository {
                     .and_then(|m| m.get(B("name")))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default();
-                strcmp(&a_name.to_str_lossy(), &b_name.to_str_lossy())
+                strcmp(a_name, b_name)
             });
         }
 
@@ -357,7 +358,7 @@ impl FilesystemRepository {
         let level = level + 1;
 
         for (key, value) in array {
-            lines.push_str(&str_repeat("    ", level as usize));
+            lines.push_str(&legacy_lossy(&str_repeat("    ", level as usize)));
             lines.push_str(&if is_php_integer_key(key) {
                 format!("{} => ", key)
             } else {
@@ -566,8 +567,8 @@ impl FilesystemRepository {
                             // PHP: sort($versions['versions'][$name][$key], SORT_NATURAL);
                             usort(list, |a: &PhpMixed, b: &PhpMixed| -> i64 {
                                 strnatcmp(
-                                    &a.as_string().unwrap_or_default().to_str_lossy(),
-                                    &b.as_string().unwrap_or_default().to_str_lossy(),
+                                    a.as_string().unwrap_or_default(),
+                                    b.as_string().unwrap_or_default(),
                                 )
                             });
                         }

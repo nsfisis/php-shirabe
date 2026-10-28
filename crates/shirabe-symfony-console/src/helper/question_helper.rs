@@ -13,7 +13,7 @@ use crate::terminal::Terminal;
 use bstr::{B, BString, ByteSlice};
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, SEEK_SET, copy, dir, explode, feof, fgetc, fgets,
-    fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
+    fopen, fread, fseek, ftell, function_exists, legacy_lossy, mb_detect_encoding, mb_strlen, ord,
     php_fopen_resource, rewind, rtrim, sapi_windows_cp_conv, sapi_windows_cp_get,
     sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat, stream_copy_to_stream,
     stream_get_meta_data, stream_isatty_resource, stream_select, stream_set_blocking, strlen,
@@ -129,9 +129,9 @@ pub trait QuestionHelperInterface {
                 Err(exception) => return Ok(Err(exception)),
             };
             ret = PhpMixed::string(if question.is_trimmable() {
-                trim(&autocomplete, None)
+                trim(&autocomplete)
             } else {
-                autocomplete
+                bstr::BString::from(autocomplete)
             });
         } else {
             let mut r: PhpMixed = PhpMixed::Bool(false);
@@ -143,9 +143,9 @@ pub trait QuestionHelperInterface {
                 )? {
                     Ok(hidden_response) => {
                         r = PhpMixed::string(if question.is_trimmable() {
-                            trim(&hidden_response, None)
+                            trim(&hidden_response)
                         } else {
-                            hidden_response
+                            bstr::BString::from(hidden_response)
                         });
                     }
                     Err(e) => {
@@ -174,7 +174,7 @@ pub trait QuestionHelperInterface {
                 }
                 r = read;
                 if question.is_trimmable() {
-                    r = PhpMixed::string(trim(&r.to_string(), None));
+                    r = PhpMixed::string(trim(r.to_string()));
                 }
             }
             ret = r;
@@ -312,11 +312,11 @@ impl QuestionHelper {
                     .unwrap_or(default);
             }
 
-            let default_parts = explode(",", &default.to_string());
+            let default_parts = explode(",", default.to_string());
             let mut resolved: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
             for (k, v) in default_parts.iter().enumerate() {
                 let v = if question.is_trimmable() {
-                    trim(v, None)
+                    trim(v)
                 } else {
                     v.clone()
                 };
@@ -508,15 +508,15 @@ impl QuestionHelper {
                         // Echo out remaining chars for current match
                         let remaining_characters = substr(
                             &ret,
-                            strlen(trim(&self.most_recently_entered_value(&full_choice), None)),
+                            strlen(trim(self.most_recently_entered_value(&full_choice))),
                             None,
                         );
                         output.borrow().write(
-                            std::slice::from_ref(&remaining_characters),
+                            std::slice::from_ref(&legacy_lossy(&remaining_characters).into_owned()),
                             false,
                             output_interface::OUTPUT_NORMAL,
                         );
-                        full_choice.push_str(&remaining_characters);
+                        full_choice.push_str(&legacy_lossy(&remaining_characters));
                         i = match mb_detect_encoding(&full_choice, None, true) {
                             None => strlen(&full_choice),
                             Some(encoding) => mb_strlen(&full_choice, &encoding),
@@ -602,15 +602,15 @@ impl QuestionHelper {
                 cursor.save_position();
                 // Write highlighted text, complete the partially entered response
                 let characters_entered =
-                    strlen(trim(&self.most_recently_entered_value(&full_choice), None));
+                    strlen(trim(self.most_recently_entered_value(&full_choice)));
                 output.borrow().write(
                     &[format!(
                         "<hl>{}</hl>",
-                        OutputFormatter::escape_trailing_backslash(&substr(
-                            &matches[ofs as usize].to_string(),
+                        OutputFormatter::escape_trailing_backslash(&legacy_lossy(&substr(
+                            matches[ofs as usize].to_string(),
                             characters_entered,
                             None,
-                        ))
+                        )))
                     )],
                     false,
                     output_interface::OUTPUT_NORMAL,
@@ -632,9 +632,9 @@ impl QuestionHelper {
         }
 
         let choices = explode(",", entered);
-        let last_choice = trim(&choices[choices.len() - 1], None);
+        let last_choice = trim(&choices[choices.len() - 1]);
         if !last_choice.is_empty() {
-            return last_choice;
+            return legacy_lossy(&last_choice).into_owned();
         }
 
         entered.to_string()
@@ -652,7 +652,7 @@ impl QuestionHelper {
 
             // handle code running from a phar
             let mut tmp_exe: Option<String> = None;
-            if substr(&magic_file(), 0, Some(5)) == "phar:" {
+            if substr(magic_file(), 0, Some(5)) == "phar:" {
                 // TODO(bytes): the executable path is kept as a String.
                 let tmp_dir = sys_get_temp_dir()
                     .into_os_string()
@@ -666,9 +666,9 @@ impl QuestionHelper {
 
             let s_exec = shell_exec(&format!("\"{}\"", exe)).unwrap_or_default();
             let value = if trimmable {
-                rtrim(&s_exec, None)
+                rtrim(&s_exec)
             } else {
-                s_exec
+                bstr::BString::from(s_exec)
             };
             output
                 .borrow()
@@ -678,7 +678,7 @@ impl QuestionHelper {
                 unlink(&tmp);
             }
 
-            return Ok(Ok(value));
+            return Ok(Ok(legacy_lossy(&value).into_owned()));
         }
 
         let mut stty_mode = String::new();
@@ -705,7 +705,7 @@ impl QuestionHelper {
             }
         };
         if trimmable {
-            value = trim(&value, None);
+            value = legacy_lossy(&trim(&value)).into_owned();
         }
         output
             .borrow()

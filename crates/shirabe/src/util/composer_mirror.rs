@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/ComposerMirror.php
 
-use shirabe_php_shim::{hash, php_regex, preg_is_match, preg_match, preg_replace};
+use shirabe_php_shim::{hash, legacy_lossy, php_regex, preg_is_match, preg_match, preg_replace};
 
 pub struct ComposerMirror;
 
@@ -17,13 +17,13 @@ impl ComposerMirror {
             if preg_is_match(php_regex!(r"{^([a-f0-9]*|%reference%)$}"), r) {
                 r.to_string()
             } else {
-                hash("md5", r)
+                legacy_lossy(&hash("md5", r)).into_owned()
             }
         });
         let version = if !version.contains('/') {
             version.to_string()
         } else {
-            hash("md5", version)
+            legacy_lossy(&hash("md5", version)).into_owned()
         };
 
         let mut from = vec!["%package%", "%version%", "%reference%", "%type%"];

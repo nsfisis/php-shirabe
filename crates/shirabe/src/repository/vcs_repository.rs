@@ -19,8 +19,8 @@ use crate::util::{HttpDownloader, Platform, ProcessExecutor, Url};
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpClass, PhpMixed, php_regex, preg_is_match,
-    preg_replace, str_replace, strpos,
+    Catch as _, InvalidArgumentException, PhpClass, PhpMixed, legacy_lossy, php_regex,
+    preg_is_match, preg_replace, str_replace, strpos,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -360,7 +360,7 @@ impl VcsRepository {
             );
 
             // strip the release- prefix from tags if present
-            tag = str_replace("release-", "", &tag);
+            tag = legacy_lossy(&str_replace("release-", "", &tag)).into_owned();
 
             let cached_package = self.get_cached_package_version(
                 &tag,
@@ -635,7 +635,7 @@ impl VcsRepository {
                 || VersionParser::DEFAULT_BRANCH_ALIAS == parsed_branch
             {
                 version = format!("dev-{}", str_replace("#", "+", &branch));
-                parsed_branch = str_replace("#", "+", &parsed_branch);
+                parsed_branch = legacy_lossy(&str_replace("#", "+", &parsed_branch)).into_owned();
             } else {
                 let prefix = if strpos(&branch, "v") == Some(0) {
                     "v"

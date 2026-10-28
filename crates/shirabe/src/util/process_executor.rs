@@ -3,12 +3,14 @@
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::signal::SignalSubscription;
 use crate::util::{GitHub, Platform};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect,
-    array_map, escapeshellarg, explode, implode, in_array_strict, is_dir, is_numeric, php_regex,
-    preg_is_match, preg_match, preg_replace, preg_replace_callback, preg_replace2, preg_split,
-    rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
+    array_map, escapeshellarg, explode, implode, in_array_strict, is_dir, is_numeric, legacy_lossy,
+    php_regex, preg_is_match, preg_match, preg_replace, preg_replace_callback, preg_replace2,
+    preg_split, rtrim2, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array,
+    substr_replace, trim,
 };
 use shirabe_symfony_process::exception::{
     ProcessSignaledException, RuntimeException as SymfonyProcessRuntimeException,
@@ -307,7 +309,7 @@ impl ProcessExecutor {
         if let Some(cwd) = cwd
             && requires_git_dir_env
         {
-            let is_bare_repository = !is_dir(format!("{}/.git", rtrim(cwd, Some("/"))));
+            let is_bare_repository = !is_dir(format!("{}/.git", rtrim2(cwd, "/")));
             if is_bare_repository {
                 let mut config_value = String::new();
                 let mut git_env: IndexMap<String, String> = IndexMap::new();
@@ -323,7 +325,7 @@ impl ProcessExecutor {
                     tty,
                     &mut config_value,
                 )?;
-                let trimmed = trim(&config_value, None);
+                let trimmed = trim(&config_value);
                 if trimmed == "explicit" {
                     env = Some(git_env);
                 }
@@ -348,10 +350,11 @@ impl ProcessExecutor {
         command: &CommandLine,
         cwd: Option<&str>,
     ) -> anyhow::Result<(String, String, i64)> {
-        let command_string = match command {
+        let command_string = legacy_lossy(&match command {
             CommandLine::Args(args) => implode(" ", args),
-            CommandLine::Shell(command) => command.clone(),
-        };
+            CommandLine::Shell(command) => bstr::BString::from(command.clone()),
+        })
+        .into_owned();
 
         let mut mock = self.mock.as_ref().unwrap().borrow_mut();
         mock.log.push(command_string);
@@ -485,18 +488,18 @@ impl ProcessExecutor {
         };
 
         if !expectations.is_empty() {
-            let remaining: Vec<String> = expectations
+            let remaining: Vec<BString> = expectations
                 .iter()
                 .map(|expect| match &expect.cmd {
                     CommandLine::Args(args) => implode(" ", args),
-                    CommandLine::Shell(command) => command.clone(),
+                    CommandLine::Shell(command) => bstr::BString::from(command.clone()),
                 })
                 .collect();
             panic!(
                 "There are still {} expected process calls which have not been consumed:{}{}{}{}Received calls:{}{}",
                 expectations.len(),
                 PHP_EOL,
-                remaining.join(PHP_EOL),
+                implode(PHP_EOL, &remaining),
                 PHP_EOL,
                 PHP_EOL,
                 PHP_EOL,
@@ -676,7 +679,7 @@ impl ProcessExecutor {
     }
 
     pub fn split_lines(&self, output: &str) -> Vec<String> {
-        let output = trim(output, None);
+        let output = legacy_lossy(&trim(output)).into_owned();
 
         if output.is_empty() {
             vec![]
@@ -719,7 +722,9 @@ impl ProcessExecutor {
 
         let command_string = match command {
             CommandLine::Shell(command) => command.clone(),
-            CommandLine::Args(args) => implode(" ", &array_map(|arg| Self::escape(arg), args)),
+            CommandLine::Args(args) => {
+                legacy_lossy(&implode(" ", &array_map(|arg| Self::escape(arg), args))).into_owned()
+            }
         };
         let safe_command = preg_replace_callback(
             php_regex!(r"{://(?P<user>[^:/\s]+):(?P<password>[^@\s/]+)@}i"),
@@ -781,7 +786,7 @@ impl ProcessExecutor {
         translation.insert("\u{2044}".to_string(), "/".to_string());
         translation.insert("\u{2215}".to_string(), "/".to_string());
         translation.insert("\u{00b4}".to_string(), "/".to_string());
-        argument = strtr_array(&argument, &translation);
+        argument = legacy_lossy(&strtr_array(&argument, &translation)).into_owned();
 
         // In addition to whitespace, commas need quoting to preserve paths
         let mut quote = strpbrk(&argument, " \t,").is_some();
@@ -814,7 +819,10 @@ impl ProcessExecutor {
 
     pub fn requires_git_dir_env(&self, command: &CommandLine) -> bool {
         let cmd: Vec<String> = match command {
-            CommandLine::Shell(command) => explode(" ", command),
+            CommandLine::Shell(command) => explode(" ", command)
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<_>>(),
             CommandLine::Args(args) => args.clone(),
         };
         if cmd.first().map(|s| s.as_str()) != Some("git") {

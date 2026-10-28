@@ -10,7 +10,8 @@ use crate::glob::Glob;
 use chrono::{NaiveDate, NaiveDateTime};
 use indexmap::IndexSet;
 use shirabe_php_shim::{
-    file_exists, glob, is_dir, php_regex, preg_is_match, preg_match, preg_quote, rtrim,
+    file_exists, glob, is_dir, legacy_lossy, php_regex, preg_is_match, preg_match, preg_quote,
+    rtrim2,
 };
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -315,12 +316,12 @@ impl Finder {
             return dir.to_string();
         }
 
-        let dir = rtrim(dir, Some("/"));
+        let dir = rtrim2(dir, "/");
 
-        if preg_is_match(php_regex!("#^(ssh2\\.)?s?ftp://#"), &dir) {
+        if preg_is_match(php_regex!("#^(ssh2\\.)?s?ftp://#"), &legacy_lossy(&dir)) {
             format!("{dir}/")
         } else {
-            dir
+            legacy_lossy(&dir).into_owned()
         }
     }
 
@@ -575,7 +576,7 @@ fn build_exclude(directories: &[String]) -> (IndexSet<String>, Option<String>) {
     let mut patterns: Vec<String> = Vec::new();
 
     for directory in directories {
-        let directory = rtrim(directory, Some("/"));
+        let directory = legacy_lossy(&rtrim2(directory, "/")).into_owned();
         // The inner iterator is always recursive, so only `/`-containing names become patterns.
         if directory.contains('/') {
             patterns.push(preg_quote(&directory, Some('#')));

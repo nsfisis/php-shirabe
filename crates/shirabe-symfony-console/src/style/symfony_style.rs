@@ -11,8 +11,8 @@ use crate::style::output_style::OutputStyle;
 use crate::style::style_interface::StyleInterface;
 use crate::terminal::Terminal;
 use shirabe_php_shim::{
-    AsAny, PHP_EOL, PhpMixed, array_unshift, boolval, explode, str_repeat, str_replace, strlen,
-    substr, substr_count, wordwrap,
+    AsAny, PHP_EOL, PhpMixed, array_unshift, boolval, explode, legacy_lossy, str_repeat,
+    str_replace, strlen, substr, substr_count, wordwrap,
 };
 
 /// Output decorator helpers for the Symfony Style Guide.
@@ -132,7 +132,7 @@ impl SymfonyStyle {
 
     fn auto_prepend_block(&mut self) {
         let chars = substr(
-            &str_replace(PHP_EOL, "\n", &self.buffered_output.fetch()),
+            str_replace(PHP_EOL, "\n", self.buffered_output.fetch()),
             -2,
             None,
         );
@@ -173,7 +173,7 @@ impl SymfonyStyle {
         if let Some(t) = &r#type {
             let formatted = format!("[{}] ", t.clone());
             indent_length = strlen(&formatted);
-            line_indentation = str_repeat(" ", indent_length as usize);
+            line_indentation = legacy_lossy(&str_repeat(" ", indent_length as usize)).into_owned();
             r#type = Some(formatted);
         }
 
@@ -197,10 +197,10 @@ impl SymfonyStyle {
             );
             let message_lines = explode(
                 PHP_EOL,
-                &wordwrap(&message, message_line_length, PHP_EOL, true),
+                wordwrap(&message, message_line_length, PHP_EOL, true),
             );
             for message_line in message_lines {
-                lines.push(message_line);
+                lines.push(legacy_lossy(&message_line).into_owned());
             }
 
             if messages_count > 1 && key < messages_count - 1 {
@@ -226,7 +226,7 @@ impl SymfonyStyle {
             }
 
             *line = format!("{}{}", prefix, line);
-            line.push_str(&str_repeat(
+            line.push_str(&legacy_lossy(&str_repeat(
                 " ",
                 (self.line_length
                     - Helper::width(&Helper::remove_decoration(
@@ -234,7 +234,7 @@ impl SymfonyStyle {
                         line,
                     )))
                 .max(0) as usize,
-            ));
+            )));
 
             if let Some(style) = style {
                 *line = format!("<{}>{}</>", style, line.clone());
@@ -310,7 +310,10 @@ impl StyleInterface for SymfonyStyle {
 
     fn new_line(&mut self, count: i64) {
         self.inner.new_line(count);
-        self.buffered_output
-            .write(&[str_repeat("\n", count as usize)], false, OUTPUT_NORMAL);
+        self.buffered_output.write(
+            &[legacy_lossy(&str_repeat("\n", count as usize)).into_owned()],
+            false,
+            OUTPUT_NORMAL,
+        );
     }
 }

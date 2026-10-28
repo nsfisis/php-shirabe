@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/class-map-generator/src/ClassMap.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{OutOfBoundsException, preg_is_match, rtrim, strpos, strtr};
+use shirabe_php_shim::{OutOfBoundsException, legacy_lossy, preg_is_match, rtrim2, strpos, strtr};
 
 #[derive(Debug, Clone)]
 pub struct PsrViolationEntry {
@@ -66,7 +66,9 @@ impl ClassMap {
         for (class, paths) in &self.ambiguous_classes {
             let paths: Vec<String> = paths
                 .iter()
-                .filter(|path| !preg_is_match(duplicates_filter, &strtr(path, "\\", "/")))
+                .filter(|path| {
+                    !preg_is_match(duplicates_filter, &legacy_lossy(&strtr(path, "\\", "/")))
+                })
                 .cloned()
                 .collect();
             if !paths.is_empty() {
@@ -83,7 +85,8 @@ impl ClassMap {
     }
 
     pub fn add_class(&mut self, class_name: String, path: String) {
-        self.psr_violations.shift_remove(&strtr(&path, "\\", "/"));
+        self.psr_violations
+            .shift_remove(&*legacy_lossy(&strtr(&path, "\\", "/")));
 
         self.map.insert(class_name, path);
     }
@@ -104,10 +107,10 @@ impl ClassMap {
     }
 
     pub fn add_psr_violation(&mut self, warning: String, class_name: String, path: String) {
-        let path = rtrim(&strtr(&path, "\\", "/"), Some("/"));
+        let path = rtrim2(strtr(&path, "\\", "/"), "/");
 
         self.psr_violations
-            .entry(path)
+            .entry(legacy_lossy(&path).into_owned())
             .or_default()
             .push(PsrViolationEntry {
                 warning,
@@ -116,10 +119,10 @@ impl ClassMap {
     }
 
     pub fn clear_psr_violations_by_path(&mut self, path_prefix: &str) {
-        let path_prefix = rtrim(&strtr(path_prefix, "\\", "/"), Some("/"));
+        let path_prefix = rtrim2(strtr(path_prefix, "\\", "/"), "/");
 
         self.psr_violations.retain(|path, _| {
-            path != &path_prefix && strpos(path, &format!("{}/", path_prefix)) != Some(0)
+            path != &path_prefix && strpos(path, format!("{}/", path_prefix)) != Some(0)
         });
     }
 

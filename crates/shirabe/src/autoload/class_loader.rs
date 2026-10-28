@@ -3,8 +3,8 @@
 use indexmap::IndexMap;
 use shirabe_php_rpc::stream_resolve_include_path;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, file_exists, spl_autoload_register,
-    spl_autoload_unregister, strlen, strpos, strrpos, strtr, substr,
+    InvalidArgumentException, PhpMixed, file_exists, legacy_lossy, path_from_bytes,
+    spl_autoload_register, spl_autoload_unregister, strlen, strpos, strrpos, strtr, substr,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -339,13 +339,13 @@ impl ClassLoader {
                     break;
                 }
                 let last_pos = last_pos.unwrap();
-                sub_path = substr(&sub_path, 0, Some(last_pos as i64));
+                sub_path = legacy_lossy(&substr(&sub_path, 0, Some(last_pos as i64))).into_owned();
                 let search = format!("{}\\", sub_path);
                 if let Some(dirs) = self.prefix_dirs_psr4.get(&search) {
                     let path_end = substr(&logical_path_psr4, (last_pos + 1) as i64, None);
                     for dir in dirs {
                         let file = std::path::Path::new(dir)
-                            .join(&path_end)
+                            .join(path_from_bytes(&path_end))
                             .into_os_string()
                             .into_string()
                             .unwrap();
@@ -377,7 +377,7 @@ impl ClassLoader {
                 "{}{}",
                 substr(&logical_path_psr4, 0, Some((pos + 1) as i64)),
                 strtr(
-                    &substr(&logical_path_psr4, (pos + 1) as i64, None),
+                    substr(&logical_path_psr4, (pos + 1) as i64, None),
                     "_",
                     std::path::MAIN_SEPARATOR_STR,
                 )

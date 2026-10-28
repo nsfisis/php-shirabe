@@ -30,7 +30,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
     array_pop, chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode, is_dir,
-    is_file, mkdir, preg_match, realpath, rtrim, strtolower, unlink,
+    is_file, legacy_lossy, mkdir, path_from_bytes, preg_match, realpath, rtrim2, strtolower,
+    unlink,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -432,12 +433,13 @@ impl CreateProjectCommand {
     ) -> anyhow::Result<bool> {
         let parser: VersionParser = VersionParser::new();
         let requirements = parser.parse_name_version_pairs(vec![package_name.to_string()])?;
-        let name = strtolower(
+        let name = legacy_lossy(&strtolower(
             requirements[0]
                 .get("name")
                 .map(|s| s.as_str())
                 .unwrap_or(""),
-        );
+        ))
+        .into_owned();
         if package_version.is_none() && requirements[0].contains_key("version") {
             package_version = requirements[0].get("version").cloned();
         }
@@ -447,14 +449,14 @@ impl CreateProjectCommand {
             None => {
                 let mut parts = explode_with_limit("/", &name, 2);
                 std::path::Path::new(&Platform::get_cwd(false)?)
-                    .join(array_pop(&mut parts).unwrap_or_default())
+                    .join(path_from_bytes(&array_pop(&mut parts).unwrap_or_default()))
                     .into_os_string()
                     .into_string()
                     .unwrap()
             }
             Some(directory) => directory,
         };
-        directory = rtrim(&directory, Some("/\\"));
+        directory = legacy_lossy(&rtrim2(&directory, "/\\")).into_owned();
 
         let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
             io.clone(),
@@ -910,7 +912,7 @@ impl Command for CreateProjectCommand {
                 .into());
             }
             let mut parts =
-                explode_with_limit("/", &strtolower(package.as_string().unwrap_or_default()), 2);
+                explode_with_limit("/", strtolower(package.as_string().unwrap_or_default()), 2);
             let prompt = format!(
                 "New project directory [<comment>{}</comment>]: ",
                 array_pop(&mut parts).unwrap_or_default()

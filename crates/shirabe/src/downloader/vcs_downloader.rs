@@ -12,11 +12,12 @@ use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
 use crate::util::{Filesystem, ProcessExecutor};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, PhpClass as _, PhpMixed, RuntimeException, array_map,
-    array_shift, explode, implode, rawurldecode, realpath, str_replace, strlen, strpos, substr,
-    trim,
+    array_shift, bconcat, explode, implode, legacy_lossy, rawurldecode, realpath, str_replace,
+    strlen, strpos, substr, trim,
 };
 
 #[derive(Debug)]
@@ -363,20 +364,20 @@ pub trait VcsDownloader:
             let mut message = "Pulling in changes:";
             let mut logs = self.get_commit_logs(&initial_ref, &target_ref, path)?;
 
-            if trim(&logs, None).is_empty() {
+            if trim(&logs).is_empty() {
                 message = "Rolling back changes:";
                 logs = self.get_commit_logs(&target_ref, &initial_ref, path)?;
             }
 
-            if !trim(&logs, None).is_empty() {
-                let prefixed: Vec<String> = array_map(
-                    |line: &String| format!("      {}", line),
+            if !trim(&logs).is_empty() {
+                let prefixed: Vec<BString> = array_map(
+                    |line: &BString| bconcat!("      ", line),
                     &explode("\n", &logs),
                 );
-                logs = implode("\n", &prefixed);
+                logs = legacy_lossy(&implode("\n", &prefixed)).into_owned();
 
                 // escape angle brackets for proper output in the console
-                logs = str_replace("<", "\\<", &logs);
+                logs = legacy_lossy(&str_replace("<", "\\<", &logs)).into_owned();
 
                 self.io()
                     .write_error3(&format!("    {}", message), true, io_interface::NORMAL);
@@ -468,13 +469,13 @@ pub trait VcsDownloader:
                 let file_protocol = "file://";
                 let mut is_file_protocol = false;
                 if strpos(&url, file_protocol) == Some(0) {
-                    url = substr(&url, strlen(file_protocol), None);
+                    url = legacy_lossy(&substr(&url, strlen(file_protocol), None)).into_owned();
                     is_file_protocol = true;
                 }
 
                 // realpath() below will not understand %20 spaces etc.
                 if strpos(&url, "%").is_some() {
-                    url = rawurldecode(&url);
+                    url = legacy_lossy(&rawurldecode(&url)).into_owned();
                 }
 
                 *url_entry = realpath(&url).unwrap_or_default();

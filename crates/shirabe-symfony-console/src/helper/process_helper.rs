@@ -3,7 +3,9 @@
 use crate::helper::{DebugFormatterHelper, Helper, HelperInterface, HelperSet};
 use crate::output::{ConsoleOutputInterface, OutputInterface, output_interface};
 use bstr::BString;
-use shirabe_php_shim::{AsAny, InvalidArgumentException, PhpMixed, spl_object_hash, str_replace};
+use shirabe_php_shim::{
+    AsAny, InvalidArgumentException, PhpMixed, legacy_lossy, spl_object_hash, str_replace,
+};
 use shirabe_symfony_process::exception::ProcessFailedException;
 use shirabe_symfony_process::process::Process;
 
@@ -238,11 +240,11 @@ impl ProcessHelper {
     }
 
     fn escape_string(&self, str: &str) -> String {
-        str_replace("<", "\\<", str)
+        legacy_lossy(&str_replace("<", "\\<", str)).into_owned()
     }
 
     fn escape_string_static(str: &str) -> String {
-        str_replace("<", "\\<", str)
+        legacy_lossy(&str_replace("<", "\\<", str)).into_owned()
     }
 
     fn formatter_start(

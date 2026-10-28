@@ -5,8 +5,8 @@ use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::{Platform, ProcessExecutor};
 use bstr::B;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, implode, parse_url, php_regex, preg_match, stripos,
-    strpos, trim,
+    LogicException, PhpMixed, RuntimeException, implode, legacy_lossy, parse_url, php_regex,
+    preg_match, stripos, strpos, trim,
 };
 use std::sync::Mutex;
 
@@ -138,10 +138,11 @@ impl Svn {
         }
 
         let error_output = self.process.borrow().get_error_output().to_string();
-        let full_output = trim(
-            &implode("\n", &[output.unwrap_or_default(), error_output]),
-            None,
-        );
+        let full_output = legacy_lossy(&trim(implode(
+            "\n",
+            &[output.unwrap_or_default(), error_output],
+        )))
+        .into_owned();
 
         // the error is not auth-related
         if stripos(&full_output, "Could not authenticate to server:").is_none()

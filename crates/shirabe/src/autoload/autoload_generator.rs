@@ -23,9 +23,9 @@ use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PHP_SERVER, PhpMixed, PregMatches, RuntimeException,
     array_keys, array_map, array_merge_map, array_merge_recursive, array_shift, array_slice_strs,
     array_unique, bin2hex, empty, explode, file_exists, file_get_contents, hash, implode, intval,
-    is_array, is_dir, ksort, ltrim, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
-    preg_replace_callback, random_bytes, realpath, rtrim, str_replace, strlen, strpos, strtr,
-    strtr_array, substr, substr_count, trim, unlink, var_export,
+    is_array, is_dir, ksort, legacy_lossy, ltrim, ltrim2, php_regex, preg_is_match, preg_match,
+    preg_quote, preg_replace, preg_replace_callback, random_bytes, realpath, rtrim2, str_replace,
+    strlen, strpos, strtr, strtr_array, substr, substr_count, trim2, unlink, var_export,
 };
 use shirabe_semver::constraint::Bound;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -230,7 +230,8 @@ impl AutoloadGenerator {
 
         let app_base_dir_code =
             filesystem.find_shortest_path_code(&vendor_path, &base_path, true, false, false)?;
-        let app_base_dir_code = str_replace("__DIR__", "$vendorDir", &app_base_dir_code);
+        let app_base_dir_code =
+            legacy_lossy(&str_replace("__DIR__", "$vendorDir", &app_base_dir_code)).into_owned();
 
         let mut namespaces_file = format!(
             r#"<?php
@@ -346,7 +347,7 @@ return array(
                 .is_some_and(|a| !a.is_empty())
         {
             let levels = substr_count(
-                &filesystem.normalize_path(&root_package.get_target_dir().unwrap_or_default()),
+                filesystem.normalize_path(&root_package.get_target_dir().unwrap_or_default()),
                 "/",
             ) + 1;
             let psr0_keys = main_autoload
@@ -592,10 +593,10 @@ return array(
                             .unwrap_or_default()
                             .to_string()
                     } else {
-                        bin2hex(&random_bytes(16))
+                        legacy_lossy(&bin2hex(random_bytes(16))).into_owned()
                     }
                 } else {
-                    bin2hex(&random_bytes(16))
+                    legacy_lossy(&bin2hex(random_bytes(16))).into_owned()
                 });
             }
         }
@@ -745,7 +746,10 @@ return array(
         // if $dir does not exist, it should anyway not find anything there so no trouble
         if file_exists(dir) {
             // transform $dir in the same way that exclude-from-classmap patterns are transformed so we can match them against each other
-            let dir_match = preg_quote(&strtr(&realpath(dir).unwrap_or_default(), "\\", "/"), None);
+            let dir_match = preg_quote(
+                &legacy_lossy(&strtr(realpath(dir).unwrap_or_default(), "\\", "/")),
+                None,
+            );
             // also match against the non-realpath version for symlinks
             let fs = Filesystem::new(None);
             let abs_dir = if fs.is_absolute_path(dir) {
@@ -757,8 +761,10 @@ return array(
                     dir
                 )
             };
-            let dir_match_normalized =
-                preg_quote(&strtr(&fs.normalize_path(&abs_dir), "\\", "/"), None);
+            let dir_match_normalized = preg_quote(
+                &legacy_lossy(&strtr(fs.normalize_path(&abs_dir), "\\", "/")),
+                None,
+            );
             let is_symlink = dir_match != dir_match_normalized;
 
             let mut new_excluded: Vec<String> = vec![];
@@ -1011,11 +1017,16 @@ return array(
                 && !target_dir.is_empty()
             {
                 let suffix_to_remove = format!("/{}", target_dir);
-                install_path = substr(&install_path, 0, Some(-(suffix_to_remove.len() as i64)));
+                install_path = legacy_lossy(&substr(
+                    &install_path,
+                    0,
+                    Some(-(suffix_to_remove.len() as i64)),
+                ))
+                .into_owned();
             }
 
             for include_path in package.get_include_paths() {
-                let include_path = trim(&include_path, Some("/"));
+                let include_path = legacy_lossy(&trim2(&include_path, "/")).into_owned();
                 include_paths.push(if install_path.is_empty() {
                     include_path
                 } else {
@@ -1135,8 +1146,8 @@ return array(
         path = filesystem.normalize_path(&path);
 
         let mut base_dir = String::new();
-        if strpos(&format!("{}/", path), &format!("{}/", vendor_path)) == Some(0) {
-            path = substr(&path, vendor_path.len() as i64, None);
+        if strpos(format!("{}/", path), format!("{}/", vendor_path)) == Some(0) {
+            path = legacy_lossy(&substr(&path, vendor_path.len() as i64, None)).into_owned();
             base_dir = "$vendorDir . ".to_string();
         } else {
             path = filesystem
@@ -1294,7 +1305,14 @@ return array(
 
             let version = str_replace("-", ".", bound.get_version());
             let chunks = explode(".", &version);
-            let chunks = array_slice_strs(&chunks, 0, Some(3));
+            let chunks = array_slice_strs(
+                &chunks
+                    .iter()
+                    .map(|s| legacy_lossy(s).into_owned())
+                    .collect::<Vec<_>>(),
+                0,
+                Some(3),
+            );
 
             PhpMixed::string(implode(".", &chunks))
         };
@@ -1527,7 +1545,7 @@ class ComposerAutoloaderInit{}
                 &PhpMixed::string(if let Some(ref prefix) = *self.apcu_prefix.borrow() {
                     prefix.clone()
                 } else {
-                    bin2hex(&random_bytes(10))
+                    legacy_lossy(&bin2hex(random_bytes(10))).into_owned()
                 }),
                 true,
             );
@@ -1712,8 +1730,8 @@ class ComposerStaticInit{}
         let absolute_vendor_path_code = format!(
             " => {}",
             substr(
-                &var_export(
-                    &PhpMixed::string(format!("{}/", rtrim(vendor_path, Some("\\/")))),
+                var_export(
+                    &PhpMixed::string(format!("{}/", rtrim2(vendor_path, "\\/"))),
                     true
                 ),
                 0,
@@ -1723,10 +1741,10 @@ class ComposerStaticInit{}
         let absolute_vendor_phar_path_code = format!(
             " => {}",
             substr(
-                &var_export(
+                var_export(
                     &PhpMixed::string(format!(
                         "{}/",
-                        rtrim(&format!("phar://{}", vendor_path), Some("\\/"))
+                        rtrim2(format!("phar://{}", vendor_path), "\\/")
                     )),
                     true
                 ),
@@ -1737,8 +1755,8 @@ class ComposerStaticInit{}
         let absolute_app_base_dir_code = format!(
             " => {}",
             substr(
-                &var_export(
-                    &PhpMixed::string(format!("{}/", rtrim(base_path, Some("\\/")))),
+                var_export(
+                    &PhpMixed::string(format!("{}/", rtrim2(base_path, "\\/"))),
                     true
                 ),
                 0,
@@ -1748,10 +1766,10 @@ class ComposerStaticInit{}
         let absolute_app_base_dir_phar_code = format!(
             " => {}",
             substr(
-                &var_export(
+                var_export(
                     &PhpMixed::string(format!(
                         "{}/",
-                        rtrim(&format!("phar://{}", base_path), Some("\\/"))
+                        rtrim2(format!("phar://{}", base_path), "\\/")
                     )),
                     true
                 ),
@@ -1779,11 +1797,11 @@ class ComposerStaticInit{}
             {
                 continue;
             }
-            maps.insert(substr(&prop, prefix_len, None).into(), value);
+            maps.insert(substr(&prop, prefix_len, None), value);
         }
 
         for (prop, value) in &maps {
-            let value = strtr_array(&var_export(value, true), &{
+            let value = strtr_array(var_export(value, true), &{
                 let mut m: IndexMap<String, String> = IndexMap::new();
                 m.insert(absolute_vendor_path_code.clone(), vendor_path_code.clone());
                 m.insert(
@@ -1800,11 +1818,13 @@ class ComposerStaticInit{}
                 );
                 m
             });
-            let value = ltrim(
-                &preg_replace(php_regex!("/^ */m"), "    $0$0", &value),
-                None,
-            );
-            let value = preg_replace(php_regex!("/ +$/m"), "", &value);
+            let value = legacy_lossy(&ltrim(preg_replace(
+                php_regex!("/^ */m"),
+                "    $0$0",
+                &legacy_lossy(&value),
+            )))
+            .into_owned();
+            let value = legacy_lossy(&preg_replace(php_regex!("/ +$/m"), "", &value)).into_owned();
 
             file.push_str(&format!(
                 "    public static ${} = {};\n\n",
@@ -1874,7 +1894,12 @@ class ComposerStaticInit{}
             let mut install_path = install_path;
             if package.get_target_dir().is_some() && !is_root {
                 let suffix_to_remove = format!("/{}", package.get_target_dir().unwrap_or_default());
-                install_path = substr(&install_path, 0, Some(-(suffix_to_remove.len() as i64)));
+                install_path = legacy_lossy(&substr(
+                    &install_path,
+                    0,
+                    Some(-(suffix_to_remove.len() as i64)),
+                ))
+                .into_owned();
             }
 
             // PHP iterates `$autoload[$type]` as a PHP array regardless of whether it is a
@@ -1895,9 +1920,9 @@ class ComposerStaticInit{}
                 let namespace = namespace.to_str_lossy().into_owned();
                 let namespace = if ["psr-4", "psr-0"].contains(&r#type) {
                     // normalize namespaces to ensure "\" becomes "" and others do not have leading separators as they are not needed
-                    ltrim(&namespace, Some("\\"))
+                    ltrim2(&namespace, "\\")
                 } else {
-                    namespace
+                    bstr::BString::from(namespace)
                 };
                 // PHP: foreach ((array) $paths as $path) — handles scalar by wrapping in an array
                 let path_list: Vec<PhpMixed> = match &paths {
@@ -1930,14 +1955,15 @@ class ComposerStaticInit{}
                                 .map(|segment| preg_quote(segment, None))
                                 .collect::<Vec<String>>()
                                 .join("[\\\\/]");
-                            path_str = ltrim(
-                                &preg_replace(
+                            path_str = legacy_lossy(&ltrim2(
+                                preg_replace(
                                     format!("{{^{}}}", target_dir),
                                     "",
-                                    &ltrim(&path_str, Some("\\/")),
+                                    &legacy_lossy(&ltrim2(&path_str, "\\/")),
                                 ),
-                                Some("\\/"),
-                            );
+                                "\\/",
+                            ))
+                            .into_owned();
                         } else {
                             // add target-dir from file paths that don't have it
                             path_str = format!(
@@ -1953,7 +1979,10 @@ class ComposerStaticInit{}
                         let p = preg_replace(
                             php_regex!("{/+}"),
                             "/",
-                            &preg_quote(&trim(&strtr(&path_str, "\\", "/"), Some("/")), None),
+                            &preg_quote(
+                                &legacy_lossy(&trim2(strtr(&path_str, "\\", "/"), "/")),
+                                None,
+                            ),
                         );
 
                         // add support for wildcards * and **
@@ -1967,23 +1996,32 @@ class ComposerStaticInit{}
                         // add support for up-level relative paths
                         let updir_cell: std::cell::RefCell<Option<String>> =
                             std::cell::RefCell::new(None);
-                        let p = preg_replace_callback(
-                            php_regex!("{^((?:(?:\\\\\\.){1,2}+/)+)}"),
-                            |matches: &PregMatches| -> anyhow::Result<String> {
-                                // undo preg_quote for the matched string
-                                *updir_cell.borrow_mut() =
-                                    Some(str_replace("\\.", ".", matches.get(1).unwrap_or("")));
+                        let p = legacy_lossy(
+                            &preg_replace_callback(
+                                php_regex!("{^((?:(?:\\\\\\.){1,2}+/)+)}"),
+                                |matches: &PregMatches| -> anyhow::Result<String> {
+                                    // undo preg_quote for the matched string
+                                    *updir_cell.borrow_mut() = Some(
+                                        legacy_lossy(&str_replace(
+                                            "\\.",
+                                            ".",
+                                            matches.get(1).unwrap_or(""),
+                                        ))
+                                        .into_owned(),
+                                    );
 
-                                Ok(String::new())
-                            },
-                            &p,
+                                    Ok(String::new())
+                                },
+                                &legacy_lossy(&p),
+                            )
+                            .expect("the replacement callback cannot fail"),
                         )
-                        .expect("the replacement callback cannot fail");
+                        .into_owned();
                         let updir: Option<String> = updir_cell.into_inner();
                         let install_path_for_resolve = if install_path.is_empty() {
-                            strtr(&Platform::get_cwd(false).unwrap_or_default(), "\\", "/")
+                            strtr(Platform::get_cwd(false).unwrap_or_default(), "\\", "/")
                         } else {
-                            install_path.clone()
+                            bstr::BString::from(install_path.clone())
                         };
 
                         let resolved_path = realpath(format!(
@@ -1997,7 +2035,7 @@ class ComposerStaticInit{}
                         };
                         let entry = format!(
                             "{}/{}($|/)",
-                            preg_quote(&strtr(&resolved_path, "\\", "/"), None),
+                            preg_quote(&legacy_lossy(&strtr(&resolved_path, "\\", "/")), None),
                             p
                         );
                         autoloads.insert(numeric_index.to_string().into(), PhpMixed::string(entry));
@@ -2033,7 +2071,7 @@ class ComposerStaticInit{}
 
                     // psr-0/psr-4: append to namespace's list
                     let entry = autoloads
-                        .entry(namespace.as_str().into())
+                        .entry(namespace.clone())
                         .or_insert_with(|| PhpMixed::List(vec![]));
                     if let PhpMixed::List(l) = entry {
                         l.push(PhpMixed::string(relative_path));
@@ -2047,7 +2085,7 @@ class ComposerStaticInit{}
 
     fn get_file_identifier(&self, package: PackageInterfaceHandle, path: &str) -> String {
         // TODO composer v3 change this to sha1 or xxh3? Possibly not worth the potential breakage though
-        hash("md5", format!("{}:{}", package.get_name(), path))
+        legacy_lossy(&hash("md5", format!("{}:{}", package.get_name(), path))).into_owned()
     }
 
     /// Filters out dev-dependencies

@@ -13,8 +13,9 @@ use bstr::B;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class, implode,
-    in_array_strict, is_dir, php_regex, preg_is_match, preg_match, preg_match_all, preg_quote,
-    preg_replace, preg_split, realpath, rtrim, strlen, strpos, substr, trim, version_compare,
+    in_array_strict, is_dir, legacy_lossy, php_regex, preg_is_match, preg_match, preg_match_all,
+    preg_quote, preg_replace, preg_split, realpath, rtrim2, strlen, strpos, substr, trim,
+    version_compare,
 };
 
 #[derive(Debug)]
@@ -84,7 +85,7 @@ impl GitDownloader {
             .into());
         }
 
-        let mut refs = trim(&output, None);
+        let mut refs = legacy_lossy(&trim(&output)).into_owned();
         let Some(head_match) = preg_match(php_regex!(r"{^([a-f0-9]+) HEAD$}mi"), &refs) else {
             // could not match the HEAD for some reason
             return Ok(None);
@@ -178,7 +179,7 @@ impl GitDownloader {
                         .into());
                     }
 
-                    let output = trim(&output, None);
+                    let output = legacy_lossy(&trim(&output)).into_owned();
                     // keep the shortest diff from all remote branches we compare against
                     if unpushed_changes.is_none()
                         || strlen(&output) < strlen(unpushed_changes.as_deref().unwrap_or(""))
@@ -220,7 +221,7 @@ impl GitDownloader {
                     ))
                     .into());
                 }
-                refs = trim(&output, None);
+                refs = legacy_lossy(&trim(&output)).into_owned();
             }
 
             // abort after first pass if we didn't find anything
@@ -439,7 +440,7 @@ impl GitDownloader {
         let mut exception_extra = String::new();
 
         // reference was not found (prints "fatal: reference is not a tree: $ref")
-        if strpos(&self.inner.process.borrow().get_error_output(), reference).is_some() {
+        if strpos(self.inner.process.borrow().get_error_output(), reference).is_some() {
             self.inner.io.write_error3(
                 &format!(
                     "    <warning>{} is gone (history was rewritten?)</warning>",
@@ -614,14 +615,15 @@ impl GitDownloader {
                 return path;
             }
 
-            path = rtrim(
-                &format!(
+            path = legacy_lossy(&rtrim2(
+                format!(
                     "{}/{}",
                     realpath(&base_path).unwrap_or_default(),
                     implode("/", &removed),
                 ),
-                Some("/"),
-            );
+                "/",
+            ))
+            .into_owned();
         }
 
         path
@@ -630,7 +632,7 @@ impl GitDownloader {
     fn get_short_hash(&self, reference: &str) -> String {
         if !self.inner.io.is_verbose() && preg_is_match(php_regex!(r"{^[0-9a-f]{40}$}"), reference)
         {
-            return substr(reference, 0, Some(10));
+            return legacy_lossy(&substr(reference, 0, Some(10))).into_owned();
         }
 
         reference.to_string()
@@ -699,7 +701,7 @@ impl ChangeReportInterface for GitDownloader {
             .into());
         }
 
-        let output = trim(&output, None);
+        let output = legacy_lossy(&trim(&output)).into_owned();
 
         Ok(if strlen(&output) > 0 {
             Some(output)

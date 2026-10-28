@@ -16,7 +16,9 @@ use crate::repository::{
     PlatformRepository, RepositoryInterfaceHandle,
 };
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, LogicException, RuntimeException, ksort, strtolower};
+use shirabe_php_shim::{
+    Catch as _, LogicException, RuntimeException, ksort, legacy_lossy, strtolower,
+};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -543,7 +545,7 @@ impl RepositorySet {
             }
 
             request.require_name(package_name, None)?;
-            allowed_packages.push(strtolower(package_name));
+            allowed_packages.push(legacy_lossy(&strtolower(package_name)).into_owned());
         }
 
         if !allowed_packages.is_empty() {

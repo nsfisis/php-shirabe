@@ -2,8 +2,8 @@
 
 use crate::php_file_cleaner::PhpFileCleaner;
 use shirabe_php_shim::{
-    PHP_EOL, RuntimeException, file_exists, file_get_contents, is_file, is_readable, ltrim,
-    php_strip_whitespace, preg_match_all, str_replace_array, strrpos, substr, trim,
+    PHP_EOL, RuntimeException, file_exists, file_get_contents, is_file, is_readable, legacy_lossy,
+    ltrim2, php_strip_whitespace, preg_match_all, str_replace_array, strrpos, substr, trim,
 };
 use std::sync::OnceLock;
 
@@ -28,13 +28,7 @@ impl PhpFileParser {
                         "File at \"{}\" is not readable, check its permissions",
                         path
                     );
-                // TODO(bytes)
-                } else if trim(
-                    &String::from_utf8_lossy(&file_get_contents(path).unwrap_or_default()),
-                    None,
-                )
-                .is_empty()
-                {
+                } else if trim(file_get_contents(path).unwrap_or_default()).is_empty() {
                     // The input file was really empty and thus contains no classes
                     return Ok(vec![]);
                 } else {
@@ -57,12 +51,12 @@ impl PhpFileParser {
 
         // return early if there is no chance of matching anything in this file
         let pattern = format!("{{\\b(?:class|interface|trait{})\\s}}i", extra_types);
-        let max_matches = preg_match_all(&pattern, &contents).count();
+        let max_matches = preg_match_all(&pattern, &legacy_lossy(&contents)).count();
         if max_matches == 0 {
             return Ok(vec![]);
         }
 
-        let mut p = PhpFileCleaner::new(contents, max_matches);
+        let mut p = PhpFileCleaner::new(legacy_lossy(&contents).into_owned(), max_matches);
         let contents = p.clean();
         drop(p);
 
@@ -92,16 +86,9 @@ impl PhpFileParser {
             let ns = r#match.name("ns");
             if ns.is_some_and(|ns| !ns.is_empty()) {
                 let nsname = r#match.name("nsname").unwrap_or("");
-                namespace = str_replace_array(
-                    &[
-                        " ".to_string(),
-                        "\t".to_string(),
-                        "\r".to_string(),
-                        "\n".to_string(),
-                    ],
-                    &["".to_string()],
-                    nsname,
-                ) + "\\";
+                let mut nsname = str_replace_array(&[" ", "\t", "\r", "\n"], &[""], nsname);
+                nsname.push(b'\\');
+                namespace = legacy_lossy(&nsname).into_owned();
             } else {
                 let name = r#match
                     .name("name")
@@ -117,11 +104,11 @@ impl PhpFileParser {
                 let name: String = if let Some(stripped) = name.strip_prefix(':') {
                     // This is an XHP class, https://github.com/facebook/xhp
                     "xhp".to_string()
-                        + &str_replace_array(
+                        + &*legacy_lossy(&str_replace_array(
                             &["-".to_string(), ":".to_string()],
                             &["_".to_string(), "__".to_string()],
                             stripped,
-                        )
+                        ))
                 } else if r#match.name("type").unwrap_or("").to_lowercase() == "enum" {
                     // something like:
                     //   enum Foo: int { HERP = '123'; }
@@ -132,7 +119,7 @@ impl PhpFileParser {
                     // The regex above captures the colon and type, which isn't part of
                     // the class name.
                     if let Some(colon_pos) = strrpos(name, ":") {
-                        substr(name, 0, Some(colon_pos as i64))
+                        legacy_lossy(&substr(name, 0, Some(colon_pos as i64))).into_owned()
                     } else {
                         name.to_string()
                     }
@@ -140,12 +127,15 @@ impl PhpFileParser {
                     name.to_string()
                 };
 
-                let class_name = ltrim(&format!("{}{}", namespace, name), Some("\\"));
+                let class_name = ltrim2(format!("{}{}", namespace, name), "\\");
                 classes.push(class_name);
             }
         }
 
-        Ok(classes)
+        Ok(classes
+            .iter()
+            .map(|s| legacy_lossy(s).into_owned())
+            .collect::<Vec<_>>())
     }
 
     fn get_extra_types() -> &'static str {

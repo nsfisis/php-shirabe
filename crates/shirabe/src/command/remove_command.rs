@@ -14,7 +14,9 @@ use crate::package::base_package;
 use crate::repository::RepositoryInterface;
 use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, UnexpectedValueException, impl_php_class, preg_grep, strtolower};
+use shirabe_php_shim::{
+    PhpMixed, UnexpectedValueException, impl_php_class, legacy_lossy, preg_grep, strtolower,
+};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::InvalidArgumentException;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -200,7 +202,11 @@ impl Command for RemoveCommand {
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(|l| l.iter().map(|v| strtolower(v)).collect())
+            .map(|l| {
+                l.iter()
+                    .map(|v| legacy_lossy(&strtolower(v)).into_owned())
+                    .collect()
+            })
             .unwrap_or_default();
 
         if input
@@ -325,7 +331,7 @@ impl Command for RemoveCommand {
                     })
                     .collect();
                 for (name, canonical) in entries {
-                    section.insert(strtolower(&name).into(), PhpMixed::string(canonical));
+                    section.insert(strtolower(&name), PhpMixed::string(canonical));
                 }
             }
         }

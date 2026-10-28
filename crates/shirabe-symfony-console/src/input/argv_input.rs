@@ -4,10 +4,11 @@ use crate::exception::RuntimeException;
 use crate::input::{
     ArgumentName, Input, InputDefinition, InputInterface, InputValue, StreamableInputInterface,
 };
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, implode, mb_detect_encoding, mb_substr, php_regex, preg_match, strlen, strpos,
-    substr,
+    PhpResource, implode, legacy_lossy, mb_detect_encoding, mb_substr, php_regex, preg_match,
+    strlen, strpos, substr,
 };
 
 /// ArgvInput represents an input coming from the CLI arguments.
@@ -135,20 +136,23 @@ impl ArgvInput {
 
         if strlen(&name) > 1 {
             let first = substr(&name, 0, Some(1));
-            if self.inner.definition.has_shortcut(&first)
+            if self.inner.definition.has_shortcut(&legacy_lossy(&first))
                 && self
                     .inner
                     .definition
-                    .get_option_for_shortcut(&first)?
+                    .get_option_for_shortcut(&legacy_lossy(&first))?
                     .accept_value()
             {
                 // an option with a value (with no space)
-                self.add_short_option(&first, InputValue::String(substr(&name, 1, None)))?;
+                self.add_short_option(
+                    &legacy_lossy(&first),
+                    InputValue::String(legacy_lossy(&substr(&name, 1, None)).into_owned()),
+                )?;
             } else {
-                self.parse_short_option_set(&name)?;
+                self.parse_short_option_set(&legacy_lossy(&name))?;
             }
         } else {
-            self.add_short_option(&name, InputValue::Null)?;
+            self.add_short_option(&legacy_lossy(&name), InputValue::Null)?;
         }
 
         Ok(())
@@ -160,11 +164,11 @@ impl ArgvInput {
         let mut i = 0;
         while i < len {
             let name_i = substr(name, i, Some(1));
-            if !self.inner.definition.has_shortcut(&name_i) {
+            if !self.inner.definition.has_shortcut(&legacy_lossy(&name_i)) {
                 let encoding = mb_detect_encoding(name, None, true);
                 let bad = match encoding {
                     None => name_i,
-                    Some(encoding) => mb_substr(name, i, Some(1), Some(&encoding)),
+                    Some(encoding) => mb_substr(name, i, Some(1), Some(encoding.as_bstr())),
                 };
                 return Err(RuntimeException::new(format!(
                     "The \"-{}\" option does not exist.",
@@ -173,12 +177,15 @@ impl ArgvInput {
                 .into());
             }
 
-            let option = self.inner.definition.get_option_for_shortcut(&name_i)?;
+            let option = self
+                .inner
+                .definition
+                .get_option_for_shortcut(&legacy_lossy(&name_i))?;
             if option.accept_value() {
                 let value = if i == len - 1 {
                     InputValue::Null
                 } else {
-                    InputValue::String(substr(name, i + 1, None))
+                    InputValue::String(legacy_lossy(&substr(name, i + 1, None)).into_owned())
                 };
                 self.add_long_option(option.get_name(), value)?;
 
@@ -201,12 +208,16 @@ impl ArgvInput {
                 let pos = pos as i64;
                 let value = substr(&name, pos + 1, None);
                 if value.is_empty() {
-                    self.parsed.insert(0, value.clone());
+                    self.parsed
+                        .insert(0, legacy_lossy(&value.clone()).into_owned());
                 }
-                self.add_long_option(&substr(&name, 0, Some(pos)), InputValue::String(value))?;
+                self.add_long_option(
+                    &legacy_lossy(&substr(&name, 0, Some(pos))),
+                    InputValue::String(legacy_lossy(&value).into_owned()),
+                )?;
             }
             None => {
-                self.add_long_option(&name, InputValue::Null)?;
+                self.add_long_option(&legacy_lossy(&name), InputValue::Null)?;
             }
         }
 
@@ -427,17 +438,18 @@ impl ArgvInput {
                 } else {
                     substr(token, -1, None)
                 };
-                if !self.inner.options.contains_key(&name)
-                    && !self.inner.definition.has_shortcut(&name)
+                if !self.inner.options.contains_key(&*legacy_lossy(&name))
+                    && !self.inner.definition.has_shortcut(&legacy_lossy(&name))
                 {
                     // noop
                 } else {
-                    if !self.inner.options.contains_key(&name)
-                        && let Ok(resolved) = self.inner.definition.shortcut_to_name(&name)
+                    if !self.inner.options.contains_key(&*legacy_lossy(&name))
+                        && let Ok(resolved) =
+                            self.inner.definition.shortcut_to_name(&legacy_lossy(&name))
                     {
-                        name = resolved;
+                        name = bstr::BString::from(resolved);
                     }
-                    if let Some(option_value) = self.inner.options.get(&name)
+                    if let Some(option_value) = self.inner.options.get(&*legacy_lossy(&name))
                         && self.tokens.get(i + 1).map(|t| t.as_str()) == option_value.as_string()
                     {
                         is_option = true;
@@ -511,7 +523,9 @@ impl ArgvInput {
                     value.to_string()
                 };
                 if !leading.is_empty() && token.starts_with(&leading) {
-                    return InputValue::String(substr(&token, strlen(&leading), None));
+                    return InputValue::String(
+                        legacy_lossy(&substr(&token, strlen(&leading), None)).into_owned(),
+                    );
                 }
             }
         }

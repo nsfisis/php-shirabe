@@ -463,12 +463,13 @@ impl TextDescriptor {
             other => other.clone(),
         };
 
-        Ok(str_replace(
+        Ok(legacy_lossy(&str_replace(
             "\\\\",
             "\\",
-            &json_encode_ex(&default, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+            json_encode_ex(&default, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
                 .unwrap_or_default(),
         ))
+        .into_owned())
     }
 
     fn get_column_width(&self, commands: &[CommandOrString]) -> i64 {

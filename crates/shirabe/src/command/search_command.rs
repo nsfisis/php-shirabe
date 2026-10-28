@@ -10,7 +10,8 @@ use crate::repository::repository_interface::{self, AbandonedInfo, RepositoryInt
 use crate::repository::{CompositeRepository, PlatformRepository, RepositoryInterfaceHandle};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, impl_php_class, implode, in_array_loose, preg_quote, substr,
+    InvalidArgumentException, PhpMixed, impl_php_class, implode, in_array_loose, legacy_lossy,
+    preg_quote, substr,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -203,9 +204,9 @@ impl Command for SearchCommand {
             .as_array()
             .map(<[String]>::to_vec)
             .unwrap_or_default();
-        let mut query = implode(" ", &token_strings);
+        let mut query = legacy_lossy(&implode(" ", &token_strings)).into_owned();
         if mode != repository_interface::SEARCH_FULLTEXT {
-            query = preg_quote(&query, None);
+            query = legacy_lossy(&bstr::BString::from(preg_quote(&query, None))).into_owned();
         }
 
         let results = repos.search(query, mode, r#type)?;

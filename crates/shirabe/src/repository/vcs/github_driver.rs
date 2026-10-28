@@ -14,8 +14,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_map,
     array_search_mixed, base64_decode, basename, date_create, empty, explode, extension_loaded,
-    in_array_loose, parse_url, php_regex, preg_is_match, preg_match, preg_replace, preg_split,
-    strpos, strtolower, substr, trim, urlencode,
+    in_array_loose, legacy_lossy, parse_url, php_regex, preg_is_match, preg_match, preg_replace,
+    preg_split, strpos, strtolower, substr, trim, trim2, urlencode,
 };
 
 #[derive(Debug)]
@@ -77,13 +77,14 @@ impl GitHubDriver {
 
         self.owner = match_.get(3).unwrap_or_default().to_string();
         self.repository = match_.get(4).unwrap_or_default().to_string();
-        self.inner.origin_url = strtolower(
-            &match_
+        self.inner.origin_url = legacy_lossy(&strtolower(
+            match_
                 .get(1)
                 .filter(|s| !s.is_empty())
                 .map(str::to_string)
                 .unwrap_or_else(|| match_.get(2).unwrap_or_default().to_string()),
-        );
+        ))
+        .into_owned();
         if self.inner.origin_url == "www.github.com" {
             self.inner.origin_url = "github.com".to_string();
         }
@@ -442,11 +443,10 @@ impl GitHubDriver {
                 continue;
             }
             let decoded = base64_decode(
-                &response_map
+                response_map
                     .get(B("content"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_str_lossy(),
+                    .unwrap_or_default(),
             );
             match decoded {
                 Some(b) if !b.is_empty() => {
@@ -468,7 +468,7 @@ impl GitHubDriver {
         let mut result: Vec<IndexMap<BString, PhpMixed>> = vec![];
         let mut key: Option<String> = None;
         for line in preg_split(php_regex!(r"{\r?\n}"), &funding) {
-            let line = trim(&line, None);
+            let line = legacy_lossy(&trim(&line)).into_owned();
             if let Some(m) = preg_match(php_regex!(r"{^(\w+)\s*:\s*(.+)$}"), &line) {
                 let g1 = m.get(1).unwrap_or_default().to_string();
                 let g2 = m.get(2).unwrap_or_default().to_string();
@@ -479,12 +479,12 @@ impl GitHubDriver {
                 if let Some(m2) = preg_match(php_regex!(r"{^\[(.*?)\](?:\s*#.*)?$}"), &g2) {
                     let inner = m2.get(1).unwrap_or_default().to_string();
                     for item in array_map(
-                        |s: &String| trim(s, None),
+                        |s: &String| trim(s),
                         &preg_split(php_regex!(r#"{[\'\"]?\s*,\s*[\'\"]?}"#), &inner),
                     ) {
                         let mut entry = IndexMap::new();
                         entry.insert("type".into(), PhpMixed::string(g1.clone()));
-                        entry.insert("url".into(), PhpMixed::string(trim(&item, Some("\"' "))));
+                        entry.insert("url".into(), PhpMixed::string(trim2(&item, "\"' ")));
                         result.push(entry);
                     }
                 } else if let Some(m2) = preg_match(php_regex!(r"{^([^#].*?)(?:\s+#.*)?$}"), &g2) {
@@ -492,7 +492,7 @@ impl GitHubDriver {
                     entry.insert("type".into(), PhpMixed::string(g1.clone()));
                     entry.insert(
                         "url".into(),
-                        PhpMixed::string(trim(m2.get(1).unwrap_or_default(), Some("\"' "))),
+                        PhpMixed::string(trim2(m2.get(1).unwrap_or_default(), "\"' ")),
                     );
                     result.push(entry);
                 }
@@ -510,7 +510,7 @@ impl GitHubDriver {
                 );
                 entry.insert(
                     "url".into(),
-                    PhpMixed::string(trim(m.get(1).unwrap_or_default(), Some("\"' "))),
+                    PhpMixed::string(trim2(m.get(1).unwrap_or_default(), "\"' ")),
                 );
                 result.push(entry);
             } else if key.is_some() && line == "]" {
@@ -717,11 +717,10 @@ impl GitHubDriver {
             resource_map.get(B("encoding")).and_then(|v| v.as_string()) == Some("base64".into());
         let content = if has_content && encoding_base64 {
             base64_decode(
-                &resource_map
+                resource_map
                     .get(B("content"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_str_lossy(),
+                    .unwrap_or_default(),
             )
         } else {
             None
@@ -845,7 +844,7 @@ impl GitHubDriver {
                                 .get(B("ref"))
                                 .and_then(|v| v.as_string())
                                 .unwrap_or_default();
-                            let name = substr(&ref_str.to_str_lossy(), 11, None);
+                            let name = legacy_lossy(&substr(ref_str, 11, None)).into_owned();
                             if name != "gh-pages" {
                                 let sha = branch_map
                                     .get(B("object"))
@@ -893,7 +892,7 @@ impl GitHubDriver {
             .map(str::to_string)
             .unwrap_or_else(|| matches.get(3).unwrap_or_default().to_string());
         if !in_array_loose(
-            strtolower(&preg_replace(php_regex!(r"{^www\.}i"), "", &origin_url)),
+            strtolower(preg_replace(php_regex!(r"{^www\.}i"), "", &origin_url)),
             config.borrow().get("github-domains").values(),
         ) {
             return Ok(false);
@@ -982,12 +981,18 @@ impl GitHubDriver {
                             if let Some(scopes) =
                                 Response::find_header_value(&headers, "X-OAuth-Scopes")
                             {
-                                scopes_issued = explode(" ", &scopes);
+                                scopes_issued = explode(" ", &scopes)
+                                    .iter()
+                                    .map(|s| legacy_lossy(s).into_owned())
+                                    .collect::<Vec<_>>();
                             }
                             if let Some(scopes) =
                                 Response::find_header_value(&headers, "X-Accepted-OAuth-Scopes")
                             {
-                                scopes_needed = explode(" ", &scopes);
+                                scopes_needed = explode(" ", &scopes)
+                                    .iter()
+                                    .map(|s| legacy_lossy(s).into_owned())
+                                    .collect::<Vec<_>>();
                             }
                         }
                         let scopes_failed = array_diff(&scopes_needed, &scopes_issued);
@@ -1225,7 +1230,9 @@ impl GitHubDriver {
 
         let links = explode(",", &header);
         for link in links.iter() {
-            if let Some(m) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
+            if let Some(m) =
+                preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), &legacy_lossy(link))
+            {
                 return Some(m.get(1).unwrap_or_default().to_string());
             }
         }

@@ -10,8 +10,8 @@ use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, php_regex,
-    preg_is_match, preg_match, preg_replace, preg_split, strtolower, trigger_error,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, legacy_lossy,
+    php_regex, preg_is_match, preg_match, preg_replace, preg_split, strtolower, trigger_error,
 };
 
 #[derive(Debug)]
@@ -268,7 +268,10 @@ impl RootPackageLoader {
                 let m1 = m.get(1).unwrap_or_default().to_string();
                 let m2 = m.get(2).unwrap_or_default().to_string();
                 let mut alias = IndexMap::new();
-                alias.insert("package".to_string(), strtolower(req_name));
+                alias.insert(
+                    "package".to_string(),
+                    legacy_lossy(&strtolower(req_name)).into_owned(),
+                );
                 alias.insert(
                     "version".to_string(),
                     self.inner
@@ -326,7 +329,7 @@ impl RootPackageLoader {
             let mut matched = false;
             for constraint in &constraints {
                 if let Some(m) = preg_match(&pattern, constraint) {
-                    let name = strtolower(req_name);
+                    let name = legacy_lossy(&strtolower(req_name)).into_owned();
                     let m1 = m.get(1).unwrap_or_default().to_string();
                     let normalized_m1 = VersionParser::normalize_stability(&m1).unwrap_or_default();
                     let stability = stabilities[normalized_m1.as_str()];
@@ -349,7 +352,7 @@ impl RootPackageLoader {
                 if preg_is_match(php_regex!(r"{^[^,\s@]+$}"), &req_version_stripped) {
                     let stability_name = VersionParser::parse_stability(&req_version_stripped);
                     if stability_name != "stable" {
-                        let name = strtolower(req_name);
+                        let name = legacy_lossy(&strtolower(req_name)).into_owned();
                         let stability = stabilities[stability_name.as_str()];
                         if stability_flags.get(&name).is_some_and(|&f| f > stability)
                             || minimum_stability_val > stability
@@ -374,7 +377,7 @@ impl RootPackageLoader {
             if let Some(m) = preg_match(php_regex!(r"{^[^,\s@]+?#([a-f0-9]+)$}"), &req_version)
                 && VersionParser::parse_stability(&req_version) == "dev"
             {
-                let name = strtolower(req_name);
+                let name = legacy_lossy(&strtolower(req_name)).into_owned();
                 references.insert(name, m.get(1).unwrap_or_default().to_string());
             }
         }

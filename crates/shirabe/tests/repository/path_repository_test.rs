@@ -10,7 +10,7 @@ use shirabe::repository::PathRepository;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Platform, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, file_get_contents, hash, realpath, serialize};
+use shirabe_php_shim::{PhpMixed, file_get_contents, hash, legacy_lossy, realpath, serialize};
 use std::path::Path;
 
 fn fixtures_dir() -> String {
@@ -302,6 +302,7 @@ fn test_reference_config() {
                 ]
                 .concat()
             ))
+            .map(|s| legacy_lossy(&s).into_owned())
         );
     }
 }

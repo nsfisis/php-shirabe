@@ -23,8 +23,8 @@ use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed,
     RuntimeException, UnexpectedValueException, array_search, chmod, dirname, extension_loaded,
     file_exists, filesize, get_class, hash, hash_file, impl_php_class, is_dir, is_executable,
-    parse_url, pathinfo, realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask,
-    usleep,
+    legacy_lossy, parse_url, pathinfo, realpath, rtrim2, spl_object_hash, strlen, strpos, strtr,
+    trim, umask, usleep,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -192,7 +192,7 @@ impl FileDownloader {
             )));
         }
 
-        let output = trim(&output, None);
+        let output = legacy_lossy(&trim(&output)).into_owned();
 
         Ok(if strlen(&output) > 0 {
             Some(output)
@@ -225,11 +225,11 @@ impl FileDownloader {
 
     fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> String {
         pathinfo(
-            &parse_url(&strtr(
-                &package.get_dist_url().unwrap_or_default(),
+            &parse_url(&legacy_lossy(&strtr(
+                package.get_dist_url().unwrap_or_default(),
                 "\\",
                 "/",
-            ))
+            )))
             .and_then(|url| url.path)
             .unwrap_or_default(),
             component,
@@ -279,8 +279,8 @@ impl FileDownloader {
             extension
         };
 
-        rtrim(
-            &format!(
+        legacy_lossy(&rtrim2(
+            format!(
                 "{}/composer/tmp-{}.{}",
                 self.config
                     .borrow_mut()
@@ -293,8 +293,9 @@ impl FileDownloader {
                 ),
                 extension
             ),
-            Some("."),
-        )
+            ".",
+        ))
+        .into_owned()
     }
 
     /// Gets appendix message to add to the "- Upgrading x" string being output on update
@@ -623,7 +624,8 @@ impl DownloaderInterface for FileDownloader {
 
             if let Some(checksum) = checksum.as_deref()
                 && !checksum.is_empty()
-                && hash_file("sha1", &file_name).as_deref() != Some(checksum)
+                && hash_file("sha1", &file_name).as_ref().map(|h| h.as_slice())
+                    != Some(checksum.as_bytes())
             {
                 return Err(UnexpectedValueException::new(format!(
                     "The checksum verification of the file failed (downloaded from {})",

@@ -109,7 +109,7 @@ impl ConsoleOutput {
             PHP_OS.to_string(),
         ];
 
-        stripos(&implode(";", &checks), "OS400").is_some()
+        stripos(implode(";", &checks), "OS400").is_some()
     }
 
     /// For testing only. Overwrites the inner `StreamOutput`'s private `stream` field, mirroring

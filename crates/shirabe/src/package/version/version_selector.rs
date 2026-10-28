@@ -12,8 +12,8 @@ use crate::package::{PackageInterfaceHandle, base_package};
 use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySetInterface};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, UnexpectedValueException, php_regex, preg_is_match, preg_replace, strtolower,
-    version_compare,
+    CmpOp, UnexpectedValueException, legacy_lossy, php_regex, preg_is_match, preg_replace,
+    strtolower, version_compare,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
@@ -87,7 +87,7 @@ impl VersionSelector {
             None => None,
         };
         let mut candidates = self.repository_set.borrow().find_packages(
-            &strtolower(package_name),
+            &legacy_lossy(&strtolower(package_name)),
             constraint,
             repo_set_flags,
         )?;

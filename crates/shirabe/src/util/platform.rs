@@ -175,7 +175,7 @@ impl Platform {
             if !ini_get("open_basedir").is_some_and(|s| PhpMixed::string(s).to_bool())
                 && is_readable("/proc/version")
                 // TODO(bytes)
-                && stripos(&String::from_utf8_lossy(&file_contents), "microsoft").is_some()
+                && stripos(&file_contents, "microsoft").is_some()
                 && !Self::is_docker()
             // Docker and Podman running inside WSL should not be seen as WSL
             {
@@ -262,8 +262,8 @@ impl Platform {
         // detect msysgit/mingw and assume this is a tty because detection
         // does not work correctly, see https://github.com/composer/composer/issues/9690
         if matches!(
-            strtoupper(&Self::get_env("MSYSTEM").unwrap_or_default()).as_str(),
-            "MINGW32" | "MINGW64"
+            strtoupper(Self::get_env("MSYSTEM").unwrap_or_default()).as_slice(),
+            b"MINGW32" | b"MINGW64"
         ) {
             return true;
         }

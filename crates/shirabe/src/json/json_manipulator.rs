@@ -9,8 +9,8 @@ use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
     array_reverse, empty, explode, implode, in_array_loose, is_array, is_int, is_numeric,
     json_decode_assoc, json_decode_obj, legacy_lossy, php_regex, php_truthy, preg_is_match,
-    preg_match, preg_quote, preg_replace, preg_replace2, rtrim, str_repeat, str_replace, strlen,
-    strnatcmp, strpos, substr, trim, uksort,
+    preg_match, preg_quote, preg_replace, preg_replace2, rtrim2, str_repeat, str_replace, strlen,
+    strnatcmp, strpos, substr, trim2, uksort,
 };
 
 #[derive(Debug)]
@@ -32,9 +32,9 @@ impl JsonManipulator {
     )";
 
     pub fn new(contents: String) -> anyhow::Result<Self> {
-        let mut contents = trim(&contents, Some(" \t\n\r\0\u{0B}"));
+        let mut contents = legacy_lossy(&trim2(&contents, " \t\n\r\0\u{0B}")).into_owned();
         if contents.is_empty() {
-            contents = "{}".to_string();
+            contents = legacy_lossy(&bstr::BString::from("{}".to_string())).into_owned();
         }
         if !preg_is_match(php_regex!("#^\\{(.*)\\}$#s"), &contents) {
             return Err(InvalidArgumentException::new(
@@ -107,7 +107,7 @@ impl JsonManipulator {
             links = format!(
                 "{}{}{}\"{}\"{}",
                 &links[..key_start],
-                JsonFile::encode(&str_replace("\\/", "/", &existing_package))?,
+                JsonFile::encode(&*legacy_lossy(&str_replace("\\/", "/", &existing_package)))?,
                 separator,
                 constraint,
                 &links[value_end..]
@@ -180,7 +180,7 @@ impl JsonManipulator {
             // TODO(bytes): package names are compared as UTF-8 text, so non-UTF-8 bytes are
             // replaced.
             uksort(arr, |a: &BStr, b: &BStr| -> i64 {
-                strnatcmp(&prefix(&a.to_str_lossy()), &prefix(&b.to_str_lossy()))
+                strnatcmp(prefix(&a.to_str_lossy()), prefix(&b.to_str_lossy()))
             });
         }
     }
@@ -609,15 +609,25 @@ impl JsonManipulator {
 
     pub fn add_property(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<bool> {
         if strpos(name, "suggest.") == Some(0) {
-            return self.add_sub_node("suggest", &substr(name, 8, None), value, true);
+            return self.add_sub_node(
+                "suggest",
+                &legacy_lossy(&substr(name, 8, None)),
+                value,
+                true,
+            );
         }
 
         if strpos(name, "extra.") == Some(0) {
-            return self.add_sub_node("extra", &substr(name, 6, None), value, true);
+            return self.add_sub_node("extra", &legacy_lossy(&substr(name, 6, None)), value, true);
         }
 
         if strpos(name, "scripts.") == Some(0) {
-            return self.add_sub_node("scripts", &substr(name, 8, None), value, true);
+            return self.add_sub_node(
+                "scripts",
+                &legacy_lossy(&substr(name, 8, None)),
+                value,
+                true,
+            );
         }
 
         self.add_main_key(name, value)
@@ -625,23 +635,23 @@ impl JsonManipulator {
 
     pub fn remove_property(&mut self, name: &str) -> anyhow::Result<bool> {
         if strpos(name, "suggest.") == Some(0) {
-            return self.remove_sub_node("suggest", &substr(name, 8, None));
+            return self.remove_sub_node("suggest", &legacy_lossy(&substr(name, 8, None)));
         }
 
         if strpos(name, "extra.") == Some(0) {
-            return self.remove_sub_node("extra", &substr(name, 6, None));
+            return self.remove_sub_node("extra", &legacy_lossy(&substr(name, 6, None)));
         }
 
         if strpos(name, "scripts.") == Some(0) {
-            return self.remove_sub_node("scripts", &substr(name, 8, None));
+            return self.remove_sub_node("scripts", &legacy_lossy(&substr(name, 8, None)));
         }
 
         if strpos(name, "autoload.") == Some(0) {
-            return self.remove_sub_node("autoload", &substr(name, 9, None));
+            return self.remove_sub_node("autoload", &legacy_lossy(&substr(name, 9, None)));
         }
 
         if strpos(name, "autoload-dev.") == Some(0) {
-            return self.remove_sub_node("autoload-dev", &substr(name, 13, None));
+            return self.remove_sub_node("autoload-dev", &legacy_lossy(&substr(name, 13, None)));
         }
 
         self.remove_main_key(name)
@@ -669,8 +679,8 @@ impl JsonManipulator {
         {
             let parts = explode(".", name);
             // PHP: explode('.', $name, 2)
-            let first = parts[0].clone();
-            let rest = parts[1..].join(".");
+            let first = legacy_lossy(&parts[0].clone()).into_owned();
+            let rest = legacy_lossy(&implode(".", &parts[1..])).into_owned();
             name_owned = first;
             sub_name = Some(rest);
         }
@@ -875,8 +885,8 @@ impl JsonManipulator {
         ) && strpos(name, ".").is_some()
         {
             let parts = explode(".", name);
-            let first = parts[0].clone();
-            let rest = parts[1..].join(".");
+            let first = legacy_lossy(&parts[0].clone()).into_owned();
+            let rest = legacy_lossy(&implode(".", &parts[1..])).into_owned();
             name_owned = first;
             sub_name = Some(rest);
         }
@@ -898,7 +908,7 @@ impl JsonManipulator {
         }
 
         // try and find a match for the subkey
-        let key_regex = str_replace("/", "\\\\?/", &preg_quote(&name_owned, None));
+        let key_regex = str_replace("/", "\\\\?/", preg_quote(&name_owned, None));
         let mut children_clean: Option<String> = None;
         if preg_is_match(format!("{{\"{}\"\\s*:}}i", key_regex), &children) {
             // find best match for the value of "name". The PHP pattern `"name"\s*:\s*(?&json)` is
@@ -1416,10 +1426,11 @@ impl JsonManipulator {
             if preg_is_match(php_regex!("#,\\s*$#"), &start)
                 && preg_is_match(php_regex!("#^\\}$#"), &end)
             {
-                start = rtrim(
-                    &preg_replace(php_regex!("#,(\\s*)$#"), "$1", &start),
-                    Some(&self.indent),
-                );
+                start = legacy_lossy(&rtrim2(
+                    preg_replace(php_regex!("#,(\\s*)$#"), "$1", &start),
+                    &self.indent,
+                ))
+                .into_owned();
             }
 
             self.contents = format!("{}{}", start, end);
@@ -1539,7 +1550,7 @@ impl JsonManipulator {
             return Ok(format!(
                 "{}{}{}{}}}",
                 out,
-                implode(&format!(",{}", self.newline), &elems),
+                implode(format!(",{}", self.newline), &elems),
                 self.newline,
                 str_repeat(&self.indent, (depth + 1) as usize)
             ));
@@ -1715,7 +1726,7 @@ impl ManipulatorFormatter {
             return Ok(format!(
                 "{}{}{}{}}}",
                 out,
-                implode(&format!(",{}", self.newline), &elems),
+                implode(format!(",{}", self.newline), &elems),
                 self.newline,
                 str_repeat(&self.indent, (depth + 1) as usize)
             ));

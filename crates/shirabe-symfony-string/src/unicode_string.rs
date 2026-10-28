@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/string/UnicodeString.php
 
-use shirabe_php_shim::{mb_strlen, mb_substr};
+use bstr::BStr;
+use shirabe_php_shim::{legacy_lossy, mb_strlen, mb_substr};
 
 #[derive(Debug, Clone)]
 pub struct UnicodeString {
@@ -48,6 +49,11 @@ impl UnicodeString {
     // needs Unicode segmentation tables with no std equivalent and no permitted crate. Approximated
     // with code-point offsets via `mb_substr`, exact only without combining/multi-code-point clusters.
     pub fn slice(&self, start: i64, length: Option<i64>) -> Self {
-        Self::new(&mb_substr(&self.string, start, length, Some("UTF-8")))
+        Self::new(&legacy_lossy(&mb_substr(
+            &self.string,
+            start,
+            length,
+            Some(BStr::new("UTF-8")),
+        )))
     }
 }

@@ -7,7 +7,7 @@ use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PHP_EOL, PhpMixed, RuntimeException, chmod, explode, file_get_contents,
-    file_put_contents, implode, is_writable,
+    file_put_contents, implode, is_writable, legacy_lossy,
 };
 
 /// JSON Configuration Source
@@ -510,8 +510,8 @@ impl ConfigSourceInterface for JsonConfigSource {
                 if auth_config {
                     let parts = explode(".", name);
                     m.add_sub_node(
-                        parts.first().map(String::as_str).unwrap_or(""),
-                        parts.get(1).map(String::as_str).unwrap_or(""),
+                        &legacy_lossy(parts.first().map(|p| p.as_slice()).unwrap_or(b"")),
+                        &legacy_lossy(parts.get(1).map(|p| p.as_slice()).unwrap_or(b"")),
                         value_cloned,
                         false,
                     )
@@ -548,8 +548,8 @@ impl ConfigSourceInterface for JsonConfigSource {
                 if auth_config {
                     let parts = explode(".", name);
                     m.remove_sub_node(
-                        parts.first().map(String::as_str).unwrap_or(""),
-                        parts.get(1).map(String::as_str).unwrap_or(""),
+                        &legacy_lossy(parts.first().map(|p| p.as_slice()).unwrap_or(b"")),
+                        &legacy_lossy(parts.get(1).map(|p| p.as_slice()).unwrap_or(b"")),
                     )
                 } else {
                     m.remove_config_setting(name)

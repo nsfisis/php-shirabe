@@ -83,7 +83,7 @@ impl ArchiverInterface for PharArchiver {
 
                 if format == "tar" {
                     // create an empty tar file (=10240 null bytes) if the tar file is empty and PharData thus did not write it to disk
-                    file_put_contents(&target, &str_repeat("\0", 10240).into_bytes());
+                    file_put_contents(&target, &str_repeat("\0", 10240));
                 } else if format == "zip" {
                     // create minimal valid ZIP file (Empty Central Directory + End of Central Directory record)
                     let mut eocd = Vec::with_capacity(22);
@@ -106,12 +106,10 @@ impl ArchiverInterface for PharArchiver {
                         .into());
                     }
                     if format == "tar.gz" {
-                        let data =
-                            gzcompress(&str_repeat("\0", 10240).into_bytes()).unwrap_or_default();
+                        let data = gzcompress(&str_repeat("\0", 10240)).unwrap_or_default();
                         file_put_contents(&target, &data);
                     } else if format == "tar.bz2" {
-                        let data =
-                            bzcompress(&str_repeat("\0", 10240).into_bytes()).unwrap_or_default();
+                        let data = bzcompress(&str_repeat("\0", 10240)).unwrap_or_default();
                         file_put_contents(&target, &data);
                     }
                 }

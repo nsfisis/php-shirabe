@@ -23,8 +23,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, Exception, InvalidArgumentException, PHP_EOL, PhpClass as _,
     PhpMixed, RuntimeException, disk_free_space, file_exists, filter_var_boolean, hash,
-    impl_php_class, implode, php_regex, preg_match, rtrim, str_replace, strpos, strstr, strstr3,
-    strtolower, trim, version_compare,
+    impl_php_class, implode, legacy_lossy, php_regex, preg_match, rtrim2, str_replace, strpos,
+    strstr, strstr3, strtolower, trim2, version_compare,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -97,10 +97,9 @@ impl DiagnoseCommand {
                 }
             }
 
-            return Ok(CheckResult::Message(rtrim(
-                &output,
-                Some(" \t\n\r\0\u{0B}"),
-            )));
+            return Ok(CheckResult::Message(
+                legacy_lossy(&rtrim2(&output, " \t\n\r\0\u{0B}")).into_owned(),
+            ));
         }
 
         Ok(CheckResult::Ok)
@@ -121,7 +120,9 @@ impl DiagnoseCommand {
                         output.push_str(&format!("<error>{}</error>{}", error, PHP_EOL));
                     }
 
-                    return Ok(CheckResult::Message(trim(&output, Some(" \t\n\r\0\u{0B}"))));
+                    return Ok(CheckResult::Message(
+                        legacy_lossy(&trim2(&output, " \t\n\r\0\u{0B}")).into_owned(),
+                    ));
                 }
                 return Err(e);
             }
@@ -153,7 +154,7 @@ impl DiagnoseCommand {
                 &mut output,
                 None,
             );
-        if strtolower(&trim(&output, Some(" \t\n\r\0\u{0B}"))) == "always" {
+        if strtolower(trim2(&output, " \t\n\r\0\u{0B}")) == "always" {
             return Ok("<comment>Your git color.ui setting is set to always, this is known to create issues. Use \"git config --global color.ui true\" to set it correctly.</comment>".to_string());
         }
 
@@ -344,12 +345,11 @@ impl DiagnoseCommand {
                     .unwrap_or(PhpMixed::Null);
                 let path = str_replace(
                     "%hash%",
-                    &hash_val.as_string().unwrap_or_default().to_str_lossy(),
-                    // TODO(bytes): include paths are Strings, so non-UTF-8 bytes are replaced.
-                    &provider_includes
+                    hash_val.as_string().unwrap_or_default(),
+                    provider_includes
                         .as_array()
                         .and_then(|a| a.keys().next())
-                        .map(|key| key.to_str_lossy())
+                        .map(|key| key.as_slice())
                         .unwrap_or_default(),
                 );
                 let response = self
@@ -811,7 +811,7 @@ impl DiagnoseCommand {
         }
 
         for message in &messages {
-            io.write(&trim(message, Some(" \t\n\r\0\u{0B}")));
+            io.write(&legacy_lossy(&trim2(message, " \t\n\r\0\u{0B}")));
         }
     }
 
@@ -1026,14 +1026,14 @@ impl DiagnoseCommand {
                         // Attempt to parse version number out, fallback to whole string value.
                         let openssl_version_text =
                             diagnostics.openssl_version_text.clone().unwrap_or_default();
-                        let openssl_trimmed = trim(
-                            &strstr(&openssl_version_text, " ").unwrap_or_default(),
-                            Some(" \t\n\r\0\u{0B}"),
+                        let openssl_trimmed = trim2(
+                            strstr(&openssl_version_text, " ").unwrap_or_default(),
+                            " \t\n\r\0\u{0B}",
                         );
                         let mut openssl_version =
                             strstr3(&openssl_trimmed, " ", true).unwrap_or_default();
                         if openssl_version.is_empty() {
-                            openssl_version = openssl_version_text;
+                            openssl_version = bstr::BString::from(openssl_version_text);
                         }
 
                         format!(

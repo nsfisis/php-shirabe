@@ -12,7 +12,7 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, base64_decode, date_create, explode, extension_loaded,
-    php_regex, preg_match, urlencode,
+    legacy_lossy, php_regex, preg_match, urlencode,
 };
 
 #[derive(Debug)]
@@ -569,8 +569,10 @@ impl ForgejoDriver {
 
         let links = explode(",", &header);
         for link in links {
-            if let Some(m) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), &link)
-                && let Some(url) = m.get(1)
+            if let Some(m) = preg_match(
+                php_regex!(r#"{<(.+?)>; *rel="next"}"#),
+                &legacy_lossy(&link),
+            ) && let Some(url) = m.get(1)
             {
                 return Some(url.to_string());
             }

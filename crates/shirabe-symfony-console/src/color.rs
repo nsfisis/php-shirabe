@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/console/Color.php
 
 use crate::exception::InvalidArgumentException;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{getenv, hexdec, implode, round, strlen, substr};
 
@@ -144,8 +145,8 @@ impl Color {
             let mut color = substr(color, 1, None);
 
             if strlen(&color) == 3 {
-                let c: Vec<char> = color.chars().collect();
-                color = format!("{}{}{}{}{}{}", c[0], c[0], c[1], c[1], c[2], c[2]);
+                let c = color.clone();
+                color = BString::from(vec![c[0], c[0], c[1], c[1], c[2], c[2]]);
             }
 
             if strlen(&color) != 6 {

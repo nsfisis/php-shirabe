@@ -8,8 +8,8 @@ use crate::input::{InputArgument, InputDefinition, InputInterface, InputOption, 
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AsAny, PHP_SERVER, PhpClass, PhpMixed, is_numeric_to_int, php_regex, preg_is_match,
-    str_replace_array,
+    AsAny, PHP_SERVER, PhpClass, PhpMixed, is_numeric_to_int, legacy_lossy, php_regex,
+    preg_is_match, str_replace_array,
 };
 use std::cell::{Cell, Ref};
 
@@ -700,7 +700,7 @@ impl Command for CommandData {
             help
         };
 
-        str_replace_array(&placeholders, &replacements, &subject)
+        legacy_lossy(&str_replace_array(&placeholders, &replacements, &subject)).into_owned()
     }
 
     fn set_aliases(&self, aliases: Vec<String>) -> anyhow::Result<()> {

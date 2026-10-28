@@ -12,8 +12,8 @@ use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, date_create, empty,
-    is_scalar, is_string, json_encode, ltrim, php_regex, preg_is_match, preg_replace, stripos,
-    strpos, strtolower, strval, substr, trigger_error, trim,
+    is_scalar, is_string, json_encode, legacy_lossy, ltrim2, php_regex, preg_is_match,
+    preg_replace, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
 };
 
 /// The fields of one package version, read without regard for how they are stored. A version
@@ -183,7 +183,7 @@ impl ArrayLoader {
         package
             .package_mut()
             .set_type(if let Some(t) = config.get(B("type")) {
-                strtolower(&t.as_string().unwrap_or_default().to_str_lossy())
+                legacy_lossy(&strtolower(t.as_string().unwrap_or_default())).into_owned()
             } else {
                 "library".to_string()
             });
@@ -209,13 +209,13 @@ impl ArrayLoader {
             if let PhpMixed::List(ref mut list) = bin_list {
                 for item in list.iter_mut() {
                     if let Some(s) = item.as_string() {
-                        *item = PhpMixed::string(ltrim(&s.to_str_lossy(), Some("/")));
+                        *item = PhpMixed::string(ltrim2(s, "/"));
                     }
                 }
             } else if let PhpMixed::Array(ref mut map) = bin_list {
                 for (_k, v) in map.iter_mut() {
                     if let Some(s) = v.as_string() {
-                        *v = PhpMixed::string(ltrim(&s.to_str_lossy(), Some("/")));
+                        *v = PhpMixed::string(ltrim2(s, "/"));
                     }
                 }
             }
@@ -328,7 +328,7 @@ impl ArrayLoader {
         {
             for (target, reason) in suggest_map.iter_mut() {
                 if let Some(r) = reason.as_string()
-                    && trim(&r.to_str_lossy(), None) == "self.version"
+                    && trim(r) == "self.version"
                 {
                     *reason = PhpMixed::string(package.get_pretty_version().to_string());
                     let _ = target;
@@ -594,7 +594,7 @@ impl ArrayLoader {
                 for (pretty_target, constraint) in entries {
                     // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
                     let pretty_target = pretty_target.to_str_lossy().into_owned();
-                    let target = strtolower(&pretty_target);
+                    let target = legacy_lossy(&strtolower(&pretty_target)).into_owned();
 
                     // recursive links are not supported
                     if target == name {
@@ -664,7 +664,7 @@ impl ArrayLoader {
             if !is_string(&constraint) {
                 continue;
             }
-            let target = strtolower(&target);
+            let target = legacy_lossy(&strtolower(&target)).into_owned();
             let link = self.create_link(
                 source,
                 source_version,
@@ -763,14 +763,16 @@ impl ArrayLoader {
                 }
 
                 // normalize without -dev and ensure it's a numeric branch that is parseable
-                let validated_target_branch = if target_branch
-                    == VersionParser::DEFAULT_BRANCH_ALIAS
-                {
-                    VersionParser::DEFAULT_BRANCH_ALIAS.to_string()
-                } else {
-                    self.version_parser
-                        .normalize_branch(&substr(&target_branch, 0, Some(-4)))?
-                };
+                let validated_target_branch =
+                    if target_branch == VersionParser::DEFAULT_BRANCH_ALIAS {
+                        VersionParser::DEFAULT_BRANCH_ALIAS.to_string()
+                    } else {
+                        self.version_parser.normalize_branch(&legacy_lossy(&substr(
+                            &target_branch,
+                            0,
+                            Some(-4),
+                        )))?
+                    };
                 if "-dev" != substr(&validated_target_branch, -4, None) {
                     continue;
                 }

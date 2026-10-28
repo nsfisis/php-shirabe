@@ -16,7 +16,7 @@ use shirabe_php_shim::{
     array_values_mixed, chmod, escapeshellcmd, exec, explode, file_exists, impl_php_class, implode,
     in_array_loose, in_array_strict, intval, is_array, is_bool, is_dir, is_numeric, is_object,
     is_string, json_encode, legacy_lossy, php_regex, php_to_string, preg_is_match, preg_match,
-    preg_replace, str_replace, strpos, strtolower, system, touch, trim, var_export,
+    preg_replace, str_replace, strpos, strtolower, system, touch, trim2, var_export,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
@@ -267,7 +267,7 @@ impl ConfigCommand {
                     let id = preg_replace(
                         php_regex!("{[^a-z0-9]}i"),
                         "-",
-                        &strtolower(&trim(&id, Some(" \t\n\r\0\u{0B}"))),
+                        &legacy_lossy(&strtolower(trim2(&id, " \t\n\r\0\u{0B}"))),
                     );
                     let id = preg_replace(php_regex!("{-+}"), "-", &id);
                     format!("https://getcomposer.org/doc/06-config.md#{}", id)
@@ -727,7 +727,7 @@ impl Command for ConfigCommand {
                 for bit in &bits {
                     let new_key = match &key_acc {
                         Some(k) => format!("{}.{}", k, bit),
-                        None => bit.clone(),
+                        None => legacy_lossy(&bit.clone()).into_owned(),
                     };
                     key_acc = Some(new_key.clone());
                     r#match = false;

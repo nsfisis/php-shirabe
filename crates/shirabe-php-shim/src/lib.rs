@@ -150,8 +150,8 @@ impl PartialEq for PhpMixed {
 }
 
 impl PhpMixed {
-    pub fn string(s: impl Into<String>) -> PhpMixed {
-        PhpMixed::String(s.into().into())
+    pub fn string(s: impl Into<BString>) -> PhpMixed {
+        PhpMixed::String(s.into())
     }
 
     pub fn as_bool(&self) -> Option<bool> {

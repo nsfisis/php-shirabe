@@ -4,12 +4,13 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::{Bitbucket, GitHub, GitLab};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, array_merge, base64_encode, explode,
-    in_array_loose, in_array_strict, is_array, is_string, json_decode_assoc, parse_url, php_regex,
-    preg_is_match, str_replace, strpos, strtolower, substr, trigger_error, trim,
+    in_array_loose, in_array_strict, is_array, is_string, json_decode_assoc, legacy_lossy,
+    parse_url, php_regex, preg_is_match, str_replace, strpos, strtolower, substr, trigger_error,
+    trim,
 };
 
 #[derive(Debug)]
@@ -59,8 +60,8 @@ impl AuthHelper {
                     config_source.get_name(),
                 ),
                 Box::new(|value: PhpMixed| -> anyhow::Result<PhpMixed> {
-                    let input = strtolower(&substr(
-                        &trim(&value.as_string().unwrap_or_default().to_str_lossy(), None),
+                    let input = strtolower(substr(
+                        trim(value.as_string().unwrap_or_default()),
                         0,
                         Some(1),
                     ));
@@ -607,7 +608,11 @@ impl AuthHelper {
                 }
             }
         } else if matches!(origin, "api.bitbucket.org" | "api.github.com") {
-            return self.add_authentication_options(options, &str_replace("api.", "", origin), url);
+            return self.add_authentication_options(
+                options,
+                &legacy_lossy(&str_replace("api.", "", origin)),
+                url,
+            );
         }
 
         // write headers back into options['http']['header']
@@ -639,6 +644,6 @@ impl AuthHelper {
         // {@link https://blog.bitbucket.org/2009/04/12/new-feature-downloads/}
         let path_parts = explode("/", path_str);
 
-        path_parts.len() as i64 >= 4 && path_parts.get(3).map(|s| s.as_str()) == Some("downloads")
+        path_parts.len() as i64 >= 4 && path_parts.get(3).is_some_and(|s| s == "downloads")
     }
 }

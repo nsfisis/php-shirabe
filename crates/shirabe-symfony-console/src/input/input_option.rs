@@ -2,7 +2,7 @@
 
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
-use shirabe_php_shim::{array_filter, implode, ltrim, php_regex, preg_split};
+use shirabe_php_shim::{array_filter, implode, legacy_lossy, ltrim2, php_regex, preg_split};
 
 #[derive(Debug, Clone)]
 pub struct InputOption {
@@ -80,8 +80,8 @@ impl InputOption {
     }
 
     fn normalize_shortcut(s: &str) -> anyhow::Result<Option<String>> {
-        let stripped = ltrim(s, Some("-"));
-        let parts = preg_split(php_regex!(r"{(\|)-?}"), &stripped);
+        let stripped = ltrim2(s, "-");
+        let parts = preg_split(php_regex!(r"{(\|)-?}"), &legacy_lossy(&stripped));
         let filtered: Vec<String> = array_filter(&parts, |s: &String| !s.is_empty());
         let result = implode("|", &filtered);
         if result.is_empty() {
@@ -90,7 +90,7 @@ impl InputOption {
             )
             .into());
         }
-        Ok(Some(result))
+        Ok(Some(legacy_lossy(&result).into_owned()))
     }
 
     pub fn get_shortcut(&self) -> Option<&str> {

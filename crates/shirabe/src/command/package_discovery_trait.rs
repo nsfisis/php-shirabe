@@ -19,8 +19,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
     array_slice, asort, explode, file_get_contents, implode, in_array_strict, is_array, is_file,
-    is_numeric, json_decode_assoc, levenshtein, php_regex, preg_is_match, preg_match, strlen,
-    strpos, trim,
+    is_numeric, json_decode_assoc, legacy_lossy, levenshtein, php_regex, preg_is_match, preg_match,
+    strlen, strpos, trim,
 };
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -366,10 +366,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 if !package.is_empty() && strpos(&package, " ").is_none() {
                     let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> =
                         Box::new(|input_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
-                            let input = trim(
-                                &input_mixed.as_string().unwrap_or_default().to_str_lossy(),
-                                None,
-                            );
+                            let input = trim(input_mixed.as_string().unwrap_or_default());
                             if strlen(&input) > 0 {
                                 Ok(PhpMixed::string(input))
                             } else {
@@ -417,7 +414,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                 if !package.is_empty() {
                     requires.push(package.clone());
-                    existing_packages.push(explode(" ", &package)[0].clone());
+                    existing_packages
+                        .push(legacy_lossy(&explode(" ", &package)[0].clone()).into_owned());
                 }
             }
         }
@@ -841,7 +839,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         Ok(format!(
             ":{}  - {}",
             PHP_EOL,
-            implode(&format!("{}  - ", PHP_EOL), &details)
+            implode(format!("{}  - ", PHP_EOL), &details)
         ))
     }
 }

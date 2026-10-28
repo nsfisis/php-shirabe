@@ -4,7 +4,7 @@ use crate::util::http::RequestProxy;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, base64_encode, parse_url, rawurldecode, strpbrk,
+    PhpMixed, RuntimeException, base64_encode, legacy_lossy, parse_url, rawurldecode, strpbrk,
 };
 
 #[derive(Debug)]
@@ -46,7 +46,7 @@ impl ProxyItem {
 
         if let Some(user_raw) = &proxy.user {
             safe = "***".to_string();
-            let auth_raw = rawurldecode(user_raw);
+            let auth_raw = legacy_lossy(&rawurldecode(user_raw)).into_owned();
 
             let mut user = user_raw.clone();
             let mut auth = auth_raw;

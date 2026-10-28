@@ -11,8 +11,8 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, implode, is_string,
-    json_encode, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, str_replace,
-    strlen, strnatcasecmp, strpos, substr, trim, usort,
+    json_encode, legacy_lossy, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
+    str_replace, strlen, strnatcasecmp, strpos, substr, trim, usort,
 };
 
 /// Seam over the parts of [`VersionGuesser`] that consumers depend on, so they can be exercised
@@ -318,10 +318,11 @@ impl VersionGuesser {
                 .borrow_mut()
                 .execute(&command, &mut command_output, Some(path))?
             {
-                let parsed = trim(
-                    &GitUtil::parse_rev_list_output(&command_output, &self.process)?,
-                    None,
-                );
+                let parsed = legacy_lossy(&trim(&GitUtil::parse_rev_list_output(
+                    &command_output,
+                    &self.process,
+                )?))
+                .into_owned();
                 commit = if parsed.is_empty() {
                     None
                 } else {
@@ -352,8 +353,13 @@ impl VersionGuesser {
             &mut output,
             Some(path),
         )? {
-            match self.version_parser.normalize(&trim(&output, None), None) {
-                Ok(version) => return Ok(Some((version, trim(&output, None)))),
+            match self
+                .version_parser
+                .normalize(&legacy_lossy(&trim(&output)), None)
+            {
+                Ok(version) => {
+                    return Ok(Some((version, legacy_lossy(&trim(&output)).into_owned())));
+                }
                 Err(_e) => {}
             }
         }
@@ -373,7 +379,7 @@ impl VersionGuesser {
             &mut output,
             Some(path),
         )? {
-            let branch = trim(&output, None);
+            let branch = legacy_lossy(&trim(&output)).into_owned();
             let version = self.version_parser.normalize_branch(&branch)?;
             let is_feature_branch = strpos(&version, "dev-") == Some(0);
 
@@ -472,7 +478,7 @@ impl VersionGuesser {
             .map(|m| m.contains_key(B(version.as_deref().unwrap_or(""))))
             .unwrap_or(false);
         let has_self_version = strpos(
-            &json_encode(&PhpMixed::Array(
+            json_encode(&PhpMixed::Array(
                 package_config
                     .iter()
                     .map(|(k, v)| (k.clone(), v.clone()))
@@ -531,7 +537,7 @@ impl VersionGuesser {
                     let cmd_line: Vec<String> = array_map(
                         move |component: &String| -> String {
                             let r1 = str_replace("%candidate%", &candidate_clone, component);
-                            str_replace("%branch%", &branch_clone, &r1)
+                            legacy_lossy(&str_replace("%branch%", &branch_clone, &r1)).into_owned()
                         },
                         &scm_cmdline,
                     );
@@ -588,7 +594,7 @@ impl VersionGuesser {
                         .collect()
                 })
                 .unwrap_or_default();
-            non_feature_branches = implode("|", &names);
+            non_feature_branches = legacy_lossy(&implode("|", &names)).into_owned();
         }
 
         !preg_is_match(
@@ -615,7 +621,7 @@ impl VersionGuesser {
             &mut output,
             Some(path),
         )? {
-            let branch = trim(&output, None);
+            let branch = legacy_lossy(&trim(&output)).into_owned();
             version = Some(self.version_parser.normalize_branch(&branch)?);
             pretty_version = Some(format!("dev-{}", branch));
         }
@@ -627,10 +633,13 @@ impl VersionGuesser {
             &mut output,
             Some(path),
         )? {
-            match self.version_parser.normalize(&trim(&output, None), None) {
+            match self
+                .version_parser
+                .normalize(&legacy_lossy(&trim(&output)), None)
+            {
                 Ok(v) => {
                     version = Some(v);
-                    pretty_version = Some(trim(&output, None));
+                    pretty_version = Some(legacy_lossy(&trim(&output)).into_owned());
                 }
                 Err(_e) => {}
             }
@@ -702,7 +711,7 @@ impl VersionGuesser {
                 }
 
                 assert!(is_string(&PhpMixed::string(m1.to_string())));
-                let pretty_version = trim(m1, None);
+                let pretty_version = legacy_lossy(&trim(m1)).into_owned();
                 let version = if pretty_version == "trunk" {
                     "dev-trunk".to_string()
                 } else {

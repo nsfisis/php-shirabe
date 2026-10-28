@@ -5,9 +5,9 @@ use crate::util::{Filesystem, Platform};
 use chrono::Utc;
 use shirabe_php_shim::{
     bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space, file_exists,
-    file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable, mkdir,
-    php_regex, preg_is_match, preg_match, preg_replace, random_bytes, random_int, rename, time,
-    touch, touch3, unlink,
+    file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable, legacy_lossy,
+    mkdir, php_regex, preg_is_match, preg_match, preg_replace, random_bytes, random_int, rename,
+    time, touch, touch3, unlink,
 };
 use shirabe_symfony_finder::Finder;
 use std::sync::Mutex;
@@ -149,7 +149,7 @@ impl Cache {
                 crate::io::DEBUG,
             );
 
-            let temp_file_name = format!("{}{}{}.tmp", self.root, file, bin2hex(&random_bytes(5)));
+            let temp_file_name = format!("{}{}{}.tmp", self.root, file, bin2hex(random_bytes(5)));
             let dest = format!("{}{}", self.root, file);
             // TODO(php-semantics): the shim's file_put_contents() discards the io::Error, so a failed
             // write returns false here instead of reaching the error handling below. Only rename()
@@ -438,7 +438,7 @@ impl Cache {
             let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
-                return hash_file("sha1", &full_path);
+                return hash_file("sha1", &full_path).map(|s| legacy_lossy(&s).into_owned());
             }
         }
 
@@ -450,7 +450,7 @@ impl Cache {
             let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
-                return hash_file("sha256", &full_path);
+                return hash_file("sha256", &full_path).map(|s| legacy_lossy(&s).into_owned());
             }
         }
 

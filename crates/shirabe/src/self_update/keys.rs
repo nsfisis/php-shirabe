@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/SelfUpdate/Keys.php
 
 use regex::Regex;
-use shirabe_php_shim::hash;
+use shirabe_php_shim::{hash, legacy_lossy, strtoupper};
 
 pub struct Keys;
 
@@ -10,7 +10,7 @@ impl Keys {
         let content = std::fs::read_to_string(path)?;
         let re = Regex::new(r"\s").unwrap();
         let cleaned = re.replace_all(&content, "");
-        let hash = hash("sha256", cleaned.as_bytes()).to_uppercase();
+        let hash = legacy_lossy(&strtoupper(hash("sha256", cleaned.as_bytes()))).into_owned();
 
         Ok([
             &hash[0..8],

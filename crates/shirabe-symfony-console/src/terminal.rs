@@ -1,9 +1,9 @@
 //! ref: composer/vendor/symfony/console/Terminal.php
 
 use shirabe_php_shim::{
-    Descriptor, PhpMixed, PhpResource, fclose, function_exists, getenv, intval, php_fopen_resource,
-    php_regex, preg_match, proc_close, proc_open, sapi_windows_cp_get, sapi_windows_cp_set,
-    sapi_windows_vt100_support, shell_exec, stream_get_contents, trim,
+    Descriptor, PhpMixed, PhpResource, fclose, function_exists, getenv, intval, legacy_lossy,
+    php_fopen_resource, php_regex, preg_match, proc_close, proc_open, sapi_windows_cp_get,
+    sapi_windows_cp_set, sapi_windows_vt100_support, shell_exec, stream_get_contents, trim,
 };
 use std::cell::Cell;
 
@@ -35,7 +35,7 @@ impl Terminal {
             let width = width
                 .into_string()
                 .unwrap_or_else(|width| panic!("COLUMNS is not valid UTF-8: {width:?}"));
-            return intval(&PhpMixed::string(trim(&width, None)));
+            return intval(&PhpMixed::string(trim(&width)));
         }
 
         if WIDTH.with(|w| w.get()).is_none() {
@@ -53,7 +53,7 @@ impl Terminal {
             let height = height
                 .into_string()
                 .unwrap_or_else(|height| panic!("LINES is not valid UTF-8: {height:?}"));
-            return intval(&PhpMixed::string(trim(&height, None)));
+            return intval(&PhpMixed::string(trim(&height)));
         }
 
         if HEIGHT.with(|h| h.get()).is_none() {
@@ -88,7 +88,7 @@ impl Terminal {
             if let Some(ansicon) = &ansicon
                 && let Some(matches) = preg_match(
                     php_regex!("/^(\\d+)x(\\d+)(?: \\((\\d+)x(\\d+)\\))?$/"),
-                    &trim(ansicon, None),
+                    &legacy_lossy(&trim(ansicon)),
                 )
             {
                 // extract [w, H] from "wxh (WxH)"

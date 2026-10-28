@@ -61,16 +61,11 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
             );
         } else if let Some(choice_question) = question.as_choice().filter(|q| q.is_multiselect()) {
             let choices = choice_question.get_choices();
-            let default_parts = explode(",", &default.to_string());
+            let default_parts = explode(",", default.to_string());
 
             let resolved: Vec<String> = default_parts
                 .iter()
-                .map(|value| {
-                    choices
-                        .get(B(&trim(value, None)))
-                        .map(|v| v.to_string())
-                        .unwrap()
-                })
+                .map(|value| choices.get(B(&trim(value))).map(|v| v.to_string()).unwrap())
                 .collect();
 
             text = format!(

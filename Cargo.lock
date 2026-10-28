@@ -2396,6 +2396,7 @@ name = "shirabe-class-map-generator"
 version = "0.2.0-dev"
 dependencies = [
  "anyhow",
+ "bstr",
  "indexmap",
  "shirabe-php-rpc",
  "shirabe-php-shim",
@@ -2537,6 +2538,7 @@ dependencies = [
 name = "shirabe-symfony-string"
 version = "0.2.0-dev"
 dependencies = [
+ "bstr",
  "shirabe-php-shim",
 ]
 

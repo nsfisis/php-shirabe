@@ -7,7 +7,7 @@ use bstr::BString;
 use shirabe_php_shim::{
     basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
     file_get_contents_with_max_length, file_put_contents, fopen, is_dir, is_file, is_link,
-    php_regex, preg_match, realpath, rmdir, substr, trim, umask,
+    legacy_lossy, php_regex, preg_match, realpath, rmdir, substr, trim, trim2, umask,
 };
 
 /// Seam over the BinaryInstaller methods reached through LibraryInstaller, so tests can inject a
@@ -196,7 +196,7 @@ impl BinaryInstaller {
             php_regex!(r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m"),
             &String::from_utf8_lossy(&line),
         ) {
-            return trim(m.get(1).unwrap_or(""), None);
+            return legacy_lossy(&trim(m.get(1).unwrap_or(""))).into_owned();
         }
 
         "php".to_string()
@@ -271,9 +271,9 @@ impl BinaryInstaller {
                  SET BIN_TARGET=%~dp0/{}\r\n\
                  SET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n\
                  {} \"%BIN_TARGET%\" %*\r\n",
-                trim(
-                    &ProcessExecutor::escape(&basename_with_suffix(link, ".bat")),
-                    Some("\"'")
+                trim2(
+                    ProcessExecutor::escape(&basename_with_suffix(link, ".bat")),
+                    "\"'"
                 ),
                 caller,
             ));
@@ -285,7 +285,7 @@ impl BinaryInstaller {
              SET BIN_TARGET=%~dp0/{}\r\n\
              SET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n\
              {} \"%BIN_TARGET%\" %*\r\n",
-            trim(&ProcessExecutor::escape(&bin_path), Some("\"'")),
+            trim2(ProcessExecutor::escape(&bin_path), "\"'"),
             caller,
         ))
     }
@@ -314,7 +314,7 @@ impl BinaryInstaller {
             // carry over the existing shebang if present, otherwise add our own
             let proxy_code = match m.get(1) {
                 None => "#!/usr/bin/env php".to_string(),
-                Some(shebang) => trim(shebang, None),
+                Some(shebang) => legacy_lossy(&trim(shebang)).into_owned(),
             };
             let bin_path_exported = self
                 .filesystem
@@ -360,7 +360,7 @@ impl BinaryInstaller {
                 $data = str_replace('__FILE__', var_export($this->realpath, true), $data);"
                     .to_string();
             }
-            if trim(m.get(0).unwrap_or(""), None) != "<?php" {
+            if trim(m.get(0).unwrap_or("")) != "<?php" {
                 stream_hint =
                     " using a stream wrapper to prevent the shebang from being output on PHP<8\n *"
                         .to_string();

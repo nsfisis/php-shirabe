@@ -9,8 +9,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, date_create,
     filter_var_email, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar, is_string,
-    json_encode, parse_url, php_regex, php_to_string, preg_is_match, preg_replace, str_replace,
-    strcasecmp, strtolower, strtotime, substr, trigger_error, trim, var_export,
+    json_encode, legacy_lossy, parse_url, php_regex, php_to_string, preg_is_match, preg_replace,
+    str_replace, strcasecmp, strtolower, strtotime, substr, trigger_error, trim2, var_export,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -85,7 +85,7 @@ impl ValidatingArrayLoader {
             "nul", "con", "prn", "aux", "com1", "com2", "com3", "com4", "com5", "com6", "com7",
             "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
         ];
-        let lower = strtolower(name);
+        let lower = legacy_lossy(&strtolower(name)).into_owned();
         let bits: Vec<&str> = lower.split('/').collect();
         if reserved_names.contains(&bits[0]) || reserved_names.contains(&bits[1]) {
             return Some(format!(
@@ -169,12 +169,11 @@ impl ValidatingArrayLoader {
         }
 
         let is_empty = !self.config.borrow().contains_key(B(property))
-            || trim(
-                &self.config.borrow()[B(property)]
+            || trim2(
+                self.config.borrow()[B(property)]
                     .as_string()
-                    .unwrap_or_default()
-                    .to_str_lossy(),
-                Some(" \t\n\r\0\u{0B}"),
+                    .unwrap_or_default(),
+                " \t\n\r\0\u{0B}",
             )
             .is_empty();
         if is_empty {
@@ -502,11 +501,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                         if license_str == "proprietary" {
                             continue;
                         }
-                        let license_to_validate = str_replace("proprietary", "MIT", &license_str);
+                        let license_to_validate =
+                            legacy_lossy(&str_replace("proprietary", "MIT", &license_str))
+                                .into_owned();
                         if !license_validator.validate(&license_to_validate) {
-                            if license_validator
-                                .validate(&trim(&license_to_validate, Some(" \t\n\r\0\u{0B}")))
-                            {
+                            if license_validator.validate(&legacy_lossy(&trim2(
+                                &license_to_validate,
+                                " \t\n\r\0\u{0B}",
+                            ))) {
                                 self.warnings.borrow_mut().push(format!(
                                     "License {} must not contain extra spaces, make sure to trim it.",
                                         json_encode(&PhpMixed::string(license_str.clone()))
@@ -1180,9 +1182,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                         .borrow()
                         .get(B("name"))
                         .and_then(|v| v.as_string())
-                        .is_some_and(|name_val| {
-                            strcasecmp(&package, &name_val.to_str_lossy()) == 0
-                        });
+                        .is_some_and(|name_val| strcasecmp(&package, name_val) == 0);
                     if conflicts_with_own_name {
                         self.errors.borrow_mut().push(format!(
                             "{}.{} : a package cannot set a {} on itself",
@@ -1333,7 +1333,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 .as_string()
                 .unwrap_or_default()
                 .to_string();
-            if !STABILITIES.contains_key(strtolower(&min_stability).as_str())
+            if !STABILITIES.contains_key(&*legacy_lossy(&strtolower(&min_stability)))
                 && min_stability != "RC"
             {
                 self.errors.borrow_mut().push(format!(
@@ -1550,11 +1550,12 @@ impl LoaderInterface for ValidatingArrayLoader {
                     }
 
                     // normalize without -dev and ensure it's a numeric branch that is parseable
-                    let trimmed = substr(
+                    let trimmed = legacy_lossy(&substr(
                         &target_branch_str,
                         0,
                         Some((target_branch_str.len() as i64) - 4),
-                    );
+                    ))
+                    .into_owned();
                     let validated_target_branch = self.version_parser.normalize_branch(&trimmed)?;
                     if substr(&validated_target_branch, -4, None) != "-dev" {
                         self.warnings.borrow_mut().push(format!(

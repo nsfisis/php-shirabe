@@ -61,7 +61,7 @@ impl MarkdownDescriptor {
                 str_replace(
                     "\n",
                     "",
-                    &var_export(&argument.get_default().to_php_mixed(), true),
+                    var_export(&argument.get_default().to_php_mixed(), true),
                 ),
             ),
             true,
@@ -101,7 +101,7 @@ impl MarkdownDescriptor {
                 str_replace(
                     "\n",
                     "",
-                    &var_export(&option.get_default().to_php_mixed(), true),
+                    var_export(&option.get_default().to_php_mixed(), true),
                 ),
             ),
             true,
@@ -260,7 +260,7 @@ impl MarkdownDescriptor {
                             str_replace(
                                 ":",
                                 "",
-                                &description
+                                description
                                     .get_command(command_name)?
                                     .borrow()
                                     .get_name()

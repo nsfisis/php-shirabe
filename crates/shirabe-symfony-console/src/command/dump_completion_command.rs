@@ -5,8 +5,8 @@ use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggesti
 use crate::input::{InputArgument, InputInterface, InputOption, InputValue};
 use crate::output::{OutputInterface, output_interface};
 use shirabe_php_shim::{
-    PHP_SERVER, PhpMixed, basename, file_exists, impl_php_class, realpath, str_replace_arrays,
-    sys_get_temp_dir, touch,
+    PHP_SERVER, PhpMixed, basename, file_exists, impl_php_class, legacy_lossy, realpath,
+    str_replace_arrays, sys_get_temp_dir, touch,
 };
 use shirabe_symfony_process::process::Process;
 use std::ops::{Deref, DerefMut};
@@ -273,14 +273,15 @@ impl Command for DumpCompletionCommand {
         let application = self.get_application().unwrap();
         let version = application.borrow().get_version();
         output.borrow_mut().write(
-            &[str_replace_arrays(
+            &[legacy_lossy(&str_replace_arrays(
                 &[
                     "{{ COMMAND_NAME }}".to_string(),
                     "{{ VERSION }}".to_string(),
                 ],
                 &[command_name, version],
                 completion_file,
-            )],
+            ))
+            .into_owned()],
             false,
             output_interface::OUTPUT_NORMAL,
         );

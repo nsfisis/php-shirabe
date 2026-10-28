@@ -11,8 +11,8 @@ use bstr::{B, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, date_create, php_regex, preg_is_match, preg_match,
-    preg_replace, stripos, strrpos, strtr, substr, trim,
+    Catch as _, PhpMixed, RuntimeException, date_create, legacy_lossy, php_regex, preg_is_match,
+    preg_match, preg_replace, stripos, strrpos, strtr, substr, trim, trim2,
 };
 
 #[derive(Debug)]
@@ -77,14 +77,15 @@ impl SvnDriver {
             self.cache_credentials = v.to_bool();
         }
         if let Some(PhpMixed::String(v)) = self.inner.repo_config.get(B("package-path")).cloned() {
-            self.package_path = format!("/{}", trim(&v.to_str_lossy(), Some("/")));
+            self.package_path = format!("/{}", trim2(&v, "/"));
         }
 
         if let Some(pos) = strrpos(
             &self.inner.url,
-            &format!("/{}", self.trunk_path.as_deref().unwrap_or("")),
+            format!("/{}", self.trunk_path.as_deref().unwrap_or("")),
         ) {
-            self.base_url = substr(&self.inner.url, 0, Some(pos as i64));
+            self.base_url =
+                legacy_lossy(&substr(&self.inner.url, 0, Some(pos as i64))).into_owned();
         }
 
         self.inner.cache = Some(Cache::new(
@@ -242,7 +243,7 @@ impl SvnDriver {
         file: &str,
         identifier: &str,
     ) -> anyhow::Result<Option<String>> {
-        let identifier = format!("/{}/", trim(identifier, Some("/")));
+        let identifier = format!("/{}/", trim2(identifier, "/"));
 
         let (path, rev) = if let Some(m) = preg_match(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
             && let Some(rev) = m.get(2)
@@ -264,7 +265,7 @@ impl SvnDriver {
                 return Err(e);
             }
         };
-        if trim(&output, None).is_empty() {
+        if trim(&output).is_empty() {
             return Ok(None);
         }
 
@@ -275,7 +276,7 @@ impl SvnDriver {
         &mut self,
         identifier: &str,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
-        let identifier = format!("/{}/", trim(identifier, Some("/")));
+        let identifier = format!("/{}/", trim2(identifier, "/"));
 
         let (path, rev) = if let Some(m) = preg_match(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
             && let Some(rev) = m.get(2)
@@ -316,7 +317,7 @@ impl SvnDriver {
                 if !output.is_empty() {
                     let mut last_rev: i64 = 0;
                     for line in self.inner.process.borrow().split_lines(&output) {
-                        let line = trim(&line, None);
+                        let line = legacy_lossy(&trim(&line)).into_owned();
                         if !line.is_empty()
                             && let Some(m) =
                                 preg_match(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
@@ -359,7 +360,7 @@ impl SvnDriver {
             )?;
             if !output.is_empty() {
                 for line in self.inner.process.borrow().split_lines(&output) {
-                    let line = trim(&line, None);
+                    let line = legacy_lossy(&trim(&line)).into_owned();
                     if !line.is_empty()
                         && let Some(m) = preg_match(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                     {
@@ -391,9 +392,9 @@ impl SvnDriver {
                         .inner
                         .process
                         .borrow()
-                        .split_lines(&trim(&output, None))
+                        .split_lines(&legacy_lossy(&trim(&output)))
                     {
-                        let line = trim(&line, None);
+                        let line = legacy_lossy(&trim(&line)).into_owned();
                         if !line.is_empty()
                             && let Some(m) =
                                 preg_match(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
@@ -456,14 +457,14 @@ impl SvnDriver {
         }
 
         // Subversion client 1.7 and older
-        if stripos(&process.get_error_output(), "authorization failed:").is_some() {
+        if stripos(process.get_error_output(), "authorization failed:").is_some() {
             // This is likely a remote Subversion repository that requires
             // authentication. We will handle actual authentication later.
             return Ok(true);
         }
 
         // Subversion client 1.8 and newer
-        if stripos(&process.get_error_output(), "Authentication failed").is_some() {
+        if stripos(process.get_error_output(), "Authentication failed").is_some() {
             // This is likely a remote Subversion or newer repository that requires
             // authentication. We will handle actual authentication later.
             return Ok(true);

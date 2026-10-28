@@ -9,6 +9,7 @@ license.workspace = true
 
 [dependencies]
 shirabe-php-shim.workspace = true
+bstr.workspace = true
 
 [lints]
 workspace = true

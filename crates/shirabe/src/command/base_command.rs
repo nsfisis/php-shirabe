@@ -18,7 +18,7 @@ use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, count, explode, in_array_strict,
+    UnexpectedValueException, count, explode, in_array_strict, legacy_lossy,
 };
 use shirabe_symfony_console::Terminal;
 use shirabe_symfony_console::command::{Command, CommandData, SetDefinitionArg};
@@ -912,7 +912,12 @@ pub fn base_command_initialize(
         {
             input.borrow_mut().set_option(
                 "ignore-platform-req",
-                InputValue::Array(explode(",", &ignore_str)),
+                InputValue::Array(
+                    explode(",", &ignore_str)
+                        .iter()
+                        .map(|s| legacy_lossy(s).into_owned())
+                        .collect::<Vec<_>>(),
+                ),
             );
 
             io.write_error(&format!(

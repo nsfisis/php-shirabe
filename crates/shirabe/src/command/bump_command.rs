@@ -13,7 +13,7 @@ use crate::util::Filesystem;
 use bstr::B;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, file_get_contents, file_put_contents, impl_php_class, is_writable,
-    php_regex, preg_is_match, preg_replace, strtolower,
+    legacy_lossy, php_regex, preg_is_match, preg_replace, strtolower,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -173,7 +173,7 @@ impl BumpCommand {
                 .collect();
             let unique_lower: Vec<String> = packages_filter
                 .iter()
-                .map(|s| strtolower(s))
+                .map(|s| legacy_lossy(&strtolower(s)).into_owned())
                 .collect::<indexmap::IndexSet<_>>()
                 .into_iter()
                 .collect();

@@ -8,8 +8,8 @@ use crate::util::Filesystem;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
-    array_reverse, array_shift, dirname, implode, in_array_strict, preg_is_match, preg_quote,
-    rtrim, str_replace, strtolower, usort,
+    array_reverse, array_shift, dirname, implode, in_array_strict, legacy_lossy, preg_is_match,
+    preg_quote, rtrim2, str_replace, strtolower, usort,
 };
 
 /// Downloaders manager.
@@ -64,7 +64,8 @@ impl DownloadManager {
         downloader: std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>,
     ) {
         let r#type = strtolower(r#type);
-        self.downloaders.insert(r#type, downloader);
+        self.downloaders
+            .insert(legacy_lossy(&r#type).into_owned(), downloader);
     }
 
     /// Returns downloader for a specific installation type.
@@ -73,7 +74,7 @@ impl DownloadManager {
         r#type: &str,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>> {
         let r#type = strtolower(r#type);
-        if !self.downloaders.contains_key(&r#type) {
+        if !self.downloaders.contains_key(&*legacy_lossy(&r#type)) {
             return Err(InvalidArgumentException::new(format!(
                 "Unknown downloader type: {}. Available types: {}.",
                 r#type,
@@ -82,7 +83,11 @@ impl DownloadManager {
             .into());
         }
 
-        Ok(self.downloaders.get(&r#type).unwrap().clone())
+        Ok(self
+            .downloaders
+            .get(&*legacy_lossy(&r#type))
+            .unwrap()
+            .clone())
     }
 
     /// Returns downloader for already installed package.
@@ -364,7 +369,7 @@ impl DownloadManager {
         for (pattern, preference) in &self.package_preferences {
             let pattern_regex = format!(
                 "{{^{}$}}i",
-                str_replace("\\*", ".*", &preg_quote(pattern, None)),
+                str_replace("\\*", ".*", preg_quote(pattern, None)),
             );
             if preg_is_match(&pattern_regex, &package.get_name()) {
                 if "dist" == preference || (!package.is_dev() && "auto" == preference) {
@@ -461,7 +466,7 @@ impl DownloadManager {
             return dir.to_string();
         }
 
-        rtrim(dir, Some("\\/"))
+        legacy_lossy(&rtrim2(dir, "\\/")).into_owned()
     }
 }
 

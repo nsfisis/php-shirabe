@@ -97,7 +97,7 @@ pub trait ArchiveDownloader {
         }
 
         let temporary_dir = loop {
-            let candidate = format!("{}/composer/{}", vendor_dir, bin2hex(&random_bytes(4)));
+            let candidate = format!("{}/composer/{}", vendor_dir, bin2hex(random_bytes(4)));
             if !is_dir(&candidate) {
                 break candidate;
             }

@@ -19,8 +19,8 @@ use crate::repository::{
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_keys, array_merge_map, array_search_in_vec, impl_php_class, php_regex, preg_is_match,
-    preg_match, preg_replace, strtolower,
+    array_keys, array_merge_map, array_search_in_vec, impl_php_class, legacy_lossy, php_regex,
+    preg_is_match, preg_match, preg_replace, strtolower,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::MultiConstraint;
@@ -391,7 +391,7 @@ impl Command for UpdateCommand {
             (*root_package.get_dev_requires()).clone(),
         );
         for (package, constraint) in reqs.iter() {
-            let package = strtolower(package);
+            let package = legacy_lossy(&strtolower(package)).into_owned();
             let parsed_constraint = parser.parse_constraints(constraint)?;
             temporary_constraints.insert(package.clone(), parsed_constraint.clone());
             if let Some(root_req) = root_requirements.get(&package)

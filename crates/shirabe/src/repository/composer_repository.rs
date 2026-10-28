@@ -29,8 +29,9 @@ use shirabe_metadata_minifier::{ExpandedVersion, ExpandedVersions, MetadataMinif
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpClass,
     PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash,
-    http_build_query_mixed, json_decode_assoc, parse_url, php_regex, preg_grep, preg_is_match,
-    preg_match, preg_replace, preg_split, realpath, strtolower, strtr, urlencode, var_export,
+    http_build_query_mixed, json_decode_assoc, legacy_lossy, parse_url, php_regex, preg_grep,
+    preg_is_match, preg_match, preg_replace, preg_split, realpath, strtolower, strtr, urlencode,
+    var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
@@ -271,7 +272,7 @@ impl ComposerRepository {
             .and_then(|v| v.as_string())
             .unwrap_or_default()
             .to_string();
-        let url_bits = parse_url(&strtr(&current_url, "\\", "/"));
+        let url_bits = parse_url(&legacy_lossy(&strtr(&current_url, "\\", "/")));
         let scheme_present = url_bits
             .as_ref()
             .and_then(|url_bits| url_bits.scheme.as_deref())
@@ -735,7 +736,7 @@ impl ComposerRepository {
             if self.has_available_package_list {
                 let names: Vec<String> = package_name_map.keys().cloned().collect();
                 for name in names {
-                    if !self.lazy_providers_repo_contains(&strtolower(&name))? {
+                    if !self.lazy_providers_repo_contains(&legacy_lossy(&strtolower(&name)))? {
                         package_name_map.shift_remove(&name);
                     }
                 }
@@ -773,7 +774,7 @@ impl ComposerRepository {
             && mode == SEARCH_FULLTEXT
         {
             let url = search_url
-                .replace("%query%", &urlencode(&query))
+                .replace("%query%", &legacy_lossy(&urlencode(&query)))
                 .replace("%type%", r#type.as_deref().unwrap_or(""));
 
             let search = self
@@ -851,7 +852,7 @@ impl ComposerRepository {
                     "{}?vendor={}&filter={}",
                     list_url,
                     urlencode(&vendor),
-                    urlencode(&format!("{}*", q)),
+                    urlencode(format!("{}*", q)),
                 );
                 let result = self
                     .http_downloader
@@ -961,7 +962,7 @@ impl ComposerRepository {
         if self.has_available_package_list {
             let names: Vec<String> = package_constraint_map.keys().cloned().collect();
             for name in names {
-                if !self.lazy_providers_repo_contains(&strtolower(&name))? {
+                if !self.lazy_providers_repo_contains(&legacy_lossy(&strtolower(&name)))? {
                     package_constraint_map.shift_remove(&name);
                 }
             }
@@ -1008,7 +1009,7 @@ impl ComposerRepository {
         {
             let names: Vec<String> = package_constraint_map
                 .keys()
-                .map(|name| strtolower(name))
+                .map(|name| legacy_lossy(&strtolower(name)).into_owned())
                 // skip platform packages, root package and composer-plugin-api
                 .filter(|name| !PlatformRepository::is_platform_package(name) && name != "__root__")
                 .collect();
@@ -1535,13 +1536,13 @@ impl ComposerRepository {
                     .iter()
                     .map(|(k, v)| (k.clone(), v.clone()))
                     .collect();
-                let normalized_name = strtolower(
-                    &version
+                let normalized_name = legacy_lossy(&strtolower(
+                    version
                         .get(B("name"))
                         .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_str_lossy(),
-                );
+                        .unwrap_or_default(),
+                ))
+                .into_owned();
 
                 // only load the actual named package, not other packages that might find themselves in the same file
                 if normalized_name != name {
@@ -1775,7 +1776,7 @@ impl ComposerRepository {
         let download_targets: Vec<(String, String, Option<AnyConstraint>)> = names_iter
             .into_iter()
             .filter_map(|(name, constraint)| {
-                let name = strtolower(&name);
+                let name = legacy_lossy(&strtolower(&name)).into_owned();
                 let real_name = preg_replace(php_regex!(r"{~dev$}"), "", &name);
                 // skip platform packages, root package and composer-plugin-api
                 if PlatformRepository::is_platform_package(&real_name) || real_name == "__root__" {
@@ -1963,7 +1964,7 @@ impl ComposerRepository {
             return Err(LogicException::new("startCachedAsyncDownload only supports v2 protocol composer repos with a metadata-url".to_string()).into());
         }
 
-        let name = strtolower(file_name);
+        let name = legacy_lossy(&strtolower(file_name)).into_owned();
         let package_name = package_name
             .map(|s| s.to_string())
             .unwrap_or_else(|| name.clone());
@@ -2109,7 +2110,7 @@ impl ComposerRepository {
     }
 
     pub fn get_packages_json_url(&self) -> String {
-        let json_url_parts = parse_url(&strtr(&self.url, "\\", "/"));
+        let json_url_parts = parse_url(&legacy_lossy(&strtr(&self.url, "\\", "/")));
 
         let has_json = json_url_parts
             .and_then(|json_url_parts| json_url_parts.path)
@@ -2309,7 +2310,10 @@ impl ComposerRepository {
             {
                 let avail_packages: Vec<String> = available
                     .iter()
-                    .filter_map(|v| v.as_string().map(|s| strtolower(&s.to_str_lossy())))
+                    .filter_map(|v| {
+                        v.as_string()
+                            .map(|s| legacy_lossy(&strtolower(s)).into_owned())
+                    })
                     .collect();
                 let mut combined: IndexMap<String, String> = IndexMap::new();
                 for k in avail_packages.iter() {
@@ -3277,7 +3281,7 @@ impl ComposerRepository {
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
                         .to_string();
-                    let version_package_name = strtolower(&name_str);
+                    let version_package_name = legacy_lossy(&strtolower(&name_str)).into_owned();
                     let version_map: IndexMap<BString, PhpMixed> = version
                         .iter()
                         .map(|(k, v)| (k.clone(), v.clone()))
@@ -3394,7 +3398,7 @@ impl RepositoryInterface for ComposerRepository {
         // this call initializes loadRootServerFile which is needed for the rest below to work
         let has_providers = self.has_providers()?;
 
-        let name = strtolower(name);
+        let name = legacy_lossy(&strtolower(name)).into_owned();
         let constraint: AnyConstraint = match constraint {
             crate::repository::FindPackageConstraint::String(s) => {
                 self.version_parser.parse_constraints(&s)?
@@ -3472,7 +3476,7 @@ impl RepositoryInterface for ComposerRepository {
         // this call initializes loadRootServerFile which is needed for the rest below to work
         let has_providers = self.has_providers()?;
 
-        let name = strtolower(name);
+        let name = legacy_lossy(&strtolower(name)).into_owned();
         let constraint: Option<AnyConstraint> = match constraint {
             None => None,
             Some(crate::repository::FindPackageConstraint::String(s)) => {

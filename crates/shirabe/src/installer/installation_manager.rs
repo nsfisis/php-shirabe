@@ -157,7 +157,7 @@ impl InstallationManager {
     ) -> anyhow::Result<std::rc::Rc<dyn InstallerInterface>> {
         let r#type = strtolower(r#type);
 
-        if let Some(installer) = self.cache.borrow().get(&r#type) {
+        if let Some(installer) = self.cache.borrow().get(&*legacy_lossy(&r#type)) {
             return Ok(installer.clone());
         }
 
@@ -165,8 +165,10 @@ impl InstallationManager {
         // it can register a further installer from that call.
         let installers = self.installers.borrow().clone();
         for installer in installers {
-            if installer.supports(&r#type)? {
-                self.cache.borrow_mut().insert(r#type, installer.clone());
+            if installer.supports(&legacy_lossy(&r#type))? {
+                self.cache
+                    .borrow_mut()
+                    .insert(legacy_lossy(&r#type).into_owned(), installer.clone());
                 return Ok(installer);
             }
         }
@@ -828,7 +830,12 @@ impl InstallationManager {
                 // non-batch API, deprecated
                 if repo_url.contains("%package%") {
                     for package in packages {
-                        let url = str_replace("%package%", &package.get_pretty_name(), repo_url);
+                        let url = legacy_lossy(&str_replace(
+                            "%package%",
+                            package.get_pretty_name(),
+                            repo_url,
+                        ))
+                        .into_owned();
 
                         let mut params: IndexMap<String, String> = IndexMap::new();
                         params.insert("version".to_string(), package.get_pretty_version());

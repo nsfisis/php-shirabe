@@ -2,9 +2,10 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::HelperSet;
+use bstr::ByteSlice;
 use shirabe_php_shim::{
-    mb_detect_encoding, mb_strlen, mb_strwidth, mb_substr, php_regex, preg_is_match, preg_replace,
-    strlen, substr, trigger_deprecation,
+    legacy_lossy, mb_detect_encoding, mb_strlen, mb_strwidth, mb_substr, php_regex, preg_is_match,
+    preg_replace, strlen, substr, trigger_deprecation,
 };
 use shirabe_symfony_string::unicode_string::UnicodeString;
 
@@ -51,7 +52,7 @@ impl Helper {
             None => return strlen(string),
         };
 
-        mb_strwidth(string, Some(&encoding))
+        mb_strwidth(string, Some(encoding.as_bstr()))
     }
 
     /// Returns the length of a string, using mb_strlen if it is available.
@@ -75,10 +76,10 @@ impl Helper {
         let encoding = mb_detect_encoding(string, None, true);
         let encoding = match encoding {
             Some(encoding) => encoding,
-            None => return substr(string, from, length),
+            None => return legacy_lossy(&substr(string, from, length)).into_owned(),
         };
 
-        mb_substr(string, from, length, Some(&encoding))
+        legacy_lossy(&mb_substr(string, from, length, Some(encoding.as_bstr()))).into_owned()
     }
 
     pub fn format_time(secs: f64) -> Option<String> {

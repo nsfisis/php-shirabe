@@ -107,7 +107,7 @@ fn test_hide_passwords() {
         process.execute(command, &mut output, None).unwrap();
         assert_eq!(
             format!("Executing command (CWD): {}", expected_command_output),
-            trim(&buffer.borrow().get_output(), None)
+            trim(buffer.borrow().get_output())
         );
     }
 }
@@ -126,7 +126,7 @@ fn test_doesnt_hide_ports() {
         .unwrap();
     assert_eq!(
         "Executing command (CWD): echo https://localhost:1234/",
-        trim(&buffer.borrow().get_output(), None)
+        trim(buffer.borrow().get_output())
     );
 }
 

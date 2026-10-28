@@ -23,7 +23,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_fill_keys, array_intersect, array_keys, array_map,
     array_merge, array_unique, empty, file_exists, file_get_contents, file_put_contents, filesize,
-    impl_php_class, implode, is_writable, strtolower, unlink,
+    impl_php_class, implode, is_writable, legacy_lossy, strtolower, unlink,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -996,7 +996,10 @@ impl Command for RequireCommand {
                     pkg.as_ref().and_then(|p| p.as_complete());
                 if let Some(pkg_complete) = pkg_as_complete {
                     let lowered: Vec<String> =
-                        array_map(|s: &String| strtolower(s), &pkg_complete.get_keywords());
+                        array_map(|s: &String| strtolower(s), &pkg_complete.get_keywords())
+                            .iter()
+                            .map(|s| legacy_lossy(s).into_owned())
+                            .collect::<Vec<_>>();
                     let pkg_dev_tags: Vec<String> = array_intersect(&dev_tags, &lowered);
                     if (pkg_dev_tags.len() as i64) > 0 {
                         dev_packages.push(pkg_dev_tags);

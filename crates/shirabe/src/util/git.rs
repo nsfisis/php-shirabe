@@ -11,8 +11,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
     RuntimeException, array_map, clearstatcache, explode, implode, in_array_loose, in_array_strict,
-    is_dir, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, rawurldecode,
-    rawurlencode, str_replace_array, strlen, strpos, substr, trim, version_compare,
+    is_dir, legacy_lossy, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
+    rawurldecode, rawurlencode, str_replace_array, strlen, strpos, substr, trim, version_compare,
 };
 use std::sync::Mutex;
 
@@ -185,7 +185,7 @@ impl Git {
             }
 
             if collect_outputs {
-                output.write_back(implode("", &outputs));
+                output.write_back(legacy_lossy(&implode("", &outputs)).into_owned());
             }
 
             status
@@ -215,8 +215,10 @@ impl Git {
                 if !self.io.has_authentication(&m3) {
                     self.io.borrow_mut().set_authentication(
                         m3,
-                        rawurldecode(m.get(1).unwrap_or_default()),
-                        Some(rawurldecode(m.get(2).unwrap_or_default())),
+                        legacy_lossy(&rawurldecode(m.get(1).unwrap_or_default())).into_owned(),
+                        Some(
+                            legacy_lossy(&rawurldecode(m.get(2).unwrap_or_default())).into_owned(),
+                        ),
                     );
                 }
             }
@@ -380,7 +382,10 @@ impl Git {
                         return Ok(());
                     }
 
-                    credentials = vec![rawurlencode(&username), rawurlencode(&password)];
+                    credentials = vec![
+                        legacy_lossy(&rawurlencode(&username)).into_owned(),
+                        legacy_lossy(&rawurlencode(&password)).into_owned(),
+                    ];
                     error_msg = self.process.borrow().get_error_output().to_string();
                 }
             } else if let Some(m) = preg_match(
@@ -505,7 +510,10 @@ impl Git {
                         return Ok(());
                     }
 
-                    credentials = vec![rawurlencode(&username), rawurlencode(&password)];
+                    credentials = vec![
+                        legacy_lossy(&rawurlencode(&username)).into_owned(),
+                        legacy_lossy(&rawurlencode(&password)).into_owned(),
+                    ];
                 }
                 // Falling back to ssh
                 let ssh_url = format!("git@bitbucket.org:{}", repo_with_git_part);
@@ -612,7 +620,10 @@ impl Git {
                         return Ok(());
                     }
 
-                    credentials = vec![rawurlencode(&username), rawurlencode(&password)];
+                    credentials = vec![
+                        legacy_lossy(&rawurlencode(&username)).into_owned(),
+                        legacy_lossy(&rawurlencode(&password)).into_owned(),
+                    ];
                     error_msg = self.process.borrow().get_error_output().to_string();
                 }
             } else if let Some(m) = self.get_authentication_failure(url) {
@@ -623,8 +634,11 @@ impl Git {
                 let mut auth_parts: Option<String> = None;
                 if m2.contains("@") {
                     let parts = explode("@", &m2);
-                    auth_parts = parts.first().cloned();
-                    m2 = parts.get(1).cloned().unwrap_or_default();
+                    auth_parts = parts
+                        .first()
+                        .cloned()
+                        .map(|s| legacy_lossy(&s).into_owned());
+                    m2 = legacy_lossy(&parts.get(1).cloned().unwrap_or_default()).into_owned();
                 }
 
                 let mut store_auth: PhpMixed = PhpMixed::Bool(false);
@@ -637,7 +651,10 @@ impl Git {
                     {
                         if parts.contains(":") {
                             let split = explode(":", parts);
-                            default_username = split.first().cloned();
+                            default_username = split
+                                .first()
+                                .cloned()
+                                .map(|s| legacy_lossy(&s).into_owned());
                         } else {
                             default_username = Some(parts.clone());
                         }
@@ -649,7 +666,7 @@ impl Git {
                         io_interface::NORMAL,
                     );
                     self.io.write_error3(
-                        &format!("<warning>{}</warning>", trim(&error_msg, None)),
+                        &format!("<warning>{}</warning>", trim(&error_msg)),
                         true,
                         io_interface::VERBOSE,
                     );
@@ -718,7 +735,10 @@ impl Git {
                         return Ok(());
                     }
 
-                    credentials = vec![rawurlencode(&username), rawurlencode(&password)];
+                    credentials = vec![
+                        legacy_lossy(&rawurlencode(&username)).into_owned(),
+                        legacy_lossy(&rawurlencode(&password)).into_owned(),
+                    ];
                     error_msg = self.process.borrow().get_error_output().to_string();
                 }
             }
@@ -727,12 +747,16 @@ impl Git {
                 self.filesystem.borrow_mut().remove_directory(orig);
             }
 
-            let mut last_command_str = match &last_command {
+            let mut last_command_str = legacy_lossy(&match &last_command {
                 CommandLine::Args(args) => implode(" ", args),
-                CommandLine::Shell(command) => command.clone(),
-            };
+                CommandLine::Shell(command) => bstr::BString::from(command.clone()),
+            })
+            .into_owned();
             if (credentials.len() as i64) > 0 {
-                last_command_str = self.mask_credentials(&last_command_str, &credentials);
+                last_command_str = legacy_lossy(&bstr::BString::from(
+                    self.mask_credentials(&last_command_str, &credentials),
+                ))
+                .into_owned();
                 error_msg = self.mask_credentials(&error_msg, &credentials);
             }
             self.throw_exception(
@@ -776,7 +800,7 @@ impl Git {
                 &mut output,
                 Some(dir),
             )? == 0
-            && trim(&output, None) == "."
+            && trim(&output) == "."
         {
             // PHP try/finally
             let try_result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
@@ -967,7 +991,10 @@ impl Git {
             return Ok(vec![]);
         }
 
-        Ok(explode(" ", &substr(&flags, 1, None)))
+        Ok(explode(" ", substr(&flags, 1, None))
+            .iter()
+            .map(|s| legacy_lossy(s).into_owned())
+            .collect::<Vec<_>>())
     }
 
     /// Checks if git version supports --no-commit-header flag (git 2.33+)
@@ -1028,7 +1055,7 @@ impl Git {
                 &mut output,
                 Some(dir),
             )? == 0
-            && trim(&output, None) == "."
+            && trim(&output) == "."
         {
             let mut ignored_output = String::new();
             let exit_code = self.process.borrow_mut().execute(
@@ -1310,7 +1337,7 @@ impl Git {
             }
         }
 
-        str_replace_array(credentials, &masked_credentials, error)
+        legacy_lossy(&str_replace_array(credentials, &masked_credentials, error)).into_owned()
     }
 }
 

@@ -3,11 +3,12 @@
 use crate::class_map::ClassMap;
 use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
+use bstr::BString;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, explode,
-    getcwd, implode, is_dir, is_file, pathinfo, php_regex, preg_is_match, preg_match, preg_quote,
-    preg_replace, preg_replace_callback, realpath, str_replace, stream_get_wrappers, strlen,
-    strpos, strrpos, strtr, substr,
+    getcwd, implode, is_dir, is_file, legacy_lossy, pathinfo, php_regex, preg_is_match, preg_match,
+    preg_quote, preg_replace, preg_replace_callback, realpath, str_replace, stream_get_wrappers,
+    strlen, strpos, strrpos, strtr, substr,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
@@ -182,11 +183,11 @@ impl ClassMapGenerator {
 
             // check the realpath of the file against the excluded paths as the path might be a symlink and the excluded path is realpath'd so symlink are resolved
             if let Some(ref excluded) = excluded {
-                if preg_is_match(excluded, &strtr(&real_path, "\\", "/")) {
+                if preg_is_match(excluded, &legacy_lossy(&strtr(&real_path, "\\", "/"))) {
                     continue;
                 }
                 // check non-realpath of file for directories symlink in project dir
-                if preg_is_match(excluded, &strtr(&file_path, "\\", "/")) {
+                if preg_is_match(excluded, &legacy_lossy(&strtr(&file_path, "\\", "/"))) {
                     continue;
                 }
             }
@@ -262,18 +263,30 @@ impl ClassMapGenerator {
                 if let Some(ns_len) = namespace_length {
                     let namespace = substr(&class, 0, Some((ns_len + 1) as i64));
                     let class_name = substr(&class, (ns_len + 1) as i64, None);
-                    sub_path = str_replace("\\", std::path::MAIN_SEPARATOR_STR, &namespace)
-                        + &str_replace("_", std::path::MAIN_SEPARATOR_STR, &class_name);
+                    let mut path = str_replace("\\", std::path::MAIN_SEPARATOR_STR, &namespace);
+                    path.extend_from_slice(&str_replace(
+                        "_",
+                        std::path::MAIN_SEPARATOR_STR,
+                        &class_name,
+                    ));
+                    sub_path = legacy_lossy(&path).into_owned();
                 } else {
-                    sub_path = str_replace("_", std::path::MAIN_SEPARATOR_STR, &class);
+                    sub_path =
+                        legacy_lossy(&str_replace("_", std::path::MAIN_SEPARATOR_STR, &class))
+                            .into_owned();
                 }
             } else if namespace_type == "psr-4" {
                 let sub_namespace = if !base_namespace.is_empty() {
                     substr(&class, strlen(base_namespace), None)
                 } else {
-                    class.clone()
+                    BString::from(class.as_str())
                 };
-                sub_path = str_replace("\\", std::path::MAIN_SEPARATOR_STR, &sub_namespace);
+                sub_path = legacy_lossy(&str_replace(
+                    "\\",
+                    std::path::MAIN_SEPARATOR_STR,
+                    &sub_namespace,
+                ))
+                .into_owned();
             } else {
                 return Err(InvalidArgumentException::new(
                     "$namespaceType must be \"psr-0\" or \"psr-4\"".to_string(),
@@ -354,7 +367,7 @@ impl ClassMapGenerator {
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
         if let Some(r#match) = preg_match(
             php_regex!(r"{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
-            &path,
+            &legacy_lossy(&path),
         ) {
             prefix = r#match.get(1).unwrap_or_default().to_string();
             path = substr(&path, strlen(&prefix), None);
@@ -371,7 +384,7 @@ impl ClassMapGenerator {
                 parts.pop();
                 up = !(parts.is_empty() || parts.last().map(|s| s.as_str()) == Some(".."));
             } else if chunk != "." && !chunk.is_empty() {
-                parts.push(chunk.clone());
+                parts.push(legacy_lossy(&chunk.clone()).into_owned());
                 up = chunk != "..";
             }
         }

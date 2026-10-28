@@ -10,8 +10,9 @@ use crate::terminal::Terminal;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, explode, memory_get_usage, microtime,
-    preg_replace_callback, round, rtrim, sprintf, str_pad, str_repeat, substr_count, time,
+    AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, explode, legacy_lossy, memory_get_usage,
+    microtime, preg_replace_callback, round, rtrim2, sprintf, str_pad, str_repeat, substr_count,
+    time,
 };
 
 pub const FORMAT_VERBOSE: &str = "verbose";
@@ -521,7 +522,7 @@ impl ProgressBar {
                         let formatter = section.get_formatter();
                         let message_line_length = Helper::width(&Helper::remove_decoration(
                             &mut *formatter.borrow_mut(),
-                            message_line,
+                            &legacy_lossy(message_line),
                         ));
                         if message_line_length > self.terminal.get_width() {
                             line_count += (message_line_length as f64
@@ -599,7 +600,7 @@ impl ProgressBar {
                 |bar: &ProgressBar,
                  output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                     let complete_bars = bar.get_bar_offset();
-                    let mut display = str_repeat(&bar.get_bar_character(), complete_bars as usize);
+                    let mut display = str_repeat(bar.get_bar_character(), complete_bars as usize);
                     if complete_bars < bar.get_bar_width() as f64 {
                         let empty_bars = bar.get_bar_width() as f64
                             - complete_bars
@@ -607,10 +608,10 @@ impl ProgressBar {
                                 &mut *output.borrow().get_formatter().borrow_mut(),
                                 &bar.get_progress_character(),
                             )) as f64;
-                        display.push_str(&format!(
-                            "{}{}",
-                            bar.get_progress_character(),
-                            str_repeat(&bar.get_empty_bar_character(), empty_bars as usize)
+                        display.extend_from_slice(bar.get_progress_character().as_bytes());
+                        display.extend_from_slice(&str_repeat(
+                            bar.get_empty_bar_character(),
+                            empty_bars as usize,
                         ));
                     }
 
@@ -672,7 +673,7 @@ impl ProgressBar {
                 |bar: &ProgressBar,
                  _output: &std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>| {
                     Ok(Ok(PhpMixed::string(str_pad(
-                        &bar.get_progress().to_string(),
+                        bar.get_progress().to_string(),
                         bar.get_step_width() as usize,
                         " ",
                         STR_PAD_LEFT,
@@ -762,7 +763,7 @@ impl ProgressBar {
             .map(|sub_line| {
                 Helper::width(&Helper::remove_decoration(
                     &mut *self.output.borrow().get_formatter().borrow_mut(),
-                    &rtrim(sub_line, Some("\r")),
+                    &legacy_lossy(&rtrim2(sub_line, "\r")),
                 ))
             })
             .collect();
@@ -803,7 +804,7 @@ impl ProgressBar {
             };
 
             if let Some(modifier) = matches.get(2) {
-                return Ok(sprintf(&format!("%{modifier}"), &[text]));
+                return Ok(legacy_lossy(&sprintf(format!("%{modifier}"), &[text])).into_owned());
             }
 
             // PHP implicitly casts the formatter result to string here.

@@ -10,8 +10,8 @@ use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, dirname, is_dir, is_link, preg_quote,
-    preg_replace, realpath, rmdir, rtrim, strpos,
+    InvalidArgumentException, LogicException, PhpMixed, dirname, is_dir, is_link, legacy_lossy,
+    preg_quote, preg_replace, realpath, rmdir, rtrim2, strpos,
 };
 
 /// Package installation manager.
@@ -47,26 +47,28 @@ impl LibraryInstaller {
 
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
-        let vendor_dir = rtrim(
-            &composer_ref
+        let vendor_dir = legacy_lossy(&rtrim2(
+            composer_ref
                 .get_config()
                 .borrow_mut()
                 .get_str("vendor-dir")
                 .unwrap_or_default(),
-            Some("/"),
-        );
+            "/",
+        ))
+        .into_owned();
         let binary_installer: std::rc::Rc<std::cell::RefCell<dyn BinaryInstallerInterface>> =
             match binary_installer {
                 Some(binary_installer) => binary_installer,
                 None => {
-                    let bin_dir = rtrim(
-                        &composer_ref
+                    let bin_dir = legacy_lossy(&rtrim2(
+                        composer_ref
                             .get_config()
                             .borrow_mut()
                             .get_str("bin-dir")
                             .unwrap_or_default(),
-                        Some("/"),
-                    );
+                        "/",
+                    ))
+                    .into_owned();
                     let bin_compat = composer_ref
                         .get_config()
                         .borrow_mut()
@@ -385,7 +387,7 @@ impl InstallerInterface for LibraryInstaller {
             .remove_binaries(package.clone());
         repo.borrow_mut().remove_package(package.clone());
 
-        if strpos(&package.get_name(), "/").is_some_and(|pos| pos != 0) {
+        if strpos(package.get_name(), "/").is_some_and(|pos| pos != 0) {
             let package_vendor_dir = dirname(&download_path);
             if is_dir(&package_vendor_dir)
                 && self.filesystem.borrow().is_dir_empty(&package_vendor_dir)

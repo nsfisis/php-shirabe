@@ -3,7 +3,7 @@
 use crate::package::BasePackageHandle;
 use crate::repository::{LockArrayRepositoryHandle, RepositoryInterface};
 use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, strtolower};
+use shirabe_php_shim::{LogicException, legacy_lossy, strtolower};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 
 /// Identifies a partial update for listed packages only, all dependencies will remain at locked versions
@@ -42,7 +42,7 @@ impl Request {
         package_name: &str,
         constraint: Option<AnyConstraint>,
     ) -> anyhow::Result<()> {
-        let package_name = strtolower(package_name);
+        let package_name = legacy_lossy(&strtolower(package_name)).into_owned();
         let constraint = constraint.unwrap_or_else(|| MatchAllConstraint::new(None).into());
         if self.requires.contains_key(&package_name) {
             return Err(LogicException::new(format!(

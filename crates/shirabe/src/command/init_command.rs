@@ -17,7 +17,7 @@ use shirabe_php_shim::{
     Catch as _, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_filter_map, array_flip_strings, array_intersect_key, array_map, basename, empty, explode,
     file, file_exists, file_get_contents, file_put_contents, filter_var_email, get_current_user,
-    impl_php_class, implode, is_dir, is_string, php_regex, preg_is_match, preg_match,
+    impl_php_class, implode, is_dir, is_string, legacy_lossy, php_regex, preg_is_match, preg_match,
     preg_match_all, preg_quote, preg_replace, realpath, str_replace, strpos, strtolower, trim,
     ucwords, unlink,
 };
@@ -97,7 +97,7 @@ impl InitCommand {
             let mut result: IndexMap<String, Option<String>> = IndexMap::new();
             result.insert(
                 "name".to_string(),
-                Some(trim(m.name("name").unwrap_or_default(), None)),
+                Some(legacy_lossy(&trim(m.name("name").unwrap_or_default())).into_owned()),
             );
             result.insert("email".to_string(), email);
 
@@ -132,16 +132,21 @@ impl InitCommand {
             return None;
         }
 
-        let namespace: Vec<String> = array_map(
-            |part: &String| {
-                let part = preg_replace(php_regex!(r"/[^a-z0-9]/i"), " ", part);
+        let namespace: Vec<BString> = array_map(
+            |part: &BString| {
+                let part = legacy_lossy(&preg_replace(
+                    php_regex!(r"/[^a-z0-9]/i"),
+                    " ",
+                    &legacy_lossy(part),
+                ))
+                .into_owned();
                 let part = ucwords(&part);
                 str_replace(" ", "", &part)
             },
             &explode("/", package_name),
         );
 
-        Some(implode("\\", &namespace))
+        Some(legacy_lossy(&implode("\\", &namespace)).into_owned())
     }
 
     fn get_git_config(&self) -> anyhow::Result<IndexMap<String, String>> {
@@ -327,7 +332,12 @@ impl InitCommand {
             name,
         );
         let name = strtolower(&name);
-        let name = preg_replace(php_regex!(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u"), "", &name);
+        let name = legacy_lossy(&preg_replace(
+            php_regex!(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u"),
+            "",
+            &legacy_lossy(&name),
+        ))
+        .into_owned();
 
         preg_replace(php_regex!(r"{([_.-]){2,}}u"), "$1", &name)
     }
@@ -684,7 +694,7 @@ impl Command for InitCommand {
                 );
                 let errors = format!(
                     " - {}",
-                    implode(&format!("{} - ", PHP_EOL), json_err.get_errors())
+                    implode(format!("{} - ", PHP_EOL), json_err.get_errors())
                 );
                 io.write_error3(
                     &format!("{}:{}{}", json_err.get_message(), PHP_EOL, errors),

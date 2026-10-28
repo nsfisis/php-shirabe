@@ -27,10 +27,10 @@ use shirabe_php_rpc::{
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, file_exists, get_class, hash, implode, ini_get, is_array,
-    is_callable, is_dir, is_object, is_string, krsort, php_regex, preg_is_match, preg_match,
-    preg_quote, preg_replace, preg_replace_callback, realpath, spl_autoload_functions,
+    is_callable, is_dir, is_object, is_string, krsort, legacy_lossy, php_regex, preg_is_match,
+    preg_match, preg_quote, preg_replace, preg_replace_callback, realpath, spl_autoload_functions,
     spl_autoload_register, spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos,
-    strtoupper, substr, trim,
+    strtoupper, substr, trim2,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
@@ -139,7 +139,7 @@ impl EventDispatcher {
         let skip_scripts_env = Platform::get_env("COMPOSER_SKIP_SCRIPTS").unwrap_or_default();
         let skip_scripts: Vec<String> = skip_scripts_env
             .split(',')
-            .map(|v| trim(v, Some(" \t\n\r\0\u{0B}")))
+            .map(|v| legacy_lossy(&trim2(v, " \t\n\r\0\u{0B}")).into_owned())
             .filter(|val| !val.is_empty())
             .collect();
         Self {
@@ -517,7 +517,7 @@ impl EventDispatcher {
                             crate::io::VERBOSE,
                         );
 
-                        let mut script: Vec<String> = substr(callable_str, 1, None)
+                        let mut script: Vec<String> = legacy_lossy(&substr(callable_str, 1, None))
                             .split(' ')
                             .map(|s| s.to_string())
                             .collect();
@@ -635,8 +635,10 @@ impl EventDispatcher {
                     }
                     Callable::String(ref callable_str) if self.is_php_script(callable_str) => {
                         let pos = strpos(callable_str, "::").unwrap_or(0) as i64;
-                        let class_name = substr(callable_str, 0, Some(pos));
-                        let method_name = substr(callable_str, pos + 2, None);
+                        let class_name =
+                            legacy_lossy(&substr(callable_str, 0, Some(pos))).into_owned();
+                        let method_name =
+                            legacy_lossy(&substr(callable_str, pos + 2, None)).into_owned();
 
                         self.make_autoloader(event, &Callable::String(callable_str.clone()))?;
                         if !self.php_runtime_bool(
@@ -732,7 +734,7 @@ impl EventDispatcher {
                             "defined",
                             vec![PluginValue::string(format!(
                                 "Composer\\Script\\ScriptEvents::{}",
-                                str_replace("-", "_", &strtoupper(event.get_name()))
+                                str_replace("-", "_", strtoupper(event.get_name()))
                             ))],
                         )? {
                             self.io.write_error3(&format!(
@@ -867,7 +869,8 @@ try {{
                         let mut exec = if strpos(&callable_str, "@putenv ") == Some(0) {
                             callable_str.clone()
                         } else if callable_str.contains("@additional_args") {
-                            str_replace("@additional_args", &args, &callable_str)
+                            legacy_lossy(&str_replace("@additional_args", &args, &callable_str))
+                                .into_owned()
                         } else {
                             format!(
                                 "{}{}",
@@ -921,9 +924,9 @@ try {{
 
                         if strpos(&exec, "@putenv ") == Some(0) {
                             if strpos(&exec, "=").is_none() {
-                                Platform::clear_env(&substr(&exec, 8, None));
+                                Platform::clear_env(&legacy_lossy(&substr(&exec, 8, None)));
                             } else {
-                                let after = substr(&exec, 8, None);
+                                let after = legacy_lossy(&substr(&exec, 8, None)).into_owned();
                                 let parts: Vec<&str> = after.splitn(2, '=').collect();
                                 let var = parts[0].to_string();
                                 let value = parts[1].to_string();
@@ -933,11 +936,15 @@ try {{
                             continue;
                         }
                         if strpos(&exec, "@php ") == Some(0) {
-                            let mut path_and_args = substr(&exec, 5, None);
+                            let mut path_and_args =
+                                legacy_lossy(&substr(&exec, 5, None)).into_owned();
                             if Platform::is_windows() {
                                 path_and_args = preg_replace_callback(
                                     php_regex!("{^\\S+}"),
-                                    |m| Ok(str_replace("/", "\\", m.get(0).unwrap())),
+                                    |m| {
+                                        Ok(legacy_lossy(&str_replace("/", "\\", m.get(0).unwrap()))
+                                            .into_owned())
+                                    },
                                     &path_and_args,
                                 )
                                 .expect("the replacement callback cannot fail");
@@ -982,7 +989,10 @@ try {{
                             if Platform::is_windows() {
                                 exec = preg_replace_callback(
                                     php_regex!("{^\\S+}"),
-                                    |m| Ok(str_replace("/", "\\", m.get(0).unwrap())),
+                                    |m| {
+                                        Ok(legacy_lossy(&str_replace("/", "\\", m.get(0).unwrap()))
+                                            .into_owned())
+                                    },
                                     &exec,
                                 )
                                 .expect("the replacement callback cannot fail");
@@ -1539,7 +1549,7 @@ try {{
                 hash_input.push_str("/dev");
             }
         }
-        let hash = hash("sha256", &hash_input);
+        let hash = legacy_lossy(&hash("sha256", &hash_input)).into_owned();
 
         if self.previous_hash.as_deref() == Some(hash.as_str()) {
             return Ok(());

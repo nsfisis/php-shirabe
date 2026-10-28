@@ -14,8 +14,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
     array_search_mixed, array_shift, ctype_alnum, date_create, empty, explode, extension_loaded,
-    implode, in_array_loose, is_array, is_string, ord, php_regex, preg_is_match, preg_match,
-    preg_replace, strpos, strtolower,
+    implode, in_array_loose, is_array, is_string, legacy_lossy, ord, php_regex, preg_is_match,
+    preg_match, preg_replace, strpos, strtolower,
 };
 
 /// Driver for GitLab API, use the Git driver for local checkouts.
@@ -82,7 +82,10 @@ impl GitLabDriver {
             .map(str::to_string)
             .unwrap_or_else(|| match_.name("domain2").unwrap_or_default().to_string());
         let configured_domains = self.inner.config.borrow_mut().get("gitlab-domains");
-        let mut url_parts: Vec<String> = explode("/", match_.name("parts").unwrap_or_default());
+        let mut url_parts: Vec<String> = explode("/", match_.name("parts").unwrap_or_default())
+            .iter()
+            .map(|s| legacy_lossy(s).into_owned())
+            .collect::<Vec<_>>();
 
         let scheme_match = match_.name("scheme").unwrap_or_default().to_string();
         self.scheme = if matches!(scheme_match.as_str(), "https" | "http") {
@@ -138,7 +141,7 @@ impl GitLabDriver {
             self.has_nonstandard_origin = true;
         }
 
-        self.namespace = implode("/", &url_parts);
+        self.namespace = legacy_lossy(&implode("/", &url_parts)).into_owned();
         self.repository = preg_replace(
             php_regex!(r"#(\.git)$#"),
             "",
@@ -914,7 +917,10 @@ impl GitLabDriver {
             .filter(|s| !s.is_empty())
             .map(str::to_string)
             .unwrap_or_else(|| match_.name("domain2").unwrap_or_default().to_string());
-        let mut url_parts: Vec<String> = explode("/", match_.name("parts").unwrap_or_default());
+        let mut url_parts: Vec<String> = explode("/", match_.name("parts").unwrap_or_default())
+            .iter()
+            .map(|s| legacy_lossy(s).into_owned())
+            .collect::<Vec<_>>();
 
         if Self::determine_origin(
             &config.borrow().get("gitlab-domains"),
@@ -955,7 +961,9 @@ impl GitLabDriver {
 
         let links = explode(",", &header);
         for link in links.iter() {
-            if let Some(match_) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
+            if let Some(match_) =
+                preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), &legacy_lossy(link))
+            {
                 return Some(match_.get(1).unwrap_or_default().to_string());
             }
         }
@@ -969,7 +977,7 @@ impl GitLabDriver {
         url_parts: &mut Vec<String>,
         port_number: Option<String>,
     ) -> Option<String> {
-        let mut guessed_domain = strtolower(&guessed_domain);
+        let mut guessed_domain = legacy_lossy(&strtolower(&guessed_domain)).into_owned();
 
         if in_array_loose(guessed_domain.clone(), configured_domains.values())
             || (port_number.is_some()

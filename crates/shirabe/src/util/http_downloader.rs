@@ -16,8 +16,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
     array_replace_recursive, empty, extension_loaded, file_get_contents, implode, is_numeric,
-    php_regex, preg_is_match, preg_match, preg_replace, rawurldecode, stream_context_create,
-    stripos, strpos, substr, ucfirst,
+    legacy_lossy, php_regex, preg_is_match, preg_match, preg_replace, rawurldecode,
+    stream_context_create, stripos, strpos, substr, ucfirst,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -275,10 +275,16 @@ impl HttpDownloader {
         if let Some(m) = preg_match(php_regex!(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i"), url) {
             self.io.borrow_mut().set_authentication(
                 origin.clone(),
-                rawurldecode(m.get(1).unwrap_or_default().to_string().as_str()),
-                Some(rawurldecode(
-                    m.get(2).unwrap_or_default().to_string().as_str(),
-                )),
+                legacy_lossy(&rawurldecode(
+                    m.get(1).unwrap_or_default().to_string().as_str(),
+                ))
+                .into_owned(),
+                Some(
+                    legacy_lossy(&rawurldecode(
+                        m.get(2).unwrap_or_default().to_string().as_str(),
+                    ))
+                    .into_owned(),
+                ),
             );
         }
 
