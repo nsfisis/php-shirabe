@@ -20,9 +20,11 @@ Composer\Package\RootPackage
 Composer\Package\AliasPackage
 Composer\Package\CompleteAliasPackage
 Composer\Package\RootAliasPackage
+Composer\Package\Locker
 Composer\Repository\ArrayRepository
 Composer\Repository\WritableArrayRepository
 Composer\Repository\InstalledArrayRepository
+Composer\Repository\LockArrayRepository
 Composer\Repository\FilesystemRepository
 Composer\Repository\InstalledFilesystemRepository
 Composer\Repository\RepositoryManager

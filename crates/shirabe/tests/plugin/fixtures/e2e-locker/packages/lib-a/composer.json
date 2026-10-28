@@ -1,0 +1,8 @@
+{
+    "name": "acme/lib-a",
+    "version": "1.0.0",
+    "require": {
+        "php": ">=7.2",
+        "acme/lib-b": "^1.0"
+    }
+}

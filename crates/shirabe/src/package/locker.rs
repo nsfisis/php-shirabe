@@ -293,7 +293,10 @@ impl Locker {
     }
 
     /// Returns the platform requirements stored in the lock file
-    pub fn get_platform_requirements(&mut self, with_dev_reqs: bool) -> anyhow::Result<Vec<Link>> {
+    pub fn get_platform_requirements(
+        &mut self,
+        with_dev_reqs: bool,
+    ) -> anyhow::Result<IndexMap<String, Link>> {
         let lock_data = self.get_lock_data()?;
         let mut requirements: IndexMap<String, Link> = IndexMap::new();
 
@@ -332,7 +335,7 @@ impl Locker {
             }
         }
 
-        Ok(requirements.into_iter().map(|(_, v)| v).collect())
+        Ok(requirements)
     }
 
     pub fn get_minimum_stability(&mut self) -> anyhow::Result<String> {
@@ -979,7 +982,10 @@ pub trait LockerInterface: std::fmt::Debug {
         with_dev_reqs: bool,
     ) -> anyhow::Result<LockArrayRepositoryHandle>;
     fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<String>>;
-    fn get_platform_requirements(&mut self, with_dev_reqs: bool) -> anyhow::Result<Vec<Link>>;
+    fn get_platform_requirements(
+        &mut self,
+        with_dev_reqs: bool,
+    ) -> anyhow::Result<IndexMap<String, Link>>;
     fn get_minimum_stability(&mut self) -> anyhow::Result<String>;
     fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, i64>>;
     fn get_prefer_stable(&mut self) -> anyhow::Result<Option<bool>>;
@@ -1041,7 +1047,10 @@ impl LockerInterface for Locker {
         self.get_dev_package_names()
     }
 
-    fn get_platform_requirements(&mut self, with_dev_reqs: bool) -> anyhow::Result<Vec<Link>> {
+    fn get_platform_requirements(
+        &mut self,
+        with_dev_reqs: bool,
+    ) -> anyhow::Result<IndexMap<String, Link>> {
         self.get_platform_requirements(with_dev_reqs)
     }
 

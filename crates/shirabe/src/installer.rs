@@ -1101,6 +1101,7 @@ impl Installer {
                 .locker
                 .borrow_mut()
                 .get_platform_requirements(self.dev_mode)?
+                .into_values()
             {
                 if !root_requires.contains_key(link.get_target()) {
                     request.require_name(link.get_target(), Some(link.get_constraint().clone()))?;

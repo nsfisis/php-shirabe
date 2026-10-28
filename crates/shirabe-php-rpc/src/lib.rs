@@ -1000,6 +1000,10 @@ const STUB_FILES: &[(&str, &str)] = &[
         include_str!("../php/stubs/Composer/Package/RootAliasPackage.php"),
     ),
     (
+        "Composer/Package/Locker.php",
+        include_str!("../php/stubs/Composer/Package/Locker.php"),
+    ),
+    (
         "Composer/Repository/ArrayRepository.php",
         include_str!("../php/stubs/Composer/Repository/ArrayRepository.php"),
     ),
@@ -1010,6 +1014,10 @@ const STUB_FILES: &[(&str, &str)] = &[
     (
         "Composer/Repository/InstalledArrayRepository.php",
         include_str!("../php/stubs/Composer/Repository/InstalledArrayRepository.php"),
+    ),
+    (
+        "Composer/Repository/LockArrayRepository.php",
+        include_str!("../php/stubs/Composer/Repository/LockArrayRepository.php"),
     ),
     (
         "Composer/Repository/FilesystemRepository.php",

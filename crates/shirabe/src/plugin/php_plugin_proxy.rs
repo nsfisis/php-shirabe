@@ -18,6 +18,7 @@ use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory
 use crate::installer::InstallationManagerInterface;
 use crate::io::IOInterface;
 use crate::package::handle::AnyPackage;
+use crate::package::locker::LockerInterface;
 use crate::package::{DisplayMode, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::plugin::capability::{Capability, CommandProvider};
 use crate::plugin::capable::Capable;
@@ -34,7 +35,7 @@ use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
 use crate::plugin::throwable_bridge::{exception_into_throw, throw_into_error};
 use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
-    RepositoryInterfaceHandle, RepositoryManagerInterface,
+    LockArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
 use bstr::BString;
 use indexmap::IndexMap;
@@ -60,6 +61,7 @@ enum RustEntity {
     Filesystem(std::rc::Rc<std::cell::RefCell<crate::util::Filesystem>>),
     Io(std::rc::Rc<std::cell::RefCell<dyn IOInterface>>),
     InstallationManager(std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>),
+    Locker(std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>),
     RepositoryManager(std::rc::Rc<std::cell::RefCell<dyn RepositoryManagerInterface>>),
     Repository(RepositoryInterfaceHandle),
     Package(std::rc::Rc<std::cell::RefCell<AnyPackage>>),
@@ -90,6 +92,7 @@ fn entity_ptr_id(entity: &RustEntity) -> usize {
         RustEntity::Filesystem(fs) => std::rc::Rc::as_ptr(fs) as *const () as usize,
         RustEntity::Io(io) => std::rc::Rc::as_ptr(io) as *const () as usize,
         RustEntity::InstallationManager(im) => std::rc::Rc::as_ptr(im) as *const () as usize,
+        RustEntity::Locker(locker) => std::rc::Rc::as_ptr(locker) as *const () as usize,
         RustEntity::RepositoryManager(rm) => std::rc::Rc::as_ptr(rm) as *const () as usize,
         RustEntity::Repository(repository) => repository.ptr_id(),
         RustEntity::Package(package) => std::rc::Rc::as_ptr(package) as *const () as usize,
@@ -203,6 +206,8 @@ fn repository_stub_class(repository: &RepositoryInterfaceHandle) -> Result<&'sta
         Ok("Composer\\Repository\\InstalledFilesystemRepository")
     } else if repository.is::<InstalledArrayRepository>() {
         Ok("Composer\\Repository\\InstalledArrayRepository")
+    } else if repository.is::<LockArrayRepository>() {
+        Ok("Composer\\Repository\\LockArrayRepository")
     } else {
         // TODO(plugin): the remaining repository classes get stubs on demand, driven by
         // explicit errors from real plugins.
@@ -497,6 +502,7 @@ pub(crate) fn dispatch_r_table_method(
         Some(RustEntity::InstallationManager(im)) => {
             dispatch_installation_manager_method(&im, method_name, args)
         }
+        Some(RustEntity::Locker(locker)) => dispatch_locker_method(&locker, method_name, args),
         Some(RustEntity::RepositoryManager(rm)) => {
             dispatch_repository_manager_method(&rm, method_name)
         }
@@ -744,6 +750,7 @@ fn clone_entity(entity: &RustEntity) -> Result<PluginValue, PhpThrow> {
         | RustEntity::Filesystem(_)
         | RustEntity::Io(_)
         | RustEntity::InstallationManager(_)
+        | RustEntity::Locker(_)
         | RustEntity::RepositoryManager(_)
         | RustEntity::Repository(_)
         | RustEntity::EventDispatcher(_)
@@ -897,7 +904,12 @@ fn dispatch_composer_method(
                 },
             ]))
         }
-        // TODO(plugin): the remaining Composer object graph (getLocker, getPluginManager, ...)
+        "getLocker" => {
+            let locker = composer.borrow().get_locker();
+            let rhandle = register_entity(RustEntity::Locker(locker));
+            Ok(rust_handle_value(rhandle, "Composer\\Package\\Locker"))
+        }
+        // TODO(plugin): the remaining Composer object graph (getPluginManager, ...)
         // becomes reachable over RPC on demand, driven by explicit errors from real plugins.
         other => Err(runtime_throw(format!(
             "the Composer method `{other}` is not available over RPC yet"
@@ -951,13 +963,11 @@ fn dispatch_autoload_generator_method(
             let target_dir = arg::<String>(method_name, args, 4)?;
             let scan_psr_packages = arg_or::<bool>(method_name, args, 5, false)?;
             let suffix = arg::<Option<String>>(method_name, args, 6)?;
-            // TODO(plugin): `Locker` has no proxy stub, so a plugin holds no instance it could
-            // pass here.
-            if !matches!(args.get(7), None | Some(PluginValue::Null)) {
-                return Err(runtime_throw(
-                    "AutoloadGenerator::dump() cannot take a Locker over RPC yet".to_string(),
-                ));
-            }
+            let locker = arg::<Option<std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>>>(
+                method_name,
+                args,
+                7,
+            )?;
             let strict_ambiguous = arg_or::<bool>(method_name, args, 8, false)?;
             let class_map = generator
                 .borrow()
@@ -969,7 +979,7 @@ fn dispatch_autoload_generator_method(
                     &target_dir,
                     scan_psr_packages,
                     suffix,
-                    None,
+                    locker,
                     strict_ambiguous,
                 )
                 .map_err(|error| error_throw("dump failed over RPC", &error))?;
@@ -1959,6 +1969,11 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
         (b"Composer\\Util\\Filesystem", b"getPlatformPath") => Ok(PluginValue::string(
             crate::util::Filesystem::get_platform_path(&string_arg(0)?),
         )),
+        (b"Composer\\Package\\Locker", b"getContentHash") => {
+            crate::package::Locker::get_content_hash(string_arg(0)?)
+                .map(PluginValue::string)
+                .map_err(|error| error_throw("getContentHash failed over RPC", &error))
+        }
         (b"Composer\\Util\\ProcessExecutor", b"getTimeout") => {
             Ok(crate::util::ProcessExecutor::get_timeout().to_plugin_value())
         }
@@ -2010,6 +2025,117 @@ fn dispatch_event_dispatcher_method(
         }
         other => Err(runtime_throw(format!(
             "the EventDispatcher method `{other}` is not available over RPC yet"
+        ))),
+    }
+}
+
+fn dispatch_locker_method(
+    locker: &std::rc::Rc<std::cell::RefCell<dyn LockerInterface>>,
+    method_name: &str,
+    args: &[PluginValue],
+) -> Result<PluginValue, PhpThrow> {
+    let failed =
+        |error: anyhow::Error| error_throw(&format!("{method_name} failed over RPC"), &error);
+    let with_dev_reqs = || arg_or::<bool>(method_name, args, 0, false);
+    match method_name {
+        "isLocked" => Ok(locker.borrow_mut().is_locked().to_plugin_value()),
+        "isFresh" => Ok(locker
+            .borrow_mut()
+            .is_fresh()
+            .map_err(failed)?
+            .to_plugin_value()),
+        "getLockedRepository" => {
+            let repository = locker
+                .borrow_mut()
+                .get_locked_repository(with_dev_reqs()?)
+                .map_err(failed)?;
+            repository_handle_value(&repository.into())
+        }
+        "getDevPackageNames" => Ok(locker
+            .borrow_mut()
+            .get_dev_package_names()
+            .map_err(failed)?
+            .to_plugin_value()),
+        "getPlatformRequirements" => Ok(locker
+            .borrow_mut()
+            .get_platform_requirements(with_dev_reqs()?)
+            .map_err(failed)?
+            .to_plugin_value()),
+        "getMinimumStability" => Ok(locker
+            .borrow_mut()
+            .get_minimum_stability()
+            .map_err(failed)?
+            .to_plugin_value()),
+        "getStabilityFlags" => Ok(locker
+            .borrow_mut()
+            .get_stability_flags()
+            .map_err(failed)?
+            .to_plugin_value()),
+        "getPreferStable" => Ok(locker
+            .borrow_mut()
+            .get_prefer_stable()
+            .map_err(failed)?
+            .to_plugin_value()),
+        "getPreferLowest" => Ok(locker
+            .borrow_mut()
+            .get_prefer_lowest()
+            .map_err(failed)?
+            .to_plugin_value()),
+        "getPlatformOverrides" => Ok(locker
+            .borrow_mut()
+            .get_platform_overrides()
+            .map_err(failed)?
+            .to_plugin_value()),
+        "getAliases" => Ok(locker
+            .borrow_mut()
+            .get_aliases()
+            .map_err(failed)?
+            .to_plugin_value()),
+        "getPluginApi" => Ok(locker
+            .borrow_mut()
+            .get_plugin_api()
+            .map_err(failed)?
+            .to_plugin_value()),
+        "getLockData" => Ok(locker
+            .borrow_mut()
+            .get_lock_data()
+            .map_err(failed)?
+            .to_plugin_value()),
+        "setLockData" => {
+            let written = locker
+                .borrow_mut()
+                .set_lock_data(
+                    arg::<Vec<PackageInterfaceHandle>>(method_name, args, 0)?,
+                    arg::<Option<Vec<PackageInterfaceHandle>>>(method_name, args, 1)?,
+                    arg::<IndexMap<String, String>>(method_name, args, 2)?,
+                    arg::<IndexMap<String, String>>(method_name, args, 3)?,
+                    arg::<Vec<IndexMap<String, PhpMixed>>>(method_name, args, 4)?,
+                    &arg::<String>(method_name, args, 5)?,
+                    arg::<IndexMap<String, i64>>(method_name, args, 6)?,
+                    arg::<bool>(method_name, args, 7)?,
+                    arg::<bool>(method_name, args, 8)?,
+                    arg::<IndexMap<String, PhpMixed>>(method_name, args, 9)?,
+                    arg_or::<bool>(method_name, args, 10, true)?,
+                )
+                .map_err(failed)?;
+            Ok(written.to_plugin_value())
+        }
+        "getMissingRequirementInfo" => {
+            let package = root_package_arg(method_name, args, 0)?;
+            let include_dev = arg::<bool>(method_name, args, 1)?;
+            Ok(locker
+                .borrow_mut()
+                .get_missing_requirement_info(package, include_dev)
+                .map_err(failed)?
+                .to_plugin_value())
+        }
+        // TODO(plugin): `JsonFile` has no proxy stub, so the lock file cannot be handed out and
+        // no plugin holds a JsonFile it could pass to `updateHash()`.
+        "getJsonFile" | "updateHash" => Err(runtime_throw(format!(
+            "the Locker method `{method_name}` is not available over RPC yet: JsonFile cannot cross the boundary"
+        ))),
+        other => Err(runtime_throw(format!(
+            "the Locker method `{other}` is not available over RPC yet"
         ))),
     }
 }
@@ -2388,6 +2514,27 @@ impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInt
                 }
             }
             other => Err(arg_throw(method, position, "an InstallationManager", other)),
+        }
+    }
+}
+
+impl FromPluginArg for std::rc::Rc<std::cell::RefCell<dyn LockerInterface>> {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::RustHandle(handle)) => {
+                match R_TABLE.with(|table| table.borrow().get(&handle.rhandle).cloned()) {
+                    Some(RustEntity::Locker(locker)) => Ok(locker),
+                    _ => Err(runtime_throw(format!(
+                        "{method} expects a Locker handle, got Rust handle {}",
+                        handle.rhandle
+                    ))),
+                }
+            }
+            other => Err(arg_throw(method, position, "a Locker", other)),
         }
     }
 }

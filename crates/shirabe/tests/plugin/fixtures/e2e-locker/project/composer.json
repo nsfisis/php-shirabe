@@ -1,0 +1,43 @@
+{
+    "name": "shirabe/e2e-locker",
+    "description": "E2E fixture project: record what the Locker Composer hands out reports to a plugin.",
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../plugin",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "type": "path",
+            "url": "../packages/*",
+            "options": {
+                "symlink": false
+            }
+        },
+        {
+            "packagist.org": false
+        }
+    ],
+    "require": {
+        "php": ">=7.0",
+        "shirabe-test/locker-probe": "1.0.0",
+        "acme/lib-a": "1.0.0",
+        "acme/lib-b": "dev-main as 1.0.0"
+    },
+    "require-dev": {
+        "ext-json": "*",
+        "acme/dev-tool": "1.0.0"
+    },
+    "minimum-stability": "beta",
+    "prefer-stable": true,
+    "config": {
+        "platform": {
+            "php": "8.1.0"
+        },
+        "allow-plugins": {
+            "shirabe-test/locker-probe": true
+        }
+    }
+}

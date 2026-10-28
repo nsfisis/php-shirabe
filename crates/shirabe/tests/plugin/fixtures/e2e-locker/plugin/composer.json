@@ -1,0 +1,17 @@
+{
+    "name": "shirabe-test/locker-probe",
+    "version": "1.0.0",
+    "type": "composer-plugin",
+    "description": "Fixture plugin reading the Locker Composer hands out.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\Locker\\": "src/"
+        }
+    },
+    "require": {
+        "composer-plugin-api": "^2.0"
+    },
+    "extra": {
+        "class": "ShirabeTest\\Locker\\Plugin"
+    }
+}

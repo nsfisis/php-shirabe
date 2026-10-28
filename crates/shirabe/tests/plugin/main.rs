@@ -18,6 +18,7 @@ mod e2e_installer_event_test;
 mod e2e_installer_test;
 mod e2e_installers_test;
 mod e2e_jetpack_autoloader_test;
+mod e2e_locker_test;
 mod e2e_normalize_test;
 mod e2e_package_event_test;
 mod e2e_pre_pool_create_test;

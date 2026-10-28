@@ -469,13 +469,30 @@ the Rust side keeps none). `createLoader()` answers with a real
 classes cannot be stub-shadowed"). The fresh instance is filled with the state
 of the Rust-side loader and is left unregistered, as upstream leaves it.
 
-Three parts of the surface are explicit errors. The constructor is one,
+Two parts of the surface are explicit errors. The constructor is one,
 because the Rust generator takes the concrete `EventDispatcher` and the R
 table holds the dispatcher only through its interface.
-`setPlatformRequirementFilter()` is another, because no filter crosses the
+`setPlatformRequirementFilter()` is the other, because no filter crosses the
 boundary: the factory's filters are guarded, and a plugin-implemented one has
-no reverse adapter. The third is a non-null `$locker` for `dump()`, since
-`Locker` has no stub.
+no reverse adapter. A `$locker` passed to `dump()` resolves to the Rust-side
+`Locker` its stub stands for.
+
+### Locker
+
+`Composer::getLocker()` hands out the locker the running command reads and
+writes the lock file through, so it is a `rust-proxy` stub: the lock data a
+plugin reads is the cache the Rust side holds, and an in-memory
+`setLockData(..., false)` is seen by the Rust side's next read. The lock
+contents cross as plain arrays, the platform requirements as materialized
+`Link` values keyed by package name, and `getLockedRepository()` as a
+`LockArrayRepository` stub over a fresh Rust-side repository, as upstream
+builds a fresh one per call. `getContentHash()` forwards because it parses
+through the guarded `JsonFile`.
+
+`getJsonFile()` and `updateHash()` are explicit errors, since `JsonFile` has
+no stub. So are the constructors: a plugin-built `Locker` would be a second
+view on the lock file the Rust side never reads back, and
+`LockArrayRepository` has no construction story yet.
 
 ### Dual instantiation
 
