@@ -6,10 +6,10 @@ use crate::util::Filesystem;
 use crate::util::Platform;
 use chrono::Utc;
 use shirabe_php_shim::{
-    ErrorException, bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space,
-    file_exists, file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable,
-    mkdir, php_regex, preg_is_match, preg_match, preg_replace, random_bytes, random_int, rename,
-    time, unlink,
+    bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space, file_exists,
+    file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable, mkdir,
+    php_regex, preg_is_match, preg_match, preg_replace, random_bytes, random_int, rename, time,
+    unlink,
 };
 use shirabe_symfony_finder::Finder;
 use std::sync::Mutex;
@@ -158,18 +158,17 @@ impl Cache {
 
             let temp_file_name = format!("{}{}{}.tmp", self.root, file, bin2hex(&random_bytes(5)));
             let dest = format!("{}{}", self.root, file);
-            let attempt = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                file_put_contents(&temp_file_name, contents.as_bytes()).is_some()
-                    && rename(&temp_file_name, &dest)
-            }));
+            // TODO(php-semantics): the shim's file_put_contents() discards the io::Error, so a failed
+            // write returns false here instead of reaching the error handling below. Only rename()
+            // failures get there, which means the "Only N of M bytes written" branch never matches.
+            let attempt = if file_put_contents(&temp_file_name, contents.as_bytes()).is_some() {
+                rename(&temp_file_name, &dest).map(|()| true)
+            } else {
+                Ok(false)
+            };
             return match attempt {
                 Ok(b) => Ok(b),
-                Err(payload) => {
-                    let e: ErrorException = match payload.downcast::<ErrorException>() {
-                        Ok(boxed) => *boxed,
-                        Err(payload) => std::panic::resume_unwind(payload),
-                    };
-
+                Err(e) => {
                     // If the write failed despite isEnabled checks passing earlier, rerun the isEnabled checks to
                     // see if they are still current and recreate the cache dir if needed. Refs https://github.com/composer/composer/issues/11076
                     if was_enabled {
@@ -180,10 +179,7 @@ impl Cache {
                     }
 
                     self.io.write_error3(
-                        &format!(
-                            "<warning>Failed to write into cache: {}</warning>",
-                            e.get_message()
-                        ),
+                        &format!("<warning>Failed to write into cache: {}</warning>", e),
                         true,
                         crate::io::DEBUG,
                     );
@@ -191,7 +187,7 @@ impl Cache {
                         php_regex!(
                             r"{^file_put_contents\(\): Only ([0-9]+) of ([0-9]+) bytes written}"
                         ),
-                        e.get_message(),
+                        &e.to_string(),
                     ) {
                         // Remove partial file.
                         unlink(&temp_file_name);
@@ -255,22 +251,11 @@ impl Cache {
             let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
-                let touch_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    shirabe_php_shim::touch3(
-                        &full_path,
-                        filemtime(&full_path).unwrap_or(0),
-                        time(),
-                    );
-                }));
-                if let Err(payload) = touch_result {
-                    match payload.downcast::<ErrorException>() {
-                        Ok(_) => {
-                            // fallback in case the above failed due to incorrect ownership
-                            // see https://github.com/composer/composer/issues/4070
-                            shirabe_php_shim::touch(&full_path);
-                        }
-                        Err(payload) => std::panic::resume_unwind(payload),
-                    }
+                if !shirabe_php_shim::touch3(&full_path, filemtime(&full_path).unwrap_or(0), time())
+                {
+                    // fallback in case the above failed due to incorrect ownership
+                    // see https://github.com/composer/composer/issues/4070
+                    shirabe_php_shim::touch(&full_path);
                 }
 
                 self.io.write_error3(

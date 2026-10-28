@@ -173,7 +173,7 @@ impl Factory {
             {
                 let from = format!("{}/cache", home);
                 let to = format!("{}/Library/Caches/shirabe", user_dir);
-                rename(&from, &to);
+                let _ = rename(&from, &to);
             }
 
             return Ok(format!("{}/Library/Caches/shirabe", user_dir));

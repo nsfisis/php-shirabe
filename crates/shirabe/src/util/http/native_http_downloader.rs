@@ -497,7 +497,7 @@ impl NativeHttpDownloader {
 
         // Atomic rename of the `~` temp file to its final name (file mode).
         if let Some(filename) = filename {
-            rename(format!("{}~", filename), filename);
+            let _ = rename(format!("{}~", filename), filename);
         }
 
         Ok(Decision::Done(native_response.inner))

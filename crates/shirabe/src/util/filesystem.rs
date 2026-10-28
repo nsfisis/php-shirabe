@@ -461,7 +461,7 @@ impl Filesystem {
     ) -> anyhow::Result<()> {
         let source = source.as_ref();
         let target = target.as_ref();
-        if rename(source, target) {
+        if rename(source, target).is_ok() {
             return Ok(());
         }
 

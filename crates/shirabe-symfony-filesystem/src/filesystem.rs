@@ -197,7 +197,7 @@ impl Filesystem {
                     }
 
                     if !shirabe_php_shim::file_exists(&tmp_name)
-                        && shirabe_php_shim::rename(&file, &tmp_name)
+                        && shirabe_php_shim::rename(&file, &tmp_name).is_ok()
                     {
                         orig_file = Some(file);
                         file = tmp_name;
@@ -226,7 +226,7 @@ impl Filesystem {
                     && !is_recursive
                 {
                     if let Some(orig_file) = orig_file {
-                        shirabe_php_shim::rename(&file, &orig_file);
+                        let _ = shirabe_php_shim::rename(&file, &orig_file);
                     }
                     return Err(IOException::new(
                         format!("Failed to remove directory \"{}\": {}", file, last_error),

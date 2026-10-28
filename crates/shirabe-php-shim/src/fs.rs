@@ -981,8 +981,8 @@ pub fn rmdir(dir: impl AsRef<std::path::Path>) -> Result<(), std::io::Error> {
 pub fn rename(
     old_name: impl AsRef<std::path::Path>,
     new_name: impl AsRef<std::path::Path>,
-) -> bool {
-    std::fs::rename(old_name, new_name).is_ok()
+) -> Result<(), std::io::Error> {
+    std::fs::rename(old_name, new_name)
 }
 
 pub fn copy(
