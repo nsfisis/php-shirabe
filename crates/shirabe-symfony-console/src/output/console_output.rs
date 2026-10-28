@@ -102,11 +102,13 @@ impl ConsoleOutput {
         let checks = [
             php_uname("s"),
             // TODO(bytes): the checks are matched as Strings.
-            getenv("OSTYPE")
-                .unwrap_or_default()
-                .into_string()
-                .unwrap_or_else(|ostype| panic!("OSTYPE is not valid UTF-8: {ostype:?}")),
-            PHP_OS.to_string(),
+            bstr::BString::from(
+                getenv("OSTYPE")
+                    .unwrap_or_default()
+                    .into_string()
+                    .unwrap_or_else(|ostype| panic!("OSTYPE is not valid UTF-8: {ostype:?}")),
+            ),
+            bstr::BString::from(PHP_OS.to_string()),
         ];
 
         stripos(implode(";", &checks), "OS400").is_some()

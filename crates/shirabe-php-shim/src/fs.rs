@@ -915,7 +915,7 @@ pub fn chdir(path: impl AsRef<std::path::Path>) -> anyhow::Result<()> {
     Ok(std::env::set_current_dir(path.as_ref())?)
 }
 
-pub fn glob(pattern: &str) -> Vec<String> {
+pub fn glob(pattern: impl AsRef<[u8]>) -> Vec<BString> {
     glob_with_flags(pattern, 0)
 }
 
@@ -1120,13 +1120,14 @@ pub const GLOB_MARK: i64 = 8;
 pub const GLOB_ONLYDIR: i64 = 1024;
 pub const GLOB_BRACE: i64 = 4096;
 
-pub fn glob_with_flags(pattern: &str, flags: i64) -> Vec<String> {
+pub fn glob_with_flags(pattern: impl AsRef<[u8]>, flags: i64) -> Vec<BString> {
+    let pattern = pattern.as_ref();
     let patterns = if flags & GLOB_BRACE != 0 {
         glob_expand_braces(pattern)
     } else {
-        vec![pattern.to_string()]
+        vec![BString::from(pattern)]
     };
-    let mut results: Vec<String> = Vec::new();
+    let mut results: Vec<BString> = Vec::new();
     for pattern in patterns {
         glob_collect(&pattern, flags, &mut results);
     }
@@ -1136,31 +1137,29 @@ pub fn glob_with_flags(pattern: &str, flags: i64) -> Vec<String> {
     results
 }
 
-fn glob_collect(pattern: &str, flags: i64, out: &mut Vec<String>) {
-    let (mut current, rest) = match pattern.strip_prefix('/') {
-        Some(rest) => (vec!["/".to_string()], rest),
-        None => (vec![String::new()], pattern),
+fn glob_collect(pattern: &[u8], flags: i64, out: &mut Vec<BString>) {
+    let (mut current, rest) = match pattern.strip_prefix(b"/") {
+        Some(rest) => (vec![BString::from("/")], rest),
+        None => (vec![BString::default()], pattern),
     };
-    let segments: Vec<&str> = rest.split('/').collect();
+    let segments: Vec<&[u8]> = rest.split(|&b| b == b'/').collect();
     for (idx, seg) in segments.iter().enumerate() {
         let is_last = idx == segments.len() - 1;
-        let mut next: Vec<String> = Vec::new();
+        let mut next: Vec<BString> = Vec::new();
         for base in &current {
             if seg.is_empty() {
                 next.push(base.clone());
                 continue;
             }
             if glob_has_wildcard(seg) {
-                let read_base = if base.is_empty() { "." } else { base.as_str() };
-                if let Ok(rd) = std::fs::read_dir(read_base) {
+                let read_base: &[u8] = if base.is_empty() { b"." } else { base };
+                if let Ok(rd) = std::fs::read_dir(path_from_bytes(read_base)) {
                     for entry in rd.flatten() {
-                        // TODO(bytes): glob matches and returns paths as Strings.
-                        let name = entry.file_name().into_string().unwrap_or_else(|name| {
-                            panic!("glob: file name is not valid UTF-8: {name:?}")
-                        });
-                        if glob_fnmatch(seg, &name) {
-                            let path = glob_join(base, &name);
-                            if is_last || std::path::Path::new(&path).is_dir() {
+                        let name = entry.file_name();
+                        let name = name.as_encoded_bytes();
+                        if glob_fnmatch(seg, name) {
+                            let path = glob_join(base, name);
+                            if is_last || path_from_bytes(&path).is_dir() {
                                 next.push(path);
                             }
                         }
@@ -1168,7 +1167,7 @@ fn glob_collect(pattern: &str, flags: i64, out: &mut Vec<String>) {
                 }
             } else {
                 let path = glob_join(base, seg);
-                let p = std::path::Path::new(&path);
+                let p = path_from_bytes(&path);
                 if (is_last && p.exists()) || (!is_last && p.is_dir()) {
                     next.push(path);
                 }
@@ -1177,37 +1176,37 @@ fn glob_collect(pattern: &str, flags: i64, out: &mut Vec<String>) {
         current = next;
     }
     for mut path in current {
-        let is_dir = std::path::Path::new(&path).is_dir();
+        let is_dir = path_from_bytes(&path).is_dir();
         if flags & GLOB_ONLYDIR != 0 && !is_dir {
             continue;
         }
-        if flags & GLOB_MARK != 0 && is_dir && !path.ends_with('/') {
-            path.push('/');
+        if flags & GLOB_MARK != 0 && is_dir && !path.ends_with(b"/") {
+            path.push(b'/');
         }
         out.push(path);
     }
 }
 
-fn glob_join(base: &str, seg: &str) -> String {
+fn glob_join(base: &[u8], seg: &[u8]) -> BString {
     if base.is_empty() {
-        seg.to_string()
-    } else if base == "/" {
-        format!("/{}", seg)
+        BString::from(seg)
+    } else if base == b"/" {
+        crate::bconcat!("/", seg)
     } else {
-        format!("{}/{}", base, seg)
+        crate::bconcat!(base, "/", seg)
     }
 }
 
-fn glob_has_wildcard(seg: &str) -> bool {
-    seg.bytes().any(|b| matches!(b, b'*' | b'?' | b'['))
+fn glob_has_wildcard(seg: &[u8]) -> bool {
+    seg.iter().any(|b| matches!(b, b'*' | b'?' | b'['))
 }
 
-fn glob_fnmatch(pattern: &str, name: &str) -> bool {
+fn glob_fnmatch(pattern: &[u8], name: &[u8]) -> bool {
     // A leading '.' is only matched by an explicit leading '.' in the pattern.
-    if name.starts_with('.') && !pattern.starts_with('.') {
+    if name.starts_with(b".") && !pattern.starts_with(b".") {
         return false;
     }
-    glob_fnmatch_bytes(pattern.as_bytes(), name.as_bytes())
+    glob_fnmatch_bytes(pattern, name)
 }
 
 fn glob_fnmatch_bytes(p: &[u8], s: &[u8]) -> bool {
@@ -1298,15 +1297,14 @@ fn glob_match_bracket(p: &[u8], start: usize, c: u8) -> Option<(bool, usize)> {
     None
 }
 
-fn glob_expand_braces(pattern: &str) -> Vec<String> {
-    let bytes = pattern.as_bytes();
-    let Some(open) = pattern.find('{') else {
-        return vec![pattern.to_string()];
+fn glob_expand_braces(pattern: &[u8]) -> Vec<BString> {
+    let Some(open) = pattern.find_byte(b'{') else {
+        return vec![BString::from(pattern)];
     };
     // Find the matching '}'.
     let mut depth = 0;
     let mut close = None;
-    for (i, &b) in bytes.iter().enumerate().skip(open) {
+    for (i, &b) in pattern.iter().enumerate().skip(open) {
         match b {
             b'{' => depth += 1,
             b'}' => {
@@ -1320,36 +1318,35 @@ fn glob_expand_braces(pattern: &str) -> Vec<String> {
         }
     }
     let Some(close) = close else {
-        return vec![pattern.to_string()];
+        return vec![BString::from(pattern)];
     };
     let prefix = &pattern[..open];
     let suffix = &pattern[close + 1..];
     let inner = &pattern[open + 1..close];
     let mut result = Vec::new();
     for alt in glob_split_top_commas(inner) {
-        let combined = format!("{}{}{}", prefix, alt, suffix);
+        let combined = crate::bconcat!(prefix, alt, suffix);
         result.extend(glob_expand_braces(&combined));
     }
     result
 }
 
-fn glob_split_top_commas(inner: &str) -> Vec<String> {
+fn glob_split_top_commas(inner: &[u8]) -> Vec<&[u8]> {
     let mut parts = Vec::new();
     let mut depth = 0;
     let mut start = 0;
-    let bytes = inner.as_bytes();
-    for (i, &b) in bytes.iter().enumerate() {
+    for (i, &b) in inner.iter().enumerate() {
         match b {
             b'{' => depth += 1,
             b'}' => depth -= 1,
             b',' if depth == 0 => {
-                parts.push(inner[start..i].to_string());
+                parts.push(&inner[start..i]);
                 start = i + 1;
             }
             _ => {}
         }
     }
-    parts.push(inner[start..].to_string());
+    parts.push(&inner[start..]);
     parts
 }
 

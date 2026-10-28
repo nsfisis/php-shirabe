@@ -253,7 +253,7 @@ impl PluginManager {
 
             if package.get_name() == "symfony/flex"
                 && preg_is_match(php_regex!("{^[0-9.]+$}"), package.get_version())
-                && version_compare(&package.get_version(), "1.9.8", CmpOp::Lt)
+                && version_compare(package.get_version(), "1.9.8", CmpOp::Lt)
             {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it is not compatible with Composer 2+. Make sure to update it to version 1.9.8 or greater.</warning>",
                     package.get_name(),

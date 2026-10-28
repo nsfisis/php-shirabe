@@ -83,7 +83,11 @@ impl ArchiverTestCase {
         let mut zip_contents: IndexMap<String, Option<String>> = IndexMap::new();
         for i in 0..zip.num_files {
             let path = zip.get_name_index(i);
-            zip_contents.insert(path.clone(), zip.get_from_name(&path));
+            zip_contents.insert(
+                legacy_lossy(&path).into_owned(),
+                zip.get_from_name(&path)
+                    .map(|contents| legacy_lossy(&contents).into_owned()),
+            );
         }
         zip.close();
 

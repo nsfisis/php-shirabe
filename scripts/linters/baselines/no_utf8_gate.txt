@@ -7,14 +7,11 @@
 1 crates/shirabe-php-rpc/tests/generated_stubs.rs
 6 crates/shirabe-php-rpc/tests/oracle.rs
 4 crates/shirabe-php-shim/src/array.rs
-2 crates/shirabe-php-shim/src/fs.rs
+1 crates/shirabe-php-shim/src/fs.rs
 1 crates/shirabe-php-shim/src/json.rs
 4 crates/shirabe-php-shim/src/phar.rs
 1 crates/shirabe-php-shim/src/process.rs
-1 crates/shirabe-php-shim/src/runtime.rs
-2 crates/shirabe-php-shim/src/url.rs
 3 crates/shirabe-php-shim/src/xml.rs
-2 crates/shirabe-php-shim/src/zip.rs
 1 crates/shirabe-symfony-console/src/command/command.rs
 6 crates/shirabe-symfony-console/src/command/complete_command.rs
 4 crates/shirabe-symfony-console/src/command/dump_completion_command.rs

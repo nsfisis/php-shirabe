@@ -3,11 +3,11 @@
 // whitespace, lowercases, and yields true only for "1"/"true"/"on"/"yes";
 // every other input (including the "0"/"false"/"off"/"no"/"" set) yields
 // false.
-pub fn filter_var_boolean(value: &str) -> bool {
-    let trimmed = value.trim_matches([' ', '\t', '\n', '\r', '\0', '\x0B']);
+pub fn filter_var_boolean(value: impl AsRef<[u8]>) -> bool {
+    let trimmed = crate::trim(value);
     matches!(
-        trimmed.to_ascii_lowercase().as_str(),
-        "1" | "true" | "on" | "yes"
+        trimmed.to_ascii_lowercase().as_slice(),
+        b"1" | b"true" | b"on" | b"yes"
     )
 }
 
@@ -15,8 +15,10 @@ pub fn filter_var_boolean(value: &str) -> bool {
 // additionally validates the host as a domain/IPv6 literal. reqwest::Url
 // (WHATWG/RFC 3986) is stricter on some inputs and more lenient on others,
 // so this is not a byte-for-byte compatible validator.
-pub fn filter_var_url(value: &str) -> bool {
-    reqwest::Url::parse(value).is_ok()
+// A URL that is not valid UTF-8 holds a byte outside the ASCII range PHP accepts, so it is
+// rejected without parsing.
+pub fn filter_var_url(value: impl AsRef<[u8]>) -> bool {
+    crate::utf8_text(value.as_ref()).is_some_and(|value| reqwest::Url::parse(value).is_ok())
 }
 
 // TODO(pcre):
@@ -26,7 +28,11 @@ pub fn filter_var_url(value: &str) -> bool {
 // `local@domain` shape plus the RFC length limits PHP enforces; it diverges
 // from PHP by rejecting quoted local parts (e.g. `"a b"@x.com`) and `[IPv6:...]`
 // literal domains.
-pub fn filter_var_email(value: &str) -> bool {
+pub fn filter_var_email(value: impl AsRef<[u8]>) -> bool {
+    // Every byte PHP accepts is printable ASCII.
+    let Some(value) = crate::utf8_text(value.as_ref()).filter(|value| value.is_ascii()) else {
+        return false;
+    };
     let Some(at) = value.rfind('@') else {
         return false;
     };
@@ -72,8 +78,8 @@ fn is_valid_email_domain(domain: &str) -> bool {
 // parser is a close match (both reject leading zeros in IPv4 octets), but is not
 // guaranteed byte-for-byte identical to PHP's hand-written validator on exotic
 // IPv6 forms.
-pub fn filter_var_ip(value: &str) -> bool {
-    value.parse::<std::net::IpAddr>().is_ok()
+pub fn filter_var_ip(value: impl AsRef<[u8]>) -> bool {
+    crate::utf8_text(value.as_ref()).is_some_and(|value| value.parse::<std::net::IpAddr>().is_ok())
 }
 
 // TODO(php-semantics):
@@ -81,7 +87,11 @@ pub fn filter_var_ip(value: &str) -> bool {
 // whitespace is trimmed, an optional sign is allowed, leading zeros are rejected
 // (except a lone "0"), and the parsed value must fall within [min, max]
 // inclusive.
-pub fn filter_var_int_with_range(value: &str, min: i64, max: i64) -> bool {
+pub fn filter_var_int_with_range(value: impl AsRef<[u8]>, min: i64, max: i64) -> bool {
+    // Every byte PHP accepts is ASCII.
+    let Some(value) = crate::utf8_text(value.as_ref()).filter(|value| value.is_ascii()) else {
+        return false;
+    };
     match parse_filter_int(value) {
         Some(n) => min <= n && n <= max,
         None => false,

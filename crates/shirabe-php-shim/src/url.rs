@@ -1,5 +1,5 @@
 use crate::PhpMixed;
-use bstr::{BString, ByteSlice};
+use bstr::BString;
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -40,58 +40,55 @@ pub fn parse_url(url: &str) -> Option<UrlComponents> {
 
 pub fn http_build_query_mixed(
     data: &IndexMap<BString, PhpMixed>,
-    numeric_prefix: &str,
-    arg_separator: &str,
-) -> String {
-    let mut pairs: Vec<(String, String)> = Vec::new();
+    numeric_prefix: impl AsRef<[u8]>,
+    arg_separator: impl AsRef<[u8]>,
+) -> BString {
+    let mut pairs: Vec<(BString, BString)> = Vec::new();
     for (key, value) in data {
         // numeric_prefix is prepended only to integer keys at the top level.
-        // TODO(bytes): pairs hold Strings, so non-UTF-8 bytes in keys are replaced instead of
-        // being percent-encoded as-is.
-        let key = key.to_str_lossy().into_owned();
-        let key = if key.parse::<i64>().is_ok() {
-            format!("{numeric_prefix}{key}")
+        let key = if crate::canonical_int_key(key).is_some() {
+            crate::bconcat!(numeric_prefix.as_ref(), key)
         } else {
-            key
+            key.clone()
         };
         append_query_pairs(&mut pairs, key, value);
     }
-    encode_pairs(&pairs, arg_separator)
+    encode_pairs(&pairs, arg_separator.as_ref())
 }
 
-pub fn http_build_query(data: &[(&str, &str)]) -> String {
-    encode_pairs(data, "&")
+pub fn http_build_query(data: &[(&str, &str)]) -> BString {
+    let pairs: Vec<(BString, BString)> = data
+        .iter()
+        .map(|(key, value)| (BString::from(*key), BString::from(*value)))
+        .collect();
+    encode_pairs(&pairs, b"&")
 }
 
-fn encode_pairs<T: serde::Serialize>(pairs: T, arg_separator: &str) -> String {
-    let encoded = serde_urlencoded::to_string(pairs).unwrap();
-    if arg_separator == "&" {
-        encoded
-    } else {
-        // serde_urlencoded percent-encodes any literal '&' in keys/values, so the
-        // only remaining '&' are the separators we are replacing.
-        encoded.replace('&', arg_separator)
-    }
+// PHP's default PHP_QUERY_RFC1738 encoding: each key and value is encoded with urlencode().
+fn encode_pairs(pairs: &[(BString, BString)], arg_separator: &[u8]) -> BString {
+    let encoded: Vec<BString> = pairs
+        .iter()
+        .map(|(key, value)| crate::bconcat!(crate::urlencode(key), "=", crate::urlencode(value)))
+        .collect();
+    crate::implode(arg_separator, &encoded)
 }
 
-fn append_query_pairs(pairs: &mut Vec<(String, String)>, key: String, value: &PhpMixed) {
+fn append_query_pairs(pairs: &mut Vec<(BString, BString)>, key: BString, value: &PhpMixed) {
     match value {
         // Null values are omitted from the query string entirely.
         PhpMixed::Null => {}
-        PhpMixed::Bool(b) => pairs.push((key, if *b { "1" } else { "0" }.to_string())),
-        PhpMixed::Int(i) => pairs.push((key, i.to_string())),
-        PhpMixed::Float(f) => pairs.push((key, f.to_string())),
-        // TODO(bytes): pairs hold Strings, so non-UTF-8 bytes are replaced instead of being
-        // percent-encoded as-is.
-        PhpMixed::String(s) => pairs.push((key, s.to_str_lossy().into_owned())),
+        PhpMixed::Bool(b) => pairs.push((key, BString::from(if *b { "1" } else { "0" }))),
+        PhpMixed::Int(i) => pairs.push((key, BString::from(i.to_string()))),
+        PhpMixed::Float(f) => pairs.push((key, BString::from(f.to_string()))),
+        PhpMixed::String(s) => pairs.push((key, s.clone())),
         PhpMixed::List(items) => {
             for (i, item) in items.iter().enumerate() {
-                append_query_pairs(pairs, format!("{key}[{i}]"), item);
+                append_query_pairs(pairs, crate::bconcat!(key, "[", i as i64, "]"), item);
             }
         }
         PhpMixed::Array(map) | PhpMixed::Object(map) => {
             for (k, v) in map {
-                append_query_pairs(pairs, format!("{key}[{k}]"), v);
+                append_query_pairs(pairs, crate::bconcat!(key, "[", k, "]"), v);
             }
         }
     }

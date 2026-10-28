@@ -53,7 +53,7 @@ impl Zip {
 
         let mut top_level_paths: IndexMap<String, bool> = IndexMap::new();
         for i in 0..zip.num_files {
-            let name = zip.get_name_index(i);
+            let name = legacy_lossy(&zip.get_name_index(i)).into_owned();
             let dir_name = legacy_lossy(&dirname(&name)).into_owned();
 
             // ignore OSX specific resource fork folder
@@ -89,7 +89,7 @@ impl Zip {
 
         if !top_level_paths.is_empty() {
             let first_key = top_level_paths.keys().next().unwrap().clone();
-            if let Some(index) = zip.locate_name(&format!("{}{}", first_key, filename))
+            if let Some(index) = zip.locate_name(format!("{}{}", first_key, filename))
                 && zip.get_from_index(index).is_some()
             {
                 return Ok(index);

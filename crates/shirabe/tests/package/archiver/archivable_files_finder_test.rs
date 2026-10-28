@@ -197,7 +197,7 @@ fn get_archived_files(set_up: &SetUp, command: &str) -> Vec<String> {
     let mut files: Vec<String> = vec![];
     for index in 0..archive.count() {
         let name = archive.get_name_index(index);
-        if name.ends_with('/') {
+        if name.ends_with(b"/") {
             continue;
         }
         let virtual_path = format!("phar://{}/archive.zip/{}", set_up.sources, name);

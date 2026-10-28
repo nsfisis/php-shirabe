@@ -10,8 +10,8 @@ use crate::glob::Glob;
 use chrono::{NaiveDate, NaiveDateTime};
 use indexmap::IndexSet;
 use shirabe_php_shim::{
-    file_exists, glob, is_dir, legacy_lossy, php_regex, preg_is_match, preg_match, preg_quote,
-    rtrim2,
+    file_exists, glob, is_dir, legacy_lossy, path_from_bytes, php_regex, preg_is_match, preg_match,
+    preg_quote, rtrim2,
 };
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -192,8 +192,11 @@ impl Finder {
             // GLOB_ONLYDIR is emulated by retaining directory matches only.
             // TODO(php-semantics): wildcard `in()` paths depend on `shirabe_php_shim::glob`, which is
             // still `todo!()`; only the real-directory branch above currently resolves.
-            let mut globbed: Vec<String> =
-                glob(&dir).into_iter().filter(|path| is_dir(path)).collect();
+            let mut globbed: Vec<String> = glob(&dir)
+                .into_iter()
+                .filter(|path| is_dir(path_from_bytes(&path)))
+                .map(|s| legacy_lossy(&s).into_owned())
+                .collect();
             if !globbed.is_empty() {
                 globbed.sort();
                 for g in &globbed {

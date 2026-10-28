@@ -113,9 +113,9 @@ impl VersionSelector {
                 return std::cmp::Ordering::Less;
             }
 
-            if version_compare(&b.get_version(), &a.get_version(), CmpOp::Gt) {
+            if version_compare(b.get_version(), a.get_version(), CmpOp::Gt) {
                 std::cmp::Ordering::Greater
-            } else if version_compare(&b.get_version(), &a.get_version(), CmpOp::Lt) {
+            } else if version_compare(b.get_version(), a.get_version(), CmpOp::Lt) {
                 std::cmp::Ordering::Less
             } else {
                 std::cmp::Ordering::Equal

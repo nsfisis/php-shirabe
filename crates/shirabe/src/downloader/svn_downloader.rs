@@ -213,7 +213,7 @@ impl VcsDownloader for SvnDownloader {
         );
         let mut flags: Vec<String> = vec![];
         if version_compare(
-            &util.binary_version()?.unwrap_or_default(),
+            util.binary_version()?.unwrap_or_default(),
             "1.7.0",
             CmpOp::Ge,
         ) {

@@ -1,4 +1,5 @@
 use crate::PhpMixed;
+use bstr::BString;
 use shirabe_php_src::standard::versioning::php_version_compare;
 
 pub const E_ALL: i64 = 32767;
@@ -233,7 +234,7 @@ impl std::fmt::Display for CmpOp {
     }
 }
 
-pub fn version_compare(v1: &str, v2: &str, op: CmpOp) -> bool {
+pub fn version_compare(v1: impl AsRef<[u8]>, v2: impl AsRef<[u8]>, op: CmpOp) -> bool {
     let ord = version_compare_ordering(v1, v2);
     match op {
         CmpOp::Lt => ord.is_lt(),
@@ -245,7 +246,7 @@ pub fn version_compare(v1: &str, v2: &str, op: CmpOp) -> bool {
     }
 }
 
-pub fn version_compare_ordering(v1: &str, v2: &str) -> std::cmp::Ordering {
+pub fn version_compare_ordering(v1: impl AsRef<[u8]>, v2: impl AsRef<[u8]>) -> std::cmp::Ordering {
     let ord = php_version_compare(v1, v2);
     if ord < 0 {
         std::cmp::Ordering::Less
@@ -282,31 +283,28 @@ pub fn spl_object_hash<T: HasAddress>(object: T) -> String {
 
 // TODO(windows): the Windows branch of php_uname is missing. There PHP reports "Windows NT" as the
 // sysname and derives release/version from the OS version APIs rather than uname(2).
-pub fn php_uname(mode: &str) -> String {
+pub fn php_uname(mode: impl AsRef<[u8]>) -> BString {
     let Ok(utsname) = nix::sys::utsname::uname() else {
-        return String::new();
+        return BString::default();
     };
-    // TODO(bytes): php_uname returns the fields as a String.
-    let field = |value: &std::ffi::OsStr| {
-        value
-            .to_str()
-            .unwrap_or_else(|| panic!("uname field is not valid UTF-8: {value:?}"))
-            .to_string()
-    };
-    match mode {
-        "s" => field(utsname.sysname()),
-        "n" => field(utsname.nodename()),
-        "r" => field(utsname.release()),
-        "v" => field(utsname.version()),
-        "m" => field(utsname.machine()),
+    let field = |value: &std::ffi::OsStr| BString::from(value.as_encoded_bytes());
+    match mode.as_ref() {
+        b"s" => field(utsname.sysname()),
+        b"n" => field(utsname.nodename()),
+        b"r" => field(utsname.release()),
+        b"v" => field(utsname.version()),
+        b"m" => field(utsname.machine()),
         // "a" is the default and any other mode falls back to it: every field in the order
         // sysname, nodename, release, version, machine.
-        _ => format!(
-            "{} {} {} {} {}",
+        _ => crate::bconcat!(
             field(utsname.sysname()),
+            " ",
             field(utsname.nodename()),
+            " ",
             field(utsname.release()),
+            " ",
             field(utsname.version()),
+            " ",
             field(utsname.machine()),
         ),
     }

@@ -1,4 +1,5 @@
 use crate::{ErrorException, StreamBacking, StreamState};
+use bstr::BString;
 use zip::write::SimpleFileOptions;
 
 /// Test-only behaviour mirroring PHPUnit's `getMockBuilder('ZipArchive')->getMock()`, where
@@ -144,15 +145,22 @@ impl ZipArchive {
         Ok(archive.extract(path.as_ref()).is_ok())
     }
 
-    pub fn locate_name(&self, name: &str) -> Option<i64> {
-        let state = self.state.borrow();
-        let ZipState::Reader(archive) = &*state else {
+    /// The index of the entry whose name is `name`, compared as the bytes the archive stores.
+    pub fn locate_name(&self, name: impl AsRef<[u8]>) -> Option<i64> {
+        let mut state = self.state.borrow_mut();
+        let ZipState::Reader(archive) = &mut *state else {
             return None;
         };
-        archive.index_for_name(name).map(|i| i as i64)
+        (0..archive.len())
+            .find(|&i| {
+                archive
+                    .by_index_raw(i)
+                    .is_ok_and(|file| file.name_raw() == name.as_ref())
+            })
+            .map(|i| i as i64)
     }
 
-    pub fn get_from_index(&self, index: i64) -> Option<String> {
+    pub fn get_from_index(&self, index: i64) -> Option<Vec<u8>> {
         let mut state = self.state.borrow_mut();
         let ZipState::Reader(archive) = &mut *state else {
             return None;
@@ -160,37 +168,33 @@ impl ZipArchive {
         let mut file = archive.by_index(index as usize).ok()?;
         let mut buf = Vec::new();
         std::io::Read::read_to_end(&mut file, &mut buf).ok()?;
-        Some(String::from_utf8_lossy(&buf).into_owned())
+        Some(buf)
     }
 
-    pub fn get_name_index(&self, index: i64) -> String {
+    pub fn get_name_index(&self, index: i64) -> BString {
         let mut state = self.state.borrow_mut();
         let ZipState::Reader(archive) = &mut *state else {
-            return String::new();
+            return BString::default();
         };
-        match archive.by_index(index as usize) {
-            Ok(file) => file.name().to_string(),
-            Err(_) => String::new(),
+        match archive.by_index_raw(index as usize) {
+            Ok(file) => BString::from(file.name_raw()),
+            Err(_) => BString::default(),
         }
     }
 
-    pub fn get_from_name(&self, name: &str) -> Option<String> {
-        let mut state = self.state.borrow_mut();
-        let ZipState::Reader(archive) = &mut *state else {
-            return None;
-        };
-        let mut file = archive.by_name(name).ok()?;
-        let mut buf = Vec::new();
-        std::io::Read::read_to_end(&mut file, &mut buf).ok()?;
-        Some(String::from_utf8_lossy(&buf).into_owned())
+    pub fn get_from_name(&self, name: impl AsRef<[u8]>) -> Option<Vec<u8>> {
+        let index = self.locate_name(name)?;
+        self.get_from_index(index)
     }
 
-    pub fn get_stream(&self, name: &str) -> Option<crate::PhpResource> {
+    pub fn get_stream(&self, name: impl AsRef<[u8]>) -> Option<crate::PhpResource> {
+        let name = name.as_ref();
+        let index = self.locate_name(name)?;
         let mut state = self.state.borrow_mut();
         let ZipState::Reader(archive) = &mut *state else {
             return None;
         };
-        let mut file = archive.by_name(name).ok()?;
+        let mut file = archive.by_index(index as usize).ok()?;
         let mut buf = Vec::new();
         std::io::Read::read_to_end(&mut file, &mut buf).ok()?;
         Some(crate::PhpResource::Stream(std::rc::Rc::new(
@@ -199,7 +203,7 @@ impl ZipArchive {
                 true,
                 false,
                 "r".to_string(),
-                format!("zip://{}", name),
+                format!("zip://{}", crate::legacy_lossy(name)),
             )),
         )))
     }

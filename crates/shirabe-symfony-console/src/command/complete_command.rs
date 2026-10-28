@@ -229,7 +229,7 @@ impl Command for CompleteCommand {
         let _ = (input, output);
         // TODO(bytes): filter_var_boolean takes the value as a &str.
         self.is_debug.set(filter_var_boolean(
-            &getenv("SYMFONY_COMPLETION_DEBUG")
+            getenv("SYMFONY_COMPLETION_DEBUG")
                 .unwrap_or_default()
                 .into_string()
                 .unwrap_or_else(|value| {

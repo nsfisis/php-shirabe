@@ -17,7 +17,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined, dirname, file_exists,
     file_get_contents, glob_with_flags, hash, is_dir, legacy_lossy, path_to_bytes, php_regex,
-    preg_is_match, realpath, serialize,
+    preg_is_match, realpath, rtrim2, serialize, str_replace,
 };
 
 #[derive(Debug)]
@@ -369,9 +369,11 @@ impl PathRepository {
         Ok(glob_with_flags(&self.url, flags)
             .into_iter()
             .map(|val| {
-                val.replace(std::path::MAIN_SEPARATOR, "/")
-                    .trim_end_matches('/')
-                    .to_string()
+                legacy_lossy(&rtrim2(
+                    str_replace(std::path::MAIN_SEPARATOR_STR, "/", &val),
+                    "/",
+                ))
+                .into_owned()
             })
             .collect())
     }

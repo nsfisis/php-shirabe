@@ -46,7 +46,10 @@ impl ExecCommand {
             .as_string()
             .unwrap_or_default()
             .to_string();
-        let bins = glob(&format!("{}/*", bin_dir));
+        let bins: Vec<String> = glob(format!("{}/*", bin_dir))
+            .iter()
+            .map(|bin| legacy_lossy(bin).into_owned())
+            .collect();
         let local_bins_raw: Vec<String> = composer_ref.get_package().get_binaries();
         let local_bins: Vec<String> = if for_display {
             local_bins_raw
@@ -65,7 +68,7 @@ impl ExecCommand {
             {
                 continue;
             }
-            previous_bin = Some(bin.clone());
+            previous_bin = Some(legacy_lossy(&bin.clone()).into_owned());
             binaries.push(legacy_lossy(&basename(bin)).into_owned());
         }
 

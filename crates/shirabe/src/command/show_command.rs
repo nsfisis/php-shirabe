@@ -1231,7 +1231,7 @@ impl ShowCommand {
                         return false;
                     }
 
-                    version_compare(&candidate.get_version(), &package_version, CmpOp::Le)
+                    version_compare(candidate.get_version(), &package_version, CmpOp::Le)
                 },
             ))
         };
@@ -2125,8 +2125,8 @@ impl Command for ShowCommand {
                         None => true,
                         Some(PackageOrName::Name(_)) => true,
                         Some(PackageOrName::Pkg(existing)) => version_compare(
-                            &existing.get_version(),
-                            &package.get_version(),
+                            existing.get_version(),
+                            package.get_version(),
                             CmpOp::Lt,
                         ),
                     };

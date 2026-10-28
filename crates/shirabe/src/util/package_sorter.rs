@@ -20,7 +20,7 @@ impl PackageSorter {
             if candidate.is_default_branch() {
                 return Some(candidate);
             }
-            if version_compare(&highest.get_version(), &candidate.get_version(), CmpOp::Lt) {
+            if version_compare(highest.get_version(), candidate.get_version(), CmpOp::Lt) {
                 highest = candidate;
             }
         }
