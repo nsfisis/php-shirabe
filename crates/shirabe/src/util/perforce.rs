@@ -485,19 +485,8 @@ impl Perforce {
 
     pub fn write_p4_client_spec(&mut self) -> anyhow::Result<()> {
         let client_spec = self.get_p4_client_spec();
-        let spec = match fopen(&client_spec, "w") {
-            Ok(spec) => spec,
-            Err(e) => {
-                return Err(Exception::new(e.to_string()).into());
-            }
-        };
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            self.write_client_spec_to_file(&spec);
-        }));
-        if let Err(e) = result {
-            fclose(&spec);
-            return Err(Exception::new(format!("{:?}", e)).into());
-        }
+        let spec = fopen(&client_spec, "w")?;
+        self.write_client_spec_to_file(&spec);
         fclose(&spec);
         Ok(())
     }
