@@ -1345,9 +1345,11 @@ impl Installer {
             let mut tmp: IndexMap<String, AnyConstraint> = IndexMap::new();
             for package in locked_repository.unwrap().get_packages()? {
                 let constraint = SimpleConstraint::new(
-                    "=".to_string(),
+                    "=",
                     package.get_version().to_string(),
-                    Some(package.get_pretty_version().to_string()),
+                    Some(bstr::BString::from(
+                        package.get_pretty_version().to_string(),
+                    )),
                 );
                 tmp.insert(package.get_name().to_string(), constraint.into());
             }
@@ -1366,9 +1368,7 @@ impl Installer {
             {
                 constraint = filter
                     .filter_constraint(&req, constraint, false)
-                    .unwrap_or_else(|_| {
-                        SimpleConstraint::new("=".to_string(), String::new(), None).into()
-                    });
+                    .unwrap_or_else(|_| SimpleConstraint::new("=", String::new(), None).into());
             }
             root_requires.insert(req, constraint);
         }
@@ -1512,12 +1512,7 @@ impl Installer {
             if !pkg_repo_is_platform
                 || !provided.contains_key(&name)
                 || !provided.get(&name).unwrap().get_constraint().matches(
-                    &SimpleConstraint::new(
-                        "=".to_string(),
-                        package.get_version().to_string(),
-                        None,
-                    )
-                    .into(),
+                    &SimpleConstraint::new("=", package.get_version().to_string(), None).into(),
                 )
             {
                 request.fix_package(package);
@@ -1555,12 +1550,7 @@ impl Installer {
                     request.require_name(
                         &locked_package.get_name(),
                         Some(
-                            SimpleConstraint::new(
-                                "==".to_string(),
-                                locked_package.get_version(),
-                                None,
-                            )
-                            .into(),
+                            SimpleConstraint::new("==", locked_package.get_version(), None).into(),
                         ),
                     )?;
                 }

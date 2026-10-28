@@ -260,13 +260,13 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
 
 /// ref: TestCase::getPackage with class `Composer\Package\RootPackage`.
 fn root_package(name: &str, version: &str) -> RootPackageHandle {
-    let normalized = VersionParser.normalize(version, None).unwrap();
+    let normalized = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
     RootPackageHandle::new(name.to_string(), normalized, version.to_string())
 }
 
 /// ref: `new Link($source, $target, $constraint, $type, $constraint->getPrettyString())`.
 fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &str) -> Link {
-    let pretty = constraint.get_pretty_string();
+    let pretty = legacy_lossy(&constraint.get_pretty_string()).into_owned();
     Link::new(
         source.to_string(),
         target.to_string(),

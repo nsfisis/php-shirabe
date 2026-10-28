@@ -12,13 +12,13 @@ use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{HttpDownloader, Platform, ProcessExecutor};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
-    let norm_version = VersionParser.normalize(version, None).unwrap();
+    let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
     CompletePackageHandle::new(name.to_string(), norm_version, version.to_string()).into()
 }
 

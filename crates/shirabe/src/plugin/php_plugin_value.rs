@@ -146,7 +146,7 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
             AnyConstraint::Simple(SimpleConstraint::new(
                 operator.to_string(),
                 required_string("a semver constraint version", object.protected("version"))?,
-                pretty_string,
+                pretty_string.map(bstr::BString::from),
             ))
         }
         MULTI_CONSTRAINT_CLASS => {
@@ -182,11 +182,15 @@ fn constraint_from_wire(value: &PluginValue) -> Result<AnyConstraint, PhpThrow> 
             AnyConstraint::Multi(MultiConstraint::new(
                 constraints,
                 conjunctive,
-                pretty_string,
+                pretty_string.map(bstr::BString::from),
             ))
         }
-        MATCH_ALL_CLASS => AnyConstraint::MatchAll(MatchAllConstraint::new(pretty_string)),
-        MATCH_NONE_CLASS => AnyConstraint::MatchNone(MatchNoneConstraint::new(pretty_string)),
+        MATCH_ALL_CLASS => AnyConstraint::MatchAll(MatchAllConstraint::new(
+            pretty_string.map(bstr::BString::from),
+        )),
+        MATCH_NONE_CLASS => AnyConstraint::MatchNone(MatchNoneConstraint::new(
+            pretty_string.map(bstr::BString::from),
+        )),
         // TODO(plugin): a plugin-defined ConstraintInterface implementation has no Rust
         // counterpart; the four composer/semver classes are the whole vocabulary here.
         other => {
@@ -261,10 +265,13 @@ pub(crate) fn class_map_to_wire(class_map: &ClassMap) -> PluginValue {
                 .iter()
                 .map(|violation| {
                     PluginValue::Array(indexmap::IndexMap::from([
-                        ("warning".into(), PluginValue::string(&violation.warning)),
+                        (
+                            "warning".into(),
+                            PluginValue::string(violation.warning.as_str()),
+                        ),
                         (
                             "className".into(),
-                            PluginValue::string(&violation.class_name),
+                            PluginValue::string(violation.class_name.as_str()),
                         ),
                     ]))
                 })
@@ -368,9 +375,9 @@ mod tests {
 
     fn simple(operator: &str, version: &str, pretty_string: Option<&str>) -> AnyConstraint {
         AnyConstraint::Simple(SimpleConstraint::new(
-            operator.to_string(),
+            operator,
             version.to_string(),
-            pretty_string.map(str::to_string),
+            pretty_string.map(str::to_string).map(bstr::BString::from),
         ))
     }
 
@@ -413,7 +420,7 @@ mod tests {
         let constraint = AnyConstraint::Multi(MultiConstraint::new(
             vec![simple(">=", "1.0.0", None), simple("<", "2.0.0", None)],
             true,
-            Some("^1.0".to_string()),
+            Some(bstr::BString::from("^1.0".to_string())),
         ));
         assert_eq!(
             String::from_utf8_lossy(&serialize(&constraint_to_wire(&constraint))),
@@ -471,10 +478,12 @@ mod tests {
                     )),
                 ],
                 false,
-                Some("<1.0 || ^3.0".to_string()),
+                Some(bstr::BString::from("<1.0 || ^3.0".to_string())),
             )),
             AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
-            AnyConstraint::MatchNone(MatchNoneConstraint::new(Some("nothing".to_string()))),
+            AnyConstraint::MatchNone(MatchNoneConstraint::new(Some(bstr::BString::from(
+                "nothing".to_string(),
+            )))),
         ];
         for constraint in constraints {
             let link = Link::new(

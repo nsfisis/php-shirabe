@@ -12,7 +12,7 @@ fn serialize_constraint<S: serde::Serializer>(
     c: &AnyConstraint,
     serializer: S,
 ) -> anyhow::Result<S::Ok, S::Error> {
-    serializer.serialize_str(&c.get_pretty_string())
+    serializer.serialize_str(&legacy_lossy(&c.get_pretty_string()))
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -44,12 +44,10 @@ impl PartialSecurityAdvisory {
                     .into_owned();
                     match parser.parse_constraints(&affected_version) {
                         Ok(c) => c,
-                        Err(_) => SimpleConstraint::new(
-                            "==".to_string(),
-                            "0.0.0-invalid-version".to_string(),
-                            None,
-                        )
-                        .into(),
+                        Err(_) => {
+                            SimpleConstraint::new("==", "0.0.0-invalid-version".to_string(), None)
+                                .into()
+                        }
                     }
                 }
             };

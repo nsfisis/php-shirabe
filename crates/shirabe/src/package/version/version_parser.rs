@@ -91,23 +91,29 @@ impl VersionParser {
     }
 
     pub fn normalize(&self, version: &str, full_version: Option<&str>) -> anyhow::Result<String> {
-        self.inner.normalize(version, full_version)
+        self.inner
+            .normalize(version, full_version.map(str::as_bytes))
+            .map(|v| legacy_lossy(&v).into_owned())
     }
 
     pub fn normalize_stability(stability: &str) -> anyhow::Result<String> {
-        SemverVersionParser::normalize_stability(stability)
+        SemverVersionParser::normalize_stability(stability).map(|v| legacy_lossy(&v).into_owned())
     }
 
     pub fn normalize_branch(&self, name: &str) -> anyhow::Result<String> {
-        self.inner.normalize_branch(name)
+        self.inner
+            .normalize_branch(name)
+            .map(|v| legacy_lossy(&v).into_owned())
     }
 
     pub fn parse_stability(version: &str) -> String {
-        SemverVersionParser::parse_stability(version)
+        legacy_lossy(&SemverVersionParser::parse_stability(version)).into_owned()
     }
 
     pub fn parse_numeric_alias_prefix(&self, branch: &str) -> Option<String> {
-        self.inner.parse_numeric_alias_prefix(branch)
+        self.inner
+            .parse_numeric_alias_prefix(branch)
+            .map(|s| legacy_lossy(&s).into_owned())
     }
 
     pub fn is_upgrade(normalized_from: &str, normalized_to: &str) -> anyhow::Result<bool> {

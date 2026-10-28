@@ -121,7 +121,7 @@ fn test_pretty_string() {
     );
     let request = Request::new(None);
 
-    let empty_constraint = MatchAllConstraint::new(Some("*".to_string()));
+    let empty_constraint = MatchAllConstraint::new(Some(bstr::BString::from("*".to_string())));
 
     let rule = Rule::Generic(GenericRule::new(
         vec![p1.get_id(), -p2.get_id()],

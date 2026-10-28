@@ -125,8 +125,8 @@ pub enum PluginValue {
 }
 
 impl PluginValue {
-    pub fn string(s: impl Into<String>) -> PluginValue {
-        PluginValue::String(s.into().into())
+    pub fn string(s: impl Into<BString>) -> PluginValue {
+        PluginValue::String(s.into())
     }
 
     /// Converts a plain data value (no handles are ever produced) coming from ported code.

@@ -62,7 +62,7 @@ impl IgnoreListPlatformRequirementFilter {
                 vec![
                     constraint,
                     AnyConstraint::Simple(SimpleConstraint::new(
-                        ">=".to_string(),
+                        ">=",
                         last.get_end().get_version().to_string(),
                         None,
                     )),

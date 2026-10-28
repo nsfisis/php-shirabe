@@ -1,14 +1,15 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/MultiConstraint.php
 
 use crate::constraint::{AnyConstraint, Bound, MatchAllConstraint};
-use shirabe_php_shim::CmpOp;
+use bstr::{BString, ByteSlice};
+use shirabe_php_shim::{CmpOp, bconcat, implode};
 use std::sync::OnceLock;
 
 #[derive(Debug, Clone)]
 pub struct MultiConstraint {
     pub(crate) constraints: Vec<AnyConstraint>,
-    pub(crate) pretty_string: Option<String>,
-    string: OnceLock<String>,
+    pub(crate) pretty_string: Option<BString>,
+    string: OnceLock<BString>,
     pub(crate) conjunctive: bool,
 }
 
@@ -16,7 +17,7 @@ impl MultiConstraint {
     pub fn new(
         constraints: Vec<AnyConstraint>,
         conjunctive: bool,
-        pretty_string: Option<String>,
+        pretty_string: Option<BString>,
     ) -> Self {
         assert!(
             constraints.len() >= 2,
@@ -91,7 +92,7 @@ impl MultiConstraint {
     pub fn create(
         constraints: Vec<AnyConstraint>,
         conjunctive: bool,
-        pretty_string: Option<String>,
+        pretty_string: Option<BString>,
     ) -> anyhow::Result<AnyConstraint> {
         if constraints.is_empty() {
             return Ok(MatchAllConstraint::new(pretty_string).into());
@@ -144,15 +145,15 @@ impl MultiConstraint {
                             && l_mc.constraints.len() == 2
                             && r_mc.constraints.len() == 2
                         {
-                            let left0 = l_mc.constraints[0].to_string();
-                            let left1 = l_mc.constraints[1].to_string();
-                            let right0 = r_mc.constraints[0].to_string();
-                            let right1 = r_mc.constraints[1].to_string();
+                            let left0 = l_mc.constraints[0].to_php_string();
+                            let left1 = l_mc.constraints[1].to_php_string();
+                            let right0 = r_mc.constraints[0].to_php_string();
+                            let right1 = r_mc.constraints[1].to_php_string();
 
-                            if left0.starts_with(">=")
-                                && left1.starts_with('<')
-                                && right0.starts_with(">=")
-                                && right1.starts_with('<')
+                            if left0.starts_with(b">=")
+                                && left1.starts_with(b"<")
+                                && right0.starts_with(b">=")
+                                && right1.starts_with(b"<")
                                 && left1.get(2..) == right0.get(3..)
                             {
                                 Some(
@@ -200,45 +201,63 @@ impl MultiConstraint {
         (constraints, conjunctive)
     }
 
-    pub fn compile(&self, other_operator: CmpOp) -> String {
+    pub fn compile(&self, other_operator: CmpOp) -> BString {
         let mut parts = Vec::new();
         for constraint in &self.constraints {
             let code = constraint.compile(other_operator);
             if code == "true" {
                 if !self.conjunctive {
-                    return "true".to_string();
+                    return "true".into();
                 }
             } else if code == "false" {
                 if self.conjunctive {
-                    return "false".to_string();
+                    return "false".into();
                 }
             } else {
-                parts.push(format!("({})", code));
+                parts.push(bconcat!("(", code, ")"));
             }
         }
 
         if parts.is_empty() {
             return if self.conjunctive {
-                "true".to_string()
+                "true".into()
             } else {
-                "false".to_string()
+                "false".into()
             };
         }
 
         if self.conjunctive {
-            parts.join("&&")
+            implode("&&", &parts)
         } else {
-            parts.join("||")
+            implode("||", &parts)
         }
     }
 
-    pub fn get_pretty_string(&self) -> String {
+    pub fn get_pretty_string(&self) -> BString {
         if let Some(ref s) = self.pretty_string
             && !s.is_empty()
         {
             return s.clone();
         }
-        self.to_string()
+        self.to_php_string()
+    }
+
+    /// PHP's `__toString()`.
+    pub fn to_php_string(&self) -> BString {
+        self.php_string().clone()
+    }
+
+    /// Appends PHP's `__toString()` to `out`.
+    pub fn append_php_string(&self, out: &mut BString) {
+        out.extend_from_slice(self.php_string());
+    }
+
+    fn php_string(&self) -> &BString {
+        self.string.get_or_init(|| {
+            let parts: Vec<BString> = self.constraints.iter().map(|c| c.to_php_string()).collect();
+            let sep = if self.conjunctive { " " } else { " || " };
+            bconcat!("[", implode(sep, &parts), "]")
+        })
     }
 
     pub fn get_lower_bound(&self) -> Bound {
@@ -252,11 +271,6 @@ impl MultiConstraint {
 
 impl std::fmt::Display for MultiConstraint {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = self.string.get_or_init(|| {
-            let parts: Vec<String> = self.constraints.iter().map(|c| c.to_string()).collect();
-            let sep = if self.conjunctive { " " } else { " || " };
-            format!("[{}]", parts.join(sep))
-        });
-        f.write_str(string)
+        std::fmt::Display::fmt(self.php_string().as_bstr(), f)
     }
 }

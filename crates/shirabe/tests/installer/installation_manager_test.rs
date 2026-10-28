@@ -13,7 +13,7 @@ use shirabe::package::handle::CompletePackageHandle;
 use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 use shirabe_semver::VersionParser;
 
 /// ref: setUp(): the PHP loop/io mocks are never exercised by these tests (the loop has its
@@ -252,7 +252,7 @@ impl BinaryPresenceInterface for BinaryInstaller {
 /// Builds a `CompletePackage` of the given type, mirroring TestCase::getPackage but with a custom
 /// type set via `__set_type` (PackageInterfaceHandle does not expose the setter).
 fn typed_package(name: &str, version: &str, r#type: &str) -> PackageInterfaceHandle {
-    let norm_version = VersionParser.normalize(version, None).unwrap();
+    let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
     let handle = CompletePackageHandle::new(name.to_string(), norm_version, version.to_string());
     handle.__set_type(r#type.to_string());
     handle.into()

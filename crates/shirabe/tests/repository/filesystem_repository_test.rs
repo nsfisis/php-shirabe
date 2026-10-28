@@ -15,7 +15,7 @@ use shirabe::repository::RepositoryInterface;
 use shirabe::repository::filesystem_repository::FilesystemRepository;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_rpc::PluginValue;
-use shirabe_php_shim::{Catch as _, PhpMixed};
+use shirabe_php_shim::{Catch as _, PhpMixed, legacy_lossy};
 use shirabe_semver::VersionParser;
 
 /// PHP mocks JsonFile::read()/exists(); without a mocking framework the canned read value is
@@ -236,7 +236,7 @@ fn test_repository_writes_installed_php() {
 
     let root_package = RootPackageHandle::new(
         "__root__".to_string(),
-        VersionParser.normalize("dev-master", None).unwrap(),
+        legacy_lossy(&VersionParser.normalize("dev-master", None).unwrap()).into_owned(),
         "dev-master".to_string(),
     );
     root_package.set_source_reference(Some("sourceref-by-default".to_string()));
@@ -249,7 +249,7 @@ fn test_repository_writes_installed_php() {
     ));
     let root_package = RootAliasPackageHandle::new(
         root_package,
-        VersionParser.normalize("1.10.x-dev", None).unwrap(),
+        legacy_lossy(&VersionParser.normalize("1.10.x-dev", None).unwrap()).into_owned(),
         "1.10.x-dev".to_string(),
     );
 

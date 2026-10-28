@@ -4,6 +4,7 @@ use crate::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
 use crate::interval::{DevConstraintSet, Interval};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{CmpOp, array_unique, version_compare, version_compare_ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -14,16 +15,16 @@ pub struct IntervalCollection {
     pub branches: DevConstraintSet,
 }
 
-static INTERVALS_CACHE: OnceLock<Mutex<IndexMap<String, Arc<IntervalCollection>>>> =
+static INTERVALS_CACHE: OnceLock<Mutex<IndexMap<BString, Arc<IntervalCollection>>>> =
     OnceLock::new();
 
-fn intervals_cache() -> &'static Mutex<IndexMap<String, Arc<IntervalCollection>>> {
+fn intervals_cache() -> &'static Mutex<IndexMap<BString, Arc<IntervalCollection>>> {
     INTERVALS_CACHE.get_or_init(|| Mutex::new(IndexMap::new()))
 }
 
-static SUBSET_CACHE: OnceLock<Mutex<IndexMap<(String, String), bool>>> = OnceLock::new();
+static SUBSET_CACHE: OnceLock<Mutex<IndexMap<(BString, BString), bool>>> = OnceLock::new();
 
-fn subset_cache() -> &'static Mutex<IndexMap<(String, String), bool>> {
+fn subset_cache() -> &'static Mutex<IndexMap<(BString, BString), bool>> {
     SUBSET_CACHE.get_or_init(|| Mutex::new(IndexMap::new()))
 }
 
@@ -61,7 +62,7 @@ impl Intervals {
         // Keying on the two operands keeps the memoized string form of each long-lived constraint
         // warm. Building the intersection first would instead stringify a throwaway
         // MultiConstraint on every call.
-        let key = (candidate.to_string(), constraint.to_string());
+        let key = (candidate.to_php_string(), constraint.to_php_string());
         if let Some(cached) = subset_cache().lock().unwrap().get(&key) {
             return Ok(*cached);
         }
@@ -90,14 +91,16 @@ impl Intervals {
                 return Ok(false);
             }
 
-            if candidate_intervals.numeric[index].get_start().to_string()
-                != interval.get_start().to_string()
+            if candidate_intervals.numeric[index]
+                .get_start()
+                .to_php_string()
+                != interval.get_start().to_php_string()
             {
                 return Ok(false);
             }
 
-            if candidate_intervals.numeric[index].get_end().to_string()
-                != interval.get_end().to_string()
+            if candidate_intervals.numeric[index].get_end().to_php_string()
+                != interval.get_end().to_php_string()
             {
                 return Ok(false);
             }
@@ -145,9 +148,10 @@ impl Intervals {
         let mut has_numeric_match_all = false;
 
         if intervals.numeric.len() == 1
-            && intervals.numeric[0].get_start().to_string() == Interval::from_zero().to_string()
-            && intervals.numeric[0].get_end().to_string()
-                == Interval::until_positive_infinity().to_string()
+            && intervals.numeric[0].get_start().to_php_string()
+                == Interval::from_zero().to_php_string()
+            && intervals.numeric[0].get_end().to_php_string()
+                == Interval::until_positive_infinity().to_php_string()
         {
             constraints.push(intervals.numeric[0].get_start().clone().into());
             has_numeric_match_all = true;
@@ -173,14 +177,15 @@ impl Intervals {
                         // unEqualConstraints currently contains [>=M, !=N] already and we only
                         // want to add !=P right now
                         if un_equal_constraints.is_empty()
-                            && interval.get_start().to_string() != Interval::from_zero().to_string()
+                            && interval.get_start().to_php_string()
+                                != Interval::from_zero().to_php_string()
                         {
                             un_equal_constraints.push(interval.get_start().clone().into());
                         }
                         un_equal_constraints.push(
                             SimpleConstraint::new(
-                                "!=".to_string(),
-                                interval.get_end().get_version().to_string(),
+                                "!=",
+                                interval.get_end().get_version().to_owned(),
                                 None,
                             )
                             .into(),
@@ -192,8 +197,8 @@ impl Intervals {
 
                 if !un_equal_constraints.is_empty() {
                     // this is where the end of the following interval of a != constraint is added
-                    if interval.get_end().to_string()
-                        != Interval::until_positive_infinity().to_string()
+                    if interval.get_end().to_php_string()
+                        != Interval::until_positive_infinity().to_php_string()
                     {
                         un_equal_constraints.push(interval.get_end().clone().into());
                     }
@@ -218,8 +223,8 @@ impl Intervals {
                 {
                     constraints.push(
                         SimpleConstraint::new(
-                            "==".to_string(),
-                            interval.get_start().get_version().to_string(),
+                            "==",
+                            interval.get_start().get_version().to_owned(),
                             None,
                         )
                         .into(),
@@ -228,10 +233,10 @@ impl Intervals {
                     continue;
                 }
 
-                if interval.get_start().to_string() == Interval::from_zero().to_string() {
+                if interval.get_start().to_php_string() == Interval::from_zero().to_php_string() {
                     constraints.push(interval.get_end().clone().into());
-                } else if interval.get_end().to_string()
-                    == Interval::until_positive_infinity().to_string()
+                } else if interval.get_end().to_php_string()
+                    == Interval::until_positive_infinity().to_php_string()
                 {
                     constraints.push(interval.get_start().clone().into());
                 } else {
@@ -262,13 +267,11 @@ impl Intervals {
         } else {
             for branch_name in &intervals.branches.names {
                 if intervals.branches.exclude {
-                    dev_constraints.push(
-                        SimpleConstraint::new("!=".to_string(), branch_name.clone(), None).into(),
-                    );
+                    dev_constraints
+                        .push(SimpleConstraint::new("!=", branch_name.clone(), None).into());
                 } else {
-                    dev_constraints.push(
-                        SimpleConstraint::new("==".to_string(), branch_name.clone(), None).into(),
-                    );
+                    dev_constraints
+                        .push(SimpleConstraint::new("==", branch_name.clone(), None).into());
                 }
             }
 
@@ -284,7 +287,7 @@ impl Intervals {
                 }
 
                 if constraints.len() == 1
-                    && constraints[0].to_string() == Interval::from_zero().to_string()
+                    && constraints[0].to_php_string() == Interval::from_zero().to_php_string()
                 {
                     if dev_constraints.len() > 1 {
                         return Ok(MultiConstraint::new(dev_constraints, true, None).into());
@@ -314,7 +317,7 @@ impl Intervals {
     }
 
     pub fn get(constraint: &AnyConstraint) -> anyhow::Result<Arc<IntervalCollection>> {
-        let key = constraint.to_string();
+        let key = constraint.to_php_string();
 
         {
             let cache = intervals_cache().lock().unwrap();
@@ -451,16 +454,16 @@ impl Intervals {
         }
 
         // Each border is (version, operator, is_start).
-        let mut borders: Vec<(String, String, bool)> = Vec::new();
+        let mut borders: Vec<(BString, String, bool)> = Vec::new();
         for group in &numeric_groups {
             for interval in group {
                 borders.push((
-                    interval.get_start().get_version().to_string(),
+                    interval.get_start().get_version().to_owned(),
                     interval.get_start().get_operator().to_string(),
                     true,
                 ));
                 borders.push((
-                    interval.get_end().get_version().to_string(),
+                    interval.get_end().get_version().to_owned(),
                     interval.get_end().get_operator().to_string(),
                     false,
                 ));
@@ -530,7 +533,7 @@ impl Intervals {
         let op = constraint.get_operator();
 
         // handle branch constraints first
-        if constraint.get_version().starts_with("dev-") {
+        if constraint.get_version().starts_with(b"dev-") {
             let mut intervals: Vec<Interval> = Vec::new();
             let mut branches = Interval::no_dev();
 
@@ -542,11 +545,11 @@ impl Intervals {
                     Interval::until_positive_infinity(),
                 ));
                 branches = DevConstraintSet {
-                    names: vec![constraint.get_version().to_string()],
+                    names: vec![constraint.get_version().to_owned()],
                     exclude: true,
                 };
             } else if op == CmpOp::Eq {
-                branches.names.push(constraint.get_version().to_string());
+                branches.names.push(constraint.get_version().to_owned());
             }
 
             return Ok(IntervalCollection {
@@ -578,18 +581,10 @@ impl Intervals {
                 numeric: vec![
                     Interval::new(
                         Interval::from_zero(),
-                        SimpleConstraint::new(
-                            "<".to_string(),
-                            constraint.get_version().to_string(),
-                            None,
-                        ),
+                        SimpleConstraint::new("<", constraint.get_version().to_owned(), None),
                     ),
                     Interval::new(
-                        SimpleConstraint::new(
-                            ">".to_string(),
-                            constraint.get_version().to_string(),
-                            None,
-                        ),
+                        SimpleConstraint::new(">", constraint.get_version().to_owned(), None),
                         Interval::until_positive_infinity(),
                     ),
                 ],
@@ -600,8 +595,8 @@ impl Intervals {
         // convert ==x to an interval of >=x - <=x
         Ok(IntervalCollection {
             numeric: vec![Interval::new(
-                SimpleConstraint::new(">=".to_string(), constraint.get_version().to_string(), None),
-                SimpleConstraint::new("<=".to_string(), constraint.get_version().to_string(), None),
+                SimpleConstraint::new(">=", constraint.get_version().to_owned(), None),
+                SimpleConstraint::new("<=", constraint.get_version().to_owned(), None),
             )],
             branches: Interval::no_dev(),
         })

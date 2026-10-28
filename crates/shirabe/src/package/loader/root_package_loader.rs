@@ -182,7 +182,7 @@ impl RootPackageLoader {
                 for link in parsed_links.values() {
                     links.insert(
                         link.get_target().to_string(),
-                        link.get_constraint().get_pretty_string(),
+                        legacy_lossy(&link.get_constraint().get_pretty_string()).into_owned(),
                     );
                 }
                 aliases = self.extract_aliases(&links, aliases);
@@ -317,9 +317,9 @@ impl RootPackageLoader {
 
             let or_split = preg_split(php_regex!(r"{\s*\|\|?\s*}"), req_version.trim());
             for or_constraint in &or_split {
-                let and_split = shirabe_semver::split_and_constraints(&legacy_lossy(or_constraint));
+                let and_split = shirabe_semver::split_and_constraints(or_constraint);
                 for and_constraint in and_split {
-                    constraints.push(and_constraint);
+                    constraints.push(legacy_lossy(&and_constraint).into_owned());
                 }
             }
 

@@ -6,7 +6,7 @@ use shirabe::dependency_resolver::operation::AnyOperation;
 use shirabe::dependency_resolver::transaction::Transaction;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 
 /// PHP `new Link($source, $target, $constraint, $type)`: prettyConstraint defaults to
 /// `(string) $constraint`.
@@ -16,7 +16,7 @@ fn mk_link(
     constraint: shirabe_semver::constraint::AnyConstraint,
     r#type: &str,
 ) -> Link {
-    let pretty = constraint.get_pretty_string();
+    let pretty = legacy_lossy(&constraint.get_pretty_string()).into_owned();
     Link::new(
         source.to_string(),
         target.to_string(),

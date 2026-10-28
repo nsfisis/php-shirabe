@@ -1,24 +1,25 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/Bound.php
 
 use anyhow::bail;
-use shirabe_php_shim::version_compare_ordering;
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{bconcat, version_compare_ordering};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Bound {
-    version: String,
+    version: BString,
     is_inclusive: bool,
 }
 
 impl Bound {
-    pub fn new(version: String, is_inclusive: bool) -> Self {
+    pub fn new(version: impl Into<BString>, is_inclusive: bool) -> Self {
         Self {
-            version,
+            version: version.into(),
             is_inclusive,
         }
     }
 
-    pub fn get_version(&self) -> &str {
-        &self.version
+    pub fn get_version(&self) -> &BStr {
+        self.version.as_bstr()
     }
 
     pub fn is_inclusive(&self) -> bool {
@@ -30,7 +31,7 @@ impl Bound {
     }
 
     pub fn is_positive_infinity(&self) -> bool {
-        self.get_version() == format!("{}.0.0.0", i64::MAX) && !self.is_inclusive()
+        self.get_version() == format!("{}.0.0.0", i64::MAX).as_str() && !self.is_inclusive()
     }
 
     pub fn compare_to(&self, other: &Bound, operator: &str) -> anyhow::Result<bool> {
@@ -56,20 +57,19 @@ impl Bound {
         })
     }
 
-    pub fn __to_string(&self) -> String {
-        format!(
-            "{} [{}]",
+    pub fn __to_string(&self) -> BString {
+        bconcat!(
             self.get_version(),
             if self.is_inclusive() {
-                "inclusive"
+                " [inclusive]"
             } else {
-                "exclusive"
+                " [exclusive]"
             }
         )
     }
 
     pub fn zero() -> Self {
-        Bound::new("0.0.0.0-dev".to_string(), true)
+        Bound::new("0.0.0.0-dev", true)
     }
 
     pub fn positive_infinity() -> Self {

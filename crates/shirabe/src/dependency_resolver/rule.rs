@@ -202,9 +202,10 @@ impl Rule {
                         if pool.is_unacceptable_fixed_or_locked_package(p.clone()) {
                             return true;
                         }
-                        if !link.get_constraint().matches(
-                            &SimpleConstraint::new("=".to_string(), p.get_version(), None).into(),
-                        ) {
+                        if !link
+                            .get_constraint()
+                            .matches(&SimpleConstraint::new("=", p.get_version(), None).into())
+                        {
                             return true;
                         }
                         // required package was locked but has been unlocked and still matches
@@ -237,9 +238,9 @@ impl Rule {
                         if pool.is_unacceptable_fixed_or_locked_package(p.clone()) {
                             return true;
                         }
-                        if !constraint.matches(
-                            &SimpleConstraint::new("=".to_string(), p.get_version(), None).into(),
-                        ) {
+                        if !constraint
+                            .matches(&SimpleConstraint::new("=", p.get_version(), None).into())
+                        {
                             return true;
                         }
                         break;

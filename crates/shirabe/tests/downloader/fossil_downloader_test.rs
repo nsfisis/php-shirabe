@@ -11,7 +11,7 @@ use shirabe::io::IOInterface;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -48,7 +48,7 @@ impl Drop for TearDown {
 /// for a PackageInterface mock as long as `getSourceUrls()` equals
 /// `[getSourceUrl()]`, which holds for every non-ignored case here.
 fn get_package(source_reference: Option<&str>, source_url: Option<&str>) -> PackageInterfaceHandle {
-    let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
+    let norm_version = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
     let package =
         CompletePackageHandle::new("dummy/pkg".to_string(), norm_version, "1.0.0".to_string());
     package.__set_source_type(Some("fossil".to_string()));

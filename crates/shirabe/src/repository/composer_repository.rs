@@ -414,7 +414,7 @@ impl ComposerRepository {
 
         for package in packages.into_iter() {
             let pkg_constraint =
-                SimpleConstraint::new("==".to_string(), package.get_version().to_string(), None);
+                SimpleConstraint::new("==", package.get_version().to_string(), None);
 
             if constraint.matches(&pkg_constraint.into()) {
                 if return_first_match {
@@ -695,7 +695,7 @@ impl ComposerRepository {
                         None => true,
                         Some(c) => {
                             let pkg_c = SimpleConstraint::new(
-                                "==".to_string(),
+                                "==",
                                 candidate.get_version().to_string(),
                                 None,
                             );

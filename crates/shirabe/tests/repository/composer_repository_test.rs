@@ -608,8 +608,7 @@ fn test_get_security_advisories_assert_repository_http_options_are_used() {
     let mut repository =
         ComposerRepository::new(repo_config, null_io(), &config, http_downloader, None).unwrap();
 
-    let constraint: AnyConstraint =
-        SimpleConstraint::new("=".to_string(), "1.0.0.0".to_string(), None).into();
+    let constraint: AnyConstraint = SimpleConstraint::new("=", "1.0.0.0".to_string(), None).into();
     let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
     map.insert("foo/bar".to_string(), constraint);
 
@@ -742,8 +741,7 @@ fn test_get_security_advisories_assert_repository_advisories_is_zero_indexed_arr
     let mut repository =
         ComposerRepository::new(repo_config, null_io(), &config, http_downloader, None).unwrap();
 
-    let constraint: AnyConstraint =
-        SimpleConstraint::new("=".to_string(), "1.0.0.0".to_string(), None).into();
+    let constraint: AnyConstraint = SimpleConstraint::new("=", "1.0.0.0".to_string(), None).into();
     let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
     map.insert(package_name.to_string(), constraint);
 

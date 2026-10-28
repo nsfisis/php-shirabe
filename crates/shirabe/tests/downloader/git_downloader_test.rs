@@ -16,7 +16,7 @@ use shirabe::package::Mirror;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
 use shirabe::util::{Git as GitUtil, ProcessExecutor};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -67,7 +67,8 @@ fn get_package(
     source_reference: Option<&str>,
     source_url: Option<&str>,
 ) -> PackageInterfaceHandle {
-    let norm_version = VersionParser.normalize(pretty_version, None).unwrap();
+    let norm_version =
+        legacy_lossy(&VersionParser.normalize(pretty_version, None).unwrap()).into_owned();
     let package =
         CompletePackageHandle::new(name.to_string(), norm_version, pretty_version.to_string());
     package.__set_source_type(Some("git".to_string()));

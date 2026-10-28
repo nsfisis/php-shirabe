@@ -814,7 +814,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 .get_constraint()
                 .matches(&shirabe_semver::constraint::AnyConstraint::Simple(
                     shirabe_semver::constraint::SimpleConstraint::new(
-                        "==".to_string(),
+                        "==",
                         platform_pkg.get_version().to_string(),
                         None,
                     ),

@@ -3,9 +3,8 @@
 use crate::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint};
 use bstr::{BStr, BString, ByteVec};
 use shirabe_php_shim::{
-    PhpMixed, PregMatches, bconcat, intval, legacy_lossy, ltrim2, php_regex, preg_is_match,
-    preg_match, preg_quote, preg_replace, preg_split, str_replace, str_replace_arr, strtolower,
-    trim,
+    PhpMixed, PregMatches, bconcat, intval, ltrim2, php_regex, preg_is_match, preg_match,
+    preg_quote, preg_replace, preg_split, str_replace, str_replace_arr, strtolower, substr, trim,
 };
 
 // Regex to match pre-release data (sort of).
@@ -26,15 +25,15 @@ const STABILITIES_REGEX: &str = "stable|RC|beta|alpha|dev";
 pub struct VersionParser;
 
 impl VersionParser {
-    pub fn parse_stability(version: &str) -> String {
+    pub fn parse_stability(version: impl AsRef<[u8]>) -> BString {
         let version = preg_replace(php_regex!("{#.+$}"), "", version);
 
         if version.starts_with(b"dev-") || version.ends_with(b"-dev") {
-            return "dev".to_string();
+            return "dev".into();
         }
 
         let pattern = format!("{{{}(?:\\+.*)?$}}i", MODIFIER_REGEX);
-        let lower = legacy_lossy(&strtolower(&version)).into_owned();
+        let lower = strtolower(&version);
         let match_ = preg_match(&pattern, &lower);
 
         // match_[3] = the ([.-]?dev)? capture
@@ -43,30 +42,33 @@ impl VersionParser {
             .and_then(|m| m.get(3))
             .is_some_and(|s| !s.is_empty())
         {
-            return "dev".to_string();
+            return "dev".into();
         }
 
         // match_[1] = the (stable|beta|b|RC|alpha|a|patch|pl|p) capture
         let m1 = match_.as_ref().and_then(|m| m.get(1)).unwrap_or_default();
         if !m1.is_empty() {
             if m1 == "beta" || m1 == "b" {
-                return "beta".to_string();
+                return "beta".into();
             }
             if m1 == "alpha" || m1 == "a" {
-                return "alpha".to_string();
+                return "alpha".into();
             }
             if m1 == "rc" {
-                return "RC".to_string();
+                return "RC".into();
             }
         }
 
-        "stable".to_string()
+        "stable".into()
     }
 
-    pub fn normalize_stability(stability: &str) -> anyhow::Result<String> {
-        let stability = legacy_lossy(&strtolower(stability)).into_owned();
+    pub fn normalize_stability(stability: impl AsRef<[u8]>) -> anyhow::Result<BString> {
+        let stability = strtolower(stability);
 
-        if !["stable", "rc", "beta", "alpha", "dev"].contains(&stability.as_str()) {
+        if !matches!(
+            stability.as_slice(),
+            b"stable" | b"rc" | b"beta" | b"alpha" | b"dev"
+        ) {
             anyhow::bail!(
                 "Invalid stability string \"{}\", expected one of stable, RC, beta, alpha or dev",
                 stability
@@ -74,45 +76,49 @@ impl VersionParser {
         }
 
         Ok(if stability == "rc" {
-            "RC".to_string()
+            "RC".into()
         } else {
             stability
         })
     }
 
-    pub fn normalize(&self, version: &str, full_version: Option<&str>) -> anyhow::Result<String> {
-        let version = legacy_lossy(&trim(version)).into_owned();
+    pub fn normalize(
+        &self,
+        version: impl AsRef<[u8]>,
+        full_version: Option<&[u8]>,
+    ) -> anyhow::Result<BString> {
+        let version = trim(version);
         let orig_version = version.clone();
-        let full_version = full_version.unwrap_or(&version).to_string();
+        let full_version = BString::from(full_version.unwrap_or(&version));
         let mut version = version;
 
         // strip off aliasing
         if let Some(match_) = preg_match(php_regex!("{^([^,\\s]++) ++as ++([^,\\s]++)$}"), &version)
         {
-            version = match_.get(1).unwrap_or_default().to_string();
+            version = match_.get(1).unwrap_or_default().to_owned();
         }
 
         // strip off stability flag
         let stab_pattern = format!("{{@(?:{})$}}i", STABILITIES_REGEX);
         if let Some(match_) = preg_match(&stab_pattern, &version) {
             let match0_len = match_.get(0).unwrap_or_default().len();
-            version = version[..version.len() - match0_len].to_string();
+            version = BString::from(&version[..version.len() - match0_len]);
         }
 
         // normalize master/trunk/default branches to dev-name for BC with 1.x as these used to
         // be valid constraints
-        if ["master", "trunk", "default"].contains(&version.as_str()) {
-            version = format!("dev-{}", version);
+        if matches!(version.as_slice(), b"master" | b"trunk" | b"default") {
+            version = bconcat!("dev-", version);
         }
 
         // if requirement is branch-like, use full name
-        if version.to_ascii_lowercase().starts_with("dev-") {
-            return Ok(format!("dev-{}", &version[4..]));
+        if strtolower(&version).starts_with(b"dev-") {
+            return Ok(bconcat!("dev-", substr(&version, 4, None)));
         }
 
         // strip off build metadata
         if let Some(match_) = preg_match(php_regex!("{^([^,\\s+]++)\\+[^\\s]++$}"), &version) {
-            version = match_.get(1).unwrap_or_default().to_string();
+            version = match_.get(1).unwrap_or_default().to_owned();
         }
 
         let mut index: Option<usize> = None;
@@ -134,13 +140,12 @@ impl VersionParser {
             let m3 = m.get(3).unwrap_or_default();
             let m4 = m.get(4).unwrap_or_default();
             let zero = BStr::new(".0");
-            version = legacy_lossy(&bconcat!(
+            version = bconcat!(
                 m.get(1).unwrap_or_default(),
                 if m2.is_empty() { zero } else { m2 },
                 if m3.is_empty() { zero } else { m3 },
                 if m4.is_empty() { zero } else { m4 },
-            ))
-            .into_owned();
+            );
             index = Some(5);
             matches = Some(m);
         } else {
@@ -150,12 +155,7 @@ impl VersionParser {
                 MODIFIER_REGEX
             );
             if let Some(m) = preg_match(&datetime_pattern, &subject) {
-                version = legacy_lossy(&preg_replace(
-                    php_regex!("{\\D}"),
-                    ".",
-                    m.get(1).unwrap_or_default(),
-                ))
-                .into_owned();
+                version = preg_replace(php_regex!("{\\D}"), ".", m.get(1).unwrap_or_default());
                 index = Some(2);
                 matches = Some(m);
             }
@@ -170,21 +170,20 @@ impl VersionParser {
                     return Ok(version);
                 }
                 let mi1 = matches.get(idx + 1).unwrap_or_default();
-                version = legacy_lossy(&bconcat!(
+                version = bconcat!(
                     version,
                     "-",
-                    self.expand_stability(&legacy_lossy(mi)),
+                    self.expand_stability(mi),
                     if !mi1.is_empty() {
                         ltrim2(mi1, ".-")
                     } else {
                         BString::default()
                     }
-                ))
-                .into_owned();
+                );
             }
 
             if !matches.get(idx + 2).unwrap_or_default().is_empty() {
-                version = format!("{}-dev", version);
+                version.push_str("-dev");
             }
 
             return Ok(version);
@@ -196,8 +195,8 @@ impl VersionParser {
             // a branch ending with -dev is only valid if it is numeric
             // if it gets prefixed with dev- it means the branch name should
             // have had a dev- prefix already when passed to normalize
-            if let Ok(normalized) = self.normalize_branch(&legacy_lossy(branch_name))
-                && !normalized.starts_with("dev-")
+            if let Ok(normalized) = self.normalize_branch(branch_name)
+                && !normalized.starts_with(b"dev-")
             {
                 return Ok(normalized);
             }
@@ -239,21 +238,21 @@ impl VersionParser {
         )
     }
 
-    pub fn parse_numeric_alias_prefix(&self, branch: &str) -> Option<String> {
+    pub fn parse_numeric_alias_prefix(&self, branch: impl AsRef<[u8]>) -> Option<BString> {
         // matches['version'] == matches[1] ((?P<version>...) is group 1)
         if let Some(matches) = preg_match(
             php_regex!("{^(?P<version>(\\d++\\.)*\\d++)(?:\\.x)?-dev$}i"),
-            branch,
+            branch.as_ref(),
         ) {
             let version = matches.get(1).unwrap_or_default();
-            return Some(format!("{}.", version));
+            return Some(bconcat!(version, "."));
         }
 
         None
     }
 
-    pub fn normalize_branch(&self, name: &str) -> anyhow::Result<String> {
-        let name = legacy_lossy(&trim(name)).into_owned();
+    pub fn normalize_branch(&self, name: impl AsRef<[u8]>) -> anyhow::Result<BString> {
+        let name = trim(name);
 
         // Groups: 1=major, 2=".minor"(outer), 3=minor(inner), 4=".patch"(outer),
         // 5=patch(inner), 6=".fourth"(outer), 7=fourth(inner).
@@ -271,35 +270,38 @@ impl VersionParser {
                 }
             }
 
-            return Ok(
-                legacy_lossy(&bconcat!(str_replace("x", "9999999", &version), "-dev")).into_owned(),
-            );
+            return Ok(bconcat!(str_replace("x", "9999999", &version), "-dev"));
         }
 
-        Ok(format!("dev-{}", name))
+        Ok(bconcat!("dev-", name))
     }
 
     #[deprecated(
         note = "No need to use this anymore in theory, Composer 2 does not normalize any \
             branch names to 9999999-dev anymore"
     )]
-    pub fn normalize_default_branch(&self, name: &str) -> String {
-        if name == "dev-master" || name == "dev-default" || name == "dev-trunk" {
-            return "9999999-dev".to_string();
+    pub fn normalize_default_branch(&self, name: impl AsRef<[u8]>) -> BString {
+        let name = name.as_ref();
+        if name == b"dev-master" || name == b"dev-default" || name == b"dev-trunk" {
+            return "9999999-dev".into();
         }
 
-        name.to_string()
+        BString::from(name)
     }
 
-    pub fn parse_constraints(&self, constraints: &str) -> anyhow::Result<AnyConstraint> {
-        let pretty_constraint = constraints.to_string();
+    pub fn parse_constraints(
+        &self,
+        constraints: impl AsRef<[u8]>,
+    ) -> anyhow::Result<AnyConstraint> {
+        let constraints = constraints.as_ref();
+        let pretty_constraint = BString::from(constraints);
 
         let or_constraints = preg_split(php_regex!("{\\s*\\|\\|?\\s*}"), trim(constraints));
 
         let mut or_groups: Vec<AnyConstraint> = Vec::new();
 
         for or_constraint in &or_constraints {
-            let and_constraints = split_and_constraints(&legacy_lossy(or_constraint));
+            let and_constraints = split_and_constraints(or_constraint);
 
             let constraint_objects: Vec<AnyConstraint> = if and_constraints.len() > 1 {
                 let mut objs: Vec<AnyConstraint> = Vec::new();
@@ -327,24 +329,24 @@ impl VersionParser {
         MultiConstraint::create(or_groups, false, Some(pretty_constraint))
     }
 
-    fn parse_constraint(&self, constraint: &str) -> anyhow::Result<Vec<AnyConstraint>> {
-        let mut constraint = constraint.to_string();
+    fn parse_constraint(&self, constraint: &[u8]) -> anyhow::Result<Vec<AnyConstraint>> {
+        let mut constraint = BString::from(constraint);
 
         // strip off aliasing
         if let Some(match_) = preg_match(
             php_regex!("{^([^,\\s]++) ++as ++([^,\\s]++)$}"),
             &constraint,
         ) {
-            constraint = match_.get(1).unwrap_or_default().to_string();
+            constraint = match_.get(1).unwrap_or_default().to_owned();
         }
 
         // strip @stability flags, and keep it for later use
-        let mut stability_modifier: Option<String> = None;
+        let mut stability_modifier: Option<BString> = None;
         let stab_pattern = format!("{{^([^,\\s]*?)@({})$}}i", STABILITIES_REGEX);
         if let Some(match_) = preg_match(&stab_pattern, &constraint) {
-            let m1 = match_.get(1).unwrap_or_default().to_string();
-            let m2 = match_.get(2).unwrap_or_default().to_string();
-            constraint = if !m1.is_empty() { m1 } else { "*".to_string() };
+            let m1 = match_.get(1).unwrap_or_default().to_owned();
+            let m2 = match_.get(2).unwrap_or_default().to_owned();
+            constraint = if !m1.is_empty() { m1 } else { "*".into() };
             if m2 != "stable" {
                 stability_modifier = Some(m2);
             }
@@ -355,7 +357,7 @@ impl VersionParser {
             php_regex!("{^(dev-[^,\\s@]+?|[^,\\s@]+?\\.x-dev)#.+$}i"),
             &constraint,
         ) {
-            constraint = match_.get(1).unwrap_or_default().to_string();
+            constraint = match_.get(1).unwrap_or_default().to_owned();
         }
 
         if let Some(match_) = preg_match(php_regex!("{^(v)?[xX*](\\.[xX*])*$}i"), &constraint) {
@@ -363,8 +365,8 @@ impl VersionParser {
             let m2_nonempty = !match_.get(2).unwrap_or_default().is_empty();
             if m1_nonempty || m2_nonempty {
                 return Ok(vec![AnyConstraint::Simple(SimpleConstraint::new(
-                    ">=".to_string(),
-                    "0.0.0.0-dev".to_string(),
+                    ">=",
+                    "0.0.0.0-dev",
                     None,
                 ))]);
             }
@@ -385,7 +387,7 @@ impl VersionParser {
         // the current version is used instead.
         let tilde_pattern = format!("{{^~>?{}$}}i", version_regex);
         if let Some(matches) = preg_match(&tilde_pattern, &constraint) {
-            if constraint.starts_with("~>") {
+            if constraint.starts_with(b"~>") {
                 anyhow::bail!(
                     "Could not parse version constraint {}: Invalid operator \"~>\", you probably \
                     meant to use the \"~\" operator",
@@ -420,19 +422,21 @@ impl VersionParser {
                 ""
             };
 
-            let low_version =
-                self.normalize(&format!("{}{}", &constraint[1..], stability_suffix), None)?;
-            let lower_bound = SimpleConstraint::new(">=".to_string(), low_version, None);
+            let low_version = self.normalize(
+                bconcat!(substr(&constraint, 1, None), stability_suffix),
+                None,
+            )?;
+            let lower_bound = SimpleConstraint::new(">=", low_version, None);
 
             // For upper bound, we increment the position of one more significance,
             // but highPosition = 0 would be illegal
             let high_position = (position - 1).max(1);
-            let high_version = format!(
-                "{}-dev",
+            let high_version = bconcat!(
                 self.manipulate_version_string(|i| matches.get(i), high_position, 1, "0")
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
+                "-dev"
             );
-            let upper_bound = SimpleConstraint::new("<".to_string(), high_version, None);
+            let upper_bound = SimpleConstraint::new("<", high_version, None);
 
             return Ok(vec![
                 AnyConstraint::Simple(lower_bound),
@@ -469,18 +473,20 @@ impl VersionParser {
                 ""
             };
 
-            let low_version =
-                self.normalize(&format!("{}{}", &constraint[1..], stability_suffix), None)?;
-            let lower_bound = SimpleConstraint::new(">=".to_string(), low_version, None);
+            let low_version = self.normalize(
+                bconcat!(substr(&constraint, 1, None), stability_suffix),
+                None,
+            )?;
+            let lower_bound = SimpleConstraint::new(">=", low_version, None);
 
             // For upper bound, we increment the position of one more significance,
             // but highPosition = 0 would be illegal
-            let high_version = format!(
-                "{}-dev",
+            let high_version = bconcat!(
                 self.manipulate_version_string(|i| matches.get(i), position, 1, "0")
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
+                "-dev"
             );
-            let upper_bound = SimpleConstraint::new("<".to_string(), high_version, None);
+            let upper_bound = SimpleConstraint::new("<", high_version, None);
 
             return Ok(vec![
                 AnyConstraint::Simple(lower_bound),
@@ -505,28 +511,28 @@ impl VersionParser {
                 1
             };
 
-            let low_version = format!(
-                "{}-dev",
+            let low_version = bconcat!(
                 self.manipulate_version_string(|i| matches.get(i), position, 0, "0")
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
+                "-dev"
             );
-            let high_version = format!(
-                "{}-dev",
+            let high_version = bconcat!(
                 self.manipulate_version_string(|i| matches.get(i), position, 1, "0")
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
+                "-dev"
             );
 
             if low_version == "0.0.0.0-dev" {
                 return Ok(vec![AnyConstraint::Simple(SimpleConstraint::new(
-                    "<".to_string(),
+                    "<",
                     high_version,
                     None,
                 ))]);
             }
 
             return Ok(vec![
-                AnyConstraint::Simple(SimpleConstraint::new(">=".to_string(), low_version, None)),
-                AnyConstraint::Simple(SimpleConstraint::new("<".to_string(), high_version, None)),
+                AnyConstraint::Simple(SimpleConstraint::new(">=", low_version, None)),
+                AnyConstraint::Simple(SimpleConstraint::new("<", high_version, None)),
             ]);
         }
 
@@ -554,13 +560,10 @@ impl VersionParser {
                 ""
             };
 
-            let from_str = legacy_lossy(&matches.get(1).unwrap_or_default()).into_owned(); // matches['from']
-            let low_version = self.normalize(&from_str, None)?;
-            let lower_bound = SimpleConstraint::new(
-                ">=".to_string(),
-                format!("{}{}", low_version, low_stability_suffix),
-                None,
-            );
+            let from_str = matches.get(1).unwrap_or_default(); // matches['from']
+            let low_version = self.normalize(from_str, None)?;
+            let lower_bound =
+                SimpleConstraint::new(">=", bconcat!(low_version, low_stability_suffix), None);
 
             // PHP's empty() on "0" returns true, but here we only check for truly empty/missing
             let empty = |x: Option<&BStr>| -> bool { x.is_none_or(|s| s.is_empty()) };
@@ -573,9 +576,9 @@ impl VersionParser {
                 || !matches.get(17).unwrap_or_default().is_empty()
                 || !matches.get(18).unwrap_or_default().is_empty()
             {
-                let to_str = legacy_lossy(&matches.get(10).unwrap_or_default()).into_owned(); // matches['to']
-                let hv = self.normalize(&to_str, None)?;
-                SimpleConstraint::new("<=".to_string(), hv, None)
+                let to_str = matches.get(10).unwrap_or_default(); // matches['to']
+                let hv = self.normalize(to_str, None)?;
+                SimpleConstraint::new("<=", hv, None)
             } else {
                 // matches[11]=to major, matches[12]=to minor, matches[13]=to patch,
                 // matches[14]=to fourth
@@ -588,16 +591,16 @@ impl VersionParser {
                 ];
 
                 // validate to version
-                let to_str = legacy_lossy(&matches.get(10).unwrap_or_default()).into_owned(); // matches['to']
-                self.normalize(&to_str, None)?;
+                let to_str = matches.get(10).unwrap_or_default(); // matches['to']
+                self.normalize(to_str, None)?;
 
                 let position = if empty(matches.get(12)) { 1 } else { 2 };
-                let hv = format!(
-                    "{}-dev",
+                let hv = bconcat!(
                     self.manipulate_version_string(|i| high_match[i], position, 1, "0")
-                        .unwrap_or_default()
+                        .unwrap_or_default(),
+                    "-dev"
                 );
-                SimpleConstraint::new("<".to_string(), hv, None)
+                SimpleConstraint::new("<", hv, None)
             };
 
             return Ok(vec![
@@ -609,22 +612,19 @@ impl VersionParser {
         // Basic Comparators
         if let Some(match_) = preg_match(php_regex!("{^(<>|!=|>=?|<=?|==?)?\\s*(.*)}"), &constraint)
         {
-            let version_str = match_.get(2).unwrap_or_default().to_string();
-            let op_str = match_.get(1).unwrap_or_default().to_string();
+            let version_str = match_.get(2).unwrap_or_default();
+            let op_str = match_.get(1).unwrap_or_default();
 
-            let version_result: anyhow::Result<String> = match self.normalize(&version_str, None) {
+            let version_result: anyhow::Result<BString> = match self.normalize(version_str, None) {
                 Ok(v) => Ok(v),
                 Err(e) => {
                     // recover from an invalid constraint like foobar-dev which should be
                     // dev-foobar except if the constraint uses a known operator, in which
                     // case it must be a parse error
-                    if version_str.ends_with("-dev")
-                        && preg_is_match(php_regex!("{^[0-9a-zA-Z-./]+$}"), &version_str)
+                    if version_str.ends_with(b"-dev")
+                        && preg_is_match(php_regex!("{^[0-9a-zA-Z-./]+$}"), version_str)
                     {
-                        self.normalize(
-                            &format!("dev-{}", &version_str[..version_str.len() - 4]),
-                            None,
-                        )
+                        self.normalize(bconcat!("dev-", substr(version_str, 0, Some(-4))), None)
                     } else {
                         Err(e)
                     }
@@ -633,29 +633,25 @@ impl VersionParser {
 
             let version_error = version_result.as_ref().err().map(|e| e.to_string());
             if let Ok(mut version) = version_result {
-                let op = if op_str.is_empty() { "=" } else { &op_str };
+                let op: &[u8] = if op_str.is_empty() { b"=" } else { op_str };
 
-                if op != "=="
-                    && op != "="
+                if op != b"=="
+                    && op != b"="
                     && let Some(ref stab_mod) = stability_modifier
                     && Self::parse_stability(&version) == "stable"
                 {
-                    version = format!("{}-{}", version, stab_mod);
+                    version = bconcat!(version, "-", stab_mod);
                 }
-                if op == "<" || op == ">=" {
+                if op == b"<" || op == b">=" {
                     let modifier_pattern = format!("{{-{}$}}", MODIFIER_REGEX);
-                    if !preg_is_match(&modifier_pattern, strtolower(&version_str))
-                        && !version_str.starts_with("dev-")
+                    if !preg_is_match(&modifier_pattern, strtolower(version_str))
+                        && !version_str.starts_with(b"dev-")
                     {
-                        version = format!("{}-dev", version);
+                        version.push_str("-dev");
                     }
                 }
 
-                let final_op = if op_str.is_empty() {
-                    "=".to_string()
-                } else {
-                    op_str
-                };
+                let final_op = op;
                 return Ok(vec![AnyConstraint::Simple(SimpleConstraint::new(
                     final_op, version, None,
                 ))]);
@@ -677,7 +673,7 @@ impl VersionParser {
         position: usize,
         increment: i64,
         pad: &str,
-    ) -> Option<String> {
+    ) -> Option<BString> {
         let part =
             |i: usize| -> i64 { intval(&PhpMixed::string(matches(i).unwrap_or(BStr::new("0")))) };
         let mut parts: [i64; 5] = [0, part(1), part(2), part(3), part(4)];
@@ -701,20 +697,20 @@ impl VersionParser {
             }
         }
 
-        Some(format!(
+        Some(BString::from(format!(
             "{}.{}.{}.{}",
             parts[1], parts[2], parts[3], parts[4]
-        ))
+        )))
     }
 
-    fn expand_stability(&self, stability: &str) -> String {
-        let stability = stability.to_ascii_lowercase();
+    fn expand_stability(&self, stability: &[u8]) -> BString {
+        let stability = strtolower(stability);
 
-        match stability.as_str() {
-            "a" => "alpha".to_string(),
-            "b" => "beta".to_string(),
-            "p" | "pl" => "patch".to_string(),
-            "rc" => "RC".to_string(),
+        match stability.as_slice() {
+            b"a" => "alpha".into(),
+            b"b" => "beta".into(),
+            b"p" | b"pl" => "patch".into(),
+            b"rc" => "RC".into(),
             _ => stability,
         }
     }
@@ -726,25 +722,24 @@ impl VersionParser {
 /// Composer splits on the PCRE delimiter `(?<!^|as|[=>< ,]) *(?<!-)[, ](?!-) *(?!,|as|$)`, which
 /// relies on look-behind/look-ahead the `regex` crate cannot express. This reproduces the PCRE
 /// semantics (greedy ` *` with backtracking around a single `,`/space core, guarded by the
-/// look-arounds) directly over the byte string. Constraint strings are ASCII, and `$` is treated
-/// as end-of-string.
-pub fn split_and_constraints(subject: &str) -> Vec<String> {
-    let b = subject.as_bytes();
+/// look-arounds) directly over the byte string, and `$` is treated as end-of-string.
+pub fn split_and_constraints(subject: &[u8]) -> Vec<BString> {
+    let b = subject;
     let n = b.len();
 
-    let mut pieces: Vec<String> = Vec::new();
+    let mut pieces: Vec<BString> = Vec::new();
     let mut last = 0usize;
     let mut i = 0usize;
     while i <= n {
         if let Some(end) = match_and_delimiter(b, i) {
-            pieces.push(subject[last..i].to_string());
+            pieces.push(BString::from(&subject[last..i]));
             last = end;
             i = end;
         } else {
             i += 1;
         }
     }
-    pieces.push(subject[last..].to_string());
+    pieces.push(BString::from(&subject[last..]));
     pieces
 }
 
@@ -810,8 +805,8 @@ fn match_and_delimiter(b: &[u8], i: usize) -> Option<usize> {
 mod tests {
     use super::split_and_constraints;
 
-    fn split(s: &str) -> Vec<String> {
-        split_and_constraints(s)
+    fn split(s: &str) -> Vec<bstr::BString> {
+        split_and_constraints(s.as_bytes())
     }
 
     #[test]

@@ -221,16 +221,23 @@ pub enum CmpOp {
     Gt,
 }
 
-impl std::fmt::Display for CmpOp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
+impl CmpOp {
+    /// The operator as PHP's `version_compare()` spells it.
+    pub fn as_str(self) -> &'static str {
+        match self {
             CmpOp::Lt => "<",
             CmpOp::Le => "<=",
             CmpOp::Eq => "==",
             CmpOp::Ne => "!=",
             CmpOp::Ge => ">=",
             CmpOp::Gt => ">",
-        })
+        }
+    }
+}
+
+impl std::fmt::Display for CmpOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 

@@ -94,8 +94,7 @@ fn test_filter_packages_by_advisories() {
     assert!(packages[0].ptr_eq(&expected_package1));
     assert!(packages[1].ptr_eq(&expected_package2));
 
-    let constraint: AnyConstraint =
-        SimpleConstraint::new("==".to_string(), "1.0.0.0".to_string(), None).into();
+    let constraint: AnyConstraint = SimpleConstraint::new("==", "1.0.0.0".to_string(), None).into();
     assert!(filtered_pool.is_security_removed_package_version("acme/package", Some(&constraint)));
     assert_eq!(
         filtered_pool

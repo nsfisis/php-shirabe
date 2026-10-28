@@ -3,6 +3,7 @@
 use crate::comparator::Comparator;
 use crate::constraint::SimpleConstraint;
 use crate::version_parser::VersionParser;
+use bstr::BString;
 use std::sync::OnceLock;
 
 pub struct Semver;
@@ -16,43 +17,46 @@ impl Semver {
         VERSION_PARSER.get_or_init(|| VersionParser)
     }
 
-    pub fn satisfies(version: String, constraints: String) -> anyhow::Result<bool> {
+    pub fn satisfies(
+        version: impl AsRef<[u8]>,
+        constraints: impl AsRef<[u8]>,
+    ) -> anyhow::Result<bool> {
         let version_parser = Self::version_parser();
-        let provider = SimpleConstraint::new(
-            "==".to_string(),
-            version_parser.normalize(&version, None)?,
-            None,
-        )
-        .into();
-        let parsed_constraints = version_parser.parse_constraints(&constraints)?;
+        let provider =
+            SimpleConstraint::new("==", version_parser.normalize(version, None)?, None).into();
+        let parsed_constraints = version_parser.parse_constraints(constraints)?;
         Ok(parsed_constraints.matches(&provider))
     }
 
-    pub fn satisfied_by(versions: Vec<String>, constraints: String) -> anyhow::Result<Vec<String>> {
+    pub fn satisfied_by<T: AsRef<[u8]> + Clone>(
+        versions: Vec<T>,
+        constraints: impl AsRef<[u8]>,
+    ) -> anyhow::Result<Vec<T>> {
+        let constraints = constraints.as_ref();
         let mut result = Vec::new();
         for version in versions.iter() {
-            if Self::satisfies(version.clone(), constraints.clone())? {
+            if Self::satisfies(version, constraints)? {
                 result.push(version.clone());
             }
         }
         Ok(result)
     }
 
-    pub fn sort(versions: Vec<String>) -> anyhow::Result<Vec<String>> {
+    pub fn sort<T: AsRef<[u8]> + Clone>(versions: Vec<T>) -> anyhow::Result<Vec<T>> {
         Self::usort(versions, Self::SORT_ASC)
     }
 
-    pub fn rsort(versions: Vec<String>) -> anyhow::Result<Vec<String>> {
+    pub fn rsort<T: AsRef<[u8]> + Clone>(versions: Vec<T>) -> anyhow::Result<Vec<T>> {
         Self::usort(versions, Self::SORT_DESC)
     }
 
-    fn usort(versions: Vec<String>, direction: i64) -> anyhow::Result<Vec<String>> {
+    fn usort<T: AsRef<[u8]> + Clone>(versions: Vec<T>, direction: i64) -> anyhow::Result<Vec<T>> {
         let version_parser = Self::version_parser();
 
-        let mut normalized: Vec<(String, usize)> = versions
+        let mut normalized: Vec<(BString, usize)> = versions
             .iter()
             .enumerate()
-            .map(|(key, version)| -> anyhow::Result<(String, usize)> {
+            .map(|(key, version)| -> anyhow::Result<(BString, usize)> {
                 let normalized_version = version_parser.normalize(version, None)?;
                 // The original PHP code still uses this deprecated function internally.
                 #[allow(deprecated)]
@@ -66,12 +70,12 @@ impl Semver {
             if left.0 == right.0 {
                 return std::cmp::Ordering::Equal;
             }
-            let is_less = Comparator::less_than(left.0.clone(), right.0.clone());
+            let is_less = Comparator::less_than(&left.0, &right.0);
             let cmp_value = if is_less { -direction } else { direction };
             cmp_value.cmp(&0)
         });
 
-        let sorted: Vec<String> = normalized
+        let sorted: Vec<T> = normalized
             .into_iter()
             .map(|(_, key)| versions[key].clone())
             .collect();

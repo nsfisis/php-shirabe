@@ -14,7 +14,7 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::MockHandler;
 use shirabe::util::{HttpDownloader, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, ZipArchive, ZipArchiveMock};
+use shirabe_php_shim::{PhpMixed, ZipArchive, ZipArchiveMock, legacy_lossy};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -45,7 +45,7 @@ fn set_up() -> SetUp {
         dl_config,
     )));
 
-    let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
+    let norm_version = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
     let package: PackageInterfaceHandle =
         CompletePackageHandle::new("test/pkg".to_string(), norm_version, "1.0.0".to_string())
             .into();
@@ -143,7 +143,7 @@ fn test_error_messages() {
 
     // $distUrl = 'file://'.__FILE__: an existing, non-zip file referenced by a file:// URL.
     let dist_url = format!("file://{}/Cargo.toml", env!("CARGO_MANIFEST_DIR"));
-    let norm_version = VersionParser.normalize("1.0.0", None).unwrap();
+    let norm_version = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
     let package: PackageInterfaceHandle =
         CompletePackageHandle::new("test/pkg".to_string(), norm_version, "1.0.0".to_string())
             .into();

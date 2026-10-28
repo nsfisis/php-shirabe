@@ -233,7 +233,7 @@ impl PluginManager {
 
             let current_plugin_api_version = self.get_plugin_api_version();
             let current_plugin_api_constraint = SimpleConstraint::new(
-                "==".to_string(),
+                "==",
                 self.version_parser
                     .normalize(&current_plugin_api_version, None)?,
                 None,

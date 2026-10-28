@@ -19,7 +19,7 @@ use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::output::output_interface;
 
 fn constraint(operator: &str, version: &str) -> shirabe_semver::constraint::AnyConstraint {
-    SimpleConstraint::new(operator.to_string(), version.to_string(), None).into()
+    SimpleConstraint::new(operator, version.to_string(), None).into()
 }
 
 fn full_advisory() -> std::rc::Rc<AnySecurityAdvisory> {

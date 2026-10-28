@@ -3,6 +3,7 @@
 use crate::constraint::{
     Bound, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
+use bstr::{BStr, BString};
 use shirabe_php_shim::CmpOp;
 
 /// Corresponds to PHP's `ConstraintInterface`.
@@ -35,7 +36,7 @@ impl AnyConstraint {
         }
     }
 
-    pub fn compile(&self, other_operator: CmpOp) -> String {
+    pub fn compile(&self, other_operator: CmpOp) -> BString {
         match self {
             Self::Simple(c) => c.compile(other_operator),
             Self::Multi(c) => c.compile(other_operator),
@@ -62,7 +63,7 @@ impl AnyConstraint {
         }
     }
 
-    pub fn get_pretty_string(&self) -> String {
+    pub fn get_pretty_string(&self) -> BString {
         match self {
             Self::Simple(c) => c.get_pretty_string(),
             Self::Multi(c) => c.get_pretty_string(),
@@ -88,10 +89,10 @@ impl AnyConstraint {
         }
     }
 
-    pub fn get_version(&self) -> &str {
+    pub fn get_version(&self) -> &BStr {
         match self {
             Self::Simple(c) => c.get_version(),
-            _ => "",
+            _ => BStr::new(""),
         }
     }
 
@@ -121,12 +122,12 @@ impl AnyConstraint {
     /// constraint's string form. PHP has no such reader — `$prettyString` is protected — so
     /// this exists for callers that must round-trip a constraint without inventing a value
     /// for the unset case.
-    pub fn pretty_string(&self) -> Option<&str> {
+    pub fn pretty_string(&self) -> Option<&BStr> {
         match self {
-            Self::Simple(c) => c.pretty_string.as_deref(),
-            Self::Multi(c) => c.pretty_string.as_deref(),
-            Self::MatchAll(c) => c.pretty_string.as_deref(),
-            Self::MatchNone(c) => c.pretty_string.as_deref(),
+            Self::Simple(c) => c.pretty_string.as_ref().map(|s| s.as_ref()),
+            Self::Multi(c) => c.pretty_string.as_ref().map(|s| s.as_ref()),
+            Self::MatchAll(c) => c.pretty_string.as_ref().map(|s| s.as_ref()),
+            Self::MatchNone(c) => c.pretty_string.as_ref().map(|s| s.as_ref()),
         }
     }
 
@@ -135,12 +136,32 @@ impl AnyConstraint {
     /// the pretty string at construction instead; this setter exists only so
     /// `MultiConstraint::create()` can apply the pretty string PHP sets on its
     /// (possibly polymorphic) result.
-    pub(crate) fn set_pretty_string(&mut self, pretty_string: Option<String>) {
+    pub(crate) fn set_pretty_string(&mut self, pretty_string: Option<BString>) {
         match self {
             Self::Simple(c) => c.pretty_string = pretty_string,
             Self::Multi(c) => c.pretty_string = pretty_string,
             Self::MatchAll(c) => c.pretty_string = pretty_string,
             Self::MatchNone(c) => c.pretty_string = pretty_string,
+        }
+    }
+
+    /// PHP's `__toString()`.
+    pub fn to_php_string(&self) -> BString {
+        match self {
+            Self::Simple(c) => c.to_php_string(),
+            Self::Multi(c) => c.to_php_string(),
+            Self::MatchAll(c) => c.to_php_string(),
+            Self::MatchNone(c) => c.to_php_string(),
+        }
+    }
+
+    /// Appends PHP's `__toString()` to `out`.
+    pub fn append_php_string(&self, out: &mut BString) {
+        match self {
+            Self::Simple(c) => c.append_php_string(out),
+            Self::Multi(c) => c.append_php_string(out),
+            Self::MatchAll(c) => c.append_php_string(out),
+            Self::MatchNone(c) => c.append_php_string(out),
         }
     }
 }

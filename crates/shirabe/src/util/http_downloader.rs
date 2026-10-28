@@ -521,7 +521,7 @@ impl HttpDownloader {
                         .to_str_lossy(),
                 )?;
                 let composer_constraint = SimpleConstraint::new(
-                    "==".to_string(),
+                    "==",
                     version_parser
                         .normalize(&composer::get_version(), None)?
                         .to_string(),
@@ -567,7 +567,7 @@ impl HttpDownloader {
                                 .to_str_lossy(),
                         )?;
                         let composer_constraint = SimpleConstraint::new(
-                            "==".to_string(),
+                            "==",
                             version_parser
                                 .normalize(&composer::get_version(), None)?
                                 .to_string(),

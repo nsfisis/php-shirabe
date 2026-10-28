@@ -306,11 +306,7 @@ fn match_all() -> AnyConstraint {
 }
 
 fn constraint(operator: &str, version: &str) -> AnyConstraint {
-    AnyConstraint::Simple(SimpleConstraint::new(
-        operator.to_string(),
-        version.to_string(),
-        None,
-    ))
+    AnyConstraint::Simple(SimpleConstraint::new(operator, version.to_string(), None))
 }
 
 fn link(source: &str, target: &str, constraint: AnyConstraint, description: Option<&str>) -> Link {

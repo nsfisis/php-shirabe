@@ -2063,18 +2063,15 @@ fn build_unique_props() -> IndexMap<String, (ValidatorFn, NormalizerFn)> {
         "minimum-stability".to_string(),
         (
             Box::new(|val| {
-                let normalized = VersionParser::normalize_stability(
-                    &val.as_string().unwrap_or_default().to_str_lossy(),
-                )
-                .unwrap_or_default();
-                PhpMixed::Bool(base_package::STABILITIES.contains_key(normalized.as_str()))
+                let normalized =
+                    VersionParser::normalize_stability(val.as_string().unwrap_or_default())
+                        .unwrap_or_default();
+                PhpMixed::Bool(base_package::STABILITIES.contains_key(&*legacy_lossy(&normalized)))
             }),
             Box::new(|val| {
                 PhpMixed::string(
-                    VersionParser::normalize_stability(
-                        &val.as_string().unwrap_or_default().to_str_lossy(),
-                    )
-                    .unwrap_or_default(),
+                    VersionParser::normalize_stability(val.as_string().unwrap_or_default())
+                        .unwrap_or_default(),
                 )
             }),
         ),

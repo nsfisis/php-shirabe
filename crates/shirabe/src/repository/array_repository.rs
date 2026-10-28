@@ -56,11 +56,8 @@ impl ArrayRepository {
 
         for package in self.get_packages_internal() {
             if name == package.get_name() {
-                let pkg_constraint = SimpleConstraint::new(
-                    "==".to_string(),
-                    package.get_version().to_string(),
-                    None,
-                );
+                let pkg_constraint =
+                    SimpleConstraint::new("==", package.get_version().to_string(), None);
                 if constraint.matches(&pkg_constraint.into()) {
                     return Ok(Some(package));
                 }
@@ -92,12 +89,8 @@ impl ArrayRepository {
             if name == package.get_name()
                 && (constraint.is_none()
                     || constraint.as_ref().unwrap().matches(
-                        &SimpleConstraint::new(
-                            "==".to_string(),
-                            package.get_version().to_string(),
-                            None,
-                        )
-                        .into(),
+                        &SimpleConstraint::new("==", package.get_version().to_string(), None)
+                            .into(),
                     ))
             {
                 packages.push(package);
@@ -245,12 +238,8 @@ impl RepositoryInterface for ArrayRepository {
                 let constraint_matches = match constraint_opt {
                     None => true,
                     Some(c) => c.matches(
-                        &SimpleConstraint::new(
-                            "==".to_string(),
-                            package.get_version().to_string(),
-                            None,
-                        )
-                        .into(),
+                        &SimpleConstraint::new("==", package.get_version().to_string(), None)
+                            .into(),
                     ),
                 };
                 if constraint_matches

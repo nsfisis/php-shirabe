@@ -62,9 +62,7 @@ impl Pool {
 
         let mut result: IndexMap<String, String> = IndexMap::new();
         for (version, pretty_version) in versions {
-            if constraint
-                .matches(&SimpleConstraint::new("==".to_string(), version.to_string(), None).into())
-            {
+            if constraint.matches(&SimpleConstraint::new("==", version.to_string(), None).into()) {
                 result.insert(version.clone(), pretty_version.clone());
             }
         }
@@ -102,9 +100,7 @@ impl Pool {
             .unwrap_or(&empty);
         for (version, _package_with_security_advisories) in versions {
             if let Some(c) = constraint
-                && c.matches(
-                    &SimpleConstraint::new("==".to_string(), version.to_string(), None).into(),
-                )
+                && c.matches(&SimpleConstraint::new("==", version.to_string(), None).into())
             {
                 return true;
             }
@@ -125,9 +121,7 @@ impl Pool {
             .unwrap_or(&empty);
         for (version, package_with_security_advisories) in versions {
             if let Some(c) = constraint
-                && c.matches(
-                    &SimpleConstraint::new("==".to_string(), version.to_string(), None).into(),
-                )
+                && c.matches(&SimpleConstraint::new("==", version.to_string(), None).into())
             {
                 return package_with_security_advisories
                     .iter()
@@ -151,9 +145,7 @@ impl Pool {
             .unwrap_or(&empty);
         for (version, _pretty_version) in versions {
             if let Some(c) = constraint
-                && c.matches(
-                    &SimpleConstraint::new("==".to_string(), version.to_string(), None).into(),
-                )
+                && c.matches(&SimpleConstraint::new("==", version.to_string(), None).into())
             {
                 return true;
             }

@@ -74,14 +74,7 @@ impl PoolOptimizer {
             irremovable_package_constraint_groups
                 .entry(package.get_name())
                 .or_default()
-                .push(
-                    SimpleConstraint::new(
-                        "==".to_string(),
-                        package.get_version().to_string(),
-                        None,
-                    )
-                    .into(),
-                );
+                .push(SimpleConstraint::new("==", package.get_version().to_string(), None).into());
         }
 
         // Extract requested package requirements
@@ -138,7 +131,7 @@ impl PoolOptimizer {
             let constraint = irremovable_package_constraints
                 .get(&package.get_name())
                 .unwrap();
-            if CompilingMatcher::r#match(constraint, CmpOp::Eq, &package.get_version()) {
+            if CompilingMatcher::r#match(constraint, CmpOp::Eq, package.get_version()) {
                 self.mark_package_irremovable(package.clone());
             }
         }
@@ -230,7 +223,7 @@ impl PoolOptimizer {
                     if CompilingMatcher::r#match(
                         require_constraint,
                         CmpOp::Eq,
-                        &package.get_version(),
+                        package.get_version(),
                     ) {
                         group_hash_parts.push(format!(
                             "require:{}",
@@ -243,7 +236,7 @@ impl PoolOptimizer {
                             if CompilingMatcher::r#match(
                                 link.get_constraint(),
                                 CmpOp::Eq,
-                                &package.get_version(),
+                                package.get_version(),
                             ) {
                                 // Use the same hash part as the regular require hash because that's what the replacement does
                                 group_hash_parts.push(format!(
@@ -261,7 +254,7 @@ impl PoolOptimizer {
                             if CompilingMatcher::r#match(
                                 conflict_constraint,
                                 CmpOp::Eq,
-                                &package.get_version(),
+                                package.get_version(),
                             ) {
                                 group_hash_parts.push(format!(
                                     "conflict:{}",

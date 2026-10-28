@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use shirabe::package::handle::{PackageHandle, PackageInterfaceHandle};
 use shirabe::package::package::Package;
 use shirabe::package::version::version_bumper::VersionBumper;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 use shirabe_semver::VersionParser;
 
 #[test]
@@ -18,7 +18,7 @@ fn test_bump_requirement() {
 
         let mut package = Package::new(
             "foo/bar".to_string(),
-            version_parser.normalize(pretty_version, None).unwrap(),
+            legacy_lossy(&version_parser.normalize(pretty_version, None).unwrap()).into_owned(),
             pretty_version.to_string(),
         );
 

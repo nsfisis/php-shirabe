@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/RequestTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::request::Request;
 use shirabe::package::version::version_parser::VersionParser;
@@ -16,9 +17,9 @@ use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstr
 fn get_version_constraint(operator: &str, version: &str) -> AnyConstraint {
     let normalized = VersionParser::new().normalize(version, None).unwrap();
     AnyConstraint::Simple(SimpleConstraint::new(
-        operator.to_string(),
+        operator,
         normalized,
-        Some(format!("{} {}", operator, version)),
+        Some(BString::from(format!("{} {}", operator, version))),
     ))
 }
 

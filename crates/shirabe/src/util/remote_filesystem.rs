@@ -139,7 +139,10 @@ impl RemoteFilesystem {
         let value = self.call(
             "findStatusMessage",
             vec![PluginValue::List(
-                headers.iter().map(PluginValue::string).collect(),
+                headers
+                    .iter()
+                    .map(|h| PluginValue::string(h.as_str()))
+                    .collect(),
             )],
         )?;
         match value {

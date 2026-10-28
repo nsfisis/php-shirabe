@@ -21,7 +21,7 @@ impl VersionBumper {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<String> {
         let parser = VersionParser::new();
-        let pretty_constraint = constraint.get_pretty_string();
+        let pretty_constraint = legacy_lossy(&constraint.get_pretty_string()).into_owned();
         if pretty_constraint.starts_with("dev-") {
             return Ok(pretty_constraint);
         }
@@ -94,7 +94,7 @@ impl VersionBumper {
             })
             .collect();
         if !constraint_matches.is_empty() {
-            let mut modified = pretty_constraint.clone();
+            let mut modified = legacy_lossy(&pretty_constraint.clone()).into_owned();
             for (match_str, match_offset) in constraint_matches.into_iter().rev() {
                 let suffix = if match_str.matches('.').count() == 2
                     && version_without_suffix.matches('.').count() == 1
@@ -120,16 +120,21 @@ impl VersionBumper {
                     } else {
                         format!("{}{}", new_pretty_constraint, suffix)
                     };
-                modified = String::from_utf8(
-                    substr_replace(
-                        &modified,
-                        &replacement,
-                        match_offset,
-                        Some(Platform::strlen(&match_str)),
+                modified = legacy_lossy(&bstr::BString::from(
+                    String::from_utf8(
+                        substr_replace(
+                            &modified,
+                            &replacement,
+                            match_offset,
+                            Some(Platform::strlen(&match_str)),
+                        )
+                        .into(),
                     )
-                    .into(),
-                )
-                .expect("the replaced range is a regex match, so it ends on character boundaries");
+                    .expect(
+                        "the replaced range is a regex match, so it ends on character boundaries",
+                    ),
+                ))
+                .into_owned();
             }
 
             let new_constraint = parser.parse_constraints(&modified)?;

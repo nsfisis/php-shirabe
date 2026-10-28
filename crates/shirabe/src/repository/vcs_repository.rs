@@ -502,12 +502,7 @@ impl VcsRepository {
                 if let Some(existing_package) = self.inner.find_package_internal(
                     &tag_package_name,
                     crate::repository::FindPackageConstraint::Constraint(
-                        SimpleConstraint::new(
-                            "=".to_string(),
-                            version_normalized.to_string(),
-                            None,
-                        )
-                        .into(),
+                        SimpleConstraint::new("=", version_normalized.to_string(), None).into(),
                     ),
                 )? {
                     if is_very_verbose {
@@ -970,8 +965,7 @@ impl VcsRepository {
             if let Some(existing_package) = self.inner.find_package_internal(
                 &name,
                 crate::repository::FindPackageConstraint::Constraint(
-                    SimpleConstraint::new("=".to_string(), version_normalized.to_string(), None)
-                        .into(),
+                    SimpleConstraint::new("=", version_normalized.to_string(), None).into(),
                 ),
             )? {
                 if is_very_verbose {

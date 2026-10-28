@@ -9,7 +9,7 @@ use crate::util::PackageInfo;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     DATE_ATOM, InvalidArgumentException, PhpMixed, array_all, array_any, array_key_exists,
-    array_keys, array_reduce, get_class, preg_is_match,
+    array_keys, array_reduce, get_class, legacy_lossy, preg_is_match,
 };
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::helper::Cell;
@@ -462,7 +462,7 @@ impl Auditor {
                     self.get_cve(sa),
                     sa.title.clone(),
                     self.get_url(sa),
-                    sa.affected_versions().get_pretty_string(),
+                    legacy_lossy(&sa.affected_versions().get_pretty_string()).into_owned(),
                     sa.reported_at.format(DATE_ATOM).to_string(),
                 ];
                 if let Some(ignored) = advisory.as_ignored() {
@@ -517,7 +517,9 @@ impl Auditor {
                 error.push(format!("URL: {}", self.get_url(sa)));
                 error.push(format!(
                     "Affected versions: {}",
-                    OutputFormatter::escape(&sa.affected_versions().get_pretty_string())?
+                    OutputFormatter::escape(&legacy_lossy(
+                        &sa.affected_versions().get_pretty_string()
+                    ))?
                 ));
                 error.push(format!("Reported at: {}", sa.reported_at.format(DATE_ATOM)));
                 if let Some(ignored) = advisory.as_ignored() {

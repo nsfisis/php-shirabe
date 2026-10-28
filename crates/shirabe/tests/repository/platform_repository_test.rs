@@ -1602,8 +1602,7 @@ fn assert_package_links(
             link.get_target(),
             expected_links
         );
-        let version_constraint =
-            SimpleConstraint::new("=".to_string(), source_package.get_version(), None);
+        let version_constraint = SimpleConstraint::new("=", source_package.get_version(), None);
         assert!(link.get_constraint().matches(&version_constraint.into()));
     }
 }

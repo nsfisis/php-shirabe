@@ -1164,7 +1164,7 @@ impl LoaderInterface for ValidatingArrayLoader {
         }
 
         let unbound_constraint =
-            SimpleConstraint::new("=".to_string(), "10000000-dev".to_string(), None).into();
+            SimpleConstraint::new("=", "10000000-dev".to_string(), None).into();
 
         let link_types: Vec<&'static str> = SUPPORTED_LINK_TYPES.keys().copied().collect();
         for link_type in link_types {
@@ -1250,7 +1250,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                                 .as_constraint()
                                 .is_some_and(|c| c.get_operator() == CmpOp::Eq)
                             && AnyConstraint::from(SimpleConstraint::new(
-                                ">=".to_string(),
+                                ">=",
                                 "1.0.0.0-dev".to_string(),
                                 None,
                             ))

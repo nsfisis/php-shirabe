@@ -27,9 +27,9 @@ fn values_fixture_package() -> PackageInterfaceHandle {
 
 fn simple(operator: &str, version: &str, pretty_string: Option<&str>) -> AnyConstraint {
     AnyConstraint::Simple(SimpleConstraint::new(
-        operator.to_string(),
+        operator,
         version.to_string(),
-        pretty_string.map(str::to_string),
+        pretty_string.map(str::to_string).map(bstr::BString::from),
     ))
 }
 
@@ -61,7 +61,7 @@ fn seeded_requires() -> IndexMap<String, Link> {
                     simple("<", "2.0.0.0", Some("<2.0")),
                 ],
                 true,
-                Some("^1.0".to_string()),
+                Some(bstr::BString::from("^1.0".to_string())),
             )),
             "^1.0",
         ),
@@ -78,7 +78,9 @@ fn seeded_requires() -> IndexMap<String, Link> {
         "foo/none".to_string(),
         link(
             "foo/none",
-            AnyConstraint::MatchNone(MatchNoneConstraint::new(Some("nothing".to_string()))),
+            AnyConstraint::MatchNone(MatchNoneConstraint::new(Some(bstr::BString::from(
+                "nothing".to_string(),
+            )))),
             "",
         ),
     );

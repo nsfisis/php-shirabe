@@ -192,15 +192,15 @@ impl PolicyInterface for DefaultPolicy {
         if (a.is_dev() && a.get_version().starts_with("dev-"))
             || (b.is_dev() && b.get_version().starts_with("dev-"))
         {
-            let constraint = SimpleConstraint::new(operator.to_string(), b.get_version(), None);
-            let version = SimpleConstraint::new("==".to_string(), a.get_version(), None);
+            let constraint = SimpleConstraint::new(operator, b.get_version(), None);
+            let version = SimpleConstraint::new("==", a.get_version(), None);
             return constraint.match_specific(&version, true);
         }
 
         CompilingMatcher::r#match(
-            &SimpleConstraint::new(operator.to_string(), b.get_version(), None).into(),
+            &SimpleConstraint::new(operator, b.get_version(), None).into(),
             CmpOp::Eq,
-            &a.get_version(),
+            a.get_version(),
         )
     }
 

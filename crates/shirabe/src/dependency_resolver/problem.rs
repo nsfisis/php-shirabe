@@ -8,9 +8,9 @@ use crate::repository::{LockArrayRepository, PlatformRepository, RepositorySet};
 use bstr::B;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, LogicException, PhpMixed, extension_loaded, implode, legacy_lossy, loosely_compare,
-    php_regex, preg_is_match, preg_match, preg_replace, spl_object_hash, sprintf, str_replace,
-    stripos, strpos, strtolower, substr, substr_count, version_compare,
+    CmpOp, LogicException, PhpMixed, bconcat, extension_loaded, implode, legacy_lossy,
+    loosely_compare, php_regex, preg_is_match, preg_match, preg_replace, spl_object_hash, sprintf,
+    str_replace, stripos, strpos, strtolower, substr, substr_count, version_compare,
 };
 use shirabe_semver::constraint::{AnyConstraint, MultiConstraint, SimpleConstraint};
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -574,12 +574,12 @@ impl Problem {
                     MultiConstraint::new(
                         vec![
                             AnyConstraint::Simple(SimpleConstraint::new(
-                                "==".to_string(),
+                                "==",
                                 new_constraint.clone(),
                                 None,
                             )),
                             AnyConstraint::Simple(SimpleConstraint::new(
-                                "==".to_string(),
+                                "==",
                                 legacy_lossy(&str_replace("#", "+", &new_constraint)).into_owned(),
                                 None,
                             )),
@@ -622,9 +622,8 @@ impl Problem {
                 let filtered: Vec<&BasePackageHandle> = packages
                     .iter()
                     .filter(|p| {
-                        root_reqs[package_name].matches(
-                            &SimpleConstraint::new("==".to_string(), p.get_version(), None).into(),
-                        )
+                        root_reqs[package_name]
+                            .matches(&SimpleConstraint::new("==", p.get_version(), None).into())
                     })
                     .collect();
                 if filtered.is_empty() {
@@ -661,10 +660,8 @@ impl Problem {
                     let filtered: Vec<&BasePackageHandle> = packages
                         .iter()
                         .filter(|p| {
-                            temp_reqs[&name].matches(
-                                &SimpleConstraint::new("==".to_string(), p.get_version(), None)
-                                    .into(),
-                            )
+                            temp_reqs[&name]
+                                .matches(&SimpleConstraint::new("==", p.get_version(), None).into())
                         })
                         .collect();
                     if filtered.is_empty() {
@@ -697,17 +694,13 @@ impl Problem {
             }
 
             if let Some(ref lp) = locked_package {
-                let fixed_constraint = AnyConstraint::from(SimpleConstraint::new(
-                    "==".to_string(),
-                    lp.get_version(),
-                    None,
-                ));
+                let fixed_constraint =
+                    AnyConstraint::from(SimpleConstraint::new("==", lp.get_version(), None));
                 let filtered: Vec<&BasePackageHandle> = packages
                     .iter()
                     .filter(|p| {
-                        fixed_constraint.matches(
-                            &SimpleConstraint::new("==".to_string(), p.get_version(), None).into(),
-                        )
+                        fixed_constraint
+                            .matches(&SimpleConstraint::new("==", p.get_version(), None).into())
                     })
                     .collect();
                 if filtered.is_empty() {
@@ -1379,7 +1372,7 @@ impl Problem {
         if let Some(c) = constraint
             && c.is_constraint()
             && c.get_operator() == Some(CmpOp::Eq)
-            && !c.get_version().starts_with("dev-")
+            && !c.get_version().starts_with(b"dev-")
         {
             if !preg_is_match(php_regex!(r"{^\d+(?:\.\d+)*$}"), c.get_pretty_string()) {
                 return format!(" {} (exact version match)", c.get_pretty_string());
@@ -1389,7 +1382,7 @@ impl Problem {
             let mut i = 3 - substr_count(&versions[0], ".");
             while i > 0 {
                 let last = versions.last().unwrap().clone();
-                versions.push(format!("{}.0", last));
+                versions.push(bconcat!(last, ".0"));
                 i -= 1;
             }
 
@@ -1401,7 +1394,7 @@ impl Problem {
                     last
                 )
             } else {
-                versions[0].clone()
+                legacy_lossy(&versions[0].clone()).into_owned()
             };
             return format!(
                 " {} (exact version match: {})",

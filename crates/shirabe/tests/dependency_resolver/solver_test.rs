@@ -16,6 +16,7 @@ use shirabe::repository::array_repository::ArrayRepository;
 use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_set::RepositorySet;
+use shirabe_php_shim::legacy_lossy;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 
 #[allow(dead_code)]
@@ -54,7 +55,7 @@ fn set_up() -> Fixtures {
 /// PHP `new Link($source, $target, $constraint, $type)`: prettyConstraint defaults to
 /// `(string) $constraint`.
 fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &str) -> Link {
-    let pretty = constraint.get_pretty_string();
+    let pretty = legacy_lossy(&constraint.get_pretty_string()).into_owned();
     Link::new(
         source.to_string(),
         target.to_string(),
@@ -1916,13 +1917,13 @@ fn test_conflict_result_empty() {
     request
         .require_name(
             "A",
-            Some(MatchAllConstraint::new(Some("*".to_string())).into()),
+            Some(MatchAllConstraint::new(Some(bstr::BString::from("*".to_string()))).into()),
         )
         .unwrap();
     request
         .require_name(
             "B",
-            Some(MatchAllConstraint::new(Some("*".to_string())).into()),
+            Some(MatchAllConstraint::new(Some(bstr::BString::from("*".to_string()))).into()),
         )
         .unwrap();
 
@@ -2062,7 +2063,7 @@ fn test_require_mismatch_exception() {
     request
         .require_name(
             "A",
-            Some(MatchAllConstraint::new(Some("*".to_string())).into()),
+            Some(MatchAllConstraint::new(Some(bstr::BString::from("*".to_string()))).into()),
         )
         .unwrap();
 

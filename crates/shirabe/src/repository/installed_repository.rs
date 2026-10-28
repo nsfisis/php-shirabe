@@ -64,12 +64,8 @@ impl InstalledRepository {
                 if name == candidate.get_name() {
                     if constraint.is_none()
                         || constraint.as_ref().unwrap().matches(
-                            &SimpleConstraint::new(
-                                "==".to_string(),
-                                candidate.get_version().to_string(),
-                                None,
-                            )
-                            .into(),
+                            &SimpleConstraint::new("==", candidate.get_version().to_string(), None)
+                                .into(),
                         )
                     {
                         matches.push(candidate.clone());
@@ -205,11 +201,8 @@ impl InstalledRepository {
             if invert && needles.contains(&package.get_name().to_string()) {
                 for link in package.get_conflicts().values() {
                     for pkg in self.find_packages(link.get_target(), None)? {
-                        let version = SimpleConstraint::new(
-                            "=".to_string(),
-                            pkg.get_version().to_string(),
-                            None,
-                        );
+                        let version =
+                            SimpleConstraint::new("=", pkg.get_version().to_string(), None);
                         if link.get_constraint().matches(&version.into()) == invert {
                             results.push(DependentsEntry(package.clone(), link.clone(), None));
                         }
@@ -220,11 +213,8 @@ impl InstalledRepository {
             for link in package.get_conflicts().values() {
                 if needles.contains(&link.get_target().to_string()) {
                     for pkg in self.find_packages(link.get_target(), None)? {
-                        let version = SimpleConstraint::new(
-                            "=".to_string(),
-                            pkg.get_version().to_string(),
-                            None,
-                        );
+                        let version =
+                            SimpleConstraint::new("=", pkg.get_version().to_string(), None);
                         if link.get_constraint().matches(&version.into()) == invert {
                             results.push(DependentsEntry(package.clone(), link.clone(), None));
                         }
@@ -236,12 +226,7 @@ impl InstalledRepository {
                 && constraint.is_some()
                 && needles.contains(&package.get_name().to_string())
                 && constraint.as_ref().unwrap().matches(
-                    &SimpleConstraint::new(
-                        "=".to_string(),
-                        package.get_version().to_string(),
-                        None,
-                    )
-                    .into(),
+                    &SimpleConstraint::new("=", package.get_version().to_string(), None).into(),
                 )
             {
                 'requires: for link in package.get_requires().values() {
@@ -284,12 +269,8 @@ impl InstalledRepository {
                             continue;
                         }
 
-                        let mut version: AnyConstraint = SimpleConstraint::new(
-                            "=".to_string(),
-                            pkg.get_version().to_string(),
-                            None,
-                        )
-                        .into();
+                        let mut version: AnyConstraint =
+                            SimpleConstraint::new("=", pkg.get_version().to_string(), None).into();
 
                         if link.get_target() != pkg.get_name().as_str() {
                             let replaces_and_provides = array_merge_map(

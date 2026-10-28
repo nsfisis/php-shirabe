@@ -289,9 +289,11 @@ impl Command for CheckPlatformReqsCommand {
                         let candidate_constraint: Option<AnyConstraint> =
                             if candidate.get_name() == *require {
                                 let c = SimpleConstraint::new(
-                                    "=".to_string(),
+                                    "=",
                                     candidate.get_version().to_string(),
-                                    Some(candidate.get_pretty_version().to_string()),
+                                    Some(bstr::BString::from(
+                                        candidate.get_pretty_version().to_string(),
+                                    )),
                                 );
                                 Some(c.into())
                             } else {

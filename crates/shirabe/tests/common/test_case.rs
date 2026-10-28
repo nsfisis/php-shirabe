@@ -4,6 +4,7 @@
 //! `#[path = "../common/test_case.rs"] mod test_case;`.
 #![allow(dead_code)]
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::console::application::ApplicationHandle;
@@ -23,7 +24,7 @@ use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_shim::{
     PHP_ENV, PHP_EOL, PHP_SERVER, PhpResource, function_exists, fwrite_resource, getenv,
-    php_fopen_resource, putenv, putenv_clear, rewind, stream_get_contents,
+    legacy_lossy, php_fopen_resource, putenv, putenv_clear, rewind, stream_get_contents,
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -38,14 +39,14 @@ use tempfile::TempDir;
 
 /// ref: TestCase::getPackage (default class CompletePackage)
 pub fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
-    let norm_version = VersionParser.normalize(version, None).unwrap();
+    let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
     CompletePackageHandle::new(name.to_string(), norm_version, version.to_string()).into()
 }
 
 /// ref: TestCase::getPackage but returning the concrete `CompletePackageHandle` so the
 /// `CompletePackage`-only setters (`set_license`, `set_homepage`, ...) are reachable.
 pub fn get_complete_package(name: &str, version: &str) -> CompletePackageHandle {
-    let norm_version = VersionParser.normalize(version, None).unwrap();
+    let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
     CompletePackageHandle::new(name.to_string(), norm_version, version.to_string())
 }
 
@@ -54,7 +55,7 @@ pub fn get_alias_package(
     package: &PackageInterfaceHandle,
     version: &str,
 ) -> PackageInterfaceHandle {
-    let norm_version = VersionParser.normalize(version, None).unwrap();
+    let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
     let complete = CompletePackageHandle::from_rc_unchecked(package.as_rc().clone());
     CompleteAliasPackageHandle::new(complete, norm_version, version.to_string()).into()
 }
@@ -63,9 +64,9 @@ pub fn get_alias_package(
 pub fn get_version_constraint(operator: &str, version: &str) -> AnyConstraint {
     let normalized = VersionParser.normalize(version, None).unwrap();
     AnyConstraint::Simple(SimpleConstraint::new(
-        operator.to_string(),
+        operator,
         normalized,
-        Some(format!("{} {}", operator, version)),
+        Some(BString::from(format!("{} {}", operator, version))),
     ))
 }
 

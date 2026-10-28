@@ -274,7 +274,7 @@ impl RepositorySet {
                     MultiConstraint::new(
                         vec![
                             AnyConstraint::Simple(SimpleConstraint::new(
-                                "=".to_string(),
+                                "=",
                                 package.get_version().to_string(),
                                 None,
                             )),
@@ -288,8 +288,7 @@ impl RepositorySet {
             } else {
                 map.insert(
                     name,
-                    SimpleConstraint::new("=".to_string(), package.get_version().to_string(), None)
-                        .into(),
+                    SimpleConstraint::new("=", package.get_version().to_string(), None).into(),
                 );
             }
         }

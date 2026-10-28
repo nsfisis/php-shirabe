@@ -152,8 +152,7 @@ impl SecurityAdvisoryPoolFilter {
             }
 
             let package_constraint =
-                SimpleConstraint::new("==".to_string(), package.get_version().to_string(), None)
-                    .into();
+                SimpleConstraint::new("==", package.get_version().to_string(), None).into();
             for advisory in &advisory_map[&package_name] {
                 if advisory.affected_versions().matches(&package_constraint) {
                     matching_advisories.push(advisory.clone());

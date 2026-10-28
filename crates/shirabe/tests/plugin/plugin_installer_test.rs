@@ -34,7 +34,9 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_rpc::PluginValue;
-use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException, UnexpectedValueException};
+use shirabe_php_shim::{
+    Catch as _, PhpMixed, RuntimeException, UnexpectedValueException, legacy_lossy,
+};
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 use tempfile::TempDir;
@@ -638,9 +640,12 @@ fn set_plugin_api_version_with_plugins(
 
     let plug_api_internal_package: PackageInterfaceHandle = CompletePackageHandle::new(
         "composer-plugin-api".to_string(),
-        VersionParser
-            .normalize(new_plugin_api_version, None)
-            .unwrap(),
+        legacy_lossy(
+            &VersionParser
+                .normalize(new_plugin_api_version, None)
+                .unwrap(),
+        )
+        .into_owned(),
         new_plugin_api_version.to_string(),
     )
     .into();

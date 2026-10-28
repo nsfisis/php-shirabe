@@ -118,9 +118,9 @@ impl AliasPackage {
                 // link is self.version, but must be replacing also the replaced version
                 if link.get_pretty_constraint() == "self.version" {
                     let constraint = SimpleConstraint::new(
-                        "=".to_string(),
+                        "=",
                         self.version.to_string(),
-                        Some(pretty_version.clone()),
+                        Some(bstr::BString::from(pretty_version.clone())),
                     );
                     let new_link = Link::new(
                         link.get_source().to_string(),
@@ -142,9 +142,9 @@ impl AliasPackage {
                         self.has_self_version_requires = true;
                     }
                     let constraint = SimpleConstraint::new(
-                        "=".to_string(),
+                        "=",
                         self.version.to_string(),
-                        Some(pretty_version.clone()),
+                        Some(bstr::BString::from(pretty_version.clone())),
                     );
                     *link = Link::new(
                         link.get_source().to_string(),

@@ -47,7 +47,7 @@
 1 crates/shirabe/src/command/base_command.rs
 1 crates/shirabe/src/command/base_config_command.rs
 1 crates/shirabe/src/command/bump_command.rs
-19 crates/shirabe/src/command/config_command.rs
+17 crates/shirabe/src/command/config_command.rs
 2 crates/shirabe/src/command/create_project_command.rs
 3 crates/shirabe/src/command/diagnose_command.rs
 9 crates/shirabe/src/command/init_command.rs

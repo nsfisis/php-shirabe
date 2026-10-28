@@ -1,10 +1,11 @@
 //! ref: composer/vendor/composer/semver/src/Interval.php
 
 use crate::constraint::SimpleConstraint;
+use bstr::BString;
 
 #[derive(Debug, Clone)]
 pub struct DevConstraintSet {
-    pub names: Vec<String>,
+    pub names: Vec<BString>,
     pub exclude: bool,
 }
 
@@ -28,11 +29,11 @@ impl Interval {
     }
 
     pub fn from_zero() -> SimpleConstraint {
-        SimpleConstraint::new(">=".to_string(), "0.0.0.0-dev".to_string(), None)
+        SimpleConstraint::new(">=", "0.0.0.0-dev".to_string(), None)
     }
 
     pub fn until_positive_infinity() -> SimpleConstraint {
-        SimpleConstraint::new("<".to_string(), format!("{}.0.0.0", i64::MAX), None)
+        SimpleConstraint::new("<", format!("{}.0.0.0", i64::MAX), None)
     }
 
     pub fn any() -> Self {
