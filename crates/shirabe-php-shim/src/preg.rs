@@ -222,7 +222,6 @@ where
 // modifiers are handled; PCRE-only constructs (possessive quantifiers,
 // lookaround, backreferences) are not supported by `regex` and must be avoided
 // in the caller's pattern.
-// TODO(pcre): replace with a faithful PCRE engine to restore full semantics.
 // PCRE treats `\<` and `\>` as escaped literal `<`/`>`, but the `regex` crate
 // reads them as start/end-of-word boundary assertions. Rewrite those escapes to
 // the literal characters so PCRE-sourced patterns (e.g. anything run through
