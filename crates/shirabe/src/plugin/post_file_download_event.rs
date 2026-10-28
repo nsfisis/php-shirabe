@@ -3,6 +3,7 @@
 use crate::event_dispatcher::{Event, EventInterface};
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::FileDownloadContext;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -87,7 +88,7 @@ impl EventInterface for PostFileDownloadEvent {
         self.inner.get_arguments()
     }
 
-    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+    fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
         self.inner.get_flags()
     }
 

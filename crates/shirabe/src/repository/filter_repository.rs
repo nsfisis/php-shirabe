@@ -5,7 +5,7 @@ use crate::repository::{
     AdvisoryProviderInterface, FindPackageConstraint, LoadPackagesResult, ProviderInfo,
     RepositoryInterface, RepositoryInterfaceHandle, SearchResult, SecurityAdvisoryResult,
 };
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, preg_is_match};
 use shirabe_semver::constraint::AnyConstraint;
@@ -21,13 +21,13 @@ pub struct FilterRepository {
 impl FilterRepository {
     pub fn new(
         repo: RepositoryInterfaceHandle,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<Self> {
         let mut only: Option<String> = None;
         let mut exclude: Option<String> = None;
         let mut canonical = true;
 
-        if let Some(only_val) = options.get("only") {
+        if let Some(only_val) = options.get(B("only")) {
             match only_val {
                 PhpMixed::List(list) => {
                     let names: Vec<String> = list
@@ -54,7 +54,7 @@ impl FilterRepository {
                 }
             }
         }
-        if let Some(exclude_val) = options.get("exclude") {
+        if let Some(exclude_val) = options.get(B("exclude")) {
             match exclude_val {
                 PhpMixed::List(list) => {
                     let names: Vec<String> = list
@@ -88,7 +88,7 @@ impl FilterRepository {
             ))
             .into());
         }
-        if let Some(canonical_val) = options.get("canonical") {
+        if let Some(canonical_val) = options.get(B("canonical")) {
             match canonical_val {
                 PhpMixed::Bool(b) => {
                     canonical = *b;

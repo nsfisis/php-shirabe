@@ -1,16 +1,17 @@
 //! ref: composer/tests/Composer/Test/Util/UrlTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::util::url::Url;
 use shirabe_php_shim::PhpMixed;
 
-fn conf(entries: &[(&str, &[&str])]) -> IndexMap<String, PhpMixed> {
+fn conf(entries: &[(&str, &[&str])]) -> IndexMap<BString, PhpMixed> {
     entries
         .iter()
         .map(|(k, vals)| {
             (
-                k.to_string(),
+                k.to_string().into(),
                 PhpMixed::List(
                     vals.iter()
                         .map(|v| PhpMixed::string(v.to_string()))
@@ -25,8 +26,8 @@ fn conf(entries: &[(&str, &[&str])]) -> IndexMap<String, PhpMixed> {
 fn test_update_dist_reference() {
     for (url, expected_url, c, r#ref) in dist_refs_provider() {
         let mut config = Config::new(true, None);
-        let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
-        merged.insert("config".to_string(), PhpMixed::Array(c));
+        let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
+        merged.insert("config".into(), PhpMixed::Array(c));
         config.merge(&merged, Config::SOURCE_UNKNOWN);
 
         assert_eq!(
@@ -39,7 +40,7 @@ fn test_update_dist_reference() {
 fn dist_refs_provider() -> Vec<(
     &'static str,
     &'static str,
-    IndexMap<String, PhpMixed>,
+    IndexMap<BString, PhpMixed>,
     &'static str,
 )> {
     vec![

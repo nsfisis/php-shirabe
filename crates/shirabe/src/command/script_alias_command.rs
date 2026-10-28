@@ -137,7 +137,7 @@ impl Command for ScriptAliasCommand {
             preg_replace2(php_regex!(r"{^\S+ ?}"), "", &input_as_string, 1, None);
         let mut flags = indexmap::IndexMap::new();
         flags.insert(
-            "script-alias-input".to_string(),
+            "script-alias-input".into(),
             PhpMixed::string(script_alias_input),
         );
 

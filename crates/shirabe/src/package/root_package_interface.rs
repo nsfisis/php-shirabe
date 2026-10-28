@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Package/RootPackageInterface.php
 
 use crate::package::{CompletePackageInterface, Link, PackageInterface};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -15,7 +16,7 @@ pub trait RootPackageInterface: CompletePackageInterface {
 
     fn get_prefer_stable(&self) -> bool;
 
-    fn get_config(&self) -> IndexMap<String, PhpMixed>;
+    fn get_config(&self) -> IndexMap<BString, PhpMixed>;
 
     fn set_requires(&mut self, requires: IndexMap<String, Link>);
 
@@ -27,9 +28,9 @@ pub trait RootPackageInterface: CompletePackageInterface {
 
     fn set_replaces(&mut self, replaces: IndexMap<String, Link>);
 
-    fn set_autoload(&mut self, autoload: IndexMap<String, PhpMixed>);
+    fn set_autoload(&mut self, autoload: IndexMap<BString, PhpMixed>);
 
-    fn set_dev_autoload(&mut self, dev_autoload: IndexMap<String, PhpMixed>);
+    fn set_dev_autoload(&mut self, dev_autoload: IndexMap<BString, PhpMixed>);
 
     fn set_stability_flags(&mut self, stability_flags: IndexMap<String, i64>);
 
@@ -37,7 +38,7 @@ pub trait RootPackageInterface: CompletePackageInterface {
 
     fn set_prefer_stable(&mut self, prefer_stable: bool);
 
-    fn set_config(&mut self, config: IndexMap<String, PhpMixed>);
+    fn set_config(&mut self, config: IndexMap<BString, PhpMixed>);
 
     fn set_references(&mut self, references: IndexMap<String, String>);
 
@@ -45,7 +46,7 @@ pub trait RootPackageInterface: CompletePackageInterface {
 
     fn set_suggests(&mut self, suggests: IndexMap<String, String>);
 
-    fn set_extra(&mut self, extra: IndexMap<String, PhpMixed>);
+    fn set_extra(&mut self, extra: IndexMap<BString, PhpMixed>);
 
     fn as_package_interface(&self) -> &dyn PackageInterface;
 }

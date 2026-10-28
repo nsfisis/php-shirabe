@@ -21,6 +21,7 @@ use crate::installer::Installer;
 use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable, NullIO, io_interface};
 use crate::json::JsonValidationException;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
+use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
@@ -2204,9 +2205,11 @@ impl ApplicationHandle {
                     json_decode_assoc(file_get_contents(&file).unwrap_or_default())
                         .unwrap_or(PhpMixed::Null);
                 if let Some(arr) = composer_json.as_array()
-                    && let Some(scripts) = arr.get("scripts").and_then(|v| v.as_array())
+                    && let Some(scripts) = arr.get(B("scripts")).and_then(|v| v.as_array())
                 {
                     for (script, dummy) in scripts {
+                        // TODO(bytes): script names are Strings, so non-UTF-8 bytes are replaced.
+                        let script: &str = &script.to_str_lossy();
                         let script_event_const = format!(
                             "Composer\\Script\\ScriptEvents::{}",
                             str_replace("-", "_", &strtoupper(script))
@@ -2221,18 +2224,18 @@ impl ApplicationHandle {
                                 );
 
                                 if let Some(desc) = arr
-                                    .get("scripts-descriptions")
+                                    .get(B("scripts-descriptions"))
                                     .and_then(|v| v.as_array())
-                                    .and_then(|a| a.get(script))
+                                    .and_then(|a| a.get(B(script)))
                                     .and_then(|v| v.as_string())
                                 {
                                     description = desc.to_string();
                                 }
 
                                 let aliases: Vec<String> = arr
-                                    .get("scripts-aliases")
+                                    .get(B("scripts-aliases"))
                                     .and_then(|v| v.as_array())
-                                    .and_then(|a| a.get(script))
+                                    .and_then(|a| a.get(B(script)))
                                     .and_then(|v| v.as_list())
                                     .map(|l| {
                                         l.iter()
@@ -2340,9 +2343,7 @@ impl ApplicationHandle {
 
                                         let handle = crate::plugin::new_php_object(
                                             &dummy_str,
-                                            vec![shirabe_php_rpc::PluginValue::string(
-                                                script.clone(),
-                                            )],
+                                            vec![shirabe_php_rpc::PluginValue::string(script)],
                                         )?;
 
                                         // makes sure the command is find()'able by the name defined in composer.json, and the name isn't overridden in its configure()
@@ -2361,9 +2362,7 @@ impl ApplicationHandle {
                                             crate::plugin::call_php_entity_method(
                                                 &handle,
                                                 "setName",
-                                                vec![shirabe_php_rpc::PluginValue::string(
-                                                    script.clone(),
-                                                )],
+                                                vec![shirabe_php_rpc::PluginValue::string(script)],
                                             )?;
                                         }
 
@@ -2403,7 +2402,7 @@ impl ApplicationHandle {
                                         // fallback to usual aliasing behavior
                                         std::rc::Rc::new(std::cell::RefCell::new(
                                             ScriptAliasCommand::new(
-                                                script.clone(),
+                                                script.to_string(),
                                                 Some(description),
                                                 aliases,
                                             )?,

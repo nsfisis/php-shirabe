@@ -4,6 +4,7 @@ use crate::dependency_resolver::Request;
 use crate::event_dispatcher::{Event, EventInterface};
 use crate::package::BasePackageHandle;
 use crate::repository::RepositoryInterfaceHandle;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -124,7 +125,7 @@ impl EventInterface for PrePoolCreateEvent {
         self.inner.get_arguments()
     }
 
-    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+    fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
         self.inner.get_flags()
     }
 

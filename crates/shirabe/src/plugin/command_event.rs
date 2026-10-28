@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Plugin/CommandEvent.php
 
 use crate::event_dispatcher::{Event, EventInterface};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_console::input::InputInterface;
@@ -30,7 +31,7 @@ impl CommandEvent {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         args: Vec<String>,
-        flags: IndexMap<String, PhpMixed>,
+        flags: IndexMap<BString, PhpMixed>,
     ) -> Self {
         let inner = Event::new(name.to_string(), args, flags);
         Self {
@@ -75,7 +76,7 @@ impl EventInterface for CommandEvent {
         self.inner.get_arguments()
     }
 
-    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+    fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
         self.inner.get_flags()
     }
 

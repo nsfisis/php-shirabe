@@ -3,6 +3,7 @@
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -22,13 +23,13 @@ struct SetUp {
 fn set_up() -> SetUp {
     let home = TempDir::new().unwrap();
     let mut config = Config::new(true, None);
-    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-    let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+    let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
-        "home".to_string(),
+        "home".into(),
         PhpMixed::string(home.path().to_str().unwrap().to_string()),
     );
-    top.insert("config".to_string(), PhpMixed::Array(config_section));
+    top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
 
     SetUp { home, config }
@@ -121,9 +122,9 @@ fn test_wrong_credentials_in_url() {
         MockHandler::default(),
     );
 
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
-        "url".to_string(),
+        "url".into(),
         PhpMixed::string("https://till:secret@corp.svn.local/repo".to_string()),
     );
 

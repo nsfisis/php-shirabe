@@ -115,49 +115,49 @@ fn php_flavor_test_cases() -> Vec<(
 
     vec![
         (
-            IndexMap::from([("PHP_VERSION".to_string(), s("7.1.33"))]),
+            IndexMap::from([("PHP_VERSION".into(), s("7.1.33"))]),
             vec![("php", "7.1.33")],
             vec![],
         ),
         (
             IndexMap::from([
-                ("PHP_VERSION".to_string(), s(ubuntu)),
-                ("PHP_DEBUG".to_string(), PhpMixed::Bool(true)),
+                ("PHP_VERSION".into(), s(ubuntu)),
+                ("PHP_DEBUG".into(), PhpMixed::Bool(true)),
             ]),
             vec![("php", "7.2.31"), ("php-debug", "7.2.31")],
             vec![],
         ),
         (
             IndexMap::from([
-                ("PHP_VERSION".to_string(), s(ubuntu)),
-                ("PHP_ZTS".to_string(), PhpMixed::Bool(true)),
+                ("PHP_VERSION".into(), s(ubuntu)),
+                ("PHP_ZTS".into(), PhpMixed::Bool(true)),
             ]),
             vec![("php", "7.2.31"), ("php-zts", "7.2.31")],
             vec![],
         ),
         (
             IndexMap::from([
-                ("PHP_VERSION".to_string(), s(ubuntu)),
-                ("PHP_INT_SIZE".to_string(), PhpMixed::Int(8)),
+                ("PHP_VERSION".into(), s(ubuntu)),
+                ("PHP_INT_SIZE".into(), PhpMixed::Int(8)),
             ]),
             vec![("php", "7.2.31"), ("php-64bit", "7.2.31")],
             vec![],
         ),
         (
             IndexMap::from([
-                ("PHP_VERSION".to_string(), s(ubuntu)),
-                ("AF_INET6".to_string(), PhpMixed::Int(30)),
+                ("PHP_VERSION".into(), s(ubuntu)),
+                ("AF_INET6".into(), PhpMixed::Int(30)),
             ]),
             vec![("php", "7.2.31"), ("php-ipv6", "7.2.31")],
             vec![],
         ),
         (
-            IndexMap::from([("PHP_VERSION".to_string(), s(ubuntu))]),
+            IndexMap::from([("PHP_VERSION".into(), s(ubuntu))]),
             vec![("php", "7.2.31"), ("php-ipv6", "7.2.31")],
             vec![(s("inet_pton"), vec![s("::")], s(""))],
         ),
         (
-            IndexMap::from([("PHP_VERSION".to_string(), s(ubuntu))]),
+            IndexMap::from([("PHP_VERSION".into(), s(ubuntu))]),
             vec![("php", "7.2.31")],
             vec![(s("inet_pton"), vec![s("::")], PhpMixed::Bool(false))],
         ),
@@ -215,11 +215,8 @@ fn test_inet_pton_regression() {
 
     // suppressing PHP_ZTS & AF_INET6 by leaving them undefined
     let constants: IndexMap<String, PhpMixed> = IndexMap::from([
-        (
-            "PHP_VERSION".to_string(),
-            PhpMixed::string("7.0.0".to_string()),
-        ),
-        ("PHP_DEBUG".to_string(), PhpMixed::Bool(false)),
+        ("PHP_VERSION".into(), PhpMixed::string("7.0.0".to_string())),
+        ("PHP_DEBUG".into(), PhpMixed::Bool(false)),
     ]);
 
     let platform_info = platform_info(
@@ -293,7 +290,7 @@ fn library_test_cases() -> Vec<LibCase> {
         (
             s("curl_version"),
             vec![],
-            PhpMixed::Array(IndexMap::from([("version".to_string(), s(v))])),
+            PhpMixed::Array(IndexMap::from([("version".into(), s(v))])),
         )
     };
 
@@ -944,7 +941,7 @@ intl.use_exceptions => 0 => 0",
                 (
                     PhpMixed::List(vec![s("ResourceBundle"), s("create")]),
                     vec![s("root"), s("ICUDATA"), PhpMixed::Bool(false)],
-                    PhpMixed::Object(IndexMap::from([("Version".to_string(), s("32.0.1"))])),
+                    PhpMixed::Object(IndexMap::from([("Version".into(), s("32.0.1"))])),
                 ),
                 (
                     PhpMixed::List(vec![s("IntlChar"), s("getUnicodeVersion")]),
@@ -999,7 +996,7 @@ ICU Data version => 57.1",
                 construct: Some((
                     vec![],
                     PhpMixed::Object(IndexMap::from([(
-                        "versionString".to_string(),
+                        "versionString".into(),
                         s("ImageMagick 6.2.9 Q16 x86_64 2018-05-18 http://www.imagemagick.org"),
                     )])),
                 )),
@@ -1019,7 +1016,7 @@ ICU Data version => 57.1",
                 construct: Some((
                     vec![],
                     PhpMixed::Object(IndexMap::from([(
-                        "versionString".to_string(),
+                        "versionString".into(),
                         s("ImageMagick 7.0.8-34 Q16 x86_64 2019-03-23 https://imagemagick.org"),
                     )])),
                 )),
@@ -1724,11 +1721,8 @@ fn test_library_information() {
 #[test]
 fn test_composer_platform_version() {
     let constants: IndexMap<String, PhpMixed> = IndexMap::from([
-        (
-            "PHP_VERSION".to_string(),
-            PhpMixed::string("7.0.0".to_string()),
-        ),
-        ("PHP_DEBUG".to_string(), PhpMixed::Bool(false)),
+        ("PHP_VERSION".into(), PhpMixed::string("7.0.0".to_string())),
+        ("PHP_DEBUG".into(), PhpMixed::Bool(false)),
     ]);
 
     // PHP only stubs getExtensions/getConstant; PHPUnit auto-returns null/false for the

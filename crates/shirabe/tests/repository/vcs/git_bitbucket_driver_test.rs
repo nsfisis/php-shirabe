@@ -2,6 +2,7 @@
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::io_stub::IOStub;
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -21,13 +22,13 @@ struct SetUp {
 fn set_up() -> SetUp {
     let home = TempDir::new().unwrap();
     let mut config = Config::new(true, None);
-    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-    let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+    let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
-        "home".to_string(),
+        "home".into(),
         PhpMixed::string(home.path().to_str().unwrap().to_string()),
     );
-    top.insert("config".to_string(), PhpMixed::Array(config_section));
+    top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
 
     SetUp { home, config }
@@ -72,8 +73,8 @@ fn get_driver(
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
 ) -> anyhow::Result<GitBitbucketDriver> {
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
+    repo_config.insert("url".into(), PhpMixed::string(url.to_string()));
 
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
         io.clone(),
@@ -191,27 +192,27 @@ fn test_driver() {
     let data = driver.get_composer_information("main").unwrap().unwrap();
     assert_eq!(
         Some("user/repo".into()),
-        data.get("name").and_then(|v| v.as_string())
+        data.get(B("name")).and_then(|v| v.as_string())
     );
     assert_eq!(
         Some("test repo".into()),
-        data.get("description").and_then(|v| v.as_string())
+        data.get(B("description")).and_then(|v| v.as_string())
     );
     assert_eq!(
         Some("2016-05-17T13:19:52+00:00".into()),
-        data.get("time").and_then(|v| v.as_string())
+        data.get(B("time")).and_then(|v| v.as_string())
     );
-    let support = data.get("support").and_then(|v| v.as_array()).unwrap();
+    let support = data.get(B("support")).and_then(|v| v.as_array()).unwrap();
     assert_eq!(
         Some(
             "https://bitbucket.org/user/repo/src/937992d19d72b5116c3e8c4a04f960e5fa270b22/?at=main"
                 .into()
         ),
-        support.get("source").and_then(|v| v.as_string())
+        support.get(B("source")).and_then(|v| v.as_string())
     );
     assert_eq!(
         Some("https://bitbucket.org/user/repo".into()),
-        data.get("homepage").and_then(|v| v.as_string())
+        data.get(B("homepage")).and_then(|v| v.as_string())
     );
 
     // testGetParams (PHP @depends testDriver): assertions over the same driver.
@@ -300,13 +301,13 @@ fn test_invalid_support_data() {
     driver.get_root_identifier().unwrap();
     let data = driver.get_composer_information("main").unwrap().unwrap();
 
-    let support = data.get("support").and_then(|v| v.as_array()).unwrap();
+    let support = data.get(B("support")).and_then(|v| v.as_array()).unwrap();
     assert_eq!(
         Some(
             "https://bitbucket.org/user/repo/src/937992d19d72b5116c3e8c4a04f960e5fa270b22/?at=main"
                 .into()
         ),
-        support.get("source").and_then(|v| v.as_string())
+        support.get(B("source")).and_then(|v| v.as_string())
     );
 }
 

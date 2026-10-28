@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Package/Loader/InvalidPackageException.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{Exception, PhpMixed};
 
@@ -8,7 +9,7 @@ pub struct InvalidPackageException {
     inner: Exception,
     errors: Vec<String>,
     warnings: Vec<String>,
-    data: IndexMap<String, PhpMixed>,
+    data: IndexMap<BString, PhpMixed>,
 }
 
 impl InvalidPackageException {
@@ -16,7 +17,7 @@ impl InvalidPackageException {
     pub fn new(
         errors: Vec<String>,
         warnings: Vec<String>,
-        data: IndexMap<String, PhpMixed>,
+        data: IndexMap<BString, PhpMixed>,
     ) -> Self {
         let message = format!(
             "Invalid package information: \n{}",
@@ -35,7 +36,7 @@ impl InvalidPackageException {
         }
     }
 
-    pub fn get_data(&self) -> &IndexMap<String, PhpMixed> {
+    pub fn get_data(&self) -> &IndexMap<BString, PhpMixed> {
         &self.data
     }
 

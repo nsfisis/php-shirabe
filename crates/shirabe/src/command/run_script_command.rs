@@ -217,12 +217,12 @@ impl Command for RunScriptCommand {
 
             let mut options = indexmap::IndexMap::new();
             for script in &scripts {
-                options.insert(script.0.clone(), PhpMixed::string(script.1.clone()));
+                options.insert(script.0.as_str().into(), PhpMixed::string(script.1.clone()));
             }
 
             let io = self.get_io();
             let script = io.select(
-                "Script to run: ".to_string(),
+                "Script to run: ".into(),
                 PhpMixed::Array(options),
                 PhpMixed::string(String::new()),
                 PhpMixed::Int(1),

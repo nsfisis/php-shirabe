@@ -7,7 +7,7 @@ use crate::descriptor::{
 use crate::exception::InvalidArgumentException;
 use crate::helper::{Helper, HelperInterface, HelperSet};
 use crate::output::OutputInterface;
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -51,17 +51,17 @@ impl DescriptorHelper {
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         object: DescribableObject,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
-        merged.insert("raw_text".to_string(), PhpMixed::Bool(false));
-        merged.insert("format".to_string(), PhpMixed::string("txt".to_string()));
+        let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
+        merged.insert("raw_text".into(), PhpMixed::Bool(false));
+        merged.insert("format".into(), PhpMixed::string("txt".to_string()));
         for (key, value) in options {
             merged.insert(key, value);
         }
         let options = merged;
 
-        let format = match &options["format"] {
+        let format = match &options[B("format")] {
             PhpMixed::String(format) => format.to_str_lossy().into_owned(),
             _ => String::new(),
         };

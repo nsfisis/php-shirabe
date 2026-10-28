@@ -2,7 +2,7 @@
 
 use crate::async_runtime::run;
 use crate::php_worker::{load_composer_php_runtime, lock_php_worker, php_runtime_available};
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::autoload::AutoloadGenerator;
 use shirabe::composer::{Composer, ComposerHandle, PartialOrFullComposer};
@@ -126,7 +126,7 @@ impl RepositoryManagerInterface for MockRepositoryManager {
     fn create_repository(
         &self,
         _type: &str,
-        _config: IndexMap<String, PhpMixed>,
+        _config: IndexMap<BString, PhpMixed>,
         _name: Option<&str>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         unimplemented!("not exercised by PluginInstallerTest")
@@ -291,9 +291,9 @@ pub(crate) fn set_up() -> SetUp {
     )));
 
     let mut config = Config::new(false, None);
-    let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
-        "vendor-dir".to_string(),
+        "vendor-dir".into(),
         PhpMixed::string(
             directory_path
                 .join("Fixtures/")
@@ -303,7 +303,7 @@ pub(crate) fn set_up() -> SetUp {
         ),
     );
     config_section.insert(
-        "home".to_string(),
+        "home".into(),
         PhpMixed::string(
             directory_path
                 .join("Fixtures")
@@ -313,7 +313,7 @@ pub(crate) fn set_up() -> SetUp {
         ),
     );
     config_section.insert(
-        "bin-dir".to_string(),
+        "bin-dir".into(),
         PhpMixed::string(
             directory_path
                 .join("Fixtures/bin")
@@ -322,9 +322,9 @@ pub(crate) fn set_up() -> SetUp {
                 .to_string(),
         ),
     );
-    config_section.insert("allow-plugins".to_string(), PhpMixed::Bool(true));
-    let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
-    merged.insert("config".to_string(), PhpMixed::Array(config_section));
+    config_section.insert("allow-plugins".into(), PhpMixed::Bool(true));
+    let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
+    merged.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&merged, Config::SOURCE_UNKNOWN);
 
     {
@@ -451,9 +451,9 @@ fn test_install_plugin_with_root_package_having_files_autoload() {
         .to_str()
         .unwrap()
         .to_string();
-    let mut autoload: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut autoload: IndexMap<BString, PhpMixed> = IndexMap::new();
     autoload.insert(
-        "files".to_string(),
+        "files".into(),
         PhpMixed::List(vec![PhpMixed::string(files_autoload)]),
     );
     let root = set_up.composer.borrow().get_package().clone();
@@ -850,7 +850,7 @@ fn test_capability_implements_composer_plugin_api_class_and_is_constructed_with_
     let plugin: std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(CapablePlugin {
             capabilities: IndexMap::from([(
-                capability_api.to_string(),
+                capability_api.into(),
                 PhpMixed::string(capability_implementation.to_string()),
             )]),
             get_capabilities_calls: get_capabilities_calls.clone(),
@@ -924,7 +924,7 @@ fn assert_querying_with_invalid_capability_class_name_throws(
     let plugin: std::rc::Rc<std::cell::RefCell<dyn PluginInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(CapablePlugin {
             capabilities: IndexMap::from([(
-                capability_api.to_string(),
+                capability_api.into(),
                 invalid_implementation_class_names.clone(),
             )]),
             get_capabilities_calls: get_capabilities_calls.clone(),
@@ -964,7 +964,7 @@ fn test_querying_with_invalid_capability_class_name_throws() {
 // is reproduced with a call counter asserted after the call.
 #[derive(Debug)]
 struct CapablePlugin {
-    capabilities: IndexMap<String, PhpMixed>,
+    capabilities: IndexMap<BString, PhpMixed>,
     // Shared with the test body, which only ever holds the plugin as a `dyn PluginInterface`.
     get_capabilities_calls: std::rc::Rc<std::cell::RefCell<i64>>,
 }
@@ -1004,7 +1004,7 @@ impl PluginInterface for CapablePlugin {
 }
 
 impl Capable for CapablePlugin {
-    fn get_capabilities(&self) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+    fn get_capabilities(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         *self.get_capabilities_calls.borrow_mut() += 1;
         Ok(self.capabilities.clone())
     }

@@ -12,6 +12,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::base_package;
 use crate::repository::RepositoryInterface;
+use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException, impl_php_class, preg_grep, strtolower};
 use shirabe_symfony_console::command::Command;
@@ -310,15 +311,21 @@ impl Command for RemoveCommand {
         for link_type in ["require", "require-dev"] {
             if let Some(section) = composer_data
                 .as_array_mut()
-                .and_then(|m| m.get_mut(link_type))
+                .and_then(|m| m.get_mut(B(link_type)))
                 .and_then(|v| v.as_array_mut())
             {
                 let entries: Vec<(String, String)> = section
                     .iter()
-                    .filter_map(|(k, v)| v.as_string().map(|_| (k.clone(), k.clone())))
+                    // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
+                    .filter_map(|(k, v)| {
+                        v.as_string().map(|_| {
+                            let k = k.to_str_lossy().into_owned();
+                            (k.clone(), k)
+                        })
+                    })
                     .collect();
                 for (name, canonical) in entries {
-                    section.insert(strtolower(&name), PhpMixed::string(canonical));
+                    section.insert(strtolower(&name).into(), PhpMixed::string(canonical));
                 }
             }
         }
@@ -332,17 +339,17 @@ impl Command for RemoveCommand {
         for package in &packages {
             let in_type = composer_data
                 .as_array()
-                .and_then(|m| m.get(r#type))
+                .and_then(|m| m.get(B(r#type)))
                 .and_then(|v| v.as_array())
-                .and_then(|m| m.get(package.as_str()))
+                .and_then(|m| m.get(B(package)))
                 .and_then(|v| v.as_string())
                 .map(|s| s.to_string());
 
             let in_alt_type = composer_data
                 .as_array()
-                .and_then(|m| m.get(alt_type))
+                .and_then(|m| m.get(B(alt_type)))
                 .and_then(|v| v.as_array())
-                .and_then(|m| m.get(package.as_str()))
+                .and_then(|m| m.get(B(package)))
                 .and_then(|v| v.as_string())
                 .map(|s| s.to_string());
 
@@ -379,11 +386,13 @@ impl Command for RemoveCommand {
                     }
                 }
             } else {
+                // TODO(bytes): package names are matched as UTF-8 text, so non-UTF-8 bytes are
+                // replaced.
                 let type_keys: Vec<String> = composer_data
                     .as_array()
-                    .and_then(|m| m.get(r#type))
+                    .and_then(|m| m.get(B(r#type)))
                     .and_then(|v| v.as_array())
-                    .map(|m| m.keys().cloned().collect())
+                    .map(|m| m.keys().map(|k| k.to_str_lossy().into_owned()).collect())
                     .unwrap_or_default();
                 let matches_in_type: Vec<&String> = preg_grep(
                     base_package::package_name_to_regexp(package),
@@ -391,11 +400,13 @@ impl Command for RemoveCommand {
                 )
                 .collect();
 
+                // TODO(bytes): package names are matched as UTF-8 text, so non-UTF-8 bytes are
+                // replaced.
                 let alt_type_keys: Vec<String> = composer_data
                     .as_array()
-                    .and_then(|m| m.get(alt_type))
+                    .and_then(|m| m.get(B(alt_type)))
                     .and_then(|v| v.as_array())
-                    .map(|m| m.keys().cloned().collect())
+                    .map(|m| m.keys().map(|k| k.to_str_lossy().into_owned()).collect())
                     .unwrap_or_default();
                 let matches_in_alt_type: Vec<&String> = preg_grep(
                     base_package::package_name_to_regexp(package),
@@ -511,7 +522,7 @@ impl Command for RemoveCommand {
             if let Some(allow_map) = allow_plugins.as_opt().and_then(|v| v.as_array()) {
                 packages
                     .iter()
-                    .filter(|p| allow_map.contains_key(p.as_str()))
+                    .filter(|p| allow_map.contains_key(B(p)))
                     .cloned()
                     .collect()
             } else {

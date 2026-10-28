@@ -14,7 +14,7 @@ use crate::io::{IOInterface, IOInterfaceImmutable, NullIO};
 use crate::package::version::VersionParser;
 use crate::plugin::{PluginEvents, PreCommandRunEvent};
 use crate::util::Platform;
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpClass, PhpMixed, RuntimeException,
@@ -185,7 +185,7 @@ pub trait BaseCommand: Command {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: Option<IndexMap<String, PhpMixed>>,
+        config: Option<IndexMap<BString, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
     ) -> anyhow::Result<PartialComposerHandle>;
@@ -248,7 +248,7 @@ macro_rules! delegate_base_command_trait_impls_to_inner {
         shirabe_symfony_console::delegate_to_inner!($field, fn reset_composer(&self) -> anyhow::Result<()>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_io(&self) -> std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>);
         shirabe_symfony_console::delegate_to_inner!($field, fn set_io(&self, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>));
-        shirabe_symfony_console::delegate_to_inner!($field, fn create_composer_instance(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>, config: Option<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>, disable_plugins: bool, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
+        shirabe_symfony_console::delegate_to_inner!($field, fn create_composer_instance(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, io: std::rc::Rc<std::cell::RefCell<dyn $crate::io::IOInterface>>, config: Option<indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>>, disable_plugins: bool, disable_scripts: Option<bool>) -> anyhow::Result<$crate::composer::PartialComposerHandle>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_preferred_install_options(&self, config: &$crate::config::Config, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>, keep_vcs_requires_prefer_source: bool) -> anyhow::Result<(bool, bool)>);
         shirabe_symfony_console::delegate_to_inner!($field, fn get_platform_requirement_filter(&self, input: std::rc::Rc<std::cell::RefCell<dyn shirabe_symfony_console::input::InputInterface>>) -> anyhow::Result<std::rc::Rc<dyn $crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface>>);
         shirabe_symfony_console::delegate_to_inner!($field, fn format_requirements(&self, requirements: Vec<String>) -> anyhow::Result<indexmap::IndexMap<String, String>>);
@@ -387,7 +387,7 @@ impl BaseCommand for BaseCommandData {
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        config: Option<IndexMap<String, PhpMixed>>,
+        config: Option<IndexMap<BString, PhpMixed>>,
         disable_plugins: bool,
         disable_scripts: Option<bool>,
     ) -> anyhow::Result<PartialComposerHandle> {

@@ -3,6 +3,7 @@
 use crate::json::JsonFile;
 use crate::package::PackageInterfaceHandle;
 use crate::package::loader::LoaderInterface;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, TypeError};
 use std::path::Path;
@@ -31,7 +32,7 @@ impl JsonLoader {
             JsonLoaderInput::String(ref s) => JsonFile::parse_json(Some(s), None)?,
         };
 
-        let config: IndexMap<String, PhpMixed> = match config {
+        let config: IndexMap<BString, PhpMixed> = match config {
             PhpMixed::Array(m) => m,
             _ => {
                 return Err(TypeError::new("Composer\\Package\\Loader\\LoaderInterface::load(): Argument #1 ($config) must be of type array".to_string())

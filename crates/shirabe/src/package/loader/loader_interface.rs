@@ -1,13 +1,14 @@
 //! ref: composer/src/Composer/Package/Loader/LoaderInterface.php
 
 use crate::package::PackageInterfaceHandle;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 pub trait LoaderInterface: std::fmt::Debug {
     fn load(
         &self,
-        config: IndexMap<String, PhpMixed>,
+        config: IndexMap<BString, PhpMixed>,
         class: Option<String>,
     ) -> anyhow::Result<PackageInterfaceHandle>;
 

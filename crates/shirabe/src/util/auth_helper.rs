@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::{Bitbucket, GitHub, GitLab};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, array_merge, base64_encode, explode,
@@ -91,7 +91,7 @@ impl AuthHelper {
                         .borrow()
                         .get_authentication(origin)
                         .into_iter()
-                        .map(|(k, v)| (k, v.map_or(PhpMixed::Null, PhpMixed::string)))
+                        .map(|(k, v)| (k.into(), v.map_or(PhpMixed::Null, PhpMixed::string)))
                         .collect(),
                 ),
             )?;
@@ -174,10 +174,16 @@ impl AuthHelper {
 
                 message = format!(
                     "GitHub API limit ({} calls/hr) is exhausted, could not fetch {}. {} You can also wait until {} for the rate limit to reset.\n",
-                    rate_limit.get("limit").cloned().unwrap_or(PhpMixed::Null),
+                    rate_limit
+                        .get(B("limit"))
+                        .cloned()
+                        .unwrap_or(PhpMixed::Null),
                     url,
                     message,
-                    rate_limit.get("reset").cloned().unwrap_or(PhpMixed::Null),
+                    rate_limit
+                        .get(B("reset"))
+                        .cloned()
+                        .unwrap_or(PhpMixed::Null),
                 );
             } else {
                 // Try to extract a more specific error message from GitHub's API response
@@ -186,7 +192,7 @@ impl AuthHelper {
                     let decoded = json_decode_assoc(body)?;
                     if is_array(&decoded)
                         && let Some(arr) = decoded.as_array()
-                        && let Some(msg) = arr.get("message")
+                        && let Some(msg) = arr.get(B("message"))
                         && is_string(msg)
                     {
                         git_hub_api_message = msg.as_string().map(|s| s.to_string());
@@ -402,9 +408,7 @@ impl AuthHelper {
                 true,
                 io_interface::NORMAL,
             );
-            let username = self
-                .io
-                .ask("      Username: ".to_string(), PhpMixed::Null)?;
+            let username = self.io.ask("      Username: ".into(), PhpMixed::Null)?;
             let password = self
                 .io
                 .ask_and_hide_answer("      Password: ".to_string())?;
@@ -438,18 +442,18 @@ impl AuthHelper {
             E_USER_DEPRECATED,
         );
 
-        let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
         http.insert(
-            "header".to_string(),
+            "header".into(),
             PhpMixed::List(headers.into_iter().map(PhpMixed::string).collect()),
         );
-        let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
-        options.insert("http".to_string(), PhpMixed::Array(http));
+        let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
+        options.insert("http".into(), PhpMixed::Array(http));
         let options = self.add_authentication_options(options, origin, url)?;
 
-        Ok(options["http"]
+        Ok(options[B("http")]
             .as_array()
-            .and_then(|http| http.get("header"))
+            .and_then(|http| http.get(B("header")))
             .and_then(|header| header.as_list())
             .expect("addAuthenticationOptions always leaves http.header a list")
             .iter()
@@ -459,31 +463,31 @@ impl AuthHelper {
 
     pub fn add_authentication_options(
         &mut self,
-        mut options: IndexMap<String, PhpMixed>,
+        mut options: IndexMap<BString, PhpMixed>,
         origin: &str,
         url: &str,
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
-        if !options.contains_key("http") {
-            options.insert("http".to_string(), PhpMixed::Array(IndexMap::new()));
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+        if !options.contains_key(B("http")) {
+            options.insert("http".into(), PhpMixed::Array(IndexMap::new()));
         }
         // PHP: if (!isset($options['http']['header']))
         {
-            let http_has_header = if let Some(PhpMixed::Array(http)) = options.get("http") {
-                http.contains_key("header")
+            let http_has_header = if let Some(PhpMixed::Array(http)) = options.get(B("http")) {
+                http.contains_key(B("header"))
             } else {
                 false
             };
-            if !http_has_header && let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-                http.insert("header".to_string(), PhpMixed::List(vec![]));
+            if !http_has_header && let Some(PhpMixed::Array(http)) = options.get_mut(B("http")) {
+                http.insert("header".into(), PhpMixed::List(vec![]));
             }
         }
 
         // PHP: $headers = &$options['http']['header'];
         // The reference is emulated by writing `headers` back into options below.
         let mut headers: Vec<PhpMixed> = match options
-            .get("http")
+            .get(B("http"))
             .and_then(|v| v.as_array())
-            .and_then(|h| h.get("header"))
+            .and_then(|h| h.get(B("header")))
             .and_then(|v| v.as_list())
         {
             Some(list) => list.to_vec(),
@@ -574,11 +578,11 @@ impl AuthHelper {
             } else if username == "client-certificate" {
                 // PHP: $options['ssl'] = array_merge($options['ssl'] ?? [], json_decode_assoc((string) $auth['password']));
                 let existing_ssl = options
-                    .get("ssl")
+                    .get(B("ssl"))
                     .cloned()
                     .unwrap_or(PhpMixed::Array(IndexMap::new()));
                 let decoded = json_decode_assoc(&password)?;
-                options.insert("ssl".to_string(), array_merge(existing_ssl, decoded));
+                options.insert("ssl".into(), array_merge(existing_ssl, decoded));
                 authentication_display_message = Some("Using SSL client certificate".to_string());
             } else {
                 let auth_str = base64_encode(format!("{}:{}", username, password));
@@ -607,8 +611,8 @@ impl AuthHelper {
         }
 
         // write headers back into options['http']['header']
-        if let Some(PhpMixed::Array(http)) = options.get_mut("http") {
-            http.insert("header".to_string(), PhpMixed::List(headers));
+        if let Some(PhpMixed::Array(http)) = options.get_mut(B("http")) {
+            http.insert("header".into(), PhpMixed::List(headers));
         }
 
         Ok(options)

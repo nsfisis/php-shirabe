@@ -5,7 +5,7 @@ use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, http_build_query, in_array_strict, json_decode_assoc,
@@ -115,10 +115,10 @@ impl GitLab {
         let mut token: Option<PhpMixed> = None;
 
         if let Some(map) = auth_tokens.as_array() {
-            if let Some(t) = map.get(origin_url) {
+            if let Some(t) = map.get(B(origin_url)) {
                 token = Some(t.clone());
             }
-            if let Some(t) = map.get(bc_origin_url.as_str()) {
+            if let Some(t) = map.get(B(&bc_origin_url)) {
                 token = Some(t.clone());
             }
         }
@@ -127,12 +127,12 @@ impl GitLab {
             let (username, password) = match &token {
                 PhpMixed::Array(arr) => {
                     let username = arr
-                        .get("username")
+                        .get(B("username"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
                         .to_string();
                     let password = arr
-                        .get("token")
+                        .get(B("token"))
                         .and_then(|v| v.as_string())
                         .unwrap_or("private-token".into())
                         .to_string();
@@ -254,7 +254,7 @@ impl GitLab {
                                 let is_invalid_grant = response
                                     .as_ref()
                                     .and_then(|r| r.as_array())
-                                    .and_then(|arr| arr.get("error"))
+                                    .and_then(|arr| arr.get(B("error")))
                                     .and_then(|v| v.as_string())
                                     == Some("invalid_grant".into());
                                 if is_invalid_grant {
@@ -306,7 +306,7 @@ impl GitLab {
 
             let access_token = response
                 .as_array()
-                .and_then(|arr| arr.get("access_token"))
+                .and_then(|arr| arr.get(B("access_token")))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string();
@@ -321,7 +321,7 @@ impl GitLab {
             let use_local = store_in_local_auth_config && has_local_auth_config;
             let has_expires_in = response
                 .as_array()
-                .map(|arr| arr.contains_key("expires_in"))
+                .map(|arr| arr.contains_key(B("expires_in")))
                 .unwrap_or(false);
 
             if use_local {
@@ -386,7 +386,7 @@ impl GitLab {
 
         let access_token = response
             .as_array()
-            .and_then(|arr| arr.get("access_token"))
+            .and_then(|arr| arr.get(B("access_token")))
             .and_then(|v| v.as_string())
             .unwrap_or_default()
             .to_string();
@@ -410,7 +410,7 @@ impl GitLab {
     }
 
     fn create_token(&mut self, scheme: &str, origin_url: &str) -> anyhow::Result<PhpMixed> {
-        let username = match self.io.ask("Username: ".to_string(), PhpMixed::Null)? {
+        let username = match self.io.ask("Username: ".into(), PhpMixed::Null)? {
             PhpMixed::String(s) => s.to_str_lossy().into_owned(),
             _ => String::new(),
         };
@@ -427,16 +427,16 @@ impl GitLab {
             ("password", password.as_str()),
             ("grant_type", "password"),
         ]);
-        let mut http_inner: IndexMap<String, PhpMixed> = IndexMap::new();
-        http_inner.insert("method".to_string(), PhpMixed::string("POST".to_string()));
+        let mut http_inner: IndexMap<BString, PhpMixed> = IndexMap::new();
+        http_inner.insert("method".into(), PhpMixed::string("POST".to_string()));
         http_inner.insert(
-            "header".to_string(),
+            "header".into(),
             PhpMixed::List(headers.into_iter().map(PhpMixed::string).collect()),
         );
-        http_inner.insert("content".to_string(), PhpMixed::string(data));
-        let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
-        options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
-        options.insert("http".to_string(), PhpMixed::Array(http_inner));
+        http_inner.insert("content".into(), PhpMixed::string(data));
+        let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
+        options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
+        options.insert("http".into(), PhpMixed::Array(http_inner));
 
         let token = self
             .http_downloader
@@ -456,9 +456,9 @@ impl GitLab {
     pub fn is_oauth_expired(&self, origin_url: &str) -> bool {
         let auth_tokens = self.config.borrow_mut().get("gitlab-oauth");
         if let Some(map) = auth_tokens.as_array()
-            && let Some(token_info) = map.get(origin_url)
+            && let Some(token_info) = map.get(B(origin_url))
             && let Some(token_map) = token_info.as_array()
-            && let Some(expires_at) = token_map.get("expires-at")
+            && let Some(expires_at) = token_map.get(B("expires-at"))
             && let Some(expires_at_int) = expires_at.as_int()
             && expires_at_int < time()
         {
@@ -472,9 +472,9 @@ impl GitLab {
         let auth_tokens = self.config.borrow_mut().get("gitlab-oauth");
         let refresh_token = auth_tokens
             .as_array()
-            .and_then(|map| map.get(origin_url))
+            .and_then(|map| map.get(B(origin_url)))
             .and_then(|v| v.as_array())
-            .and_then(|token_map| token_map.get("refresh-token"))
+            .and_then(|token_map| token_map.get(B("refresh-token")))
             .and_then(|v| v.as_string())
             .map(|s| s.to_string());
 
@@ -496,15 +496,15 @@ impl GitLab {
             ("grant_type", "refresh_token"),
         ]);
         let mut http_inner = IndexMap::new();
-        http_inner.insert("method".to_string(), PhpMixed::string("POST".to_string()));
+        http_inner.insert("method".into(), PhpMixed::string("POST".to_string()));
         http_inner.insert(
-            "header".to_string(),
+            "header".into(),
             PhpMixed::List(headers.into_iter().map(PhpMixed::string).collect()),
         );
-        http_inner.insert("content".to_string(), PhpMixed::string(data));
-        let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
-        options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
-        options.insert("http".to_string(), PhpMixed::Array(http_inner));
+        http_inner.insert("content".into(), PhpMixed::string(data));
+        let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
+        options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
+        options.insert("http".into(), PhpMixed::Array(http_inner));
 
         let token = self
             .http_downloader
@@ -535,30 +535,24 @@ impl GitLab {
     fn build_oauth_config(response: &PhpMixed, access_token: &str) -> PhpMixed {
         let created_at = response
             .as_array()
-            .and_then(|arr| arr.get("created_at"))
+            .and_then(|arr| arr.get(B("created_at")))
             .and_then(|v| v.as_int())
             .unwrap_or(0);
         let expires_in = response
             .as_array()
-            .and_then(|arr| arr.get("expires_in"))
+            .and_then(|arr| arr.get(B("expires_in")))
             .and_then(|v| v.as_int())
             .unwrap_or(0);
         let refresh_token = response
             .as_array()
-            .and_then(|arr| arr.get("refresh_token"))
+            .and_then(|arr| arr.get(B("refresh_token")))
             .and_then(|v| v.as_string())
             .unwrap_or_default()
             .to_string();
         let mut setting = IndexMap::new();
-        setting.insert(
-            "expires-at".to_string(),
-            PhpMixed::Int(created_at + expires_in),
-        );
-        setting.insert("refresh-token".to_string(), PhpMixed::string(refresh_token));
-        setting.insert(
-            "token".to_string(),
-            PhpMixed::string(access_token.to_string()),
-        );
+        setting.insert("expires-at".into(), PhpMixed::Int(created_at + expires_in));
+        setting.insert("refresh-token".into(), PhpMixed::string(refresh_token));
+        setting.insert("token".into(), PhpMixed::string(access_token.to_string()));
         PhpMixed::Array(setting)
     }
 }

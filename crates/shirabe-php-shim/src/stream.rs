@@ -1,4 +1,5 @@
 use crate::{PhpMixed, PhpResource, StreamBacking};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use std::io::{Read as _, Write as _};
 
@@ -49,22 +50,22 @@ fn stream_read_remaining(stream: &PhpResource, max_length: Option<i64>) -> Optio
 // `options` and the `params`. This is a self-contained value, so it round-trips through the
 // accessor below without any registry.
 pub fn stream_context_create(
-    options: &IndexMap<String, PhpMixed>,
-    params: Option<&IndexMap<String, PhpMixed>>,
+    options: &IndexMap<BString, PhpMixed>,
+    params: Option<&IndexMap<BString, PhpMixed>>,
 ) -> PhpMixed {
     let mut context = IndexMap::new();
-    context.insert("options".to_string(), PhpMixed::Array(options.clone()));
+    context.insert("options".into(), PhpMixed::Array(options.clone()));
     context.insert(
-        "params".to_string(),
+        "params".into(),
         PhpMixed::Array(params.cloned().unwrap_or_default()),
     );
     PhpMixed::Object(context)
 }
 
-pub fn stream_context_get_options(stream_or_context: &PhpMixed) -> IndexMap<String, PhpMixed> {
+pub fn stream_context_get_options(stream_or_context: &PhpMixed) -> IndexMap<BString, PhpMixed> {
     match stream_or_context {
         PhpMixed::Object(context) | PhpMixed::Array(context) => context
-            .get("options")
+            .get(B("options"))
             .and_then(PhpMixed::as_array)
             .cloned()
             .unwrap_or_default(),

@@ -27,7 +27,7 @@ use crate::repository::{
 };
 use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
@@ -44,7 +44,7 @@ use shirabe_symfony_console::output::ConsoleOutput;
 /// Either a configuration array or a filename to read from. PHP's `$localConfig` accepts both.
 pub enum LocalConfigInput {
     Path(String),
-    Data(IndexMap<String, PhpMixed>),
+    Data(IndexMap<BString, PhpMixed>),
 }
 
 /// PHP's `$disablePlugins` accepts `bool|'local'|'global'`.
@@ -213,19 +213,19 @@ impl Factory {
 
         // determine and add main dirs to the config
         let home = Self::get_home_dir()?;
-        let mut defaults: IndexMap<String, PhpMixed> = IndexMap::new();
-        let mut inner: IndexMap<String, PhpMixed> = IndexMap::new();
-        inner.insert("home".to_string(), PhpMixed::string(home.clone()));
+        let mut defaults: IndexMap<BString, PhpMixed> = IndexMap::new();
+        let mut inner: IndexMap<BString, PhpMixed> = IndexMap::new();
+        inner.insert("home".into(), PhpMixed::string(home.clone()));
         inner.insert(
-            "cache-dir".to_string(),
+            "cache-dir".into(),
             PhpMixed::string(Self::get_cache_dir(&home)?),
         );
         inner.insert(
-            "data-dir".to_string(),
+            "data-dir".into(),
             PhpMixed::string(Self::get_data_dir(&home)?),
         );
         defaults.insert(
-            "config".to_string(),
+            "config".into(),
             PhpMixed::Array(inner.into_iter().collect()),
         );
         config.merge(&defaults, Config::SOURCE_DEFAULT);
@@ -297,13 +297,13 @@ impl Factory {
                 JsonFile::AUTH_SCHEMA,
                 None,
             )?;
-            let read_data: IndexMap<String, PhpMixed> = match auth_file.read()? {
+            let read_data: IndexMap<BString, PhpMixed> = match auth_file.read()? {
                 PhpMixed::Array(map) => map.into_iter().collect(),
                 _ => IndexMap::new(),
             };
-            let mut wrapped: IndexMap<String, PhpMixed> = IndexMap::new();
+            let mut wrapped: IndexMap<BString, PhpMixed> = IndexMap::new();
             wrapped.insert(
-                "config".to_string(),
+                "config".into(),
                 PhpMixed::Array(read_data.into_iter().collect()),
             );
             let auth_path_owned = auth_file.get_path().to_string();
@@ -412,7 +412,7 @@ impl Factory {
 
         let mut local_config_source = Config::SOURCE_UNKNOWN.to_string();
         let mut composer_file: Option<String> = None;
-        let mut local_config_data: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut local_config_data: IndexMap<BString, PhpMixed> = IndexMap::new();
         if let Some(LocalConfigInput::Path(path)) = &local_config {
             composer_file = Some(path.clone());
 
@@ -512,8 +512,8 @@ impl Factory {
                     None,
                 )?;
                 let auth_read = local_auth_file.read()?;
-                let mut wrapped: IndexMap<String, PhpMixed> = IndexMap::new();
-                wrapped.insert("config".to_string(), auth_read);
+                let mut wrapped: IndexMap<BString, PhpMixed> = IndexMap::new();
+                wrapped.insert("config".into(), auth_read);
                 let auth_path = local_auth_file.get_path().to_string();
                 config.merge(&wrapped, &auth_path);
                 config.set_local_auth_config_source(Box::new(JsonConfigSource::new(
@@ -612,9 +612,9 @@ impl Factory {
 
                     // force-set the version of the global package if not defined as
                     // guessing it adds no value and only takes time
-                    if !full_load && !local_config_data.contains_key("version") {
+                    if !full_load && !local_config_data.contains_key(B("version")) {
                         local_config_data
-                            .insert("version".to_string(), PhpMixed::string("1.0.0".to_string()));
+                            .insert("version".into(), PhpMixed::string("1.0.0".to_string()));
                     }
 
                     // load package
@@ -1006,9 +1006,10 @@ impl Factory {
             dm.set_preferences(
                 prefs
                     .into_iter()
+                    // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
                     .map(|(k, v)| {
                         (
-                            k,
+                            k.to_str_lossy().into_owned(),
                             match v {
                                 PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                                 _ => String::new(),
@@ -1381,9 +1382,9 @@ impl Factory {
         ));
         let _ = std::fs::create_dir_all(&home);
 
-        let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
         config_section.insert(
-            "home".to_string(),
+            "home".into(),
             // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
             PhpMixed::string(
                 home.into_os_string()
@@ -1391,12 +1392,12 @@ impl Factory {
                     .unwrap_or_else(|home| panic!("temp dir is not valid UTF-8: {home:?}")),
             ),
         );
-        let mut repositories: IndexMap<String, PhpMixed> = IndexMap::new();
-        repositories.insert("packagist".to_string(), PhpMixed::Bool(false));
+        let mut repositories: IndexMap<BString, PhpMixed> = IndexMap::new();
+        repositories.insert("packagist".into(), PhpMixed::Bool(false));
 
-        let mut merge: IndexMap<String, PhpMixed> = IndexMap::new();
-        merge.insert("config".to_string(), PhpMixed::Array(config_section));
-        merge.insert("repositories".to_string(), PhpMixed::Array(repositories));
+        let mut merge: IndexMap<BString, PhpMixed> = IndexMap::new();
+        merge.insert("config".into(), PhpMixed::Array(config_section));
+        merge.insert("repositories".into(), PhpMixed::Array(repositories));
         config.merge(&merge, Config::SOURCE_UNKNOWN);
 
         Ok(config)
@@ -1406,7 +1407,7 @@ impl Factory {
     pub fn create_http_downloader(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<HttpDownloader> {
         // TODO(plugin): static `$warned` flag — port as a OnceCell or atomic.
         static mut WARNED: bool = false;
@@ -1438,31 +1439,29 @@ impl Factory {
             return Err(NoSslException::new("The openssl extension is required for SSL/TLS protection but is not available. If you can not enable the openssl extension, you can disable this error, at your own risk, by setting the 'disable-tls' option to true."
                         .to_string()).into());
         }
-        let mut http_downloader_options: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut http_downloader_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         if !disable_tls {
             if "" != config.borrow_mut().get_str("cafile").unwrap_or_default() {
-                let mut ssl_map: IndexMap<String, PhpMixed> = IndexMap::new();
+                let mut ssl_map: IndexMap<BString, PhpMixed> = IndexMap::new();
                 ssl_map.insert(
-                    "cafile".to_string(),
+                    "cafile".into(),
                     PhpMixed::string(config.borrow_mut().get_str("cafile").unwrap_or_default()),
                 );
-                http_downloader_options.insert(
-                    "ssl".to_string(),
-                    PhpMixed::Array(ssl_map.into_iter().collect()),
-                );
+                http_downloader_options
+                    .insert("ssl".into(), PhpMixed::Array(ssl_map.into_iter().collect()));
             }
             if "" != config.borrow_mut().get_str("capath").unwrap_or_default() {
                 let existing_ssl = http_downloader_options
-                    .get("ssl")
+                    .get(B("ssl"))
                     .and_then(|v| v.as_array())
                     .cloned()
                     .unwrap_or_default();
                 let mut ssl_map = existing_ssl;
                 ssl_map.insert(
-                    "capath".to_string(),
+                    "capath".into(),
                     PhpMixed::string(config.borrow_mut().get_str("capath").unwrap_or_default()),
                 );
-                http_downloader_options.insert("ssl".to_string(), PhpMixed::Array(ssl_map));
+                http_downloader_options.insert("ssl".into(), PhpMixed::Array(ssl_map));
             }
             http_downloader_options = array_replace_recursive(http_downloader_options, options);
         }
@@ -1535,8 +1534,8 @@ impl Factory {
         )?;
         let auth_data_assoc = json_decode_assoc(&composer_auth_env_str)?;
         if !matches!(auth_data_assoc, PhpMixed::Null) {
-            let mut wrapped: IndexMap<String, PhpMixed> = IndexMap::new();
-            wrapped.insert("config".to_string(), auth_data_assoc);
+            let mut wrapped: IndexMap<BString, PhpMixed> = IndexMap::new();
+            wrapped.insert("config".into(), auth_data_assoc);
             config.merge(&wrapped, "COMPOSER_AUTH");
         }
         Ok(())

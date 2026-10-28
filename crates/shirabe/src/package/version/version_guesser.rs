@@ -7,7 +7,7 @@ use crate::repository::vcs::HgDriver;
 use crate::util::{
     Git as GitUtil, HttpDownloader, Platform, ProcessExecutor, Svn as SvnUtil, sync_executor,
 };
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, implode, is_string,
@@ -21,7 +21,7 @@ use shirabe_php_shim::{
 pub trait VersionGuesserInterface: std::fmt::Debug {
     fn guess_version(
         &mut self,
-        package_config: &IndexMap<String, PhpMixed>,
+        package_config: &IndexMap<BString, PhpMixed>,
         path: &str,
     ) -> anyhow::Result<Option<VersionData>>;
 
@@ -85,7 +85,7 @@ impl VersionGuesser {
 
     pub fn guess_version(
         &mut self,
-        package_config: &IndexMap<String, PhpMixed>,
+        package_config: &IndexMap<BString, PhpMixed>,
         path: &str,
     ) -> anyhow::Result<Option<VersionData>> {
         // For testing only (ref VersionGuesserMock::guessVersion returns null).
@@ -182,7 +182,7 @@ impl VersionGuesser {
 
     fn guess_git_version(
         &mut self,
-        package_config: &IndexMap<String, PhpMixed>,
+        package_config: &IndexMap<BString, PhpMixed>,
         path: &str,
     ) -> anyhow::Result<VersionData> {
         GitUtil::clean_env(&self.process);
@@ -363,7 +363,7 @@ impl VersionGuesser {
 
     fn guess_hg_version(
         &mut self,
-        package_config: &IndexMap<String, PhpMixed>,
+        package_config: &IndexMap<BString, PhpMixed>,
         path: &str,
     ) -> anyhow::Result<Option<VersionData>> {
         // try to fetch current version from hg branch
@@ -398,8 +398,8 @@ impl VersionGuesser {
             }
 
             // re-use the HgDriver to fetch branches (this properly includes bookmarks)
-            let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-            repo_config.insert("url".to_string(), PhpMixed::string(path.to_string()));
+            let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
+            repo_config.insert("url".into(), PhpMixed::string(path.to_string()));
             let io: std::rc::Rc<std::cell::RefCell<dyn crate::io::IOInterface>> =
                 std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
             let http_io: std::rc::Rc<std::cell::RefCell<dyn crate::io::IOInterface>> =
@@ -453,7 +453,7 @@ impl VersionGuesser {
 
     fn guess_feature_version(
         &mut self,
-        package_config: &IndexMap<String, PhpMixed>,
+        package_config: &IndexMap<BString, PhpMixed>,
         version: Option<String>,
         mut branches: Vec<String>,
         scm_cmdline: Vec<String>,
@@ -465,11 +465,11 @@ impl VersionGuesser {
         // ignore feature branches if they have no branch-alias or self.version is used
         // and find the branch they came from to use as a version instead
         let has_branch_alias = package_config
-            .get("extra")
+            .get(B("extra"))
             .and_then(|v| v.as_array())
-            .and_then(|m| m.get("branch-alias"))
+            .and_then(|m| m.get(B("branch-alias")))
             .and_then(|v| v.as_array())
-            .map(|m| m.contains_key(version.as_deref().unwrap_or("")))
+            .map(|m| m.contains_key(B(version.as_deref().unwrap_or(""))))
             .unwrap_or(false);
         let has_self_version = strpos(
             &json_encode(&PhpMixed::Array(
@@ -574,11 +574,11 @@ impl VersionGuesser {
 
     fn is_feature_branch(
         &self,
-        package_config: &IndexMap<String, PhpMixed>,
+        package_config: &IndexMap<BString, PhpMixed>,
         branch_name: Option<&str>,
     ) -> bool {
         let mut non_feature_branches = String::new();
-        let nf_value = package_config.get("non-feature-branches");
+        let nf_value = package_config.get(B("non-feature-branches"));
         if !empty(&nf_value.cloned().unwrap_or(PhpMixed::Null)) {
             let names: Vec<String> = nf_value
                 .and_then(|v| v.as_list())
@@ -647,7 +647,7 @@ impl VersionGuesser {
 
     fn guess_svn_version(
         &mut self,
-        package_config: &IndexMap<String, PhpMixed>,
+        package_config: &IndexMap<BString, PhpMixed>,
         path: &str,
     ) -> anyhow::Result<Option<VersionData>> {
         SvnUtil::clean_env();
@@ -660,17 +660,17 @@ impl VersionGuesser {
             Some(path),
         )? {
             let trunk_path = package_config
-                .get("trunk-path")
+                .get(B("trunk-path"))
                 .and_then(|v| v.as_string())
                 .map(|s| preg_quote(&s.to_str_lossy(), Some('#')))
                 .unwrap_or_else(|| "trunk".to_string());
             let branches_path = package_config
-                .get("branches-path")
+                .get(B("branches-path"))
                 .and_then(|v| v.as_string())
                 .map(|s| preg_quote(&s.to_str_lossy(), Some('#')))
                 .unwrap_or_else(|| "branches".to_string());
             let tags_path = package_config
-                .get("tags-path")
+                .get(B("tags-path"))
                 .and_then(|v| v.as_string())
                 .map(|s| preg_quote(&s.to_str_lossy(), Some('#')))
                 .unwrap_or_else(|| "tags".to_string());
@@ -744,7 +744,7 @@ impl VersionGuesser {
 impl VersionGuesserInterface for VersionGuesser {
     fn guess_version(
         &mut self,
-        package_config: &IndexMap<String, PhpMixed>,
+        package_config: &IndexMap<BString, PhpMixed>,
         path: &str,
     ) -> anyhow::Result<Option<VersionData>> {
         VersionGuesser::guess_version(self, package_config, path)

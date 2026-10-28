@@ -2406,6 +2406,7 @@ dependencies = [
 name = "shirabe-metadata-minifier"
 version = "0.2.0-dev"
 dependencies = [
+ "bstr",
  "indexmap",
  "shirabe-php-shim",
 ]

@@ -25,6 +25,7 @@ pub use vcs_driver_interface::*;
 use crate::config::Config;
 use crate::io::IOInterface;
 use crate::util::{HttpDownloader, ProcessExecutor};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpClass, PhpMixed};
 
@@ -44,7 +45,7 @@ pub enum VcsDriverKind {
 impl VcsDriverKind {
     pub fn instantiate(
         self,
-        repo_config: IndexMap<String, PhpMixed>,
+        repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,

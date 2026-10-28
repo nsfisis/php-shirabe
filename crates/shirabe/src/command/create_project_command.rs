@@ -25,6 +25,7 @@ use crate::repository::{
 use crate::script::ScriptEvents;
 use crate::signal::SignalSubscription;
 use crate::util::{Filesystem, Platform, ProcessExecutor};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
@@ -182,12 +183,14 @@ impl CreateProjectCommand {
                     false,
                 );
 
-                let is_packagist_disabled = (repo_config.contains_key("packagist")
+                let is_packagist_disabled = (repo_config.contains_key(B("packagist"))
                     && repo_config.len() == 1
-                    && repo_config.get("packagist").and_then(|v| v.as_bool()) == Some(false))
-                    || (repo_config.contains_key("packagist.org")
+                    && repo_config.get(B("packagist")).and_then(|v| v.as_bool()) == Some(false))
+                    || (repo_config.contains_key(B("packagist.org"))
                         && repo_config.len() == 1
-                        && repo_config.get("packagist.org").and_then(|v| v.as_bool())
+                        && repo_config
+                            .get(B("packagist.org"))
+                            .and_then(|v| v.as_bool())
                             == Some(false));
                 if is_packagist_disabled {
                     config_source.add_repository("packagist.org", PhpMixed::Bool(false), false);
@@ -474,10 +477,10 @@ impl CreateProjectCommand {
         // set the base dir to ensure $config->all() below resolves the correct absolute paths to vendor-dir etc
         config.borrow_mut().set_base_dir(Some(directory.clone()));
         if !secure_http {
-            let mut merge_map: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
-            let mut inner_map: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
-            inner_map.insert("secure-http".to_string(), PhpMixed::Bool(false));
-            merge_map.insert("config".to_string(), PhpMixed::Array(inner_map));
+            let mut merge_map: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
+            let mut inner_map: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
+            inner_map.insert("secure-http".into(), PhpMixed::Bool(false));
+            merge_map.insert("config".into(), PhpMixed::Array(inner_map));
             config
                 .borrow_mut()
                 .merge(&merge_map, Config::SOURCE_COMMAND);
@@ -577,12 +580,14 @@ impl CreateProjectCommand {
             for repo in repositories {
                 let mut repo_config =
                     RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
-                let is_packagist_disabled = (repo_config.contains_key("packagist")
+                let is_packagist_disabled = (repo_config.contains_key(B("packagist"))
                     && repo_config.len() == 1
-                    && repo_config.get("packagist").and_then(|v| v.as_bool()) == Some(false))
-                    || (repo_config.contains_key("packagist.org")
+                    && repo_config.get(B("packagist")).and_then(|v| v.as_bool()) == Some(false))
+                    || (repo_config.contains_key(B("packagist.org"))
                         && repo_config.len() == 1
-                        && repo_config.get("packagist.org").and_then(|v| v.as_bool())
+                        && repo_config
+                            .get(B("packagist.org"))
+                            .and_then(|v| v.as_bool())
                             == Some(false));
                 if is_packagist_disabled {
                     continue;
@@ -590,20 +595,20 @@ impl CreateProjectCommand {
 
                 // disable symlinking for the root package by default as that most likely makes no sense
                 let is_path_type =
-                    repo_config.get("type").and_then(|v| v.as_string()) == Some("path".into());
+                    repo_config.get(B("type")).and_then(|v| v.as_string()) == Some("path".into());
                 let has_symlink_option = repo_config
-                    .get("options")
+                    .get(B("options"))
                     .and_then(|v| match v {
-                        PhpMixed::Array(m) => Some(m.contains_key("symlink")),
+                        PhpMixed::Array(m) => Some(m.contains_key(B("symlink"))),
                         _ => None,
                     })
                     .unwrap_or(false);
                 if is_path_type && !has_symlink_option {
                     let options_entry = repo_config
-                        .entry("options".to_string())
+                        .entry("options".into())
                         .or_insert(PhpMixed::Array(indexmap::IndexMap::new()));
                     if let PhpMixed::Array(options_map) = options_entry {
-                        options_map.insert("symlink".to_string(), PhpMixed::Bool(false));
+                        options_map.insert("symlink".into(), PhpMixed::Bool(false));
                     }
                 }
 

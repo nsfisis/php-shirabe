@@ -9,7 +9,7 @@ use crate::pipes::pipes_interface::PipesInterface;
 use crate::pipes::unix_pipes::UnixPipes;
 use crate::pipes::windows_pipes::WindowsPipes;
 use crate::process_utils::ProcessUtils;
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Descriptor, PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, ProcStatus, SEEK_END,
@@ -60,7 +60,7 @@ pub struct Process {
     callback_error: Option<anyhow::Error>,
     commandline: CommandLine,
     cwd: Option<String>,
-    env: IndexMap<String, PhpMixed>,
+    env: IndexMap<BString, PhpMixed>,
     input: PhpMixed,
     starttime: Option<f64>,
     timeout: Option<f64>,
@@ -73,7 +73,7 @@ pub struct Process {
     incremental_output_offset: i64,
     incremental_error_output_offset: i64,
     tty: bool,
-    options: IndexMap<String, PhpMixed>,
+    options: IndexMap<BString, PhpMixed>,
     process_pipes: Option<Box<dyn PipesInterface>>,
     latest_signal: Option<i64>,
     /// Test-only mock state. `None` in production; set via [`Process::__mock`] in tests.
@@ -179,8 +179,8 @@ impl Process {
 
     fn empty() -> Self {
         let mut options = IndexMap::new();
-        options.insert("suppress_errors".to_string(), PhpMixed::Bool(true));
-        options.insert("bypass_shell".to_string(), PhpMixed::Bool(true));
+        options.insert("suppress_errors".into(), PhpMixed::Bool(true));
+        options.insert("bypass_shell".into(), PhpMixed::Bool(true));
 
         Self {
             callback: None,
@@ -245,7 +245,7 @@ impl Process {
         if let Some(env) = env {
             this.set_env(
                 env.into_iter()
-                    .map(|(k, v)| (k, PhpMixed::string(v)))
+                    .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                     .collect(),
             );
         }
@@ -274,7 +274,7 @@ impl Process {
     pub fn run(
         &mut self,
         callback: Option<UserCallback>,
-        env: IndexMap<String, PhpMixed>,
+        env: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<i64> {
         self.start(callback, env)?;
 
@@ -285,7 +285,7 @@ impl Process {
     pub fn start(
         &mut self,
         callback: Option<UserCallback>,
-        mut env: IndexMap<String, PhpMixed>,
+        mut env: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         if self.is_running() {
             return Err(RuntimeException::new("Process is already running.".to_string()).into());
@@ -331,7 +331,11 @@ impl Process {
         let mut env_pairs: Vec<String> = Vec::new();
         for (k, v) in &env {
             let is_false = matches!(v, PhpMixed::Bool(false));
-            if !is_false && !["argc", "argv", "ARGC", "ARGV"].contains(&k.as_str()) {
+            if !is_false
+                && !["argc", "argv", "ARGC", "ARGV"]
+                    .iter()
+                    .any(|name| k == name)
+            {
                 env_pairs.push(format!("{}={}", k, to_php_string(v)));
             }
         }
@@ -675,12 +679,12 @@ impl Process {
     }
 
     /// Gets the environment variables.
-    pub fn get_env(&self) -> &IndexMap<String, PhpMixed> {
+    pub fn get_env(&self) -> &IndexMap<BString, PhpMixed> {
         &self.env
     }
 
     /// Sets the environment variables.
-    pub fn set_env(&mut self, env: IndexMap<String, PhpMixed>) -> &mut Self {
+    pub fn set_env(&mut self, env: IndexMap<BString, PhpMixed>) -> &mut Self {
         self.env = env;
 
         self
@@ -974,7 +978,7 @@ impl Process {
     fn prepare_windows_command_line(
         &mut self,
         cmd: &str,
-        env: &mut IndexMap<String, PhpMixed>,
+        env: &mut IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<String> {
         let uid = uniqid("", true);
         let mut var_count = 0;
@@ -1022,7 +1026,7 @@ impl Process {
                 var_count += 1;
                 let var = format!("{}{}", uid, var_count);
 
-                env.insert(var.clone(), PhpMixed::string(value));
+                env.insert(var.as_str().into(), PhpMixed::string(value));
 
                 let replacement = format!("!{}!", var);
                 var_cache.insert(m0, replacement.clone());
@@ -1115,13 +1119,13 @@ impl Process {
     fn replace_placeholders(
         &self,
         commandline: &str,
-        env: &IndexMap<String, PhpMixed>,
+        env: &IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<String> {
         preg_replace_callback(
             php_regex!(r#"/"\$\{:([_a-zA-Z]+[_a-zA-Z0-9]*)\}"/"#),
             |matches: &PregMatches| -> anyhow::Result<String> {
                 let key = matches.get(1).unwrap_or_default().to_string();
-                match env.get(&key) {
+                match env.get(B(&key)) {
                     None => Err(InvalidArgumentException::new(format!(
                         "Command line is missing a value for parameter \"{}\": {}",
                         key, commandline
@@ -1139,7 +1143,7 @@ impl Process {
         )
     }
 
-    fn get_default_env(&self) -> IndexMap<String, PhpMixed> {
+    fn get_default_env(&self) -> IndexMap<BString, PhpMixed> {
         // TODO(bytes): the environment is kept as Strings.
         let env: IndexMap<String, String> = getenv_all()
             .map(|(k, v)| {
@@ -1154,22 +1158,22 @@ impl Process {
         let server = PHP_SERVER.lock().unwrap();
 
         // non-Windows: array_intersect_key($env, $_SERVER) ?: $env
-        let mut intersect: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut intersect: IndexMap<BString, PhpMixed> = IndexMap::new();
         for (k, v) in &env {
             if server.get(k).is_some() {
-                intersect.insert(k.clone(), PhpMixed::string(v.clone()));
+                intersect.insert(k.as_str().into(), PhpMixed::string(v.clone()));
             }
         }
-        let env_map: IndexMap<String, PhpMixed> = if intersect.is_empty() {
+        let env_map: IndexMap<BString, PhpMixed> = if intersect.is_empty() {
             env.into_iter()
-                .map(|(k, v)| (k, PhpMixed::string(v)))
+                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                 .collect()
         } else {
             intersect
         };
 
         // $_ENV + env_map
-        let mut result: IndexMap<String, PhpMixed> = PHP_ENV
+        let mut result: IndexMap<BString, PhpMixed> = PHP_ENV
             .lock()
             .unwrap()
             .get_all()
@@ -1177,7 +1181,8 @@ impl Process {
             .map(|(k, v)| {
                 (
                     k.into_string()
-                        .unwrap_or_else(|k| panic!("env name is not valid UTF-8: {k:?}")),
+                        .unwrap_or_else(|k| panic!("env name is not valid UTF-8: {k:?}"))
+                        .into(),
                     PhpMixed::string(
                         v.into_string()
                             .unwrap_or_else(|v| panic!("env value is not valid UTF-8: {v:?}")),

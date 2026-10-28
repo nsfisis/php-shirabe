@@ -1,4 +1,5 @@
 use crate::{ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState};
+use bstr::BString;
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::exec::escapeshellcmd;
 
@@ -146,7 +147,7 @@ pub fn proc_open(
     pipes: &mut IndexMap<i64, PhpResource>,
     cwd: Option<&std::path::Path>,
     env: Option<&[String]>,
-    options: Option<&IndexMap<String, PhpMixed>>,
+    options: Option<&IndexMap<BString, PhpMixed>>,
 ) -> std::io::Result<PhpResource> {
     // Windows-oriented options (bypass_shell, create_process_group, ...) have no effect here.
     let _ = options;

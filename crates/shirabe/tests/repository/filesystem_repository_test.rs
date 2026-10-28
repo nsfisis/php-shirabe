@@ -2,6 +2,7 @@
 
 use crate::php_worker::{load_composer_php_runtime, php_call_static, php_runtime_available};
 use crate::test_case::{get_alias_package, get_package};
+use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::dependency_resolver::operation::AnyOperation;
@@ -206,10 +207,10 @@ fn configure_links(
     description: &str,
     links: &[(&str, &str)],
 ) -> IndexMap<String, Link> {
-    let mut map: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (target, constraint) in links {
         map.insert(
-            (*target).to_string(),
+            (*target).to_string().into(),
             PhpMixed::string((*constraint).to_string()),
         );
     }
@@ -379,45 +380,45 @@ fn test_safely_load_installed_versions() {
 
     let root = PhpMixed::Array(IndexMap::from([
         (
-            "install_path".to_string(),
+            "install_path".into(),
             PhpMixed::string(format!("{}/./", fixtures_dir)),
         ),
         (
-            "aliases".to_string(),
+            "aliases".into(),
             PhpMixed::List(vec![
                 PhpMixed::string("1.10.x-dev".to_string()),
                 PhpMixed::string("2.10.x-dev".to_string()),
             ]),
         ),
-        ("name".to_string(), PhpMixed::string("__root__".to_string())),
-        ("true".to_string(), PhpMixed::Bool(true)),
-        ("false".to_string(), PhpMixed::Bool(false)),
-        ("null".to_string(), PhpMixed::Null),
+        ("name".into(), PhpMixed::string("__root__".to_string())),
+        ("true".into(), PhpMixed::Bool(true)),
+        ("false".into(), PhpMixed::Bool(false)),
+        ("null".into(), PhpMixed::Null),
     ]));
 
     let a_provider = PhpMixed::Array(IndexMap::from([
         (
-            "foo".to_string(),
+            "foo".into(),
             PhpMixed::string("simple string/no backslash".to_string()),
         ),
         (
-            "install_path".to_string(),
+            "install_path".into(),
             PhpMixed::string(format!(
                 "{}/vendor/{{${{passthru('bash -i')}}}}",
                 fixtures_dir
             )),
         ),
-        ("empty array".to_string(), PhpMixed::List(vec![])),
+        ("empty array".into(), PhpMixed::List(vec![])),
     ]));
 
     let c_c = PhpMixed::Array(IndexMap::from([
         (
-            "install_path".to_string(),
+            "install_path".into(),
             PhpMixed::string("/foo/bar/ven/do{}r/c/c${}".to_string()),
         ),
-        ("aliases".to_string(), PhpMixed::List(vec![])),
+        ("aliases".into(), PhpMixed::List(vec![])),
         (
-            "reference".to_string(),
+            "reference".into(),
             PhpMixed::string(
                 "{${passthru('bash -i')}} Foo\\Bar\n\ttab\u{0b}verticaltab\0".to_string(),
             ),
@@ -425,12 +426,12 @@ fn test_safely_load_installed_versions() {
     ]));
 
     let expected = PhpMixed::Array(IndexMap::from([
-        ("root".to_string(), root),
+        ("root".into(), root),
         (
-            "versions".to_string(),
+            "versions".into(),
             PhpMixed::Array(IndexMap::from([
-                ("a/provider".to_string(), a_provider),
-                ("c/c".to_string(), c_c),
+                ("a/provider".into(), a_provider),
+                ("c/c".into(), c_c),
             ])),
         ),
     ]));

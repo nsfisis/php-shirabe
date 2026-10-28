@@ -6,6 +6,7 @@
 //! constraint decides how many versions survive that filter, which is what the lazy expansion is
 //! meant to exploit.
 
+use bstr::BString;
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use indexmap::IndexMap;
 use shirabe::config::Config;
@@ -45,10 +46,10 @@ const METADATA_URL: &str = "https://example.org/p2/%package%.json";
 /// A root file with nothing but a metadata-url, which is what puts the repository on the lazy
 /// provider path `load_async_packages` serves.
 fn root_file() -> String {
-    let mut root: IndexMap<String, PhpMixed> = IndexMap::new();
-    root.insert("packages".to_string(), PhpMixed::Array(IndexMap::new()));
+    let mut root: IndexMap<BString, PhpMixed> = IndexMap::new();
+    root.insert("packages".into(), PhpMixed::Array(IndexMap::new()));
     root.insert(
-        "metadata-url".to_string(),
+        "metadata-url".into(),
         PhpMixed::string(METADATA_URL.to_string()),
     );
     JsonFile::encode(&PhpMixed::Array(root)).expect("failed to encode the root file")
@@ -57,14 +58,14 @@ fn root_file() -> String {
 /// A config whose cache is read-only, so the measurement stays off the filesystem.
 fn config(home: &TempDir) -> Config {
     let mut config = Config::new(true, None);
-    let mut settings: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut settings: IndexMap<BString, PhpMixed> = IndexMap::new();
     settings.insert(
-        "home".to_string(),
+        "home".into(),
         PhpMixed::string(home.path().display().to_string()),
     );
-    settings.insert("cache-read-only".to_string(), PhpMixed::Bool(true));
-    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-    top.insert("config".to_string(), PhpMixed::Array(settings));
+    settings.insert("cache-read-only".into(), PhpMixed::Bool(true));
+    let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+    top.insert("config".into(), PhpMixed::Array(settings));
     config.merge(&top, Config::SOURCE_UNKNOWN);
     config
 }
@@ -101,11 +102,8 @@ fn repository(package: &str, root: &str, metadata: &str, config: &Config) -> Com
         HttpDownloaderMockHandler::default(),
     );
 
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert(
-        "url".to_string(),
-        PhpMixed::string(REPOSITORY_URL.to_string()),
-    );
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
+    repo_config.insert("url".into(), PhpMixed::string(REPOSITORY_URL.to_string()));
 
     ComposerRepository::new(repo_config, io, config, http_downloader, None)
         .expect("failed to build the repository")

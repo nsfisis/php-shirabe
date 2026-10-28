@@ -5,6 +5,7 @@ use crate::dependency_resolver::operation::AnyOperation;
 use crate::event_dispatcher::{Event, EventInterface};
 use crate::io::IOInterface;
 use crate::repository::InstalledRepositoryInterfaceHandle;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -88,7 +89,7 @@ impl EventInterface for PackageEvent {
         self.inner.get_arguments()
     }
 
-    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+    fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
         self.inner.get_flags()
     }
 

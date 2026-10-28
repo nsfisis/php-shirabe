@@ -17,6 +17,7 @@ mod suggested_packages_reporter;
 
 pub use binary_installer::*;
 pub use binary_presence_interface::*;
+use bstr::BString;
 pub use installation_manager::*;
 pub use installer_event::*;
 pub use installer_events::*;
@@ -849,17 +850,17 @@ impl Installer {
             }
         }
 
-        // Convert aliases (Vec<IndexMap<String, String>>) into Vec<IndexMap<String, PhpMixed>>
-        let aliases_php_mixed: Vec<IndexMap<String, PhpMixed>> = lock_transaction
+        // Convert aliases (Vec<IndexMap<String, String>>) into Vec<IndexMap<BString, PhpMixed>>
+        let aliases_php_mixed: Vec<IndexMap<BString, PhpMixed>> = lock_transaction
             .get_aliases(aliases.clone())
             .into_iter()
             .map(|m| {
                 m.into_iter()
-                    .map(|(k, v)| (k, PhpMixed::string(v)))
-                    .collect::<IndexMap<String, PhpMixed>>()
+                    .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                    .collect::<IndexMap<BString, PhpMixed>>()
             })
             .collect();
-        let platform_overrides: IndexMap<String, PhpMixed> = self
+        let platform_overrides: IndexMap<BString, PhpMixed> = self
             .config
             .borrow_mut()
             .get("platform")
@@ -1273,7 +1274,7 @@ impl Installer {
         &mut self,
         for_update: bool,
     ) -> anyhow::Result<PlatformRepositoryHandle> {
-        let platform_overrides: IndexMap<String, PhpMixed> = if for_update {
+        let platform_overrides: IndexMap<BString, PhpMixed> = if for_update {
             self.config
                 .borrow_mut()
                 .get("platform")
@@ -1288,7 +1289,7 @@ impl Installer {
                 .get_platform_overrides()
                 .unwrap_or_default()
                 .into_iter()
-                .map(|(k, v)| (k, PhpMixed::string(v)))
+                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                 .collect()
         };
 

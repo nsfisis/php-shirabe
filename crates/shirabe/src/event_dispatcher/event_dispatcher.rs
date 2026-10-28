@@ -18,7 +18,7 @@ use crate::plugin::{CommandEvent, PreCommandRunEvent};
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
 use crate::util::{Platform, ProcessExecutor};
-use bstr::{BString, ByteSlice};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
@@ -115,7 +115,7 @@ impl std::fmt::Debug for GetListenersOverride {
 
 /// For testing only. Holds a closure standing in for an overridden `dispatchScript` method.
 pub struct DispatchScriptOverride(
-    pub Box<dyn Fn(&str, bool, &[String], &IndexMap<String, PhpMixed>) -> anyhow::Result<i64>>,
+    pub Box<dyn Fn(&str, bool, &[String], &IndexMap<BString, PhpMixed>) -> anyhow::Result<i64>>,
 );
 
 impl std::fmt::Debug for DispatchScriptOverride {
@@ -173,7 +173,7 @@ impl EventDispatcher {
     pub fn __set_dispatch_script_override(
         &mut self,
         callback: Box<
-            dyn Fn(&str, bool, &[String], &IndexMap<String, PhpMixed>) -> anyhow::Result<i64>,
+            dyn Fn(&str, bool, &[String], &IndexMap<BString, PhpMixed>) -> anyhow::Result<i64>,
         >,
     ) {
         self.dispatch_script_override = Some(DispatchScriptOverride(callback));
@@ -215,7 +215,7 @@ impl EventDispatcher {
         event_name: &str,
         dev_mode: bool,
         additional_args: Vec<String>,
-        flags: IndexMap<String, PhpMixed>,
+        flags: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<i64> {
         if let Some(over) = &self.dispatch_script_override {
             return (over.0)(event_name, dev_mode, &additional_args, &flags);
@@ -321,18 +321,18 @@ impl EventDispatcher {
         // finally block
         self.pop_event();
 
-        let mut known_identifiers: IndexMap<String, IndexMap<String, PhpMixed>> = IndexMap::new();
+        let mut known_identifiers: IndexMap<String, IndexMap<BString, PhpMixed>> = IndexMap::new();
         for (key, cb) in autoloaders_before.iter().enumerate() {
-            let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
-            entry.insert("key".to_string(), PhpMixed::Int(key as i64));
-            entry.insert("callback".to_string(), cb.clone());
+            let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
+            entry.insert("key".into(), PhpMixed::Int(key as i64));
+            entry.insert("callback".into(), cb.clone());
             known_identifiers.insert(Self::get_callback_identifier(cb), entry);
         }
         for cb in spl_autoload_functions() {
             // once we get to the first known autoloader, we can leave any appended autoloader without problems
             if let Some(entry) = known_identifiers.get(&Self::get_callback_identifier(&cb))
                 && entry
-                    .get("key")
+                    .get(B("key"))
                     .and_then(|v| v.as_int())
                     .map(|k| k == 0)
                     .unwrap_or(false)
@@ -539,19 +539,19 @@ impl EventDispatcher {
                             args = merged;
                         }
                         let mut flags = event.get_flags().clone();
-                        if flags.contains_key("script-alias-input") {
+                        if flags.contains_key(B("script-alias-input")) {
                             let args_string = script
                                 .iter()
                                 .map(|arg| ProcessExecutor::escape(arg))
                                 .collect::<Vec<_>>()
                                 .join(" ");
                             let existing = flags
-                                .get("script-alias-input")
+                                .get(B("script-alias-input"))
                                 .and_then(|v| v.as_string())
                                 .unwrap_or_default()
                                 .to_string();
                             flags.insert(
-                                "script-alias-input".to_string(),
+                                "script-alias-input".into(),
                                 PhpMixed::string(format!("{} {}", args_string, existing)),
                             );
                         }
@@ -757,7 +757,7 @@ impl EventDispatcher {
                             .join(" ");
                         let string_input = event
                             .get_flags()
-                            .get("script-alias-input")
+                            .get(B("script-alias-input"))
                             .and_then(|v| v.as_string().map(|s| s.to_string()))
                             .unwrap_or(args);
                         let verbosity = if self.io.is_debug() {
@@ -819,14 +819,14 @@ try {{
                         };
                         let command_output = result
                             .as_array()
-                            .and_then(|map| map.get("output"))
+                            .and_then(|map| map.get(B("output")))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_string();
                         if !command_output.is_empty() {
                             self.io.write3(&command_output, false, crate::io::NORMAL);
                         }
-                        if let Some(throw) = result.as_array().and_then(|map| map.get("throw")) {
+                        if let Some(throw) = result.as_array().and_then(|map| map.get(B("throw"))) {
                             let throw = described_throw(
                                 throw
                                     .as_list()
@@ -834,7 +834,7 @@ try {{
                             );
                             let caught = result
                                 .as_array()
-                                .and_then(|map| map.get("caught"))
+                                .and_then(|map| map.get(B("caught")))
                                 .is_some_and(|caught| matches!(caught, PhpMixed::Bool(true)));
                             if caught {
                                 self.io.write_error3(
@@ -849,7 +849,7 @@ try {{
                             }
                             return Err(throw_into_error(throw));
                         }
-                        r#return = match result.as_array().and_then(|map| map.get("status")) {
+                        r#return = match result.as_array().and_then(|map| map.get(B("status"))) {
                             Some(PhpMixed::Int(status)) => *status,
                             other => panic!(
                                 "the eval snippet always returns an int status, got {other:?}"
@@ -1216,7 +1216,7 @@ try {{
         // do not output the command being run when using `composer <script-name>` as it is also fairly obvious the user is running it
         if event
             .get_flags()
-            .get("script-alias-input")
+            .get(B("script-alias-input"))
             .map(|v| !matches!(v, PhpMixed::Null))
             .unwrap_or(false)
         {
@@ -1960,7 +1960,7 @@ pub trait EventDispatcherInterface: std::fmt::Debug {
         event_name: &str,
         dev_mode: bool,
         additional_args: Vec<String>,
-        flags: IndexMap<String, PhpMixed>,
+        flags: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<i64>;
     fn dispatch_installer_event(
         &mut self,
@@ -1989,7 +1989,7 @@ impl EventDispatcherInterface for EventDispatcher {
         event_name: &str,
         dev_mode: bool,
         additional_args: Vec<String>,
-        flags: IndexMap<String, PhpMixed>,
+        flags: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<i64> {
         self.dispatch_script(event_name, dev_mode, additional_args, flags)
     }

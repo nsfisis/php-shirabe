@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Json/JsonManipulatorTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::json::{JsonFile, JsonManipulator};
 use shirabe_php_shim::PhpMixed;
@@ -9,9 +10,9 @@ fn s(v: &str) -> PhpMixed {
 }
 
 fn arr(pairs: &[(&str, PhpMixed)]) -> PhpMixed {
-    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in pairs {
-        m.insert(k.to_string(), v.clone());
+        m.insert(k.to_string().into(), v.clone());
     }
     PhpMixed::Array(m)
 }

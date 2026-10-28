@@ -4,6 +4,7 @@ use crate::config_stub::ConfigStubBuilder;
 use crate::http_downloader_mock::{expect_full, get_http_downloader_mock};
 use crate::io_mock::{Expectation, IOMock, get_io_mock};
 use crate::process_executor_mock::get_process_executor_mock;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::{IOInterface, io_interface};
@@ -100,16 +101,16 @@ fn set_up_with_config_and_http(
 }
 
 // The OAuth2 token request as built by Bitbucket::request_access_token.
-fn access_token_request_options() -> IndexMap<String, PhpMixed> {
+fn access_token_request_options() -> IndexMap<BString, PhpMixed> {
     let mut http = IndexMap::new();
-    http.insert("method".to_string(), PhpMixed::string("POST".to_string()));
+    http.insert("method".into(), PhpMixed::string("POST".to_string()));
     http.insert(
-        "content".to_string(),
+        "content".into(),
         PhpMixed::string("grant_type=client_credentials".to_string()),
     );
-    let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
-    options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
-    options.insert("http".to_string(), PhpMixed::Array(http));
+    let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
+    options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
+    options.insert("http".into(), PhpMixed::Array(http));
     options
 }
 
@@ -169,21 +170,15 @@ fn set_expectations_for_storing_access_token(
 fn expected_stored_token(time: i64) -> PhpMixed {
     let mut consumer = IndexMap::new();
     consumer.insert(
-        "consumer-key".to_string(),
+        "consumer-key".into(),
         PhpMixed::string(CONSUMER_KEY.to_string()),
     );
     consumer.insert(
-        "consumer-secret".to_string(),
+        "consumer-secret".into(),
         PhpMixed::string(CONSUMER_SECRET.to_string()),
     );
-    consumer.insert(
-        "access-token".to_string(),
-        PhpMixed::string(TOKEN.to_string()),
-    );
-    consumer.insert(
-        "access-token-expiration".to_string(),
-        PhpMixed::Int(time + 3600),
-    );
+    consumer.insert("access-token".into(), PhpMixed::string(TOKEN.to_string()));
+    consumer.insert("access-token-expiration".into(), PhpMixed::Int(time + 3600));
     PhpMixed::Array(consumer)
 }
 
@@ -226,24 +221,18 @@ fn test_request_access_token_with_valid_oauth_consumer() {
 fn test_request_access_token_with_valid_oauth_consumer_and_valid_stored_access_token() {
     let time = time();
     let mut stored = IndexMap::new();
+    stored.insert("access-token".into(), PhpMixed::string(TOKEN.to_string()));
+    stored.insert("access-token-expiration".into(), PhpMixed::Int(time + 1800));
     stored.insert(
-        "access-token".to_string(),
-        PhpMixed::string(TOKEN.to_string()),
-    );
-    stored.insert(
-        "access-token-expiration".to_string(),
-        PhpMixed::Int(time + 1800),
-    );
-    stored.insert(
-        "consumer-key".to_string(),
+        "consumer-key".into(),
         PhpMixed::string(CONSUMER_KEY.to_string()),
     );
     stored.insert(
-        "consumer-secret".to_string(),
+        "consumer-secret".into(),
         PhpMixed::string(CONSUMER_SECRET.to_string()),
     );
     let mut oauth = IndexMap::new();
-    oauth.insert(ORIGIN.to_string(), PhpMixed::Array(stored));
+    oauth.insert(ORIGIN.into(), PhpMixed::Array(stored));
 
     let config = ConfigStubBuilder::new()
         .with("bitbucket-oauth", PhpMixed::Array(oauth))
@@ -267,23 +256,20 @@ fn test_request_access_token_with_valid_oauth_consumer_and_expired_access_token(
     let time = time();
     let mut stored = IndexMap::new();
     stored.insert(
-        "access-token".to_string(),
+        "access-token".into(),
         PhpMixed::string("randomExpiredToken".to_string()),
     );
+    stored.insert("access-token-expiration".into(), PhpMixed::Int(time - 400));
     stored.insert(
-        "access-token-expiration".to_string(),
-        PhpMixed::Int(time - 400),
-    );
-    stored.insert(
-        "consumer-key".to_string(),
+        "consumer-key".into(),
         PhpMixed::string(CONSUMER_KEY.to_string()),
     );
     stored.insert(
-        "consumer-secret".to_string(),
+        "consumer-secret".into(),
         PhpMixed::string(CONSUMER_SECRET.to_string()),
     );
     let mut oauth = IndexMap::new();
-    oauth.insert(ORIGIN.to_string(), PhpMixed::Array(stored));
+    oauth.insert(ORIGIN.into(), PhpMixed::Array(stored));
 
     let config = ConfigStubBuilder::new()
         .with("bitbucket-oauth", PhpMixed::Array(oauth))

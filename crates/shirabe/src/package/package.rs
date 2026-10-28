@@ -4,6 +4,7 @@ use crate::package::version::VersionParser;
 use crate::package::{BasePackage, DisplayMode, Link, PackageInterface};
 use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle};
 use crate::util::ComposerMirror;
+use bstr::BString;
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
@@ -43,7 +44,7 @@ pub struct Package {
     version: String,
     pretty_version: String,
     release_date: Option<chrono::DateTime<chrono::Utc>>,
-    extra: IndexMap<String, PhpMixed>,
+    extra: IndexMap<BString, PhpMixed>,
     binaries: Vec<String>,
     dev: bool,
     /// `'stable'` | `'RC'` | `'beta'` | `'alpha'` | `'dev'`
@@ -56,12 +57,12 @@ pub struct Package {
     replaces: std::rc::Rc<IndexMap<String, Link>>,
     dev_requires: std::rc::Rc<IndexMap<String, Link>>,
     suggests: IndexMap<String, String>,
-    autoload: IndexMap<String, PhpMixed>,
-    dev_autoload: IndexMap<String, PhpMixed>,
+    autoload: IndexMap<BString, PhpMixed>,
+    dev_autoload: IndexMap<BString, PhpMixed>,
     include_paths: Vec<String>,
     is_default_branch: bool,
-    transport_options: IndexMap<String, PhpMixed>,
-    php_ext: Option<IndexMap<String, PhpMixed>>,
+    transport_options: IndexMap<BString, PhpMixed>,
+    php_ext: Option<IndexMap<BString, PhpMixed>>,
 }
 
 impl Package {
@@ -143,11 +144,11 @@ impl Package {
         Some(replaced.trim_start_matches('/').to_string())
     }
 
-    pub fn set_extra(&mut self, extra: IndexMap<String, PhpMixed>) {
+    pub fn set_extra(&mut self, extra: IndexMap<BString, PhpMixed>) {
         self.extra = extra;
     }
 
-    pub fn get_extra(&self) -> &IndexMap<String, PhpMixed> {
+    pub fn get_extra(&self) -> &IndexMap<BString, PhpMixed> {
         &self.extra
     }
 
@@ -265,11 +266,11 @@ impl Package {
         )
     }
 
-    pub fn get_transport_options(&self) -> &IndexMap<String, PhpMixed> {
+    pub fn get_transport_options(&self) -> &IndexMap<BString, PhpMixed> {
         &self.transport_options
     }
 
-    pub fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>) {
+    pub fn set_transport_options(&mut self, options: IndexMap<BString, PhpMixed>) {
         self.transport_options = options;
     }
 
@@ -358,19 +359,19 @@ impl Package {
         &self.suggests
     }
 
-    pub fn set_autoload(&mut self, autoload: IndexMap<String, PhpMixed>) {
+    pub fn set_autoload(&mut self, autoload: IndexMap<BString, PhpMixed>) {
         self.autoload = autoload;
     }
 
-    pub fn get_autoload(&self) -> &IndexMap<String, PhpMixed> {
+    pub fn get_autoload(&self) -> &IndexMap<BString, PhpMixed> {
         &self.autoload
     }
 
-    pub fn set_dev_autoload(&mut self, dev_autoload: IndexMap<String, PhpMixed>) {
+    pub fn set_dev_autoload(&mut self, dev_autoload: IndexMap<BString, PhpMixed>) {
         self.dev_autoload = dev_autoload;
     }
 
-    pub fn get_dev_autoload(&self) -> &IndexMap<String, PhpMixed> {
+    pub fn get_dev_autoload(&self) -> &IndexMap<BString, PhpMixed> {
         &self.dev_autoload
     }
 
@@ -382,11 +383,11 @@ impl Package {
         &self.include_paths
     }
 
-    pub fn set_php_ext(&mut self, php_ext: Option<IndexMap<String, PhpMixed>>) {
+    pub fn set_php_ext(&mut self, php_ext: Option<IndexMap<BString, PhpMixed>>) {
         self.php_ext = php_ext;
     }
 
-    pub fn get_php_ext(&self) -> Option<&IndexMap<String, PhpMixed>> {
+    pub fn get_php_ext(&self) -> Option<&IndexMap<BString, PhpMixed>> {
         self.php_ext.as_ref()
     }
 
@@ -626,7 +627,7 @@ impl PackageInterface for Package {
     fn get_target_dir(&self) -> Option<String> {
         Package::get_target_dir(self)
     }
-    fn get_extra(&self) -> IndexMap<String, PhpMixed> {
+    fn get_extra(&self) -> IndexMap<BString, PhpMixed> {
         self.extra.clone()
     }
     fn set_installation_source(&mut self, r#type: Option<String>) {
@@ -707,16 +708,16 @@ impl PackageInterface for Package {
     fn get_suggests(&self) -> IndexMap<String, String> {
         self.suggests.clone()
     }
-    fn get_autoload(&self) -> IndexMap<String, PhpMixed> {
+    fn get_autoload(&self) -> IndexMap<BString, PhpMixed> {
         self.autoload.clone()
     }
-    fn get_dev_autoload(&self) -> IndexMap<String, PhpMixed> {
+    fn get_dev_autoload(&self) -> IndexMap<BString, PhpMixed> {
         self.dev_autoload.clone()
     }
     fn get_include_paths(&self) -> Vec<String> {
         self.include_paths.clone()
     }
-    fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>> {
+    fn get_php_ext(&self) -> Option<IndexMap<BString, PhpMixed>> {
         self.php_ext.clone()
     }
     fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
@@ -752,10 +753,10 @@ impl PackageInterface for Package {
     fn is_default_branch(&self) -> bool {
         self.is_default_branch
     }
-    fn get_transport_options(&self) -> IndexMap<String, PhpMixed> {
+    fn get_transport_options(&self) -> IndexMap<BString, PhpMixed> {
         self.transport_options.clone()
     }
-    fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>) {
+    fn set_transport_options(&mut self, options: IndexMap<BString, PhpMixed>) {
         self.transport_options = options;
     }
     fn set_source_reference(&mut self, reference: Option<String>) {

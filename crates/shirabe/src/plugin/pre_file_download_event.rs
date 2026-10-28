@@ -3,6 +3,7 @@
 use crate::event_dispatcher::{Event, EventInterface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::HttpDownloader;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -26,7 +27,7 @@ pub struct PreFileDownloadEvent {
     custom_cache_key: Option<String>,
     r#type: String,
     context: Option<FileDownloadContext>,
-    transport_options: IndexMap<String, PhpMixed>,
+    transport_options: IndexMap<BString, PhpMixed>,
 }
 
 impl PreFileDownloadEvent {
@@ -80,11 +81,11 @@ impl PreFileDownloadEvent {
         self.context.as_ref()
     }
 
-    pub fn get_transport_options(&self) -> &IndexMap<String, PhpMixed> {
+    pub fn get_transport_options(&self) -> &IndexMap<BString, PhpMixed> {
         &self.transport_options
     }
 
-    pub fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>) {
+    pub fn set_transport_options(&mut self, options: IndexMap<BString, PhpMixed>) {
         self.transport_options = options;
     }
 }
@@ -106,7 +107,7 @@ impl EventInterface for PreFileDownloadEvent {
         self.inner.get_arguments()
     }
 
-    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+    fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
         self.inner.get_flags()
     }
 

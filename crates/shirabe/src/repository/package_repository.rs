@@ -9,6 +9,7 @@ use crate::repository::{
     LoadPackagesResult, ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle,
     SearchResult, SecurityAdvisoryResult,
 };
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, json_encode, php_regex, preg_replace, var_export,
@@ -19,19 +20,19 @@ use shirabe_semver::constraint::AnyConstraint;
 pub struct PackageRepository {
     inner: ArrayRepository,
     config: Vec<PhpMixed>,
-    security_advisories: IndexMap<String, PhpMixed>,
+    security_advisories: IndexMap<BString, PhpMixed>,
 }
 
 impl PackageRepository {
-    pub fn new(config: IndexMap<String, PhpMixed>) -> Self {
-        let package = config.get("package").cloned().unwrap_or(PhpMixed::Null);
+    pub fn new(config: IndexMap<BString, PhpMixed>) -> Self {
+        let package = config.get(B("package")).cloned().unwrap_or(PhpMixed::Null);
         let config_list: Vec<PhpMixed> = match package {
             PhpMixed::List(list) => list.into_iter().collect(),
             other => vec![other],
         };
 
         let security_advisories = match config
-            .get("security-advisories")
+            .get(B("security-advisories"))
             .cloned()
             .unwrap_or(PhpMixed::Array(IndexMap::new()))
         {
@@ -53,7 +54,7 @@ impl PackageRepository {
         let loader =
             ValidatingArrayLoader::new(Box::new(ArrayLoader::new(None, true)), true, None, 0);
         for package in &self.config {
-            let config_map: IndexMap<String, PhpMixed> = match package {
+            let config_map: IndexMap<BString, PhpMixed> = match package {
                 PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
                 _ => IndexMap::new(),
             };
@@ -206,6 +207,8 @@ impl AdvisoryProviderInterface for PackageRepository {
 
         let mut advisories = IndexMap::new();
         for (package_name, package_advisories) in &self.security_advisories {
+            // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
+            let package_name: &str = &package_name.to_str_lossy();
             let Some(package_constraint) = package_constraint_map.get(package_name) else {
                 continue;
             };
@@ -216,7 +219,7 @@ impl AdvisoryProviderInterface for PackageRepository {
             };
             let mut items: Vec<std::rc::Rc<AnySecurityAdvisory>> = Vec::new();
             for data in list {
-                let data_map: IndexMap<String, PhpMixed> = match data {
+                let data_map: IndexMap<BString, PhpMixed> = match data {
                     PhpMixed::Array(m) => m.clone(),
                     _ => continue,
                 };
@@ -242,7 +245,7 @@ impl AdvisoryProviderInterface for PackageRepository {
 
                 items.push(std::rc::Rc::new(advisory));
             }
-            advisories.insert(package_name.clone(), items);
+            advisories.insert(package_name.to_string(), items);
         }
 
         let names_found: Vec<String> = advisories.keys().cloned().collect();

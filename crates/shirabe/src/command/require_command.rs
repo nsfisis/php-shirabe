@@ -18,6 +18,7 @@ use crate::repository::{
 };
 use crate::signal::SignalSubscription;
 use crate::util::{Filesystem, PackageSorter};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_fill_keys, array_intersect, array_keys, array_map,
@@ -98,8 +99,8 @@ impl RequireCommand {
     fn get_packages_by_require_key(&self) -> IndexMap<String, String> {
         let json = self.json.borrow().as_ref().unwrap().clone();
         let composer_definition = json.borrow_mut().read().unwrap_or_default();
-        let mut require: IndexMap<String, PhpMixed> = IndexMap::new();
-        let mut require_dev: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut require: IndexMap<BString, PhpMixed> = IndexMap::new();
+        let mut require_dev: IndexMap<BString, PhpMixed> = IndexMap::new();
 
         if let Some(r) = composer_definition
             .get("require")
@@ -124,7 +125,7 @@ impl RequireCommand {
                 PhpMixed::List(
                     array_keys(&require)
                         .into_iter()
-                        .map(PhpMixed::string)
+                        .map(PhpMixed::String)
                         .collect(),
                 ),
                 PhpMixed::string("require".to_string()),
@@ -133,7 +134,7 @@ impl RequireCommand {
                 PhpMixed::List(
                     array_keys(&require_dev)
                         .into_iter()
-                        .map(PhpMixed::string)
+                        .map(PhpMixed::String)
                         .collect(),
                 ),
                 PhpMixed::string("require-dev".to_string()),
@@ -142,7 +143,11 @@ impl RequireCommand {
         .as_array()
         .map(|m| {
             m.iter()
-                .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_string())))
+                // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
+                .filter_map(|(k, v)| {
+                    v.as_string()
+                        .map(|s| (k.to_str_lossy().into_owned(), s.to_string()))
+                })
                 .collect()
         })
         .unwrap_or_default()
@@ -193,9 +198,9 @@ impl RequireCommand {
                 (*root_package.get_dev_requires()).clone(),
             );
             let loader = ArrayLoader::new(None, false);
-            let requirements_mixed: IndexMap<String, PhpMixed> = requirements
+            let requirements_mixed: IndexMap<BString, PhpMixed> = requirements
                 .iter()
-                .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
+                .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
                 .collect();
             let new_links = loader.parse_links(
                 &root_package.get_name(),
@@ -574,11 +579,11 @@ impl RequireCommand {
                     &json.borrow(),
                     Some(Box::new(move |mut lock_data| {
                         let section = lock_data
-                            .entry("stability-flags".to_string())
+                            .entry("stability-flags".into())
                             .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
                         if let Some(section) = section.as_array_mut() {
                             for (package_name, flag) in &stability_flags {
-                                section.insert(package_name.clone(), PhpMixed::Int(*flag));
+                                section.insert(package_name.as_str().into(), PhpMixed::Int(*flag));
                             }
                         }
                         lock_data
@@ -609,24 +614,24 @@ impl RequireCommand {
             .unwrap_or_default();
         for (package, version) in new {
             let section = composer_definition
-                .entry(require_key.to_string())
+                .entry(require_key.to_string().into())
                 .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
             if let Some(section) = section.as_array_mut() {
-                section.insert(package.clone(), PhpMixed::string(version.clone()));
+                section.insert(package.as_str().into(), PhpMixed::string(version.clone()));
             }
             if let Some(section) = composer_definition
-                .get_mut(remove_key)
+                .get_mut(B(remove_key))
                 .and_then(|v| v.as_array_mut())
             {
-                section.shift_remove(package);
+                section.shift_remove(B(package));
             }
             let remove_empty = composer_definition
-                .get(remove_key)
+                .get(B(remove_key))
                 .and_then(|v| v.as_array())
                 .map(|m| m.is_empty())
                 .unwrap_or(false);
-            if remove_empty && composer_definition.contains_key(remove_key) {
-                composer_definition.shift_remove(remove_key);
+            if remove_empty && composer_definition.contains_key(B(remove_key)) {
+                composer_definition.shift_remove(B(remove_key));
             }
         }
         let _ = json.borrow().write(PhpMixed::Array(composer_definition));
@@ -883,7 +888,7 @@ impl Command for RequireCommand {
         let repos = repository_manager.get_repositories();
 
         let platform_overrides = composer.get_config().borrow_mut().get("platform");
-        let platform_overrides_map: IndexMap<String, PhpMixed> = platform_overrides
+        let platform_overrides_map: IndexMap<BString, PhpMixed> = platform_overrides
             .as_array()
             .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default();

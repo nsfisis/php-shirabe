@@ -7,7 +7,7 @@ use crate::descriptor::{
 };
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, json_encode_ex, php_regex, preg_replace, str_replace};
 
@@ -21,7 +21,7 @@ impl JsonDescriptor {
     fn describe_input_argument(
         &mut self,
         argument: &InputArgument,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         self.write_data(self.get_input_argument_data(argument)?, &options)?;
         Ok(())
@@ -30,7 +30,7 @@ impl JsonDescriptor {
     fn describe_input_option(
         &mut self,
         option: &InputOption,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         self.write_data(self.get_input_option_data(option, false)?, &options)?;
         if option.is_negatable() {
@@ -42,7 +42,7 @@ impl JsonDescriptor {
     fn describe_input_definition(
         &mut self,
         definition: &InputDefinition,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         self.write_data(self.get_input_definition_data(definition)?, &options)?;
         Ok(())
@@ -51,9 +51,9 @@ impl JsonDescriptor {
     fn describe_command(
         &mut self,
         command: &dyn Command,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let short = matches!(options.get("short"), Some(PhpMixed::Bool(true)));
+        let short = matches!(options.get(B("short")), Some(PhpMixed::Bool(true)));
         self.write_data(self.get_command_data(command, short)?, &options)?;
         Ok(())
     }
@@ -61,9 +61,9 @@ impl JsonDescriptor {
     fn describe_application(
         &mut self,
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let described_namespace = match options.get("namespace") {
+        let described_namespace = match options.get(B("namespace")) {
             Some(PhpMixed::String(s)) => Some(s.to_str_lossy().into_owned()),
             _ => None,
         };
@@ -71,7 +71,7 @@ impl JsonDescriptor {
             ApplicationDescription::new(application.clone(), described_namespace.clone(), true);
         let mut commands: Vec<PhpMixed> = vec![];
 
-        let short = matches!(options.get("short"), Some(PhpMixed::Bool(true)));
+        let short = matches!(options.get(B("short")), Some(PhpMixed::Bool(true)));
         for command in description.get_commands().values() {
             let command = command.borrow();
             commands.push(PhpMixed::Array(
@@ -81,32 +81,29 @@ impl JsonDescriptor {
             ));
         }
 
-        let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
         if "UNKNOWN" != application.borrow().get_name() {
-            let mut application_data: IndexMap<String, PhpMixed> = IndexMap::new();
+            let mut application_data: IndexMap<BString, PhpMixed> = IndexMap::new();
             application_data.insert(
-                "name".to_string(),
+                "name".into(),
                 PhpMixed::string(application.borrow().get_name()),
             );
             if "UNKNOWN" != application.borrow().get_version() {
                 application_data.insert(
-                    "version".to_string(),
+                    "version".into(),
                     PhpMixed::string(application.borrow().get_version()),
                 );
             }
-            data.insert("application".to_string(), PhpMixed::Array(application_data));
+            data.insert("application".into(), PhpMixed::Array(application_data));
         }
 
-        data.insert("commands".to_string(), PhpMixed::List(commands));
+        data.insert("commands".into(), PhpMixed::List(commands));
 
         if let Some(described_namespace) = described_namespace {
-            data.insert(
-                "namespace".to_string(),
-                PhpMixed::string(described_namespace),
-            );
+            data.insert("namespace".into(), PhpMixed::string(described_namespace));
         } else {
             data.insert(
-                "namespaces".to_string(),
+                "namespaces".into(),
                 PhpMixed::List(
                     description
                         .get_namespaces()
@@ -124,10 +121,10 @@ impl JsonDescriptor {
     /// Writes data as json.
     fn write_data(
         &self,
-        data: IndexMap<String, PhpMixed>,
-        options: &IndexMap<String, PhpMixed>,
+        data: IndexMap<BString, PhpMixed>,
+        options: &IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let flags = match options.get("json_encoding") {
+        let flags = match options.get(B("json_encoding")) {
             Some(PhpMixed::Int(f)) => *f,
             _ => 0,
         };
@@ -143,19 +140,16 @@ impl JsonDescriptor {
     fn get_input_argument_data(
         &self,
         argument: &InputArgument,
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
-        let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+        let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
         data.insert(
-            "name".to_string(),
+            "name".into(),
             PhpMixed::string(argument.get_name().to_string()),
         );
+        data.insert("is_required".into(), PhpMixed::Bool(argument.is_required()));
+        data.insert("is_array".into(), PhpMixed::Bool(argument.is_array()));
         data.insert(
-            "is_required".to_string(),
-            PhpMixed::Bool(argument.is_required()),
-        );
-        data.insert("is_array".to_string(), PhpMixed::Bool(argument.is_array()));
-        data.insert(
-            "description".to_string(),
+            "description".into(),
             PhpMixed::string(preg_replace(
                 php_regex!("/\\s*[\\r\\n]\\s*/"),
                 " ",
@@ -164,7 +158,7 @@ impl JsonDescriptor {
         );
         // TODO(type-model): PHP compares the default against `INF` and serializes it as the
         // string "INF"; `InputValue` has no float variant to hold one.
-        data.insert("default".to_string(), argument.get_default().clone().into());
+        data.insert("default".into(), argument.get_default().clone().into());
         Ok(data)
     }
 
@@ -172,46 +166,43 @@ impl JsonDescriptor {
         &self,
         option: &InputOption,
         negated: bool,
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
-        let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+        let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
         if negated {
             data.insert(
-                "name".to_string(),
+                "name".into(),
                 PhpMixed::string(format!("--no-{}", option.get_name())),
             );
-            data.insert("shortcut".to_string(), PhpMixed::string(String::new()));
-            data.insert("accept_value".to_string(), PhpMixed::Bool(false));
-            data.insert("is_value_required".to_string(), PhpMixed::Bool(false));
-            data.insert("is_multiple".to_string(), PhpMixed::Bool(false));
+            data.insert("shortcut".into(), PhpMixed::string(String::new()));
+            data.insert("accept_value".into(), PhpMixed::Bool(false));
+            data.insert("is_value_required".into(), PhpMixed::Bool(false));
+            data.insert("is_multiple".into(), PhpMixed::Bool(false));
             data.insert(
-                "description".to_string(),
+                "description".into(),
                 PhpMixed::string(format!("Negate the \"--{}\" option", option.get_name())),
             );
-            data.insert("default".to_string(), PhpMixed::Bool(false));
+            data.insert("default".into(), PhpMixed::Bool(false));
         } else {
             data.insert(
-                "name".to_string(),
+                "name".into(),
                 PhpMixed::string(format!("--{}", option.get_name())),
             );
             data.insert(
-                "shortcut".to_string(),
+                "shortcut".into(),
                 PhpMixed::string(if let Some(shortcut) = option.get_shortcut() {
                     format!("-{}", str_replace("|", "|-", shortcut))
                 } else {
                     String::new()
                 }),
             );
+            data.insert("accept_value".into(), PhpMixed::Bool(option.accept_value()));
             data.insert(
-                "accept_value".to_string(),
-                PhpMixed::Bool(option.accept_value()),
-            );
-            data.insert(
-                "is_value_required".to_string(),
+                "is_value_required".into(),
                 PhpMixed::Bool(option.is_value_required()),
             );
-            data.insert("is_multiple".to_string(), PhpMixed::Bool(option.is_array()));
+            data.insert("is_multiple".into(), PhpMixed::Bool(option.is_array()));
             data.insert(
-                "description".to_string(),
+                "description".into(),
                 PhpMixed::string(preg_replace(
                     php_regex!("/\\s*[\\r\\n]\\s*/"),
                     " ",
@@ -220,7 +211,7 @@ impl JsonDescriptor {
             );
             // TODO(type-model): PHP compares the default against `INF` and serializes it as the
             // string "INF"; `InputValue` has no float variant to hold one.
-            data.insert("default".to_string(), option.get_default().clone().into());
+            data.insert("default".into(), option.get_default().clone().into());
         }
         Ok(data)
     }
@@ -228,11 +219,11 @@ impl JsonDescriptor {
     fn get_input_definition_data(
         &self,
         definition: &InputDefinition,
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
-        let mut input_arguments: IndexMap<String, PhpMixed> = IndexMap::new();
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+        let mut input_arguments: IndexMap<BString, PhpMixed> = IndexMap::new();
         for (name, argument) in definition.get_arguments() {
             input_arguments.insert(
-                name.clone(),
+                name.as_str().into(),
                 PhpMixed::Array(
                     self.get_input_argument_data(argument)?
                         .into_iter()
@@ -241,10 +232,10 @@ impl JsonDescriptor {
             );
         }
 
-        let mut input_options: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut input_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         for (name, option) in definition.get_options() {
             input_options.insert(
-                name.clone(),
+                name.as_str().into(),
                 PhpMixed::Array(
                     self.get_input_option_data(option, false)?
                         .into_iter()
@@ -253,7 +244,7 @@ impl JsonDescriptor {
             );
             if option.is_negatable() {
                 input_options.insert(
-                    format!("no-{}", name),
+                    format!("no-{}", name).into(),
                     PhpMixed::Array(
                         self.get_input_option_data(option, true)?
                             .into_iter()
@@ -263,9 +254,9 @@ impl JsonDescriptor {
             }
         }
 
-        let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
-        data.insert("arguments".to_string(), PhpMixed::Array(input_arguments));
-        data.insert("options".to_string(), PhpMixed::Array(input_options));
+        let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
+        data.insert("arguments".into(), PhpMixed::Array(input_arguments));
+        data.insert("options".into(), PhpMixed::Array(input_options));
         Ok(data)
     }
 
@@ -273,23 +264,23 @@ impl JsonDescriptor {
         &self,
         command: &dyn Command,
         short: bool,
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
-        let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
+        let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
         data.insert(
-            "name".to_string(),
+            "name".into(),
             match command.get_name() {
                 Some(name) => PhpMixed::string(name),
                 None => PhpMixed::Null,
             },
         );
         data.insert(
-            "description".to_string(),
+            "description".into(),
             PhpMixed::string(command.get_description()),
         );
 
         if short {
             data.insert(
-                "usage".to_string(),
+                "usage".into(),
                 PhpMixed::List(
                     command
                         .get_aliases()
@@ -304,13 +295,13 @@ impl JsonDescriptor {
             let mut usage = vec![PhpMixed::string(command.get_synopsis(false))];
             usage.extend(command.get_usages().into_iter().map(PhpMixed::string));
             usage.extend(command.get_aliases().into_iter().map(PhpMixed::string));
-            data.insert("usage".to_string(), PhpMixed::List(usage));
+            data.insert("usage".into(), PhpMixed::List(usage));
             data.insert(
-                "help".to_string(),
+                "help".into(),
                 PhpMixed::string(command.get_processed_help()),
             );
             data.insert(
-                "definition".to_string(),
+                "definition".into(),
                 PhpMixed::Array(
                     self.get_input_definition_data(&command.get_definition())?
                         .into_iter()
@@ -319,7 +310,7 @@ impl JsonDescriptor {
             );
         }
 
-        data.insert("hidden".to_string(), PhpMixed::Bool(command.is_hidden()));
+        data.insert("hidden".into(), PhpMixed::Bool(command.is_hidden()));
 
         Ok(data)
     }
@@ -330,7 +321,7 @@ impl DescriptorInterface for JsonDescriptor {
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         object: DescribableObject,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         Descriptor::describe(self, output, object, options)
     }
@@ -348,7 +339,7 @@ impl Descriptor for JsonDescriptor {
     fn describe_input_argument(
         &mut self,
         argument: &InputArgument,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         JsonDescriptor::describe_input_argument(self, argument, options)
     }
@@ -356,7 +347,7 @@ impl Descriptor for JsonDescriptor {
     fn describe_input_option(
         &mut self,
         option: &InputOption,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         JsonDescriptor::describe_input_option(self, option, options)
     }
@@ -364,7 +355,7 @@ impl Descriptor for JsonDescriptor {
     fn describe_input_definition(
         &mut self,
         definition: &InputDefinition,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         JsonDescriptor::describe_input_definition(self, definition, options)
     }
@@ -372,7 +363,7 @@ impl Descriptor for JsonDescriptor {
     fn describe_command(
         &mut self,
         command: &dyn Command,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         JsonDescriptor::describe_command(self, command, options)
     }
@@ -380,7 +371,7 @@ impl Descriptor for JsonDescriptor {
     fn describe_application(
         &mut self,
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         JsonDescriptor::describe_application(self, application, options)
     }

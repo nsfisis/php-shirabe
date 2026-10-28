@@ -8,7 +8,7 @@ use crate::descriptor::{
 use crate::helper::Helper;
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, preg_replace, str_repeat, str_replace, var_export};
 
@@ -23,7 +23,7 @@ impl MarkdownDescriptor {
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         object: DescribableObject,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let decorated = output.borrow().is_decorated();
         output.borrow().set_decorated(false);
@@ -37,7 +37,7 @@ impl MarkdownDescriptor {
     fn describe_input_argument(
         &mut self,
         argument: &InputArgument,
-        _options: IndexMap<String, PhpMixed>,
+        _options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let name = if !argument.get_name().is_empty() {
             argument.get_name().to_string()
@@ -72,7 +72,7 @@ impl MarkdownDescriptor {
     fn describe_input_option(
         &mut self,
         option: &InputOption,
-        _options: IndexMap<String, PhpMixed>,
+        _options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let mut name = format!("--{}", option.get_name());
         if option.is_negatable() {
@@ -112,7 +112,7 @@ impl MarkdownDescriptor {
     fn describe_input_definition(
         &mut self,
         definition: &InputDefinition,
-        _options: IndexMap<String, PhpMixed>,
+        _options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let show_arguments = !definition.get_arguments().is_empty();
         if show_arguments {
@@ -142,9 +142,9 @@ impl MarkdownDescriptor {
     fn describe_command(
         &mut self,
         command: &dyn Command,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
-        if matches!(options.get("short"), Some(PhpMixed::Bool(true))) {
+        if matches!(options.get(B("short")), Some(PhpMixed::Bool(true))) {
             self.write(
                 &format!(
                     "`{}`\n{}\n\n{}### Usage\n\n{}",
@@ -213,9 +213,9 @@ impl MarkdownDescriptor {
     fn describe_application(
         &mut self,
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let described_namespace = match options.get("namespace") {
+        let described_namespace = match options.get(B("namespace")) {
             Some(PhpMixed::String(s)) => Some(s.to_str_lossy().into_owned()),
             _ => None,
         };
@@ -233,7 +233,7 @@ impl MarkdownDescriptor {
         );
 
         for namespace in description.get_namespaces().values() {
-            let namespace_id = match namespace.get("id") {
+            let namespace_id = match namespace.get(B("id")) {
                 Some(PhpMixed::String(s)) => s.to_str_lossy().into_owned(),
                 _ => String::new(),
             };
@@ -243,7 +243,7 @@ impl MarkdownDescriptor {
             }
 
             self.write("\n\n", true);
-            let command_names: Vec<String> = match namespace.get("commands") {
+            let command_names: Vec<String> = match namespace.get(B("commands")) {
                 Some(PhpMixed::List(names)) => names
                     .iter()
                     .filter_map(|n| n.as_string().map(|s| s.to_string()))
@@ -301,7 +301,7 @@ impl DescriptorInterface for MarkdownDescriptor {
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         object: DescribableObject,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         MarkdownDescriptor::describe(self, output, object, options)
     }
@@ -334,7 +334,7 @@ impl Descriptor for MarkdownDescriptor {
     fn describe_input_argument(
         &mut self,
         argument: &InputArgument,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         MarkdownDescriptor::describe_input_argument(self, argument, options)
     }
@@ -342,7 +342,7 @@ impl Descriptor for MarkdownDescriptor {
     fn describe_input_option(
         &mut self,
         option: &InputOption,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         MarkdownDescriptor::describe_input_option(self, option, options)
     }
@@ -350,7 +350,7 @@ impl Descriptor for MarkdownDescriptor {
     fn describe_input_definition(
         &mut self,
         definition: &InputDefinition,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         MarkdownDescriptor::describe_input_definition(self, definition, options)
     }
@@ -358,7 +358,7 @@ impl Descriptor for MarkdownDescriptor {
     fn describe_command(
         &mut self,
         command: &dyn Command,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         MarkdownDescriptor::describe_command(self, command, options)
     }
@@ -366,7 +366,7 @@ impl Descriptor for MarkdownDescriptor {
     fn describe_application(
         &mut self,
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         MarkdownDescriptor::describe_application(self, application, options)
     }

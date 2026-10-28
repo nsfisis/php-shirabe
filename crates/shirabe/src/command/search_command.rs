@@ -260,9 +260,9 @@ impl Command for SearchCommand {
                 .into_iter()
                 .map(|result| {
                     let mut entry = IndexMap::new();
-                    entry.insert("name".to_string(), PhpMixed::string(result.name));
+                    entry.insert("name".into(), PhpMixed::string(result.name));
                     entry.insert(
-                        "description".to_string(),
+                        "description".into(),
                         result
                             .description
                             .map(PhpMixed::string)
@@ -270,7 +270,7 @@ impl Command for SearchCommand {
                     );
                     if let Some(abandoned) = result.abandoned {
                         entry.insert(
-                            "abandoned".to_string(),
+                            "abandoned".into(),
                             match abandoned {
                                 AbandonedInfo::Replacement(s) => PhpMixed::string(s),
                                 AbandonedInfo::Abandoned => PhpMixed::Bool(true),
@@ -278,7 +278,7 @@ impl Command for SearchCommand {
                         );
                     }
                     if let Some(url) = result.url {
-                        entry.insert("url".to_string(), PhpMixed::string(url));
+                        entry.insert("url".into(), PhpMixed::string(url));
                     }
                     PhpMixed::Array(entry)
                 })

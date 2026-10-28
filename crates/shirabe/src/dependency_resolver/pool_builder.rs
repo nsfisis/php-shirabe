@@ -12,6 +12,7 @@ use crate::plugin::{PluginEvents, PrePoolCreateEvent};
 use crate::repository::{
     PlatformRepository, RepositoryInterface, RepositoryInterfaceHandle, RootPackageRepository,
 };
+use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, array_flip_strings, array_map, in_array_strict, microtime,
@@ -125,7 +126,8 @@ impl PoolBuilder {
             Some(
                 array_flip_strings(request.get_restricted_packages().unwrap())
                     .into_iter()
-                    .map(|(k, v)| (k, v.as_int().unwrap_or(0)))
+                    // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
+                    .map(|(k, v)| (k.to_str_lossy().into_owned(), v.as_int().unwrap_or(0)))
                     .collect(),
             )
         } else {
@@ -169,10 +171,10 @@ impl PoolBuilder {
                     if locked_package.get_dist_type().as_deref() == Some("path") {
                         let transport_options = locked_package.get_transport_options();
                         let symlink_disabled = transport_options
-                            .get("symlink")
+                            .get(B("symlink"))
                             .map(|v| v.as_bool() == Some(false))
                             .unwrap_or(false);
-                        if !transport_options.contains_key("symlink") || !symlink_disabled {
+                        if !transport_options.contains_key(B("symlink")) || !symlink_disabled {
                             self.path_repo_unlocked
                                 .insert(locked_package.get_name().to_string(), true);
                             continue;

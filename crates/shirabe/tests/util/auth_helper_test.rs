@@ -2,6 +2,7 @@
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_mock::{Expectation, IOMock, get_io_mock};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe::config::ConfigSourceInterface;
 use shirabe::io::{IOInterface, io_interface};
@@ -49,11 +50,11 @@ fn expects_authentication(
     );
 }
 
-fn header_strings(options: &IndexMap<String, PhpMixed>) -> Vec<String> {
+fn header_strings(options: &IndexMap<BString, PhpMixed>) -> Vec<String> {
     options
-        .get("http")
+        .get(B("http"))
         .and_then(|v| v.as_array())
-        .and_then(|http| http.get("header"))
+        .and_then(|http| http.get(B("header")))
         .and_then(|v| v.as_list())
         .map(|list| {
             list.iter()
@@ -70,11 +71,11 @@ fn base_headers() -> Vec<PhpMixed> {
     ]
 }
 
-fn http_options_with_headers() -> IndexMap<String, PhpMixed> {
+fn http_options_with_headers() -> IndexMap<BString, PhpMixed> {
     let mut http = IndexMap::new();
-    http.insert("header".to_string(), PhpMixed::List(base_headers()));
+    http.insert("header".into(), PhpMixed::List(base_headers()));
     let mut options = IndexMap::new();
-    options.insert("http".to_string(), PhpMixed::Array(http));
+    options.insert("http".into(), PhpMixed::Array(http));
     options
 }
 
@@ -192,15 +193,12 @@ fn test_add_authentication_options_for_client_certificate() {
 
     let mut certificate_configuration = IndexMap::new();
     certificate_configuration.insert(
-        "local_cert".to_string(),
+        "local_cert".into(),
         PhpMixed::string("certificate value".to_string()),
     );
+    certificate_configuration.insert("local_pk".into(), PhpMixed::string("key value".to_string()));
     certificate_configuration.insert(
-        "local_pk".to_string(),
-        PhpMixed::string("key value".to_string()),
-    );
-    certificate_configuration.insert(
-        "passphrase".to_string(),
+        "passphrase".into(),
         PhpMixed::string("passphrase value".to_string()),
     );
     let password = json_encode(&PhpMixed::Array(certificate_configuration.clone())).unwrap();
@@ -212,7 +210,7 @@ fn test_add_authentication_options_for_client_certificate() {
         .unwrap();
 
     assert_eq!(
-        options.get("ssl"),
+        options.get(B("ssl")),
         Some(&PhpMixed::Array(certificate_configuration))
     );
 }
@@ -421,14 +419,8 @@ mockall::mock! {
 
 fn expected_auth_setting(username: &str, password: &str) -> PhpMixed {
     let mut auth = IndexMap::new();
-    auth.insert(
-        "username".to_string(),
-        PhpMixed::string(username.to_string()),
-    );
-    auth.insert(
-        "password".to_string(),
-        PhpMixed::string(password.to_string()),
-    );
+    auth.insert("username".into(), PhpMixed::string(username.to_string()));
+    auth.insert("password".into(), PhpMixed::string(password.to_string()));
     PhpMixed::Array(auth)
 }
 
@@ -604,14 +596,14 @@ fn test_prompt_auth_if_needed_git_lab_no_auth_change() {
     let mut gitlab_token = IndexMap::new();
     let mut token_entry = IndexMap::new();
     token_entry.insert(
-        "username".to_string(),
+        "username".into(),
         PhpMixed::string("gitlab-user".to_string()),
     );
     token_entry.insert(
-        "token".to_string(),
+        "token".into(),
         PhpMixed::string("gitlab-password".to_string()),
     );
-    gitlab_token.insert("gitlab.com".to_string(), PhpMixed::Array(token_entry));
+    gitlab_token.insert("gitlab.com".into(), PhpMixed::Array(token_entry));
 
     let config = ConfigStubBuilder::new()
         .with("github-domains", PhpMixed::List(vec![]))
@@ -661,15 +653,15 @@ fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
 
     let mut token_entry = IndexMap::new();
     token_entry.insert(
-        "access-token".to_string(),
+        "access-token".into(),
         PhpMixed::string("bitbucket_access_token".to_string()),
     );
     token_entry.insert(
-        "access-token-expiration".to_string(),
+        "access-token-expiration".into(),
         PhpMixed::Int(time() + 1800),
     );
     let mut bitbucket_oauth = IndexMap::new();
-    bitbucket_oauth.insert("bitbucket.org".to_string(), PhpMixed::Array(token_entry));
+    bitbucket_oauth.insert("bitbucket.org".into(), PhpMixed::Array(token_entry));
 
     let config = ConfigStubBuilder::new()
         .with("github-domains", PhpMixed::List(vec![]))

@@ -2,7 +2,7 @@
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_stub::IOStub;
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::util::{GetResult, RemoteFilesystem};
@@ -26,20 +26,20 @@ fn config_mock() -> std::rc::Rc<std::cell::RefCell<shirabe::config::Config>> {
 fn call_get_options_for_url(
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     origin_url: &str,
-    additional_options: IndexMap<String, PhpMixed>,
-    options: IndexMap<String, PhpMixed>,
+    additional_options: IndexMap<BString, PhpMixed>,
+    options: IndexMap<BString, PhpMixed>,
     file_url: &str,
-) -> IndexMap<String, PhpMixed> {
+) -> IndexMap<BString, PhpMixed> {
     let fs = RemoteFilesystem::new(io, config_mock(), options, false);
     fs.__set_file_url(file_url).unwrap();
     fs.__get_options_for_url(origin_url, additional_options)
         .unwrap()
 }
 
-fn http_header_list(res: &IndexMap<String, PhpMixed>) -> Option<Vec<String>> {
-    res.get("http")
+fn http_header_list(res: &IndexMap<BString, PhpMixed>) -> Option<Vec<String>> {
+    res.get(B("http"))
         .and_then(|v| v.as_array())
-        .and_then(|http| http.get("header"))
+        .and_then(|http| http.get(B("header")))
         .and_then(|v| v.as_list())
         .map(|list| {
             list.iter()
@@ -121,10 +121,10 @@ fn test_get_options_for_url_with_stream_options() {
                 .with_get_authentication(auth),
         ));
 
-    let mut ssl: IndexMap<String, PhpMixed> = IndexMap::new();
-    ssl.insert("allow_self_signed".to_string(), PhpMixed::Bool(true));
-    let mut stream_options: IndexMap<String, PhpMixed> = IndexMap::new();
-    stream_options.insert("ssl".to_string(), PhpMixed::Array(ssl));
+    let mut ssl: IndexMap<BString, PhpMixed> = IndexMap::new();
+    ssl.insert("allow_self_signed".into(), PhpMixed::Bool(true));
+    let mut stream_options: IndexMap<BString, PhpMixed> = IndexMap::new();
+    stream_options.insert("ssl".into(), PhpMixed::Array(ssl));
 
     let res = call_get_options_for_url(
         io,
@@ -135,9 +135,9 @@ fn test_get_options_for_url_with_stream_options() {
     );
 
     let allow_self_signed = res
-        .get("ssl")
+        .get(B("ssl"))
         .and_then(|v| v.as_array())
-        .and_then(|ssl| ssl.get("allow_self_signed"))
+        .and_then(|ssl| ssl.get(B("allow_self_signed")))
         .and_then(|v| v.as_bool());
     assert_eq!(
         allow_self_signed,
@@ -162,13 +162,10 @@ fn test_get_options_for_url_with_call_options_keeps_header() {
                 .with_get_authentication(auth),
         ));
 
-    let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
-    http.insert(
-        "header".to_string(),
-        PhpMixed::string("Foo: bar".to_string()),
-    );
-    let mut additional_options: IndexMap<String, PhpMixed> = IndexMap::new();
-    additional_options.insert("http".to_string(), PhpMixed::Array(http));
+    let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
+    http.insert("header".into(), PhpMixed::string("Foo: bar".to_string()));
+    let mut additional_options: IndexMap<BString, PhpMixed> = IndexMap::new();
+    additional_options.insert("http".into(), PhpMixed::Array(http));
 
     let res = call_get_options_for_url(
         io,
@@ -277,13 +274,13 @@ fn test_get_options_for_url_creates_secure_tls_defaults() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
 
-    let mut ssl: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut ssl: IndexMap<BString, PhpMixed> = IndexMap::new();
     ssl.insert(
-        "cafile".to_string(),
+        "cafile".into(),
         PhpMixed::string("/some/path/file.crt".to_string()),
     );
-    let mut additional_options: IndexMap<String, PhpMixed> = IndexMap::new();
-    additional_options.insert("ssl".to_string(), PhpMixed::Array(ssl));
+    let mut additional_options: IndexMap<BString, PhpMixed> = IndexMap::new();
+    additional_options.insert("ssl".into(), PhpMixed::Array(ssl));
 
     let res = call_get_options_for_url(
         io,
@@ -293,30 +290,35 @@ fn test_get_options_for_url_creates_secure_tls_defaults() {
         "http://www.example.org",
     );
 
-    let ssl_res = res.get("ssl").and_then(|v| v.as_array()).unwrap();
-    let ciphers = ssl_res.get("ciphers").and_then(|v| v.as_string()).unwrap();
+    let ssl_res = res.get(B("ssl")).and_then(|v| v.as_array()).unwrap();
+    let ciphers = ssl_res
+        .get(B("ciphers"))
+        .and_then(|v| v.as_string())
+        .unwrap();
     assert!(ciphers.contains_str(
         "!aNULL:!eNULL:!EXPORT:!DES:!3DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA"
     ));
     assert_eq!(
         Some(true),
-        ssl_res.get("verify_peer").and_then(|v| v.as_bool())
+        ssl_res.get(B("verify_peer")).and_then(|v| v.as_bool())
     );
     assert_eq!(
         Some(true),
-        ssl_res.get("SNI_enabled").and_then(|v| v.as_bool())
+        ssl_res.get(B("SNI_enabled")).and_then(|v| v.as_bool())
     );
     assert_eq!(
         Some(7),
-        ssl_res.get("verify_depth").and_then(|v| v.as_int())
+        ssl_res.get(B("verify_depth")).and_then(|v| v.as_int())
     );
     assert_eq!(
         Some("/some/path/file.crt".into()),
-        ssl_res.get("cafile").and_then(|v| v.as_string())
+        ssl_res.get(B("cafile")).and_then(|v| v.as_string())
     );
     assert_eq!(
         Some(true),
-        ssl_res.get("disable_compression").and_then(|v| v.as_bool())
+        ssl_res
+            .get(B("disable_compression"))
+            .and_then(|v| v.as_bool())
     );
 }
 

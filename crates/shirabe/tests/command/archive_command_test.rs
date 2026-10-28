@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/ArchiveCommandTest.php
 
 use crate::config_stub::ConfigStubBuilder;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::command::BaseCommand;
 use shirabe::command::archive_command::ArchiveCommand;
@@ -50,7 +51,7 @@ mockall::mock! {
         fn create_repository<'a>(
             &self,
             r#type: &str,
-            config: IndexMap<String, PhpMixed>,
+            config: IndexMap<BString, PhpMixed>,
             name: Option<&'a str>,
         ) -> anyhow::Result<RepositoryInterfaceHandle>;
         fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
@@ -74,7 +75,7 @@ mockall::mock! {
             event_name: &str,
             dev_mode: bool,
             additional_args: Vec<String>,
-            flags: IndexMap<String, PhpMixed>,
+            flags: IndexMap<BString, PhpMixed>,
         ) -> anyhow::Result<i64>;
         fn dispatch_installer_event(
             &mut self,

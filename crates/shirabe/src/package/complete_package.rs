@@ -1,14 +1,14 @@
 //! ref: composer/src/Composer/Package/CompletePackage.php
 
 use crate::package::{CompletePackageInterface, DisplayMode, Mirror, Package, PackageInterface};
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug, Clone)]
 pub struct CompletePackage {
     pub(crate) inner: Package,
-    repositories: IndexMap<String, PhpMixed>,
+    repositories: IndexMap<BString, PhpMixed>,
     license: Vec<String>,
     keywords: Vec<String>,
     authors: Vec<IndexMap<String, String>>,
@@ -16,7 +16,7 @@ pub struct CompletePackage {
     homepage: Option<String>,
     scripts: IndexMap<String, Vec<String>>,
     support: IndexMap<String, String>,
-    funding: Vec<IndexMap<String, PhpMixed>>,
+    funding: Vec<IndexMap<BString, PhpMixed>>,
     abandoned: PhpMixed,
     archive_name: Option<String>,
     archive_excludes: Vec<String>,
@@ -59,11 +59,11 @@ impl CompletePackageInterface for CompletePackage {
         self.scripts.clone()
     }
 
-    fn set_repositories(&mut self, repositories: IndexMap<String, PhpMixed>) {
+    fn set_repositories(&mut self, repositories: IndexMap<BString, PhpMixed>) {
         self.repositories = repositories;
     }
 
-    fn get_repositories(&self) -> IndexMap<String, PhpMixed> {
+    fn get_repositories(&self) -> IndexMap<BString, PhpMixed> {
         self.repositories.clone()
     }
 
@@ -115,11 +115,11 @@ impl CompletePackageInterface for CompletePackage {
         self.support.clone()
     }
 
-    fn set_funding(&mut self, funding: Vec<IndexMap<String, PhpMixed>>) {
+    fn set_funding(&mut self, funding: Vec<IndexMap<BString, PhpMixed>>) {
         self.funding = funding;
     }
 
-    fn get_funding(&self) -> Vec<IndexMap<String, PhpMixed>> {
+    fn get_funding(&self) -> Vec<IndexMap<BString, PhpMixed>> {
         self.funding.clone()
     }
 
@@ -192,7 +192,7 @@ impl PackageInterface for CompletePackage {
         self.inner.get_target_dir()
     }
 
-    fn get_extra(&self) -> IndexMap<String, PhpMixed> {
+    fn get_extra(&self) -> IndexMap<BString, PhpMixed> {
         self.inner.get_extra().clone()
     }
 
@@ -300,11 +300,11 @@ impl PackageInterface for CompletePackage {
         self.inner.get_suggests().clone()
     }
 
-    fn get_autoload(&self) -> IndexMap<String, PhpMixed> {
+    fn get_autoload(&self) -> IndexMap<BString, PhpMixed> {
         self.inner.get_autoload().clone()
     }
 
-    fn get_dev_autoload(&self) -> IndexMap<String, PhpMixed> {
+    fn get_dev_autoload(&self) -> IndexMap<BString, PhpMixed> {
         self.inner.get_dev_autoload().clone()
     }
 
@@ -312,7 +312,7 @@ impl PackageInterface for CompletePackage {
         self.inner.get_include_paths().clone()
     }
 
-    fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>> {
+    fn get_php_ext(&self) -> Option<IndexMap<BString, PhpMixed>> {
         self.inner.get_php_ext().cloned()
     }
 
@@ -347,11 +347,11 @@ impl PackageInterface for CompletePackage {
         self.inner.is_default_branch()
     }
 
-    fn get_transport_options(&self) -> IndexMap<String, PhpMixed> {
+    fn get_transport_options(&self) -> IndexMap<BString, PhpMixed> {
         self.inner.get_transport_options().clone()
     }
 
-    fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>) {
+    fn set_transport_options(&mut self, options: IndexMap<BString, PhpMixed>) {
         self.inner.set_transport_options(options);
     }
 

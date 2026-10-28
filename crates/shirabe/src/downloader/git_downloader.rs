@@ -9,6 +9,7 @@ use crate::downloader::{
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Git as GitUtil, Platform, ProcessExecutor, Url};
+use bstr::B;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class, implode,
@@ -844,9 +845,9 @@ impl VcsDownloader for GitDownloader {
                 cache_path.clone(),
             ];
             let transport_options = package.get_transport_options();
-            if let Some(git_opts) = transport_options.get("git").and_then(|v| v.as_array())
+            if let Some(git_opts) = transport_options.get(B("git")).and_then(|v| v.as_array())
                 && git_opts
-                    .get("single_use_clone")
+                    .get(B("single_use_clone"))
                     .is_some_and(|v| v.to_bool())
             {
                 clone_flags = vec![];

@@ -16,7 +16,7 @@ use crate::repository::{
     PlatformRepository, RepositoryInterfaceHandle, RootPackageRepository,
 };
 use crate::util::{Git as GitUtil, ProcessExecutor};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect,
@@ -36,7 +36,7 @@ pub struct Locker {
     loader: ArrayLoader,
     dumper: ArrayDumper,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    lock_data_cache: std::cell::RefCell<Option<IndexMap<String, PhpMixed>>>,
+    lock_data_cache: std::cell::RefCell<Option<IndexMap<BString, PhpMixed>>>,
     virtual_file_written: bool,
 }
 
@@ -70,7 +70,7 @@ impl Locker {
     /// Returns the md5 hash of the sorted content of the composer file.
     pub fn get_content_hash(composer_file_contents: impl AsRef<[u8]>) -> anyhow::Result<String> {
         let content = JsonFile::parse_json(Some(composer_file_contents), Some("composer.json"))?;
-        let content_map: IndexMap<String, PhpMixed> = match &content {
+        let content_map: IndexMap<BString, PhpMixed> = match &content {
             PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             _ => IndexMap::new(),
         };
@@ -89,25 +89,25 @@ impl Locker {
             "extra",
         ];
 
-        let mut relevant_content: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut relevant_content: IndexMap<BString, PhpMixed> = IndexMap::new();
 
-        let content_keys: Vec<String> = array_keys(&content_map);
-        let relevant_keys_strings: Vec<String> =
-            relevant_keys.iter().map(|s| s.to_string()).collect();
+        let content_keys: Vec<BString> = array_keys(&content_map);
+        let relevant_keys_strings: Vec<BString> =
+            relevant_keys.iter().map(|s| BString::from(*s)).collect();
         let intersected = array_intersect(&relevant_keys_strings, &content_keys);
         for key in intersected {
             if let Some(value) = content_map.get(&key) {
                 relevant_content.insert(key, value.clone());
             }
         }
-        let platform_value = content_map.get("config").and_then(|v| match v {
-            PhpMixed::Array(m) => m.get("platform").cloned(),
+        let platform_value = content_map.get(B("config")).and_then(|v| match v {
+            PhpMixed::Array(m) => m.get(B("platform")).cloned(),
             _ => None,
         });
         if let Some(platform) = platform_value {
-            let mut config_map: IndexMap<String, PhpMixed> = IndexMap::new();
-            config_map.insert("platform".to_string(), platform);
-            relevant_content.insert("config".to_string(), PhpMixed::Array(config_map));
+            let mut config_map: IndexMap<BString, PhpMixed> = IndexMap::new();
+            config_map.insert("platform".into(), platform);
+            relevant_content.insert("config".into(), PhpMixed::Array(config_map));
         }
 
         ksort(&mut relevant_content);
@@ -129,7 +129,7 @@ impl Locker {
 
         let data_result = self.get_lock_data();
         if let Ok(data) = data_result {
-            return data.contains_key("packages");
+            return data.contains_key(B("packages"));
         }
         false
     }
@@ -137,12 +137,12 @@ impl Locker {
     /// Checks whether the lock file is still up to date with the current hash
     pub fn is_fresh(&mut self) -> anyhow::Result<bool> {
         let lock = self.lock_file.read()?;
-        let lock_map: IndexMap<String, PhpMixed> = match lock {
+        let lock_map: IndexMap<BString, PhpMixed> = match lock {
             PhpMixed::Array(m) => m.into_iter().collect(),
             _ => IndexMap::new(),
         };
 
-        let content_hash = lock_map.get("content-hash");
+        let content_hash = lock_map.get(B("content-hash"));
         if let Some(content_hash) = content_hash
             && !empty(content_hash)
         {
@@ -151,7 +151,7 @@ impl Locker {
         }
 
         // BC support for old lock files without content-hash
-        let lock_hash = lock_map.get("hash");
+        let lock_hash = lock_map.get(B("hash"));
         if let Some(lock_hash) = lock_hash
             && !empty(lock_hash)
         {
@@ -172,11 +172,11 @@ impl Locker {
             LockArrayRepositoryHandle::new(LockArrayRepository::new(vec![])?);
 
         let mut locked_packages = lock_data
-            .get("packages")
+            .get(B("packages"))
             .cloned()
             .unwrap_or(PhpMixed::List(vec![]));
         if with_dev_reqs {
-            if let Some(packages_dev) = lock_data.get("packages-dev").cloned() {
+            if let Some(packages_dev) = lock_data.get(B("packages-dev")).cloned() {
                 locked_packages = array_merge(locked_packages, packages_dev);
             } else {
                 return Err(RuntimeException::new("The lock file does not contain require-dev information, run install with the --no-dev option or delete it and run shirabe update to generate a new lock file.".to_string())
@@ -191,7 +191,7 @@ impl Locker {
         let has_name = if let PhpMixed::List(list) = &locked_packages {
             list.first()
                 .map(|v| match v {
-                    PhpMixed::Array(m) => m.contains_key("name"),
+                    PhpMixed::Array(m) => m.contains_key(B("name")),
                     _ => false,
                 })
                 .unwrap_or(false)
@@ -203,7 +203,7 @@ impl Locker {
             if let PhpMixed::List(list) = locked_packages {
                 for info in list {
                     if let PhpMixed::Array(m) = info {
-                        let info_map: IndexMap<String, PhpMixed> =
+                        let info_map: IndexMap<BString, PhpMixed> =
                             m.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
                         let package = self.loader.load(info_map, None)?;
                         packages.add_package(package.clone())?;
@@ -217,13 +217,13 @@ impl Locker {
                 }
             }
 
-            if let Some(aliases) = lock_data.get("aliases")
+            if let Some(aliases) = lock_data.get(B("aliases"))
                 && let PhpMixed::List(alias_list) = aliases
             {
                 for alias in alias_list {
                     if let PhpMixed::Array(m) = alias {
                         let alias_pkg_name = m
-                            .get("package")
+                            .get(B("package"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_string();
@@ -233,11 +233,11 @@ impl Locker {
                                 );
                             let alias_pkg = CompleteAliasPackageHandle::new(
                                 alias_of,
-                                m.get("alias_normalized")
+                                m.get(B("alias_normalized"))
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default()
                                     .to_string(),
-                                m.get("alias")
+                                m.get(B("alias"))
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default()
                                     .to_string(),
@@ -262,11 +262,11 @@ impl Locker {
     pub fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<String>> {
         let mut names: Vec<String> = vec![];
         let lock_data = self.get_lock_data()?;
-        if let Some(PhpMixed::List(list)) = lock_data.get("packages-dev") {
+        if let Some(PhpMixed::List(list)) = lock_data.get(B("packages-dev")) {
             for package in list {
                 if let PhpMixed::Array(m) = package {
                     names.push(strtolower(
-                        &m.get("name")
+                        &m.get(B("name"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_str_lossy(),
@@ -286,7 +286,7 @@ impl Locker {
         let lock_data = self.get_lock_data()?;
         let mut requirements: IndexMap<String, Link> = IndexMap::new();
 
-        let platform_value = lock_data.get("platform");
+        let platform_value = lock_data.get(B("platform"));
         if let Some(platform_value) = platform_value
             && !empty(platform_value)
         {
@@ -301,7 +301,7 @@ impl Locker {
             )?;
         }
 
-        let platform_dev_value = lock_data.get("platform-dev");
+        let platform_dev_value = lock_data.get(B("platform-dev"));
         if with_dev_reqs
             && let Some(platform_dev_value) = platform_dev_value
             && !empty(platform_dev_value)
@@ -328,7 +328,7 @@ impl Locker {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
-            .get("minimum-stability")
+            .get(B("minimum-stability"))
             .and_then(|v| v.as_string())
             .unwrap_or("stable".into())
             .to_string())
@@ -340,11 +340,12 @@ impl Locker {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
-            .get("stability-flags")
+            .get(B("stability-flags"))
             .and_then(|v| match v {
                 PhpMixed::Array(m) => Some(
                     m.iter()
-                        .map(|(k, v)| (k.clone(), v.as_int().unwrap_or(0)))
+                        // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
+                        .map(|(k, v)| (k.to_str_lossy().into_owned(), v.as_int().unwrap_or(0)))
                         .collect(),
                 ),
                 _ => None,
@@ -357,24 +358,30 @@ impl Locker {
 
         // return null if not set to allow caller logic to choose the
         // right behavior since old lock files have no prefer-stable
-        Ok(lock_data.get("prefer-stable").and_then(|v| v.as_bool()))
+        Ok(lock_data.get(B("prefer-stable")).and_then(|v| v.as_bool()))
     }
 
     pub fn get_prefer_lowest(&mut self) -> anyhow::Result<Option<bool>> {
         let lock_data = self.get_lock_data()?;
 
-        Ok(lock_data.get("prefer-lowest").and_then(|v| v.as_bool()))
+        Ok(lock_data.get(B("prefer-lowest")).and_then(|v| v.as_bool()))
     }
 
     pub fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
-            .get("platform-overrides")
+            .get(B("platform-overrides"))
             .and_then(|v| match v {
                 PhpMixed::Array(m) => Some(
                     m.iter()
-                        .map(|(k, v)| (k.clone(), v.as_string().unwrap_or_default().to_string()))
+                        // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
+                        .map(|(k, v)| {
+                            (
+                                k.to_str_lossy().into_owned(),
+                                v.as_string().unwrap_or_default().to_string(),
+                            )
+                        })
                         .collect(),
                 ),
                 _ => None,
@@ -386,15 +393,19 @@ impl Locker {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
-            .get("aliases")
+            .get(B("aliases"))
             .and_then(|v| match v {
                 PhpMixed::List(list) => Some(
                     list.iter()
                         .filter_map(|v| match v {
                             PhpMixed::Array(m) => Some(
                                 m.iter()
+                                    // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
                                     .map(|(k, v)| {
-                                        (k.clone(), v.as_string().unwrap_or_default().to_string())
+                                        (
+                                            k.to_str_lossy().into_owned(),
+                                            v.as_string().unwrap_or_default().to_string(),
+                                        )
                                     })
                                     .collect(),
                             ),
@@ -411,13 +422,13 @@ impl Locker {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
-            .get("plugin-api-version")
+            .get(B("plugin-api-version"))
             .and_then(|v| v.as_string())
             .unwrap_or("1.1.0".into())
             .to_string())
     }
 
-    pub fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+    pub fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         if let Some(cache) = self.lock_data_cache.borrow().clone() {
             return Ok(cache);
         }
@@ -430,7 +441,7 @@ impl Locker {
         }
 
         let data_php = self.lock_file.read()?;
-        let data: IndexMap<String, PhpMixed> = match data_php {
+        let data: IndexMap<BString, PhpMixed> = match data_php {
             PhpMixed::Array(m) => m.into_iter().collect(),
             _ => IndexMap::new(),
         };
@@ -447,29 +458,29 @@ impl Locker {
         dev_packages: Option<Vec<PackageInterfaceHandle>>,
         platform_reqs: IndexMap<String, String>,
         platform_dev_reqs: IndexMap<String, String>,
-        aliases: Vec<IndexMap<String, PhpMixed>>,
+        aliases: Vec<IndexMap<BString, PhpMixed>>,
         minimum_stability: &str,
         stability_flags: IndexMap<String, i64>,
         prefer_stable: bool,
         prefer_lowest: bool,
-        platform_overrides: IndexMap<String, PhpMixed>,
+        platform_overrides: IndexMap<BString, PhpMixed>,
         write: bool,
     ) -> anyhow::Result<bool> {
         // keep old default branch names normalized to DEFAULT_BRANCH_ALIAS for BC as that is how Composer 1 outputs the lock file
         // when loading the lock file the version is anyway ignored in Composer 2, so it has no adverse effect
-        let aliases: Vec<IndexMap<String, PhpMixed>> = array_map(
-            |alias: &IndexMap<String, PhpMixed>| {
+        let aliases: Vec<IndexMap<BString, PhpMixed>> = array_map(
+            |alias: &IndexMap<BString, PhpMixed>| {
                 let mut alias = alias.clone();
                 if matches!(
                     &*alias
-                        .get("version")
+                        .get(B("version"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
                         .to_str_lossy(),
                     "dev-master" | "dev-trunk" | "dev-default"
                 ) {
                     alias.insert(
-                        "version".to_string(),
+                        "version".into(),
                         PhpMixed::string(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()),
                     );
                 }
@@ -478,9 +489,9 @@ impl Locker {
             &aliases,
         );
 
-        let mut lock: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut lock: IndexMap<BString, PhpMixed> = IndexMap::new();
         lock.insert(
-            "_readme".to_string(),
+            "_readme".into(),
             PhpMixed::List(vec![
                 PhpMixed::string(
                     "This file locks the dependencies of your project to a known state".to_string(),
@@ -494,13 +505,13 @@ impl Locker {
             ]),
         );
         lock.insert(
-            "content-hash".to_string(),
+            "content-hash".into(),
             PhpMixed::string(self.content_hash.clone()),
         );
-        lock.insert("packages".to_string(), self.lock_packages(&packages)?);
-        lock.insert("packages-dev".to_string(), PhpMixed::Null);
+        lock.insert("packages".into(), self.lock_packages(&packages)?);
+        lock.insert("packages-dev".into(), PhpMixed::Null);
         lock.insert(
-            "aliases".to_string(),
+            "aliases".into(),
             PhpMixed::List(
                 aliases
                     .iter()
@@ -511,54 +522,51 @@ impl Locker {
             ),
         );
         lock.insert(
-            "minimum-stability".to_string(),
+            "minimum-stability".into(),
             PhpMixed::string(minimum_stability.to_string()),
         );
         lock.insert(
-            "stability-flags".to_string(),
+            "stability-flags".into(),
             PhpMixed::Array(
                 stability_flags
                     .iter()
-                    .map(|(k, v)| (k.clone(), PhpMixed::Int(*v)))
+                    .map(|(k, v)| (k.as_str().into(), PhpMixed::Int(*v)))
                     .collect(),
             ),
         );
-        lock.insert("prefer-stable".to_string(), PhpMixed::Bool(prefer_stable));
-        lock.insert("prefer-lowest".to_string(), PhpMixed::Bool(prefer_lowest));
+        lock.insert("prefer-stable".into(), PhpMixed::Bool(prefer_stable));
+        lock.insert("prefer-lowest".into(), PhpMixed::Bool(prefer_lowest));
 
         if let Some(dev_packages) = dev_packages {
-            lock.insert(
-                "packages-dev".to_string(),
-                self.lock_packages(&dev_packages)?,
-            );
+            lock.insert("packages-dev".into(), self.lock_packages(&dev_packages)?);
         }
 
         lock.insert(
-            "platform".to_string(),
+            "platform".into(),
             PhpMixed::Array(
                 platform_reqs
                     .iter()
-                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
+                    .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
                     .collect(),
             ),
         );
         lock.insert(
-            "platform-dev".to_string(),
+            "platform-dev".into(),
             PhpMixed::Array(
                 platform_dev_reqs
                     .iter()
-                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
+                    .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
                     .collect(),
             ),
         );
         if !platform_overrides.is_empty() {
             lock.insert(
-                "platform-overrides".to_string(),
+                "platform-overrides".into(),
                 PhpMixed::Array(platform_overrides.into_iter().collect()),
             );
         }
         lock.insert(
-            "plugin-api-version".to_string(),
+            "plugin-api-version".into(),
             PhpMixed::string(plugin_interface::PLUGIN_API_VERSION.to_string()),
         );
 
@@ -597,7 +605,7 @@ impl Locker {
                     ))?),
                     None,
                 )?;
-                let parsed_map: IndexMap<String, PhpMixed> = match parsed {
+                let parsed_map: IndexMap<BString, PhpMixed> = match parsed {
                     PhpMixed::Array(m) => m.into_iter().collect(),
                     _ => IndexMap::new(),
                 };
@@ -619,7 +627,7 @@ impl Locker {
         &mut self,
         composer_json: &JsonFile,
         data_processor: Option<
-            Box<dyn FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>>,
+            Box<dyn FnOnce(IndexMap<BString, PhpMixed>) -> IndexMap<BString, PhpMixed>>,
         >,
     ) -> anyhow::Result<()> {
         let contents = match file_get_contents(composer_json.get_path()) {
@@ -635,12 +643,12 @@ impl Locker {
 
         let lock_mtime = filemtime(self.lock_file.get_path());
         let lock_data_php = self.lock_file.read()?;
-        let mut lock_data: IndexMap<String, PhpMixed> = match lock_data_php {
+        let mut lock_data: IndexMap<BString, PhpMixed> = match lock_data_php {
             PhpMixed::Array(m) => m.into_iter().collect(),
             _ => IndexMap::new(),
         };
         lock_data.insert(
-            "content-hash".to_string(),
+            "content-hash".into(),
             PhpMixed::string(Self::get_content_hash(&contents)?),
         );
         if let Some(processor) = data_processor {
@@ -663,11 +671,11 @@ impl Locker {
     /// Ensures correct data types and ordering for the JSON lock format
     fn fixup_json_data_type(
         &self,
-        mut lock_data: IndexMap<String, PhpMixed>,
-    ) -> IndexMap<String, PhpMixed> {
+        mut lock_data: IndexMap<BString, PhpMixed>,
+    ) -> IndexMap<BString, PhpMixed> {
         for key in ["stability-flags", "platform", "platform-dev"].iter() {
             let should_replace = lock_data
-                .get(*key)
+                .get(B(key))
                 .map(|v| match v {
                     PhpMixed::Array(m) => m.is_empty(),
                     _ => false,
@@ -675,12 +683,12 @@ impl Locker {
                 .unwrap_or(false);
             if should_replace {
                 // PHP: new \stdClass() — empty JSON object
-                lock_data.insert(key.to_string(), PhpMixed::Object(IndexMap::new()));
+                lock_data.insert(key.to_string().into(), PhpMixed::Object(IndexMap::new()));
             }
         }
 
-        if let Some(PhpMixed::Array(m)) = lock_data.get_mut("stability-flags") {
-            let mut as_map: IndexMap<String, PhpMixed> =
+        if let Some(PhpMixed::Array(m)) = lock_data.get_mut(B("stability-flags")) {
+            let mut as_map: IndexMap<BString, PhpMixed> =
                 m.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
             ksort(&mut as_map);
             *m = as_map.into_iter().collect();
@@ -690,7 +698,7 @@ impl Locker {
     }
 
     fn lock_packages(&mut self, packages: &[PackageInterfaceHandle]) -> anyhow::Result<PhpMixed> {
-        let mut locked: Vec<IndexMap<String, PhpMixed>> = vec![];
+        let mut locked: Vec<IndexMap<BString, PhpMixed>> = vec![];
 
         for package in packages {
             if package.as_alias().is_some() {
@@ -709,11 +717,11 @@ impl Locker {
             }
 
             let mut spec = self.dumper.dump(package.clone());
-            spec.shift_remove("version_normalized");
+            spec.shift_remove(B("version_normalized"));
 
             // always move time to the end of the package definition
-            let time = spec.get("time").cloned();
-            spec.shift_remove("time");
+            let time = spec.get(B("time")).cloned();
+            spec.shift_remove(B("time"));
             let time = if package.is_dev()
                 && package.get_installation_source() == Some("source".to_string())
             {
@@ -724,21 +732,21 @@ impl Locker {
                 time
             };
             if let Some(t) = time {
-                spec.insert("time".to_string(), t);
+                spec.insert("time".into(), t);
             }
 
-            spec.shift_remove("installation-source");
+            spec.shift_remove(B("installation-source"));
 
             locked.push(spec);
         }
 
         usort(&mut locked, |a, b| {
             let comparison = strcmp(
-                &a.get("name")
+                &a.get(B("name"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_str_lossy(),
-                &b.get("name")
+                &b.get(B("name"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_str_lossy(),
@@ -750,11 +758,11 @@ impl Locker {
 
             // If it is the same package, compare the versions to make the order deterministic
             strcmp(
-                &a.get("version")
+                &a.get(B("version"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_str_lossy(),
-                &b.get("version")
+                &b.get(B("version"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_str_lossy(),
@@ -992,7 +1000,7 @@ pub trait LockerInterface: std::fmt::Debug {
     fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<String, String>>;
     fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<String, String>>>;
     fn get_plugin_api(&mut self) -> anyhow::Result<String>;
-    fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<String, PhpMixed>>;
+    fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<BString, PhpMixed>>;
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn set_lock_data(
         &mut self,
@@ -1000,19 +1008,19 @@ pub trait LockerInterface: std::fmt::Debug {
         dev_packages: Option<Vec<PackageInterfaceHandle>>,
         platform_reqs: IndexMap<String, String>,
         platform_dev_reqs: IndexMap<String, String>,
-        aliases: Vec<IndexMap<String, PhpMixed>>,
+        aliases: Vec<IndexMap<BString, PhpMixed>>,
         minimum_stability: &str,
         stability_flags: IndexMap<String, i64>,
         prefer_stable: bool,
         prefer_lowest: bool,
-        platform_overrides: IndexMap<String, PhpMixed>,
+        platform_overrides: IndexMap<BString, PhpMixed>,
         write: bool,
     ) -> anyhow::Result<bool>;
     fn update_hash(
         &mut self,
         composer_json: &JsonFile,
         data_processor: Option<
-            Box<dyn FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>>,
+            Box<dyn FnOnce(IndexMap<BString, PhpMixed>) -> IndexMap<BString, PhpMixed>>,
         >,
     ) -> anyhow::Result<()>;
     fn get_missing_requirement_info(
@@ -1081,7 +1089,7 @@ impl LockerInterface for Locker {
         self.get_plugin_api()
     }
 
-    fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+    fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         self.get_lock_data()
     }
 
@@ -1092,12 +1100,12 @@ impl LockerInterface for Locker {
         dev_packages: Option<Vec<PackageInterfaceHandle>>,
         platform_reqs: IndexMap<String, String>,
         platform_dev_reqs: IndexMap<String, String>,
-        aliases: Vec<IndexMap<String, PhpMixed>>,
+        aliases: Vec<IndexMap<BString, PhpMixed>>,
         minimum_stability: &str,
         stability_flags: IndexMap<String, i64>,
         prefer_stable: bool,
         prefer_lowest: bool,
-        platform_overrides: IndexMap<String, PhpMixed>,
+        platform_overrides: IndexMap<BString, PhpMixed>,
         write: bool,
     ) -> anyhow::Result<bool> {
         self.set_lock_data(
@@ -1119,7 +1127,7 @@ impl LockerInterface for Locker {
         &mut self,
         composer_json: &JsonFile,
         data_processor: Option<
-            Box<dyn FnOnce(IndexMap<String, PhpMixed>) -> IndexMap<String, PhpMixed>>,
+            Box<dyn FnOnce(IndexMap<BString, PhpMixed>) -> IndexMap<BString, PhpMixed>>,
         >,
     ) -> anyhow::Result<()> {
         self.update_hash(composer_json, data_processor)

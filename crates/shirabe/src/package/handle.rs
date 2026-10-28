@@ -255,7 +255,7 @@ macro_rules! delegate_package_interface_to_inner {
             fn get_target_dir(&self) -> Option<String> {
                 self.$field.get_target_dir()
             }
-            fn get_extra(&self) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
+            fn get_extra(&self) -> indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
                 self.$field.get_extra()
             }
             fn set_installation_source(&mut self, r#type: Option<String>) {
@@ -350,10 +350,14 @@ macro_rules! delegate_package_interface_to_inner {
             fn get_suggests(&self) -> indexmap::IndexMap<String, String> {
                 self.$field.get_suggests()
             }
-            fn get_autoload(&self) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
+            fn get_autoload(
+                &self,
+            ) -> indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
                 self.$field.get_autoload()
             }
-            fn get_dev_autoload(&self) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
+            fn get_dev_autoload(
+                &self,
+            ) -> indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
                 self.$field.get_dev_autoload()
             }
             fn get_include_paths(&self) -> Vec<String> {
@@ -361,7 +365,7 @@ macro_rules! delegate_package_interface_to_inner {
             }
             fn get_php_ext(
                 &self,
-            ) -> Option<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>> {
+            ) -> Option<indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>> {
                 self.$field.get_php_ext()
             }
             fn set_repository(
@@ -390,12 +394,12 @@ macro_rules! delegate_package_interface_to_inner {
             }
             fn get_transport_options(
                 &self,
-            ) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
+            ) -> indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
                 self.$field.get_transport_options()
             }
             fn set_transport_options(
                 &mut self,
-                options: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
+                options: indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>,
             ) {
                 self.$field.set_transport_options(options);
             }
@@ -474,7 +478,9 @@ macro_rules! impl_package_interface_handle {
                 self.0.borrow().as_package_interface().get_target_dir()
             }
 
-            pub fn get_extra(&self) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
+            pub fn get_extra(
+                &self,
+            ) -> indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
                 self.0.borrow().as_package_interface().get_extra()
             }
 
@@ -639,13 +645,15 @@ macro_rules! impl_package_interface_handle {
                     .get_links_for_type(link_type)
             }
 
-            pub fn get_autoload(&self) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
+            pub fn get_autoload(
+                &self,
+            ) -> indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
                 self.0.borrow().as_package_interface().get_autoload()
             }
 
             pub fn get_dev_autoload(
                 &self,
-            ) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
+            ) -> indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
                 self.0.borrow().as_package_interface().get_dev_autoload()
             }
 
@@ -655,7 +663,7 @@ macro_rules! impl_package_interface_handle {
 
             pub fn get_php_ext(
                 &self,
-            ) -> Option<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>> {
+            ) -> Option<indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>> {
                 self.0.borrow().as_package_interface().get_php_ext()
             }
 
@@ -698,7 +706,7 @@ macro_rules! impl_package_interface_handle {
 
             pub fn get_transport_options(
                 &self,
-            ) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
+            ) -> indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
                 self.0
                     .borrow()
                     .as_package_interface()
@@ -707,7 +715,7 @@ macro_rules! impl_package_interface_handle {
 
             pub fn set_transport_options(
                 &self,
-                options: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
+                options: indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>,
             ) {
                 self.0
                     .borrow_mut()
@@ -781,7 +789,7 @@ macro_rules! impl_complete_package_interface_handle {
 
             pub fn get_repositories(
                 &self,
-            ) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
+            ) -> indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -791,7 +799,7 @@ macro_rules! impl_complete_package_interface_handle {
 
             pub fn set_repositories(
                 &self,
-                repositories: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
+                repositories: indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>,
             ) {
                 self.0
                     .borrow_mut()
@@ -898,7 +906,7 @@ macro_rules! impl_complete_package_interface_handle {
 
             pub fn get_funding(
                 &self,
-            ) -> Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>> {
+            ) -> Vec<indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -908,7 +916,7 @@ macro_rules! impl_complete_package_interface_handle {
 
             pub fn set_funding(
                 &self,
-                funding: Vec<indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>>,
+                funding: Vec<indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1019,7 +1027,9 @@ macro_rules! impl_root_package_interface_handle {
                     .get_prefer_stable()
             }
 
-            pub fn get_config(&self) -> indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> {
+            pub fn get_config(
+                &self,
+            ) -> indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
                 self.0
                     .borrow()
                     .as_root_package_interface()
@@ -1075,7 +1085,7 @@ macro_rules! impl_root_package_interface_handle {
 
             pub fn set_autoload(
                 &self,
-                autoload: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
+                autoload: indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1086,7 +1096,7 @@ macro_rules! impl_root_package_interface_handle {
 
             pub fn set_dev_autoload(
                 &self,
-                dev_autoload: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
+                dev_autoload: indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1121,7 +1131,7 @@ macro_rules! impl_root_package_interface_handle {
 
             pub fn set_config(
                 &self,
-                config: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
+                config: indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1154,7 +1164,10 @@ macro_rules! impl_root_package_interface_handle {
                     .set_suggests(suggests);
             }
 
-            pub fn set_extra(&self, extra: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>) {
+            pub fn set_extra(
+                &self,
+                extra: indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>,
+            ) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1231,7 +1244,7 @@ macro_rules! impl_real_package_test_setters {
             /// For testing only: mirrors PHP `Package::setExtra`.
             pub fn __set_extra(
                 &self,
-                extra: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
+                extra: indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1297,7 +1310,7 @@ macro_rules! impl_real_package_test_setters {
             /// For testing only: mirrors PHP `Package::setAutoload`.
             pub fn __set_autoload(
                 &self,
-                autoload: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
+                autoload: indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1309,7 +1322,7 @@ macro_rules! impl_real_package_test_setters {
             /// For testing only: mirrors PHP `Package::setDevAutoload`.
             pub fn __set_dev_autoload(
                 &self,
-                dev_autoload: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed>,
+                dev_autoload: indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed>,
             ) {
                 self.0
                     .borrow_mut()

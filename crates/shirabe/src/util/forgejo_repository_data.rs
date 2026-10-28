@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/ForgejoRepositoryData.php
 
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -36,15 +36,15 @@ impl ForgejoRepositoryData {
         }
     }
 
-    pub fn from_remote_data(data: &IndexMap<String, PhpMixed>) -> anyhow::Result<Self> {
+    pub fn from_remote_data(data: &IndexMap<BString, PhpMixed>) -> anyhow::Result<Self> {
         let get_string = |key: &str| {
-            data.get(key)
+            data.get(B(key))
                 .and_then(|v| v.as_string())
                 .map(|s| s.to_str_lossy().into_owned())
                 .ok_or_else(|| anyhow::anyhow!("missing or invalid string field: {key}"))
         };
         let get_bool = |key: &str| {
-            data.get(key)
+            data.get(B(key))
                 .and_then(|v| v.as_bool())
                 .ok_or_else(|| anyhow::anyhow!("missing or invalid bool field: {key}"))
         };

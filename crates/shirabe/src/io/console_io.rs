@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
 use crate::question::StrictConfirmationQuestion;
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use indexmap::{IndexMap, indexmap};
 use shirabe_php_shim::{
     PhpMixed, array_search, in_array_strict, is_array, is_string, memory_get_usage, microtime,
@@ -396,7 +396,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         multiselect: bool,
     ) -> anyhow::Result<PhpMixed> {
         let sanitized_question = Self::sanitize(&question, true);
-        // ChoiceQuestion::new expects an IndexMap<String, PhpMixed>; project the
+        // ChoiceQuestion::new expects an IndexMap<BString, PhpMixed>; project the
         // sanitized choice list/map into the keyed form, preserving keys.
         let sanitize_choice = |choice: &PhpMixed| {
             PhpMixed::string(Self::sanitize(
@@ -404,17 +404,17 @@ impl IOInterfaceImmutable for ConsoleIO {
                 true,
             ))
         };
-        let sanitized_choices: IndexMap<String, PhpMixed> = match &choices {
+        let sanitized_choices: IndexMap<BString, PhpMixed> = match &choices {
             PhpMixed::List(l) => l
                 .iter()
                 .enumerate()
-                .map(|(i, choice)| (i.to_string(), sanitize_choice(choice)))
+                .map(|(i, choice)| (i.to_string().into(), sanitize_choice(choice)))
                 .collect(),
             PhpMixed::Array(a) => a
                 .iter()
                 .map(|(key, choice)| (key.clone(), sanitize_choice(choice)))
                 .collect(),
-            other => indexmap! { "0".to_string() => sanitize_choice(other) },
+            other => indexmap! { "0".into() => sanitize_choice(other) },
         };
         let sanitized_default = if is_string(&default) {
             Some(PhpMixed::string(Self::sanitize(
@@ -443,13 +443,15 @@ impl IOInterfaceImmutable for ConsoleIO {
         let result: PhpMixed = self.ask_question(&question)?;
 
         // PHP: $isAssoc = (bool) \count(array_filter(array_keys($choices), 'is_string'));
-        let choice_keys: Vec<String> = match &choices {
+        let choice_keys: Vec<BString> = match &choices {
             PhpMixed::Array(a) => a.keys().cloned().collect(),
             PhpMixed::List(_) => vec![],
             _ => vec![],
         };
-        let is_assoc =
-            !choice_keys.is_empty() && choice_keys.iter().any(|k| k.parse::<i64>().is_err());
+        let is_assoc = !choice_keys.is_empty()
+            && choice_keys
+                .iter()
+                .any(|k| !k.to_str().is_ok_and(|k| k.parse::<i64>().is_ok()));
         if is_assoc {
             return Ok(result);
         }
@@ -464,7 +466,11 @@ impl IOInterfaceImmutable for ConsoleIO {
                     .collect(),
                 PhpMixed::Array(a) => a
                     .iter()
-                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_string())))
+                    // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
+                    .filter_map(|(k, v)| {
+                        v.as_string()
+                            .map(|s| (k.to_str_lossy().into_owned(), s.to_string()))
+                    })
                     .collect(),
                 _ => IndexMap::new(),
             };
@@ -473,13 +479,13 @@ impl IOInterfaceImmutable for ConsoleIO {
             ));
         }
 
-        let mut results: Vec<String> = vec![];
+        let mut results: Vec<BString> = vec![];
         let result_list: Vec<PhpMixed> = result.as_list().cloned().unwrap_or_default();
-        let choice_list: Vec<(String, PhpMixed)> = match &choices {
+        let choice_list: Vec<(BString, PhpMixed)> = match &choices {
             PhpMixed::List(l) => l
                 .iter()
                 .enumerate()
-                .map(|(i, v)| (i.to_string(), v.clone()))
+                .map(|(i, v)| (i.to_string().into(), v.clone()))
                 .collect(),
             PhpMixed::Array(a) => a.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             _ => vec![],
@@ -491,7 +497,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         }
 
         Ok(PhpMixed::List(
-            results.into_iter().map(PhpMixed::string).collect(),
+            results.into_iter().map(PhpMixed::String).collect(),
         ))
     }
 

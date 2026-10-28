@@ -4,6 +4,7 @@ use crate::async_runtime::run;
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::get_process_executor_mock;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::VcsDownloader;
@@ -39,20 +40,20 @@ mockall::mock! {
         fn get_composer_information(
             &mut self,
             identifier: &str,
-        ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>>;
+        ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>>;
     }
 }
 
 /// ref: PerforceDownloaderTest::getConfig (seeds `home` with the temp dir)
 fn get_config(test_path: &std::path::Path) -> Config {
     let mut config = Config::new(true, None);
-    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-    let mut section: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+    let mut section: IndexMap<BString, PhpMixed> = IndexMap::new();
     section.insert(
-        "home".to_string(),
+        "home".into(),
         PhpMixed::string(test_path.to_str().unwrap().to_string()),
     );
-    top.insert("config".to_string(), PhpMixed::Array(section));
+    top.insert("config".into(), PhpMixed::Array(section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
     config
 }

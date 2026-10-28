@@ -62,7 +62,13 @@ pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
     if let Some(PhpMixed::Array(properties)) = fields.get(3) {
         *throw.properties = properties
             .iter()
-            .map(|(name, value)| (name.clone(), PluginValue::from_php_mixed(value)))
+            // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
+            .map(|(name, value)| {
+                (
+                    name.to_str_lossy().into_owned(),
+                    PluginValue::from_php_mixed(value),
+                )
+            })
             .collect();
     }
     throw.file = string(4);

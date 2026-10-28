@@ -3,6 +3,7 @@
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, get_http_downloader_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd_full, get_process_executor_mock};
+use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -24,13 +25,13 @@ struct SetUp {
 fn set_up() -> SetUp {
     let home = TempDir::new().unwrap();
     let mut config = Config::new(true, None);
-    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-    let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+    let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
-        "home".to_string(),
+        "home".into(),
         PhpMixed::string(home.path().to_str().unwrap().to_string()),
     );
-    top.insert("config".to_string(), PhpMixed::Array(config_section));
+    top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
     let network_env = Platform::get_env("COMPOSER_DISABLE_NETWORK");
 
@@ -93,8 +94,8 @@ fn test_get_root_identifier_from_remote_local_repository() {
         MockHandler::default(),
     );
 
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::string(home_path.clone()));
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
+    repo_config.insert("url".into(), PhpMixed::string(home_path.clone()));
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
     driver.__set_repo_dir(home_path);
@@ -157,9 +158,9 @@ fn test_get_root_identifier_from_remote() {
         MockHandler::default(),
     );
 
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
-        "url".to_string(),
+        "url".into(),
         PhpMixed::string("https://example.org/acme.git".to_string()),
     );
 
@@ -197,9 +198,9 @@ fn test_get_root_identifier_from_local_with_network_disabled() {
         MockHandler::default(),
     );
 
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
-        "url".to_string(),
+        "url".into(),
         PhpMixed::string("https://example.org/acme.git".to_string()),
     );
 
@@ -241,9 +242,9 @@ fn test_get_branches_filter_invalid_branch_names() {
         MockHandler::default(),
     );
 
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
-        "url".to_string(),
+        "url".into(),
         PhpMixed::string("https://example.org/acme.git".to_string()),
     );
 
@@ -282,9 +283,9 @@ fn test_file_get_content_invalid_identifier() {
     let (process, _process_guard): (_, ProcessExecutorMockGuard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
 
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
-        "url".to_string(),
+        "url".into(),
         PhpMixed::string("https://example.org/acme.git".to_string()),
     );
 
@@ -315,9 +316,9 @@ fn test_get_change_date_invalid_identifier() {
     let (process, _process_guard): (_, ProcessExecutorMockGuard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
 
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
-        "url".to_string(),
+        "url".into(),
         PhpMixed::string("https://example.org/acme.git".to_string()),
     );
 

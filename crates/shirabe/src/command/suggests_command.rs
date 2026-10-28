@@ -8,6 +8,7 @@ use crate::repository::{
     InstalledRepository, PlatformRepository, RepositoryInterface, RepositoryInterfaceHandle,
     RootPackageRepository,
 };
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, impl_php_class, in_array_loose};
 use shirabe_symfony_console::command::Command;
@@ -124,9 +125,9 @@ impl Command for SuggestsCommand {
                 .get_locker()
                 .borrow_mut()
                 .get_platform_overrides()?;
-            let platform_overrides: IndexMap<String, PhpMixed> = platform_overrides
+            let platform_overrides: IndexMap<BString, PhpMixed> = platform_overrides
                 .into_iter()
-                .map(|(k, v)| (k, PhpMixed::string(v)))
+                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                 .collect();
             installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],
@@ -144,7 +145,7 @@ impl Command for SuggestsCommand {
             installed_repos.push(locked_repo.into());
         } else {
             let platform_cfg = composer.get_config().borrow().get("platform");
-            let platform_overrides: IndexMap<String, PhpMixed> = platform_cfg
+            let platform_overrides: IndexMap<BString, PhpMixed> = platform_cfg
                 .as_array()
                 .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                 .unwrap_or_default();

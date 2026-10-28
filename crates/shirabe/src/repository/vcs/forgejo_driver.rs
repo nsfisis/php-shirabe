@@ -8,7 +8,7 @@ use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase};
 use crate::util::http::Response;
 use crate::util::{Forgejo, ForgejoRepositoryData, ForgejoUrl};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, base64_decode, date_create, explode, extension_loaded,
@@ -27,7 +27,7 @@ pub struct ForgejoDriver {
 
 impl ForgejoDriver {
     pub fn new(
-        repo_config: IndexMap<String, PhpMixed>,
+        repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
@@ -107,11 +107,11 @@ impl ForgejoDriver {
         // larger files either need be fetched with a raw accept header or by using the git blob endpoint.
         let needs_git_blob = if let PhpMixed::Array(ref arr) = resource {
             let content_empty = arr
-                .get("content")
+                .get(B("content"))
                 .is_none_or(|v| v.as_string().is_none_or(|s| s.is_empty()));
             let encoding_none =
-                arr.get("encoding").and_then(|v| v.as_string()) == Some("none".into());
-            let has_git_url = arr.contains_key("git_url");
+                arr.get(B("encoding")).and_then(|v| v.as_string()) == Some("none".into());
+            let has_git_url = arr.contains_key(B("git_url"));
             content_empty && encoding_none && has_git_url
         } else {
             false
@@ -119,7 +119,7 @@ impl ForgejoDriver {
 
         if needs_git_blob {
             let git_url = if let PhpMixed::Array(ref arr) = resource {
-                arr.get("git_url")
+                arr.get(B("git_url"))
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_str_lossy().into_owned())
             } else {
@@ -131,11 +131,11 @@ impl ForgejoDriver {
         }
 
         let content_b64 = if let PhpMixed::Array(ref arr) = resource {
-            let has_content = arr.contains_key("content");
+            let has_content = arr.contains_key(B("content"));
             let encoding_ok =
-                arr.get("encoding").and_then(|v| v.as_string()) == Some("base64".into());
+                arr.get(B("encoding")).and_then(|v| v.as_string()) == Some("base64".into());
             if has_content && encoding_ok {
-                arr.get("content")
+                arr.get(B("content"))
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_str_lossy().into_owned())
             } else {
@@ -186,11 +186,11 @@ impl ForgejoDriver {
         let commit = self.get_contents(&resource_url, false)??.decode_json()?;
 
         let date_str = if let PhpMixed::Array(ref arr) = commit {
-            arr.get("commit")
+            arr.get(B("commit"))
                 .and_then(|v| v.as_array())
-                .and_then(|c| c.get("committer"))
+                .and_then(|c| c.get(B("committer")))
                 .and_then(|v| v.as_array())
-                .and_then(|c| c.get("date"))
+                .and_then(|c| c.get(B("date")))
                 .and_then(|v| v.as_string())
                 .map(|s| s.to_str_lossy().into_owned())
         } else {
@@ -235,13 +235,13 @@ impl ForgejoDriver {
                     for branch in list {
                         if let PhpMixed::Array(ref arr) = *branch {
                             let name = arr
-                                .get("name")
+                                .get(B("name"))
                                 .and_then(|v| v.as_string())
                                 .map(|s| s.to_str_lossy().into_owned());
                             let id = arr
-                                .get("commit")
+                                .get(B("commit"))
                                 .and_then(|v| v.as_array())
-                                .and_then(|c| c.get("id"))
+                                .and_then(|c| c.get(B("id")))
                                 .and_then(|v| v.as_string())
                                 .map(|s| s.to_str_lossy().into_owned());
                             if let (Some(n), Some(i)) = (name, id) {
@@ -276,13 +276,13 @@ impl ForgejoDriver {
                     for tag in list {
                         if let PhpMixed::Array(ref arr) = *tag {
                             let name = arr
-                                .get("name")
+                                .get(B("name"))
                                 .and_then(|v| v.as_string())
                                 .map(|s| s.to_str_lossy().into_owned());
                             let sha = arr
-                                .get("commit")
+                                .get(B("commit"))
                                 .and_then(|v| v.as_array())
-                                .and_then(|c| c.get("sha"))
+                                .and_then(|c| c.get(B("sha")))
                                 .and_then(|v| v.as_string())
                                 .map(|s| s.to_str_lossy().into_owned());
                             if let (Some(n), Some(s)) = (name, sha) {
@@ -317,7 +317,7 @@ impl ForgejoDriver {
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_composer_information(identifier);
         }
@@ -368,16 +368,16 @@ impl ForgejoDriver {
             if let Some(ref mut composer_map) = composer {
                 // specials for forgejo
                 let support_not_array = composer_map
-                    .get("support")
+                    .get(B("support"))
                     .is_some_and(|v| v.as_array().is_none());
                 if support_not_array {
-                    composer_map.insert("support".to_string(), PhpMixed::Array(IndexMap::new()));
+                    composer_map.insert("support".into(), PhpMixed::Array(IndexMap::new()));
                 }
 
                 let has_source = composer_map
-                    .get("support")
+                    .get(B("support"))
                     .and_then(|v| v.as_array())
-                    .is_some_and(|arr| arr.contains_key("source"));
+                    .is_some_and(|arr| arr.contains_key(B("source")));
 
                 if !has_source {
                     let html_url = self
@@ -405,15 +405,15 @@ impl ForgejoDriver {
                         format!("{}/commit/{}", html_url, identifier)
                     };
 
-                    if let Some(PhpMixed::Array(support)) = composer_map.get_mut("support") {
-                        support.insert("source".to_string(), PhpMixed::string(source_url));
+                    if let Some(PhpMixed::Array(support)) = composer_map.get_mut(B("support")) {
+                        support.insert("source".into(), PhpMixed::string(source_url));
                     }
                 }
 
                 let has_issues = composer_map
-                    .get("support")
+                    .get(B("support"))
                     .and_then(|v| v.as_array())
-                    .is_some_and(|arr| arr.contains_key("issues"));
+                    .is_some_and(|arr| arr.contains_key(B("issues")));
 
                 if !has_issues && self.repository_data.as_ref().is_some_and(|r| r.has_issues) {
                     let issues_url = format!(
@@ -423,15 +423,15 @@ impl ForgejoDriver {
                             .map(|r| r.html_url.clone())
                             .unwrap_or_default()
                     );
-                    if let Some(PhpMixed::Array(support)) = composer_map.get_mut("support") {
-                        support.insert("issues".to_string(), PhpMixed::string(issues_url));
+                    if let Some(PhpMixed::Array(support)) = composer_map.get_mut(B("support")) {
+                        support.insert("issues".into(), PhpMixed::string(issues_url));
                     }
                 }
 
-                if !composer_map.contains_key("abandoned")
+                if !composer_map.contains_key(B("abandoned"))
                     && self.repository_data.as_ref().is_some_and(|r| r.is_archived)
                 {
-                    composer_map.insert("abandoned".to_string(), PhpMixed::Bool(true));
+                    composer_map.insert("abandoned".into(), PhpMixed::Bool(true));
                 }
             }
 
@@ -519,7 +519,7 @@ impl ForgejoDriver {
             inner: VcsDriverBase::new(
                 {
                     let mut m = IndexMap::new();
-                    m.insert("url".to_string(), PhpMixed::string(url.to_string()));
+                    m.insert("url".into(), PhpMixed::string(url.to_string()));
                     m
                 },
                 self.inner.io.clone(),
@@ -661,7 +661,7 @@ impl crate::repository::vcs::VcsDriverInterface for ForgejoDriver {
     fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         ForgejoDriver::get_composer_information(self, identifier)
     }
 

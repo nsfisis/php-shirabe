@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/ArtifactRepositoryTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::ArtifactRepository;
@@ -24,9 +25,9 @@ fn artifacts_dir() -> String {
 }
 
 fn create_repo(url: &str) -> ArtifactRepository {
-    let mut coordinates: IndexMap<String, PhpMixed> = IndexMap::new();
-    coordinates.insert("type".to_string(), PhpMixed::string("artifact".to_string()));
-    coordinates.insert("url".to_string(), PhpMixed::string(url.to_string()));
+    let mut coordinates: IndexMap<BString, PhpMixed> = IndexMap::new();
+    coordinates.insert("type".into(), PhpMixed::string("artifact".to_string()));
+    coordinates.insert("url".into(), PhpMixed::string(url.to_string()));
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));

@@ -11,6 +11,7 @@ use crate::repository::{
     RootPackageRepository,
 };
 use crate::util::PackageInfo;
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueException};
 use shirabe_semver::constraint::{AnyConstraint, Bound};
@@ -78,10 +79,10 @@ pub trait BaseDependencyCommand: BaseCommand {
             }
 
             repos.push(locker.get_locked_repository(true)?.into());
-            let platform_overrides: IndexMap<String, PhpMixed> = locker
+            let platform_overrides: IndexMap<BString, PhpMixed> = locker
                 .get_platform_overrides()?
                 .into_iter()
-                .map(|(k, v)| (k, PhpMixed::string(v)))
+                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                 .collect();
             repos.push(crate::repository::RepositoryInterfaceHandle::new(
                 PlatformRepository::new(vec![], platform_overrides, None, None)?,
@@ -105,7 +106,7 @@ pub trait BaseDependencyCommand: BaseCommand {
 
             repos.push(local_repo);
 
-            let platform_overrides: IndexMap<String, PhpMixed> = composer
+            let platform_overrides: IndexMap<BString, PhpMixed> = composer
                 .get_config()
                 .borrow()
                 .get("platform")
@@ -203,7 +204,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             Some(matched) if PlatformRepository::is_platform_package(&needle) => {
                 let extra_notice = if matched
                     .get_extra()
-                    .get("config.platform")
+                    .get(B("config.platform"))
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false)
                 {

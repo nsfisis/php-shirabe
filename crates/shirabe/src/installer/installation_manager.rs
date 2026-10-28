@@ -13,6 +13,7 @@ use crate::repository::{InstalledRepositoryInterface, InstalledRepositoryInterfa
 use crate::signal::SignalSubscription;
 use crate::util::Platform;
 use crate::util::r#loop::Loop;
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_splice, array_unshift, http_build_query, json_encode,
@@ -307,7 +308,7 @@ impl InstallationManager {
                 {
                     let extra = package.get_extra();
                     if extra
-                        .get("plugin-modifies-downloads")
+                        .get(B("plugin-modifies-downloads"))
                         .and_then(|v| v.as_bool())
                         == Some(true)
                     {
@@ -832,12 +833,12 @@ impl InstallationManager {
                         let mut params: IndexMap<String, String> = IndexMap::new();
                         params.insert("version".to_string(), package.get_pretty_version());
                         params.insert("version_normalized".to_string(), package.get_version());
-                        let mut opts: IndexMap<String, PhpMixed> = IndexMap::new();
-                        opts.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
-                        let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
-                        http.insert("method".to_string(), PhpMixed::string("POST".to_string()));
+                        let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
+                        opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
+                        let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
+                        http.insert("method".into(), PhpMixed::string("POST".to_string()));
                         http.insert(
-                            "header".to_string(),
+                            "header".into(),
                             PhpMixed::List(vec![PhpMixed::string(
                                 "Content-type: application/x-www-form-urlencoded".to_string(),
                             )]),
@@ -847,14 +848,11 @@ impl InstallationManager {
                             .map(|(k, v)| (k.as_str(), v.as_str()))
                             .collect();
                         http.insert(
-                            "content".to_string(),
+                            "content".into(),
                             PhpMixed::string(http_build_query(&params_vec)),
                         );
-                        http.insert("timeout".to_string(), PhpMixed::Int(3));
-                        opts.insert(
-                            "http".to_string(),
-                            PhpMixed::Array(http.into_iter().collect()),
-                        );
+                        http.insert("timeout".into(), PhpMixed::Int(3));
+                        opts.insert("http".into(), PhpMixed::Array(http.into_iter().collect()));
 
                         let http_downloader = &*http_downloader;
                         promises.push(Box::pin(async move {
@@ -865,55 +863,47 @@ impl InstallationManager {
                     continue;
                 }
 
-                let mut post_data: IndexMap<String, PhpMixed> = IndexMap::new();
-                post_data.insert("downloads".to_string(), PhpMixed::List(vec![]));
+                let mut post_data: IndexMap<BString, PhpMixed> = IndexMap::new();
+                post_data.insert("downloads".into(), PhpMixed::List(vec![]));
                 for package in packages {
-                    let mut package_notification: IndexMap<String, PhpMixed> = IndexMap::new();
-                    package_notification.insert(
-                        "name".to_string(),
-                        PhpMixed::string(package.get_pretty_name()),
-                    );
-                    package_notification.insert(
-                        "version".to_string(),
-                        PhpMixed::string(package.get_version()),
-                    );
+                    let mut package_notification: IndexMap<BString, PhpMixed> = IndexMap::new();
+                    package_notification
+                        .insert("name".into(), PhpMixed::string(package.get_pretty_name()));
+                    package_notification
+                        .insert("version".into(), PhpMixed::string(package.get_version()));
                     if strpos(repo_url, "packagist.org/").is_some() {
                         if let Some(metadata) =
-                            FileDownloader::download_metadata().get(&package.get_name())
+                            FileDownloader::download_metadata().get(B(&package.get_name()))
                         {
-                            package_notification.insert("downloaded".to_string(), metadata.clone());
+                            package_notification.insert("downloaded".into(), metadata.clone());
                         } else {
-                            package_notification
-                                .insert("downloaded".to_string(), PhpMixed::Bool(false));
+                            package_notification.insert("downloaded".into(), PhpMixed::Bool(false));
                         }
                     }
-                    if let Some(PhpMixed::List(downloads)) = post_data.get_mut("downloads") {
+                    if let Some(PhpMixed::List(downloads)) = post_data.get_mut(B("downloads")) {
                         downloads.push(PhpMixed::Array(package_notification.into_iter().collect()));
                     }
                 }
 
-                let mut opts: IndexMap<String, PhpMixed> = IndexMap::new();
-                opts.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
-                let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
-                http.insert("method".to_string(), PhpMixed::string("POST".to_string()));
+                let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
+                opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
+                let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
+                http.insert("method".into(), PhpMixed::string("POST".to_string()));
                 http.insert(
-                    "header".to_string(),
+                    "header".into(),
                     PhpMixed::List(vec![PhpMixed::string(
                         "Content-Type: application/json".to_string(),
                     )]),
                 );
                 http.insert(
-                    "content".to_string(),
+                    "content".into(),
                     PhpMixed::string(
                         json_encode(&PhpMixed::Array(post_data.into_iter().collect()))
                             .unwrap_or_default(),
                     ),
                 );
-                http.insert("timeout".to_string(), PhpMixed::Int(6));
-                opts.insert(
-                    "http".to_string(),
-                    PhpMixed::Array(http.into_iter().collect()),
-                );
+                http.insert("timeout".into(), PhpMixed::Int(6));
+                opts.insert("http".into(), PhpMixed::Array(http.into_iter().collect()));
 
                 let http_downloader = &*http_downloader;
                 let repo_url = repo_url.clone();

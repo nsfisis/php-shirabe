@@ -5,6 +5,7 @@ use crate::config_stub::ConfigStubBuilder;
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
+use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -80,13 +81,13 @@ fn setup_config(config: Config) -> Config {
     let mut config = config;
     if !config.has("home") {
         let tmp_dir = TempDir::new().unwrap().keep();
-        let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-        let mut section: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+        let mut section: IndexMap<BString, PhpMixed> = IndexMap::new();
         section.insert(
-            "home".to_string(),
+            "home".into(),
             PhpMixed::string(tmp_dir.to_str().unwrap().to_string()),
         );
-        top.insert("config".to_string(), PhpMixed::Array(section));
+        top.insert("config".into(), PhpMixed::Array(section));
         config.merge(&top, Config::SOURCE_UNKNOWN);
     }
     config
@@ -517,10 +518,10 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
         );
 
         let mut config = Config::new(false, None);
-        let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-        let mut section: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+        let mut section: IndexMap<BString, PhpMixed> = IndexMap::new();
         section.insert(
-            "github-protocols".to_string(),
+            "github-protocols".into(),
             PhpMixed::List(
                 protocols
                     .iter()
@@ -528,7 +529,7 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
                     .collect(),
             ),
         );
-        top.insert("config".to_string(), PhpMixed::Array(section));
+        top.insert("config".into(), PhpMixed::Array(section));
         config.merge(&top, Config::SOURCE_UNKNOWN);
 
         let downloader = get_downloader_mock(None, Some(config), process, None);

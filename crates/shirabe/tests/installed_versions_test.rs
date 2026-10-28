@@ -333,29 +333,26 @@ fn test_get_root_package() {
     let set_up = set_up();
 
     let expected = PhpMixed::Array(IndexMap::from([
-        ("name".to_string(), PhpMixed::string("__root__".to_string())),
+        ("name".into(), PhpMixed::string("__root__".to_string())),
         (
-            "pretty_version".to_string(),
+            "pretty_version".into(),
             PhpMixed::string("dev-master".to_string()),
         ),
+        ("version".into(), PhpMixed::string("dev-master".to_string())),
         (
-            "version".to_string(),
-            PhpMixed::string("dev-master".to_string()),
-        ),
-        (
-            "reference".to_string(),
+            "reference".into(),
             PhpMixed::string("sourceref-by-default".to_string()),
         ),
-        ("type".to_string(), PhpMixed::string("library".to_string())),
+        ("type".into(), PhpMixed::string("library".to_string())),
         (
-            "install_path".to_string(),
+            "install_path".into(),
             PhpMixed::string(format!("{}/./", set_up.root())),
         ),
         (
-            "aliases".to_string(),
+            "aliases".into(),
             PhpMixed::List(vec![PhpMixed::string("1.10.x-dev".to_string())]),
         ),
-        ("dev".to_string(), PhpMixed::Bool(true)),
+        ("dev".into(), PhpMixed::Bool(true)),
     ]));
 
     assert_eq!(
@@ -481,8 +478,8 @@ fn test_with_class_loader_loaded() {
             PluginValue::Array(IndexMap::from([(
                 "foo/bar".into(),
                 PluginValue::from_php_mixed(&PhpMixed::Array(IndexMap::from([
-                    ("version".to_string(), PhpMixed::string("1.0.0".to_string())),
-                    ("dev_requirement".to_string(), PhpMixed::Bool(false)),
+                    ("version".into(), PhpMixed::string("1.0.0".to_string())),
+                    ("dev_requirement".into(), PhpMixed::Bool(false)),
                 ]))),
             )])),
         ),

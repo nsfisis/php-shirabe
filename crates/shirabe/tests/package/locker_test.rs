@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/LockerTest.php
 
 use crate::test_case::installation_manager;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
@@ -19,14 +20,14 @@ fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
 
 /// ref: LockerTest::getJsonContent — `JsonFile::encode(ksort([minimum-stability, name]), 0).unwrap()`.
 fn get_json_content(custom_data: &[(&str, &str)]) -> String {
-    let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
     data.insert(
-        "minimum-stability".to_string(),
+        "minimum-stability".into(),
         PhpMixed::string("beta".to_string()),
     );
-    data.insert("name".to_string(), PhpMixed::string("test".to_string()));
+    data.insert("name".into(), PhpMixed::string("test".to_string()));
     for (k, v) in custom_data {
-        data.insert(k.to_string(), PhpMixed::string(v.to_string()));
+        data.insert(k.to_string().into(), PhpMixed::string(v.to_string()));
     }
     data.sort_keys();
 
@@ -134,8 +135,8 @@ fn test_set_lock_data() {
 
     let content_hash = hash("md5", json_content.trim());
 
-    let mut platform_overrides: IndexMap<String, PhpMixed> = IndexMap::new();
-    platform_overrides.insert("foo/bar".to_string(), PhpMixed::string("1.0".to_string()));
+    let mut platform_overrides: IndexMap<BString, PhpMixed> = IndexMap::new();
+    platform_overrides.insert("foo/bar".into(), PhpMixed::string("1.0".to_string()));
 
     locker
         .set_lock_data(
@@ -241,8 +242,8 @@ fn test_is_fresh_false() {
     let other = get_json_content(&[("name", "test2")]);
     let lock = JsonFile::encode_with_options(
         &PhpMixed::Array({
-            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-            m.insert("hash".to_string(), PhpMixed::string(other));
+            let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
+            m.insert("hash".into(), PhpMixed::string(other));
             m
         }),
         JsonEncodeOptions::none(),

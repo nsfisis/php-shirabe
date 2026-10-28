@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/EventDispatcher/Event.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -7,12 +8,12 @@ use shirabe_php_shim::PhpMixed;
 pub struct Event {
     name: String,
     args: Vec<String>,
-    flags: IndexMap<String, PhpMixed>,
+    flags: IndexMap<BString, PhpMixed>,
     propagation_stopped: bool,
 }
 
 impl Event {
-    pub fn new(name: String, args: Vec<String>, flags: IndexMap<String, PhpMixed>) -> Self {
+    pub fn new(name: String, args: Vec<String>, flags: IndexMap<BString, PhpMixed>) -> Self {
         Self {
             name,
             args,
@@ -33,7 +34,7 @@ impl Event {
         &self.args
     }
 
-    pub fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+    pub fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
         &self.flags
     }
 
@@ -53,7 +54,7 @@ pub trait EventInterface: std::fmt::Debug {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
     fn get_name(&self) -> &str;
     fn get_arguments(&self) -> &Vec<String>;
-    fn get_flags(&self) -> &IndexMap<String, PhpMixed>;
+    fn get_flags(&self) -> &IndexMap<BString, PhpMixed>;
     fn is_propagation_stopped(&self) -> bool;
     fn stop_propagation(&mut self);
 }
@@ -75,7 +76,7 @@ impl EventInterface for Event {
         &self.args
     }
 
-    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+    fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
         &self.flags
     }
 

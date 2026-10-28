@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolOptimizerTest.php
 
-use bstr::ByteSlice;
+use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
 use shirabe::dependency_resolver::pool::Pool;
@@ -192,21 +192,21 @@ fn run_test_pool_optimizer(
     let mut request = Request::new(Some(locked_repo));
     let parser = VersionParser::new();
 
-    if let Some(locked) = request_data.get("locked") {
+    if let Some(locked) = request_data.get(B("locked")) {
         for package in locked.as_list().unwrap() {
             request.lock_package(load_package(package));
         }
     }
-    if let Some(fixed) = request_data.get("fixed") {
+    if let Some(fixed) = request_data.get(B("fixed")) {
         for package in fixed.as_list().unwrap() {
             request.fix_package(load_package(package));
         }
     }
 
-    for (package, constraint) in request_data["require"].as_array().unwrap() {
+    for (package, constraint) in request_data[B("require")].as_array().unwrap() {
         request
             .require_name(
-                package,
+                &package.to_str_lossy(),
                 Some(
                     parser
                         .parse_constraints(&constraint.as_string().unwrap().to_str_lossy())
@@ -217,11 +217,11 @@ fn run_test_pool_optimizer(
     }
 
     let prefer_stable = request_data
-        .get("preferStable")
+        .get(B("preferStable"))
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
     let prefer_lowest = request_data
-        .get("preferLowest")
+        .get(B("preferLowest"))
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 

@@ -5,6 +5,7 @@ use crate::command::Command;
 use crate::descriptor::{DescribableObject, DescriptorInterface};
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -17,7 +18,7 @@ pub trait Descriptor: DescriptorInterface {
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         object: DescribableObject,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         self.set_output(output);
 
@@ -61,34 +62,34 @@ pub trait Descriptor: DescriptorInterface {
     fn describe_input_argument(
         &mut self,
         argument: &InputArgument,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()>;
 
     /// Describes an InputOption instance.
     fn describe_input_option(
         &mut self,
         option: &InputOption,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()>;
 
     /// Describes an InputDefinition instance.
     fn describe_input_definition(
         &mut self,
         definition: &InputDefinition,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()>;
 
     /// Describes a Command instance.
     fn describe_command(
         &mut self,
         command: &dyn Command,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()>;
 
     /// Describes an Application instance.
     fn describe_application(
         &mut self,
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()>;
 }

@@ -8,6 +8,7 @@
 // execution), every test here is also tagged `#[serial_test::serial]` to avoid racing other
 // serial-tagged tests in this binary that touch the same global state (see
 // util/http/proxy_manager_test.rs and http_downloader_test.rs).
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe::util::http::proxy_manager::ProxyManager;
 use shirabe::util::platform::Platform;
@@ -24,7 +25,7 @@ fn arr(entries: Vec<(&str, PhpMixed)>) -> PhpMixed {
     PhpMixed::Array(
         entries
             .into_iter()
-            .map(|(k, v)| (k.to_string(), v))
+            .map(|(k, v)| (k.to_string().into(), v))
             .collect(),
     )
 }
@@ -33,10 +34,10 @@ fn list(items: Vec<PhpMixed>) -> PhpMixed {
     PhpMixed::List(items)
 }
 
-fn map(entries: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
+fn map(entries: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
     entries
         .into_iter()
-        .map(|(k, v)| (k.to_string(), v))
+        .map(|(k, v)| (k.to_string().into(), v))
         .collect()
 }
 
@@ -44,7 +45,7 @@ fn map(entries: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
 // tests port PHPUnit's `assertEquals`, which compares associative arrays by key/value regardless
 // of insertion order (PHP `List`/sequential arrays are still position-sensitive, since reordering
 // them changes which value is at which index). This mirrors that PHPUnit semantics for the
-// `IndexMap<String, PhpMixed>` results `stream_context_get_options` returns.
+// `IndexMap<BString, PhpMixed>` results `stream_context_get_options` returns.
 fn php_equals(a: &PhpMixed, b: &PhpMixed) -> bool {
     match (a, b) {
         (PhpMixed::Array(a), PhpMixed::Array(b)) => {
@@ -60,7 +61,7 @@ fn php_equals(a: &PhpMixed, b: &PhpMixed) -> bool {
 }
 
 #[track_caller]
-fn assert_options_eq(expected: &IndexMap<String, PhpMixed>, actual: &IndexMap<String, PhpMixed>) {
+fn assert_options_eq(expected: &IndexMap<BString, PhpMixed>, actual: &IndexMap<BString, PhpMixed>) {
     let matches = expected.len() == actual.len()
         && expected
             .iter()
@@ -408,9 +409,9 @@ fn test_ensure_thatfix_http_header_field_moves_content_type_to_end_of_options() 
         StreamContextFactory::get_context("http://example.org", options, IndexMap::new()).unwrap();
     let ctxoptions = stream_context_get_options(&context);
     let ctx_header = ctxoptions
-        .get("http")
+        .get(B("http"))
         .and_then(|v| v.as_array())
-        .and_then(|a| a.get("header"))
+        .and_then(|a| a.get(B("header")))
         .and_then(|v| v.as_list())
         .unwrap();
     assert_eq!(expected_header.last().unwrap(), ctx_header.last().unwrap());
@@ -427,13 +428,13 @@ fn test_init_options_does_include_proxy_auth_headers() {
         "http://username:password@proxyserver.net:3128/",
     );
 
-    let options: IndexMap<String, PhpMixed> = IndexMap::new();
+    let options: IndexMap<BString, PhpMixed> = IndexMap::new();
     let options =
         StreamContextFactory::init_options("https://example.org", options, false).unwrap();
     let header_list: Vec<String> = options
-        .get("http")
+        .get(B("http"))
         .and_then(|v| v.as_array())
-        .and_then(|a| a.get("header"))
+        .and_then(|a| a.get(B("header")))
         .and_then(|v| v.as_list())
         .unwrap()
         .iter()
@@ -455,12 +456,12 @@ fn test_init_options_for_curl_does_not_include_proxy_auth_headers() {
         "http://username:password@proxyserver.net:3128/",
     );
 
-    let options: IndexMap<String, PhpMixed> = IndexMap::new();
+    let options: IndexMap<BString, PhpMixed> = IndexMap::new();
     let options = StreamContextFactory::init_options("https://example.org", options, true).unwrap();
     let header_list: Vec<String> = options
-        .get("http")
+        .get(B("http"))
         .and_then(|v| v.as_array())
-        .and_then(|a| a.get("header"))
+        .and_then(|a| a.get(B("header")))
         .and_then(|v| v.as_list())
         .unwrap()
         .iter()

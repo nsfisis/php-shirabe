@@ -6,6 +6,7 @@ use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::{Filesystem, Hg as HgUtils, Url};
+use bstr::BString;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -24,7 +25,7 @@ pub struct HgDriver {
 
 impl HgDriver {
     pub fn new(
-        repo_config: IndexMap<String, PhpMixed>,
+        repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
@@ -349,7 +350,7 @@ impl HgDriver {
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if let Some(cached) = self.inner.read_cached_composer(identifier)? {
             return Ok(cached);
         }
@@ -372,7 +373,7 @@ impl crate::repository::vcs::VcsDriverInterface for HgDriver {
     fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         HgDriver::get_composer_information(self, identifier)
     }
 

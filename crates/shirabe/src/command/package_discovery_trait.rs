@@ -14,7 +14,7 @@ use crate::repository::{
     RepositoryInterface, RepositorySet, SearchResult,
 };
 use crate::util::Filesystem;
-use bstr::ByteSlice;
+use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
@@ -109,7 +109,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             let composer = json_decode_assoc(&contents).unwrap_or(PhpMixed::Null);
             if is_array(&composer)
                 && let Some(arr) = composer.as_array()
-                && let Some(ms) = arr.get("minimum-stability")
+                && let Some(ms) = arr.get(B("minimum-stability"))
                 && let Some(s) = ms.as_string()
             {
                 return VersionParser::normalize_stability(&s.to_str_lossy()).unwrap_or_default();
@@ -219,7 +219,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
         let io = self.get_io();
         loop {
-            let package_input = io.ask("Search for a package: ".to_string(), PhpMixed::Null)?;
+            let package_input = io.ask("Search for a package: ".into(), PhpMixed::Null)?;
             let mut package = match package_input.as_string() {
                 Some(s) => s.to_string(),
                 None => break,
@@ -810,7 +810,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             {
                 let mut platform_pkg_version = platform_pkg.get_pretty_version().to_string();
                 let platform_extra = platform_pkg.get_extra();
-                let has_config_platform = platform_extra.contains_key("config.platform");
+                let has_config_platform = platform_extra.contains_key(B("config.platform"));
                 let is_complete = platform_pkg.as_complete().is_some();
                 if has_config_platform && is_complete {
                     platform_pkg_version = format!(

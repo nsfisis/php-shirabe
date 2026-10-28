@@ -2,6 +2,7 @@
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_mock::{Expectation, get_io_mock};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::TransportException;
@@ -64,41 +65,35 @@ fn test_output_warnings() {
     HttpDownloader::output_warnings(io_dyn.clone(), "$URL", &IndexMap::new()).unwrap();
     assert_eq!("", io.borrow().get_output());
 
-    let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
     data.insert(
-        "warning".to_string(),
+        "warning".into(),
         PhpMixed::string("old warning msg".to_string()),
     );
     data.insert(
-        "warning-versions".to_string(),
+        "warning-versions".into(),
         PhpMixed::string(">=2.0".to_string()),
     );
+    data.insert("info".into(), PhpMixed::string("old info msg".to_string()));
     data.insert(
-        "info".to_string(),
-        PhpMixed::string("old info msg".to_string()),
-    );
-    data.insert(
-        "info-versions".to_string(),
+        "info-versions".into(),
         PhpMixed::string(">=2.0".to_string()),
     );
 
     let mut warning_should_not = IndexMap::new();
     warning_should_not.insert(
-        "message".to_string(),
+        "message".into(),
         PhpMixed::string("should not appear".to_string()),
     );
-    warning_should_not.insert("versions".to_string(), PhpMixed::string("<2.2".to_string()));
+    warning_should_not.insert("versions".into(), PhpMixed::string("<2.2".to_string()));
     let mut warning_visible = IndexMap::new();
     warning_visible.insert(
-        "message".to_string(),
+        "message".into(),
         PhpMixed::string("visible warning".to_string()),
     );
-    warning_visible.insert(
-        "versions".to_string(),
-        PhpMixed::string(">=2.2-dev".to_string()),
-    );
+    warning_visible.insert("versions".into(), PhpMixed::string(">=2.2-dev".to_string()));
     data.insert(
-        "warnings".to_string(),
+        "warnings".into(),
         PhpMixed::List(vec![
             PhpMixed::Array(warning_should_not),
             PhpMixed::Array(warning_visible),
@@ -107,21 +102,18 @@ fn test_output_warnings() {
 
     let mut info_should_not = IndexMap::new();
     info_should_not.insert(
-        "message".to_string(),
+        "message".into(),
         PhpMixed::string("should not appear".to_string()),
     );
-    info_should_not.insert("versions".to_string(), PhpMixed::string("<2.2".to_string()));
+    info_should_not.insert("versions".into(), PhpMixed::string("<2.2".to_string()));
     let mut info_visible = IndexMap::new();
     info_visible.insert(
-        "message".to_string(),
+        "message".into(),
         PhpMixed::string("visible info".to_string()),
     );
-    info_visible.insert(
-        "versions".to_string(),
-        PhpMixed::string(">=2.2-dev".to_string()),
-    );
+    info_visible.insert("versions".into(), PhpMixed::string(">=2.2-dev".to_string()));
     data.insert(
-        "infos".to_string(),
+        "infos".into(),
         PhpMixed::List(vec![
             PhpMixed::Array(info_should_not),
             PhpMixed::Array(info_visible),

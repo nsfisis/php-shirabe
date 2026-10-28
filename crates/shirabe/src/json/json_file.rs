@@ -319,9 +319,9 @@ impl JsonFile {
         // A string-keyed `PhpMixed::Array` serializes as a JSON object, matching the (object) cast.
         let mut schema_data: PhpMixed = {
             let mut m = indexmap::IndexMap::new();
-            m.insert("$ref".to_string(), PhpMixed::string(schema_file.clone()));
+            m.insert("$ref".into(), PhpMixed::string(schema_file.clone()));
             m.insert(
-                "$schema".to_string(),
+                "$schema".into(),
                 PhpMixed::string("https://json-schema.org/draft-04/schema#".to_string()),
             );
             PhpMixed::Array(m)
@@ -330,9 +330,9 @@ impl JsonFile {
         if schema == Self::STRICT_SCHEMA && is_composer_schema_file {
             schema_data = json_decode_obj(Self::COMPOSER_SCHEMA_JSON)?;
             if let PhpMixed::Object(map) = &mut schema_data {
-                map.insert("additionalProperties".to_string(), PhpMixed::Bool(false));
+                map.insert("additionalProperties".into(), PhpMixed::Bool(false));
                 map.insert(
-                    "required".to_string(),
+                    "required".into(),
                     PhpMixed::List(vec![
                         PhpMixed::string("name".to_string()),
                         PhpMixed::string("description".to_string()),
@@ -342,11 +342,11 @@ impl JsonFile {
         } else if schema == Self::AUTH_SCHEMA && is_composer_schema_file {
             let mut m = indexmap::IndexMap::new();
             m.insert(
-                "$ref".to_string(),
+                "$ref".into(),
                 PhpMixed::string(format!("{}#/properties/config", schema_file)),
             );
             m.insert(
-                "$schema".to_string(),
+                "$schema".into(),
                 PhpMixed::string("https://json-schema.org/draft-04/schema#".to_string()),
             );
             schema_data = PhpMixed::Array(m);

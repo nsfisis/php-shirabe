@@ -7,7 +7,7 @@ use crate::package::version::{VersionGuesser, VersionGuesserInterface, VersionPa
 use crate::package::{RootPackage, STABILITIES, SUPPORTED_LINK_TYPES};
 use crate::repository::{RepositoryFactory, RepositoryManager};
 use crate::util::{Platform, ProcessExecutor};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, php_regex,
@@ -53,7 +53,7 @@ impl RootPackageLoader {
 
     pub fn load(
         &mut self,
-        config: IndexMap<String, PhpMixed>,
+        config: IndexMap<BString, PhpMixed>,
         class: &str,
         cwd: Option<&str>,
     ) -> anyhow::Result<crate::package::PackageInterfaceHandle> {
@@ -66,10 +66,10 @@ impl RootPackageLoader {
 
         let mut config = config;
 
-        if !config.contains_key("name") {
-            config.insert("name".to_string(), PhpMixed::string("__root__".to_string()));
+        if !config.contains_key(B("name")) {
+            config.insert("name".into(), PhpMixed::string("__root__".to_string()));
         } else if let Some(err) = ValidatingArrayLoader::has_package_naming_error(
-            &config["name"]
+            &config[B("name")]
                 .as_string()
                 .unwrap_or_default()
                 .to_str_lossy(),
@@ -79,12 +79,12 @@ impl RootPackageLoader {
         }
 
         let mut auto_versioned = false;
-        if !config.contains_key("version") {
+        if !config.contains_key(B("version")) {
             let mut commit: Option<String> = None;
 
             if Platform::get_env("COMPOSER_ROOT_VERSION").is_some() {
                 let version = self.version_guesser.get_root_version_from_env()?;
-                config.insert("version".to_string(), PhpMixed::string(version));
+                config.insert("version".into(), PhpMixed::string(version));
             } else {
                 let cwd_str = cwd
                     .map(|s| s.to_string())
@@ -92,22 +92,22 @@ impl RootPackageLoader {
                 let version_data = self.version_guesser.guess_version(&config, &cwd_str)?;
                 if let Some(data) = version_data {
                     config.insert(
-                        "version".to_string(),
+                        "version".into(),
                         PhpMixed::string(data.pretty_version.clone().unwrap_or_default()),
                     );
                     config.insert(
-                        "version_normalized".to_string(),
+                        "version_normalized".into(),
                         PhpMixed::string(data.version.clone().unwrap_or_default()),
                     );
                     commit = data.commit;
                 }
             }
 
-            if !config.contains_key("version") {
+            if !config.contains_key(B("version")) {
                 if let Some(ref io) = self.io {
-                    let name = config["name"].as_string().unwrap_or_default();
+                    let name = config[B("name")].as_string().unwrap_or_default();
                     let package_type = config
-                        .get("type")
+                        .get(B("type"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default();
                     if name != "__root__" && package_type != "project" {
@@ -117,25 +117,22 @@ impl RootPackageLoader {
                         ), &[]);
                     }
                 }
-                config.insert("version".to_string(), PhpMixed::string("1.0.0".to_string()));
+                config.insert("version".into(), PhpMixed::string("1.0.0".to_string()));
                 auto_versioned = true;
             }
 
             if let Some(commit_hash) = commit {
                 let mut source = IndexMap::new();
-                source.insert("type".to_string(), PhpMixed::string(String::new()));
-                source.insert("url".to_string(), PhpMixed::string(String::new()));
-                source.insert(
-                    "reference".to_string(),
-                    PhpMixed::string(commit_hash.clone()),
-                );
-                config.insert("source".to_string(), PhpMixed::Array(source));
+                source.insert("type".into(), PhpMixed::string(String::new()));
+                source.insert("url".into(), PhpMixed::string(String::new()));
+                source.insert("reference".into(), PhpMixed::string(commit_hash.clone()));
+                config.insert("source".into(), PhpMixed::Array(source));
 
                 let mut dist = IndexMap::new();
-                dist.insert("type".to_string(), PhpMixed::string(String::new()));
-                dist.insert("url".to_string(), PhpMixed::string(String::new()));
-                dist.insert("reference".to_string(), PhpMixed::string(commit_hash));
-                config.insert("dist".to_string(), PhpMixed::Array(dist));
+                dist.insert("type".into(), PhpMixed::string(String::new()));
+                dist.insert("url".into(), PhpMixed::string(String::new()));
+                dist.insert("reference".into(), PhpMixed::string(commit_hash));
+                config.insert("dist".into(), PhpMixed::Array(dist));
             }
         }
 
@@ -159,7 +156,10 @@ impl RootPackageLoader {
             );
         }
 
-        if let Some(min_stability) = config.get("minimum-stability").and_then(|v| v.as_string()) {
+        if let Some(min_stability) = config
+            .get(B("minimum-stability"))
+            .and_then(|v| v.as_string())
+        {
             real_package.set_minimum_stability(
                 VersionParser::normalize_stability(&min_stability.to_str_lossy())
                     .unwrap_or_default(),
@@ -171,7 +171,7 @@ impl RootPackageLoader {
         let mut references: IndexMap<String, String> = IndexMap::new();
 
         for link_type in ["require", "require-dev"] {
-            if config.contains_key(link_type) {
+            if config.contains_key(B(link_type)) {
                 // PHP dynamic dispatch: $realPackage->{'get'.ucfirst($linkInfo['method'])}()
                 let parsed_links = match link_type {
                     "require" => real_package.get_requires(),
@@ -193,7 +193,10 @@ impl RootPackageLoader {
                 );
                 references = Self::extract_references(&links, references);
 
-                let package_name = config["name"].as_string().unwrap_or_default().to_string();
+                let package_name = config[B("name")]
+                    .as_string()
+                    .unwrap_or_default()
+                    .to_string();
                 if links.contains_key(&package_name) {
                     return Err(RuntimeException::new(format!(
                         "Root package '{}' cannot require itself in its composer.json\nDid you accidentally name your root package after an external package?",
@@ -204,12 +207,17 @@ impl RootPackageLoader {
         }
 
         for link_type in SUPPORTED_LINK_TYPES.keys() {
-            if let Some(section) = config.get(*link_type)
+            if let Some(section) = config.get(B(link_type))
                 && let Some(section_map) = section.as_array()
             {
                 for (link_name, _constraint) in section_map {
                     if let Some(err) =
-                        ValidatingArrayLoader::has_package_naming_error(link_name, true)
+                        // TODO(bytes): package names are validated as UTF-8 text, so non-UTF-8
+                        // bytes are replaced.
+                        ValidatingArrayLoader::has_package_naming_error(
+                            &link_name.to_str_lossy(),
+                            true,
+                        )
                     {
                         return Err(RuntimeException::new(format!("{}.{}", link_type, err)).into());
                     }
@@ -221,11 +229,11 @@ impl RootPackageLoader {
         real_package.set_stability_flags(stability_flags);
         real_package.set_references(references);
 
-        if let Some(prefer_stable) = config.get("prefer-stable").and_then(|v| v.as_opt()) {
+        if let Some(prefer_stable) = config.get(B("prefer-stable")).and_then(|v| v.as_opt()) {
             real_package.set_prefer_stable(prefer_stable.to_bool());
         }
 
-        if let Some(pkg_config) = config.get("config").and_then(|v| v.as_array()) {
+        if let Some(pkg_config) = config.get(B("config")).and_then(|v| v.as_array()) {
             real_package.set_config(
                 pkg_config
                     .iter()

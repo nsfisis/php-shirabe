@@ -8,6 +8,7 @@ use crate::repository::{
     CompositeRepository, InstalledRepository, PlatformRepository, RepositoryInterface,
     RepositoryInterfaceHandle, RootPackageRepository,
 };
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_quote, substr};
 
@@ -71,16 +72,16 @@ pub trait CompletionTrait: BaseCommand {
             let mut platform_hint: Vec<String> = vec![];
             if include_platform_packages {
                 let mut platform_repo = if locker.borrow_mut().is_locked() {
-                    let overrides: IndexMap<String, PhpMixed> = locker
+                    let overrides: IndexMap<BString, PhpMixed> = locker
                         .borrow_mut()
                         .get_platform_overrides()?
                         .into_iter()
-                        .map(|(k, v)| (k, PhpMixed::string(v)))
+                        .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                         .collect();
                     PlatformRepository::new(vec![], overrides, None, None)?
                 } else {
                     let platform_cfg = composer.get_config().borrow().get("platform");
-                    let overrides: IndexMap<String, PhpMixed> = platform_cfg
+                    let overrides: IndexMap<BString, PhpMixed> = platform_cfg
                         .as_array()
                         .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                         .unwrap_or_default();
@@ -277,7 +278,7 @@ pub trait CompletionTrait: BaseCommand {
             let composer = this.require_composer(None, None)?;
             let composer = crate::composer::composer_full(&composer);
             let platform_cfg = composer.get_config().borrow().get("platform");
-            let overrides: IndexMap<String, PhpMixed> = platform_cfg
+            let overrides: IndexMap<BString, PhpMixed> = platform_cfg
                 .as_array()
                 .map(|m| m.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
                 .unwrap_or_default();

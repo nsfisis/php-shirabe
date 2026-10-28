@@ -6,6 +6,7 @@ use crate::io::IOInterface;
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::http::Response;
 use crate::util::{Perforce, PerforceInterface, ProcessExecutor};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     BadMethodCallException, PhpMixed, RuntimeException, php_regex, preg_is_match,
@@ -21,7 +22,7 @@ pub struct PerforceDriver {
 
 impl PerforceDriver {
     pub fn new(
-        repo_config: IndexMap<String, PhpMixed>,
+        repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
@@ -39,7 +40,7 @@ impl PerforceDriver {
         self.depot = self
             .inner
             .repo_config
-            .get("depot")
+            .get(B("depot"))
             .and_then(|v| v.as_string())
             .unwrap_or_default()
             .to_string();
@@ -47,7 +48,7 @@ impl PerforceDriver {
         if let Some(branch) = self
             .inner
             .repo_config
-            .get("branch")
+            .get(B("branch"))
             .and_then(|v| v.as_string())
             && !branch.is_empty()
         {
@@ -64,7 +65,7 @@ impl PerforceDriver {
         Ok(())
     }
 
-    fn init_perforce(&mut self, repo_config: &IndexMap<String, PhpMixed>) -> anyhow::Result<()> {
+    fn init_perforce(&mut self, repo_config: &IndexMap<BString, PhpMixed>) -> anyhow::Result<()> {
         if self.perforce.is_some() {
             return Ok(());
         }
@@ -130,27 +131,24 @@ impl PerforceDriver {
         Ok(self.perforce.as_mut().unwrap().get_tags())
     }
 
-    pub fn get_dist(&self, _identifier: &str) -> Option<IndexMap<String, PhpMixed>> {
+    pub fn get_dist(&self, _identifier: &str) -> Option<IndexMap<BString, PhpMixed>> {
         None
     }
 
-    pub fn get_source(&self, identifier: &str) -> IndexMap<String, PhpMixed> {
+    pub fn get_source(&self, identifier: &str) -> IndexMap<BString, PhpMixed> {
         let mut source = IndexMap::new();
-        source.insert("type".to_string(), PhpMixed::string("perforce".to_string()));
+        source.insert("type".into(), PhpMixed::string("perforce".to_string()));
         source.insert(
-            "url".to_string(),
+            "url".into(),
             self.inner
                 .repo_config
-                .get("url")
+                .get(B("url"))
                 .cloned()
                 .unwrap_or(PhpMixed::Null),
         );
+        source.insert("reference".into(), PhpMixed::string(identifier.to_string()));
         source.insert(
-            "reference".to_string(),
-            PhpMixed::string(identifier.to_string()),
-        );
-        source.insert(
-            "p4user".to_string(),
+            "p4user".into(),
             PhpMixed::string(
                 self.perforce
                     .as_ref()
@@ -197,7 +195,7 @@ impl PerforceDriver {
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if let Some(cached) = self.inner.read_cached_composer(identifier)? {
             return Ok(cached);
         }
@@ -234,7 +232,7 @@ impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
     fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         PerforceDriver::get_composer_information(self, identifier)
     }
 
@@ -264,7 +262,13 @@ impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
     fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
         PerforceDriver::get_dist(self, identifier).map(|m| {
             m.into_iter()
-                .map(|(k, v)| (k, v.as_string().unwrap_or_default().to_string()))
+                // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
+                .map(|(k, v)| {
+                    (
+                        k.to_str_lossy().into_owned(),
+                        v.as_string().unwrap_or_default().to_string(),
+                    )
+                })
                 .collect()
         })
     }
@@ -272,7 +276,13 @@ impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
     fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
         PerforceDriver::get_source(self, identifier)
             .into_iter()
-            .map(|(k, v)| (k, v.as_string().unwrap_or_default().to_string()))
+            // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
+            .map(|(k, v)| {
+                (
+                    k.to_str_lossy().into_owned(),
+                    v.as_string().unwrap_or_default().to_string(),
+                )
+            })
             .collect()
     }
 

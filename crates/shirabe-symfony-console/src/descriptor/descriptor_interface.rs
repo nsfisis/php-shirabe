@@ -4,6 +4,7 @@ use crate::application::Application;
 use crate::command::Command;
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -22,6 +23,6 @@ pub trait DescriptorInterface {
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         object: DescribableObject,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()>;
 }

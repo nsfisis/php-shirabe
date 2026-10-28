@@ -2,6 +2,7 @@
 
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
+use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::io::{IOInterface, NullIO};
@@ -17,22 +18,13 @@ const TEST_CLIENT_NAME: &str = "TEST";
 const TEST_PORT: &str = "port";
 const TEST_PATH: &str = "path";
 
-fn get_test_repo_config() -> IndexMap<String, PhpMixed> {
+fn get_test_repo_config() -> IndexMap<BString, PhpMixed> {
     let mut config = IndexMap::new();
+    config.insert("depot".into(), PhpMixed::string(TEST_DEPOT.to_string()));
+    config.insert("branch".into(), PhpMixed::string(TEST_BRANCH.to_string()));
+    config.insert("p4user".into(), PhpMixed::string(TEST_P4USER.to_string()));
     config.insert(
-        "depot".to_string(),
-        PhpMixed::string(TEST_DEPOT.to_string()),
-    );
-    config.insert(
-        "branch".to_string(),
-        PhpMixed::string(TEST_BRANCH.to_string()),
-    );
-    config.insert(
-        "p4user".to_string(),
-        PhpMixed::string(TEST_P4USER.to_string()),
-    );
-    config.insert(
-        "unique_perforce_client_name".to_string(),
+        "unique_perforce_client_name".into(),
         PhpMixed::string(TEST_CLIENT_NAME.to_string()),
     );
     config
@@ -71,24 +63,21 @@ fn create_perforce(
 
 // The expected decoded composer.json, equivalent to PerforceTest::getComposerJson()
 // after json_decode($json, true): an empty `psr-0` object decodes to an empty array.
-fn expected_composer_information() -> IndexMap<String, PhpMixed> {
+fn expected_composer_information() -> IndexMap<BString, PhpMixed> {
     let mut autoload = IndexMap::new();
-    autoload.insert("psr-0".to_string(), PhpMixed::Array(IndexMap::new()));
+    autoload.insert("psr-0".into(), PhpMixed::Array(IndexMap::new()));
 
     let mut expected = IndexMap::new();
+    expected.insert("name".into(), PhpMixed::string("test/perforce".to_string()));
     expected.insert(
-        "name".to_string(),
-        PhpMixed::string("test/perforce".to_string()),
-    );
-    expected.insert(
-        "description".to_string(),
+        "description".into(),
         PhpMixed::string("Basic project for testing".to_string()),
     );
     expected.insert(
-        "minimum-stability".to_string(),
+        "minimum-stability".into(),
         PhpMixed::string("dev".to_string()),
     );
-    expected.insert("autoload".to_string(), PhpMixed::Array(autoload));
+    expected.insert("autoload".into(), PhpMixed::Array(autoload));
     expected
 }
 
@@ -335,11 +324,11 @@ fn test_query_p4_user_escapes_injection_on_unix() {
 #[test]
 fn test_query_p4_password_with_password_already_set() {
     let mut repo_config = IndexMap::new();
-    repo_config.insert("depot".to_string(), PhpMixed::string("depot".to_string()));
-    repo_config.insert("branch".to_string(), PhpMixed::string("branch".to_string()));
-    repo_config.insert("p4user".to_string(), PhpMixed::string("user".to_string()));
+    repo_config.insert("depot".into(), PhpMixed::string("depot".to_string()));
+    repo_config.insert("branch".into(), PhpMixed::string("branch".to_string()));
+    repo_config.insert("p4user".into(), PhpMixed::string("user".to_string()));
     repo_config.insert(
-        "p4password".to_string(),
+        "p4password".into(),
         PhpMixed::string("TEST_PASSWORD".to_string()),
     );
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)));

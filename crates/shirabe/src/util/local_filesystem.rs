@@ -9,6 +9,7 @@ use crate::downloader::{MaxFileSizeExceededException, TransportException};
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::http::ProxyManager;
 use crate::util::{GetResult, Url};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, file_get_contents, file_get_contents_with_max_length,
@@ -48,7 +49,7 @@ impl LocalFilesystem {
         file_url: &str,
         file_name: &str,
         progress: bool,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<GetResult> {
         self.get(origin_url, file_url, options, Some(file_name), progress)
     }
@@ -58,7 +59,7 @@ impl LocalFilesystem {
         origin_url: &str,
         file_url: &str,
         progress: bool,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<GetResult> {
         self.get(origin_url, file_url, options, None, progress)
     }
@@ -67,17 +68,17 @@ impl LocalFilesystem {
         &self,
         origin_url: &str,
         file_url: &str,
-        mut options: IndexMap<String, PhpMixed>,
+        mut options: IndexMap<BString, PhpMixed>,
         file_name: Option<&str>,
         progress: bool,
     ) -> anyhow::Result<GetResult> {
-        options.shift_remove("retry-auth-failure");
-        let is_redirect = options.shift_remove("redirects").is_some();
+        options.shift_remove(B("retry-auth-failure"));
+        let is_redirect = options.shift_remove(B("redirects")).is_some();
 
         let orig_file_url = file_url.to_string();
         let mut file_url = file_url.to_string();
 
-        if options.contains_key("prevent_ip_access_callable") {
+        if options.contains_key(B("prevent_ip_access_callable")) {
             return Err(RuntimeException::new(
                 "RemoteFilesystem doesn't support the 'prevent_ip_access_callable' config."
                     .to_string(),
@@ -85,7 +86,7 @@ impl LocalFilesystem {
             .into());
         }
 
-        if let Some(token) = options.shift_remove("gitlab-token") {
+        if let Some(token) = options.shift_remove(B("gitlab-token")) {
             let separator = if strpos(&file_url, "?").is_none() {
                 "?"
             } else {
@@ -100,7 +101,7 @@ impl LocalFilesystem {
         }
 
         let max_file_size = options
-            .shift_remove("max_file_size")
+            .shift_remove(B("max_file_size"))
             .and_then(|v| v.as_int());
 
         let using_proxy = {

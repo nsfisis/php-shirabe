@@ -454,11 +454,11 @@ impl ClassLoader {
                         .iter()
                         .map(|(k, inner)| {
                             (
-                                k.clone(),
+                                k.as_str().into(),
                                 PhpMixed::Array(
                                     inner
                                         .iter()
-                                        .map(|(k2, n)| (k2.clone(), PhpMixed::Int(*n)))
+                                        .map(|(k2, n)| (k2.as_str().into(), PhpMixed::Int(*n)))
                                         .collect(),
                                 ),
                             )
@@ -471,7 +471,7 @@ impl ClassLoader {
                 PhpMixed::Array(
                     self.prefix_dirs_psr4
                         .iter()
-                        .map(|(k, v)| (k.clone(), str_list(v)))
+                        .map(|(k, v)| (k.as_str().into(), str_list(v)))
                         .collect(),
                 ),
             ),
@@ -483,11 +483,11 @@ impl ClassLoader {
                         .iter()
                         .map(|(k, inner)| {
                             (
-                                k.clone(),
+                                k.as_str().into(),
                                 PhpMixed::Array(
                                     inner
                                         .iter()
-                                        .map(|(k2, v)| (k2.clone(), str_list(v)))
+                                        .map(|(k2, v)| (k2.as_str().into(), str_list(v)))
                                         .collect(),
                                 ),
                             )
@@ -502,7 +502,7 @@ impl ClassLoader {
                 PhpMixed::Array(
                     self.class_map
                         .iter()
-                        .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
+                        .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
                         .collect(),
                 ),
             ),
@@ -515,7 +515,7 @@ impl ClassLoader {
                 PhpMixed::Array(
                     self.missing_classes
                         .iter()
-                        .map(|(k, b)| (k.clone(), PhpMixed::Bool(*b)))
+                        .map(|(k, b)| (k.as_str().into(), PhpMixed::Bool(*b)))
                         .collect(),
                 ),
             ),

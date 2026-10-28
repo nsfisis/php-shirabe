@@ -5,6 +5,7 @@
 // crate cannot compile. The fixtures also build PackageRepository security-advisory data
 // and run the Auditor.
 
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe::advisory::{AuditConfig, Auditor};
 use shirabe::dependency_resolver::SecurityAdvisoryPoolFilter;
@@ -37,18 +38,18 @@ fn test_filter_packages_by_advisories() {
         generate_security_advisory("acme/package", Some("CVE-1999-1000"), ">=1.0.0,<1.1.0");
     let advisory2 =
         generate_security_advisory("acme/package", Some("CVE-1999-1001"), ">=1.0.0,<1.1.0");
-    let mut security_advisories: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut security_advisories: IndexMap<BString, PhpMixed> = IndexMap::new();
     security_advisories.insert(
-        "acme/package".to_string(),
+        "acme/package".into(),
         PhpMixed::List(vec![
             PhpMixed::Array(advisory1.clone()),
             PhpMixed::Array(advisory2.clone()),
         ]),
     );
-    let mut config: IndexMap<String, PhpMixed> = IndexMap::new();
-    config.insert("package".to_string(), PhpMixed::List(vec![]));
+    let mut config: IndexMap<BString, PhpMixed> = IndexMap::new();
+    config.insert("package".into(), PhpMixed::List(vec![]));
     config.insert(
-        "security-advisories".to_string(),
+        "security-advisories".into(),
         PhpMixed::Array(security_advisories),
     );
     let repository = RepositoryInterfaceHandle::new(PackageRepository::new(config));
@@ -108,8 +109,8 @@ fn test_filter_packages_by_advisories() {
     assert!(advisory_map["acme/package"].contains_key("1.0.0.0"));
     assert_eq!(
         vec![
-            advisory1["advisoryId"].as_string().unwrap().to_string(),
-            advisory2["advisoryId"].as_string().unwrap().to_string(),
+            advisory1[B("advisoryId")].as_string().unwrap().to_string(),
+            advisory2[B("advisoryId")].as_string().unwrap().to_string(),
         ],
         filtered_pool.get_security_advisory_identifiers_for_package_version(
             "acme/package",
@@ -138,19 +139,19 @@ fn test_dont_filter_packages_by_ignored_advisories() {
     );
     let filter = SecurityAdvisoryPoolFilter::new(Auditor, audit_config);
 
-    let mut security_advisories: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut security_advisories: IndexMap<BString, PhpMixed> = IndexMap::new();
     security_advisories.insert(
-        "acme/package".to_string(),
+        "acme/package".into(),
         PhpMixed::List(vec![PhpMixed::Array(generate_security_advisory(
             "acme/package",
             Some("CVE-2024-1234"),
             ">=1.0.0,<1.1.0",
         ))]),
     );
-    let mut config: IndexMap<String, PhpMixed> = IndexMap::new();
-    config.insert("package".to_string(), PhpMixed::List(vec![]));
+    let mut config: IndexMap<BString, PhpMixed> = IndexMap::new();
+    config.insert("package".into(), PhpMixed::List(vec![]));
     config.insert(
-        "security-advisories".to_string(),
+        "security-advisories".into(),
         PhpMixed::Array(security_advisories),
     );
     let repository = RepositoryInterfaceHandle::new(PackageRepository::new(config));
@@ -216,19 +217,19 @@ fn test_dont_filter_packages_with_block_insecure_disabled() {
     );
     let filter = SecurityAdvisoryPoolFilter::new(Auditor, audit_config);
 
-    let mut security_advisories: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut security_advisories: IndexMap<BString, PhpMixed> = IndexMap::new();
     security_advisories.insert(
-        "acme/package".to_string(),
+        "acme/package".into(),
         PhpMixed::List(vec![PhpMixed::Array(generate_security_advisory(
             "acme/package",
             Some("CVE-2024-1234"),
             ">=1.0.0,<1.1.0",
         ))]),
     );
-    let mut config: IndexMap<String, PhpMixed> = IndexMap::new();
-    config.insert("package".to_string(), PhpMixed::List(vec![]));
+    let mut config: IndexMap<BString, PhpMixed> = IndexMap::new();
+    config.insert("package".into(), PhpMixed::List(vec![]));
     config.insert(
-        "security-advisories".to_string(),
+        "security-advisories".into(),
         PhpMixed::Array(security_advisories),
     );
     let repository = RepositoryInterfaceHandle::new(PackageRepository::new(config));
@@ -355,52 +356,52 @@ fn generate_security_advisory(
     package_name: &str,
     cve: Option<&str>,
     affected_versions: &str,
-) -> IndexMap<String, PhpMixed> {
-    let mut source: IndexMap<String, PhpMixed> = IndexMap::new();
+) -> IndexMap<BString, PhpMixed> {
+    let mut source: IndexMap<BString, PhpMixed> = IndexMap::new();
     source.insert(
-        "name".to_string(),
+        "name".into(),
         PhpMixed::string("Security Advisory".to_string()),
     );
-    source.insert("remoteId".to_string(), PhpMixed::string("test".to_string()));
+    source.insert("remoteId".into(), PhpMixed::string("test".to_string()));
 
-    let mut advisory: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut advisory: IndexMap<BString, PhpMixed> = IndexMap::new();
     advisory.insert(
-        "advisoryId".to_string(),
+        "advisoryId".into(),
         PhpMixed::string(uniqid("PKSA-", false)),
     );
     advisory.insert(
-        "packageName".to_string(),
+        "packageName".into(),
         PhpMixed::string(package_name.to_string()),
     );
-    advisory.insert("remoteId".to_string(), PhpMixed::string("test".to_string()));
+    advisory.insert("remoteId".into(), PhpMixed::string("test".to_string()));
     advisory.insert(
-        "title".to_string(),
+        "title".into(),
         PhpMixed::string("Security Advisory".to_string()),
     );
-    advisory.insert("link".to_string(), PhpMixed::Null);
+    advisory.insert("link".into(), PhpMixed::Null);
     advisory.insert(
-        "cve".to_string(),
+        "cve".into(),
         match cve {
             Some(cve) => PhpMixed::string(cve.to_string()),
             None => PhpMixed::Null,
         },
     );
     advisory.insert(
-        "affectedVersions".to_string(),
+        "affectedVersions".into(),
         PhpMixed::string(affected_versions.to_string()),
     );
-    advisory.insert("source".to_string(), PhpMixed::string("Tests".to_string()));
+    advisory.insert("source".into(), PhpMixed::string("Tests".to_string()));
     advisory.insert(
-        "reportedAt".to_string(),
+        "reportedAt".into(),
         PhpMixed::string("2024-04-31 12:37:47".to_string()),
     );
     advisory.insert(
-        "composerRepository".to_string(),
+        "composerRepository".into(),
         PhpMixed::string("Package Repository".to_string()),
     );
-    advisory.insert("severity".to_string(), PhpMixed::string("high".to_string()));
+    advisory.insert("severity".into(), PhpMixed::string("high".to_string()));
     advisory.insert(
-        "sources".to_string(),
+        "sources".into(),
         PhpMixed::List(vec![PhpMixed::Array(source)]),
     );
     advisory

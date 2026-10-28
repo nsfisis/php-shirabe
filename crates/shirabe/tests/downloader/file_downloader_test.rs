@@ -3,6 +3,7 @@
 use crate::async_runtime::run;
 use crate::http_downloader_mock::get_http_downloader_mock;
 use crate::io_mock::{Expectation, get_io_mock};
+use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::cache::{Cache, CacheMock};
@@ -29,12 +30,12 @@ fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
 
 /// ref: TestCase::getConfig
 fn get_config(
-    config_options: IndexMap<String, PhpMixed>,
+    config_options: IndexMap<BString, PhpMixed>,
 ) -> std::rc::Rc<std::cell::RefCell<Config>> {
     let mut config = Config::new(false, None);
     if !config_options.is_empty() {
-        let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
-        merged.insert("config".to_string(), PhpMixed::Array(config_options));
+        let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
+        merged.insert("config".into(), PhpMixed::Array(config_options));
         config.merge(&merged, "test");
     }
     std::rc::Rc::new(std::cell::RefCell::new(config))
@@ -120,11 +121,8 @@ fn test_get_file_name() {
     let package = get_package("dummy/pkg", "1.0.0");
     package.set_dist_url(Some("http://example.com/script.js".to_string()));
 
-    let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
-    config_options.insert(
-        "vendor-dir".to_string(),
-        PhpMixed::string("/vendor".to_string()),
-    );
+    let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
+    config_options.insert("vendor-dir".into(), PhpMixed::string("/vendor".to_string()));
     let config = get_config(config_options);
 
     let (downloader, _http_downloader, _guard) = get_downloader(None, Some(config));
@@ -145,9 +143,9 @@ fn test_download_but_file_is_unsaved() {
 
     // The PHP IOMock write callback unlinks the half-written script.js; the Rust mock never writes
     // the destination file in the first place, so a NullIO suffices to reproduce the unsaved-file path.
-    let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(
-        "vendor-dir".to_string(),
+        "vendor-dir".into(),
         PhpMixed::string(tmp_dir.path().join("vendor").to_str().unwrap().to_string()),
     );
     let config = get_config(config_options);
@@ -201,13 +199,13 @@ fn test_download_with_custom_cache_key() {
 fn test_cache_garbage_collection_is_called() {
     let expected_ttl: i64 = 99999999;
 
-    let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(
-        "cache-files-ttl".to_string(),
+        "cache-files-ttl".into(),
         PhpMixed::string("99999999".to_string()),
     );
     config_options.insert(
-        "cache-files-maxsize".to_string(),
+        "cache-files-maxsize".into(),
         PhpMixed::string("500M".to_string()),
     );
     let config = get_config(config_options);
@@ -264,9 +262,9 @@ fn test_download_file_with_invalid_checksum() {
 
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_str().unwrap().to_string();
-    let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(
-        "vendor-dir".to_string(),
+        "vendor-dir".into(),
         PhpMixed::string(tmp_dir.path().join("vendor").to_str().unwrap().to_string()),
     );
     let config = get_config(config_options);
@@ -322,9 +320,9 @@ fn test_downgrade_shows_appropriate_message() {
 
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_str().unwrap().to_string();
-    let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(
-        "vendor-dir".to_string(),
+        "vendor-dir".into(),
         PhpMixed::string(tmp_dir.path().join("vendor").to_str().unwrap().to_string()),
     );
     let config = get_config(config_options);

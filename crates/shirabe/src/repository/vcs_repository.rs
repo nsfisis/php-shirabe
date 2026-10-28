@@ -16,7 +16,7 @@ use crate::repository::{
     RepositoryInterfaceWeakHandle, SearchResult, VersionCacheInterface, VersionCacheResult,
 };
 use crate::util::{HttpDownloader, Platform, ProcessExecutor, Url};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpClass, PhpMixed, php_regex, preg_is_match,
@@ -37,7 +37,7 @@ pub struct VcsRepository {
     version_parser: std::cell::RefCell<Option<VersionParser>>,
     r#type: String,
     loader: std::cell::RefCell<Option<Box<dyn LoaderInterface>>>,
-    repo_config: IndexMap<String, PhpMixed>,
+    repo_config: IndexMap<BString, PhpMixed>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     process_executor: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     branch_error_occurred: std::cell::Cell<bool>,
@@ -54,7 +54,7 @@ pub struct VcsRepository {
 }
 
 impl ConfigurableRepositoryInterface for VcsRepository {
-    fn get_repo_config(&self) -> IndexMap<String, PhpMixed> {
+    fn get_repo_config(&self) -> IndexMap<BString, PhpMixed> {
         self.repo_config.clone()
     }
 }
@@ -62,7 +62,7 @@ impl ConfigurableRepositoryInterface for VcsRepository {
 impl VcsRepository {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
-        mut repo_config: IndexMap<String, PhpMixed>,
+        mut repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
@@ -90,14 +90,14 @@ impl VcsRepository {
 
         let url = Platform::expand_path(
             &repo_config
-                .get("url")
+                .get(B("url"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_str_lossy(),
         );
-        repo_config.insert("url".to_string(), PhpMixed::string(url.clone()));
+        repo_config.insert("url".into(), PhpMixed::string(url.clone()));
         let r#type = repo_config
-            .get("type")
+            .get(B("type"))
             .and_then(|v| v.as_string())
             .unwrap_or("vcs".into())
             .to_string();
@@ -156,7 +156,7 @@ impl VcsRepository {
         )
     }
 
-    pub fn get_repo_config(&self) -> &IndexMap<String, PhpMixed> {
+    pub fn get_repo_config(&self) -> &IndexMap<BString, PhpMixed> {
         &self.repo_config
     }
 
@@ -309,7 +309,7 @@ impl VcsRepository {
                         match composer_information {
                             Ok(Some(data)) => {
                                 *self.package_name.borrow_mut() = data
-                                    .get("name")
+                                    .get(B("name"))
                                     .and_then(|v| v.as_string())
                                     .filter(|s| !s.is_empty())
                                     .map(|s| s.to_str_lossy().into_owned());
@@ -420,48 +420,45 @@ impl VcsRepository {
                 let mut data = data_opt.unwrap();
 
                 // manually versioned package
-                if data.contains_key("version") {
+                if data.contains_key(B("version")) {
                     let normalized = self.version_parser.borrow().as_ref().unwrap().normalize(
                         &data
-                            .get("version")
+                            .get(B("version"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_str_lossy(),
                         None,
                     )?;
-                    data.insert(
-                        "version_normalized".to_string(),
-                        PhpMixed::string(normalized),
-                    );
+                    data.insert("version_normalized".into(), PhpMixed::string(normalized));
                 } else {
                     // auto-versioned package, read value from tag
-                    data.insert("version".to_string(), PhpMixed::string(tag.clone()));
+                    data.insert("version".into(), PhpMixed::string(tag.clone()));
                     data.insert(
-                        "version_normalized".to_string(),
+                        "version_normalized".into(),
                         PhpMixed::string(parsed_tag.clone()),
                     );
                 }
 
                 // make sure tag packages have no -dev flag
                 data.insert(
-                    "version".to_string(),
+                    "version".into(),
                     PhpMixed::string(preg_replace(
                         php_regex!(r"{[.-]?dev$}i"),
                         "",
                         &data
-                            .get("version")
+                            .get(B("version"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_str_lossy(),
                     )),
                 );
                 data.insert(
-                    "version_normalized".to_string(),
+                    "version_normalized".into(),
                     PhpMixed::string(preg_replace(
                         php_regex!(r"{(^dev-|[.-]?dev$)}i"),
                         "",
                         &data
-                            .get("version_normalized")
+                            .get(B("version_normalized"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_str_lossy(),
@@ -469,10 +466,10 @@ impl VcsRepository {
                 );
 
                 // make sure tag do not contain the default-branch marker
-                data.shift_remove("default-branch");
+                data.shift_remove(B("default-branch"));
 
                 let version_normalized = data
-                    .get("version_normalized")
+                    .get(B("version_normalized"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_string();
@@ -501,7 +498,7 @@ impl VcsRepository {
                     .clone()
                     .filter(|s| !s.is_empty())
                     .unwrap_or_else(|| {
-                        data.get("name")
+                        data.get(B("name"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_string()
@@ -698,13 +695,13 @@ impl VcsRepository {
                 let mut data = data_opt.unwrap();
 
                 // branches are always auto-versioned, read value from branch name
-                data.insert("version".to_string(), PhpMixed::string(version.clone()));
+                data.insert("version".into(), PhpMixed::string(version.clone()));
                 data.insert(
-                    "version_normalized".to_string(),
+                    "version_normalized".into(),
                     PhpMixed::string(parsed_branch.clone()),
                 );
 
-                data.shift_remove("default-branch");
+                data.shift_remove(B("default-branch"));
                 if self
                     .driver
                     .borrow_mut()
@@ -713,14 +710,14 @@ impl VcsRepository {
                     .get_root_identifier()?
                     == branch
                 {
-                    data.insert("default-branch".to_string(), PhpMixed::Bool(true));
+                    data.insert("default-branch".into(), PhpMixed::Bool(true));
                 }
 
                 if is_very_verbose {
                     self.io.write_error(&format!(
                         "Importing branch {} ({})",
                         branch,
-                        data.get("version")
+                        data.get(B("version"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                     ));
@@ -807,14 +804,14 @@ impl VcsRepository {
     fn pre_process(
         &self,
         driver: &dyn VcsDriverInterface,
-        mut data: IndexMap<String, PhpMixed>,
+        mut data: IndexMap<BString, PhpMixed>,
         identifier: &str,
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         // keep the name of the main identifier for all packages
         // this ensures that a package can be renamed in one place and that all old tags
         // will still be installable using that new name without requiring re-tagging
         let data_package_name = data
-            .get("name")
+            .get(B("name"))
             .and_then(|v| v.as_string())
             .map(|s| s.to_str_lossy().into_owned());
         let name_value = self
@@ -824,59 +821,59 @@ impl VcsRepository {
             .filter(|s| !s.is_empty())
             .or(data_package_name);
         data.insert(
-            "name".to_string(),
+            "name".into(),
             match name_value {
                 Some(n) => PhpMixed::string(n),
                 None => PhpMixed::Null,
             },
         );
 
-        if !data.contains_key("dist") {
+        if !data.contains_key(B("dist")) {
             let dist = driver.get_dist(identifier);
             data.insert(
-                "dist".to_string(),
+                "dist".into(),
                 match dist {
                     Some(m) => PhpMixed::Array(
                         m.into_iter()
-                            .map(|(k, v)| (k, PhpMixed::string(v)))
+                            .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                             .collect(),
                     ),
                     None => PhpMixed::Null,
                 },
             );
         }
-        if !data.contains_key("source") {
+        if !data.contains_key(B("source")) {
             let source = driver.get_source(identifier);
             data.insert(
-                "source".to_string(),
+                "source".into(),
                 PhpMixed::Array(
                     source
                         .into_iter()
-                        .map(|(k, v)| (k, PhpMixed::string(v)))
+                        .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                         .collect(),
                 ),
             );
         }
 
         // if custom dist info is provided but does not provide a reference, copy the source reference to it
-        let dist_is_array = matches!(data.get("dist"), Some(PhpMixed::Array(_)));
+        let dist_is_array = matches!(data.get(B("dist")), Some(PhpMixed::Array(_)));
         let dist_lacks_reference = data
-            .get("dist")
+            .get(B("dist"))
             .and_then(|v| match v {
-                PhpMixed::Array(m) => Some(!m.contains_key("reference")),
+                PhpMixed::Array(m) => Some(!m.contains_key(B("reference"))),
                 _ => None,
             })
             .unwrap_or(false);
-        let source_reference = data.get("source").and_then(|v| match v {
-            PhpMixed::Array(m) => m.get("reference").cloned(),
+        let source_reference = data.get(B("source")).and_then(|v| match v {
+            PhpMixed::Array(m) => m.get(B("reference")).cloned(),
             _ => None,
         });
         if dist_is_array
             && dist_lacks_reference
             && source_reference.is_some()
-            && let Some(PhpMixed::Array(dist_map)) = data.get_mut("dist")
+            && let Some(PhpMixed::Array(dist_map)) = data.get_mut(B("dist"))
         {
-            dist_map.insert("reference".to_string(), source_reference.unwrap());
+            dist_map.insert("reference".into(), source_reference.unwrap());
         }
 
         Ok(data)
@@ -959,18 +956,18 @@ impl VcsRepository {
                     .overwrite_error4(&msg, false, None, io_interface::NORMAL);
             }
 
-            data.shift_remove("default-branch");
+            data.shift_remove(B("default-branch"));
             if is_default_branch {
-                data.insert("default-branch".to_string(), PhpMixed::Bool(true));
+                data.insert("default-branch".into(), PhpMixed::Bool(true));
             }
 
             let name = data
-                .get("name")
+                .get(B("name"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string();
             let version_normalized = data
-                .get("version_normalized")
+                .get(B("version_normalized"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string();

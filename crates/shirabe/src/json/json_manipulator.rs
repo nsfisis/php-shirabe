@@ -3,6 +3,7 @@
 use crate::json::JsonFile;
 use crate::json::json_grammar::{self, ValueKind};
 use crate::repository::PlatformRepository;
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
@@ -73,10 +74,10 @@ impl JsonManipulator {
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no link of that type yet
-        if decoded.as_array().and_then(|a| a.get(r#type)).is_none() {
-            let mut arr: IndexMap<String, PhpMixed> = IndexMap::new();
+        if decoded.as_array().and_then(|a| a.get(B(r#type))).is_none() {
+            let mut arr: IndexMap<BString, PhpMixed> = IndexMap::new();
             arr.insert(
-                package.to_string(),
+                package.to_string().into(),
                 PhpMixed::string(constraint.to_string()),
             );
             return self.add_main_key(r#type, PhpMixed::Array(arr));
@@ -176,8 +177,10 @@ impl JsonManipulator {
         };
 
         if let Some(arr) = packages.as_array_mut() {
-            uksort(arr, |a: &str, b: &str| -> i64 {
-                strnatcmp(&prefix(a), &prefix(b))
+            // TODO(bytes): package names are compared as UTF-8 text, so non-UTF-8 bytes are
+            // replaced.
+            uksort(arr, |a: &BStr, b: &BStr| -> i64 {
+                strnatcmp(&prefix(&a.to_str_lossy()), &prefix(&b.to_str_lossy()))
             });
         }
     }
@@ -201,8 +204,8 @@ impl JsonManipulator {
             && !name.is_empty()
         {
             // PHP: ['name' => $name] + $config — preserve $config keys
-            let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
-            merged.insert("name".to_string(), PhpMixed::string(name.to_string()));
+            let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
+            merged.insert("name".into(), PhpMixed::string(name.to_string()));
             if let Some(arr) = config.as_array() {
                 for (k, v) in arr {
                     if !merged.contains_key(k) {
@@ -212,8 +215,8 @@ impl JsonManipulator {
             }
             PhpMixed::Array(merged)
         } else if config.as_bool() == Some(false) {
-            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-            m.insert(name.to_string(), PhpMixed::Bool(false));
+            let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
+            m.insert(name.to_string().into(), PhpMixed::Bool(false));
             PhpMixed::Array(m)
         } else {
             config
@@ -227,7 +230,7 @@ impl JsonManipulator {
 
         let repositories_value: Option<PhpMixed> = decoded
             .as_object()
-            .and_then(|o| o.get("repositories").cloned());
+            .and_then(|o| o.get(B("repositories")).cloned());
         let is_std_class = repositories_value
             .as_ref()
             .map(|v| v.as_object().is_some())
@@ -235,14 +238,15 @@ impl JsonManipulator {
 
         if is_std_class {
             // delete from bottom to top, to ensure keys stay the same
-            let repos_arr: IndexMap<String, PhpMixed> = repositories_value
+            let repos_arr: IndexMap<BString, PhpMixed> = repositories_value
                 .as_ref()
                 .and_then(|v| v.as_object().cloned())
                 .unwrap_or_default();
-            let entries_to_revert: Vec<String> = array_reverse(&array_keys(&repos_arr), false);
+            let entries_to_revert: Vec<BString> = array_reverse(&array_keys(&repos_arr), false);
 
             for entry_key in &entries_to_revert {
-                if !self.remove_sub_node("repositories", entry_key)? {
+                // TODO(bytes): node names are Strings, so non-UTF-8 bytes are replaced.
+                if !self.remove_sub_node("repositories", &entry_key.to_str_lossy())? {
                     return Ok(false);
                 }
             }
@@ -253,27 +257,24 @@ impl JsonManipulator {
             for (repository_name, repository) in &repos_arr {
                 let is_obj = repository.as_object().is_some();
                 if !is_obj {
-                    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+                    let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
                     m.insert(repository_name.clone(), repository.clone());
                     if !self.add_list_item("repositories", PhpMixed::Array(m), true)? {
                         return Ok(false);
                     }
-                } else if is_numeric(&PhpMixed::string(repository_name.clone())) {
+                } else if is_numeric(&PhpMixed::String(repository_name.clone())) {
                     if !self.add_list_item("repositories", repository.clone(), true)? {
                         return Ok(false);
                     }
                 } else {
-                    let repo: IndexMap<String, PhpMixed> = repository
+                    let repo: IndexMap<BString, PhpMixed> = repository
                         .as_array()
                         .or_else(|| repository.as_object())
                         .cloned()
                         .unwrap_or_default();
                     // prepend name property
-                    let mut prepended: IndexMap<String, PhpMixed> = IndexMap::new();
-                    prepended.insert(
-                        "name".to_string(),
-                        PhpMixed::string(repository_name.clone()),
-                    );
+                    let mut prepended: IndexMap<BString, PhpMixed> = IndexMap::new();
+                    prepended.insert("name".into(), PhpMixed::String(repository_name.clone()));
                     for (k, v) in &repo {
                         if !prepended.contains_key(k) {
                             prepended.insert(k.clone(), v.clone());
@@ -295,7 +296,7 @@ impl JsonManipulator {
 
         let repos_value = decoded
             .as_array()
-            .and_then(|a| a.get("repositories"))
+            .and_then(|a| a.get(B("repositories")))
             .cloned();
         // A list keeps integer indices (matching PHP's `is_int($index)` branch); an associative
         // "repositories" object keeps string keys.
@@ -313,6 +314,8 @@ impl JsonManipulator {
                     .cloned()
                     .unwrap_or_default()
                     .into_iter()
+                    // TODO(bytes): repository names are Strings, so non-UTF-8 bytes are replaced.
+                    .map(|(k, v)| (k.to_str_lossy().into_owned(), v))
                     .collect()
             };
         for (index, repository) in &repos {
@@ -328,7 +331,7 @@ impl JsonManipulator {
 
             let repo_name = repository
                 .as_array()
-                .and_then(|a| a.get("name"))
+                .and_then(|a| a.get(B("name")))
                 .and_then(|v| v.as_string());
             if Some(name.into()) == repo_name {
                 repository_index = Some(index_value);
@@ -445,14 +448,14 @@ impl JsonManipulator {
 
         let repos = decoded
             .as_array()
-            .and_then(|a| a.get("repositories"))
+            .and_then(|a| a.get(B("repositories")))
             .and_then(|v| v.as_list())
             .cloned()
             .unwrap_or_default();
         for (i, repository) in repos.iter().enumerate() {
             let repo_name = repository
                 .as_array()
-                .and_then(|a| a.get("name"))
+                .and_then(|a| a.get(B("name")))
                 .and_then(|v| v.as_string());
             if Some(reference_name.into()) == repo_name {
                 index_to_insert = Some(i as i64);
@@ -464,7 +467,7 @@ impl JsonManipulator {
             if let Some(arr) = repository.as_array()
                 && arr.len() == 1
                 && arr
-                    .get(reference_name)
+                    .get(B(reference_name))
                     .map(|v| v.as_bool() == Some(false))
                     .unwrap_or(false)
             {
@@ -482,8 +485,8 @@ impl JsonManipulator {
             && !is_numeric(&PhpMixed::string(name.to_string()))
             && !name.is_empty()
         {
-            let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
-            merged.insert("name".to_string(), PhpMixed::string(name.to_string()));
+            let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
+            merged.insert("name".into(), PhpMixed::string(name.to_string()));
             if let Some(arr) = config.as_array() {
                 for (k, v) in arr {
                     if !merged.contains_key(k) {
@@ -493,8 +496,8 @@ impl JsonManipulator {
             }
             PhpMixed::Array(merged)
         } else if config.as_bool() == Some(false) {
-            let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-            m.insert("name".to_string(), PhpMixed::Bool(false));
+            let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
+            m.insert("name".into(), PhpMixed::Bool(false));
             PhpMixed::Array(m)
         } else {
             config
@@ -511,7 +514,7 @@ impl JsonManipulator {
         let decoded = json_decode_obj(&self.contents)?;
         let repositories_value: Option<PhpMixed> = decoded
             .as_object()
-            .and_then(|o| o.get("repositories").cloned());
+            .and_then(|o| o.get(B("repositories")).cloned());
         let is_assoc = repositories_value
             .as_ref()
             .map(|v| v.as_object().is_some())
@@ -521,7 +524,10 @@ impl JsonManipulator {
         // it as (index, repository) pairs.
         let repos: Vec<(String, PhpMixed)> =
             if let Some(o) = repositories_value.as_ref().and_then(|v| v.as_object()) {
-                o.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+                // TODO(bytes): repository names are Strings, so non-UTF-8 bytes are replaced.
+                o.iter()
+                    .map(|(k, v)| (k.to_str_lossy().into_owned(), v.clone()))
+                    .collect()
             } else if let Some(l) = repositories_value.as_ref().and_then(|v| v.as_list()) {
                 l.iter()
                     .enumerate()
@@ -542,7 +548,7 @@ impl JsonManipulator {
 
             let repo_name_owned: Option<String> = repository
                 .as_object()
-                .and_then(|o| o.get("name").cloned())
+                .and_then(|o| o.get(B("name")).cloned())
                 .and_then(|v| v.as_string().map(|s| s.to_string()));
             if Some(name) == repo_name_owned.as_deref() {
                 if is_assoc {
@@ -568,14 +574,14 @@ impl JsonManipulator {
                     return Ok(true);
                 }
             } else {
-                let repository_as_array: IndexMap<String, PhpMixed> = repository
+                let repository_as_array: IndexMap<BString, PhpMixed> = repository
                     .as_array()
                     .or_else(|| repository.as_object())
                     .cloned()
                     .unwrap_or_default();
 
                 if repository_as_array
-                    .get(name)
+                    .get(B(name))
                     .map(|v| v.as_bool() == Some(false))
                     .unwrap_or(false)
                     && 1 == repository_as_array.len()
@@ -670,16 +676,20 @@ impl JsonManipulator {
         }
 
         // no main node yet
-        if decoded.as_array().and_then(|a| a.get(main_node)).is_none() {
+        if decoded
+            .as_array()
+            .and_then(|a| a.get(B(main_node)))
+            .is_none()
+        {
             if let Some(ref sub) = sub_name {
-                let mut inner: IndexMap<String, PhpMixed> = IndexMap::new();
-                inner.insert(sub.clone(), value);
-                let mut outer: IndexMap<String, PhpMixed> = IndexMap::new();
-                outer.insert(name_owned, PhpMixed::Array(inner));
+                let mut inner: IndexMap<BString, PhpMixed> = IndexMap::new();
+                inner.insert(sub.as_str().into(), value);
+                let mut outer: IndexMap<BString, PhpMixed> = IndexMap::new();
+                outer.insert(name_owned.into(), PhpMixed::Array(inner));
                 self.add_main_key(main_node, PhpMixed::Array(outer))?;
             } else {
-                let mut outer: IndexMap<String, PhpMixed> = IndexMap::new();
-                outer.insert(name_owned, value);
+                let mut outer: IndexMap<BString, PhpMixed> = IndexMap::new();
+                outer.insert(name_owned.into(), value);
                 self.add_main_key(main_node, PhpMixed::Array(outer))?;
             }
 
@@ -721,7 +731,7 @@ impl JsonManipulator {
                     cur_val = PhpMixed::Array(IndexMap::new());
                 }
                 if let Some(arr) = cur_val.as_array_mut() {
-                    arr.insert(sub_name, value_local.clone());
+                    arr.insert(sub_name.into(), value_local.clone());
                 }
                 value_local = cur_val;
             }
@@ -751,8 +761,8 @@ impl JsonManipulator {
                 if content_present {
                     let mut value_local = value;
                     if let Some(ref sub) = sub_name {
-                        let mut wrap: IndexMap<String, PhpMixed> = IndexMap::new();
-                        wrap.insert(sub.clone(), value_local.clone());
+                        let mut wrap: IndexMap<BString, PhpMixed> = IndexMap::new();
+                        wrap.insert(sub.as_str().into(), value_local.clone());
                         value_local = PhpMixed::Array(wrap);
                     }
 
@@ -796,8 +806,8 @@ impl JsonManipulator {
                 } else {
                     let mut value_local = value;
                     if let Some(ref sub) = sub_name {
-                        let mut wrap: IndexMap<String, PhpMixed> = IndexMap::new();
-                        wrap.insert(sub.clone(), value_local.clone());
+                        let mut wrap: IndexMap<BString, PhpMixed> = IndexMap::new();
+                        wrap.insert(sub.as_str().into(), value_local.clone());
                         value_local = PhpMixed::Array(wrap);
                     }
 
@@ -830,7 +840,7 @@ impl JsonManipulator {
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no node or empty node
-        let main_node_value = decoded.as_array().and_then(|a| a.get(main_node));
+        let main_node_value = decoded.as_array().and_then(|a| a.get(B(main_node)));
         if main_node_value.map(empty).unwrap_or(true) {
             return Ok(true);
         }
@@ -876,12 +886,12 @@ impl JsonManipulator {
             .and_then(|v| v.as_array())
             .cloned()
             .unwrap_or_default();
-        if !main_arr.contains_key(&name_owned)
+        if !main_arr.contains_key(B(&name_owned))
             || (sub_name.is_some()
                 && !main_arr
-                    .get(&name_owned)
+                    .get(B(&name_owned))
                     .and_then(|v| v.as_array())
-                    .map(|a| a.contains_key(sub_name.as_ref().unwrap()))
+                    .map(|a| a.contains_key(B(sub_name.as_ref().unwrap())))
                     .unwrap_or(false))
         {
             return Ok(true);
@@ -947,21 +957,25 @@ impl JsonManipulator {
             if let Some(sub) = sub_name {
                 let mut cur_val = json_decode_assoc(&children)?;
                 if let Some(arr) = cur_val.as_array_mut() {
-                    if let Some(inner) = arr.get_mut(&name_owned).and_then(|v| v.as_array_mut()) {
-                        inner.shift_remove(&sub);
+                    if let Some(inner) = arr.get_mut(B(&name_owned)).and_then(|v| v.as_array_mut())
+                    {
+                        inner.shift_remove(B(&sub));
                     }
                     let now_empty = arr
-                        .get(&name_owned)
+                        .get(B(&name_owned))
                         .and_then(|v| v.as_array())
                         .map(|a| a.is_empty())
                         .unwrap_or(false);
                     if now_empty {
-                        arr.insert(name_owned.clone(), PhpMixed::Object(IndexMap::new()));
+                        arr.insert(
+                            name_owned.as_str().into(),
+                            PhpMixed::Object(IndexMap::new()),
+                        );
                     }
                 }
                 let val = cur_val
                     .as_array()
-                    .and_then(|a| a.get(&name_owned))
+                    .and_then(|a| a.get(B(&name_owned)))
                     .cloned()
                     .unwrap_or(PhpMixed::Null);
                 self.add_sub_node(main_node, &name_owned, val, true)?;
@@ -976,16 +990,19 @@ impl JsonManipulator {
         if let Some(ref sub) = sub_name {
             let mut cur_val = json_decode_assoc(&children).unwrap_or(PhpMixed::Null);
             if let Some(arr) = cur_val.as_array_mut() {
-                if let Some(inner) = arr.get_mut(&name_owned).and_then(|v| v.as_array_mut()) {
-                    inner.shift_remove(sub);
+                if let Some(inner) = arr.get_mut(B(&name_owned)).and_then(|v| v.as_array_mut()) {
+                    inner.shift_remove(B(sub));
                 }
                 let now_empty = arr
-                    .get(&name_owned)
+                    .get(B(&name_owned))
                     .and_then(|v| v.as_array())
                     .map(|a| a.is_empty())
                     .unwrap_or(false);
                 if now_empty {
-                    arr.insert(name_owned.clone(), PhpMixed::Object(IndexMap::new()));
+                    arr.insert(
+                        name_owned.as_str().into(),
+                        PhpMixed::Object(IndexMap::new()),
+                    );
                 }
             }
             children_final = self.format(&cur_val, 0, true)?;
@@ -1005,7 +1022,10 @@ impl JsonManipulator {
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no main node yet
-        if decoded.as_array().and_then(|a| a.get(main_node)).is_none()
+        if decoded
+            .as_array()
+            .and_then(|a| a.get(B(main_node)))
+            .is_none()
             && !self.add_main_key(main_node, PhpMixed::List(vec![]))?
         {
             return Ok(false);
@@ -1126,7 +1146,10 @@ impl JsonManipulator {
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no main node yet
-        if decoded.as_array().and_then(|a| a.get(main_node)).is_none()
+        if decoded
+            .as_array()
+            .and_then(|a| a.get(B(main_node)))
+            .is_none()
             && !self.add_main_key(main_node, PhpMixed::List(vec![]))?
         {
             return Ok(false);
@@ -1134,7 +1157,7 @@ impl JsonManipulator {
 
         let main_node_count = decoded
             .as_array()
-            .and_then(|a| a.get(main_node))
+            .and_then(|a| a.get(B(main_node)))
             .and_then(|v| v.as_list())
             .map(|l| l.len() as i64)
             .unwrap_or(0);
@@ -1201,7 +1224,7 @@ impl JsonManipulator {
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no node or empty node
-        let main_node_value = decoded.as_array().and_then(|a| a.get(main_node));
+        let main_node_value = decoded.as_array().and_then(|a| a.get(B(main_node)));
         if main_node_value.map(empty).unwrap_or(true) {
             return Ok(true);
         }
@@ -1289,7 +1312,7 @@ impl JsonManipulator {
 
         // key exists already
         let encoded_key = JsonFile::encode(key)?;
-        let key_match = if decoded.as_array().and_then(|a| a.get(key)).is_some() {
+        let key_match = if decoded.as_array().and_then(|a| a.get(B(key))).is_some() {
             json_grammar::find_top_level_key(
                 self.contents.as_bytes(),
                 encoded_key.as_bytes(),
@@ -1361,7 +1384,7 @@ impl JsonManipulator {
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();
 
-        if !array_key_exists(key, &decoded_arr) {
+        if !array_key_exists(B(key), &decoded_arr) {
             return Ok(true);
         }
 
@@ -1414,7 +1437,7 @@ impl JsonManipulator {
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();
 
-        if !array_key_exists(key, &decoded_arr) {
+        if !array_key_exists(B(key), &decoded_arr) {
             return Ok(true);
         }
 
@@ -1449,11 +1472,11 @@ impl JsonManipulator {
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
         let decoded_arr = decoded.as_array().cloned().unwrap_or_default();
 
-        if !array_key_exists(key, &decoded_arr) {
+        if !array_key_exists(B(key), &decoded_arr) {
             return Ok(true);
         }
 
-        let value = decoded_arr.get(key).cloned().unwrap_or(PhpMixed::Null);
+        let value = decoded_arr.get(B(key)).cloned().unwrap_or(PhpMixed::Null);
         // PHP `count($val)` applies to both associative and positional arrays.
         let count = value
             .as_array()
@@ -1507,7 +1530,7 @@ impl JsonManipulator {
                     elems.push(format!(
                         "{}{}: {}",
                         str_repeat(&self.indent, (depth + 2) as usize),
-                        JsonFile::encode(key)?,
+                        JsonFile::encode(&PhpMixed::String(key.clone()))?,
                         self.format(val, depth + 1, false)?
                     ));
                 }
@@ -1683,7 +1706,7 @@ impl ManipulatorFormatter {
                     elems.push(format!(
                         "{}{}: {}",
                         str_repeat(&self.indent, (depth + 2) as usize),
-                        JsonFile::encode(key)?,
+                        JsonFile::encode(&PhpMixed::String(key.clone()))?,
                         self.format(val, depth + 1, false)?
                     ));
                 }

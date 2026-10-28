@@ -5,6 +5,7 @@ use crate::dependency_resolver::{Pool, Request};
 use crate::package::version::VersionParser;
 use crate::package::{BasePackageHandle, Link};
 use crate::repository::{LockArrayRepository, PlatformRepository, RepositorySet};
+use bstr::B;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, extension_loaded, implode, loosely_compare, php_regex,
@@ -1154,8 +1155,8 @@ impl Problem {
             let mut version: String = selected.get_pretty_version();
             let extra = selected.get_extra();
             if selected.as_complete().is_some()
-                && extra.contains_key("config.platform")
-                && extra["config.platform"].as_bool() == Some(true)
+                && extra.contains_key(B("config.platform"))
+                && extra[B("config.platform")].as_bool() == Some(true)
             {
                 let description: String = selected
                     .as_complete()
@@ -1292,8 +1293,8 @@ impl Problem {
             // symlinked path repos cannot be locked so do not suggest keeping it locked
             if next_repo_packages[0].get_dist_type() == Some("path".to_string()) {
                 let transport_options = next_repo_packages[0].get_transport_options();
-                if !transport_options.contains_key("symlink")
-                    || transport_options["symlink"].as_bool() != Some(false)
+                if !transport_options.contains_key(B("symlink"))
+                    || transport_options[B("symlink")].as_bool() != Some(false)
                 {
                     suggestion = format!(
                         "Make sure you fix the {} as packages installed from symlinked path repos are updated even in partial updates and the one from the lock file can thus not be used.",

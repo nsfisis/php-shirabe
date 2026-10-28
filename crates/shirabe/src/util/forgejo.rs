@@ -80,7 +80,7 @@ impl Forgejo {
 
         let username = self
             .io
-            .ask("Username: ".to_string(), PhpMixed::Null)?
+            .ask("Username: ".into(), PhpMixed::Null)?
             .as_string()
             .map(|s| s.to_str_lossy().trim().to_string())
             .unwrap_or_default();
@@ -115,7 +115,7 @@ impl Forgejo {
         match self.http_downloader.borrow_mut().get(
             &format!("https://{}/api/v1/version", origin_url),
             indexmap::indexmap! {
-                "retry-auth-failure".to_string() => false.into(),
+                "retry-auth-failure".into() => false.into(),
             },
         ) {
             Ok(_) => {}
@@ -148,8 +148,8 @@ impl Forgejo {
                 .remove_config_setting(&setting_key)?;
         }
         let value = PhpMixed::Array(indexmap::indexmap! {
-            "username".to_string() => username.into(),
-            "token".to_string() => token.into(),
+            "username".into() => username.into(),
+            "token".into() => token.into(),
         });
         if store_in_local_auth_config && has_local_auth {
             let mut cfg = self.config.borrow_mut();

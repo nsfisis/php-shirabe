@@ -20,7 +20,7 @@ use crate::repository::{
     InstalledRepository, RepositoryInterfaceHandle, RepositoryUtils, RootPackageRepository,
 };
 use crate::util::PackageSorter;
-use bstr::ByteSlice;
+use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PluginValue, call_function_with_dispatcher};
 use shirabe_php_shim::{
@@ -264,7 +264,7 @@ impl PluginManager {
 
         let plugin_optional = package
             .get_extra()
-            .get("plugin-optional")
+            .get(B("plugin-optional"))
             .map(|v| v.as_bool() == Some(true))
             .unwrap_or(false);
         if !self.is_plugin_allowed(&package.get_name(), is_global_plugin, plugin_optional, true)? {
@@ -291,7 +291,7 @@ impl PluginManager {
         }
 
         let extra = package.get_extra();
-        let class_value = extra.get("class");
+        let class_value = extra.get(B("class"));
         // PHP: empty($extra['class']) — true for null, false, 0, "", "0", [], or missing key.
         let class_is_empty = match class_value {
             None => true,
@@ -340,10 +340,10 @@ impl PluginManager {
         // clear files autoload rules from the root package as the root dependencies are not
         // necessarily all present yet when booting this runtime autoloader
         let mut root_package_autoloads = root_package.get_autoload();
-        root_package_autoloads.insert("files".to_string(), PhpMixed::List(vec![]));
+        root_package_autoloads.insert("files".into(), PhpMixed::List(vec![]));
         root_package.set_autoload(root_package_autoloads);
         let mut root_package_autoloads = root_package.get_dev_autoload();
-        root_package_autoloads.insert("files".to_string(), PhpMixed::List(vec![]));
+        root_package_autoloads.insert("files".into(), PhpMixed::List(vec![]));
         root_package.set_dev_autoload(root_package_autoloads);
 
         let root_package_repo =
@@ -404,7 +404,7 @@ impl PluginManager {
         EventDispatcher::ensure_composer_php_runtime(std::path::Path::new(&cache_dir))?;
         EventDispatcher::ensure_script_autoloader()?;
 
-        if let Some(files) = map.get("files").and_then(|v| v.as_array()) {
+        if let Some(files) = map.get(B("files")).and_then(|v| v.as_array()) {
             for (file_identifier, file) in files {
                 // exclude laminas/laminas-zendframework-bridge:src/autoload.php as it breaks Composer in some conditions
                 // see https://github.com/composer/composer/issues/10349 and https://github.com/composer/composer/issues/10401
@@ -415,7 +415,11 @@ impl PluginManager {
                 let file = file.as_string().unwrap_or_else(|| {
                     panic!("autoload files entry `{file_identifier}` is not a string path")
                 });
-                self.php_runtime_composer_require(file_identifier, &file.to_str_lossy())?;
+                // TODO(bytes): file identifiers are Strings, so non-UTF-8 bytes are replaced.
+                self.php_runtime_composer_require(
+                    &file_identifier.to_str_lossy(),
+                    &file.to_str_lossy(),
+                )?;
             }
         }
 
@@ -716,7 +720,7 @@ impl PluginManager {
             Some(sp) => {
                 let plugin_optional = sp
                     .get_extra()
-                    .get("plugin-optional")
+                    .get(B("plugin-optional"))
                     .map(|v| v.as_bool() == Some(true))
                     .unwrap_or(false);
                 if !self.is_plugin_allowed(
@@ -849,7 +853,7 @@ impl PluginManager {
                 let extra = package.get_extra();
                 if package.get_name() == "composer/installers"
                     || extra
-                        .get("plugin-modifies-install-path")
+                        .get(B("plugin-modifies-install-path"))
                         .map(|v| v.as_bool() == Some(true))
                         .unwrap_or(false)
                 {
@@ -997,7 +1001,7 @@ impl PluginManager {
         let capabilities = capable.get_capabilities()?;
 
         // PHP: !empty($capabilities[$capability]) && is_string($capabilities[$capability]) && trim($capabilities[$capability])
-        if let Some(value) = capabilities.get(capability)
+        if let Some(value) = capabilities.get(B(capability))
             && !empty(value)
             && let PhpMixed::String(s) = value
         {
@@ -1011,7 +1015,7 @@ impl PluginManager {
         // PHP: array_key_exists($capability, $capabilities) && (empty(...) || !is_string(...)
         // || !trim(...)). Once the first branch has declined, a present key always fails one
         // of the three disjuncts, so a present key unconditionally throws here.
-        if let Some(value) = capabilities.get(capability) {
+        if let Some(value) = capabilities.get(B(capability)) {
             return Err(UnexpectedValueException::new(format!(
                 "Plugin {} provided invalid capability class name(s), got {}",
                 plugin.get_class_name(),
@@ -1164,7 +1168,9 @@ impl PluginManager {
         if let Some(arr) = allow_plugins_config.as_array() {
             for (pattern, allow) in arr {
                 rules.insert(
-                    base_package::package_name_to_regexp(pattern),
+                    // TODO(bytes): patterns are compiled from UTF-8 text, so non-UTF-8 bytes are
+                    // replaced.
+                    base_package::package_name_to_regexp(&pattern.to_str_lossy()),
                     allow.as_bool().unwrap_or(false),
                 );
             }
@@ -1280,7 +1286,8 @@ impl PluginManager {
                             let allow_plugins_value = config.borrow_mut().get("allow-plugins");
                             if let Some(arr) = allow_plugins_value.as_array() {
                                 let mut allow_plugins = arr.clone();
-                                allow_plugins.insert(package.to_string(), PhpMixed::Bool(allow));
+                                allow_plugins
+                                    .insert(package.to_string().into(), PhpMixed::Bool(allow));
                                 if config
                                     .borrow_mut()
                                     .get("sort-packages")
@@ -1297,12 +1304,10 @@ impl PluginManager {
                                         PhpMixed::Array(allow_plugins.clone()),
                                     )?;
                                 let mut inner = IndexMap::new();
-                                inner.insert(
-                                    "allow-plugins".to_string(),
-                                    PhpMixed::Array(allow_plugins),
-                                );
+                                inner
+                                    .insert("allow-plugins".into(), PhpMixed::Array(allow_plugins));
                                 let mut config_section = IndexMap::new();
-                                config_section.insert("config".to_string(), PhpMixed::Array(inner));
+                                config_section.insert("config".into(), PhpMixed::Array(inner));
                                 config
                                     .borrow_mut()
                                     .merge(&config_section, crate::config::Config::SOURCE_UNKNOWN);

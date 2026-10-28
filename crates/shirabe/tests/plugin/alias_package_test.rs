@@ -5,6 +5,7 @@
 use crate::async_runtime::run;
 use crate::php_worker::{lock_php_worker, php_runtime_available};
 use crate::plugin_installer_test::{new_installer, set_up};
+use bstr::B;
 use shirabe::installer::InstallerInterface;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{
@@ -85,6 +86,6 @@ fn test_alias_packages_cross_the_plugin_boundary() {
     assert_eq!("dev", real_root.get_minimum_stability());
     assert_eq!(
         Some(&PhpMixed::string("alias-v1".to_string())),
-        real_root.get_extra().get("seen-by")
+        real_root.get_extra().get(B("seen-by"))
     );
 }

@@ -9,7 +9,7 @@ use crate::formatter::OutputFormatter;
 use crate::helper::Helper;
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, count, json_encode_ex, php_truthy,
@@ -34,7 +34,7 @@ impl TextDescriptor {
     fn describe_input_argument(
         &mut self,
         argument: &InputArgument,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let default_value = argument.get_default().to_php_mixed();
         let default = if !default_value.is_null()
@@ -49,7 +49,7 @@ impl TextDescriptor {
             String::new()
         };
 
-        let total_width = match options.get("total_width") {
+        let total_width = match options.get(B("total_width")) {
             Some(PhpMixed::Int(w)) => *w,
             _ => Helper::width(argument.get_name()),
         };
@@ -76,7 +76,7 @@ impl TextDescriptor {
     fn describe_input_option(
         &mut self,
         option: &InputOption,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let default_value = option.get_default().to_php_mixed();
         let default = if option.accept_value()
@@ -101,7 +101,7 @@ impl TextDescriptor {
             }
         }
 
-        let total_width = match options.get("total_width") {
+        let total_width = match options.get(B("total_width")) {
             Some(PhpMixed::Int(w)) => *w,
             _ => self.calculate_total_width_for_options(&[option]),
         };
@@ -147,7 +147,7 @@ impl TextDescriptor {
     fn describe_input_definition(
         &mut self,
         definition: &InputDefinition,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let mut total_width = self.calculate_total_width_for_options(
             &definition
@@ -165,7 +165,7 @@ impl TextDescriptor {
             self.write_text("\n", &IndexMap::new());
             for argument in definition.get_arguments().values() {
                 let mut merged = options.clone();
-                merged.insert("total_width".to_string(), PhpMixed::Int(total_width));
+                merged.insert("total_width".into(), PhpMixed::Int(total_width));
                 self.describe_input_argument(argument, merged)?;
                 self.write_text("\n", &IndexMap::new());
             }
@@ -186,13 +186,13 @@ impl TextDescriptor {
                 }
                 self.write_text("\n", &IndexMap::new());
                 let mut merged = options.clone();
-                merged.insert("total_width".to_string(), PhpMixed::Int(total_width));
+                merged.insert("total_width".into(), PhpMixed::Int(total_width));
                 self.describe_input_option(option, merged)?;
             }
             for option in later_options {
                 self.write_text("\n", &IndexMap::new());
                 let mut merged = options.clone();
-                merged.insert("total_width".to_string(), PhpMixed::Int(total_width));
+                merged.insert("total_width".into(), PhpMixed::Int(total_width));
                 self.describe_input_option(option, merged)?;
             }
         }
@@ -202,7 +202,7 @@ impl TextDescriptor {
     fn describe_command(
         &mut self,
         command: &dyn Command,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         command.merge_application_definition(false);
 
@@ -245,16 +245,16 @@ impl TextDescriptor {
     fn describe_application(
         &mut self,
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let described_namespace = match options.get("namespace") {
+        let described_namespace = match options.get(B("namespace")) {
             Some(PhpMixed::String(s)) => Some(s.to_str_lossy().into_owned()),
             _ => None,
         };
         let mut description =
             ApplicationDescription::new(application.clone(), described_namespace.clone(), false);
 
-        if matches!(options.get("raw_text"), Some(v) if php_truthy(v)) {
+        if matches!(options.get(B("raw_text")), Some(v) if php_truthy(v)) {
             let width = self.get_column_width(
                 &description
                     .get_commands()
@@ -304,7 +304,7 @@ impl TextDescriptor {
             if described_namespace.is_some() && !namespaces.is_empty() {
                 // make sure all alias commands are included when describing a specific namespace
                 let described_namespace_info = namespaces.values().next().unwrap();
-                if let Some(PhpMixed::List(names)) = described_namespace_info.get("commands") {
+                if let Some(PhpMixed::List(names)) = described_namespace_info.get(B("commands")) {
                     let names: Vec<String> = names
                         .iter()
                         .filter_map(|n| n.as_string().map(|s| s.to_string()))
@@ -321,7 +321,7 @@ impl TextDescriptor {
                 let command_keys: Vec<String> = commands.keys().cloned().collect();
                 let mut merged: Vec<CommandOrString> = vec![];
                 for namespace in namespaces.values() {
-                    if let Some(PhpMixed::List(ns_commands)) = namespace.get("commands") {
+                    if let Some(PhpMixed::List(ns_commands)) = namespace.get(B("commands")) {
                         for c in ns_commands {
                             if let PhpMixed::String(name) = c
                                 && command_keys.iter().any(|key| name == key)
@@ -349,7 +349,7 @@ impl TextDescriptor {
             }
 
             for namespace in namespaces.values() {
-                let ns_commands: Vec<String> = match namespace.get("commands") {
+                let ns_commands: Vec<String> = match namespace.get(B("commands")) {
                     Some(PhpMixed::List(names)) => names
                         .iter()
                         .filter_map(|n| match n {
@@ -368,7 +368,7 @@ impl TextDescriptor {
                     continue;
                 }
 
-                let namespace_id = match namespace.get("id") {
+                let namespace_id = match namespace.get(B("id")) {
                     Some(PhpMixed::String(s)) => s.to_str_lossy().into_owned(),
                     _ => String::new(),
                 };
@@ -408,14 +408,14 @@ impl TextDescriptor {
         Ok(())
     }
 
-    fn write_text(&self, content: &str, options: &IndexMap<String, PhpMixed>) {
-        let raw_text = matches!(options.get("raw_text"), Some(v) if php_truthy(v));
+    fn write_text(&self, content: &str, options: &IndexMap<BString, PhpMixed>) {
+        let raw_text = matches!(options.get(B("raw_text")), Some(v) if php_truthy(v));
         let content = if raw_text {
             strip_tags(content)
         } else {
             content.to_string()
         };
-        let decorated = match options.get("raw_output") {
+        let decorated = match options.get(B("raw_output")) {
             Some(v) => !php_truthy(v),
             None => true,
         };
@@ -525,7 +525,7 @@ impl DescriptorInterface for TextDescriptor {
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         object: DescribableObject,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         Descriptor::describe(self, output, object, options)
     }
@@ -543,7 +543,7 @@ impl Descriptor for TextDescriptor {
     fn describe_input_argument(
         &mut self,
         argument: &InputArgument,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         TextDescriptor::describe_input_argument(self, argument, options)
     }
@@ -551,7 +551,7 @@ impl Descriptor for TextDescriptor {
     fn describe_input_option(
         &mut self,
         option: &InputOption,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         TextDescriptor::describe_input_option(self, option, options)
     }
@@ -559,7 +559,7 @@ impl Descriptor for TextDescriptor {
     fn describe_input_definition(
         &mut self,
         definition: &InputDefinition,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         TextDescriptor::describe_input_definition(self, definition, options)
     }
@@ -567,7 +567,7 @@ impl Descriptor for TextDescriptor {
     fn describe_command(
         &mut self,
         command: &dyn Command,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         TextDescriptor::describe_command(self, command, options)
     }
@@ -575,7 +575,7 @@ impl Descriptor for TextDescriptor {
     fn describe_application(
         &mut self,
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         TextDescriptor::describe_application(self, application, options)
     }

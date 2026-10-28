@@ -1,8 +1,8 @@
-use crate::{PhpMixed, php_to_string};
-use bstr::ByteSlice;
+use crate::{PhpMixed, canonical_int_key, php_to_string};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 
-pub fn array_values<V: Clone>(array: &IndexMap<String, V>) -> Vec<V> {
+pub fn array_values<K, V: Clone>(array: &IndexMap<K, V>) -> Vec<V> {
     array.values().cloned().collect()
 }
 
@@ -14,7 +14,7 @@ pub fn array_values_mixed(value: &PhpMixed) -> Vec<PhpMixed> {
     }
 }
 
-pub fn array_keys<V>(array: &IndexMap<String, V>) -> Vec<String> {
+pub fn array_keys<K: Clone, V>(array: &IndexMap<K, V>) -> Vec<K> {
     array.keys().cloned().collect()
 }
 
@@ -62,9 +62,9 @@ pub fn array_fill_keys(keys: PhpMixed, value: PhpMixed) -> PhpMixed {
         PhpMixed::Array(map) => map.values().collect(),
         _ => panic!("array_fill_keys(): Argument #1 ($keys) must be of type array"),
     };
-    let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut result: IndexMap<BString, PhpMixed> = IndexMap::new();
     for key in entries {
-        result.insert(php_to_string(key), value.clone());
+        result.insert(php_to_string(key).into(), value.clone());
     }
     PhpMixed::Array(result)
 }
@@ -82,22 +82,20 @@ pub fn array_fill_keys(keys: PhpMixed, value: PhpMixed) -> PhpMixed {
 /// self.version expansion appends links under "0","1",... keys). See the typed
 /// [`array_merge_map`] variant used by such call sites.
 pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
-    let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut result: IndexMap<BString, PhpMixed> = IndexMap::new();
     let mut next_int: i64 = 0;
     for array in [array1, array2] {
         match array {
             PhpMixed::List(items) => {
                 for value in items {
-                    result.insert(next_int.to_string(), value);
+                    result.insert(next_int.to_string().into(), value);
                     next_int += 1;
                 }
             }
             PhpMixed::Array(map) => {
                 for (key, value) in map {
-                    if let Ok(n) = key.parse::<i64>()
-                        && n.to_string() == key
-                    {
-                        result.insert(next_int.to_string(), value);
+                    if canonical_int_key(&key).is_some() {
+                        result.insert(next_int.to_string().into(), value);
                         next_int += 1;
                         continue;
                     }
@@ -107,7 +105,10 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
             _ => panic!("array_merge(): Argument must be of type array"),
         }
     }
-    let is_list = result.keys().enumerate().all(|(i, k)| *k == i.to_string());
+    let is_list = result
+        .keys()
+        .enumerate()
+        .all(|(i, k)| *k == i.to_string().as_bytes());
     if is_list {
         PhpMixed::List(result.into_values().collect())
     } else {
@@ -123,18 +124,16 @@ pub fn array_merge(array1: PhpMixed, array2: PhpMixed) -> PhpMixed {
 /// overwrite in place (later wins), integer-like keys ("0","1",...) are appended
 /// and renumbered sequentially across both inputs. A naive `IndexMap::insert`
 /// per entry is INCORRECT because it would collide on shared integer keys.
-pub fn array_merge_map<V>(
-    array1: IndexMap<String, V>,
-    array2: IndexMap<String, V>,
-) -> IndexMap<String, V> {
-    let mut result: IndexMap<String, V> = IndexMap::new();
+pub fn array_merge_map<K, V>(array1: IndexMap<K, V>, array2: IndexMap<K, V>) -> IndexMap<K, V>
+where
+    K: std::hash::Hash + Eq + AsRef<[u8]> + From<String>,
+{
+    let mut result: IndexMap<K, V> = IndexMap::new();
     let mut next_int: i64 = 0;
     for array in [array1, array2] {
         for (key, value) in array {
-            if let Ok(n) = key.parse::<i64>()
-                && n.to_string() == key
-            {
-                result.insert(next_int.to_string(), value);
+            if canonical_int_key(key.as_ref()).is_some() {
+                result.insert(next_int.to_string().into(), value);
                 next_int += 1;
                 continue;
             }
@@ -166,20 +165,20 @@ pub fn array_unique<T: Clone + PartialEq>(array: &[T]) -> Vec<T> {
 }
 
 pub fn array_intersect_key(
-    array1: &IndexMap<String, PhpMixed>,
-    array2: &IndexMap<String, PhpMixed>,
-) -> IndexMap<String, PhpMixed> {
+    array1: &IndexMap<BString, PhpMixed>,
+    array2: &IndexMap<BString, PhpMixed>,
+) -> IndexMap<BString, PhpMixed> {
     array1
         .iter()
-        .filter(|(k, _)| array2.contains_key(k.as_str()))
+        .filter(|(k, _)| array2.contains_key(B(k)))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect()
 }
 
 pub fn array_replace_recursive(
-    mut base: IndexMap<String, PhpMixed>,
-    replacement: IndexMap<String, PhpMixed>,
-) -> IndexMap<String, PhpMixed> {
+    mut base: IndexMap<BString, PhpMixed>,
+    replacement: IndexMap<BString, PhpMixed>,
+) -> IndexMap<BString, PhpMixed> {
     for (key, replacement_value) in replacement {
         let merged = match base.get(&key) {
             Some(base_value) => {
@@ -207,9 +206,9 @@ fn array_replace_recursive_value(base: PhpMixed, replacement: PhpMixed) -> PhpMi
 }
 
 fn array_replace_recursive_assoc(
-    mut base: IndexMap<String, PhpMixed>,
-    replacement: IndexMap<String, PhpMixed>,
-) -> IndexMap<String, PhpMixed> {
+    mut base: IndexMap<BString, PhpMixed>,
+    replacement: IndexMap<BString, PhpMixed>,
+) -> IndexMap<BString, PhpMixed> {
     for (key, replacement_value) in replacement {
         let merged = match base.get(&key) {
             Some(base_value) => {
@@ -296,9 +295,9 @@ where
 }
 
 pub fn array_filter_map<F>(
-    array: &IndexMap<String, PhpMixed>,
+    array: &IndexMap<BString, PhpMixed>,
     callback: F,
-) -> IndexMap<String, PhpMixed>
+) -> IndexMap<BString, PhpMixed>
 where
     F: Fn(&PhpMixed) -> bool,
 {
@@ -339,18 +338,16 @@ pub fn array_intersect<T: Clone + PartialEq>(array1: &[T], array2: &[T]) -> Vec<
 }
 
 pub fn array_flip(array: &PhpMixed) -> PhpMixed {
-    let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut result: IndexMap<BString, PhpMixed> = IndexMap::new();
     match array {
         PhpMixed::List(items) => {
             for (i, value) in items.iter().enumerate() {
                 match value {
                     PhpMixed::Int(n) => {
-                        result.insert(n.to_string(), PhpMixed::Int(i as i64));
+                        result.insert(n.to_string().into(), PhpMixed::Int(i as i64));
                     }
-                    // TODO(bytes): array keys are Strings, so distinct non-UTF-8 values can
-                    // collapse into the same key.
                     PhpMixed::String(s) => {
-                        result.insert(s.to_str_lossy().into_owned(), PhpMixed::Int(i as i64));
+                        result.insert(s.clone(), PhpMixed::Int(i as i64));
                     }
                     // Non int/string values cannot be array keys and are skipped.
                     _ => {}
@@ -361,11 +358,10 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
             for (key, value) in map {
                 match value {
                     PhpMixed::Int(n) => {
-                        result.insert(n.to_string(), php_key_to_mixed(key));
+                        result.insert(n.to_string().into(), php_key_to_mixed(key));
                     }
-                    // TODO(bytes): same key collapse as the list case above.
                     PhpMixed::String(s) => {
-                        result.insert(s.to_str_lossy().into_owned(), php_key_to_mixed(key));
+                        result.insert(s.clone(), php_key_to_mixed(key));
                     }
                     _ => {}
                 }
@@ -376,15 +372,18 @@ pub fn array_flip(array: &PhpMixed) -> PhpMixed {
     PhpMixed::Array(result)
 }
 
-pub fn array_flip_strings(array: &[String]) -> IndexMap<String, PhpMixed> {
+pub fn array_flip_strings(array: &[String]) -> IndexMap<BString, PhpMixed> {
     array
         .iter()
         .enumerate()
-        .map(|(i, s)| (s.clone(), PhpMixed::Int(i as i64)))
+        .map(|(i, s)| (s.as_str().into(), PhpMixed::Int(i as i64)))
         .collect()
 }
 
-pub fn array_key_exists<V>(key: &str, array: &IndexMap<String, V>) -> bool {
+pub fn array_key_exists<Q, K, V>(key: &Q, array: &IndexMap<K, V>) -> bool
+where
+    Q: ?Sized + std::hash::Hash + indexmap::Equivalent<K>,
+{
     array.contains_key(key)
 }
 
@@ -418,7 +417,7 @@ pub fn array_merge_recursive(arrays: Vec<PhpMixed>) -> PhpMixed {
 #[derive(Clone)]
 enum MergeKey {
     Int(i64),
-    Str(String),
+    Str(BString),
 }
 
 // Split a PHP array value into (key, value) entries. Integer and integer-like
@@ -439,13 +438,11 @@ fn merge_entries(value: PhpMixed) -> Vec<(MergeKey, PhpMixed)> {
     }
 }
 
-fn merge_parse_key(key: String) -> MergeKey {
-    if let Ok(n) = key.parse::<i64>()
-        && n.to_string() == key
-    {
-        return MergeKey::Int(n);
+fn merge_parse_key(key: BString) -> MergeKey {
+    match canonical_int_key(&key) {
+        Some(n) => MergeKey::Int(n),
+        None => MergeKey::Str(key),
     }
-    MergeKey::Str(key)
 }
 
 // Wrap a scalar into a single-element list, mirroring PHP's behaviour of
@@ -507,7 +504,7 @@ fn merge_build(acc: Vec<(MergeKey, PhpMixed)>) -> PhpMixed {
         PhpMixed::Array(
             acc.into_iter()
                 .map(|(k, v)| match k {
-                    MergeKey::Int(n) => (n.to_string(), v),
+                    MergeKey::Int(n) => (n.to_string().into(), v),
                     MergeKey::Str(s) => (s, v),
                 })
                 .collect(),
@@ -515,11 +512,11 @@ fn merge_build(acc: Vec<(MergeKey, PhpMixed)>) -> PhpMixed {
     }
 }
 
-pub fn array_slice<V: Clone>(
-    array: &IndexMap<String, V>,
+pub fn array_slice<K: Clone + std::hash::Hash + Eq, V: Clone>(
+    array: &IndexMap<K, V>,
     offset: i64,
     length: Option<i64>,
-) -> IndexMap<String, V> {
+) -> IndexMap<K, V> {
     let (start, end) = php_slice_bounds(array.len() as i64, offset, length);
     array
         .iter()
@@ -541,24 +538,22 @@ pub fn array_chunk<T: Clone>(array: &[T], size: i64, _preserve_keys: bool) -> Ve
 }
 
 pub fn array_diff_key(
-    array1: IndexMap<String, PhpMixed>,
-    array2: &IndexMap<String, PhpMixed>,
-) -> IndexMap<String, PhpMixed> {
+    array1: IndexMap<BString, PhpMixed>,
+    array2: &IndexMap<BString, PhpMixed>,
+) -> IndexMap<BString, PhpMixed> {
     array1
         .into_iter()
-        .filter(|(k, _)| !array2.contains_key(k.as_str()))
+        .filter(|(k, _)| !array2.contains_key(B(k)))
         .collect()
 }
 
 /// Map a PHP array key (always stored as a `String` here) back to its PHP value
 /// type: an integer-like key becomes an int, anything else stays a string.
-fn php_key_to_mixed(key: &str) -> PhpMixed {
-    if let Ok(n) = key.parse::<i64>()
-        && n.to_string() == key
-    {
-        return PhpMixed::Int(n);
+fn php_key_to_mixed(key: &BString) -> PhpMixed {
+    match canonical_int_key(key) {
+        Some(n) => PhpMixed::Int(n),
+        None => PhpMixed::String(key.clone()),
     }
-    PhpMixed::string(key.to_string())
 }
 
 /// Resolve PHP array_slice/substr-style (offset, length) into a `[start, end)`
@@ -695,34 +690,33 @@ where
     array.sort_by(|a, b| compare(a, b).cmp(&0));
 }
 
-pub fn ksort<V>(array: &mut IndexMap<String, V>) {
-    array.sort_by(|k1, _, k2, _| php_sort_regular_key(k1, k2));
+pub fn ksort<K: AsRef<[u8]>, V>(array: &mut IndexMap<K, V>) {
+    array.sort_by(|k1, _, k2, _| php_sort_regular_key(k1.as_ref(), k2.as_ref()));
 }
 
 // PHP's default SORT_REGULAR comparison for array keys: two integer-like keys
 // compare numerically, otherwise byte-wise as strings.
 // TODO(php-semantics): full SORT_REGULAR semantics for mixed integer/non-numeric-string
 // keys are not reproduced; every current caller uses homogeneous string keys.
-fn php_sort_regular_key(a: &str, b: &str) -> std::cmp::Ordering {
-    if let (Ok(na), Ok(nb)) = (a.parse::<i64>(), b.parse::<i64>())
-        && na.to_string() == a
-        && nb.to_string() == b
-    {
+fn php_sort_regular_key(a: &[u8], b: &[u8]) -> std::cmp::Ordering {
+    if let (Some(na), Some(nb)) = (canonical_int_key(a), canonical_int_key(b)) {
         return na.cmp(&nb);
     }
     a.cmp(b)
 }
 
-pub fn asort<V: Ord>(array: &mut IndexMap<String, V>) {
+pub fn asort<K, V: Ord>(array: &mut IndexMap<K, V>) {
     array.sort_by(|_, v1, _, v2| v1.cmp(v2));
 }
 
-pub fn uksort<V, F>(array: &mut IndexMap<String, V>, callback: F)
+pub fn uksort<K, Q, V, F>(array: &mut IndexMap<K, V>, callback: F)
 where
-    F: FnMut(&str, &str) -> i64,
+    K: AsRef<Q>,
+    Q: ?Sized,
+    F: FnMut(&Q, &Q) -> i64,
 {
     let mut callback = callback;
-    array.sort_by(|k1, _, k2, _| callback(k1, k2).cmp(&0));
+    array.sort_by(|k1, _, k2, _| callback(k1.as_ref(), k2.as_ref()).cmp(&0));
 }
 
 pub fn sort_natural_flag_case(values: &mut [String]) {

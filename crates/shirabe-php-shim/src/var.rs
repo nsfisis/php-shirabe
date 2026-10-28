@@ -1,5 +1,5 @@
 use crate::PhpMixed;
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 
 pub fn empty(value: &PhpMixed) -> bool {
@@ -72,18 +72,18 @@ fn serialize_float(f: f64) -> String {
 /// Returns the integer a PHP array key string normalizes to, or None if the key stays a string.
 /// PHP treats a key as an integer only when it is a canonical decimal integer: no leading `+`, no
 /// redundant leading zeros, and within the platform integer range ("-0" is not canonical).
-pub fn canonical_int_key(key: &str) -> Option<i64> {
-    if key == "0" {
+pub fn canonical_int_key(key: &[u8]) -> Option<i64> {
+    if key == b"0" {
         return Some(0);
     }
-    let digits = key.strip_prefix('-').unwrap_or(key);
-    if digits.is_empty() || digits.starts_with('0') {
+    let digits = key.strip_prefix(b"-").unwrap_or(key);
+    if digits.is_empty() || digits.starts_with(b"0") {
         return None;
     }
-    if !digits.bytes().all(|b| b.is_ascii_digit()) {
+    if !digits.iter().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    key.parse::<i64>().ok()
+    key.to_str().ok()?.parse::<i64>().ok()
 }
 
 pub fn is_bool(value: &PhpMixed) -> bool {
@@ -207,11 +207,11 @@ pub fn get_class(_object: &PhpMixed) -> String {
 
 pub fn get_debug_type(value: &PhpMixed) -> String {
     match value {
-        PhpMixed::Null => "null".to_string(),
-        PhpMixed::Bool(_) => "bool".to_string(),
-        PhpMixed::Int(_) => "int".to_string(),
-        PhpMixed::Float(_) => "float".to_string(),
-        PhpMixed::String(_) => "string".to_string(),
+        PhpMixed::Null => "null".into(),
+        PhpMixed::Bool(_) => "bool".into(),
+        PhpMixed::Int(_) => "int".into(),
+        PhpMixed::Float(_) => "float".into(),
+        PhpMixed::String(_) => "string".into(),
         PhpMixed::List(_) | PhpMixed::Array(_) => "array".to_string(),
         // TODO(php-runtime): PHP returns the object's class name; PhpMixed::Object carries none.
         PhpMixed::Object(_) => todo!(),
@@ -227,7 +227,7 @@ pub fn get_debug_type_obj<T>(_value: &T) -> String {
 pub fn php_to_string(value: &PhpMixed) -> String {
     match value {
         PhpMixed::Null => String::new(),
-        PhpMixed::Bool(true) => "1".to_string(),
+        PhpMixed::Bool(true) => "1".into(),
         PhpMixed::Bool(false) => String::new(),
         PhpMixed::Int(i) => i.to_string(),
         PhpMixed::Float(f) => float_to_string(*f),
@@ -307,7 +307,7 @@ pub fn intval(value: &PhpMixed) -> i64 {
     }
 }
 
-pub fn to_array(value: PhpMixed) -> IndexMap<String, PhpMixed> {
+pub fn to_array(value: PhpMixed) -> IndexMap<BString, PhpMixed> {
     // PHP `(array)` cast: null => empty array; scalar => [0 => value]; list keeps its integer keys;
     // array/object map directly to their entries.
     match value {
@@ -316,11 +316,11 @@ pub fn to_array(value: PhpMixed) -> IndexMap<String, PhpMixed> {
         PhpMixed::List(items) => items
             .into_iter()
             .enumerate()
-            .map(|(i, v)| (i.to_string(), v))
+            .map(|(i, v)| (i.to_string().into(), v))
             .collect(),
         scalar => {
             let mut m = IndexMap::new();
-            m.insert("0".to_string(), scalar);
+            m.insert("0".into(), scalar);
             m
         }
     }
@@ -407,7 +407,8 @@ fn var_export_into(out: &mut String, value: &PhpMixed, level: usize) {
                 var_export_indent(out, level + 1);
                 match canonical_int_key(k) {
                     Some(i) => out.push_str(&i.to_string()),
-                    None => out.push_str(&var_export_string(k)),
+                    // TODO(bytes): the output is a String, so non-UTF-8 bytes are replaced.
+                    None => out.push_str(&var_export_string(&k.to_str_lossy())),
                 }
                 out.push_str(" => ");
                 if matches!(
@@ -432,7 +433,8 @@ fn var_export_into(out: &mut String, value: &PhpMixed, level: usize) {
                 var_export_indent(out, level + 1);
                 // Object property keys are always exported as quoted strings, never as ints.
                 out.push(' ');
-                out.push_str(&var_export_string(k));
+                // TODO(bytes): the output is a String, so non-UTF-8 bytes are replaced.
+                out.push_str(&var_export_string(&k.to_str_lossy()));
                 out.push_str(" => ");
                 if matches!(
                     v,
@@ -638,9 +640,9 @@ mod tests {
             var_export(&PhpMixed::Object(IndexMap::new()), true)
         );
         let obj = PhpMixed::Object(IndexMap::from([
-            ("a".to_string(), PhpMixed::Int(1)),
+            ("a".into(), PhpMixed::Int(1)),
             (
-                "b".to_string(),
+                "b".into(),
                 PhpMixed::List(vec![PhpMixed::Int(1), PhpMixed::Int(2)]),
             ),
         ]));
@@ -649,12 +651,12 @@ mod tests {
             var_export(&obj, true)
         );
         let arr = PhpMixed::Array(IndexMap::from([(
-            "x".to_string(),
+            "x".into(),
             PhpMixed::Object(IndexMap::from([
-                ("a".to_string(), PhpMixed::Int(1)),
+                ("a".into(), PhpMixed::Int(1)),
                 (
-                    "o".to_string(),
-                    PhpMixed::Object(IndexMap::from([("b".to_string(), PhpMixed::Int(2))])),
+                    "o".into(),
+                    PhpMixed::Object(IndexMap::from([("b".into(), PhpMixed::Int(2))])),
                 ),
             ])),
         )]));

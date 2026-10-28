@@ -10,6 +10,7 @@ use crate::package::base_package;
 use crate::package::version::VersionBumper;
 use crate::repository::PlatformRepository;
 use crate::util::Filesystem;
+use bstr::B;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, file_get_contents, file_put_contents, impl_php_class, is_writable,
     php_regex, preg_is_match, preg_replace, strtolower,
@@ -135,7 +136,7 @@ impl BumpCommand {
             let contents_data = composer_json.read()?;
             if !contents_data
                 .as_array()
-                .is_some_and(|m| m.contains_key("type"))
+                .is_some_and(|m| m.contains_key(B("type")))
             {
                 io.write_error3(
                     "<warning>If your package is not a library, you can explicitly specify the \"type\" by using \"shirabe config type project\".</warning>",
@@ -227,10 +228,10 @@ impl BumpCommand {
             for (key, packages) in &updates {
                 for (package, version) in packages {
                     let section = composer_definition
-                        .entry(key.to_string())
+                        .entry(key.to_string().into())
                         .or_insert_with(|| PhpMixed::Array(indexmap::IndexMap::new()));
                     if let PhpMixed::Array(map) = section {
-                        map.insert(package.clone(), PhpMixed::string(version.clone()));
+                        map.insert(package.as_str().into(), PhpMixed::string(version.clone()));
                     }
                 }
             }

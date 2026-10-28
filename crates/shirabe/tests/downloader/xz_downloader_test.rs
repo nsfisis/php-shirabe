@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Downloader/XzDownloaderTest.php
 
 use crate::async_runtime::run;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::DownloaderInterface;
@@ -52,10 +53,10 @@ impl Drop for TearDown {
 }
 
 /// ref: TestCase::getConfig
-fn get_config(config_options: IndexMap<String, PhpMixed>, use_environment: bool) -> Config {
+fn get_config(config_options: IndexMap<BString, PhpMixed>, use_environment: bool) -> Config {
     let mut config = Config::new(use_environment, None);
-    let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
-    merged.insert("config".to_string(), PhpMixed::Array(config_options));
+    let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
+    merged.insert("config".into(), PhpMixed::Array(config_options));
     config.merge(&merged, "test");
     config
 }
@@ -74,9 +75,9 @@ fn test_error_messages() {
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
-    let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(
-        "vendor-dir".to_string(),
+        "vendor-dir".into(),
         PhpMixed::string(test_dir.to_str().unwrap().to_string()),
     );
     let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(config_options, false)));

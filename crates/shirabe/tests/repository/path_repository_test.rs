@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/PathRepositoryTest.php
 
 use crate::test_case::get_package;
+use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -21,7 +22,7 @@ fn fixtures_dir() -> String {
 }
 
 /// ref: PathRepositoryTest::createPathRepo
-fn create_path_repo(options: IndexMap<String, PhpMixed>) -> PathRepository {
+fn create_path_repo(options: IndexMap<BString, PhpMixed>) -> PathRepository {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
 
@@ -41,10 +42,10 @@ fn create_path_repo(options: IndexMap<String, PhpMixed>) -> PathRepository {
     PathRepository::new(options, io, config, None, None, Some(proc)).unwrap()
 }
 
-fn coordinates(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
-    let mut map: IndexMap<String, PhpMixed> = IndexMap::new();
+fn coordinates(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
+    let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (key, value) in pairs {
-        map.insert(key.to_string(), value);
+        map.insert(key.to_string().into(), value);
     }
     map
 }
@@ -136,13 +137,13 @@ fn test_load_package_from_file_system_with_wildcard() {
 
 #[test]
 fn test_load_package_with_explicit_versions() {
-    let mut versions: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut versions: IndexMap<BString, PhpMixed> = IndexMap::new();
     versions.insert(
-        "test/path-unversioned".to_string(),
+        "test/path-unversioned".into(),
         PhpMixed::string("4.3.2.1".to_string()),
     );
     versions.insert(
-        "test/path-versioned".to_string(),
+        "test/path-versioned".into(),
         PhpMixed::string("3.2.1.0".to_string()),
     );
     let options = coordinates(vec![("versions", PhpMixed::Array(versions))]);

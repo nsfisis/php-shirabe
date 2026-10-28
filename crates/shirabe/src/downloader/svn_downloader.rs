@@ -9,7 +9,7 @@ use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil};
-use bstr::ByteSlice;
+use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, preg_is_match,
@@ -160,7 +160,7 @@ impl VcsDownloader for SvnDownloader {
                 let repo_ref = repo.borrow();
                 if let Some(vcs_repo) = repo_ref.as_any().downcast_ref::<VcsRepository>() {
                     let repo_config = vcs_repo.get_repo_config();
-                    if let Some(val) = repo_config.get("svn-cache-credentials") {
+                    if let Some(val) = repo_config.get(B("svn-cache-credentials")) {
                         self.cache_credentials.set(val.to_bool());
                     }
                 }
@@ -303,7 +303,7 @@ impl VcsDownloader for SvnDownloader {
                 .inner
                 .io
                 .ask(
-                    "    <info>Discard changes [y,n,v,?]?</info> ".to_string(),
+                    "    <info>Discard changes [y,n,v,?]?</info> ".into(),
                     PhpMixed::string("?".to_string()),
                 )?
                 .as_string()

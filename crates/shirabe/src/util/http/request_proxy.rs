@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Util/Http/RequestProxy.php
 
 use crate::downloader::TransportException;
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CURLAUTH_BASIC, CURLOPT_NOPROXY, CURLOPT_PROXY, CURLOPT_PROXY_CAINFO, CURLOPT_PROXY_CAPATH,
@@ -8,7 +9,7 @@ use shirabe_php_shim::{
 };
 
 // contextOptions = array{http: array{proxy: string, header?: string, request_fulluri?: bool}}
-type ContextOptions = IndexMap<String, IndexMap<String, PhpMixed>>;
+type ContextOptions = IndexMap<String, IndexMap<BString, PhpMixed>>;
 
 #[derive(Debug)]
 pub struct RequestProxy {
@@ -47,7 +48,7 @@ impl RequestProxy {
 
     pub fn get_curl_options(
         &self,
-        ssl_options: &IndexMap<String, PhpMixed>,
+        ssl_options: &IndexMap<BString, PhpMixed>,
     ) -> Result<IndexMap<i64, PhpMixed>, Box<TransportException>> {
         // PHP guards an HTTPS proxy behind `is_secure() && !supports_secure_proxy()` because
         // libcurl < 7.52.0 cannot speak TLS to a proxy. Shirabe always can (see
@@ -69,10 +70,10 @@ impl RequestProxy {
         }
 
         if self.is_secure() {
-            if let Some(cafile) = ssl_options.get("cafile") {
+            if let Some(cafile) = ssl_options.get(B("cafile")) {
                 options.insert(CURLOPT_PROXY_CAINFO, cafile.clone());
             }
-            if let Some(capath) = ssl_options.get("capath") {
+            if let Some(capath) = ssl_options.get(B("capath")) {
                 options.insert(CURLOPT_PROXY_CAPATH, capath.clone());
             }
         }

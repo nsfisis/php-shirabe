@@ -3,6 +3,7 @@
 use crate::composer::ComposerWeakHandle;
 use crate::event_dispatcher::{Event as BaseEvent, EventInterface};
 use crate::io::IOInterface;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -28,7 +29,7 @@ impl Event {
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         dev_mode: bool,
         args: Vec<String>,
-        flags: IndexMap<String, PhpMixed>,
+        flags: IndexMap<BString, PhpMixed>,
     ) -> Self {
         Self {
             inner: BaseEvent::new(name, args, flags),
@@ -90,7 +91,7 @@ impl EventInterface for Event {
         self.inner.get_arguments()
     }
 
-    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+    fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
         self.inner.get_flags()
     }
 
@@ -126,7 +127,7 @@ impl EventInterface for OriginatingEvent {
         }
     }
 
-    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+    fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
         match self {
             OriginatingEvent::Base(e) => e.get_flags(),
             OriginatingEvent::Script(e) => e.get_flags(),

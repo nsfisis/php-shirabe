@@ -11,7 +11,7 @@ use crate::repository::{
     ProviderInfo, RepositoryInterface, SearchResult, WritableArrayRepository,
 };
 use crate::util::{Filesystem, Platform};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed,
@@ -90,8 +90,8 @@ impl FilesystemRepository {
         let packages: PhpMixed = match (|| -> anyhow::Result<PhpMixed> {
             let data = self.file.read()?;
             let packages_value = if let PhpMixed::Array(ref m) = data {
-                if m.contains_key("packages") {
-                    m.get("packages").unwrap().clone()
+                if m.contains_key(B("packages")) {
+                    m.get(B("packages")).unwrap().clone()
                 } else {
                     data.clone()
                 }
@@ -100,7 +100,7 @@ impl FilesystemRepository {
             };
 
             if let PhpMixed::Array(ref m) = data {
-                if let Some(names) = m.get("dev-package-names") {
+                if let Some(names) = m.get(B("dev-package-names")) {
                     let dev_names: Vec<String> = names
                         .as_list()
                         .map(|l| {
@@ -111,7 +111,7 @@ impl FilesystemRepository {
                         .unwrap_or_default();
                     self.inner.set_dev_package_names(dev_names);
                 }
-                if let Some(dev) = m.get("dev") {
+                if let Some(dev) = m.get(B("dev")) {
                     self.dev_mode.set(dev.as_bool());
                 }
             }
@@ -200,10 +200,10 @@ impl FilesystemRepository {
         dev_mode: bool,
         installation_manager: &dyn InstallationManagerInterface,
     ) -> anyhow::Result<()> {
-        let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
-        data.insert("packages".to_string(), PhpMixed::List(vec![]));
-        data.insert("dev".to_string(), PhpMixed::Bool(dev_mode));
-        data.insert("dev-package-names".to_string(), PhpMixed::List(vec![]));
+        let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
+        data.insert("packages".into(), PhpMixed::List(vec![]));
+        data.insert("dev".into(), PhpMixed::Bool(dev_mode));
+        data.insert("dev-package-names".into(), PhpMixed::List(vec![]));
 
         let dumper = ArrayDumper::new();
 
@@ -251,13 +251,13 @@ impl FilesystemRepository {
             install_paths.insert(package.get_name().to_string(), install_path.clone());
 
             pkg_array.insert(
-                "install-path".to_string(),
+                "install-path".into(),
                 match install_path {
                     Some(s) => PhpMixed::string(s),
                     None => PhpMixed::Null,
                 },
             );
-            if let Some(PhpMixed::List(list)) = data.get_mut("packages") {
+            if let Some(PhpMixed::List(list)) = data.get_mut(B("packages")) {
                 list.push(PhpMixed::Array(pkg_array.into_iter().collect()));
             }
 
@@ -272,14 +272,14 @@ impl FilesystemRepository {
                     .iter()
                     .map(|s| PhpMixed::string(s.clone()))
                     .collect::<Vec<_>>(),
-            ) && let Some(PhpMixed::List(list)) = data.get_mut("dev-package-names")
+            ) && let Some(PhpMixed::List(list)) = data.get_mut(B("dev-package-names"))
             {
                 list.push(PhpMixed::string(package.get_name().to_string()));
             }
         }
 
         // PHP: sort($data['dev-package-names']);
-        if let Some(PhpMixed::List(list)) = data.get_mut("dev-package-names") {
+        if let Some(PhpMixed::List(list)) = data.get_mut(B("dev-package-names")) {
             usort(list, |a: &PhpMixed, b: &PhpMixed| -> i64 {
                 strcmp(
                     &a.as_string().unwrap_or_default().to_str_lossy(),
@@ -288,16 +288,16 @@ impl FilesystemRepository {
             });
         }
         // PHP: usort($data['packages'], static function ($a, $b): int { return strcmp($a['name'], $b['name']); });
-        if let Some(PhpMixed::List(list)) = data.get_mut("packages") {
+        if let Some(PhpMixed::List(list)) = data.get_mut(B("packages")) {
             usort(list, |a: &PhpMixed, b: &PhpMixed| -> i64 {
                 let a_name = a
                     .as_array()
-                    .and_then(|m| m.get("name"))
+                    .and_then(|m| m.get(B("name")))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default();
                 let b_name = b
                     .as_array()
-                    .and_then(|m| m.get("name"))
+                    .and_then(|m| m.get(B("name")))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default();
                 strcmp(&a_name.to_str_lossy(), &b_name.to_str_lossy())
@@ -352,7 +352,7 @@ impl FilesystemRepository {
         true
     }
 
-    fn dump_to_php_code(&self, array: &IndexMap<String, PhpMixed>, level: i64) -> String {
+    fn dump_to_php_code(&self, array: &IndexMap<BString, PhpMixed>, level: i64) -> String {
         let mut lines = String::from("array(\n");
         let level = level + 1;
 
@@ -361,13 +361,13 @@ impl FilesystemRepository {
             lines.push_str(&if is_php_integer_key(key) {
                 format!("{} => ", key)
             } else {
-                format!("{} => ", var_export(&PhpMixed::string(key.clone()), true))
+                format!("{} => ", var_export(&PhpMixed::String(key.clone()), true))
             });
 
             if is_array(value) {
                 if let Some(inner_arr) = value.as_array() {
                     if !inner_arr.is_empty() {
-                        let inner_map: IndexMap<String, PhpMixed> = inner_arr
+                        let inner_map: IndexMap<BString, PhpMixed> = inner_arr
                             .iter()
                             .map(|(k, v)| (k.clone(), v.clone()))
                             .collect();
@@ -377,10 +377,10 @@ impl FilesystemRepository {
                     }
                 } else if let Some(list) = value.as_list() {
                     if !list.is_empty() {
-                        let inner_map: IndexMap<String, PhpMixed> = list
+                        let inner_map: IndexMap<BString, PhpMixed> = list
                             .iter()
                             .enumerate()
-                            .map(|(i, v)| (i.to_string(), v.clone()))
+                            .map(|(i, v)| (i.to_string().into(), v.clone()))
                             .collect();
                         lines.push_str(&self.dump_to_php_code(&inner_map, level));
                     } else {
@@ -424,7 +424,7 @@ impl FilesystemRepository {
         install_paths: &IndexMap<String, Option<String>>,
         dev_mode: bool,
         repo_dir: &str,
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let dev_packages = array_flip(&PhpMixed::List(
             self.inner
                 .dev_package_names
@@ -454,9 +454,9 @@ impl FilesystemRepository {
             current_root = root_alias.get_alias_of().into();
             packages.push(current_root.clone().into());
         }
-        let mut versions: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut versions: IndexMap<BString, PhpMixed> = IndexMap::new();
         versions.insert(
-            "root".to_string(),
+            "root".into(),
             PhpMixed::Array(
                 self.dump_root_package(
                     current_root,
@@ -469,7 +469,7 @@ impl FilesystemRepository {
                 .collect(),
             ),
         );
-        versions.insert("versions".to_string(), PhpMixed::Array(IndexMap::new()));
+        versions.insert("versions".into(), PhpMixed::Array(IndexMap::new()));
 
         // add real installed packages
         for package in &packages {
@@ -483,9 +483,9 @@ impl FilesystemRepository {
                 repo_dir,
                 &dev_packages,
             )?;
-            if let Some(PhpMixed::Array(versions_map)) = versions.get_mut("versions") {
+            if let Some(PhpMixed::Array(versions_map)) = versions.get_mut(B("versions")) {
                 versions_map.insert(
-                    package.get_name().to_string(),
+                    package.get_name().to_string().into(),
                     PhpMixed::Array(dumped.into_iter().collect()),
                 );
             }
@@ -495,7 +495,7 @@ impl FilesystemRepository {
         for package in &packages {
             let is_dev_package = dev_packages
                 .as_array()
-                .map(|m| m.contains_key(&package.get_name()))
+                .map(|m| m.contains_key(B(&package.get_name())))
                 .unwrap_or(false);
             for (_, replace) in package.get_replaces().iter() {
                 // exclude platform replaces as when they are really there we can not check for their presence
@@ -545,22 +545,22 @@ impl FilesystemRepository {
                 pretty.clone(),
             );
             if package.as_root().is_some()
-                && let Some(PhpMixed::Array(root_map)) = versions.get_mut("root")
+                && let Some(PhpMixed::Array(root_map)) = versions.get_mut(B("root"))
             {
                 push_to_list(root_map, "aliases", pretty);
             }
         }
 
-        if let Some(PhpMixed::Array(versions_map)) = versions.get_mut("versions") {
+        if let Some(PhpMixed::Array(versions_map)) = versions.get_mut(B("versions")) {
             ksort(versions_map);
         }
         ksort(&mut versions);
 
-        if let Some(PhpMixed::Array(versions_map)) = versions.get_mut("versions") {
+        if let Some(PhpMixed::Array(versions_map)) = versions.get_mut(B("versions")) {
             for (_name, version) in versions_map.iter_mut() {
                 if let PhpMixed::Array(version_map) = version {
                     for key in ["aliases", "replaced", "provided"] {
-                        if let Some(entry) = version_map.get_mut(key)
+                        if let Some(entry) = version_map.get_mut(B(key))
                             && let PhpMixed::List(list) = entry
                         {
                             // PHP: sort($versions['versions'][$name][$key], SORT_NATURAL);
@@ -585,7 +585,7 @@ impl FilesystemRepository {
         install_paths: &IndexMap<String, Option<String>>,
         repo_dir: &str,
         dev_packages: &PhpMixed,
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let mut reference: Option<String> = None;
         if let Some(install_src) = package.get_installation_source() {
             reference = if install_src == "source" {
@@ -619,37 +619,34 @@ impl FilesystemRepository {
             install_paths.get(&package.get_name()).cloned().flatten()
         };
 
-        let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
         data.insert(
-            "pretty_version".to_string(),
+            "pretty_version".into(),
             PhpMixed::string(package.get_pretty_version()),
         );
+        data.insert("version".into(), PhpMixed::string(package.get_version()));
         data.insert(
-            "version".to_string(),
-            PhpMixed::string(package.get_version()),
-        );
-        data.insert(
-            "reference".to_string(),
+            "reference".into(),
             match reference {
                 Some(s) => PhpMixed::string(s),
                 None => PhpMixed::Null,
             },
         );
-        data.insert("type".to_string(), PhpMixed::string(package.get_type()));
+        data.insert("type".into(), PhpMixed::string(package.get_type()));
         data.insert(
-            "install_path".to_string(),
+            "install_path".into(),
             match install_path {
                 Some(s) => PhpMixed::string(s),
                 None => PhpMixed::Null,
             },
         );
-        data.insert("aliases".to_string(), PhpMixed::List(vec![]));
+        data.insert("aliases".into(), PhpMixed::List(vec![]));
         data.insert(
-            "dev_requirement".to_string(),
+            "dev_requirement".into(),
             PhpMixed::Bool(
                 dev_packages
                     .as_array()
-                    .map(|m| m.contains_key(&package.get_name()))
+                    .map(|m| m.contains_key(B(&package.get_name())))
                     .unwrap_or(false),
             ),
         );
@@ -664,7 +661,7 @@ impl FilesystemRepository {
         dev_mode: bool,
         repo_dir: &str,
         dev_packages: &PhpMixed,
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let data = self.dump_installed_package(
             package.clone().into(),
             install_paths,
@@ -672,37 +669,39 @@ impl FilesystemRepository {
             dev_packages,
         )?;
 
-        let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
-        result.insert("name".to_string(), PhpMixed::string(package.get_name()));
+        let mut result: IndexMap<BString, PhpMixed> = IndexMap::new();
+        result.insert("name".into(), PhpMixed::string(package.get_name()));
         result.insert(
-            "pretty_version".to_string(),
-            data.get("pretty_version")
+            "pretty_version".into(),
+            data.get(B("pretty_version"))
                 .cloned()
                 .unwrap_or(PhpMixed::Null),
         );
         result.insert(
-            "version".to_string(),
-            data.get("version").cloned().unwrap_or(PhpMixed::Null),
+            "version".into(),
+            data.get(B("version")).cloned().unwrap_or(PhpMixed::Null),
         );
         result.insert(
-            "reference".to_string(),
-            data.get("reference").cloned().unwrap_or(PhpMixed::Null),
+            "reference".into(),
+            data.get(B("reference")).cloned().unwrap_or(PhpMixed::Null),
         );
         result.insert(
-            "type".to_string(),
-            data.get("type").cloned().unwrap_or(PhpMixed::Null),
+            "type".into(),
+            data.get(B("type")).cloned().unwrap_or(PhpMixed::Null),
         );
         result.insert(
-            "install_path".to_string(),
-            data.get("install_path").cloned().unwrap_or(PhpMixed::Null),
+            "install_path".into(),
+            data.get(B("install_path"))
+                .cloned()
+                .unwrap_or(PhpMixed::Null),
         );
         result.insert(
-            "aliases".to_string(),
-            data.get("aliases")
+            "aliases".into(),
+            data.get(B("aliases"))
                 .cloned()
                 .unwrap_or(PhpMixed::List(vec![])),
         );
-        result.insert("dev".to_string(), PhpMixed::Bool(dev_mode));
+        result.insert("dev".into(), PhpMixed::Bool(dev_mode));
 
         Ok(result)
     }
@@ -792,15 +791,15 @@ impl RepositoryInterface for FilesystemRepository {
 }
 
 fn versions_entry<'a>(
-    versions: &'a mut IndexMap<String, PhpMixed>,
+    versions: &'a mut IndexMap<BString, PhpMixed>,
     target: &str,
-) -> &'a mut IndexMap<String, PhpMixed> {
-    let versions_map = match versions.get_mut("versions") {
+) -> &'a mut IndexMap<BString, PhpMixed> {
+    let versions_map = match versions.get_mut(B("versions")) {
         Some(PhpMixed::Array(m)) => m,
         _ => unreachable!("versions['versions'] is always an array"),
     };
     match versions_map
-        .entry(target.to_string())
+        .entry(target.to_string().into())
         .or_insert_with(|| PhpMixed::Array(IndexMap::new()))
     {
         PhpMixed::Array(m) => m,
@@ -808,9 +807,9 @@ fn versions_entry<'a>(
     }
 }
 
-fn push_to_list(entry: &mut IndexMap<String, PhpMixed>, key: &str, value: String) {
+fn push_to_list(entry: &mut IndexMap<BString, PhpMixed>, key: &str, value: String) {
     if let PhpMixed::List(list) = entry
-        .entry(key.to_string())
+        .entry(key.to_string().into())
         .or_insert_with(|| PhpMixed::List(vec![]))
     {
         list.push(PhpMixed::string(value));
@@ -818,22 +817,19 @@ fn push_to_list(entry: &mut IndexMap<String, PhpMixed>, key: &str, value: String
 }
 
 fn record_replace_or_provide(
-    versions: &mut IndexMap<String, PhpMixed>,
+    versions: &mut IndexMap<BString, PhpMixed>,
     target: &str,
     key: &str,
     value: String,
     is_dev_package: bool,
 ) {
     let entry = versions_entry(versions, target);
-    if !entry.contains_key("dev_requirement") {
-        entry.insert(
-            "dev_requirement".to_string(),
-            PhpMixed::Bool(is_dev_package),
-        );
+    if !entry.contains_key(B("dev_requirement")) {
+        entry.insert("dev_requirement".into(), PhpMixed::Bool(is_dev_package));
     } else if !is_dev_package {
-        entry.insert("dev_requirement".to_string(), PhpMixed::Bool(false));
+        entry.insert("dev_requirement".into(), PhpMixed::Bool(false));
     }
-    let already_present = match entry.get(key) {
+    let already_present = match entry.get(B(key)) {
         Some(b) => matches!(
             b,
             PhpMixed::List(list) if list.iter().any(|v| v.as_string() == Some(value.as_str().into()))

@@ -17,6 +17,7 @@ use crate::plugin::{
     FileDownloadContext, PluginEvents, PostFileDownloadEvent, PreFileDownloadEvent,
 };
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor, Url as UrlUtil};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed,
@@ -27,7 +28,7 @@ use shirabe_php_shim::{
 };
 use std::sync::{LazyLock, Mutex};
 
-pub static DOWNLOAD_METADATA: LazyLock<Mutex<IndexMap<String, PhpMixed>>> =
+pub static DOWNLOAD_METADATA: LazyLock<Mutex<IndexMap<BString, PhpMixed>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 /// Collects response headers when running on GH Actions
@@ -55,7 +56,7 @@ impl FileDownloader {
         DOWNLOAD_METADATA.lock().unwrap().clear();
     }
 
-    pub fn download_metadata() -> IndexMap<String, PhpMixed> {
+    pub fn download_metadata() -> IndexMap<BString, PhpMixed> {
         DOWNLOAD_METADATA.lock().unwrap().clone()
     }
 
@@ -512,7 +513,7 @@ impl DownloaderInterface for FileDownloader {
                         DOWNLOAD_METADATA
                             .lock()
                             .unwrap()
-                            .insert(package.get_name(), file_size);
+                            .insert(package.get_name().into(), file_size);
 
                         if Platform::get_env("GITHUB_ACTIONS").is_some()
                             && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()

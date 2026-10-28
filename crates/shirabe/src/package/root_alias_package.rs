@@ -5,6 +5,7 @@ use crate::package::{
     CompleteAliasPackage, CompletePackageHandle, CompletePackageInterface, Link, RootPackageHandle,
     RootPackageInterface,
 };
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -71,7 +72,7 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.get_prefer_stable()
     }
 
-    fn get_config(&self) -> IndexMap<String, PhpMixed> {
+    fn get_config(&self) -> IndexMap<BString, PhpMixed> {
         self.alias_of.get_config()
     }
 
@@ -122,11 +123,11 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.set_replaces(replaces);
     }
 
-    fn set_autoload(&mut self, autoload: IndexMap<String, PhpMixed>) {
+    fn set_autoload(&mut self, autoload: IndexMap<BString, PhpMixed>) {
         self.alias_of.set_autoload(autoload);
     }
 
-    fn set_dev_autoload(&mut self, dev_autoload: IndexMap<String, PhpMixed>) {
+    fn set_dev_autoload(&mut self, dev_autoload: IndexMap<BString, PhpMixed>) {
         self.alias_of.set_dev_autoload(dev_autoload);
     }
 
@@ -142,7 +143,7 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.set_prefer_stable(prefer_stable);
     }
 
-    fn set_config(&mut self, config: IndexMap<String, PhpMixed>) {
+    fn set_config(&mut self, config: IndexMap<BString, PhpMixed>) {
         self.alias_of.set_config(config);
     }
 
@@ -158,7 +159,7 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.set_suggests(suggests);
     }
 
-    fn set_extra(&mut self, extra: IndexMap<String, PhpMixed>) {
+    fn set_extra(&mut self, extra: IndexMap<BString, PhpMixed>) {
         self.alias_of.set_extra(extra);
     }
 
@@ -176,11 +177,11 @@ impl CompletePackageInterface for RootAliasPackage {
         self.inner.set_scripts(scripts);
     }
 
-    fn get_repositories(&self) -> IndexMap<String, PhpMixed> {
+    fn get_repositories(&self) -> IndexMap<BString, PhpMixed> {
         self.inner.get_repositories()
     }
 
-    fn set_repositories(&mut self, repositories: IndexMap<String, PhpMixed>) {
+    fn set_repositories(&mut self, repositories: IndexMap<BString, PhpMixed>) {
         self.inner.set_repositories(repositories);
     }
 
@@ -232,11 +233,11 @@ impl CompletePackageInterface for RootAliasPackage {
         self.inner.set_support(support);
     }
 
-    fn get_funding(&self) -> Vec<IndexMap<String, PhpMixed>> {
+    fn get_funding(&self) -> Vec<IndexMap<BString, PhpMixed>> {
         self.inner.get_funding()
     }
 
-    fn set_funding(&mut self, funding: Vec<IndexMap<String, PhpMixed>>) {
+    fn set_funding(&mut self, funding: Vec<IndexMap<BString, PhpMixed>>) {
         self.inner.set_funding(funding);
     }
 

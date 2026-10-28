@@ -161,11 +161,11 @@ impl UpdateCommand {
         }
 
         let select_result = io.select(
-            "Select packages: (Select more than one value separated by comma) ".to_string(),
+            "Select packages: (Select more than one value separated by comma) ".into(),
             PhpMixed::Array(
                 autocompleter_values
                     .iter()
-                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
+                    .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
                     .collect(),
             ),
             PhpMixed::Bool(false),

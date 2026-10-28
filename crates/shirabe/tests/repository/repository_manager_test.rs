@@ -4,6 +4,7 @@
 // curl_multi_init, todo!()) with a mocked IO/Config/EventDispatcher and exercise repo
 // creation/prepending/wrapping.
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -64,10 +65,10 @@ fn http_downloader(
     )))
 }
 
-fn str_config(pairs: &[(&str, PhpMixed)]) -> IndexMap<String, PhpMixed> {
-    let mut c: IndexMap<String, PhpMixed> = IndexMap::new();
+fn str_config(pairs: &[(&str, PhpMixed)]) -> IndexMap<BString, PhpMixed> {
+    let mut c: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in pairs {
-        c.insert(k.to_string(), v.clone());
+        c.insert(k.to_string().into(), v.clone());
     }
     c
 }
@@ -120,7 +121,7 @@ fn test_repo_creation() {
     rm.set_repository_class("hg", "Composer\\Repository\\VcsRepository");
     rm.set_repository_class("artifact", "Composer\\Repository\\ArtifactRepository");
 
-    let cases: Vec<(&str, IndexMap<String, PhpMixed>)> = vec![
+    let cases: Vec<(&str, IndexMap<BString, PhpMixed>)> = vec![
         (
             "composer",
             str_config(&[("url", PhpMixed::string("http://example.org".to_string()))]),
@@ -194,7 +195,7 @@ fn test_invalid_repo_creation_throws() {
         "unknown",
     );
 
-    let cases: Vec<(&str, IndexMap<String, PhpMixed>)> = vec![
+    let cases: Vec<(&str, IndexMap<BString, PhpMixed>)> = vec![
         (
             "pear",
             str_config(&[(

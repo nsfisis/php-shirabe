@@ -3,6 +3,7 @@
 use crate::config::Config;
 use crate::io::{IOInterface, io_interface};
 use crate::util::ProcessExecutor;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
@@ -25,10 +26,10 @@ impl LogLevel {
     pub const DEBUG: &'static str = "debug";
 }
 
-fn log_context(context: &[(&str, &str)]) -> IndexMap<String, PhpMixed> {
+fn log_context(context: &[(&str, &str)]) -> IndexMap<BString, PhpMixed> {
     context
         .iter()
-        .map(|(k, v)| (k.to_string(), PhpMixed::string(v.to_string())))
+        .map(|(k, v)| (k.to_string().into(), PhpMixed::string(v.to_string())))
         .collect()
 }
 
@@ -108,14 +109,17 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = bitbucket_oauth.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
+                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
+                // replaced.
+                let domain = domain.to_str_lossy().into_owned();
                 if let Some(cred_map) = cred.as_array() {
                     let consumer_key = cred_map
-                        .get("consumer-key")
+                        .get(B("consumer-key"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
                         .to_string();
                     let consumer_secret = cred_map
-                        .get("consumer-secret")
+                        .get(B("consumer-secret"))
                         .and_then(|v| v.as_string())
                         .map(|s| s.to_string());
                     self.check_and_set_authentication(domain, consumer_key, consumer_secret);
@@ -125,6 +129,9 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = github_oauth.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
+                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
+                // replaced.
+                let domain = domain.to_str_lossy().into_owned();
                 let token_str = token.as_string().unwrap_or_default().to_string();
                 let github_domains = config.get("github-domains");
                 if domain != "github.com"
@@ -149,9 +156,9 @@ pub trait BaseIO: IOInterface {
                         PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
                     );
                     let mut inner = IndexMap::new();
-                    inner.insert("github-domains".to_string(), merged);
+                    inner.insert("github-domains".into(), merged);
                     let mut config_outer = IndexMap::new();
-                    config_outer.insert("config".to_string(), PhpMixed::Array(inner));
+                    config_outer.insert("config".into(), PhpMixed::Array(inner));
                     config.merge(&config_outer, "implicit-due-to-auth");
                 }
 
@@ -172,6 +179,9 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = gitlab_oauth.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
+                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
+                // replaced.
+                let domain = domain.to_str_lossy().into_owned();
                 let gitlab_domains = config.get("gitlab-domains");
                 if domain != "gitlab.com"
                     && !in_array_strict(
@@ -195,14 +205,14 @@ pub trait BaseIO: IOInterface {
                         PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
                     );
                     let mut inner = IndexMap::new();
-                    inner.insert("gitlab-domains".to_string(), merged);
-                    let mut config_outer: IndexMap<String, PhpMixed> = IndexMap::new();
-                    config_outer.insert("config".to_string(), PhpMixed::Array(inner));
+                    inner.insert("gitlab-domains".into(), merged);
+                    let mut config_outer: IndexMap<BString, PhpMixed> = IndexMap::new();
+                    config_outer.insert("config".into(), PhpMixed::Array(inner));
                     config.merge(&config_outer, "implicit-due-to-auth");
                 }
 
                 let token_str = if let Some(arr) = token.as_array() {
-                    arr.get("token")
+                    arr.get(B("token"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
                         .to_string()
@@ -215,6 +225,9 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = gitlab_token.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
+                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
+                // replaced.
+                let domain = domain.to_str_lossy().into_owned();
                 let gitlab_domains = config.get("gitlab-domains");
                 if domain != "gitlab.com"
                     && !in_array_strict(
@@ -238,19 +251,19 @@ pub trait BaseIO: IOInterface {
                         PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
                     );
                     let mut inner = IndexMap::new();
-                    inner.insert("gitlab-domains".to_string(), merged);
-                    let mut config_outer: IndexMap<String, PhpMixed> = IndexMap::new();
-                    config_outer.insert("config".to_string(), PhpMixed::Array(inner));
+                    inner.insert("gitlab-domains".into(), merged);
+                    let mut config_outer: IndexMap<BString, PhpMixed> = IndexMap::new();
+                    config_outer.insert("config".into(), PhpMixed::Array(inner));
                     config.merge(&config_outer, "implicit-due-to-auth");
                 }
 
                 let (username, password) = if let Some(arr) = token.as_array() {
                     (
-                        arr.get("username")
+                        arr.get(B("username"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_string(),
-                        arr.get("token")
+                        arr.get(B("token"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_string(),
@@ -267,6 +280,9 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = forgejo_token.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
+                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
+                // replaced.
+                let domain = domain.to_str_lossy().into_owned();
                 let forgejo_domains = config.get("forgejo-domains");
                 if !in_array_strict(
                     domain.clone(),
@@ -288,20 +304,20 @@ pub trait BaseIO: IOInterface {
                         PhpMixed::List(vec![PhpMixed::string(domain.clone())]),
                     );
                     let mut inner = IndexMap::new();
-                    inner.insert("forgejo-domains".to_string(), merged);
-                    let mut config_outer: IndexMap<String, PhpMixed> = IndexMap::new();
-                    config_outer.insert("config".to_string(), PhpMixed::Array(inner));
+                    inner.insert("forgejo-domains".into(), merged);
+                    let mut config_outer: IndexMap<BString, PhpMixed> = IndexMap::new();
+                    config_outer.insert("config".into(), PhpMixed::Array(inner));
                     config.merge(&config_outer, "implicit-due-to-auth");
                 }
 
                 if let Some(cred_map) = cred.as_array() {
                     let username = cred_map
-                        .get("username")
+                        .get(B("username"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
                         .to_string();
                     let token = cred_map
-                        .get("token")
+                        .get(B("token"))
                         .and_then(|v| v.as_string())
                         .map(|s| s.to_string());
                     self.check_and_set_authentication(domain, username, token);
@@ -311,14 +327,17 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = http_basic.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
+                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
+                // replaced.
+                let domain = domain.to_str_lossy().into_owned();
                 if let Some(cred_map) = cred.as_array() {
                     let username = cred_map
-                        .get("username")
+                        .get(B("username"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
                         .to_string();
                     let password = cred_map
-                        .get("password")
+                        .get(B("password"))
                         .and_then(|v| v.as_string())
                         .map(|s| s.to_string());
                     self.check_and_set_authentication(domain, username, password);
@@ -328,6 +347,9 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = bearer_token.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
+                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
+                // replaced.
+                let domain = domain.to_str_lossy().into_owned();
                 let token_str = token.as_string().unwrap_or_default().to_string();
                 self.check_and_set_authentication(domain, token_str, Some("bearer".to_string()));
             }
@@ -335,6 +357,9 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = custom_headers.as_opt().and_then(|v| v.as_array()) {
             for (domain, headers) in map.clone() {
+                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
+                // replaced.
+                let domain = domain.to_str_lossy().into_owned();
                 if !headers.is_null() {
                     let json_str = json_encode_ex(&headers, 0).unwrap_or_default();
                     self.check_and_set_authentication(
@@ -348,32 +373,35 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = client_certificate.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
+                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
+                // replaced.
+                let domain = domain.to_str_lossy().into_owned();
                 if let Some(cred_map) = cred.as_array() {
                     let local_cert = cred_map
-                        .get("local_cert")
+                        .get(B("local_cert"))
                         .and_then(|v| v.as_string())
                         .map(|s| s.to_string());
                     let local_pk = cred_map
-                        .get("local_pk")
+                        .get(B("local_pk"))
                         .and_then(|v| v.as_string())
                         .map(|s| s.to_string());
                     let passphrase = cred_map
-                        .get("passphrase")
+                        .get(B("passphrase"))
                         .and_then(|v| v.as_string())
                         .map(|s| s.to_string());
 
                     let mut ssl_options = IndexMap::new();
                     if let Some(cert) = local_cert {
-                        ssl_options.insert("local_cert".to_string(), PhpMixed::string(cert));
+                        ssl_options.insert("local_cert".into(), PhpMixed::string(cert));
                     }
                     if let Some(pk) = local_pk {
-                        ssl_options.insert("local_pk".to_string(), PhpMixed::string(pk));
+                        ssl_options.insert("local_pk".into(), PhpMixed::string(pk));
                     }
                     if let Some(pass) = passphrase {
-                        ssl_options.insert("passphrase".to_string(), PhpMixed::string(pass));
+                        ssl_options.insert("passphrase".into(), PhpMixed::string(pass));
                     }
 
-                    if !ssl_options.contains_key("local_cert") {
+                    if !ssl_options.contains_key(B("local_cert")) {
                         self.write_error3(&format!(
                             "<warning>Warning: Client certificate configuration is missing key `local_cert` for {}.</warning>",
                             domain

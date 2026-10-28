@@ -3,6 +3,7 @@
 use crate::application::Application;
 use crate::command::Command;
 use crate::exception::CommandNotFoundException;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -12,7 +13,7 @@ pub struct ApplicationDescription {
     namespace: Option<String>,
     show_hidden: bool,
     /// Each namespace entry is `['id' => string, 'commands' => string[]]`.
-    namespaces: Option<IndexMap<String, IndexMap<String, PhpMixed>>>,
+    namespaces: Option<IndexMap<String, IndexMap<BString, PhpMixed>>>,
     commands: Option<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
     aliases: Option<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
 }
@@ -35,7 +36,7 @@ impl ApplicationDescription {
         }
     }
 
-    pub fn get_namespaces(&mut self) -> IndexMap<String, IndexMap<String, PhpMixed>> {
+    pub fn get_namespaces(&mut self) -> IndexMap<String, IndexMap<BString, PhpMixed>> {
         if self.namespaces.is_none() {
             self.inspect_application();
         }
@@ -126,10 +127,10 @@ impl ApplicationDescription {
                 names.push(name);
             }
 
-            let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
-            entry.insert("id".to_string(), PhpMixed::string(namespace.clone()));
+            let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
+            entry.insert("id".into(), PhpMixed::string(namespace.clone()));
             entry.insert(
-                "commands".to_string(),
+                "commands".into(),
                 PhpMixed::List(names.into_iter().map(PhpMixed::string).collect()),
             );
             self.namespaces.as_mut().unwrap().insert(namespace, entry);

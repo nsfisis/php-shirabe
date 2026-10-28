@@ -5,6 +5,7 @@ use crate::helper::{QuestionHelper, QuestionHelperInterface};
 use crate::output::{OutputInterface, output_interface};
 use crate::question::QuestionInterface;
 use crate::style::{StyleInterface, SymfonyStyle};
+use bstr::B;
 use shirabe_php_shim::{Exception, PhpMixed, boolval, explode, php_os_family, trim};
 use std::ops::{Deref, DerefMut};
 
@@ -66,7 +67,7 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
                 .iter()
                 .map(|value| {
                     choices
-                        .get(&trim(value, None))
+                        .get(B(&trim(value, None)))
                         .map(|v| v.to_string())
                         .unwrap()
                 })
@@ -84,7 +85,7 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
                 text,
                 OutputFormatter::escape(
                     &choices
-                        .get(&default.to_string())
+                        .get(B(&default.to_string()))
                         .cloned()
                         .unwrap_or(default)
                         .to_string(),

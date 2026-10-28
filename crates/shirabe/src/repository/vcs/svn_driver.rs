@@ -7,7 +7,7 @@ use crate::io::IOInterface;
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil, Url};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -34,7 +34,7 @@ pub struct SvnDriver {
 
 impl SvnDriver {
     pub fn new(
-        repo_config: IndexMap<String, PhpMixed>,
+        repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
@@ -62,21 +62,21 @@ impl SvnDriver {
 
         SvnUtil::clean_env();
 
-        match self.inner.repo_config.get("trunk-path") {
+        match self.inner.repo_config.get(B("trunk-path")) {
             Some(PhpMixed::Bool(false)) => self.trunk_path = None,
             Some(PhpMixed::String(v)) => self.trunk_path = Some(v.to_str_lossy().into_owned()),
             _ => {}
         }
-        if let Some(PhpMixed::String(v)) = self.inner.repo_config.get("branches-path").cloned() {
+        if let Some(PhpMixed::String(v)) = self.inner.repo_config.get(B("branches-path")).cloned() {
             self.branches_path = v.to_str_lossy().into_owned();
         }
-        if let Some(PhpMixed::String(v)) = self.inner.repo_config.get("tags-path").cloned() {
+        if let Some(PhpMixed::String(v)) = self.inner.repo_config.get(B("tags-path")).cloned() {
             self.tags_path = v.to_str_lossy().into_owned();
         }
-        if let Some(v) = self.inner.repo_config.get("svn-cache-credentials") {
+        if let Some(v) = self.inner.repo_config.get(B("svn-cache-credentials")) {
             self.cache_credentials = v.to_bool();
         }
-        if let Some(PhpMixed::String(v)) = self.inner.repo_config.get("package-path").cloned() {
+        if let Some(PhpMixed::String(v)) = self.inner.repo_config.get(B("package-path")).cloned() {
             self.package_path = format!("/{}", trim(&v.to_str_lossy(), Some("/")));
         }
 
@@ -146,7 +146,7 @@ impl SvnDriver {
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if !self.inner.info_cache.contains_key(identifier) {
             if self.should_cache(identifier)
                 && let Some(mut res) = self
@@ -167,7 +167,7 @@ impl SvnDriver {
                 }
 
                 let parsed = JsonFile::parse_json(Some(res.as_str()), None)?;
-                let composer: Option<IndexMap<String, PhpMixed>> = parsed.as_array().cloned();
+                let composer: Option<IndexMap<BString, PhpMixed>> = parsed.as_array().cloned();
                 self.inner
                     .info_cache
                     .insert(identifier.to_string(), composer.clone());
@@ -183,7 +183,7 @@ impl SvnDriver {
                             || self.get_change_date(identifier),
                         )
                     });
-            let composer: Option<IndexMap<String, PhpMixed>> = match base_result {
+            let composer: Option<IndexMap<BString, PhpMixed>> = match base_result {
                 Ok(c) => c,
                 Err(e) => {
                     // PHP catches only TransportException; other exceptions propagate uncaught.
@@ -543,7 +543,7 @@ impl crate::repository::vcs::VcsDriverInterface for SvnDriver {
     fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         SvnDriver::get_composer_information(self, identifier)
     }
 

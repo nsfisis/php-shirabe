@@ -3,6 +3,7 @@
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::{Platform, ProcessExecutor};
+use bstr::B;
 use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, implode, parse_url, php_regex, preg_match, stripos,
     strpos, trim,
@@ -193,7 +194,7 @@ impl Svn {
         self.credentials = Some(SvnCredentials {
             username: self
                 .io
-                .ask("Username: ".to_string(), PhpMixed::string("".to_string()))?
+                .ask("Username: ".into(), PhpMixed::string("".to_string()))?
                 .as_string()
                 .unwrap_or_default()
                 .to_string(),
@@ -309,19 +310,19 @@ impl Svn {
         let host_str = host.as_deref().unwrap_or("");
         let auth_for_host = auth_config
             .as_array()
-            .and_then(|m| m.get(host_str))
+            .and_then(|m| m.get(B(host_str)))
             .cloned();
         if let Some(entry) = auth_for_host
             && let Some(entry_arr) = entry.as_array()
         {
             self.credentials = Some(SvnCredentials {
                 username: entry_arr
-                    .get("username")
+                    .get(B("username"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_string(),
                 password: entry_arr
-                    .get("password")
+                    .get(B("password"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_string(),

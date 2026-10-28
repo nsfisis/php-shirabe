@@ -9,6 +9,7 @@
 use crate::config::Config;
 use crate::io::IOInterface;
 use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, config_handle_value, io_handle_value};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue};
 use shirabe_php_shim::{PhpMixed, RuntimeException, php_regex, preg_match};
@@ -27,7 +28,7 @@ pub enum GetResult {
 pub struct RemoteFilesystem {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    options: IndexMap<String, PhpMixed>,
+    options: IndexMap<BString, PhpMixed>,
     disable_tls: bool,
     entity: std::cell::OnceCell<PhpObjHandle>,
 }
@@ -38,7 +39,7 @@ impl RemoteFilesystem {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
         disable_tls: bool,
     ) -> Self {
         Self {
@@ -56,7 +57,7 @@ impl RemoteFilesystem {
         file_url: &str,
         file_name: &str,
         progress: bool,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<GetResult> {
         let value = self.call(
             "copy",
@@ -76,7 +77,7 @@ impl RemoteFilesystem {
         origin_url: &str,
         file_url: &str,
         progress: bool,
-        options: IndexMap<String, PhpMixed>,
+        options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<GetResult> {
         let value = self.call(
             "getContents",
@@ -90,7 +91,7 @@ impl RemoteFilesystem {
         Self::get_result(value)
     }
 
-    pub fn get_options(&self) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+    pub fn get_options(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         match self.call("getOptions", Vec::new())?.to_php_mixed()? {
             PhpMixed::Array(options) => Ok(options),
             PhpMixed::List(list) if list.is_empty() => Ok(IndexMap::new()),
@@ -98,7 +99,7 @@ impl RemoteFilesystem {
         }
     }
 
-    pub fn set_options(&self, options: IndexMap<String, PhpMixed>) -> anyhow::Result<()> {
+    pub fn set_options(&self, options: IndexMap<BString, PhpMixed>) -> anyhow::Result<()> {
         self.call(
             "setOptions",
             vec![PluginValue::from_php_mixed(&PhpMixed::Array(options))],
@@ -233,8 +234,8 @@ impl RemoteFilesystem {
     pub fn __get_options_for_url(
         &self,
         origin_url: &str,
-        additional_options: IndexMap<String, PhpMixed>,
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+        additional_options: IndexMap<BString, PhpMixed>,
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let value = self.reflection_invoke(
             "getOptionsForUrl",
             vec![

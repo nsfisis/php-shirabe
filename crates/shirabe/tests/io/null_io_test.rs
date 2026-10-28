@@ -44,7 +44,7 @@ fn test_ask() {
 
     assert_eq!(
         PhpMixed::string("foo".to_string()),
-        io.ask("bar".to_string(), PhpMixed::string("foo".to_string()))
+        io.ask("bar".into(), PhpMixed::string("foo".to_string()))
             .unwrap()
     );
 }
@@ -79,7 +79,7 @@ fn test_select() {
     assert_eq!(
         PhpMixed::string("1".to_string()),
         io.select(
-            "question".to_string(),
+            "question".into(),
             PhpMixed::List(vec![
                 PhpMixed::string("item1".to_string()),
                 PhpMixed::string("item2".to_string()),

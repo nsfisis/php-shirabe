@@ -8,7 +8,7 @@ use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase};
 use crate::util::http::Response;
 use crate::util::{GitLab, HttpDownloader};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -25,8 +25,8 @@ pub struct GitLabDriver {
     scheme: String,
     namespace: String,
     repository: String,
-    project: Option<IndexMap<String, PhpMixed>>,
-    commits: IndexMap<String, IndexMap<String, PhpMixed>>,
+    project: Option<IndexMap<BString, PhpMixed>>,
+    commits: IndexMap<String, IndexMap<BString, PhpMixed>>,
     tags: Option<IndexMap<String, String>>,
     branches: Option<IndexMap<String, String>>,
     /// Git Driver
@@ -42,7 +42,7 @@ impl GitLabDriver {
     pub const URL_REGEX: &'static str = r##"#^(?:(?P<scheme>https?)://(?P<domain>.+?)(?::(?P<port>[0-9]+))?/|git@(?P<domain2>[^:]+):)(?P<parts>.+)/(?P<repo>[^/]+?)(?:\.git|/)?$#"##;
 
     pub fn new(
-        repo_config: IndexMap<String, PhpMixed>,
+        repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
@@ -90,7 +90,7 @@ impl GitLabDriver {
         } else if self
             .inner
             .repo_config
-            .get("secure-http")
+            .get(B("secure-http"))
             .and_then(|v| v.as_bool())
             == Some(false)
         {
@@ -203,7 +203,7 @@ impl GitLabDriver {
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_composer_information(identifier);
         }
@@ -255,17 +255,22 @@ impl GitLabDriver {
             let mut composer = composer;
             if let Some(ref mut composer) = composer {
                 // specials for gitlab (this data is only available if authentication is provided)
-                if composer.contains_key("support")
-                    && !is_array(&composer.get("support").cloned().unwrap_or(PhpMixed::Null))
+                if composer.contains_key(B("support"))
+                    && !is_array(
+                        &composer
+                            .get(B("support"))
+                            .cloned()
+                            .unwrap_or(PhpMixed::Null),
+                    )
                 {
-                    composer.insert("support".to_string(), PhpMixed::Array(IndexMap::new()));
+                    composer.insert("support".into(), PhpMixed::Array(IndexMap::new()));
                 }
                 let project = self.project.clone().unwrap_or_default();
-                let has_web_url = project.contains_key("web_url");
+                let has_web_url = project.contains_key(B("web_url"));
                 let support_source_missing = !composer
-                    .get("support")
+                    .get(B("support"))
                     .and_then(|v| v.as_array())
-                    .map(|m| m.contains_key("source"))
+                    .map(|m| m.contains_key(B("source")))
                     .unwrap_or(false);
                 if support_source_missing && has_web_url {
                     let label = array_search_mixed(
@@ -273,7 +278,7 @@ impl GitLabDriver {
                         &PhpMixed::Array(
                             self.get_tags()?
                                 .into_iter()
-                                .map(|(k, v)| (k, PhpMixed::string(v)))
+                                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                                 .collect(),
                         ),
                         true,
@@ -286,7 +291,7 @@ impl GitLabDriver {
                                 self.get_branches()
                                     .unwrap_or_default()
                                     .into_iter()
-                                    .map(|(k, v)| (k, PhpMixed::string(v)))
+                                    .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                                     .collect(),
                             ),
                             true,
@@ -296,51 +301,56 @@ impl GitLabDriver {
                     .unwrap_or_else(|| PhpMixed::string(identifier.to_string()));
                     let label_str = label.as_string().unwrap_or(identifier.into()).to_string();
                     let web_url = project
-                        .get("web_url")
+                        .get(B("web_url"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
                         .to_string();
-                    if let Some(support) = composer.get_mut("support").and_then(|v| match v {
+                    if let Some(support) = composer.get_mut(B("support")).and_then(|v| match v {
                         PhpMixed::Array(m) => Some(m),
                         _ => None,
                     }) {
                         support.insert(
-                            "source".to_string(),
+                            "source".into(),
                             PhpMixed::string(format!("{}/-/tree/{}", web_url, label_str)),
                         );
                     }
                 }
                 let issues_missing = !composer
-                    .get("support")
+                    .get(B("support"))
                     .and_then(|v| v.as_array())
-                    .map(|m| m.contains_key("issues"))
+                    .map(|m| m.contains_key(B("issues")))
                     .unwrap_or(false);
                 let issues_enabled = !empty(
                     &project
-                        .get("issues_enabled")
+                        .get(B("issues_enabled"))
                         .cloned()
                         .unwrap_or(PhpMixed::Null),
                 );
                 if issues_missing && issues_enabled && has_web_url {
                     let web_url = project
-                        .get("web_url")
+                        .get(B("web_url"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
                         .to_string();
-                    if let Some(support) = composer.get_mut("support").and_then(|v| match v {
+                    if let Some(support) = composer.get_mut(B("support")).and_then(|v| match v {
                         PhpMixed::Array(m) => Some(m),
                         _ => None,
                     }) {
                         support.insert(
-                            "issues".to_string(),
+                            "issues".into(),
                             PhpMixed::string(format!("{}/-/issues", PhpMixed::string(web_url))),
                         );
                     }
                 }
-                if !composer.contains_key("abandoned")
-                    && !empty(&project.get("archived").cloned().unwrap_or(PhpMixed::Null))
+                if !composer.contains_key(B("abandoned"))
+                    && !empty(
+                        &project
+                            .get(B("archived"))
+                            .cloned()
+                            .unwrap_or(PhpMixed::Null),
+                    )
                 {
-                    composer.insert("abandoned".to_string(), PhpMixed::Bool(true));
+                    composer.insert("abandoned".into(), PhpMixed::Bool(true));
                 }
             }
 
@@ -406,7 +416,7 @@ impl GitLabDriver {
 
         if let Some(commit) = self.commits.get(identifier) {
             let committed_date = commit
-                .get("committed_date")
+                .get(B("committed_date"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default();
             let date: DateTime<FixedOffset> = date_create(&committed_date.to_str_lossy())?;
@@ -420,7 +430,7 @@ impl GitLabDriver {
         let project = self.project.clone().unwrap_or_default();
         if !self.protocol.is_empty() {
             return project
-                .get(&format!("{}_url_to_repo", self.protocol))
+                .get(B(&format!("{}_url_to_repo", self.protocol)))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string();
@@ -428,13 +438,13 @@ impl GitLabDriver {
 
         if self.is_private {
             project
-                .get("ssh_url_to_repo")
+                .get(B("ssh_url_to_repo"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string()
         } else {
             project
-                .get("http_url_to_repo")
+                .get(B("http_url_to_repo"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string()
@@ -448,13 +458,13 @@ impl GitLabDriver {
 
         self.project
             .as_ref()
-            .and_then(|p| p.get("web_url"))
+            .and_then(|p| p.get(B("web_url")))
             .and_then(|v| v.as_string())
             .unwrap_or_default()
             .to_string()
     }
 
-    pub fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, PhpMixed>> {
+    pub fn get_dist(&self, identifier: &str) -> Option<IndexMap<BString, PhpMixed>> {
         let url = format!(
             "{}/repository/archive.zip?sha={}",
             self.get_api_url(),
@@ -462,35 +472,26 @@ impl GitLabDriver {
         );
 
         let mut result = IndexMap::new();
-        result.insert("type".to_string(), PhpMixed::string("zip".to_string()));
-        result.insert("url".to_string(), PhpMixed::string(url));
-        result.insert(
-            "reference".to_string(),
-            PhpMixed::string(identifier.to_string()),
-        );
-        result.insert("shasum".to_string(), PhpMixed::string(String::new()));
+        result.insert("type".into(), PhpMixed::string("zip".to_string()));
+        result.insert("url".into(), PhpMixed::string(url));
+        result.insert("reference".into(), PhpMixed::string(identifier.to_string()));
+        result.insert("shasum".into(), PhpMixed::string(String::new()));
         Some(result)
     }
 
-    pub fn get_source(&self, identifier: &str) -> IndexMap<String, PhpMixed> {
+    pub fn get_source(&self, identifier: &str) -> IndexMap<BString, PhpMixed> {
         if let Some(ref git_driver) = self.git_driver {
             return git_driver
                 .get_source(identifier)
                 .into_iter()
-                .map(|(k, v)| (k, PhpMixed::string(v)))
+                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                 .collect();
         }
 
         let mut result = IndexMap::new();
-        result.insert("type".to_string(), PhpMixed::string("git".to_string()));
-        result.insert(
-            "url".to_string(),
-            PhpMixed::string(self.get_repository_url()),
-        );
-        result.insert(
-            "reference".to_string(),
-            PhpMixed::string(identifier.to_string()),
-        );
+        result.insert("type".into(), PhpMixed::string("git".to_string()));
+        result.insert("url".into(), PhpMixed::string(self.get_repository_url()));
+        result.insert("reference".into(), PhpMixed::string(identifier.to_string()));
         result
     }
 
@@ -502,7 +503,7 @@ impl GitLabDriver {
         Ok(self
             .project
             .as_ref()
-            .and_then(|p| p.get("default_branch"))
+            .and_then(|p| p.get(B("default_branch")))
             .and_then(|v| v.as_string())
             .unwrap_or_default()
             .to_string())
@@ -578,14 +579,14 @@ impl GitLabDriver {
                 for datum in list {
                     if let PhpMixed::Array(ref datum_map) = *datum {
                         let name = datum_map
-                            .get("name")
+                            .get(B("name"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_string();
                         let commit_id = datum_map
-                            .get("commit")
+                            .get(B("commit"))
                             .and_then(|v| v.as_array())
-                            .and_then(|m| m.get("id"))
+                            .and_then(|m| m.get(B("id")))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_string();
@@ -594,7 +595,7 @@ impl GitLabDriver {
                         // Keep the last commit date of a reference to avoid
                         // unnecessary API call when retrieving the composer file.
                         let commit_data = datum_map
-                            .get("commit")
+                            .get(B("commit"))
                             .and_then(|v| v.as_array())
                             .cloned()
                             .unwrap_or_default();
@@ -634,9 +635,9 @@ impl GitLabDriver {
             _ => None,
         };
         let project = self.project.clone().unwrap_or_default();
-        if project.contains_key("visibility") {
+        if project.contains_key(B("visibility")) {
             self.is_private = project
-                .get("visibility")
+                .get(B("visibility"))
                 .and_then(|v| v.as_string())
                 .map(|s| s != "public")
                 .unwrap_or(true);
@@ -699,8 +700,8 @@ impl GitLabDriver {
     }
 
     fn setup_git_driver(&mut self, url: &str) -> anyhow::Result<()> {
-        let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
+        let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
+        repo_config.insert("url".into(), PhpMixed::string(url.to_string()));
         let mut git_driver = GitDriver::new(
             repo_config,
             self.inner.io.clone(),
@@ -737,11 +738,11 @@ impl GitLabDriver {
                     // Accessing the API with a token with Guest (10) or Planner (15) access will return
                     // more data than unauthenticated access but no default_branch data
                     // accessing files via the API will then also fail
-                    if !json_map.contains_key("default_branch")
-                        && json_map.contains_key("permissions")
+                    if !json_map.contains_key(B("default_branch"))
+                        && json_map.contains_key(B("permissions"))
                     {
                         this.is_private = json_map
-                            .get("visibility")
+                            .get(B("visibility"))
                             .and_then(|v| v.as_string())
                             .map(|s| s != "public")
                             .unwrap_or(true);
@@ -751,12 +752,12 @@ impl GitLabDriver {
                         // - value will be null if no access is set
                         // - value will be array with key access_level if set
                         if let Some(permissions) =
-                            json_map.get("permissions").and_then(|v| v.as_array())
+                            json_map.get(B("permissions")).and_then(|v| v.as_array())
                         {
                             for (_, permission) in permissions {
                                 if let Some(perm_map) = permission.as_array()
                                     && let Some(level) =
-                                        perm_map.get("access_level").and_then(|v| v.as_int())
+                                        perm_map.get(B("access_level")).and_then(|v| v.as_int())
                                     && level >= 20
                                 {
                                     more_than_guest_access = true;
@@ -783,10 +784,10 @@ impl GitLabDriver {
                     }
 
                     // force auth as the unauthenticated version of the API is broken
-                    if !json_map.contains_key("default_branch") {
+                    if !json_map.contains_key(B("default_branch")) {
                         // GitLab allows you to disable the repository inside a project to use a project only for issues and wiki
                         if json_map
-                            .get("repository_access_level")
+                            .get(B("repository_access_level"))
                             .and_then(|v| v.as_string())
                             == Some("disabled".into())
                         {
@@ -796,7 +797,7 @@ impl GitLabDriver {
                             ))));
                         }
 
-                        if !empty(&json_map.get("id").cloned().unwrap_or(PhpMixed::Null)) {
+                        if !empty(&json_map.get(B("id")).cloned().unwrap_or(PhpMixed::Null)) {
                             this.is_private = false;
                         }
 
@@ -943,7 +944,7 @@ impl GitLabDriver {
     }
 
     /// Gives back the loaded <gitlab-api>/projects/<owner>/<repo> result
-    pub fn get_repo_data(&mut self) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    pub fn get_repo_data(&mut self) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         self.fetch_project()?;
 
         Ok(self.project.clone())
@@ -1018,7 +1019,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitLabDriver {
     fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         GitLabDriver::get_composer_information(self, identifier)
     }
 
@@ -1048,7 +1049,13 @@ impl crate::repository::vcs::VcsDriverInterface for GitLabDriver {
     fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
         GitLabDriver::get_dist(self, identifier).map(|m| {
             m.into_iter()
-                .map(|(k, v)| (k, v.as_string().unwrap_or_default().to_string()))
+                // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
+                .map(|(k, v)| {
+                    (
+                        k.to_str_lossy().into_owned(),
+                        v.as_string().unwrap_or_default().to_string(),
+                    )
+                })
                 .collect()
         })
     }
@@ -1056,7 +1063,13 @@ impl crate::repository::vcs::VcsDriverInterface for GitLabDriver {
     fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
         GitLabDriver::get_source(self, identifier)
             .into_iter()
-            .map(|(k, v)| (k, v.as_string().unwrap_or_default().to_string()))
+            // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
+            .map(|(k, v)| {
+                (
+                    k.to_str_lossy().into_owned(),
+                    v.as_string().unwrap_or_default().to_string(),
+                )
+            })
             .collect()
     }
 

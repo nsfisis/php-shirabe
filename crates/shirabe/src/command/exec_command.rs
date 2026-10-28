@@ -126,7 +126,7 @@ impl Command for ExecCommand {
 
             let io = self.get_io();
             let binary = io.select(
-                "Binary to run: ".to_string(),
+                "Binary to run: ".into(),
                 PhpMixed::List(
                     binaries
                         .iter()

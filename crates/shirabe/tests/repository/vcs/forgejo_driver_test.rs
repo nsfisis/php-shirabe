@@ -2,6 +2,7 @@
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -22,17 +23,17 @@ struct SetUp {
 fn set_up() -> SetUp {
     let home = TempDir::new().unwrap();
     let mut config = Config::new(true, None);
-    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-    let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+    let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
-        "home".to_string(),
+        "home".into(),
         PhpMixed::string(home.path().to_str().unwrap().to_string()),
     );
     config_section.insert(
-        "forgejo-domains".to_string(),
+        "forgejo-domains".into(),
         PhpMixed::List(vec![PhpMixed::string("codeberg.org".to_string())]),
     );
-    top.insert("config".to_string(), PhpMixed::Array(config_section));
+    top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
 
     // PHP mocks IOInterface with isInteractive() => true; on the passing (200) paths
@@ -76,8 +77,8 @@ fn initialize_driver(
 ) -> (ForgejoDriver, ProcessExecutorMockGuard) {
     let (process, process_guard) = get_process_executor_mock(vec![], false, MockHandler::default());
 
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::string(repo_url.to_string()));
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
+    repo_config.insert("url".into(), PhpMixed::string(repo_url.to_string()));
     let mut driver = ForgejoDriver::new(
         repo_config,
         set_up.io.clone(),
@@ -101,24 +102,24 @@ fn http_mock(
 
 fn repo_body() -> String {
     shirabe::json::JsonFile::encode(&PhpMixed::Array({
-        let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
         m.insert(
-            "default_branch".to_string(),
+            "default_branch".into(),
             PhpMixed::string("main".to_string()),
         );
-        m.insert("has_issues".to_string(), PhpMixed::Bool(true));
-        m.insert("archived".to_string(), PhpMixed::Bool(false));
-        m.insert("private".to_string(), PhpMixed::Bool(false));
+        m.insert("has_issues".into(), PhpMixed::Bool(true));
+        m.insert("archived".into(), PhpMixed::Bool(false));
+        m.insert("private".into(), PhpMixed::Bool(false));
         m.insert(
-            "html_url".to_string(),
+            "html_url".into(),
             PhpMixed::string("https://codeberg.org/acme/repo".to_string()),
         );
         m.insert(
-            "ssh_url".to_string(),
+            "ssh_url".into(),
             PhpMixed::string("git@codeberg.org:acme/repo.git".to_string()),
         );
         m.insert(
-            "clone_url".to_string(),
+            "clone_url".into(),
             PhpMixed::string("https://codeberg.org/acme/repo.git".to_string()),
         );
         m
@@ -170,11 +171,11 @@ fn test_get_branches() {
     let _tear_down = TearDown::new(set_up.home.path().to_path_buf());
 
     let branches_body = shirabe::json::JsonFile::encode(&PhpMixed::List(vec![PhpMixed::Array({
-        let mut commit: IndexMap<String, PhpMixed> = IndexMap::new();
-        commit.insert("id".to_string(), PhpMixed::string("SOMESHA".to_string()));
-        let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
-        entry.insert("name".to_string(), PhpMixed::string("main".to_string()));
-        entry.insert("commit".to_string(), PhpMixed::Array(commit));
+        let mut commit: IndexMap<BString, PhpMixed> = IndexMap::new();
+        commit.insert("id".into(), PhpMixed::string("SOMESHA".to_string()));
+        let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
+        entry.insert("name".into(), PhpMixed::string("main".to_string()));
+        entry.insert("commit".into(), PhpMixed::Array(commit));
         entry
     })]))
     .unwrap();
@@ -213,11 +214,11 @@ fn test_get_tags() {
     let _tear_down = TearDown::new(set_up.home.path().to_path_buf());
 
     let tags_body = shirabe::json::JsonFile::encode(&PhpMixed::List(vec![PhpMixed::Array({
-        let mut commit: IndexMap<String, PhpMixed> = IndexMap::new();
-        commit.insert("sha".to_string(), PhpMixed::string("SOMESHA".to_string()));
-        let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
-        entry.insert("name".to_string(), PhpMixed::string("1.0".to_string()));
-        entry.insert("commit".to_string(), PhpMixed::Array(commit));
+        let mut commit: IndexMap<BString, PhpMixed> = IndexMap::new();
+        commit.insert("sha".into(), PhpMixed::string("SOMESHA".to_string()));
+        let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
+        entry.insert("name".into(), PhpMixed::string("1.0".to_string()));
+        entry.insert("commit".into(), PhpMixed::Array(commit));
         entry
     })]))
     .unwrap();

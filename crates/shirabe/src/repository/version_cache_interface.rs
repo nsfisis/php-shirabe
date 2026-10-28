@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Repository/VersionCacheInterface.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -14,7 +15,7 @@ pub enum VersionCacheResult {
     /// Cached absence (PHP `false`).
     Missing,
     /// Cached package data (PHP `array`).
-    Package(IndexMap<String, PhpMixed>),
+    Package(IndexMap<BString, PhpMixed>),
 }
 
 pub trait VersionCacheInterface: std::fmt::Debug {

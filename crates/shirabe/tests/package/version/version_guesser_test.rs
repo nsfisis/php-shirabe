@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionGuesserTest.php
 
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
+use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -27,10 +28,10 @@ impl Drop for TearDown {
 // `$config = new Config; $config->merge(['repositories' => ['packagist' => false]]);`
 fn make_config() -> std::rc::Rc<std::cell::RefCell<Config>> {
     let mut config = Config::new(true, None);
-    let mut repositories: IndexMap<String, PhpMixed> = IndexMap::new();
-    repositories.insert("packagist".to_string(), PhpMixed::Bool(false));
-    let mut merge: IndexMap<String, PhpMixed> = IndexMap::new();
-    merge.insert("repositories".to_string(), PhpMixed::Array(repositories));
+    let mut repositories: IndexMap<BString, PhpMixed> = IndexMap::new();
+    repositories.insert("packagist".into(), PhpMixed::Bool(false));
+    let mut merge: IndexMap<BString, PhpMixed> = IndexMap::new();
+    merge.insert("repositories".into(), PhpMixed::Array(repositories));
     config.merge(&merge, Config::SOURCE_UNKNOWN);
     std::rc::Rc::new(std::cell::RefCell::new(config))
 }
@@ -43,10 +44,10 @@ fn make_guesser(
 }
 
 // Helper to build a `['key' => 'value']` package config used in the tests.
-fn package_config(entries: &[(&str, PhpMixed)]) -> IndexMap<String, PhpMixed> {
-    let mut map: IndexMap<String, PhpMixed> = IndexMap::new();
+fn package_config(entries: &[(&str, PhpMixed)]) -> IndexMap<BString, PhpMixed> {
+    let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        map.insert(k.to_string(), v.clone());
+        map.insert(k.to_string().into(), v.clone());
     }
     map
 }

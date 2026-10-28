@@ -64,11 +64,8 @@ fn test_add_repository() {
     let mut json_config_source = json_config_source(&config);
 
     let mut repo = IndexMap::new();
-    repo.insert("type".to_string(), PhpMixed::string("git".to_string()));
-    repo.insert(
-        "url".to_string(),
-        PhpMixed::string("example.tld".to_string()),
-    );
+    repo.insert("type".into(), PhpMixed::string("git".to_string()));
+    repo.insert("url".into(), PhpMixed::string("example.tld".to_string()));
     json_config_source
         .add_repository("example_tld", PhpMixed::Array(repo), true)
         .unwrap();
@@ -87,11 +84,8 @@ fn test_add_repository_as_list() {
     let mut json_config_source = json_config_source(&config);
 
     let mut repo = IndexMap::new();
-    repo.insert("type".to_string(), PhpMixed::string("git".to_string()));
-    repo.insert(
-        "url".to_string(),
-        PhpMixed::string("example.tld".to_string()),
-    );
+    repo.insert("type".into(), PhpMixed::string("git".to_string()));
+    repo.insert("url".into(), PhpMixed::string("example.tld".to_string()));
     json_config_source
         .add_repository("", PhpMixed::Array(repo), true)
         .unwrap();
@@ -110,20 +104,20 @@ fn test_add_repository_with_options() {
     let mut json_config_source = json_config_source(&config);
 
     let mut repo = IndexMap::new();
-    repo.insert("type".to_string(), PhpMixed::string("composer".to_string()));
+    repo.insert("type".into(), PhpMixed::string("composer".to_string()));
     repo.insert(
-        "url".to_string(),
+        "url".into(),
         PhpMixed::string("https://example.tld".to_string()),
     );
     {
         let mut local_cert = IndexMap::new();
         local_cert.insert(
-            "local_cert".to_string(),
+            "local_cert".into(),
             PhpMixed::string("/home/composer/.ssl/composer.pem".to_string()),
         );
         let mut ssl = IndexMap::new();
-        ssl.insert("ssl".to_string(), PhpMixed::Array(local_cert));
-        repo.insert("options".to_string(), PhpMixed::Array(ssl));
+        ssl.insert("ssl".into(), PhpMixed::Array(local_cert));
+        repo.insert("options".into(), PhpMixed::Array(ssl));
     }
 
     json_config_source

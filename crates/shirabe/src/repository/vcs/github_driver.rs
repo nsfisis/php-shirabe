@@ -8,7 +8,7 @@ use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase};
 use crate::util::GitHub;
 use crate::util::http::Response;
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -26,7 +26,7 @@ pub struct GitHubDriver {
     tags: Option<IndexMap<String, String>>,
     branches: Option<IndexMap<String, String>>,
     root_identifier: String,
-    repo_data: Option<IndexMap<String, PhpMixed>>,
+    repo_data: Option<IndexMap<BString, PhpMixed>>,
     has_issues: bool,
     is_private: bool,
     is_archived: bool,
@@ -38,7 +38,7 @@ pub struct GitHubDriver {
 
 impl GitHubDriver {
     pub fn new(
-        repo_config: IndexMap<String, PhpMixed>,
+        repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
@@ -119,7 +119,7 @@ impl GitHubDriver {
         if self
             .inner
             .repo_config
-            .get("allow-git-fallback")
+            .get(B("allow-git-fallback"))
             .and_then(|v| v.as_bool())
             == Some(false)
         {
@@ -136,7 +136,7 @@ impl GitHubDriver {
             || self
                 .inner
                 .repo_config
-                .get("no-api")
+                .get(B("no-api"))
                 .is_some_and(|v| v.to_bool())
         {
             self.setup_git_driver(&self.inner.url.clone())?;
@@ -183,12 +183,12 @@ impl GitHubDriver {
         format!("https://{}", api_url)
     }
 
-    pub fn get_source(&self, identifier: &str) -> IndexMap<String, PhpMixed> {
+    pub fn get_source(&self, identifier: &str) -> IndexMap<BString, PhpMixed> {
         if let Some(ref git_driver) = self.git_driver {
             return git_driver
                 .get_source(identifier)
                 .into_iter()
-                .map(|(k, v)| (k, PhpMixed::string(v)))
+                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                 .collect();
         }
         let url = if self.is_private {
@@ -200,16 +200,13 @@ impl GitHubDriver {
         };
 
         let mut result = IndexMap::new();
-        result.insert("type".to_string(), PhpMixed::string("git".to_string()));
-        result.insert("url".to_string(), PhpMixed::string(url));
-        result.insert(
-            "reference".to_string(),
-            PhpMixed::string(identifier.to_string()),
-        );
+        result.insert("type".into(), PhpMixed::string("git".to_string()));
+        result.insert("url".into(), PhpMixed::string(url));
+        result.insert("reference".into(), PhpMixed::string(identifier.to_string()));
         result
     }
 
-    pub fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, PhpMixed>> {
+    pub fn get_dist(&self, identifier: &str) -> Option<IndexMap<BString, PhpMixed>> {
         let url = format!(
             "{}/repos/{}/{}/zipball/{}",
             self.get_api_url(),
@@ -219,20 +216,17 @@ impl GitHubDriver {
         );
 
         let mut result = IndexMap::new();
-        result.insert("type".to_string(), PhpMixed::string("zip".to_string()));
-        result.insert("url".to_string(), PhpMixed::string(url));
-        result.insert(
-            "reference".to_string(),
-            PhpMixed::string(identifier.to_string()),
-        );
-        result.insert("shasum".to_string(), PhpMixed::string(String::new()));
+        result.insert("type".into(), PhpMixed::string("zip".to_string()));
+        result.insert("url".into(), PhpMixed::string(url));
+        result.insert("reference".into(), PhpMixed::string(identifier.to_string()));
+        result.insert("shasum".into(), PhpMixed::string(String::new()));
         Some(result)
     }
 
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if let Some(ref mut git_driver) = self.git_driver {
             return git_driver.get_composer_information(identifier);
         }
@@ -291,15 +285,15 @@ impl GitHubDriver {
             let mut composer = composer;
             if let Some(ref mut composer) = composer {
                 // specials for github
-                if composer.contains_key("support")
-                    && !matches!(composer.get("support"), Some(PhpMixed::Array(_)))
+                if composer.contains_key(B("support"))
+                    && !matches!(composer.get(B("support")), Some(PhpMixed::Array(_)))
                 {
-                    composer.insert("support".to_string(), PhpMixed::Array(IndexMap::new()));
+                    composer.insert("support".into(), PhpMixed::Array(IndexMap::new()));
                 }
                 let support_source_missing = !composer
-                    .get("support")
+                    .get(B("support"))
                     .and_then(|v| v.as_array())
-                    .map(|m| m.contains_key("source"))
+                    .map(|m| m.contains_key(B("source")))
                     .unwrap_or(false);
                 if support_source_missing {
                     // PHP's `?:` chain only evaluates getBranches() when the tags search is falsy.
@@ -309,7 +303,7 @@ impl GitHubDriver {
                         &PhpMixed::Array(
                             tags_map
                                 .into_iter()
-                                .map(|(k, v)| (k, PhpMixed::string(v)))
+                                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                                 .collect(),
                         ),
                         false,
@@ -322,7 +316,7 @@ impl GitHubDriver {
                             &PhpMixed::Array(
                                 branches_map
                                     .into_iter()
-                                    .map(|(k, v)| (k, PhpMixed::string(v)))
+                                    .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                                     .collect(),
                             ),
                             false,
@@ -331,12 +325,12 @@ impl GitHubDriver {
                     }
                     let label = label.unwrap_or_else(|| PhpMixed::string(identifier.to_string()));
                     let label_str = label.as_string().unwrap_or(identifier.into()).to_string();
-                    if let Some(support) = composer.get_mut("support").and_then(|v| match v {
+                    if let Some(support) = composer.get_mut(B("support")).and_then(|v| match v {
                         PhpMixed::Array(m) => Some(m),
                         _ => None,
                     }) {
                         support.insert(
-                            "source".to_string(),
+                            "source".into(),
                             PhpMixed::string(format!(
                                 "https://{}/{}/{}/tree/{}",
                                 self.inner.origin_url.clone(),
@@ -348,19 +342,19 @@ impl GitHubDriver {
                     }
                 }
                 let issues_missing = !composer
-                    .get("support")
+                    .get(B("support"))
                     .and_then(|v| v.as_array())
-                    .map(|m| m.contains_key("issues"))
+                    .map(|m| m.contains_key(B("issues")))
                     .unwrap_or(false);
                 if issues_missing
                     && self.has_issues
-                    && let Some(support) = composer.get_mut("support").and_then(|v| match v {
+                    && let Some(support) = composer.get_mut(B("support")).and_then(|v| match v {
                         PhpMixed::Array(m) => Some(m),
                         _ => None,
                     })
                 {
                     support.insert(
-                        "issues".to_string(),
+                        "issues".into(),
                         PhpMixed::string(format!(
                             "https://{}/{}/{}/issues",
                             self.inner.origin_url.clone(),
@@ -369,13 +363,13 @@ impl GitHubDriver {
                         )),
                     );
                 }
-                if !composer.contains_key("abandoned") && self.is_archived {
-                    composer.insert("abandoned".to_string(), PhpMixed::Bool(true));
+                if !composer.contains_key(B("abandoned")) && self.is_archived {
+                    composer.insert("abandoned".into(), PhpMixed::Bool(true));
                 }
-                if !composer.contains_key("funding") {
+                if !composer.contains_key(B("funding")) {
                     let funding = self.get_funding_info();
                     if !matches!(funding, PhpMixed::Bool(false)) {
-                        composer.insert("funding".to_string(), funding);
+                        composer.insert("funding".into(), funding);
                     }
                 }
             }
@@ -417,8 +411,8 @@ impl GitHubDriver {
                 self.owner
             ),
         ] {
-            let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
-            options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
+            let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
+            options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
             let response = self
                 .inner
                 .http_downloader
@@ -438,18 +432,18 @@ impl GitHubDriver {
                 _ => continue,
             };
             let content_empty = response_map
-                .get("content")
+                .get(B("content"))
                 .and_then(|v| v.as_string())
                 .map(|s| s.is_empty())
                 .unwrap_or(true);
-            let encoding_not_base64 =
-                response_map.get("encoding").and_then(|v| v.as_string()) != Some("base64".into());
+            let encoding_not_base64 = response_map.get(B("encoding")).and_then(|v| v.as_string())
+                != Some("base64".into());
             if content_empty || encoding_not_base64 {
                 continue;
             }
             let decoded = base64_decode(
                 &response_map
-                    .get("content")
+                    .get(B("content"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_str_lossy(),
@@ -471,7 +465,7 @@ impl GitHubDriver {
             }
         };
 
-        let mut result: Vec<IndexMap<String, PhpMixed>> = vec![];
+        let mut result: Vec<IndexMap<BString, PhpMixed>> = vec![];
         let mut key: Option<String> = None;
         for line in preg_split(php_regex!(r"{\r?\n}"), &funding) {
             let line = trim(&line, None);
@@ -489,18 +483,15 @@ impl GitHubDriver {
                         &preg_split(php_regex!(r#"{[\'\"]?\s*,\s*[\'\"]?}"#), &inner),
                     ) {
                         let mut entry = IndexMap::new();
-                        entry.insert("type".to_string(), PhpMixed::string(g1.clone()));
-                        entry.insert(
-                            "url".to_string(),
-                            PhpMixed::string(trim(&item, Some("\"' "))),
-                        );
+                        entry.insert("type".into(), PhpMixed::string(g1.clone()));
+                        entry.insert("url".into(), PhpMixed::string(trim(&item, Some("\"' "))));
                         result.push(entry);
                     }
                 } else if let Some(m2) = preg_match(php_regex!(r"{^([^#].*?)(?:\s+#.*)?$}"), &g2) {
                     let mut entry = IndexMap::new();
-                    entry.insert("type".to_string(), PhpMixed::string(g1.clone()));
+                    entry.insert("type".into(), PhpMixed::string(g1.clone()));
                     entry.insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(trim(m2.get(1).unwrap_or_default(), Some("\"' "))),
                     );
                     result.push(entry);
@@ -514,11 +505,11 @@ impl GitHubDriver {
             {
                 let mut entry = IndexMap::new();
                 entry.insert(
-                    "type".to_string(),
+                    "type".into(),
                     PhpMixed::string(key.clone().unwrap_or_default()),
                 );
                 entry.insert(
-                    "url".to_string(),
+                    "url".into(),
                     PhpMixed::string(trim(m.get(1).unwrap_or_default(), Some("\"' "))),
                 );
                 result.push(entry);
@@ -528,22 +519,22 @@ impl GitHubDriver {
         }
 
         let mut keys_to_remove: Vec<usize> = vec![];
-        let mut result_for_iter: Vec<IndexMap<String, PhpMixed>> = result.clone();
+        let mut result_for_iter: Vec<IndexMap<BString, PhpMixed>> = result.clone();
         for (key_idx, item) in result_for_iter.iter_mut().enumerate() {
             let item_type = item
-                .get("type")
+                .get(B("type"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string();
             let item_url = item
-                .get("url")
+                .get(B("url"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string();
             match item_type.as_str() {
                 "community_bridge" => {
                     result[key_idx].insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(format!(
                             "https://funding.communitybridge.org/projects/{}",
                             basename(&item_url)
@@ -552,31 +543,31 @@ impl GitHubDriver {
                 }
                 "github" => {
                     result[key_idx].insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(format!("https://github.com/{}", basename(&item_url))),
                     );
                 }
                 "issuehunt" => {
                     result[key_idx].insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(format!("https://issuehunt.io/r/{}", item_url)),
                     );
                 }
                 "ko_fi" => {
                     result[key_idx].insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(format!("https://ko-fi.com/{}", basename(&item_url))),
                     );
                 }
                 "liberapay" => {
                     result[key_idx].insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(format!("https://liberapay.com/{}", basename(&item_url))),
                     );
                 }
                 "open_collective" => {
                     result[key_idx].insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(format!(
                             "https://opencollective.com/{}",
                             basename(&item_url)
@@ -585,7 +576,7 @@ impl GitHubDriver {
                 }
                 "patreon" => {
                     result[key_idx].insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(format!(
                             "https://www.patreon.com/{}",
                             basename(&item_url)
@@ -594,7 +585,7 @@ impl GitHubDriver {
                 }
                 "tidelift" => {
                     result[key_idx].insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(format!(
                             "https://tidelift.com/funding/github/{}",
                             item_url
@@ -603,13 +594,13 @@ impl GitHubDriver {
                 }
                 "polar" => {
                     result[key_idx].insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(format!("https://polar.sh/{}", basename(&item_url))),
                     );
                 }
                 "buy_me_a_coffee" => {
                     result[key_idx].insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(format!(
                             "https://www.buymeacoffee.com/{}",
                             basename(&item_url)
@@ -618,13 +609,13 @@ impl GitHubDriver {
                 }
                 "thanks_dev" => {
                     result[key_idx].insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(format!("https://thanks.dev/{}", item_url)),
                     );
                 }
                 "otechie" => {
                     result[key_idx].insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string(format!("https://otechie.com/{}", basename(&item_url))),
                     );
                 }
@@ -637,7 +628,7 @@ impl GitHubDriver {
                     if bits.scheme.is_none() && bits.host.is_none() {
                         if preg_is_match(php_regex!(r"{^[a-z0-9-]++\.[a-z]{2,3}$}"), &item_url) {
                             result[key_idx].insert(
-                                "url".to_string(),
+                                "url".into(),
                                 PhpMixed::string(format!("https://{}", item_url)),
                             );
                             continue;
@@ -698,19 +689,19 @@ impl GitHubDriver {
             _ => IndexMap::new(),
         };
         let needs_git_url = (resource_map
-            .get("content")
+            .get(B("content"))
             .and_then(|v| v.as_string())
             .is_none()
             || resource_map
-                .get("content")
+                .get(B("content"))
                 .and_then(|v| v.as_string())
                 .map(|s| s.is_empty())
                 .unwrap_or(false))
-            && resource_map.get("encoding").and_then(|v| v.as_string()) == Some("none".into())
-            && resource_map.contains_key("git_url");
+            && resource_map.get(B("encoding")).and_then(|v| v.as_string()) == Some("none".into())
+            && resource_map.contains_key(B("git_url"));
         if needs_git_url {
             let git_url = resource_map
-                .get("git_url")
+                .get(B("git_url"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string();
@@ -721,13 +712,13 @@ impl GitHubDriver {
             PhpMixed::Array(m) => m,
             _ => IndexMap::new(),
         };
-        let has_content = resource_map.contains_key("content");
+        let has_content = resource_map.contains_key(B("content"));
         let encoding_base64 =
-            resource_map.get("encoding").and_then(|v| v.as_string()) == Some("base64".into());
+            resource_map.get(B("encoding")).and_then(|v| v.as_string()) == Some("base64".into());
         let content = if has_content && encoding_base64 {
             base64_decode(
                 &resource_map
-                    .get("content")
+                    .get(B("content"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_str_lossy(),
@@ -768,11 +759,11 @@ impl GitHubDriver {
 
         let date_str = match commit {
             PhpMixed::Array(m) => m
-                .get("commit")
+                .get(B("commit"))
                 .and_then(|v| v.as_array())
-                .and_then(|c| c.get("committer"))
+                .and_then(|c| c.get(B("committer")))
                 .and_then(|v| v.as_array())
-                .and_then(|c| c.get("date"))
+                .and_then(|c| c.get(B("date")))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string(),
@@ -803,14 +794,14 @@ impl GitHubDriver {
                     for tag in list {
                         if let PhpMixed::Array(ref tag_map) = *tag {
                             let name = tag_map
-                                .get("name")
+                                .get(B("name"))
                                 .and_then(|v| v.as_string())
                                 .unwrap_or_default()
                                 .to_string();
                             let sha = tag_map
-                                .get("commit")
+                                .get(B("commit"))
                                 .and_then(|v| v.as_array())
-                                .and_then(|m| m.get("sha"))
+                                .and_then(|m| m.get(B("sha")))
                                 .and_then(|v| v.as_string())
                                 .unwrap_or_default()
                                 .to_string();
@@ -851,15 +842,15 @@ impl GitHubDriver {
                     for branch in list {
                         if let PhpMixed::Array(ref branch_map) = *branch {
                             let ref_str = branch_map
-                                .get("ref")
+                                .get(B("ref"))
                                 .and_then(|v| v.as_string())
                                 .unwrap_or_default();
                             let name = substr(&ref_str.to_str_lossy(), 11, None);
                             if name != "gh-pages" {
                                 let sha = branch_map
-                                    .get("object")
+                                    .get(B("object"))
                                     .and_then(|v| v.as_array())
-                                    .and_then(|m| m.get("sha"))
+                                    .and_then(|m| m.get(B("sha")))
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default()
                                     .to_string();
@@ -925,7 +916,7 @@ impl GitHubDriver {
     }
 
     /// Gives back the loaded <github-api>/repos/<owner>/<repo> result
-    pub fn get_repo_data(&mut self) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    pub fn get_repo_data(&mut self) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         self.fetch_root_identifier()?;
 
         Ok(self.repo_data.clone())
@@ -1069,8 +1060,8 @@ impl GitHubDriver {
                             self.inner.io.write_error3(
                                 &format!(
                                     "<error>GitHub API limit ({} calls/hr) is exhausted. You are already authorized so you have to wait until {} before doing more requests</error>",
-                                    rate_limit.get("limit").cloned().unwrap_or(PhpMixed::Null),
-                                    rate_limit.get("reset").cloned().unwrap_or(PhpMixed::Null),
+                                    rate_limit.get(B("limit")).cloned().unwrap_or(PhpMixed::Null),
+                                    rate_limit.get(B("reset")).cloned().unwrap_or(PhpMixed::Null),
                                 ),
                                 true,
                                 io_interface::NORMAL,
@@ -1121,23 +1112,32 @@ impl GitHubDriver {
 
         let repo_data = self.repo_data.clone().unwrap_or_default();
         self.owner = repo_data
-            .get("owner")
+            .get(B("owner"))
             .and_then(|v| v.as_array())
-            .and_then(|m| m.get("login"))
+            .and_then(|m| m.get(B("login")))
             .and_then(|v| v.as_string())
             .unwrap_or_default()
             .to_string();
         self.repository = repo_data
-            .get("name")
+            .get(B("name"))
             .and_then(|v| v.as_string())
             .unwrap_or_default()
             .to_string();
 
-        self.is_private = !empty(&repo_data.get("private").cloned().unwrap_or(PhpMixed::Null));
-        if let Some(default_branch) = repo_data.get("default_branch").and_then(|v| v.as_string()) {
+        self.is_private = !empty(
+            &repo_data
+                .get(B("private"))
+                .cloned()
+                .unwrap_or(PhpMixed::Null),
+        );
+        if let Some(default_branch) = repo_data
+            .get(B("default_branch"))
+            .and_then(|v| v.as_string())
+        {
             self.root_identifier = default_branch.to_string();
-        } else if let Some(master_branch) =
-            repo_data.get("master_branch").and_then(|v| v.as_string())
+        } else if let Some(master_branch) = repo_data
+            .get(B("master_branch"))
+            .and_then(|v| v.as_string())
         {
             self.root_identifier = master_branch.to_string();
         } else {
@@ -1145,11 +1145,16 @@ impl GitHubDriver {
         }
         self.has_issues = !empty(
             &repo_data
-                .get("has_issues")
+                .get(B("has_issues"))
                 .cloned()
                 .unwrap_or(PhpMixed::Null),
         );
-        self.is_archived = !empty(&repo_data.get("archived").cloned().unwrap_or(PhpMixed::Null));
+        self.is_archived = !empty(
+            &repo_data
+                .get(B("archived"))
+                .cloned()
+                .unwrap_or(PhpMixed::Null),
+        );
 
         Ok(())
     }
@@ -1198,8 +1203,8 @@ impl GitHubDriver {
                 RuntimeException::new("Fallback to git driver disabled".to_string()).into(),
             );
         }
-        let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
+        let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
+        repo_config.insert("url".into(), PhpMixed::string(url.to_string()));
         let mut git_driver = GitDriver::new(
             repo_config,
             self.inner.io.clone(),
@@ -1249,7 +1254,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitHubDriver {
     fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         GitHubDriver::get_composer_information(self, identifier)
     }
 
@@ -1279,7 +1284,13 @@ impl crate::repository::vcs::VcsDriverInterface for GitHubDriver {
     fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
         GitHubDriver::get_dist(self, identifier).map(|m| {
             m.into_iter()
-                .map(|(k, v)| (k, v.as_string().unwrap_or_default().to_string()))
+                // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
+                .map(|(k, v)| {
+                    (
+                        k.to_str_lossy().into_owned(),
+                        v.as_string().unwrap_or_default().to_string(),
+                    )
+                })
                 .collect()
         })
     }
@@ -1287,7 +1298,13 @@ impl crate::repository::vcs::VcsDriverInterface for GitHubDriver {
     fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
         GitHubDriver::get_source(self, identifier)
             .into_iter()
-            .map(|(k, v)| (k, v.as_string().unwrap_or_default().to_string()))
+            // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
+            .map(|(k, v)| {
+                (
+                    k.to_str_lossy().into_owned(),
+                    v.as_string().unwrap_or_default().to_string(),
+                )
+            })
             .collect()
     }
 

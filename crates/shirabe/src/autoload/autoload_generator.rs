@@ -15,7 +15,7 @@ use crate::json::JsonFile;
 use crate::package::{LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::script::ScriptEvents;
 use crate::util::{Filesystem, PackageSorter, Platform};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
@@ -137,7 +137,7 @@ impl AutoloadGenerator {
             if installed_json.exists() {
                 let installed_json_data = installed_json.read()?;
                 if let Some(arr) = installed_json_data.as_array()
-                    && let Some(dev) = arr.get("dev")
+                    && let Some(dev) = arr.get(B("dev"))
                 {
                     self.dev_mode.set(dev.as_bool());
                 }
@@ -162,8 +162,8 @@ impl AutoloadGenerator {
                 );
             }
 
-            let mut additional_args: IndexMap<String, PhpMixed> = IndexMap::new();
-            additional_args.insert("optimize".to_string(), PhpMixed::Bool(scan_psr_packages));
+            let mut additional_args: IndexMap<BString, PhpMixed> = IndexMap::new();
+            additional_args.insert("optimize".into(), PhpMixed::Bool(scan_psr_packages));
             self.event_dispatcher.borrow_mut().dispatch_script(
                 ScriptEvents::PRE_AUTOLOAD_DUMP,
                 self.dev_mode.get().unwrap_or(false),
@@ -292,7 +292,7 @@ return array(
 
         // Process the 'psr-0' base directories.
         let psr0_map = autoloads
-            .get("psr-0")
+            .get(B("psr-0"))
             .and_then(|v| v.as_array().cloned())
             .unwrap_or_default();
         for (namespace, paths) in &psr0_map {
@@ -307,7 +307,7 @@ return array(
                     )?);
                 }
             }
-            let exported_prefix = var_export(&PhpMixed::string(namespace.clone()), true);
+            let exported_prefix = var_export(&PhpMixed::String(namespace.clone()), true);
             namespaces_file.push_str(&format!("    {} => ", exported_prefix));
             namespaces_file.push_str(&format!("array({}),\n", implode(", ", &exported_paths)));
         }
@@ -315,7 +315,7 @@ return array(
 
         // Process the 'psr-4' base directories.
         let psr4_map = autoloads
-            .get("psr-4")
+            .get(B("psr-4"))
             .and_then(|v| v.as_array().cloned())
             .unwrap_or_default();
         for (namespace, paths) in &psr4_map {
@@ -330,7 +330,7 @@ return array(
                     )?);
                 }
             }
-            let exported_prefix = var_export(&PhpMixed::string(namespace.clone()), true);
+            let exported_prefix = var_export(&PhpMixed::String(namespace.clone()), true);
             psr4_file.push_str(&format!("    {} => ", exported_prefix));
             psr4_file.push_str(&format!("array({}),\n", implode(", ", &exported_paths)));
         }
@@ -341,7 +341,7 @@ return array(
         let main_autoload = root_package.get_autoload();
         if root_package.get_target_dir().is_some()
             && main_autoload
-                .get("psr-0")
+                .get(B("psr-0"))
                 .and_then(|v| v.as_array())
                 .is_some_and(|a| !a.is_empty())
         {
@@ -350,14 +350,14 @@ return array(
                 "/",
             ) + 1;
             let psr0_keys = main_autoload
-                .get("psr-0")
+                .get(B("psr-0"))
                 .and_then(|v| v.as_array())
                 .cloned()
                 .unwrap_or_default();
             let prefixes = implode(
                 ", ",
                 &array_map(
-                    |prefix: &String| var_export(&PhpMixed::string(prefix.clone()), true),
+                    |prefix: &BString| var_export(&PhpMixed::String(prefix.clone()), true),
                     &array_keys(&psr0_keys),
                 ),
             );
@@ -390,7 +390,7 @@ return array(
 
         let mut excluded: Vec<String> = vec![];
         if let Some(ex) = autoloads
-            .get("exclude-from-classmap")
+            .get(B("exclude-from-classmap"))
             .and_then(|v| v.as_array())
             && !ex.is_empty()
         {
@@ -401,7 +401,7 @@ return array(
         }
 
         let classmap_list: Vec<PhpMixed> = autoloads
-            .get("classmap")
+            .get(B("classmap"))
             .and_then(|v| v.as_array())
             .map(|m| m.values().cloned().collect())
             .unwrap_or_default();
@@ -417,20 +417,22 @@ return array(
         }
 
         if scan_psr_packages {
-            let mut namespaces_to_scan: IndexMap<String, Vec<IndexMap<String, PhpMixed>>> =
+            let mut namespaces_to_scan: IndexMap<String, Vec<IndexMap<BString, PhpMixed>>> =
                 IndexMap::new();
 
             // Scan the PSR-0/4 directories for class files, and add them to the class map
             for psr_type in &["psr-4", "psr-0"] {
                 let map = autoloads
-                    .get(*psr_type)
+                    .get(B(psr_type))
                     .and_then(|v| v.as_array())
                     .cloned()
                     .unwrap_or_default();
                 for (namespace, paths) in &map {
-                    let mut entry: IndexMap<String, PhpMixed> = IndexMap::new();
-                    entry.insert("paths".to_string(), paths.clone());
-                    entry.insert("type".to_string(), PhpMixed::string(psr_type.to_string()));
+                    // TODO(bytes): namespaces are Strings, so non-UTF-8 bytes are replaced.
+                    let namespace = namespace.to_str_lossy().into_owned();
+                    let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
+                    entry.insert("paths".into(), paths.clone());
+                    entry.insert("type".into(), PhpMixed::string(psr_type.to_string()));
                     namespaces_to_scan
                         .entry(namespace.clone())
                         .or_default()
@@ -443,12 +445,12 @@ return array(
             for (namespace, groups) in &namespaces_to_scan {
                 for group in groups {
                     let paths = group
-                        .get("paths")
+                        .get(B("paths"))
                         .and_then(|v| v.as_list())
                         .cloned()
                         .unwrap_or_default();
                     let group_type = group
-                        .get("type")
+                        .get(B("type"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
                         .to_string();
@@ -585,7 +587,7 @@ return array(
                     if is_locked {
                         l.borrow_mut()
                             .get_lock_data()?
-                            .get("content-hash")
+                            .get(B("content-hash"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_string()
@@ -631,13 +633,17 @@ return array(
         }
         let include_files_file_path = format!("{}/autoload_files.php", target_dir);
         let files_map = autoloads
-            .get("files")
+            .get(B("files"))
             .and_then(|v| v.as_array())
             .cloned()
             .unwrap_or_default();
         let mut files_str_map: IndexMap<String, String> = IndexMap::new();
         for (k, v) in &files_map {
-            files_str_map.insert(k.clone(), v.as_string().unwrap_or_default().to_string());
+            // TODO(bytes): file identifiers are Strings, so non-UTF-8 bytes are replaced.
+            files_str_map.insert(
+                k.to_str_lossy().into_owned(),
+                v.as_string().unwrap_or_default().to_string(),
+            );
         }
         let include_files_file_contents = self.get_include_files_file(
             &files_str_map,
@@ -715,8 +721,8 @@ return array(
         )?;
 
         if self.run_scripts.get() {
-            let mut additional_args: IndexMap<String, PhpMixed> = IndexMap::new();
-            additional_args.insert("optimize".to_string(), PhpMixed::Bool(scan_psr_packages));
+            let mut additional_args: IndexMap<BString, PhpMixed> = IndexMap::new();
+            additional_args.insert("optimize".into(), PhpMixed::Bool(scan_psr_packages));
             self.event_dispatcher.borrow_mut().dispatch_script(
                 ScriptEvents::POST_AUTOLOAD_DUMP,
                 self.dev_mode.get().unwrap_or(false),
@@ -814,7 +820,7 @@ return array(
     fn validate_package(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
         let autoload = package.get_autoload();
         if autoload
-            .get("psr-4")
+            .get(B("psr-4"))
             .and_then(|v| v.as_array())
             .is_some_and(|a| !a.is_empty())
             && package.get_target_dir().is_some()
@@ -824,9 +830,9 @@ return array(
             return Err(InvalidArgumentException::new(format!("PSR-4 autoloading is incompatible with the target-dir property, remove the target-dir in package '{}'.", name))
             .into());
         }
-        if let Some(psr4) = autoload.get("psr-4").and_then(|v| v.as_array()) {
+        if let Some(psr4) = autoload.get(B("psr-4")).and_then(|v| v.as_array()) {
             for (namespace, _dirs) in psr4 {
-                if !namespace.is_empty() && !namespace.ends_with('\\') {
+                if !namespace.is_empty() && !namespace.ends_with(b"\\") {
                     return Err(InvalidArgumentException::new(format!("psr-4 namespaces must end with a namespace separator, '{}' does not, use '{}\\'.", namespace, namespace))
                     .into());
                 }
@@ -841,7 +847,7 @@ return array(
         package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
         root_package: RootPackageInterfaceHandle,
         filtered_dev_packages: PhpMixed,
-    ) -> IndexMap<String, PhpMixed> {
+    ) -> IndexMap<BString, PhpMixed> {
         let mut package_map = package_map;
         let root_package_map = array_shift(&mut package_map).unwrap();
         let package_map = if is_array(&filtered_dev_packages) {
@@ -885,28 +891,27 @@ return array(
         psr0.sort_by(|k1, _, k2, _| k2.cmp(k1));
         psr4.sort_by(|k1, _, k2, _| k2.cmp(k1));
 
-        let mut result: IndexMap<String, PhpMixed> = IndexMap::new();
-        result.insert("psr-0".to_string(), PhpMixed::Array(psr0));
-        result.insert("psr-4".to_string(), PhpMixed::Array(psr4));
-        result.insert("classmap".to_string(), PhpMixed::Array(classmap));
-        result.insert("files".to_string(), PhpMixed::Array(files));
-        result.insert(
-            "exclude-from-classmap".to_string(),
-            PhpMixed::Array(exclude),
-        );
+        let mut result: IndexMap<BString, PhpMixed> = IndexMap::new();
+        result.insert("psr-0".into(), PhpMixed::Array(psr0));
+        result.insert("psr-4".into(), PhpMixed::Array(psr4));
+        result.insert("classmap".into(), PhpMixed::Array(classmap));
+        result.insert("files".into(), PhpMixed::Array(files));
+        result.insert("exclude-from-classmap".into(), PhpMixed::Array(exclude));
         result
     }
 
     /// Registers an autoloader based on an autoload-map returned by parseAutoloads
     pub fn create_loader(
         &self,
-        autoloads: &IndexMap<String, PhpMixed>,
+        autoloads: &IndexMap<BString, PhpMixed>,
         vendor_dir: Option<String>,
     ) -> anyhow::Result<ClassLoader> {
         let mut loader = ClassLoader::new(vendor_dir);
 
-        if let Some(psr0) = autoloads.get("psr-0").and_then(|v| v.as_array()) {
+        if let Some(psr0) = autoloads.get(B("psr-0")).and_then(|v| v.as_array()) {
             for (namespace, path) in psr0 {
+                // TODO(bytes): namespaces are Strings, so non-UTF-8 bytes are replaced.
+                let namespace: &str = &namespace.to_str_lossy();
                 let paths = path
                     .as_list()
                     .map(|l| {
@@ -920,8 +925,10 @@ return array(
             }
         }
 
-        if let Some(psr4) = autoloads.get("psr-4").and_then(|v| v.as_array()) {
+        if let Some(psr4) = autoloads.get(B("psr-4")).and_then(|v| v.as_array()) {
             for (namespace, path) in psr4 {
+                // TODO(bytes): namespaces are Strings, so non-UTF-8 bytes are replaced.
+                let namespace: &str = &namespace.to_str_lossy();
                 let paths = path
                     .as_list()
                     .map(|l| {
@@ -935,9 +942,9 @@ return array(
             }
         }
 
-        if let Some(classmap) = autoloads.get("classmap").filter(|v| !v.is_null()) {
+        if let Some(classmap) = autoloads.get(B("classmap")).filter(|v| !v.is_null()) {
             let mut excluded: Vec<String> = vec![];
-            if let Some(ex) = autoloads.get("exclude-from-classmap")
+            if let Some(ex) = autoloads.get(B("exclude-from-classmap"))
                 && !empty(ex)
             {
                 excluded = ex
@@ -1608,6 +1615,8 @@ class ComposerStaticInit{}
         let map = require_generated_php_array(&format!("{}/autoload_namespaces.php", target_dir));
         if let Some(map_arr) = map.as_array() {
             for (namespace, path) in map_arr {
+                // TODO(bytes): namespaces are Strings, so non-UTF-8 bytes are replaced.
+                let namespace: &str = &namespace.to_str_lossy();
                 let paths: Vec<String> = if let PhpMixed::List(items) = path.clone() {
                     items
                         .iter()
@@ -1623,6 +1632,8 @@ class ComposerStaticInit{}
         let map = require_generated_php_array(&format!("{}/autoload_psr4.php", target_dir));
         if let Some(map_arr) = map.as_array() {
             for (namespace, path) in map_arr {
+                // TODO(bytes): namespaces are Strings, so non-UTF-8 bytes are replaced.
+                let namespace: &str = &namespace.to_str_lossy();
                 let paths: Vec<String> = if let PhpMixed::List(items) = path.clone() {
                     items
                         .iter()
@@ -1643,7 +1654,13 @@ class ComposerStaticInit{}
         {
             let cm_str: IndexMap<String, String> = cm
                 .iter()
-                .map(|(k, v)| (k.clone(), v.as_string().unwrap_or_default().to_string()))
+                // TODO(bytes): class names are Strings, so non-UTF-8 bytes are replaced.
+                .map(|(k, v)| {
+                    (
+                        k.to_str_lossy().into_owned(),
+                        v.as_string().unwrap_or_default().to_string(),
+                    )
+                })
                 .collect();
             loader.add_class_map(cm_str);
         }
@@ -1746,10 +1763,10 @@ class ComposerStaticInit{}
         let mut initializer = String::new();
         let prefix = "\0Composer\\Autoload\\ClassLoader\0";
         let prefix_len = strlen(prefix);
-        let mut maps: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut maps: IndexMap<BString, PhpMixed> = IndexMap::new();
         if file_exists(format!("{}/autoload_files.php", target_dir)) {
             maps.insert(
-                "files".to_string(),
+                "files".into(),
                 require_generated_php_array(&format!("{}/autoload_files.php", target_dir)),
             );
         }
@@ -1762,7 +1779,7 @@ class ComposerStaticInit{}
             {
                 continue;
             }
-            maps.insert(substr(&prop, prefix_len, None), value);
+            maps.insert(substr(&prop, prefix_len, None).into(), value);
         }
 
         for (prop, value) in &maps {
@@ -1794,7 +1811,7 @@ class ComposerStaticInit{}
                 prop.clone(),
                 value.clone(),
             ));
-            if "files" != prop.as_str() {
+            if *prop != "files" {
                 initializer.push_str(&format!(
                     "            $loader->{} = ComposerStaticInit{}::${};\n",
                     prop, suffix, prop
@@ -1820,8 +1837,8 @@ class ComposerStaticInit{}
         package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
         r#type: &str,
         root_package: RootPackageInterfaceHandle,
-    ) -> IndexMap<String, PhpMixed> {
-        let mut autoloads: IndexMap<String, PhpMixed> = IndexMap::new();
+    ) -> IndexMap<BString, PhpMixed> {
+        let mut autoloads: IndexMap<BString, PhpMixed> = IndexMap::new();
         let mut numeric_index: i64 = 0;
 
         for item in package_map {
@@ -1847,7 +1864,7 @@ class ComposerStaticInit{}
             }
 
             // skip misconfigured packages
-            let type_value = match autoload.get(r#type) {
+            let type_value = match autoload.get(B(r#type)) {
                 Some(v) => v,
                 None => continue,
             };
@@ -1864,16 +1881,18 @@ class ComposerStaticInit{}
             // string-keyed map (psr-0/psr-4) or a numerically-indexed list (classmap/files/
             // exclude-from-classmap, which JSON decodes to `PhpMixed::List`). Normalize both into
             // `(key, value)` pairs so list-form types are not silently skipped.
-            let type_arr: IndexMap<String, PhpMixed> = match type_value {
+            let type_arr: IndexMap<BString, PhpMixed> = match type_value {
                 PhpMixed::Array(a) => a.clone(),
                 PhpMixed::List(l) => l
                     .iter()
                     .enumerate()
-                    .map(|(i, v)| (i.to_string(), v.clone()))
+                    .map(|(i, v)| (i.to_string().into(), v.clone()))
                     .collect(),
                 _ => IndexMap::new(),
             };
             for (namespace, paths) in type_arr {
+                // TODO(bytes): namespaces are Strings, so non-UTF-8 bytes are replaced.
+                let namespace = namespace.to_str_lossy().into_owned();
                 let namespace = if ["psr-4", "psr-0"].contains(&r#type) {
                     // normalize namespaces to ensure "\" becomes "" and others do not have leading separators as they are not needed
                     ltrim(&namespace, Some("\\"))
@@ -1981,7 +2000,7 @@ class ComposerStaticInit{}
                             preg_quote(&strtr(&resolved_path, "\\", "/"), None),
                             p
                         );
-                        autoloads.insert(numeric_index.to_string(), PhpMixed::string(entry));
+                        autoloads.insert(numeric_index.to_string().into(), PhpMixed::string(entry));
                         numeric_index += 1;
                         continue;
                     }
@@ -1998,21 +2017,23 @@ class ComposerStaticInit{}
 
                     if r#type == "files" {
                         autoloads.insert(
-                            self.get_file_identifier(package.clone(), &path_str),
+                            self.get_file_identifier(package.clone(), &path_str).into(),
                             PhpMixed::string(relative_path),
                         );
                         continue;
                     }
                     if r#type == "classmap" {
-                        autoloads
-                            .insert(numeric_index.to_string(), PhpMixed::string(relative_path));
+                        autoloads.insert(
+                            numeric_index.to_string().into(),
+                            PhpMixed::string(relative_path),
+                        );
                         numeric_index += 1;
                         continue;
                     }
 
                     // psr-0/psr-4: append to namespace's list
                     let entry = autoloads
-                        .entry(namespace.clone())
+                        .entry(namespace.as_str().into())
                         .or_insert_with(|| PhpMixed::List(vec![]));
                     if let PhpMixed::List(l) = entry {
                         l.push(PhpMixed::string(relative_path));
@@ -2155,10 +2176,10 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
         package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
         root_package: RootPackageInterfaceHandle,
         filtered_dev_packages: PhpMixed,
-    ) -> IndexMap<String, PhpMixed>;
+    ) -> IndexMap<BString, PhpMixed>;
     fn create_loader(
         &self,
-        autoloads: &IndexMap<String, PhpMixed>,
+        autoloads: &IndexMap<BString, PhpMixed>,
         vendor_dir: Option<String>,
     ) -> anyhow::Result<ClassLoader>;
 }
@@ -2231,13 +2252,13 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
         package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
         root_package: RootPackageInterfaceHandle,
         filtered_dev_packages: PhpMixed,
-    ) -> IndexMap<String, PhpMixed> {
+    ) -> IndexMap<BString, PhpMixed> {
         self.parse_autoloads(package_map, root_package, filtered_dev_packages)
     }
 
     fn create_loader(
         &self,
-        autoloads: &IndexMap<String, PhpMixed>,
+        autoloads: &IndexMap<BString, PhpMixed>,
         vendor_dir: Option<String>,
     ) -> anyhow::Result<ClassLoader> {
         self.create_loader(autoloads, vendor_dir)
@@ -2289,7 +2310,7 @@ fn require_generated_php_array(file: &str) -> PhpMixed {
     };
     let body = &contents[start..end];
 
-    let mut map: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();
     for entry in split_top_level_commas(body) {
         let entry = entry.trim();
         if entry.is_empty() {
@@ -2317,7 +2338,7 @@ fn require_generated_php_array(file: &str) -> PhpMixed {
         } else {
             PhpMixed::string(eval_php_path_expr(value_expr, &dir, &vendor_dir, &base_dir))
         };
-        map.insert(key, value);
+        map.insert(key.into(), value);
     }
 
     PhpMixed::Array(map)

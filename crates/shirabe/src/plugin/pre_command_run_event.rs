@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Plugin/PreCommandRunEvent.php
 
 use crate::event_dispatcher::{Event, EventInterface};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_console::input::InputInterface;
@@ -56,7 +57,7 @@ impl EventInterface for PreCommandRunEvent {
         self.inner.get_arguments()
     }
 
-    fn get_flags(&self) -> &IndexMap<String, PhpMixed> {
+    fn get_flags(&self) -> &IndexMap<BString, PhpMixed> {
         self.inner.get_flags()
     }
 

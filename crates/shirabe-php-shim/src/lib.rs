@@ -50,7 +50,7 @@ pub use var::*;
 pub use xml::*;
 pub use zip::*;
 
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 
 // Re-exported at the crate root so `php_regex!` can reach it via `$crate::regex!` regardless of
@@ -67,9 +67,9 @@ pub enum PhpMixed {
     Float(f64),
     String(bstr::BString),
     List(Vec<PhpMixed>),
-    Array(IndexMap<String, PhpMixed>),
+    Array(IndexMap<BString, PhpMixed>),
     // TODO(type-model): consolidate Object to Array.
-    Object(IndexMap<String, PhpMixed>),
+    Object(IndexMap<BString, PhpMixed>),
     // Resources, arbitrary objects and callables are intentionally excluded. Do not add these
     // things to this type.
 }
@@ -103,14 +103,16 @@ impl serde::Serialize for PhpMixed {
                 }
                 let mut map = serializer.serialize_map(Some(entries.len()))?;
                 for (k, v) in entries {
-                    map.serialize_entry(k, v)?;
+                    // TODO(bytes): serde serializes keys as UTF-8, so non-UTF-8 bytes are replaced.
+                    map.serialize_entry(&k.to_str_lossy(), v)?;
                 }
                 map.end()
             }
             PhpMixed::Object(entries) => {
                 let mut map = serializer.serialize_map(Some(entries.len()))?;
                 for (k, v) in entries {
-                    map.serialize_entry(k, v)?;
+                    // TODO(bytes): serde serializes keys as UTF-8, so non-UTF-8 bytes are replaced.
+                    map.serialize_entry(&k.to_str_lossy(), v)?;
                 }
                 map.end()
             }
@@ -185,14 +187,14 @@ impl PhpMixed {
         }
     }
 
-    pub fn as_array(&self) -> Option<&IndexMap<String, PhpMixed>> {
+    pub fn as_array(&self) -> Option<&IndexMap<BString, PhpMixed>> {
         match self {
             PhpMixed::Array(a) => Some(a),
             _ => None,
         }
     }
 
-    pub fn as_array_mut(&mut self) -> Option<&mut IndexMap<String, PhpMixed>> {
+    pub fn as_array_mut(&mut self) -> Option<&mut IndexMap<BString, PhpMixed>> {
         match self {
             PhpMixed::Array(a) => Some(a),
             _ => None,
@@ -206,7 +208,7 @@ impl PhpMixed {
         }
     }
 
-    pub fn as_object(&self) -> Option<&IndexMap<String, PhpMixed>> {
+    pub fn as_object(&self) -> Option<&IndexMap<BString, PhpMixed>> {
         match self {
             PhpMixed::Object(o) => Some(o),
             _ => None,
@@ -233,7 +235,7 @@ impl PhpMixed {
     }
 
     pub fn get(&self, key: &str) -> Option<&PhpMixed> {
-        self.as_array().and_then(|m| m.get(key))
+        self.as_array().and_then(|m| m.get(B(key)))
     }
 
     /// Treats PhpMixed::Null as None, everything else as Some.
@@ -350,6 +352,12 @@ impl From<&str> for PhpMixed {
     }
 }
 
+impl From<BString> for PhpMixed {
+    fn from(value: BString) -> Self {
+        PhpMixed::String(value)
+    }
+}
+
 impl From<&bstr::BStr> for PhpMixed {
     fn from(value: &bstr::BStr) -> Self {
         PhpMixed::String(value.to_owned())
@@ -361,6 +369,20 @@ where
     T: Into<PhpMixed>,
 {
     fn from(value: IndexMap<String, T>) -> Self {
+        PhpMixed::Array(
+            value
+                .into_iter()
+                .map(|(k, v)| (k.into(), v.into()))
+                .collect(),
+        )
+    }
+}
+
+impl<T> From<IndexMap<BString, T>> for PhpMixed
+where
+    T: Into<PhpMixed>,
+{
+    fn from(value: IndexMap<BString, T>) -> Self {
         PhpMixed::Array(value.into_iter().map(|(k, v)| (k, v.into())).collect())
     }
 }

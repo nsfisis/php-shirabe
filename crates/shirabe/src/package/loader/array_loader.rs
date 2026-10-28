@@ -7,7 +7,7 @@ use crate::package::{
     Link, Mirror, Package, PackageInterface, PackageInterfaceHandle, RootAliasPackageHandle,
     RootPackage, RootPackageHandle, SUPPORTED_LINK_TYPES,
 };
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -27,13 +27,13 @@ pub trait VersionFields {
     }
 }
 
-impl VersionFields for IndexMap<String, PhpMixed> {
+impl VersionFields for IndexMap<BString, PhpMixed> {
     fn get(&self, key: &str) -> Option<&PhpMixed> {
-        IndexMap::get(self, key)
+        IndexMap::get(self, B(key))
     }
 
     fn contains_key(&self, key: &str) -> bool {
-        IndexMap::contains_key(self, key)
+        IndexMap::contains_key(self, B(key))
     }
 }
 
@@ -55,7 +55,7 @@ impl ArrayLoader {
     #[tracing::instrument(skip_all)]
     pub fn load_packages(
         &self,
-        versions: Vec<IndexMap<String, PhpMixed>>,
+        versions: Vec<IndexMap<BString, PhpMixed>>,
     ) -> anyhow::Result<Vec<PackageInterfaceHandle>> {
         let mut packages: Vec<PackageInterfaceHandle> = vec![];
         let mut link_cache: IndexMap<
@@ -77,38 +77,38 @@ impl ArrayLoader {
 
     fn create_object(
         &self,
-        config: &IndexMap<String, PhpMixed>,
+        config: &IndexMap<BString, PhpMixed>,
         class: &str,
     ) -> anyhow::Result<CompleteOrRootPackage> {
-        if !config.contains_key("name") {
+        if !config.contains_key(B("name")) {
             return Err(UnexpectedValueException::new(format!(
                 "Unknown package has no name defined ({}).",
                 json_encode(&PhpMixed::Array(config.clone())).unwrap_or_default()
             ))
             .into());
         }
-        if !config.contains_key("version") || !is_scalar(config.get("version").unwrap()) {
+        if !config.contains_key(B("version")) || !is_scalar(config.get(B("version")).unwrap()) {
             return Err(UnexpectedValueException::new(format!(
                 "Package {} has no version defined.",
                 config
-                    .get("name")
+                    .get(B("name"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
             ))
             .into());
         }
-        let mut config_version = config.get("version").cloned().unwrap_or(PhpMixed::Null);
+        let mut config_version = config.get(B("version")).cloned().unwrap_or(PhpMixed::Null);
         if !is_string(&config_version) {
             config_version = PhpMixed::string(strval(&config_version));
         }
 
         // handle already normalized versions
         let version: String;
-        if config.contains_key("version_normalized")
-            && is_string(config.get("version_normalized").unwrap())
+        if config.contains_key(B("version_normalized"))
+            && is_string(config.get(B("version_normalized")).unwrap())
         {
             let mut v = config
-                .get("version_normalized")
+                .get(B("version_normalized"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string();
@@ -137,7 +137,7 @@ impl ArrayLoader {
                     let message = format!(
                         "Failed to normalize version for package \"{}\": {}",
                         config
-                            .get("name")
+                            .get(B("name"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
                         e
@@ -154,7 +154,7 @@ impl ArrayLoader {
         }
 
         let name = config
-            .get("name")
+            .get(B("name"))
             .and_then(|v| v.as_string())
             .unwrap_or_default()
             .to_string();
@@ -178,30 +178,30 @@ impl ArrayLoader {
     fn configure_object(
         &self,
         mut package: CompleteOrRootPackage,
-        config: &mut IndexMap<String, PhpMixed>,
+        config: &mut IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<PackageInterfaceHandle> {
         package
             .package_mut()
-            .set_type(if let Some(t) = config.get("type") {
+            .set_type(if let Some(t) = config.get(B("type")) {
                 strtolower(&t.as_string().unwrap_or_default().to_str_lossy())
             } else {
                 "library".to_string()
             });
 
-        if let Some(target_dir) = config.get("target-dir") {
+        if let Some(target_dir) = config.get(B("target-dir")) {
             package
                 .package_mut()
                 .set_target_dir(target_dir.as_string().map(|s| s.to_string()));
         }
 
-        if let Some(extra) = config.get("extra")
+        if let Some(extra) = config.get(B("extra"))
             && matches!(extra, PhpMixed::Array(_))
         {
             let extra_map = php_to_map(extra);
             package.package_mut().set_extra(extra_map);
         }
 
-        if let Some(bin) = config.get("bin").cloned() {
+        if let Some(bin) = config.get(B("bin")).cloned() {
             let mut bin_list = match bin {
                 PhpMixed::Array(_) | PhpMixed::List(_) => bin,
                 other => PhpMixed::List(vec![other]),
@@ -220,23 +220,23 @@ impl ArrayLoader {
                 }
             }
             let binaries = php_to_string_vec(&bin_list);
-            config.insert("bin".to_string(), bin_list);
+            config.insert("bin".into(), bin_list);
             package.package_mut().set_binaries(binaries);
         }
 
-        if let Some(installation_source) = config.get("installation-source") {
+        if let Some(installation_source) = config.get(B("installation-source")) {
             package
                 .package_mut()
                 .set_installation_source(installation_source.as_string().map(|s| s.to_string()));
         }
 
-        if let Some(default_branch) = config.get("default-branch")
+        if let Some(default_branch) = config.get(B("default-branch"))
             && default_branch.as_bool() == Some(true)
         {
             package.package_mut().set_is_default_branch(true);
         }
 
-        if let Some(source) = config.get("source").filter(|v| !v.is_null()).cloned() {
+        if let Some(source) = config.get(B("source")).filter(|v| !v.is_null()).cloned() {
             let source_map = match &source {
                 PhpMixed::Array(m) => Some(m.clone()),
                 _ => None,
@@ -244,14 +244,16 @@ impl ArrayLoader {
             let has_required = source_map
                 .as_ref()
                 .map(|m| {
-                    m.contains_key("type") && m.contains_key("url") && m.contains_key("reference")
+                    m.contains_key(B("type"))
+                        && m.contains_key(B("url"))
+                        && m.contains_key(B("reference"))
                 })
                 .unwrap_or(false);
             if !has_required {
                 return Err(UnexpectedValueException::new(format!(
                     "Package {}'s source key should be specified as {{\"type\": ..., \"url\": ..., \"reference\": ...}},\n{} given.",
                     config
-                        .get("name")
+                        .get(B("name"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default(),
                     json_encode(&source).unwrap_or_default(),
@@ -261,37 +263,37 @@ impl ArrayLoader {
             let source_map = source_map.unwrap();
             package
                 .package_mut()
-                .set_source_type(source_map.get("type").map(strval));
+                .set_source_type(source_map.get(B("type")).map(strval));
             package
                 .package_mut()
-                .set_source_url(source_map.get("url").map(strval));
+                .set_source_url(source_map.get(B("url")).map(strval));
             package.package_mut().set_source_reference(
                 source_map
-                    .get("reference")
+                    .get(B("reference"))
                     .filter(|v| !v.is_null())
                     .map(strval),
             );
-            if let Some(mirrors) = source_map.get("mirrors") {
+            if let Some(mirrors) = source_map.get(B("mirrors")) {
                 package
                     .package_mut()
                     .set_source_mirrors(Some(php_to_mirrors(mirrors)));
             }
         }
 
-        if let Some(dist) = config.get("dist").filter(|v| !v.is_null()).cloned() {
+        if let Some(dist) = config.get(B("dist")).filter(|v| !v.is_null()).cloned() {
             let dist_map = match &dist {
                 PhpMixed::Array(m) => Some(m.clone()),
                 _ => None,
             };
             let has_required = dist_map
                 .as_ref()
-                .map(|m| m.contains_key("type") && m.contains_key("url"))
+                .map(|m| m.contains_key(B("type")) && m.contains_key(B("url")))
                 .unwrap_or(false);
             if !has_required {
                 return Err(UnexpectedValueException::new(format!(
                     "Package {}'s dist key should be specified as {{\"type\": ..., \"url\": ..., \"reference\": ..., \"shasum\": ...}},\n{} given.",
                     config
-                        .get("name")
+                        .get(B("name"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default(),
                     json_encode(&dist).unwrap_or_default(),
@@ -301,27 +303,27 @@ impl ArrayLoader {
             let dist_map = dist_map.unwrap();
             package
                 .package_mut()
-                .set_dist_type(dist_map.get("type").map(strval));
+                .set_dist_type(dist_map.get(B("type")).map(strval));
             package
                 .package_mut()
-                .set_dist_url(dist_map.get("url").map(strval));
+                .set_dist_url(dist_map.get(B("url")).map(strval));
             package.package_mut().set_dist_reference(
                 dist_map
-                    .get("reference")
+                    .get(B("reference"))
                     .filter(|v| !v.is_null())
                     .map(strval),
             );
             package
                 .package_mut()
-                .set_dist_sha1_checksum(dist_map.get("shasum").map(strval));
-            if let Some(mirrors) = dist_map.get("mirrors") {
+                .set_dist_sha1_checksum(dist_map.get(B("shasum")).map(strval));
+            if let Some(mirrors) = dist_map.get(B("mirrors")) {
                 package
                     .package_mut()
                     .set_dist_mirrors(Some(php_to_mirrors(mirrors)));
             }
         }
 
-        if let Some(suggest) = config.get("suggest").cloned()
+        if let Some(suggest) = config.get(B("suggest")).cloned()
             && let PhpMixed::Array(mut suggest_map) = suggest
         {
             for (target, reason) in suggest_map.iter_mut() {
@@ -334,33 +336,34 @@ impl ArrayLoader {
             }
             let suggests: IndexMap<String, String> = suggest_map
                 .iter()
-                .map(|(k, v)| (k.clone(), strval(v)))
+                // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
+                .map(|(k, v)| (k.to_str_lossy().into_owned(), strval(v)))
                 .collect();
-            config.insert("suggest".to_string(), PhpMixed::Array(suggest_map));
+            config.insert("suggest".into(), PhpMixed::Array(suggest_map));
             package.package_mut().set_suggests(suggests);
         }
 
-        if let Some(autoload) = config.get("autoload") {
+        if let Some(autoload) = config.get(B("autoload")) {
             let autoload_map = php_to_map(autoload);
             package.package_mut().set_autoload(autoload_map);
         }
 
-        if let Some(autoload_dev) = config.get("autoload-dev") {
+        if let Some(autoload_dev) = config.get(B("autoload-dev")) {
             let dev_autoload_map = php_to_map(autoload_dev);
             package.package_mut().set_dev_autoload(dev_autoload_map);
         }
 
-        if let Some(include_path) = config.get("include-path") {
+        if let Some(include_path) = config.get(B("include-path")) {
             let include_paths = php_to_string_vec(include_path);
             package.package_mut().set_include_paths(include_paths);
         }
 
-        if let Some(php_ext) = config.get("php-ext") {
+        if let Some(php_ext) = config.get(B("php-ext")) {
             let php_ext_map = php_to_map(php_ext);
             package.package_mut().set_php_ext(Some(php_ext_map));
         }
 
-        if let Some(time_value) = config.get("time")
+        if let Some(time_value) = config.get(B("time"))
             && !empty(time_value)
         {
             let time_str = time_value.as_string().unwrap_or_default();
@@ -375,7 +378,7 @@ impl ArrayLoader {
             }
         }
 
-        if let Some(notification_url) = config.get("notification-url")
+        if let Some(notification_url) = config.get(B("notification-url"))
             && !empty(notification_url)
         {
             package
@@ -383,15 +386,15 @@ impl ArrayLoader {
                 .set_notification_url(strval(notification_url));
         }
 
-        if let Some(archive) = config.get("archive").cloned()
+        if let Some(archive) = config.get(B("archive")).cloned()
             && let PhpMixed::Array(archive_map) = archive
         {
-            if let Some(name) = archive_map.get("name")
+            if let Some(name) = archive_map.get(B("name"))
                 && !empty(name)
             {
                 package.complete_mut().set_archive_name(strval(name));
             }
-            if let Some(exclude) = archive_map.get("exclude")
+            if let Some(exclude) = archive_map.get(B("exclude"))
                 && !empty(exclude)
             {
                 package
@@ -400,7 +403,7 @@ impl ArrayLoader {
             }
         }
 
-        if let Some(scripts) = config.get("scripts").cloned()
+        if let Some(scripts) = config.get(B("scripts")).cloned()
             && let PhpMixed::Array(mut scripts_map) = scripts
         {
             for (event, listeners) in scripts_map.iter_mut() {
@@ -412,7 +415,7 @@ impl ArrayLoader {
                 let _ = event;
             }
             for reserved in ["composer", "php", "putenv"].iter() {
-                if scripts_map.contains_key(*reserved) {
+                if scripts_map.contains_key(B(reserved)) {
                     trigger_error(
                         &format!(
                             "The `{}` script name is reserved for internal use, please avoid defining it",
@@ -424,13 +427,14 @@ impl ArrayLoader {
             }
             let scripts: IndexMap<String, Vec<String>> = scripts_map
                 .iter()
-                .map(|(k, v)| (k.clone(), php_to_string_vec(v)))
+                // TODO(bytes): script names are Strings, so non-UTF-8 bytes are replaced.
+                .map(|(k, v)| (k.to_str_lossy().into_owned(), php_to_string_vec(v)))
                 .collect();
-            config.insert("scripts".to_string(), PhpMixed::Array(scripts_map));
+            config.insert("scripts".into(), PhpMixed::Array(scripts_map));
             package.complete_mut().set_scripts(scripts);
         }
 
-        if let Some(description) = config.get("description")
+        if let Some(description) = config.get(B("description"))
             && !empty(description)
             && is_string(description)
         {
@@ -439,7 +443,7 @@ impl ArrayLoader {
                 .set_description(description.as_string().unwrap_or_default().to_string());
         }
 
-        if let Some(homepage) = config.get("homepage")
+        if let Some(homepage) = config.get(B("homepage"))
             && !empty(homepage)
             && is_string(homepage)
         {
@@ -448,7 +452,7 @@ impl ArrayLoader {
                 .set_homepage(homepage.as_string().unwrap_or_default().to_string());
         }
 
-        if let Some(keywords) = config.get("keywords")
+        if let Some(keywords) = config.get(B("keywords"))
             && !empty(keywords)
             && matches!(keywords, PhpMixed::Array(_) | PhpMixed::List(_))
         {
@@ -460,7 +464,7 @@ impl ArrayLoader {
             package.complete_mut().set_keywords(keywords_vec);
         }
 
-        if let Some(license) = config.get("license")
+        if let Some(license) = config.get(B("license"))
             && !empty(license)
         {
             let license_vec: Vec<String> = match license {
@@ -477,7 +481,7 @@ impl ArrayLoader {
             package.complete_mut().set_license(license_vec);
         }
 
-        if let Some(authors) = config.get("authors")
+        if let Some(authors) = config.get(B("authors"))
             && !empty(authors)
             && let PhpMixed::List(list) = authors
         {
@@ -486,8 +490,13 @@ impl ArrayLoader {
                 .filter_map(|v| match v {
                     PhpMixed::Array(m) => Some(
                         m.iter()
+                            // TODO(bytes): author keys are Strings, so non-UTF-8 bytes are
+                            // replaced.
                             .map(|(k, v)| {
-                                (k.clone(), v.as_string().unwrap_or_default().to_string())
+                                (
+                                    k.to_str_lossy().into_owned(),
+                                    v.as_string().unwrap_or_default().to_string(),
+                                )
                             })
                             .collect(),
                     ),
@@ -497,21 +506,27 @@ impl ArrayLoader {
             package.complete_mut().set_authors(authors_vec);
         }
 
-        if let Some(support) = config.get("support")
+        if let Some(support) = config.get(B("support"))
             && let PhpMixed::Array(map) = support
         {
             let support_map: IndexMap<String, String> = map
                 .iter()
-                .map(|(k, v)| (k.clone(), v.as_string().unwrap_or_default().to_string()))
+                // TODO(bytes): support keys are Strings, so non-UTF-8 bytes are replaced.
+                .map(|(k, v)| {
+                    (
+                        k.to_str_lossy().into_owned(),
+                        v.as_string().unwrap_or_default().to_string(),
+                    )
+                })
                 .collect();
             package.complete_mut().set_support(support_map);
         }
 
-        if let Some(funding) = config.get("funding")
+        if let Some(funding) = config.get(B("funding"))
             && !empty(funding)
             && let PhpMixed::List(list) = funding
         {
-            let funding_vec: Vec<IndexMap<String, PhpMixed>> = list
+            let funding_vec: Vec<IndexMap<BString, PhpMixed>> = list
                 .iter()
                 .filter_map(|v| match v {
                     PhpMixed::Array(m) => Some(m.clone()),
@@ -521,12 +536,12 @@ impl ArrayLoader {
             package.complete_mut().set_funding(funding_vec);
         }
 
-        if let Some(abandoned) = config.get("abandoned") {
+        if let Some(abandoned) = config.get(B("abandoned")) {
             package.complete_mut().set_abandoned(abandoned.clone());
         }
 
         if self.load_options
-            && let Some(transport_options) = config.get("transport-options")
+            && let Some(transport_options) = config.get(B("transport-options"))
         {
             let options = php_to_map(transport_options);
             package.package_mut().set_transport_options(options);
@@ -564,19 +579,21 @@ impl ArrayLoader {
             IndexMap<String, IndexMap<String, IndexMap<String, (String, Link)>>>,
         >,
         package: &mut CompleteOrRootPackage,
-        config: &IndexMap<String, PhpMixed>,
+        config: &IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let name = package.get_name().to_string();
         let pretty_version = package.get_pretty_version().to_string();
 
         for (r#type, opts) in SUPPORTED_LINK_TYPES.iter() {
-            if let Some(entry) = config.get(*r#type) {
+            if let Some(entry) = config.get(B(r#type)) {
                 let mut links: IndexMap<String, Link> = IndexMap::new();
-                let entries: IndexMap<String, PhpMixed> = match entry {
+                let entries: IndexMap<BString, PhpMixed> = match entry {
                     PhpMixed::Array(m) => m.clone(),
                     _ => continue,
                 };
                 for (pretty_target, constraint) in entries {
+                    // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
+                    let pretty_target = pretty_target.to_str_lossy().into_owned();
                     let target = strtolower(&pretty_target);
 
                     // recursive links are not supported
@@ -638,10 +655,12 @@ impl ArrayLoader {
         source: &str,
         source_version: &str,
         description: &str,
-        links: IndexMap<String, PhpMixed>,
+        links: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<IndexMap<String, Link>> {
         let mut res: IndexMap<String, Link> = IndexMap::new();
         for (target, constraint) in links {
+            // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
+            let target = target.to_str_lossy().into_owned();
             if !is_string(&constraint) {
                 continue;
             }
@@ -722,7 +741,7 @@ impl ArrayLoader {
         let extra_branch_alias = config
             .get("extra")
             .and_then(|v| match v {
-                PhpMixed::Array(m) => m.get("branch-alias").cloned(),
+                PhpMixed::Array(m) => m.get(B("branch-alias")).cloned(),
                 _ => None,
             })
             .and_then(|v| match v {
@@ -732,7 +751,7 @@ impl ArrayLoader {
 
         if let Some(branch_alias_map) = extra_branch_alias {
             for (source_branch, target_branch_value) in branch_alias_map {
-                let source_branch = strval(&PhpMixed::string(source_branch));
+                let source_branch = strval(&PhpMixed::String(source_branch));
                 let target_branch = target_branch_value
                     .as_string()
                     .unwrap_or_default()
@@ -841,7 +860,7 @@ impl CompleteOrRootPackage {
     }
 }
 
-fn php_to_map(value: &PhpMixed) -> IndexMap<String, PhpMixed> {
+fn php_to_map(value: &PhpMixed) -> IndexMap<BString, PhpMixed> {
     match value {
         PhpMixed::Array(m) => m.clone(),
         _ => IndexMap::new(),
@@ -881,11 +900,11 @@ fn php_to_mirrors(value: &PhpMixed) -> Vec<Mirror> {
         .filter_map(|entry| match entry {
             PhpMixed::Array(m) => Some(Mirror {
                 url: m
-                    .get("url")
+                    .get(B("url"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_string(),
-                preferred: m.get("preferred").is_some_and(|v| v.to_bool()),
+                preferred: m.get(B("preferred")).is_some_and(|v| v.to_bool()),
             }),
             _ => None,
         })
@@ -899,7 +918,7 @@ impl LoaderInterface for ArrayLoader {
 
     fn load(
         &self,
-        mut config: IndexMap<String, PhpMixed>,
+        mut config: IndexMap<BString, PhpMixed>,
         class: Option<String>,
     ) -> anyhow::Result<PackageInterfaceHandle> {
         let class = class.unwrap_or_else(|| "Composer\\Package\\CompletePackage".to_string());
@@ -916,7 +935,7 @@ impl LoaderInterface for ArrayLoader {
         let mut package = self.create_object(&config, &class)?;
 
         for (r#type, opts) in SUPPORTED_LINK_TYPES.iter() {
-            let entry = config.get(*r#type);
+            let entry = config.get(B(r#type));
             let entry_is_array = entry
                 .map(|v| matches!(v, PhpMixed::Array(_)))
                 .unwrap_or(false);

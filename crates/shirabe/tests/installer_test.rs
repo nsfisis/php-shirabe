@@ -7,6 +7,7 @@ mod config_stub;
 #[path = "common/test_case.rs"]
 mod test_case;
 
+use bstr::{B, BString};
 use config_stub::ConfigStubBuilder;
 use serial_test::serial;
 use shirabe_symfony_console::input::{
@@ -171,7 +172,7 @@ impl EventDispatcherInterface for StubEventDispatcher {
         _event_name: &str,
         _dev_mode: bool,
         _additional_args: Vec<String>,
-        _flags: IndexMap<String, PhpMixed>,
+        _flags: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<i64> {
         Ok(0)
     }
@@ -245,12 +246,12 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
         _package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
         _root_package: RootPackageInterfaceHandle,
         _filtered_dev_packages: PhpMixed,
-    ) -> IndexMap<String, PhpMixed> {
+    ) -> IndexMap<BString, PhpMixed> {
         IndexMap::new()
     }
     fn create_loader(
         &self,
-        _autoloads: &IndexMap<String, PhpMixed>,
+        _autoloads: &IndexMap<BString, PhpMixed>,
         _vendor_dir: Option<String>,
     ) -> anyhow::Result<ClassLoader> {
         unimplemented!("create_loader is not reached by the installer test path")
@@ -365,7 +366,7 @@ fn provide_installer() -> Vec<InstallerCase> {
 /// ref: InstallerTest::makePackagesComparable
 fn make_packages_comparable(
     packages: &[PackageInterfaceHandle],
-) -> Vec<IndexMap<String, PhpMixed>> {
+) -> Vec<IndexMap<BString, PhpMixed>> {
     let dumper = ArrayDumper::new();
     packages.iter().map(|p| dumper.dump(p.clone())).collect()
 }
@@ -1241,25 +1242,25 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     if let Some(expect_installed) = &case.expect_installed {
         let dumper = ArrayDumper::new();
         let local_repo = repository_manager.borrow().get_local_repository();
-        let mut actual_installed: Vec<IndexMap<String, PhpMixed>> = local_repo
+        let mut actual_installed: Vec<IndexMap<BString, PhpMixed>> = local_repo
             .get_canonical_packages()
             .unwrap()
             .into_iter()
             .map(|package| {
                 let mut dumped = dumper.dump(package);
-                dumped.shift_remove("version_normalized");
+                dumped.shift_remove(B("version_normalized"));
                 dumped
             })
             .collect();
         actual_installed.sort_by(
-            |a: &IndexMap<String, PhpMixed>, b: &IndexMap<String, PhpMixed>| {
+            |a: &IndexMap<BString, PhpMixed>, b: &IndexMap<BString, PhpMixed>| {
                 let an = a
-                    .get("name")
+                    .get(B("name"))
                     .and_then(|m| m.as_string())
                     .map(|s| s.to_string())
                     .unwrap_or_default();
                 let bn = b
-                    .get("name")
+                    .get(B("name"))
                     .and_then(|m| m.as_string())
                     .map(|s| s.to_string())
                     .unwrap_or_default();
@@ -1305,8 +1306,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     }
 }
 
-fn php_mixed_map_to_json(map: &IndexMap<String, PhpMixed>) -> serde_json::Value {
-    serde_json::to_value(map).unwrap_or(serde_json::Value::Null)
+fn php_mixed_map_to_json(map: &IndexMap<BString, PhpMixed>) -> serde_json::Value {
+    serde_json::to_value(PhpMixed::Array(map.clone())).unwrap_or(serde_json::Value::Null)
 }
 
 #[test]

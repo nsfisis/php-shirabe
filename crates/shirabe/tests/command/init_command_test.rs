@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/InitCommandTest.php
 
 use crate::test_case::{RestoreEnv, RunOptions, get_application_tester, init_temp_composer};
+use bstr::BString;
 use serial_test::serial;
 use shirabe::command::init_command::InitCommand;
 use shirabe::json::JsonFile;
@@ -581,23 +582,17 @@ fn test_format_authors() {
     let command = InitCommand::new();
 
     let authors = command.__format_authors(author_with_email).unwrap();
-    let mut expected: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
+    let mut expected: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
+    expected.insert("name".into(), PhpMixed::string("John Smith".to_string()));
     expected.insert(
-        "name".to_string(),
-        PhpMixed::string("John Smith".to_string()),
-    );
-    expected.insert(
-        "email".to_string(),
+        "email".into(),
         PhpMixed::string("john@example.com".to_string()),
     );
     assert_eq!(expected, authors[0]);
 
     let authors = command.__format_authors(author_without_email).unwrap();
-    let mut expected: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
-    expected.insert(
-        "name".to_string(),
-        PhpMixed::string("John Smith".to_string()),
-    );
+    let mut expected: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
+    expected.insert("name".into(), PhpMixed::string("John Smith".to_string()));
     assert_eq!(expected, authors[0]);
 }
 

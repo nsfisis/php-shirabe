@@ -2,7 +2,7 @@
 
 use crate::advisory::{AnySecurityAdvisory, SecurityAdvisory};
 use crate::package::version::VersionParser;
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, date_create, php_regex, preg_replace};
@@ -27,10 +27,10 @@ pub struct PartialSecurityAdvisory {
 impl PartialSecurityAdvisory {
     pub fn create(
         package_name: &str,
-        data: &IndexMap<String, PhpMixed>,
+        data: &IndexMap<BString, PhpMixed>,
         parser: &VersionParser,
     ) -> anyhow::Result<AnySecurityAdvisory> {
-        let affected_versions_str = data["affectedVersions"].as_string().unwrap_or_default();
+        let affected_versions_str = data[B("affectedVersions")].as_string().unwrap_or_default();
 
         let constraint: AnyConstraint =
             match parser.parse_constraints(&affected_versions_str.to_str_lossy()) {
@@ -53,27 +53,29 @@ impl PartialSecurityAdvisory {
                 }
             };
 
-        let has_full_data = data.contains_key("title")
-            && data.contains_key("sources")
-            && data.contains_key("reportedAt");
+        let has_full_data = data.contains_key(B("title"))
+            && data.contains_key(B("sources"))
+            && data.contains_key(B("reportedAt"));
 
         if has_full_data {
             let reported_at: DateTime<Utc> = date_create(
-                &data["reportedAt"]
+                &data[B("reportedAt")]
                     .as_string()
                     .unwrap_or_default()
                     .to_str_lossy(),
             )
             .unwrap_or_default();
-            let sources: Vec<IndexMap<String, String>> = data["sources"]
+            let sources: Vec<IndexMap<String, String>> = data[B("sources")]
                 .as_list()
                 .map(|list| {
                     list.iter()
                         .filter_map(|item| item.as_array())
                         .map(|arr| {
                             arr.iter()
+                                // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
                                 .filter_map(|(k, v)| {
-                                    v.as_string().map(|s| (k.clone(), s.to_string()))
+                                    v.as_string()
+                                        .map(|s| (k.to_str_lossy().into_owned(), s.to_string()))
                                 })
                                 .collect()
                         })
@@ -82,21 +84,21 @@ impl PartialSecurityAdvisory {
                 .unwrap_or_default();
             let advisory = SecurityAdvisory::new(
                 package_name.to_string(),
-                data["advisoryId"]
+                data[B("advisoryId")]
                     .as_string()
                     .unwrap_or_default()
                     .to_string(),
                 constraint,
-                data["title"].as_string().unwrap_or_default().to_string(),
+                data[B("title")].as_string().unwrap_or_default().to_string(),
                 sources,
                 reported_at,
-                data.get("cve")
+                data.get(B("cve"))
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string()),
-                data.get("link")
+                data.get(B("link"))
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string()),
-                data.get("severity")
+                data.get(B("severity"))
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string()),
             );
@@ -104,7 +106,7 @@ impl PartialSecurityAdvisory {
         }
 
         Ok(AnySecurityAdvisory::Partial(Self {
-            advisory_id: data["advisoryId"]
+            advisory_id: data[B("advisoryId")]
                 .as_string()
                 .unwrap_or_default()
                 .to_string(),

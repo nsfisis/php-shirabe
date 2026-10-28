@@ -1,12 +1,18 @@
 //! ref: composer/tests/Composer/Test/Advisory/AuditConfigTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::advisory::{AuditConfig, Auditor};
 use shirabe::config::Config;
 use shirabe_php_shim::PhpMixed;
 
 fn arr(pairs: Vec<(&str, PhpMixed)>) -> PhpMixed {
-    PhpMixed::Array(pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect())
+    PhpMixed::Array(
+        pairs
+            .into_iter()
+            .map(|(k, v)| (k.to_string().into(), v))
+            .collect(),
+    )
 }
 
 fn list(items: Vec<PhpMixed>) -> PhpMixed {
@@ -26,8 +32,8 @@ fn ignore_list(pairs: Vec<(&str, Option<&str>)>) -> IndexMap<String, Option<Stri
 
 fn audit_config_from(audit_section: PhpMixed) -> anyhow::Result<AuditConfig> {
     let mut config = Config::new(true, None);
-    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-    top.insert("config".to_string(), arr(vec![("audit", audit_section)]));
+    let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+    top.insert("config".into(), arr(vec![("audit", audit_section)]));
     config.merge(&top, "test");
 
     AuditConfig::from_config(&mut config, true, Auditor::FORMAT_SUMMARY)

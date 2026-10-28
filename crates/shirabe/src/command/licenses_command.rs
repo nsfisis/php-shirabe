@@ -8,6 +8,7 @@ use crate::json::JsonFile;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{RepositoryInterface, RepositoryUtils};
 use crate::util::{PackageInfo, PackageSorter};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException, impl_php_class};
 use shirabe_symfony_console::command::Command;
@@ -222,35 +223,35 @@ impl Command for LicensesCommand {
                 table.render();
             }
             "json" => {
-                let mut dependencies: IndexMap<String, PhpMixed> = IndexMap::new();
+                let mut dependencies: IndexMap<BString, PhpMixed> = IndexMap::new();
                 for package in &packages {
                     let pkg_licenses = if let Some(complete_pkg) = package.as_complete_package() {
                         complete_pkg.get_license()
                     } else {
                         vec![]
                     };
-                    let mut dep_info: IndexMap<String, PhpMixed> = IndexMap::new();
+                    let mut dep_info: IndexMap<BString, PhpMixed> = IndexMap::new();
                     dep_info.insert(
-                        "version".to_string(),
+                        "version".into(),
                         PhpMixed::string(package.get_full_pretty_version(
                             true,
                             crate::package::DisplayMode::SourceRefIfDev,
                         )),
                     );
                     dep_info.insert(
-                        "license".to_string(),
+                        "license".into(),
                         PhpMixed::List(pkg_licenses.into_iter().map(PhpMixed::string).collect()),
                     );
                     dependencies.insert(
-                        package.get_pretty_name().to_string(),
+                        package.get_pretty_name().to_string().into(),
                         PhpMixed::Array(dep_info),
                     );
                 }
 
-                let mut output_map: IndexMap<String, PhpMixed> = IndexMap::new();
-                output_map.insert("name".to_string(), PhpMixed::string(root.get_pretty_name()));
+                let mut output_map: IndexMap<BString, PhpMixed> = IndexMap::new();
+                output_map.insert("name".into(), PhpMixed::string(root.get_pretty_name()));
                 output_map.insert(
-                    "version".to_string(),
+                    "version".into(),
                     PhpMixed::string(root.get_full_pretty_version(
                         true,
                         crate::package::DisplayMode::SourceRefIfDev,
@@ -258,10 +259,10 @@ impl Command for LicensesCommand {
                 );
                 let root_licenses = root.get_license();
                 output_map.insert(
-                    "license".to_string(),
+                    "license".into(),
                     PhpMixed::List(root_licenses.into_iter().map(PhpMixed::string).collect()),
                 );
-                output_map.insert("dependencies".to_string(), PhpMixed::Array(dependencies));
+                output_map.insert("dependencies".into(), PhpMixed::Array(dependencies));
                 io.write(&JsonFile::encode(&PhpMixed::Array(
                     output_map.into_iter().collect(),
                 ))?);

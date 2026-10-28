@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Json/JsonFileTest.php
 
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe::json::{JsonEncodeOptions, JsonFile, JsonValidationException};
 use shirabe_php_shim::{Catch as _, PhpMixed, json_decode_assoc, json_decode_obj};
@@ -110,9 +111,9 @@ fn test_parse_error_detect_missing_colon() {
 
 #[test]
 fn test_simple_json_string() {
-    let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
     data.insert(
-        "name".to_string(),
+        "name".into(),
         PhpMixed::string("composer/composer".to_string()),
     );
     let json = "{\n    \"name\": \"composer/composer\"\n}";
@@ -121,40 +122,34 @@ fn test_simple_json_string() {
 
 #[test]
 fn test_trailing_backslash() {
-    let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
-    data.insert(
-        "Metadata\\".to_string(),
-        PhpMixed::string("src/".to_string()),
-    );
+    let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
+    data.insert("Metadata\\".into(), PhpMixed::string("src/".to_string()));
     let json = "{\n    \"Metadata\\\\\": \"src/\"\n}";
     assert_json_format(json, &PhpMixed::Array(data), None);
 }
 
 #[test]
 fn test_format_empty_array() {
-    let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
-    data.insert("test".to_string(), PhpMixed::List(vec![]));
-    data.insert("test2".to_string(), PhpMixed::Object(IndexMap::new()));
+    let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
+    data.insert("test".into(), PhpMixed::List(vec![]));
+    data.insert("test2".into(), PhpMixed::Object(IndexMap::new()));
     let json = "{\n    \"test\": [],\n    \"test2\": {}\n}";
     assert_json_format(json, &PhpMixed::Array(data), None);
 }
 
 #[test]
 fn test_escape() {
-    let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
-    data.insert(
-        "Metadata\\\"".to_string(),
-        PhpMixed::string("src/".to_string()),
-    );
+    let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
+    data.insert("Metadata\\\"".into(), PhpMixed::string("src/".to_string()));
     let json = "{\n    \"Metadata\\\\\\\"\": \"src/\"\n}";
     assert_json_format(json, &PhpMixed::Array(data), None);
 }
 
 #[test]
 fn test_unicode() {
-    let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
     data.insert(
-        "Žluťoučký \" kůň".to_string(),
+        "Žluťoučký \" kůň".into(),
         PhpMixed::string("úpěl ďábelské ódy za €".to_string()),
     );
     let json = "{\n    \"Žluťoučký \\\" kůň\": \"úpěl ďábelské ódy za €\"\n}";
@@ -193,12 +188,12 @@ fn test_double_escaped_unicode() {
     ]);
     let encoded_data = JsonFile::encode(&data).unwrap();
 
-    let mut wrapper: IndexMap<String, PhpMixed> = IndexMap::new();
-    wrapper.insert("t".to_string(), PhpMixed::string(encoded_data));
+    let mut wrapper: IndexMap<BString, PhpMixed> = IndexMap::new();
+    wrapper.insert("t".into(), PhpMixed::string(encoded_data));
     let double_encoded_data = JsonFile::encode(&PhpMixed::Array(wrapper)).unwrap();
 
     let decoded_data = json_decode_assoc(&double_encoded_data).unwrap();
-    let t = decoded_data.as_array().unwrap().get("t").unwrap();
+    let t = decoded_data.as_array().unwrap().get(B("t")).unwrap();
     let double_data = json_decode_assoc(t.as_string().unwrap()).unwrap();
     assert_eq!(data, double_data);
 }
@@ -214,8 +209,8 @@ fn test_preserve_indentation_after_read() {
 
     let json_file = JsonFile::new(dst.to_str().unwrap().to_string(), None, None).unwrap();
     let _data = json_file.read().unwrap();
-    let mut hash: IndexMap<String, PhpMixed> = IndexMap::new();
-    hash.insert("foo".to_string(), PhpMixed::string("baz".to_string()));
+    let mut hash: IndexMap<BString, PhpMixed> = IndexMap::new();
+    hash.insert("foo".into(), PhpMixed::string("baz".to_string()));
     json_file.write(PhpMixed::Array(hash)).unwrap();
 
     assert_eq!(
@@ -235,8 +230,8 @@ fn test_overwrites_indentation_by_default() {
     std::fs::copy(&src, &dst).unwrap();
 
     let json_file = JsonFile::new(dst.to_str().unwrap().to_string(), None, None).unwrap();
-    let mut hash: IndexMap<String, PhpMixed> = IndexMap::new();
-    hash.insert("foo".to_string(), PhpMixed::string("baz".to_string()));
+    let mut hash: IndexMap<BString, PhpMixed> = IndexMap::new();
+    hash.insert("foo".into(), PhpMixed::string("baz".to_string()));
     json_file.write(PhpMixed::Array(hash)).unwrap();
 
     assert_eq!(
@@ -451,9 +446,9 @@ fn test_auth_schema_validation_with_custom_data_source() {
 
 /// ref: shared `$data` for the simple merge-conflict cases.
 fn merge_conflict_simple_data() -> PhpMixed {
-    let mut data: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
     data.insert(
-        "_readme".to_string(),
+        "_readme".into(),
         PhpMixed::List(vec![
             PhpMixed::string(
                 "This file locks the dependencies of your project to a known state".to_string(),
@@ -466,25 +461,25 @@ fn merge_conflict_simple_data() -> PhpMixed {
         ]),
     );
     data.insert(
-        "content-hash".to_string(),
+        "content-hash".into(),
         PhpMixed::string(
             "VCS merge conflict detected. Please run `shirabe update --lock`.".to_string(),
         ),
     );
-    data.insert("packages".to_string(), PhpMixed::List(vec![]));
-    data.insert("packages-dev".to_string(), PhpMixed::List(vec![]));
-    data.insert("aliases".to_string(), PhpMixed::List(vec![]));
+    data.insert("packages".into(), PhpMixed::List(vec![]));
+    data.insert("packages-dev".into(), PhpMixed::List(vec![]));
+    data.insert("aliases".into(), PhpMixed::List(vec![]));
     data.insert(
-        "minimum-stability".to_string(),
+        "minimum-stability".into(),
         PhpMixed::string("stable".to_string()),
     );
-    data.insert("stability-flags".to_string(), PhpMixed::List(vec![]));
-    data.insert("prefer-stable".to_string(), PhpMixed::Bool(false));
-    data.insert("prefer-lowest".to_string(), PhpMixed::Bool(false));
-    data.insert("platform".to_string(), PhpMixed::List(vec![]));
-    data.insert("platform-dev".to_string(), PhpMixed::List(vec![]));
+    data.insert("stability-flags".into(), PhpMixed::List(vec![]));
+    data.insert("prefer-stable".into(), PhpMixed::Bool(false));
+    data.insert("prefer-lowest".into(), PhpMixed::Bool(false));
+    data.insert("platform".into(), PhpMixed::List(vec![]));
+    data.insert("platform-dev".into(), PhpMixed::List(vec![]));
     data.insert(
-        "plugin-api-version".to_string(),
+        "plugin-api-version".into(),
         PhpMixed::string("2.3.0".to_string()),
     );
     PhpMixed::Array(data)
@@ -544,7 +539,7 @@ fn test_composer_lock_file_merge_conflict_extended() {
         "VCS merge conflict detected. Please run `shirabe update --lock`.",
         json.as_array()
             .unwrap()
-            .get("content-hash")
+            .get(B("content-hash"))
             .unwrap()
             .as_string()
             .unwrap()

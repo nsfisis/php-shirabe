@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/Vcs/PerforceDriverTest.php
 
 use crate::process_executor_mock::{ProcessExecutorMockGuard, get_process_executor_mock};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -38,25 +39,25 @@ mockall::mock! {
         fn get_composer_information(
             &mut self,
             identifier: &str,
-        ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>>;
+        ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>>;
     }
 }
 
 struct SetUp {
     test_path: TempDir,
     config: Config,
-    repo_config: IndexMap<String, PhpMixed>,
+    repo_config: IndexMap<BString, PhpMixed>,
 }
 
 fn get_test_config(test_path: &std::path::Path) -> Config {
     let mut config = Config::new(true, None);
-    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-    let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+    let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
-        "home".to_string(),
+        "home".into(),
         PhpMixed::string(test_path.to_str().unwrap().to_string()),
     );
-    top.insert("config".to_string(), PhpMixed::Array(config_section));
+    top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
 
     config
@@ -65,16 +66,10 @@ fn get_test_config(test_path: &std::path::Path) -> Config {
 fn set_up() -> SetUp {
     let test_path = TempDir::new().unwrap();
     let config = get_test_config(test_path.path());
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::string(TEST_URL.to_string()));
-    repo_config.insert(
-        "depot".to_string(),
-        PhpMixed::string(TEST_DEPOT.to_string()),
-    );
-    repo_config.insert(
-        "branch".to_string(),
-        PhpMixed::string(TEST_BRANCH.to_string()),
-    );
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
+    repo_config.insert("url".into(), PhpMixed::string(TEST_URL.to_string()));
+    repo_config.insert("depot".into(), PhpMixed::string(TEST_DEPOT.to_string()));
+    repo_config.insert("branch".into(), PhpMixed::string(TEST_BRANCH.to_string()));
 
     SetUp {
         test_path,
@@ -88,7 +83,7 @@ fn set_up() -> SetUp {
 // with the default (exit 0) result.
 fn make_driver(
     config: Config,
-    repo_config: &IndexMap<String, PhpMixed>,
+    repo_config: &IndexMap<BString, PhpMixed>,
 ) -> (PerforceDriver, ProcessExecutorMockGuard) {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
@@ -230,8 +225,8 @@ fn test_has_composer_file_returns_true_with_one_or_more_composer_files() {
         .withf(move |id: &str| id == formatted_depot_path)
         .returning(|_| {
             // ref: returnValue(['']) — a non-empty list with one empty-string element.
-            let mut info: IndexMap<String, PhpMixed> = IndexMap::new();
-            info.insert("0".to_string(), PhpMixed::string(String::new()));
+            let mut info: IndexMap<BString, PhpMixed> = IndexMap::new();
+            info.insert("0".into(), PhpMixed::string(String::new()));
             Ok(Some(info))
         });
     driver.__override_perforce(Box::new(perforce));

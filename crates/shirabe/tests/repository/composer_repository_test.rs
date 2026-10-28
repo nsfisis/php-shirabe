@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/ComposerRepositoryTest.php
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -26,26 +27,26 @@ fn http_body(
 fn create_config() -> (Config, TempDir) {
     let home = TempDir::new().unwrap();
     let mut config = Config::new(true, None);
-    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-    let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+    let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
-        "home".to_string(),
+        "home".into(),
         PhpMixed::string(home.path().to_str().unwrap().to_string()),
     );
-    top.insert("config".to_string(), PhpMixed::Array(config_section));
-    let mut repositories: IndexMap<String, PhpMixed> = IndexMap::new();
-    repositories.insert("packagist".to_string(), PhpMixed::Bool(false));
-    top.insert("repositories".to_string(), PhpMixed::Array(repositories));
+    top.insert("config".into(), PhpMixed::Array(config_section));
+    let mut repositories: IndexMap<BString, PhpMixed> = IndexMap::new();
+    repositories.insert("packagist".into(), PhpMixed::Bool(false));
+    top.insert("repositories".into(), PhpMixed::Array(repositories));
     config.merge(&top, Config::SOURCE_UNKNOWN);
     (config, home)
 }
 
 fn create_config_read_only() -> (Config, TempDir) {
     let (mut config, home) = create_config();
-    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-    let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
-    config_section.insert("cache-read-only".to_string(), PhpMixed::Bool(true));
-    top.insert("config".to_string(), PhpMixed::Array(config_section));
+    let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+    let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
+    config_section.insert("cache-read-only".into(), PhpMixed::Bool(true));
+    top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
     (config, home)
 }
@@ -54,9 +55,9 @@ fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
     std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))
 }
 
-fn repo_config(url: &str) -> IndexMap<String, PhpMixed> {
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-    repo_config.insert("url".to_string(), PhpMixed::string(url.to_string()));
+fn repo_config(url: &str) -> IndexMap<BString, PhpMixed> {
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
+    repo_config.insert("url".into(), PhpMixed::string(url.to_string()));
     repo_config
 }
 
@@ -65,9 +66,9 @@ fn json_encode(value: &PhpMixed) -> String {
 }
 
 fn str_kv(pairs: &[(&str, PhpMixed)]) -> PhpMixed {
-    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in pairs {
-        m.insert(k.to_string(), v.clone());
+        m.insert(k.to_string().into(), v.clone());
     }
     PhpMixed::Array(m)
 }
@@ -318,10 +319,10 @@ fn test_search_with_type() {
     assert_eq!(1, plugin_results.len());
     assert_eq!(
         Some("foo".into()),
-        plugin_results[0].get("name").and_then(|v| v.as_string())
+        plugin_results[0].get(B("name")).and_then(|v| v.as_string())
     );
     assert!(matches!(
-        plugin_results[0].get("description"),
+        plugin_results[0].get(B("description")),
         Some(PhpMixed::Null)
     ));
 
@@ -423,27 +424,27 @@ fn test_search_with_abandoned_packages() {
     assert_eq!(2, results.len());
     assert_eq!(
         Some("foo1".into()),
-        results[0].get("name").and_then(|v| v.as_string())
+        results[0].get(B("name")).and_then(|v| v.as_string())
     );
     assert!(matches!(
-        results[0].get("description"),
+        results[0].get(B("description")),
         Some(PhpMixed::Null)
     ));
     assert!(matches!(
-        results[0].get("abandoned"),
+        results[0].get(B("abandoned")),
         Some(PhpMixed::Bool(true))
     ));
     assert_eq!(
         Some("foo2".into()),
-        results[1].get("name").and_then(|v| v.as_string())
+        results[1].get(B("name")).and_then(|v| v.as_string())
     );
     assert!(matches!(
-        results[1].get("description"),
+        results[1].get(B("description")),
         Some(PhpMixed::Null)
     ));
     assert_eq!(
         Some("bar".into()),
-        results[1].get("abandoned").and_then(|v| v.as_string())
+        results[1].get(B("abandoned")).and_then(|v| v.as_string())
     );
 }
 
@@ -594,13 +595,13 @@ fn test_get_security_advisories_assert_repository_http_options_are_used() {
         HttpDownloaderMockHandler::default(),
     );
 
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
-        "url".to_string(),
+        "url".into(),
         PhpMixed::string("https://example.org/packages.json".to_string()),
     );
     repo_config.insert(
-        "options".to_string(),
+        "options".into(),
         str_kv(&[("http", str_kv(&[("verify_peer", PhpMixed::Bool(false))]))]),
     );
 
@@ -728,13 +729,13 @@ fn test_get_security_advisories_assert_repository_advisories_is_zero_indexed_arr
         HttpDownloaderMockHandler::default(),
     );
 
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
-        "url".to_string(),
+        "url".into(),
         PhpMixed::string("https://example.org/packages.json".to_string()),
     );
     repo_config.insert(
-        "options".to_string(),
+        "options".into(),
         str_kv(&[("http", str_kv(&[("verify_peer", PhpMixed::Bool(false))]))]),
     );
 

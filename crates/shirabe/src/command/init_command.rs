@@ -11,7 +11,7 @@ use crate::repository::{
     CompositeRepository, PlatformRepository, PlatformRepositoryHandle, RepositoryFactory,
 };
 use crate::util::{Filesystem, ProcessExecutor};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
@@ -109,16 +109,16 @@ impl InitCommand {
         .into())
     }
 
-    fn format_authors(&self, author: &str) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
+    fn format_authors(&self, author: &str) -> anyhow::Result<Vec<IndexMap<BString, PhpMixed>>> {
         let parsed = self.parse_author_string(author)?;
-        let mut author_map: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut author_map: IndexMap<BString, PhpMixed> = IndexMap::new();
         let name = parsed.get("name").cloned().unwrap_or(None);
         let email = parsed.get("email").cloned().unwrap_or(None);
         if let Some(name) = name {
-            author_map.insert("name".to_string(), PhpMixed::string(name));
+            author_map.insert("name".into(), PhpMixed::string(name));
         }
         if let Some(email) = email {
-            author_map.insert("email".to_string(), PhpMixed::string(email));
+            author_map.insert("email".into(), PhpMixed::string(email));
         }
 
         Ok(vec![author_map])
@@ -230,7 +230,7 @@ impl InitCommand {
     pub fn __format_authors(
         &self,
         author: &str,
-    ) -> anyhow::Result<Vec<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Vec<IndexMap<BString, PhpMixed>>> {
         self.format_authors(author)
     }
 
@@ -301,15 +301,15 @@ impl InitCommand {
         }
     }
 
-    fn has_dependencies(&self, options: &IndexMap<String, PhpMixed>) -> bool {
-        let requires = options.get("require").cloned().unwrap_or(PhpMixed::Null);
+    fn has_dependencies(&self, options: &IndexMap<BString, PhpMixed>) -> bool {
+        let requires = options.get(B("require")).cloned().unwrap_or(PhpMixed::Null);
         let requires_arr_empty = match &requires {
             PhpMixed::Array(m) => m.is_empty(),
             PhpMixed::List(l) => l.is_empty(),
             PhpMixed::Null => true,
             _ => false,
         };
-        let dev_requires = options.get("require-dev").cloned();
+        let dev_requires = options.get(B("require-dev")).cloned();
         let dev_requires_arr_empty = match &dev_requires {
             Some(PhpMixed::Array(m)) => m.is_empty(),
             Some(PhpMixed::List(l)) => l.is_empty(),
@@ -496,13 +496,13 @@ impl Command for InitCommand {
             "license".to_string(),
             "autoload".to_string(),
         ];
-        let options: IndexMap<String, PhpMixed> = input
+        let options: IndexMap<BString, PhpMixed> = input
             .borrow()
             .get_options()
             .into_iter()
-            .map(|(key, value)| (key, value.to_php_mixed()))
+            .map(|(key, value)| (key.into(), value.to_php_mixed()))
             .collect();
-        let filtered_input: IndexMap<String, PhpMixed> =
+        let filtered_input: IndexMap<BString, PhpMixed> =
             array_intersect_key(&options, &array_flip_strings(&allowlist))
                 .into_iter()
                 .collect();
@@ -510,11 +510,11 @@ impl Command for InitCommand {
             !matches!(val, PhpMixed::Null) && !matches!(val, PhpMixed::List(l) if l.is_empty())
         });
 
-        if options.contains_key("name")
+        if options.contains_key(B("name"))
             && !preg_is_match(
                 php_regex!(r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"),
                 &options
-                    .get("name")
+                    .get(B("name"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_str_lossy(),
@@ -522,19 +522,19 @@ impl Command for InitCommand {
         {
             return Err(InvalidArgumentException::new(format!(
                 "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
-                options.get("name").and_then(|v| v.as_string()).unwrap_or_default()
+                options.get(B("name")).and_then(|v| v.as_string()).unwrap_or_default()
             ))
             .into());
         }
 
-        if options.contains_key("author") {
+        if options.contains_key(B("author")) {
             let author = options
-                .get("author")
+                .get(B("author"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string();
             options.insert(
-                "authors".to_string(),
+                "authors".into(),
                 PhpMixed::List(
                     self.format_authors(&author)?
                         .into_iter()
@@ -542,7 +542,7 @@ impl Command for InitCommand {
                         .collect(),
                 ),
             );
-            options.shift_remove("author");
+            options.shift_remove(B("author"));
         }
 
         let repositories: Vec<String> = input
@@ -560,7 +560,7 @@ impl Command for InitCommand {
                 let repo_config =
                     RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
                 let entry = options
-                    .entry("repositories".to_string())
+                    .entry("repositories".into())
                     .or_insert_with(|| PhpMixed::List(vec![]));
                 if let PhpMixed::List(list) = entry {
                     list.push(PhpMixed::Array(repo_config.into_iter().collect()));
@@ -568,14 +568,16 @@ impl Command for InitCommand {
             }
         }
 
-        if options.contains_key("stability") {
-            let stab = options.shift_remove("stability").unwrap_or(PhpMixed::Null);
-            options.insert("minimum-stability".to_string(), stab);
+        if options.contains_key(B("stability")) {
+            let stab = options
+                .shift_remove(B("stability"))
+                .unwrap_or(PhpMixed::Null);
+            options.insert("minimum-stability".into(), stab);
         }
 
-        let require_value = if options.contains_key("require") {
+        let require_value = if options.contains_key(B("require")) {
             let req_list: Vec<String> = options
-                .get("require")
+                .get(B("require"))
                 .and_then(|v| v.as_list())
                 .map(|l| {
                     l.iter()
@@ -591,7 +593,7 @@ impl Command for InitCommand {
                 PhpMixed::Array(
                     formatted
                         .into_iter()
-                        .map(|(k, v)| (k, PhpMixed::string(v)))
+                        .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                         .collect(),
                 )
             }
@@ -599,11 +601,11 @@ impl Command for InitCommand {
             // PHP: new \stdClass
             PhpMixed::Object(IndexMap::new())
         };
-        options.insert("require".to_string(), require_value);
+        options.insert("require".into(), require_value);
 
-        if options.contains_key("require-dev") {
+        if options.contains_key(B("require-dev")) {
             let req_list: Vec<String> = options
-                .get("require-dev")
+                .get(B("require-dev"))
                 .and_then(|v| v.as_list())
                 .map(|l| {
                     l.iter()
@@ -618,18 +620,18 @@ impl Command for InitCommand {
                 PhpMixed::Array(
                     formatted
                         .into_iter()
-                        .map(|(k, v)| (k, PhpMixed::string(v)))
+                        .map(|(k, v)| (k.into(), PhpMixed::string(v)))
                         .collect(),
                 )
             };
-            options.insert("require-dev".to_string(), value);
+            options.insert("require-dev".into(), value);
         }
 
         // --autoload - create autoload object
         let mut autoload_path: Option<String> = None;
-        if options.contains_key("autoload") {
+        if options.contains_key(B("autoload")) {
             let ap = options
-                .get("autoload")
+                .get(B("autoload"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default()
                 .to_string();
@@ -642,14 +644,14 @@ impl Command for InitCommand {
                 .to_string();
             let namespace = self.namespace_from_package_name(&name).unwrap_or_default();
             let mut psr4 = IndexMap::new();
-            psr4.insert(format!("{}\\", namespace), PhpMixed::string(ap));
+            psr4.insert(format!("{}\\", namespace).into(), PhpMixed::string(ap));
             let mut autoload_obj = IndexMap::new();
-            autoload_obj.insert("psr-4".to_string(), PhpMixed::Array(psr4));
-            options.insert("autoload".to_string(), PhpMixed::Array(autoload_obj));
+            autoload_obj.insert("psr-4".into(), PhpMixed::Array(psr4));
+            options.insert("autoload".into(), PhpMixed::Array(autoload_obj));
         }
 
         let file_obj = JsonFile::new(Factory::get_composer_file()?, None, None)?;
-        let options_for_encode: IndexMap<String, PhpMixed> = options.clone().into_iter().collect();
+        let options_for_encode: IndexMap<BString, PhpMixed> = options.clone().into_iter().collect();
         let json = JsonFile::encode(&PhpMixed::Array(options_for_encode.clone()))?;
 
         if input.borrow().is_interactive() {
@@ -825,12 +827,12 @@ impl Command for InitCommand {
                     let repo_config =
                         RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
                     let is_packagist_false = repo_config
-                        .get("packagist")
+                        .get(B("packagist"))
                         .map(|v| v.as_bool() == Some(false))
                         .unwrap_or(false)
                         && repo_config.len() == 1;
                     let is_packagist_org_false = repo_config
-                        .get("packagist.org")
+                        .get(B("packagist.org"))
                         .map(|v| v.as_bool() == Some(false))
                         .unwrap_or(false)
                         && repo_config.len() == 1;
@@ -847,11 +849,10 @@ impl Command for InitCommand {
                 }
 
                 if create_default_packagist_repo {
-                    let mut default_config: IndexMap<String, PhpMixed> = IndexMap::new();
-                    default_config
-                        .insert("type".to_string(), PhpMixed::string("composer".to_string()));
+                    let mut default_config: IndexMap<BString, PhpMixed> = IndexMap::new();
+                    default_config.insert("type".into(), PhpMixed::string("composer".to_string()));
                     default_config.insert(
-                        "url".to_string(),
+                        "url".into(),
                         PhpMixed::string("https://repo.packagist.org".to_string()),
                     );
                     repos.push(RepositoryFactory::create_repo(

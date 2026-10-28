@@ -18,7 +18,7 @@ use crate::repository::{
 use crate::self_update::{Keys, Versions};
 use crate::util::http::{ProxyManager, RequestProxy};
 use crate::util::{ConfigValidator, Git, HttpDownloader, IniHelper, Platform, ProcessExecutor};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, Exception, InvalidArgumentException, PHP_EOL, PhpClass as _,
@@ -328,7 +328,7 @@ impl DiagnoseCommand {
                 )?
                 .decode_json()?;
             if let Some(provider_includes) =
-                json.as_array().and_then(|a| a.get("provider-includes"))
+                json.as_array().and_then(|a| a.get(B("provider-includes")))
             {
                 let provider_includes_arr =
                     provider_includes.as_array().cloned().unwrap_or_default();
@@ -339,15 +339,17 @@ impl DiagnoseCommand {
                     .unwrap_or(PhpMixed::Null);
                 let hash_val = first
                     .as_array()
-                    .and_then(|a| a.get("sha256"))
+                    .and_then(|a| a.get(B("sha256")))
                     .cloned()
                     .unwrap_or(PhpMixed::Null);
                 let path = str_replace(
                     "%hash%",
                     &hash_val.as_string().unwrap_or_default().to_str_lossy(),
+                    // TODO(bytes): include paths are Strings, so non-UTF-8 bytes are replaced.
                     &provider_includes
                         .as_array()
-                        .and_then(|a| a.keys().next().cloned())
+                        .and_then(|a| a.keys().next())
+                        .map(|key| key.to_str_lossy())
                         .unwrap_or_default(),
                 );
                 let response = self
@@ -398,8 +400,8 @@ impl DiagnoseCommand {
             format!("https://{}/api/v3/", domain)
         };
 
-        let mut opts: IndexMap<String, PhpMixed> = IndexMap::new();
-        opts.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
+        let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
+        opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
 
         match self
             .http_downloader
@@ -460,8 +462,8 @@ impl DiagnoseCommand {
         } else {
             format!("https://{}/api/rate_limit", domain)
         };
-        let mut opts: IndexMap<String, PhpMixed> = IndexMap::new();
-        opts.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
+        let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
+        opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
         let data = self
             .http_downloader
             .borrow()
@@ -473,13 +475,16 @@ impl DiagnoseCommand {
 
         Ok(data
             .as_array()
-            .and_then(|a| a.get("resources"))
+            .and_then(|a| a.get(B("resources")))
             .and_then(|v| v.as_array())
-            .and_then(|a| a.get("core"))
+            .and_then(|a| a.get(B("core")))
             .and_then(|core| core.as_array())
             .map(|core| GithubRateLimit::Core {
-                limit: core.get("limit").and_then(|v| v.as_int()).unwrap_or(0),
-                remaining: core.get("remaining").and_then(|v| v.as_int()).unwrap_or(0),
+                limit: core.get(B("limit")).and_then(|v| v.as_int()).unwrap_or(0),
+                remaining: core
+                    .get(B("remaining"))
+                    .and_then(|v| v.as_int())
+                    .unwrap_or(0),
             })
             .unwrap_or(GithubRateLimit::Unavailable(CheckResult::Failed)))
     }
@@ -586,7 +591,7 @@ impl DiagnoseCommand {
         };
 
         let latest_version = latest
-            .get("version")
+            .get(B("version"))
             .and_then(|v| v.as_string())
             .unwrap_or_default()
             .to_string();
@@ -647,10 +652,10 @@ impl DiagnoseCommand {
                 RootPackage::new("composer/composer".to_string(), normalized_version, version);
             packages.push(crate::package::RootPackageHandle::from_root_package(root_pkg).into());
         }
-        let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
-        repo_config.insert("type".to_string(), PhpMixed::string("composer".to_string()));
+        let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
+        repo_config.insert("type".into(), PhpMixed::string("composer".to_string()));
         repo_config.insert(
-            "url".to_string(),
+            "url".into(),
             PhpMixed::string("https://packagist.org".to_string()),
         );
         let composer_repo_as_repo =
@@ -1195,9 +1200,9 @@ impl Command for DiagnoseCommand {
             )));
         }
         let mut config_inner = IndexMap::new();
-        config_inner.insert("secure-http".to_string(), PhpMixed::Bool(false));
-        let mut secure_http_wrap: IndexMap<String, PhpMixed> = IndexMap::new();
-        secure_http_wrap.insert("config".to_string(), PhpMixed::Array(config_inner));
+        config_inner.insert("secure-http".into(), PhpMixed::Bool(false));
+        let mut secure_http_wrap: IndexMap<BString, PhpMixed> = IndexMap::new();
+        secure_http_wrap.insert("config".into(), PhpMixed::Array(config_inner));
         let config = config;
         config
             .borrow_mut()
@@ -1241,7 +1246,7 @@ impl Command for DiagnoseCommand {
             .as_array()
             .cloned()
             .unwrap_or_default();
-        let platform_overrides_unboxed: indexmap::IndexMap<String, PhpMixed> =
+        let platform_overrides_unboxed: indexmap::IndexMap<BString, PhpMixed> =
             platform_overrides.into_iter().collect();
         let mut platform_repo =
             PlatformRepository::new(vec![], platform_overrides_unboxed, None, None).unwrap();
@@ -1370,10 +1375,10 @@ impl Command for DiagnoseCommand {
         let repositories = config.borrow().get_repositories();
         for repo in repositories {
             let repo_arr = repo.1.as_array().cloned().unwrap_or_default();
-            if repo_arr.get("type").and_then(|v| v.as_string()) == Some("composer".into())
-                && repo_arr.get("url").is_some()
+            if repo_arr.get(B("type")).and_then(|v| v.as_string()) == Some("composer".into())
+                && repo_arr.get(B("url")).is_some()
             {
-                let repo_arr_unboxed: indexmap::IndexMap<String, PhpMixed> = repo_arr
+                let repo_arr_unboxed: indexmap::IndexMap<BString, PhpMixed> = repo_arr
                     .iter()
                     .map(|(k, v)| (k.clone(), v.clone()))
                     .collect();
@@ -1398,7 +1403,7 @@ impl Command for DiagnoseCommand {
                 io.write_no_newline(&format!(
                     "Checking connectivity to {}: ",
                     repo_arr
-                        .get("url")
+                        .get(B("url"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
                 ));
@@ -1452,7 +1457,8 @@ impl Command for DiagnoseCommand {
             for (domain, token) in &oauth {
                 io.write_no_newline(&format!("Checking {} oauth access: ", domain));
                 let r = self.check_github_oauth(
-                    domain,
+                    // TODO(bytes): domains are Strings, so non-UTF-8 bytes are replaced.
+                    &domain.to_str_lossy(),
                     &token.as_string().unwrap_or_default().to_str_lossy(),
                 )?;
                 self.output_result(r);

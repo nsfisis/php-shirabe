@@ -9,7 +9,7 @@ pub mod xdebug;
 
 pub use value::{PhpClassHandle, PhpObjHandle, PhpObject, PluginValue, RustObjHandle};
 
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use frame::Frame;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
@@ -176,7 +176,12 @@ pub fn get_diagnostics() -> &'static Diagnostics {
             functions: payload.bool_map("functions"),
             ini_settings: payload
                 .entries("ini")
-                .map(|(name, value)| (name.clone(), as_nullable_string(value, "ini", name)))
+                .map(|(name, value)| {
+                    // TODO(bytes): the result is keyed by String, so non-UTF-8 bytes are replaced.
+                    let name = name.to_str_lossy().into_owned();
+                    let value = as_nullable_string(value, "ini", &name);
+                    (name, value)
+                })
                 .collect(),
         }
     })
@@ -398,7 +403,7 @@ pub fn get_platform_info() -> &'static PlatformInfo {
             constants: constant_names
                 .into_iter()
                 .map(|name| {
-                    let value = constants.and_then(|map| map.get(&name)).cloned();
+                    let value = constants.and_then(|map| map.get(B(&name))).cloned();
                     (name, value)
                 })
                 .collect(),
@@ -416,13 +421,13 @@ pub fn get_platform_info() -> &'static PlatformInfo {
 /// which payload was malformed.
 struct Payload<'a> {
     what: &'static str,
-    map: &'a IndexMap<String, PhpMixed>,
+    map: &'a IndexMap<BString, PhpMixed>,
 }
 
 impl Payload<'_> {
     fn field(&self, key: &str) -> &PhpMixed {
         self.map
-            .get(key)
+            .get(B(key))
             .unwrap_or_else(|| panic!("PHP RPC: `{}` payload has no `{key}` entry", self.what))
     }
 
@@ -460,7 +465,7 @@ impl Payload<'_> {
     }
 
     /// `None` for PHP's empty array, which carries no key type and so decodes as an empty list.
-    fn map(&self, key: &str) -> Option<&IndexMap<String, PhpMixed>> {
+    fn map(&self, key: &str) -> Option<&IndexMap<BString, PhpMixed>> {
         match self.field(key) {
             PhpMixed::Array(map) => Some(map),
             PhpMixed::List(items) if items.is_empty() => None,
@@ -471,13 +476,18 @@ impl Payload<'_> {
         }
     }
 
-    fn entries(&self, key: &str) -> impl Iterator<Item = (&String, &PhpMixed)> {
+    fn entries(&self, key: &str) -> impl Iterator<Item = (&BString, &PhpMixed)> {
         self.map(key).into_iter().flatten()
     }
 
     fn bool_map(&self, key: &str) -> IndexMap<String, bool> {
         self.entries(key)
-            .map(|(name, value)| (name.clone(), as_bool(value, self.what, name)))
+            .map(|(name, value)| {
+                // TODO(bytes): the result is keyed by String, so non-UTF-8 bytes are replaced.
+                let name = name.to_str_lossy().into_owned();
+                let value = as_bool(value, self.what, &name);
+                (name, value)
+            })
             .collect()
     }
 
@@ -485,7 +495,10 @@ impl Payload<'_> {
         self.entries(key)
             .map(|(name, value)| match value {
                 // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
-                PhpMixed::String(s) => (name.clone(), s.to_str_lossy().into_owned()),
+                PhpMixed::String(s) => (
+                    name.to_str_lossy().into_owned(),
+                    s.to_str_lossy().into_owned(),
+                ),
                 other => panic!(
                     "PHP RPC: `{}` payload entry `{key}[{name}]` is not a string: {other:?}",
                     self.what

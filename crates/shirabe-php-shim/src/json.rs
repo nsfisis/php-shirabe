@@ -1,4 +1,5 @@
 use crate::PhpMixed;
+use bstr::BString;
 use indexmap::IndexMap;
 use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use std::fmt;
@@ -9,7 +10,7 @@ pub trait JsonSerializable {
 
 #[derive(Debug)]
 pub struct JsonObject {
-    data: IndexMap<String, PhpMixed>,
+    data: IndexMap<BString, PhpMixed>,
 }
 
 pub const JSON_UNESCAPED_UNICODE: i64 = 256;
@@ -164,7 +165,7 @@ impl<'de> Visitor<'de> for PhpMixedSeed {
         let mut data = IndexMap::new();
         while let Some(key) = map.next_key::<String>()? {
             // A duplicate key keeps its original position and takes the later value, like PHP.
-            data.insert(key, map.next_value_seed(self)?);
+            data.insert(key.into(), map.next_value_seed(self)?);
         }
         Ok(if self.assoc {
             PhpMixed::Array(data)

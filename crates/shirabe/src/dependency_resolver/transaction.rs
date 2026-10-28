@@ -6,6 +6,7 @@ use crate::dependency_resolver::operation::{
 };
 use crate::package::{AliasPackageHandle, Link, PackageInterfaceHandle};
 use crate::repository::PlatformRepository;
+use bstr::B;
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
     PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, strcmp, uasort,
@@ -271,9 +272,9 @@ impl Transaction {
 
             let extra = package.get_extra();
             let is_downloads_modifying_plugin = package.get_type() == "composer-plugin"
-                && extra.contains_key("plugin-modifies-downloads")
+                && extra.contains_key(B("plugin-modifies-downloads"))
                 && matches!(
-                    extra.get("plugin-modifies-downloads"),
+                    extra.get(B("plugin-modifies-downloads")),
                     Some(PhpMixed::Bool(true))
                 );
 

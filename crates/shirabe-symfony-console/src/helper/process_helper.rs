@@ -2,6 +2,7 @@
 
 use crate::helper::{DebugFormatterHelper, Helper, HelperInterface, HelperSet};
 use crate::output::{ConsoleOutputInterface, OutputInterface, output_interface};
+use bstr::BString;
 use shirabe_php_shim::{AsAny, InvalidArgumentException, PhpMixed, spl_object_hash, str_replace};
 use shirabe_symfony_process::exception::ProcessFailedException;
 use shirabe_symfony_process::process::Process;
@@ -113,12 +114,12 @@ impl ProcessHelper {
         };
 
         // PHP passes the remaining `$cmd` array as the `$env` argument to Process::run.
-        let env: indexmap::IndexMap<String, PhpMixed> = cmd
+        let env: indexmap::IndexMap<BString, PhpMixed> = cmd
             .iter()
             .enumerate()
             .filter_map(|(i, element)| match element {
                 ProcessHelperCmdElement::String(s) => {
-                    Some((i.to_string(), PhpMixed::string(s.clone())))
+                    Some((i.to_string().into(), PhpMixed::string(s.clone())))
                 }
                 ProcessHelperCmdElement::Process(_) => None,
             })

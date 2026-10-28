@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Loader/ArrayLoaderTest.php
 
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe::package::loader::{ArrayLoader, LoaderInterface};
 use shirabe::package::version::VersionParser;
@@ -15,17 +16,17 @@ fn s(value: &str) -> PhpMixed {
 }
 
 fn map(entries: Vec<(&str, PhpMixed)>) -> PhpMixed {
-    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        m.insert(k.to_string(), v);
+        m.insert(k.to_string().into(), v);
     }
     PhpMixed::Array(m)
 }
 
-fn make_config(entries: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
-    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+fn make_config(entries: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
+    let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        m.insert(k.to_string(), v);
+        m.insert(k.to_string().into(), v);
     }
     m
 }
@@ -35,7 +36,7 @@ fn list(items: Vec<PhpMixed>) -> PhpMixed {
 }
 
 /// ref: ArrayLoaderTest::parseDumpProvider valid config
-fn valid_config() -> IndexMap<String, PhpMixed> {
+fn valid_config() -> IndexMap<BString, PhpMixed> {
     make_config(vec![
         ("name", s("A/B")),
         ("version", s("1.2.3")),
@@ -103,10 +104,10 @@ fn valid_config() -> IndexMap<String, PhpMixed> {
 
 /// ref: ArrayLoaderTest::fixConfigWhenLoadConfigIsFalse
 fn fix_config_when_load_config_is_false(
-    config: &IndexMap<String, PhpMixed>,
-) -> IndexMap<String, PhpMixed> {
+    config: &IndexMap<BString, PhpMixed>,
+) -> IndexMap<BString, PhpMixed> {
     let mut expected_config = config.clone();
-    expected_config.shift_remove("transport-options");
+    expected_config.shift_remove(B("transport-options"));
     expected_config
 }
 

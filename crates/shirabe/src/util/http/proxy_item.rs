@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Util/Http/ProxyItem.php
 
 use crate::util::http::RequestProxy;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, base64_encode, parse_url, rawurldecode, strpbrk,
@@ -115,21 +116,18 @@ impl ProxyItem {
     }
 
     pub fn to_request_proxy(&self, scheme: String) -> RequestProxy {
-        let mut http_options: IndexMap<String, PhpMixed> = IndexMap::new();
-        http_options.insert(
-            "proxy".to_string(),
-            PhpMixed::string(self.options_proxy.clone()),
-        );
+        let mut http_options: IndexMap<BString, PhpMixed> = IndexMap::new();
+        http_options.insert("proxy".into(), PhpMixed::string(self.options_proxy.clone()));
 
         if let Some(ref auth) = self.options_auth {
-            http_options.insert("header".to_string(), PhpMixed::string(auth.clone()));
+            http_options.insert("header".into(), PhpMixed::string(auth.clone()));
         }
 
         if scheme == "http" {
-            http_options.insert("request_fulluri".to_string(), PhpMixed::Bool(true));
+            http_options.insert("request_fulluri".into(), PhpMixed::Bool(true));
         }
 
-        let mut options: IndexMap<String, IndexMap<String, PhpMixed>> = IndexMap::new();
+        let mut options: IndexMap<String, IndexMap<BString, PhpMixed>> = IndexMap::new();
         options.insert("http".to_string(), http_options);
 
         RequestProxy::new(

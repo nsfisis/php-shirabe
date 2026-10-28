@@ -4,6 +4,7 @@ use crate::config::Config;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, date_local, in_array_loose, php_regex, preg_is_match, preg_match,
@@ -221,8 +222,8 @@ impl GitHub {
             format!("{}/api/v3/", origin_url)
         };
 
-        let mut http_options: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
-        http_options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
+        let mut http_options: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
+        http_options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
 
         match self
             .http_downloader
@@ -283,10 +284,10 @@ impl GitHub {
         Ok(true)
     }
 
-    pub fn get_rate_limit(&self, headers: &[String]) -> indexmap::IndexMap<String, PhpMixed> {
+    pub fn get_rate_limit(&self, headers: &[String]) -> indexmap::IndexMap<BString, PhpMixed> {
         let mut rate_limit = indexmap::IndexMap::new();
-        rate_limit.insert("limit".to_string(), PhpMixed::string("?".to_string()));
-        rate_limit.insert("reset".to_string(), PhpMixed::string("?".to_string()));
+        rate_limit.insert("limit".into(), PhpMixed::string("?".to_string()));
+        rate_limit.insert("reset".into(), PhpMixed::string("?".to_string()));
 
         for header in headers {
             let header = header.trim();
@@ -301,12 +302,12 @@ impl GitHub {
             match strtolower(r#type).as_str() {
                 "x-ratelimit-limit" => {
                     let v: i64 = value.trim().parse().unwrap_or(0);
-                    rate_limit.insert("limit".to_string(), PhpMixed::Int(v));
+                    rate_limit.insert("limit".into(), PhpMixed::Int(v));
                 }
                 "x-ratelimit-reset" => {
                     let ts: i64 = value.trim().parse().unwrap_or(0);
                     rate_limit.insert(
-                        "reset".to_string(),
+                        "reset".into(),
                         PhpMixed::string(date_local("Y-m-d H:i:s", Some(ts))),
                     );
                 }

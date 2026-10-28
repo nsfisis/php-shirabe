@@ -7,6 +7,7 @@ use crate::completion::{
 };
 use crate::input::{InputInterface, InputOption, InputValue};
 use crate::output::OutputInterface;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     FILE_APPEND, PHP_EOL, PHP_SERVER, PhpMixed, RuntimeException, basename, ctype_digit, date_utc,
@@ -18,7 +19,7 @@ use std::ops::{Deref, DerefMut};
 #[derive(Debug)]
 pub struct CompleteCommand {
     inner: CommandData,
-    completion_outputs: IndexMap<String, PhpMixed>,
+    completion_outputs: IndexMap<BString, PhpMixed>,
     is_debug: std::cell::Cell<bool>,
 }
 
@@ -46,18 +47,15 @@ impl CompleteCommand {
     pub const DEFAULT_DESCRIPTION: &'static str =
         "Internal command to provide shell completion suggestions";
 
-    pub fn new(completion_outputs: IndexMap<String, PhpMixed>) -> anyhow::Result<Self> {
+    pub fn new(completion_outputs: IndexMap<BString, PhpMixed>) -> anyhow::Result<Self> {
         // must be set before the parent constructor, as the property value is used in configure()
         let mut completion_outputs = completion_outputs;
         // $completionOutputs + ['bash' => BashCompletionOutput::class]
-        completion_outputs
-            .entry("bash".to_string())
-            .or_insert_with(|| {
-                PhpMixed::from(
-                    "Symfony\\Component\\Console\\Completion\\Output\\BashCompletionOutput"
-                        .to_string(),
-                )
-            });
+        completion_outputs.entry("bash".into()).or_insert_with(|| {
+            PhpMixed::from(
+                "Symfony\\Component\\Console\\Completion\\Output\\BashCompletionOutput".to_string(),
+            )
+        });
 
         let this = Self {
             inner: CommandData::new(None),
@@ -187,7 +185,7 @@ impl Command for CompleteCommand {
         let shells = self
             .completion_outputs
             .keys()
-            .cloned()
+            .map(|shell| shell.to_str_lossy())
             .collect::<Vec<_>>()
             .join("\", \"");
         self.inner
@@ -267,7 +265,7 @@ impl Command for CompleteCommand {
 
             let completion_output = self
                 .completion_outputs
-                .get(shell.as_string().unwrap_or_default())
+                .get(B(shell.as_string().unwrap_or_default()))
                 .cloned()
                 .unwrap_or(PhpMixed::Bool(false));
             if !completion_output.to_bool() {
@@ -276,7 +274,7 @@ impl Command for CompleteCommand {
                     shell.as_string().unwrap_or_default(),
                     self.completion_outputs
                         .keys()
-                        .cloned()
+                        .map(|shell| shell.to_str_lossy())
                         .collect::<Vec<_>>()
                         .join("\", \"")
                 )));

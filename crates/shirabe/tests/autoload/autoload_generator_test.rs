@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Autoload/AutoloadGeneratorTest.php
 
 use crate::config_stub::ConfigStubBuilder;
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::autoload::AutoloadGenerator;
@@ -323,10 +324,10 @@ fn requires(links: Vec<(&str, Link)>) -> IndexMap<String, Link> {
     links.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
 }
 
-fn autoload(entries: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
+fn autoload(entries: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
     entries
         .into_iter()
-        .map(|(k, v)| (k.to_string(), v))
+        .map(|(k, v)| (k.to_string().into(), v))
         .collect()
 }
 
@@ -343,7 +344,7 @@ fn str_map(entries: &[(&str, PhpMixed)]) -> PhpMixed {
     PhpMixed::Array(
         entries
             .iter()
-            .map(|(k, v)| (k.to_string(), v.clone()))
+            .map(|(k, v)| (k.to_string().into(), v.clone()))
             .collect(),
     )
 }
@@ -2339,7 +2340,7 @@ fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
     );
     assert_eq!(
         str_map(&[("0", pstr(&excluded_root)), ("1", pstr(&root_excl))]),
-        parsed["exclude-from-classmap"]
+        parsed[B("exclude-from-classmap")]
     );
 }
 

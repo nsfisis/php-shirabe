@@ -4,16 +4,17 @@ use crate::test_case::{
     RunOptions, create_installed_json, get_application_tester, get_complete_package,
     init_temp_composer,
 };
+use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_console::input::{InputValue, ParameterName};
 
-fn funding_entry(r#type: &str, url: &str) -> IndexMap<String, PhpMixed> {
+fn funding_entry(r#type: &str, url: &str) -> IndexMap<BString, PhpMixed> {
     let mut m = IndexMap::new();
-    m.insert("type".to_string(), PhpMixed::from(r#type));
-    m.insert("url".to_string(), PhpMixed::from(url));
+    m.insert("type".into(), PhpMixed::from(r#type));
+    m.insert("url".into(), PhpMixed::from(url));
     m
 }
 
@@ -21,7 +22,7 @@ fn funding_entry(r#type: &str, url: &str) -> IndexMap<String, PhpMixed> {
 fn run_fund_case(
     composer_json: serde_json::Value,
     command: &[(&str, InputValue)],
-    funding: &[(&str, IndexMap<String, PhpMixed>)],
+    funding: &[(&str, IndexMap<BString, PhpMixed>)],
     expected: &str,
 ) {
     let tear_down = init_temp_composer(Some(&composer_json), None, None, true);

@@ -1,5 +1,6 @@
 //! ref: composer/vendor/composer/metadata-minifier/src/MetadataMinifier.php
 
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -11,8 +12,8 @@ impl MetadataMinifier {
     /// references into `versions` rather than a copy of the values. Callers that discard most
     /// versions (a repository filtering by constraint and stability, say) pay for a deep copy only
     /// on the ones they keep.
-    pub fn expand(versions: Vec<IndexMap<String, PhpMixed>>) -> ExpandedVersions {
-        let mut keys: IndexMap<String, u32> = IndexMap::new();
+    pub fn expand(versions: Vec<IndexMap<BString, PhpMixed>>) -> ExpandedVersions {
+        let mut keys: IndexMap<BString, u32> = IndexMap::new();
         let mut views: Vec<Vec<Entry>> = Vec::with_capacity(versions.len());
         let mut current: Vec<Entry> = Vec::new();
 
@@ -68,12 +69,12 @@ impl MetadataMinifier {
     // The function is mainly for package repositories.
 }
 
-fn intern(keys: &mut IndexMap<String, u32>, key: &str) -> u32 {
+fn intern(keys: &mut IndexMap<BString, u32>, key: &[u8]) -> u32 {
     if let Some(&id) = keys.get(key) {
         return id;
     }
     let id = keys.len() as u32;
-    keys.insert(key.to_string(), id);
+    keys.insert(key.into(), id);
     id
 }
 
@@ -100,8 +101,8 @@ enum Slot {
 /// version, the fields it ends up with and where their values live.
 #[derive(Debug)]
 pub struct ExpandedVersions {
-    source: Vec<IndexMap<String, PhpMixed>>,
-    keys: IndexMap<String, u32>,
+    source: Vec<IndexMap<BString, PhpMixed>>,
+    keys: IndexMap<BString, u32>,
     views: Vec<Vec<Entry>>,
     overrides: Vec<PhpMixed>,
 }
@@ -128,7 +129,7 @@ impl ExpandedVersions {
         let value = Slot::Overridden(self.overrides.len() as u32);
         self.overrides.push(val);
 
-        let key = intern(&mut self.keys, key);
+        let key = intern(&mut self.keys, key.as_bytes());
         match self.views[index].iter_mut().find(|entry| entry.key == key) {
             Some(entry) => entry.value = value,
             None => self.views[index].push(Entry { key, value }),
@@ -137,22 +138,22 @@ impl ExpandedVersions {
 
     /// Copies one expanded version out, in the same field order [`MetadataMinifier::expand`]
     /// produces.
-    pub fn materialize(&self, index: usize) -> IndexMap<String, PhpMixed> {
+    pub fn materialize(&self, index: usize) -> IndexMap<BString, PhpMixed> {
         let view = &self.views[index];
-        let mut version: IndexMap<String, PhpMixed> = IndexMap::with_capacity(view.len());
+        let mut version: IndexMap<BString, PhpMixed> = IndexMap::with_capacity(view.len());
         for entry in view {
             version.insert(self.key_of(entry).clone(), self.value_of(entry).clone());
         }
         version
     }
 
-    pub fn into_vec(self) -> Vec<IndexMap<String, PhpMixed>> {
+    pub fn into_vec(self) -> Vec<IndexMap<BString, PhpMixed>> {
         (0..self.len())
             .map(|index| self.materialize(index))
             .collect()
     }
 
-    fn key_of(&self, entry: &Entry) -> &String {
+    fn key_of(&self, entry: &Entry) -> &BString {
         self.keys
             .get_index(entry.key as usize)
             .expect("every interned key id is an index into `keys`")
@@ -184,7 +185,7 @@ pub struct ExpandedVersion<'a> {
 
 impl<'a> ExpandedVersion<'a> {
     pub fn get(&self, key: &str) -> Option<&'a PhpMixed> {
-        let key = *self.versions.keys.get(key)?;
+        let key = *self.versions.keys.get(B(key))?;
         let entry = self.versions.views[self.index]
             .iter()
             .find(|entry| entry.key == key)?;
@@ -192,7 +193,7 @@ impl<'a> ExpandedVersion<'a> {
     }
 
     pub fn contains_key(&self, key: &str) -> bool {
-        let Some(&key) = self.versions.keys.get(key) else {
+        let Some(&key) = self.versions.keys.get(B(key)) else {
             return false;
         };
         self.versions.views[self.index]
@@ -205,14 +206,14 @@ impl<'a> ExpandedVersion<'a> {
 mod tests {
     use super::*;
 
-    fn version(fields: &[(&str, &str)]) -> IndexMap<String, PhpMixed> {
+    fn version(fields: &[(&str, &str)]) -> IndexMap<BString, PhpMixed> {
         fields
             .iter()
-            .map(|(key, val)| (key.to_string(), PhpMixed::string(val.to_string())))
+            .map(|(key, val)| ((*key).into(), PhpMixed::string(val.to_string())))
             .collect()
     }
 
-    fn versions() -> Vec<IndexMap<String, PhpMixed>> {
+    fn versions() -> Vec<IndexMap<BString, PhpMixed>> {
         vec![
             version(&[("name", "foo/bar"), ("version", "3.0"), ("type", "library")]),
             version(&[
@@ -232,7 +233,7 @@ mod tests {
         ]
     }
 
-    fn expanded() -> Vec<IndexMap<String, PhpMixed>> {
+    fn expanded() -> Vec<IndexMap<BString, PhpMixed>> {
         vec![
             version(&[("name", "foo/bar"), ("version", "3.0"), ("type", "library")]),
             version(&[
@@ -263,10 +264,10 @@ mod tests {
         for (index, expected) in expanded().iter().enumerate() {
             let version = versions.version(index);
             for key in ["name", "version", "type", "abandoned", "missing"] {
-                assert_eq!(version.get(key), expected.get(key), "{index} {key}");
+                assert_eq!(version.get(key), expected.get(B(key)), "{index} {key}");
                 assert_eq!(
                     version.contains_key(key),
-                    expected.contains_key(key),
+                    expected.contains_key(B(key)),
                     "{index} {key}",
                 );
             }
@@ -288,10 +289,7 @@ mod tests {
         );
 
         let mut expected = expanded();
-        expected[1].insert(
-            "version".to_string(),
-            PhpMixed::string("2.0.0.0".to_string()),
-        );
+        expected[1].insert("version".into(), PhpMixed::string("2.0.0.0".to_string()));
         assert_eq!(versions.into_vec(), expected);
     }
 
@@ -306,7 +304,7 @@ mod tests {
 
         let mut expected = expanded();
         expected[0].insert(
-            "version_normalized".to_string(),
+            "version_normalized".into(),
             PhpMixed::string("3.0.0.0".to_string()),
         );
         assert_eq!(versions.into_vec(), expected);

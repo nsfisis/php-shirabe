@@ -25,6 +25,7 @@ use crate::downloader::{MaxFileSizeExceededException, TransportException};
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::http::{NativeHttpResponse, ProxyManager, Response};
 use crate::util::{AuthHelper, HttpDownloader, Platform, PromptAuthResult, StoreAuth, Url};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, implode, in_array_loose, in_array_strict, json_decode_assoc, parse_url,
@@ -100,7 +101,7 @@ impl NativeHttpDownloader {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        _options: IndexMap<String, PhpMixed>,
+        _options: IndexMap<BString, PhpMixed>,
         _disable_tls: bool,
     ) -> Self {
         // PHP set up the multi/share handle here (CURLMOPT_PIPELINING, MAX_HOST_CONNECTIONS,
@@ -131,43 +132,43 @@ impl NativeHttpDownloader {
         &self,
         origin: &str,
         url: &str,
-        mut options: IndexMap<String, PhpMixed>,
+        mut options: IndexMap<BString, PhpMixed>,
         copy_to: Option<&str>,
     ) -> anyhow::Result<Result<Response, anyhow::Error>> {
-        let mut attributes: IndexMap<String, PhpMixed> = {
+        let mut attributes: IndexMap<BString, PhpMixed> = {
             let mut m = IndexMap::new();
-            m.insert("retryAuthFailure".to_string(), PhpMixed::Bool(true));
-            m.insert("redirects".to_string(), PhpMixed::Int(0));
-            m.insert("retries".to_string(), PhpMixed::Int(0));
-            m.insert("storeAuth".to_string(), PhpMixed::Bool(false));
-            m.insert("ipResolve".to_string(), PhpMixed::Null);
+            m.insert("retryAuthFailure".into(), PhpMixed::Bool(true));
+            m.insert("redirects".into(), PhpMixed::Int(0));
+            m.insert("retries".into(), PhpMixed::Int(0));
+            m.insert("storeAuth".into(), PhpMixed::Bool(false));
+            m.insert("ipResolve".into(), PhpMixed::Null);
             m
         };
-        if options.contains_key("retry-auth-failure") {
+        if options.contains_key(B("retry-auth-failure")) {
             attributes.insert(
-                "retryAuthFailure".to_string(),
+                "retryAuthFailure".into(),
                 options
-                    .get("retry-auth-failure")
+                    .get(B("retry-auth-failure"))
                     .cloned()
                     .unwrap_or(PhpMixed::Null),
             );
-            options.shift_remove("retry-auth-failure");
+            options.shift_remove(B("retry-auth-failure"));
         }
 
         if attributes
-            .get("ipResolve")
+            .get(B("ipResolve"))
             .map(|v| v.is_null())
             .unwrap_or(true)
             && Platform::get_env("COMPOSER_IPRESOLVE").as_deref() == Some("4")
         {
-            attributes.insert("ipResolve".to_string(), PhpMixed::Int(4));
+            attributes.insert("ipResolve".into(), PhpMixed::Int(4));
         } else if attributes
-            .get("ipResolve")
+            .get(B("ipResolve"))
             .map(|v| v.is_null())
             .unwrap_or(true)
             && Platform::get_env("COMPOSER_IPRESOLVE").as_deref() == Some("6")
         {
-            attributes.insert("ipResolve".to_string(), PhpMixed::Int(6));
+            attributes.insert("ipResolve".into(), PhpMixed::Int(6));
         }
 
         // check URL can be accessed (i.e. is not insecure), but allow insecure Packagist calls to
@@ -271,8 +272,8 @@ impl NativeHttpDownloader {
         url: &str,
         origin: &str,
         filename: Option<&str>,
-        options: &IndexMap<String, PhpMixed>,
-        attributes: &mut IndexMap<String, PhpMixed>,
+        options: &IndexMap<BString, PhpMixed>,
+        attributes: &mut IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<Decision> {
         let response = match send_result {
             Ok(resp) => resp,
@@ -292,17 +293,17 @@ impl NativeHttpDownloader {
                 // reset by peer"); reqwest does not expose those errnos, so approximate with
                 // is_connect/is_timeout/is_request on GET requests.
                 let retries = attributes
-                    .get("retries")
+                    .get(B("retries"))
                     .and_then(|v| v.as_int())
                     .unwrap_or(0);
                 if transport_err.retryable
                     && Self::method_is_get(options)
                     && retries < self.max_retries
                 {
-                    attributes.insert("retries".to_string(), PhpMixed::Int(retries + 1));
+                    attributes.insert("retries".into(), PhpMixed::Int(retries + 1));
                     // CURLE_COULDNT_CONNECT analogue: force IPv4 if no IP stack chosen.
-                    if transport_err.is_connect && !attributes.contains_key("ipResolve") {
-                        attributes.insert("ipResolve".to_string(), PhpMixed::Int(4));
+                    if transport_err.is_connect && !attributes.contains_key(B("ipResolve")) {
+                        attributes.insert("ipResolve".into(), PhpMixed::Int(4));
                     }
                     self.io.write_error3(
                         &format!(
@@ -378,17 +379,17 @@ impl NativeHttpDownloader {
         match auth_result {
             Ok(prompt) if prompt.retry => {
                 attributes.insert(
-                    "storeAuth".to_string(),
+                    "storeAuth".into(),
                     match prompt.store_auth {
                         StoreAuth::Bool(b) => PhpMixed::Bool(b),
                         StoreAuth::Prompt => PhpMixed::string("prompt".to_string()),
                     },
                 );
                 let retries = attributes
-                    .get("retries")
+                    .get(B("retries"))
                     .and_then(|v| v.as_int())
                     .unwrap_or(0);
-                attributes.insert("retries".to_string(), PhpMixed::Int(retries + 1));
+                attributes.insert("retries".into(), PhpMixed::Int(retries + 1));
                 if let Some(filename) = filename {
                     unlink_silent(format!("{}~", filename));
                 }
@@ -403,7 +404,7 @@ impl NativeHttpDownloader {
 
         // Handle 3xx redirects, 304 Not Modified excluded.
         let redirects = attributes
-            .get("redirects")
+            .get(B("redirects"))
             .and_then(|v| v.as_int())
             .unwrap_or(0);
         if (300..=399).contains(&status_code)
@@ -412,7 +413,7 @@ impl NativeHttpDownloader {
         {
             match self.handle_redirect(url, attributes, &native_response)? {
                 Ok(location) if !location.is_empty() => {
-                    attributes.insert("redirects".to_string(), PhpMixed::Int(redirects + 1));
+                    attributes.insert("redirects".into(), PhpMixed::Int(redirects + 1));
                     if let Some(filename) = filename {
                         unlink_silent(format!("{}~", filename));
                     }
@@ -434,7 +435,7 @@ impl NativeHttpDownloader {
         // Fail 4xx and 5xx responses (some are retried on GET).
         if (400..=599).contains(&status_code) {
             let retries = attributes
-                .get("retries")
+                .get(B("retries"))
                 .and_then(|v| v.as_int())
                 .unwrap_or(0);
             if Self::method_is_get(options)
@@ -451,7 +452,7 @@ impl NativeHttpDownloader {
                     true,
                     crate::io::DEBUG,
                 );
-                attributes.insert("retries".to_string(), PhpMixed::Int(retries + 1));
+                attributes.insert("retries".into(), PhpMixed::Int(retries + 1));
                 if let Some(filename) = filename {
                     unlink_silent(format!("{}~", filename));
                 }
@@ -475,7 +476,7 @@ impl NativeHttpDownloader {
         }
 
         // storeAuth on success.
-        let store_auth = attributes.get("storeAuth").cloned();
+        let store_auth = attributes.get(B("storeAuth")).cloned();
         if !matches!(store_auth, Some(PhpMixed::Bool(false))) {
             let store_auth = match store_auth {
                 Some(PhpMixed::String(ref s)) if s == "prompt" => StoreAuth::Prompt,
@@ -498,28 +499,28 @@ impl NativeHttpDownloader {
     async fn send_once(
         &self,
         url: &str,
-        options: &IndexMap<String, PhpMixed>,
+        options: &IndexMap<BString, PhpMixed>,
         filename: Option<&str>,
-        attributes: &IndexMap<String, PhpMixed>,
+        attributes: &IndexMap<BString, PhpMixed>,
     ) -> Result<RawResponse, TransportError> {
-        let http = options.get("http").and_then(|v| v.as_array());
+        let http = options.get(B("http")).and_then(|v| v.as_array());
         let method = http
-            .and_then(|h| h.get("method"))
+            .and_then(|h| h.get(B("method")))
             .and_then(|v| v.as_string())
             .unwrap_or("GET".into())
             .to_string();
         let body = http
-            .and_then(|h| h.get("content"))
+            .and_then(|h| h.get(B("content")))
             .and_then(|v| v.as_string())
             .map(|s| s.to_vec());
         let timeout_secs = http
-            .and_then(|h| h.get("timeout"))
+            .and_then(|h| h.get(B("timeout")))
             .and_then(|v| v.as_int())
             .unwrap_or(0)
             .max(300);
         let headers = Self::header_list(options);
         let max_file_size = options
-            .get("max_file_size")
+            .get(B("max_file_size"))
             .and_then(|v| v.as_int())
             .map(|n| n as u64);
 
@@ -657,7 +658,7 @@ impl NativeHttpDownloader {
     fn handle_redirect(
         &self,
         url: &str,
-        attributes: &IndexMap<String, PhpMixed>,
+        attributes: &IndexMap<BString, PhpMixed>,
         response: &NativeHttpResponse,
     ) -> anyhow::Result<Result<String, Box<TransportException>>> {
         let mut target_url = String::new();
@@ -712,7 +713,7 @@ impl NativeHttpDownloader {
                 &format!(
                     "Following redirect ({}) {}",
                     attributes
-                        .get("redirects")
+                        .get(B("redirects"))
                         .and_then(|v| v.as_int())
                         .unwrap_or(0)
                         + 1,
@@ -740,15 +741,15 @@ impl NativeHttpDownloader {
         url: &str,
         origin: &str,
         filename: Option<&str>,
-        attributes: &IndexMap<String, PhpMixed>,
+        attributes: &IndexMap<BString, PhpMixed>,
         response: &NativeHttpResponse,
     ) -> anyhow::Result<Result<PromptAuthResult, Box<TransportException>>> {
         let retry_auth_failure = attributes
-            .get("retryAuthFailure")
+            .get(B("retryAuthFailure"))
             .and_then(|b| b.as_bool())
             .unwrap_or(false);
         let retries = attributes
-            .get("retries")
+            .get(B("retries"))
             .and_then(|b| b.as_int())
             .unwrap_or(0);
 
@@ -884,11 +885,11 @@ impl NativeHttpDownloader {
         ))
     }
 
-    fn method_is_get(options: &IndexMap<String, PhpMixed>) -> bool {
+    fn method_is_get(options: &IndexMap<BString, PhpMixed>) -> bool {
         let method = options
-            .get("http")
+            .get(B("http"))
             .and_then(|v| v.as_array())
-            .and_then(|h| h.get("method"))
+            .and_then(|h| h.get(B("method")))
             .and_then(|v| v.as_string());
         match method {
             None => true,
@@ -897,11 +898,11 @@ impl NativeHttpDownloader {
     }
 
     /// Extracts `options['http']['header']` as a `Vec<String>`.
-    fn header_list(options: &IndexMap<String, PhpMixed>) -> Vec<String> {
+    fn header_list(options: &IndexMap<BString, PhpMixed>) -> Vec<String> {
         options
-            .get("http")
+            .get(B("http"))
             .and_then(|v| v.as_array())
-            .and_then(|h| h.get("header"))
+            .and_then(|h| h.get(B("header")))
             .and_then(|v| match v {
                 PhpMixed::List(l) => Some(
                     l.iter()

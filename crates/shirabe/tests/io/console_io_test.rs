@@ -192,7 +192,7 @@ fn test_ask() {
     // stream yields the answer makes ConsoleIO::ask return that answer.
     let (console_io, _output) = make_console_io_with_answer("answer\n");
     let result = console_io
-        .ask("Why?".to_string(), PhpMixed::string("default".to_string()))
+        .ask("Why?".into(), PhpMixed::string("default".to_string()))
         .unwrap();
     assert_eq!(PhpMixed::string("answer".to_string()), result);
 }
@@ -240,7 +240,7 @@ fn test_select() {
     // ["item1","item2"] resolves to that choice, which select maps back to its index '1'.
     let (console_io, _output) = make_console_io_with_answer("item2\n");
     let result = console_io.select(
-        "Select item".to_string(),
+        "Select item".into(),
         PhpMixed::List(vec![
             PhpMixed::string("item1".to_string()),
             PhpMixed::string("item2".to_string()),

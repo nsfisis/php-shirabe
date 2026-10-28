@@ -7,6 +7,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
+use bstr::B;
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException, empty};
 
 #[derive(Debug)]
@@ -95,7 +96,7 @@ impl InstallerInterface for PluginInstaller {
         {
             let plugin_optional = package
                 .get_extra()
-                .get("plugin-optional")
+                .get(B("plugin-optional"))
                 .map(|v| matches!(v, PhpMixed::Bool(true)))
                 .unwrap_or(false);
             self.get_plugin_manager().borrow_mut().is_plugin_allowed(
@@ -115,7 +116,7 @@ impl InstallerInterface for PluginInstaller {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let extra = package.get_extra();
-        let class = extra.get("class").cloned().unwrap_or(PhpMixed::Null);
+        let class = extra.get(B("class")).cloned().unwrap_or(PhpMixed::Null);
         if empty(&class) {
             return Err(UnexpectedValueException::new(format!(
                 "Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.",

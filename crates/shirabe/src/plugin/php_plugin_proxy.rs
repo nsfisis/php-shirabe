@@ -694,7 +694,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
                 std::cell::RefCell::new(crate::util::HttpDownloader::new(
                     io_arg(0)?,
                     config_arg(1)?,
-                    arg_or::<IndexMap<String, PhpMixed>>(
+                    arg_or::<IndexMap<BString, PhpMixed>>(
                         &class_name,
                         ctor_args,
                         2,
@@ -1012,7 +1012,7 @@ fn dispatch_autoload_generator_method(
                 .to_plugin_value());
         }
         "createLoader" => {
-            let autoloads = arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?;
+            let autoloads = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
             let vendor_dir = arg::<Option<String>>(method_name, args, 1)?;
             let loader = generator
                 .borrow()
@@ -1174,7 +1174,7 @@ fn dispatch_config_method(
             .get_source_of_value(&key(0)?)
             .to_plugin_value()),
         "merge" => {
-            let values = arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?;
+            let values = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
             let source = arg_or::<String>(
                 method_name,
                 args,
@@ -1774,14 +1774,14 @@ fn dispatch_http_downloader_method(
             downloader.borrow().get_options().clone(),
         ))),
         "setOptions" => {
-            let options = arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?;
+            let options = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
             downloader.borrow_mut().set_options(options);
             Ok(PluginValue::Null)
         }
         "get" => {
             let url = arg::<String>(method_name, args, 0)?;
             let options =
-                arg_or::<IndexMap<String, PhpMixed>>(method_name, args, 1, IndexMap::new())?;
+                arg_or::<IndexMap<BString, PhpMixed>>(method_name, args, 1, IndexMap::new())?;
             let response = downloader
                 .borrow()
                 .get(&url, options)
@@ -1792,7 +1792,7 @@ fn dispatch_http_downloader_method(
             let url = arg::<String>(method_name, args, 0)?;
             let to = arg::<String>(method_name, args, 1)?;
             let options =
-                arg_or::<IndexMap<String, PhpMixed>>(method_name, args, 2, IndexMap::new())?;
+                arg_or::<IndexMap<BString, PhpMixed>>(method_name, args, 2, IndexMap::new())?;
             let response = downloader
                 .borrow()
                 .copy(&url, &to, options)
@@ -1806,7 +1806,7 @@ fn dispatch_http_downloader_method(
             } else {
                 (Some(arg::<String>(method_name, args, 1)?), 2)
             };
-            let options = arg_or::<IndexMap<String, PhpMixed>>(
+            let options = arg_or::<IndexMap<BString, PhpMixed>>(
                 method_name,
                 args,
                 options_position,
@@ -2111,12 +2111,12 @@ fn dispatch_locker_method(
                     arg::<Option<Vec<PackageInterfaceHandle>>>(method_name, args, 1)?,
                     arg::<IndexMap<String, String>>(method_name, args, 2)?,
                     arg::<IndexMap<String, String>>(method_name, args, 3)?,
-                    arg::<Vec<IndexMap<String, PhpMixed>>>(method_name, args, 4)?,
+                    arg::<Vec<IndexMap<BString, PhpMixed>>>(method_name, args, 4)?,
                     &arg::<String>(method_name, args, 5)?,
                     arg::<IndexMap<String, i64>>(method_name, args, 6)?,
                     arg::<bool>(method_name, args, 7)?,
                     arg::<bool>(method_name, args, 8)?,
-                    arg::<IndexMap<String, PhpMixed>>(method_name, args, 9)?,
+                    arg::<IndexMap<BString, PhpMixed>>(method_name, args, 9)?,
                     arg_or::<bool>(method_name, args, 10, true)?,
                 )
                 .map_err(failed)?;
@@ -2363,22 +2363,20 @@ impl<T: FromPluginArg> FromPluginArg for Vec<T> {
 
 /// A PHP array argument as a map. An empty PHP array is indistinguishable from an empty list on
 /// the wire, so it decodes here as an empty map; a non-empty list decodes under its int keys.
-impl<T: FromPluginArg> FromPluginArg for IndexMap<String, T> {
+impl<T: FromPluginArg> FromPluginArg for IndexMap<BString, T> {
     fn from_arg(
         method: &str,
         position: usize,
         value: Option<&PluginValue>,
     ) -> Result<Self, PhpThrow> {
-        let entries: Vec<(String, &PluginValue)> = match value {
-            Some(PluginValue::Array(map)) => map
-                .iter()
-                // TODO(bytes): lossy UTF-8; PHP array keys are bytes.
-                .map(|(key, item)| (String::from_utf8_lossy(key).into_owned(), item))
-                .collect(),
+        let entries: Vec<(BString, &PluginValue)> = match value {
+            Some(PluginValue::Array(map)) => {
+                map.iter().map(|(key, item)| (key.clone(), item)).collect()
+            }
             Some(PluginValue::List(items)) => items
                 .iter()
                 .enumerate()
-                .map(|(index, item)| (index.to_string(), item))
+                .map(|(index, item)| (index.to_string().into(), item))
                 .collect(),
             other => return Err(arg_throw(method, position, "an array", other)),
         };
@@ -2386,6 +2384,20 @@ impl<T: FromPluginArg> FromPluginArg for IndexMap<String, T> {
             .into_iter()
             .map(|(key, item)| Ok((key, T::from_arg(method, position, Some(item))?)))
             .collect()
+    }
+}
+
+impl<T: FromPluginArg> FromPluginArg for IndexMap<String, T> {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        Ok(IndexMap::<BString, T>::from_arg(method, position, value)?
+            .into_iter()
+            // TODO(bytes): lossy UTF-8; PHP array keys are bytes.
+            .map(|(key, item)| (key.to_str_lossy().into_owned(), item))
+            .collect())
     }
 }
 
@@ -2706,7 +2718,7 @@ impl<T: ToPluginValue> ToPluginValue for Vec<T> {
 
 /// An `array<string, T>` as PHP shapes it: an empty map crosses as a list, since an empty PHP
 /// array is indistinguishable from an empty list on the wire.
-impl<T: ToPluginValue> ToPluginValue for IndexMap<String, T> {
+impl<K: Into<BString>, T: ToPluginValue> ToPluginValue for IndexMap<K, T> {
     fn to_plugin_value(self) -> PluginValue {
         if self.is_empty() {
             PluginValue::List(Vec::new())
@@ -2875,7 +2887,7 @@ fn dispatch_package_method(
         }
         "setTransportOptions" => {
             let options =
-                arg_or::<IndexMap<String, PhpMixed>>(method_name, args, 0, IndexMap::new())?;
+                arg_or::<IndexMap<BString, PhpMixed>>(method_name, args, 0, IndexMap::new())?;
             package
                 .borrow_mut()
                 .as_package_interface_mut()
@@ -2931,9 +2943,9 @@ fn dispatch_package_method(
                     method_name, args, 0, IndexMap::new()
                 )?),
                 "setAutoload" => {
-                    package.set_autoload(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?)
+                    package.set_autoload(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
                 }
-                "setDevAutoload" => package.set_dev_autoload(arg::<IndexMap<String, PhpMixed>>(
+                "setDevAutoload" => package.set_dev_autoload(arg::<IndexMap<BString, PhpMixed>>(
                     method_name,
                     args,
                     0,
@@ -2941,7 +2953,7 @@ fn dispatch_package_method(
                 "setSuggests" => {
                     package.set_suggests(arg::<IndexMap<String, String>>(method_name, args, 0)?)
                 }
-                _ => package.set_extra(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?),
+                _ => package.set_extra(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?),
             }
             return Ok(PluginValue::Null);
         }
@@ -2974,7 +2986,7 @@ fn dispatch_package_method(
                     package.set_target_dir(arg::<Option<String>>(method_name, args, 0)?)
                 }
                 "setExtra" => {
-                    package.set_extra(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?)
+                    package.set_extra(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
                 }
                 "setBinaries" => package.set_binaries(arg::<Vec<String>>(method_name, args, 0)?),
                 "setSourceType" => {
@@ -2987,9 +2999,9 @@ fn dispatch_package_method(
                     package.set_suggests(arg::<IndexMap<String, String>>(method_name, args, 0)?)
                 }
                 "setAutoload" => {
-                    package.set_autoload(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?)
+                    package.set_autoload(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
                 }
-                "setDevAutoload" => package.set_dev_autoload(arg::<IndexMap<String, PhpMixed>>(
+                "setDevAutoload" => package.set_dev_autoload(arg::<IndexMap<BString, PhpMixed>>(
                     method_name,
                     args,
                     0,
@@ -2997,7 +3009,7 @@ fn dispatch_package_method(
                 "setIncludePaths" => {
                     package.set_include_paths(arg::<Vec<String>>(method_name, args, 0)?)
                 }
-                "setPhpExt" => package.set_php_ext(arg::<Option<IndexMap<String, PhpMixed>>>(
+                "setPhpExt" => package.set_php_ext(arg::<Option<IndexMap<BString, PhpMixed>>>(
                     method_name,
                     args,
                     0,
@@ -3063,7 +3075,7 @@ fn dispatch_package_method(
                 "setScripts" => {
                     package.set_scripts(arg::<IndexMap<String, Vec<String>>>(method_name, args, 0)?)
                 }
-                "setRepositories" => package.set_repositories(arg::<IndexMap<String, PhpMixed>>(
+                "setRepositories" => package.set_repositories(arg::<IndexMap<BString, PhpMixed>>(
                     method_name,
                     args,
                     0,
@@ -3078,7 +3090,7 @@ fn dispatch_package_method(
                 "setSupport" => {
                     package.set_support(arg::<IndexMap<String, String>>(method_name, args, 0)?)
                 }
-                "setFunding" => package.set_funding(arg::<Vec<IndexMap<String, PhpMixed>>>(
+                "setFunding" => package.set_funding(arg::<Vec<IndexMap<BString, PhpMixed>>>(
                     method_name,
                     args,
                     0,
@@ -3110,7 +3122,7 @@ fn dispatch_package_method(
                 }
                 "setPreferStable" => package.set_prefer_stable(arg::<bool>(method_name, args, 0)?),
                 "setConfig" => {
-                    package.set_config(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?)
+                    package.set_config(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
                 }
                 "setReferences" => {
                     package.set_references(arg::<IndexMap<String, String>>(method_name, args, 0)?)
@@ -3303,7 +3315,7 @@ pub(crate) fn dispatch_pre_file_download_event_method(
         "getContext" => file_download_context_value(event.get_context()),
         "getTransportOptions" => Ok(event.get_transport_options().clone().to_plugin_value()),
         "setTransportOptions" => {
-            event.set_transport_options(arg::<IndexMap<String, PhpMixed>>(method_name, args, 0)?);
+            event.set_transport_options(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
         other => Err(runtime_throw(format!(
@@ -3657,7 +3669,7 @@ impl EventSubscriberInterface for PhpPluginProxy {
 }
 
 impl Capable for PhpPluginProxy {
-    fn get_capabilities(&self) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+    fn get_capabilities(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let outcome = call_php_method(
             self.phandle,
             "getCapabilities",
@@ -3675,14 +3687,14 @@ impl Capable for PhpPluginProxy {
             PluginValue::Null => IndexMap::new(),
             PluginValue::Array(map) | PluginValue::Object(map) => map
                 .into_iter()
-                .map(|(k, v)| Ok((String::from_utf8_lossy(&k).into_owned(), v.to_php_mixed()?)))
+                .map(|(k, v)| Ok((k, v.to_php_mixed()?)))
                 .collect::<anyhow::Result<_>>()?,
             PluginValue::List(items) => items
                 .into_iter()
                 .enumerate()
-                .map(|(i, v)| Ok((i.to_string(), v.to_php_mixed()?)))
+                .map(|(i, v)| Ok((i.to_string().into(), v.to_php_mixed()?)))
                 .collect::<anyhow::Result<_>>()?,
-            scalar => IndexMap::from([("0".to_string(), scalar.to_php_mixed()?)]),
+            scalar => IndexMap::from([("0".into(), scalar.to_php_mixed()?)]),
         };
         Ok(entries)
     }

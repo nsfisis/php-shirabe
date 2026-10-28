@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/RepositoryUtilsTest.php
 
 use crate::test_case::{get_alias_package, get_package};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::array_loader::ArrayLoader;
@@ -15,15 +16,18 @@ fn load_with(
     link_type: &str,
     deps: Vec<(&str, &str)>,
 ) -> PackageInterfaceHandle {
-    let mut config: IndexMap<String, PhpMixed> = IndexMap::new();
-    config.insert("name".to_string(), PhpMixed::string(name.to_string()));
-    config.insert("version".to_string(), PhpMixed::string(version.to_string()));
+    let mut config: IndexMap<BString, PhpMixed> = IndexMap::new();
+    config.insert("name".into(), PhpMixed::string(name.to_string()));
+    config.insert("version".into(), PhpMixed::string(version.to_string()));
 
-    let mut links: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut links: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (dep, constraint) in deps {
-        links.insert(dep.to_string(), PhpMixed::string(constraint.to_string()));
+        links.insert(
+            dep.to_string().into(),
+            PhpMixed::string(constraint.to_string()),
+        );
     }
-    config.insert(link_type.to_string(), PhpMixed::Array(links));
+    config.insert(link_type.to_string().into(), PhpMixed::Array(links));
 
     ArrayLoader::new(None, false)
         .load_packages(vec![config])

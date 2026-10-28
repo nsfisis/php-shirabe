@@ -5,6 +5,7 @@ use crate::package::{
     RootPackageInterface,
 };
 use crate::repository::RepositoryInterfaceHandle;
+use bstr::BString;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
@@ -15,7 +16,7 @@ pub struct RootPackage {
     minimum_stability: String,
     prefer_stable: bool,
     stability_flags: IndexMap<String, i64>,
-    config: IndexMap<String, PhpMixed>,
+    config: IndexMap<BString, PhpMixed>,
     references: IndexMap<String, String>,
     aliases: Vec<IndexMap<String, String>>,
 }
@@ -70,11 +71,11 @@ impl RootPackageInterface for RootPackage {
         self.prefer_stable
     }
 
-    fn set_config(&mut self, config: IndexMap<String, PhpMixed>) {
+    fn set_config(&mut self, config: IndexMap<BString, PhpMixed>) {
         self.config = config;
     }
 
-    fn get_config(&self) -> IndexMap<String, PhpMixed> {
+    fn get_config(&self) -> IndexMap<BString, PhpMixed> {
         self.config.clone()
     }
 
@@ -114,11 +115,11 @@ impl RootPackageInterface for RootPackage {
         self.inner.inner.set_replaces(replaces);
     }
 
-    fn set_autoload(&mut self, autoload: IndexMap<String, PhpMixed>) {
+    fn set_autoload(&mut self, autoload: IndexMap<BString, PhpMixed>) {
         self.inner.inner.set_autoload(autoload);
     }
 
-    fn set_dev_autoload(&mut self, dev_autoload: IndexMap<String, PhpMixed>) {
+    fn set_dev_autoload(&mut self, dev_autoload: IndexMap<BString, PhpMixed>) {
         self.inner.inner.set_dev_autoload(dev_autoload);
     }
 
@@ -126,7 +127,7 @@ impl RootPackageInterface for RootPackage {
         self.inner.inner.set_suggests(suggests);
     }
 
-    fn set_extra(&mut self, extra: IndexMap<String, PhpMixed>) {
+    fn set_extra(&mut self, extra: IndexMap<BString, PhpMixed>) {
         self.inner.inner.set_extra(extra);
     }
 
@@ -144,11 +145,11 @@ impl CompletePackageInterface for RootPackage {
         self.inner.set_scripts(scripts)
     }
 
-    fn get_repositories(&self) -> IndexMap<String, PhpMixed> {
+    fn get_repositories(&self) -> IndexMap<BString, PhpMixed> {
         self.inner.get_repositories()
     }
 
-    fn set_repositories(&mut self, repositories: IndexMap<String, PhpMixed>) {
+    fn set_repositories(&mut self, repositories: IndexMap<BString, PhpMixed>) {
         self.inner.set_repositories(repositories)
     }
 
@@ -200,11 +201,11 @@ impl CompletePackageInterface for RootPackage {
         self.inner.set_support(support)
     }
 
-    fn get_funding(&self) -> Vec<IndexMap<String, PhpMixed>> {
+    fn get_funding(&self) -> Vec<IndexMap<BString, PhpMixed>> {
         self.inner.get_funding()
     }
 
-    fn set_funding(&mut self, funding: Vec<IndexMap<String, PhpMixed>>) {
+    fn set_funding(&mut self, funding: Vec<IndexMap<BString, PhpMixed>>) {
         self.inner.set_funding(funding)
     }
 
@@ -272,7 +273,7 @@ impl PackageInterface for RootPackage {
     fn get_target_dir(&self) -> Option<String> {
         self.inner.get_target_dir()
     }
-    fn get_extra(&self) -> IndexMap<String, PhpMixed> {
+    fn get_extra(&self) -> IndexMap<BString, PhpMixed> {
         self.inner.get_extra()
     }
     fn set_installation_source(&mut self, r#type: Option<String>) {
@@ -353,16 +354,16 @@ impl PackageInterface for RootPackage {
     fn get_suggests(&self) -> IndexMap<String, String> {
         self.inner.get_suggests()
     }
-    fn get_autoload(&self) -> IndexMap<String, PhpMixed> {
+    fn get_autoload(&self) -> IndexMap<BString, PhpMixed> {
         self.inner.get_autoload()
     }
-    fn get_dev_autoload(&self) -> IndexMap<String, PhpMixed> {
+    fn get_dev_autoload(&self) -> IndexMap<BString, PhpMixed> {
         self.inner.get_dev_autoload()
     }
     fn get_include_paths(&self) -> Vec<String> {
         self.inner.get_include_paths()
     }
-    fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>> {
+    fn get_php_ext(&self) -> Option<IndexMap<BString, PhpMixed>> {
         self.inner.get_php_ext()
     }
     fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
@@ -386,10 +387,10 @@ impl PackageInterface for RootPackage {
     fn is_default_branch(&self) -> bool {
         self.inner.is_default_branch()
     }
-    fn get_transport_options(&self) -> IndexMap<String, PhpMixed> {
+    fn get_transport_options(&self) -> IndexMap<BString, PhpMixed> {
         self.inner.get_transport_options()
     }
-    fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>) {
+    fn set_transport_options(&mut self, options: IndexMap<BString, PhpMixed>) {
         self.inner.set_transport_options(options);
     }
     fn set_source_reference(&mut self, reference: Option<String>) {

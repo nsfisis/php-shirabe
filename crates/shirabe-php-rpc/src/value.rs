@@ -142,20 +142,19 @@ impl PluginValue {
             }
             PhpMixed::Array(map) => PluginValue::Array(
                 map.iter()
-                    .map(|(k, v)| (k.as_str().into(), PluginValue::from_php_mixed(v)))
+                    .map(|(k, v)| (k.clone(), PluginValue::from_php_mixed(v)))
                     .collect(),
             ),
             PhpMixed::Object(map) => PluginValue::Object(
                 map.iter()
-                    .map(|(k, v)| (k.as_str().into(), PluginValue::from_php_mixed(v)))
+                    .map(|(k, v)| (k.clone(), PluginValue::from_php_mixed(v)))
                     .collect(),
             ),
         }
     }
 
     /// Converts back to `PhpMixed` for callers outside the plugin boundary. Handles have no
-    /// `PhpMixed` counterpart and fail. String values keep their bytes; non-UTF-8 bytes in array
-    /// keys are replaced because `PhpMixed` array keys are `String`.
+    /// `PhpMixed` counterpart and fail.
     pub fn to_php_mixed(&self) -> anyhow::Result<PhpMixed> {
         Ok(match self {
             PluginValue::Null => PhpMixed::Null,
@@ -171,7 +170,7 @@ impl PluginValue {
             ),
             PluginValue::Array(map) | PluginValue::Object(map) => PhpMixed::Array(
                 map.iter()
-                    .map(|(k, v)| Ok((String::from_utf8_lossy(k).into_owned(), v.to_php_mixed()?)))
+                    .map(|(k, v)| Ok((k.clone(), v.to_php_mixed()?)))
                     .collect::<anyhow::Result<_>>()?,
             ),
             PluginValue::PhpObject(_)
@@ -981,8 +980,8 @@ mod tests {
     fn php_mixed_conversions() {
         let mixed = PhpMixed::Array(
             [
-                ("a".to_string(), PhpMixed::Int(1)),
-                ("b".to_string(), PhpMixed::List(vec![PhpMixed::Null])),
+                ("a".into(), PhpMixed::Int(1)),
+                ("b".into(), PhpMixed::List(vec![PhpMixed::Null])),
             ]
             .into_iter()
             .collect(),

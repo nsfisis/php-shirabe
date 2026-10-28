@@ -8,6 +8,7 @@
 //! real resolution logic instead of intercepting `get`.
 #![allow(dead_code)]
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe_php_shim::PhpMixed;
@@ -16,7 +17,7 @@ pub struct ConfigStubBuilder {
     use_environment: bool,
     base_dir: Option<String>,
     // Config values to seed, applied via Config::merge under the `config` section.
-    values: IndexMap<String, PhpMixed>,
+    values: IndexMap<BString, PhpMixed>,
     source: String,
 }
 
@@ -49,15 +50,15 @@ impl ConfigStubBuilder {
     /// Sets the value `Config::get(key)` will return. Equivalent to PHPUnit's
     /// `->method('get')->with(key)->willReturn(value)`.
     pub fn with(mut self, key: impl Into<String>, value: PhpMixed) -> Self {
-        self.values.insert(key.into(), value);
+        self.values.insert(BString::from(key.into()), value);
         self
     }
 
     pub fn build(self) -> Config {
         let mut config = Config::new(self.use_environment, self.base_dir);
         if !self.values.is_empty() {
-            let mut merge: IndexMap<String, PhpMixed> = IndexMap::new();
-            merge.insert("config".to_string(), PhpMixed::Array(self.values));
+            let mut merge: IndexMap<BString, PhpMixed> = IndexMap::new();
+            merge.insert("config".into(), PhpMixed::Array(self.values));
             config.merge(&merge, &self.source);
         }
         config

@@ -2,6 +2,7 @@
 
 use crate::async_runtime::run;
 use crate::test_case::get_package;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::composer::{
     ComposerHandle, PartialComposerHandle, PartialComposerWeakHandle, PartialOrFullComposer,
@@ -122,17 +123,17 @@ fn set_up() -> SetUp {
     fs::create_dir_all(&bin_dir).unwrap();
 
     let mut config = Config::new(false, None);
-    let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
-        "vendor-dir".to_string(),
+        "vendor-dir".into(),
         PhpMixed::string(vendor_dir.to_str().unwrap().to_string()),
     );
     config_section.insert(
-        "bin-dir".to_string(),
+        "bin-dir".into(),
         PhpMixed::string(bin_dir.to_str().unwrap().to_string()),
     );
-    let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
-    merged.insert("config".to_string(), PhpMixed::Array(config_section));
+    let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
+    merged.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&merged, Config::SOURCE_UNKNOWN);
     let config_rc = std::rc::Rc::new(std::cell::RefCell::new(config));
 

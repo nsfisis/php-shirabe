@@ -9,6 +9,7 @@ use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::{Filesystem, Perforce, PerforceInterface, ProcessExecutor};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, impl_php_class};
 
@@ -52,7 +53,7 @@ impl PerforceDownloader {
         }
 
         let repository = package.get_repository();
-        let repo_config: Option<IndexMap<String, PhpMixed>> = if let Some(repo) = repository {
+        let repo_config: Option<IndexMap<BString, PhpMixed>> = if let Some(repo) = repository {
             let repo_ref = repo.borrow();
             repo_ref
                 .as_any()
@@ -70,7 +71,7 @@ impl PerforceDownloader {
         )));
     }
 
-    fn get_repo_config(&self, repository: &VcsRepository) -> IndexMap<String, PhpMixed> {
+    fn get_repo_config(&self, repository: &VcsRepository) -> IndexMap<BString, PhpMixed> {
         repository.get_repo_config().clone()
     }
 

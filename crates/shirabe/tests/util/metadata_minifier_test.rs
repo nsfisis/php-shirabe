@@ -37,26 +37,26 @@ fn test_minify_expand() {
 
     let minified = vec![
         indexmap! {
-            "name".to_string() => PhpMixed::string("foo/bar".to_string()),
-            "version".to_string() => PhpMixed::string("2.0.0".to_string()),
-            "version_normalized".to_string() => PhpMixed::string("2.0.0.0".to_string()),
-            "type".to_string() => PhpMixed::string("library".to_string()),
-            "scripts".to_string() => PhpMixed::Array(indexmap! {
-                "foo".to_string() => PhpMixed::List(vec![PhpMixed::string("bar".to_string())]),
+            "name".into() => PhpMixed::string("foo/bar".to_string()),
+            "version".into() => PhpMixed::string("2.0.0".to_string()),
+            "version_normalized".into() => PhpMixed::string("2.0.0.0".to_string()),
+            "type".into() => PhpMixed::string("library".to_string()),
+            "scripts".into() => PhpMixed::Array(indexmap! {
+                "foo".into() => PhpMixed::List(vec![PhpMixed::string("bar".to_string())]),
             }),
-            "license".to_string() => PhpMixed::List(vec![PhpMixed::string("MIT".to_string())]),
+            "license".into() => PhpMixed::List(vec![PhpMixed::string("MIT".to_string())]),
         },
         indexmap! {
-            "version".to_string() => PhpMixed::string("1.2.0".to_string()),
-            "version_normalized".to_string() => PhpMixed::string("1.2.0.0".to_string()),
-            "license".to_string() => PhpMixed::List(vec![PhpMixed::string("GPL".to_string())]),
-            "homepage".to_string() => PhpMixed::string("https://example.org".to_string()),
-            "scripts".to_string() => PhpMixed::string("__unset".to_string()),
+            "version".into() => PhpMixed::string("1.2.0".to_string()),
+            "version_normalized".into() => PhpMixed::string("1.2.0.0".to_string()),
+            "license".into() => PhpMixed::List(vec![PhpMixed::string("GPL".to_string())]),
+            "homepage".into() => PhpMixed::string("https://example.org".to_string()),
+            "scripts".into() => PhpMixed::string("__unset".to_string()),
         },
         indexmap! {
-            "version".to_string() => PhpMixed::string("1.0.0".to_string()),
-            "version_normalized".to_string() => PhpMixed::string("1.0.0.0".to_string()),
-            "homepage".to_string() => PhpMixed::string("__unset".to_string()),
+            "version".into() => PhpMixed::string("1.0.0".to_string()),
+            "version_normalized".into() => PhpMixed::string("1.0.0.0".to_string()),
+            "homepage".into() => PhpMixed::string("__unset".to_string()),
         },
     ];
 

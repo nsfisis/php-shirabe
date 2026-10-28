@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Mock/HttpDownloaderMock.php
 #![allow(dead_code)]
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -25,7 +26,7 @@ pub fn expect(url: impl Into<String>) -> HttpDownloaderMockExpectation {
 
 pub fn expect_full(
     url: impl Into<String>,
-    options: Option<IndexMap<String, PhpMixed>>,
+    options: Option<IndexMap<BString, PhpMixed>>,
     status: i64,
     body: impl Into<String>,
     headers: Vec<String>,

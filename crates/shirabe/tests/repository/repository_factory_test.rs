@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/RepositoryFactoryTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -96,9 +97,9 @@ fn generate_repository_name_provider() -> Vec<(
 #[test]
 fn test_generate_repository_name() {
     for (index, repo_pairs, existing_keys, expected) in generate_repository_name_provider() {
-        let repo: IndexMap<String, PhpMixed> = repo_pairs
+        let repo: IndexMap<BString, PhpMixed> = repo_pairs
             .into_iter()
-            .map(|(k, v)| (k.to_string(), v))
+            .map(|(k, v)| (k.to_string().into(), v))
             .collect();
         let existing_repos: IndexMap<String, ()> = existing_keys
             .into_iter()

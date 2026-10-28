@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionBumperTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::package::handle::{PackageHandle, PackageInterfaceHandle};
 use shirabe::package::package::Package;
@@ -22,13 +23,13 @@ fn test_bump_requirement() {
         );
 
         if let Some(branch_alias) = branch_alias {
-            let mut alias_map: IndexMap<String, PhpMixed> = IndexMap::new();
+            let mut alias_map: IndexMap<BString, PhpMixed> = IndexMap::new();
             alias_map.insert(
-                pretty_version.to_string(),
+                pretty_version.to_string().into(),
                 PhpMixed::string(branch_alias.to_string()),
             );
-            let mut extra: IndexMap<String, PhpMixed> = IndexMap::new();
-            extra.insert("branch-alias".to_string(), PhpMixed::Array(alias_map));
+            let mut extra: IndexMap<BString, PhpMixed> = IndexMap::new();
+            extra.insert("branch-alias".into(), PhpMixed::Array(alias_map));
             package.set_extra(extra);
         }
 

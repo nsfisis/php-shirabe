@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/ConfigTest.php
 
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::advisory::Auditor;
@@ -14,14 +15,14 @@ mod io_mock;
 use io_mock::{Expectation, get_io_mock};
 
 /// Builds a `['config' => {...}]` map for `Config::merge`.
-fn config_section(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
-    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-    m.insert("config".to_string(), PhpMixed::Array(map(pairs)));
+fn config_section(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
+    let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
+    m.insert("config".into(), PhpMixed::Array(map(pairs)));
     m
 }
 
 /// PHP assertEquals on associative arrays compares pairs irrespective of order.
-fn assert_map_equals(expected: &IndexMap<String, PhpMixed>, actual: &IndexMap<String, PhpMixed>) {
+fn assert_map_equals(expected: &IndexMap<BString, PhpMixed>, actual: &IndexMap<BString, PhpMixed>) {
     assert_eq!(expected.len(), actual.len());
     for (key, value) in expected {
         assert_eq!(Some(value), actual.get(key), "key {key:?}");
@@ -29,14 +30,17 @@ fn assert_map_equals(expected: &IndexMap<String, PhpMixed>, actual: &IndexMap<St
 }
 
 fn repo(r#type: &str, url: &str) -> PhpMixed {
-    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-    m.insert("type".to_string(), PhpMixed::string(r#type.to_string()));
-    m.insert("url".to_string(), PhpMixed::string(url.to_string()));
+    let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
+    m.insert("type".into(), PhpMixed::string(r#type.to_string()));
+    m.insert("url".into(), PhpMixed::string(url.to_string()));
     PhpMixed::Array(m)
 }
 
-fn map(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
-    pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
+fn map(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
+    pairs
+        .into_iter()
+        .map(|(k, v)| (k.to_string().into(), v))
+        .collect()
 }
 
 fn disable(name: &str) -> PhpMixed {
@@ -48,9 +52,9 @@ fn packagist() -> PhpMixed {
 }
 
 struct Case {
-    expected: IndexMap<String, PhpMixed>,
-    local: IndexMap<String, PhpMixed>,
-    system: Option<IndexMap<String, PhpMixed>>,
+    expected: IndexMap<BString, PhpMixed>,
+    local: IndexMap<BString, PhpMixed>,
+    system: Option<IndexMap<BString, PhpMixed>>,
 }
 
 /// ref: ConfigTest::dataAddPackagistRepository
@@ -168,12 +172,12 @@ fn test_add_packagist_repository() {
     for case in data_add_packagist_repository() {
         let mut config = Config::new(false, None);
         if let Some(system) = case.system {
-            let mut cfg: IndexMap<String, PhpMixed> = IndexMap::new();
-            cfg.insert("repositories".to_string(), PhpMixed::Array(system));
+            let mut cfg: IndexMap<BString, PhpMixed> = IndexMap::new();
+            cfg.insert("repositories".into(), PhpMixed::Array(system));
             config.merge(&cfg, "test");
         }
-        let mut cfg: IndexMap<String, PhpMixed> = IndexMap::new();
-        cfg.insert("repositories".to_string(), PhpMixed::Array(case.local));
+        let mut cfg: IndexMap<BString, PhpMixed> = IndexMap::new();
+        cfg.insert("repositories".into(), PhpMixed::Array(case.local));
         config.merge(&cfg, "test");
 
         let actual = config.get_repositories();
@@ -506,9 +510,9 @@ fn test_prohibited_urls_warning_verify_peer() {
 
     let mut config = Config::new(false, None);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> = io_mock;
-    let mut repo_options: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut repo_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_options.insert(
-        "ssl".to_string(),
+        "ssl".into(),
         PhpMixed::Array(map(vec![
             ("verify_peer", PhpMixed::Bool(false)),
             ("verify_peer_name", PhpMixed::Bool(false)),
@@ -596,30 +600,30 @@ fn test_audit() {
     let mut config = Config::new(true, None);
     let result = config.get("audit");
     let result = result.as_array().unwrap();
-    assert!(result.contains_key("abandoned"));
-    assert!(result.contains_key("ignore"));
+    assert!(result.contains_key(B("abandoned")));
+    assert!(result.contains_key(B("ignore")));
     assert_eq!(
         Some(&PhpMixed::string(Auditor::ABANDONED_FAIL.to_string())),
-        result.get("abandoned")
+        result.get(B("abandoned"))
     );
     assert_eq!(
         Some(&PhpMixed::Array(IndexMap::new())),
-        result.get("ignore")
+        result.get(B("ignore"))
     );
 
     Platform::put_env("COMPOSER_AUDIT_ABANDONED", Auditor::ABANDONED_IGNORE);
     let result = config.get("audit");
     Platform::clear_env("COMPOSER_AUDIT_ABANDONED");
     let result = result.as_array().unwrap();
-    assert!(result.contains_key("abandoned"));
-    assert!(result.contains_key("ignore"));
+    assert!(result.contains_key(B("abandoned")));
+    assert!(result.contains_key(B("ignore")));
     assert_eq!(
         Some(&PhpMixed::string(Auditor::ABANDONED_IGNORE.to_string())),
-        result.get("abandoned")
+        result.get(B("abandoned"))
     );
     assert_eq!(
         Some(&PhpMixed::Array(IndexMap::new())),
-        result.get("ignore")
+        result.get(B("ignore"))
     );
 
     config.merge(
@@ -650,7 +654,7 @@ fn test_audit() {
     );
     let result = config.get("audit");
     let result = result.as_array().unwrap();
-    assert!(result.contains_key("ignore"));
+    assert!(result.contains_key(B("ignore")));
     assert_eq!(
         Some(&PhpMixed::List(vec![
             PhpMixed::string("A".to_string()),
@@ -658,7 +662,7 @@ fn test_audit() {
             PhpMixed::string("A".to_string()),
             PhpMixed::string("C".to_string()),
         ])),
-        result.get("ignore")
+        result.get(B("ignore"))
     );
 
     // Test COMPOSER_SECURITY_BLOCKING_ABANDONED env var
@@ -666,15 +670,21 @@ fn test_audit() {
     let result = config.get("audit");
     Platform::clear_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
     let result = result.as_array().unwrap();
-    assert!(result.contains_key("block-abandoned"));
-    assert_eq!(Some(&PhpMixed::Bool(true)), result.get("block-abandoned"));
+    assert!(result.contains_key(B("block-abandoned")));
+    assert_eq!(
+        Some(&PhpMixed::Bool(true)),
+        result.get(B("block-abandoned"))
+    );
 
     Platform::put_env("COMPOSER_SECURITY_BLOCKING_ABANDONED", "0");
     let result = config.get("audit");
     Platform::clear_env("COMPOSER_SECURITY_BLOCKING_ABANDONED");
     let result = result.as_array().unwrap();
-    assert!(result.contains_key("block-abandoned"));
-    assert_eq!(Some(&PhpMixed::Bool(false)), result.get("block-abandoned"));
+    assert!(result.contains_key(B("block-abandoned")));
+    assert_eq!(
+        Some(&PhpMixed::Bool(false)),
+        result.get(B("block-abandoned"))
+    );
 }
 
 #[test]

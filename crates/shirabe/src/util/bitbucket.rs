@@ -5,7 +5,7 @@ use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, json_encode, time};
 
@@ -19,7 +19,7 @@ pub struct Bitbucket {
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-    token: Option<IndexMap<String, PhpMixed>>,
+    token: Option<IndexMap<BString, PhpMixed>>,
     time: Option<i64>,
 }
 
@@ -60,7 +60,7 @@ impl Bitbucket {
     pub fn get_token(&self) -> String {
         match &self.token {
             Some(token) => token
-                .get("access_token")
+                .get(B("access_token"))
                 .and_then(|v| v.as_string())
                 .map(|s| s.to_string())
                 .unwrap_or_default(),
@@ -99,14 +99,14 @@ impl Bitbucket {
 
     fn request_access_token(&mut self) -> anyhow::Result<bool> {
         let mut http = IndexMap::new();
-        http.insert("method".to_string(), PhpMixed::string("POST".to_string()));
+        http.insert("method".into(), PhpMixed::string("POST".to_string()));
         http.insert(
-            "content".to_string(),
+            "content".into(),
             PhpMixed::string("grant_type=client_credentials".to_string()),
         );
-        let mut options: IndexMap<String, PhpMixed> = IndexMap::new();
-        options.insert("retry-auth-failure".to_string(), PhpMixed::Bool(false));
-        options.insert("http".to_string(), PhpMixed::Array(http));
+        let mut options: IndexMap<BString, PhpMixed> = IndexMap::new();
+        options.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
+        options.insert("http".into(), PhpMixed::Array(http));
 
         let response = match self
             .http_downloader
@@ -172,7 +172,7 @@ impl Bitbucket {
                 .into());
             }
         };
-        if !token_map.contains_key("expires_in") || !token_map.contains_key("access_token") {
+        if !token_map.contains_key(B("expires_in")) || !token_map.contains_key(B("access_token")) {
             return Err(LogicException::new(format!(
                 "Expected a token configured with expires_in and access_token present, got {}",
                 json_encode(&token).unwrap_or_default()
@@ -314,7 +314,7 @@ impl Bitbucket {
                 .token
                 .as_ref()
                 .unwrap()
-                .get("access_token")
+                .get(B("access_token"))
                 .and_then(|v| v.as_string())
                 .map(|s| s.to_string())
                 .unwrap_or_default());
@@ -336,7 +336,7 @@ impl Bitbucket {
         let access_token = self
             .token
             .as_ref()
-            .and_then(|t| t.get("access_token"))
+            .and_then(|t| t.get(B("access_token")))
             .and_then(|v| v.as_string())
             .map(|s| s.to_string());
 
@@ -364,7 +364,7 @@ impl Bitbucket {
             )
         })?;
         let expires_in = token
-            .get("expires_in")
+            .get(B("expires_in"))
             .and_then(|v| v.as_int())
             .ok_or_else(|| {
                 let token_mixed =
@@ -378,19 +378,22 @@ impl Bitbucket {
         let t = self.time.unwrap_or_else(time);
         let mut consumer = IndexMap::new();
         consumer.insert(
-            "consumer-key".to_string(),
+            "consumer-key".into(),
             PhpMixed::string(consumer_key.to_string()),
         );
         consumer.insert(
-            "consumer-secret".to_string(),
+            "consumer-secret".into(),
             PhpMixed::string(consumer_secret.to_string()),
         );
         consumer.insert(
-            "access-token".to_string(),
-            token.get("access_token").cloned().unwrap_or(PhpMixed::Null),
+            "access-token".into(),
+            token
+                .get(B("access_token"))
+                .cloned()
+                .unwrap_or(PhpMixed::Null),
         );
         consumer.insert(
-            "access-token-expiration".to_string(),
+            "access-token-expiration".into(),
             PhpMixed::Int(t + expires_in),
         );
 
@@ -412,7 +415,7 @@ impl Bitbucket {
             Some(m) => m.clone(),
             None => return false,
         };
-        let origin_config = match auth_map.get(origin_url) {
+        let origin_config = match auth_map.get(B(origin_url)) {
             Some(v) => match v.as_array() {
                 Some(m) => m.clone(),
                 None => return false,
@@ -420,13 +423,13 @@ impl Bitbucket {
             None => return false,
         };
 
-        if !origin_config.contains_key("access-token")
-            || !origin_config.contains_key("access-token-expiration")
+        if !origin_config.contains_key(B("access-token"))
+            || !origin_config.contains_key(B("access-token-expiration"))
         {
             return false;
         }
         if let Some(expiration) = origin_config
-            .get("access-token-expiration")
+            .get(B("access-token-expiration"))
             .and_then(|v| v.as_int())
         {
             if time() > expiration {
@@ -436,12 +439,12 @@ impl Bitbucket {
             return false;
         }
 
-        let access_token = match origin_config.get("access-token").cloned() {
+        let access_token = match origin_config.get(B("access-token")).cloned() {
             Some(t) => t,
             None => return false,
         };
         let mut token = IndexMap::new();
-        token.insert("access_token".to_string(), access_token);
+        token.insert("access_token".into(), access_token);
         self.token = Some(token);
 
         true

@@ -1,5 +1,6 @@
 //! ref: composer/src/Composer/Plugin/Capable.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -8,5 +9,5 @@ use shirabe_php_shim::PhpMixed;
 // PHP's getCapabilities() may return anything, and PluginManager validates only the queried
 // key, so narrowing the type here would reject maps upstream Composer accepts.
 pub trait Capable {
-    fn get_capabilities(&self) -> anyhow::Result<IndexMap<String, PhpMixed>>;
+    fn get_capabilities(&self) -> anyhow::Result<IndexMap<BString, PhpMixed>>;
 }

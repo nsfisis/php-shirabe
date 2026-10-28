@@ -3,6 +3,7 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::question::choice_question::ChoiceQuestion;
 use crate::question::confirmation_question::ConfirmationQuestion;
+use bstr::ByteSlice;
 use shirabe_php_shim::PhpMixed;
 
 /// Polymorphic boundary for the Symfony Console Question hierarchy.
@@ -175,7 +176,7 @@ impl Question {
                     };
                     // array_merge(array_keys($values), array_values($values))
                     let mut merged: Vec<PhpMixed> =
-                        array.keys().map(|k| PhpMixed::string(k.clone())).collect();
+                        array.keys().map(|k| PhpMixed::String(k.clone())).collect();
                     merged.extend(array.values().cloned());
                     merged
                 } else {
@@ -305,7 +306,9 @@ impl Question {
     // ConsoleIO::select when computing `$isAssoc` over the choice map.
     pub(crate) fn is_assoc(array: &PhpMixed) -> bool {
         match array {
-            PhpMixed::Array(map) => map.keys().any(|key| key.parse::<i64>().is_err()),
+            PhpMixed::Array(map) => map
+                .keys()
+                .any(|key| !key.to_str().is_ok_and(|key| key.parse::<i64>().is_ok())),
             _ => false,
         }
     }

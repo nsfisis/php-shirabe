@@ -29,7 +29,7 @@ fn test_set_user_inputs() {
         PhpMixed::string("default".to_string()),
         buffer_io
             .ask(
-                "Empty string last".to_string(),
+                "Empty string last".into(),
                 PhpMixed::string("default".to_string())
             )
             .unwrap()

@@ -2,6 +2,7 @@
 
 use crate::async_runtime::run;
 use crate::io_stub::IOStub;
+use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -121,13 +122,13 @@ fn test_error_messages() {
 
     // $this->config->method('get')->with('vendor-dir')->willReturn($this->testDir)
     let mut config = Config::new(false, None);
-    let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert(
-        "vendor-dir".to_string(),
+        "vendor-dir".into(),
         PhpMixed::string(test_dir.path().to_str().unwrap().to_string()),
     );
-    let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
-    merged.insert("config".to_string(), PhpMixed::Array(config_options));
+    let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
+    merged.insert("config".into(), PhpMixed::Array(config_options));
     config.merge(&merged, "test");
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 

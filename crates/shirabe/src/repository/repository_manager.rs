@@ -6,6 +6,7 @@ use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{FilterRepository, RepositoryInterfaceHandle};
 use crate::util::{HttpDownloader, ProcessExecutor};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException, json_encode};
 use shirabe_semver::constraint::AnyConstraint;
@@ -93,7 +94,7 @@ impl RepositoryManager {
     pub fn create_repository(
         &self,
         r#type: &str,
-        config: IndexMap<String, PhpMixed>,
+        config: IndexMap<BString, PhpMixed>,
         name: Option<&str>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         if !self.repository_classes.contains_key(r#type) {
@@ -104,7 +105,7 @@ impl RepositoryManager {
             .into());
         }
 
-        if config.get("packagist").and_then(|v| v.as_bool()) == Some(false) {
+        if config.get(B("packagist")).and_then(|v| v.as_bool()) == Some(false) {
             let config_json = json_encode(&PhpMixed::Array(
                 config.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             ))
@@ -114,9 +115,9 @@ impl RepositoryManager {
 
         let class = self.repository_classes[r#type].clone();
 
-        let has_filter = config.contains_key("only")
-            || config.contains_key("exclude")
-            || config.contains_key("canonical");
+        let has_filter = config.contains_key(B("only"))
+            || config.contains_key(B("exclude"))
+            || config.contains_key(B("canonical"));
         let filter_config = if has_filter {
             Some(config.clone())
         } else {
@@ -124,9 +125,9 @@ impl RepositoryManager {
         };
 
         let mut cleaned_config = config;
-        cleaned_config.shift_remove("only");
-        cleaned_config.shift_remove("exclude");
-        cleaned_config.shift_remove("canonical");
+        cleaned_config.shift_remove(B("only"));
+        cleaned_config.shift_remove(B("exclude"));
+        cleaned_config.shift_remove(B("canonical"));
 
         // PHP instantiates `new $class(...)` dynamically; the port matches on the known
         // repository class names instead.
@@ -145,7 +146,7 @@ impl RepositoryManager {
     fn create_repository_by_class(
         &self,
         class: &str,
-        config: IndexMap<String, PhpMixed>,
+        config: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         // PHP: `new $class($config, $this->io, $this->config, $this->httpDownloader,
         // $this->eventDispatcher, $this->process)`. Rust cannot instantiate by string class name, so
@@ -230,7 +231,7 @@ pub trait RepositoryManagerInterface: std::fmt::Debug {
     fn create_repository(
         &self,
         r#type: &str,
-        config: IndexMap<String, PhpMixed>,
+        config: IndexMap<BString, PhpMixed>,
         name: Option<&str>,
     ) -> anyhow::Result<RepositoryInterfaceHandle>;
     fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
@@ -249,7 +250,7 @@ impl RepositoryManagerInterface for RepositoryManager {
     fn create_repository(
         &self,
         r#type: &str,
-        config: IndexMap<String, PhpMixed>,
+        config: IndexMap<BString, PhpMixed>,
         name: Option<&str>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         self.create_repository(r#type, config, name)

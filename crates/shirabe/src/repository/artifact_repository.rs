@@ -9,6 +9,7 @@ use crate::repository::{
     ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
 };
 use crate::util::{Platform, Tar, Zip};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash_file,
@@ -20,7 +21,7 @@ pub struct ArtifactRepository {
     inner: ArrayRepository,
     loader: Box<dyn LoaderInterface>,
     lookup: String,
-    repo_config: IndexMap<String, PhpMixed>,
+    repo_config: IndexMap<BString, PhpMixed>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 
@@ -35,7 +36,7 @@ impl std::fmt::Debug for ArtifactRepository {
 
 impl ArtifactRepository {
     pub fn new(
-        repo_config: IndexMap<String, PhpMixed>,
+        repo_config: IndexMap<BString, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> anyhow::Result<Self> {
         if !extension_loaded("zip") {
@@ -45,7 +46,7 @@ impl ArtifactRepository {
             .into());
         }
 
-        let url = repo_config["url"]
+        let url = repo_config[B("url")]
             .as_string()
             .unwrap_or_default()
             .to_string();
@@ -205,14 +206,14 @@ impl ArtifactRepository {
         let shasum = hash_file("sha1", &real_path).unwrap_or_default();
 
         let mut dist = IndexMap::new();
-        dist.insert("type".to_string(), PhpMixed::string(file_type.to_string()));
-        dist.insert("url".to_string(), PhpMixed::string(url_normalized));
-        dist.insert("shasum".to_string(), PhpMixed::string(shasum));
+        dist.insert("type".into(), PhpMixed::string(file_type.to_string()));
+        dist.insert("url".into(), PhpMixed::string(url_normalized));
+        dist.insert("shasum".into(), PhpMixed::string(shasum));
         if let Some(arr) = package.as_array_mut() {
-            arr.insert("dist".to_string(), PhpMixed::Array(dist));
+            arr.insert("dist".into(), PhpMixed::Array(dist));
         }
 
-        let cfg: IndexMap<String, PhpMixed> = package
+        let cfg: IndexMap<BString, PhpMixed> = package
             .as_array()
             .cloned()
             .map(|m| m.into_iter().collect())
@@ -233,7 +234,7 @@ impl ArtifactRepository {
 }
 
 impl ConfigurableRepositoryInterface for ArtifactRepository {
-    fn get_repo_config(&self) -> IndexMap<String, PhpMixed> {
+    fn get_repo_config(&self) -> IndexMap<BString, PhpMixed> {
         self.repo_config.clone()
     }
 }

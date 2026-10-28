@@ -6,6 +6,7 @@
 // real Config merged with `vendor-dir`, and real CompletePackage instances with dist
 // url/reference set.
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::FileDownloader;
@@ -30,13 +31,13 @@ fn get_archive_downloader(vendor_dir: Option<&str>) -> FileDownloader {
 
     let mut config = Config::new(false, None);
     if let Some(vendor_dir) = vendor_dir {
-        let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         config_options.insert(
-            "vendor-dir".to_string(),
+            "vendor-dir".into(),
             PhpMixed::string(vendor_dir.to_string()),
         );
-        let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
-        merged.insert("config".to_string(), PhpMixed::Array(config_options));
+        let mut merged: IndexMap<BString, PhpMixed> = IndexMap::new();
+        merged.insert("config".into(), PhpMixed::Array(config_options));
         config.merge(&merged, "test");
     }
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));

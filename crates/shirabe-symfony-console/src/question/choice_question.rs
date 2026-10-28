@@ -2,6 +2,7 @@
 
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::question::{Question, QuestionInterface};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, array_search, explode, implode, php_regex, preg_is_match, sprintf, strval, trim,
@@ -11,7 +12,7 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct ChoiceQuestion {
     inner: Question,
-    choices: IndexMap<String, PhpMixed>,
+    choices: IndexMap<BString, PhpMixed>,
     multiselect: bool,
     prompt: String,
     error_message: String,
@@ -23,7 +24,7 @@ impl ChoiceQuestion {
     /// `$default` The default answer to return.
     pub fn new(
         question: String,
-        choices: IndexMap<String, PhpMixed>,
+        choices: IndexMap<BString, PhpMixed>,
         default: Option<PhpMixed>,
     ) -> Result<Self, LogicException> {
         if choices.is_empty() {
@@ -51,7 +52,7 @@ impl ChoiceQuestion {
     }
 
     /// Returns available choices.
-    pub fn get_choices(&self) -> &IndexMap<String, PhpMixed> {
+    pub fn get_choices(&self) -> &IndexMap<BString, PhpMixed> {
         &self.choices
     }
 
@@ -149,7 +150,8 @@ impl ChoiceQuestion {
                 let mut results: Vec<String> = Vec::new();
                 for (key, choice) in &choices {
                     if (*choice) == *value {
-                        results.push(key.clone());
+                        // TODO(bytes): results are Strings, so non-UTF-8 bytes are replaced.
+                        results.push(key.to_str_lossy().into_owned());
                     }
                 }
 
@@ -167,15 +169,15 @@ impl ChoiceQuestion {
                 if !is_assoc {
                     if let Some(found_key) = &result_key {
                         // $result = $choices[$result];
-                        result = choices[found_key].clone();
-                    } else if let Some(found) = choices.get(&strval(value)) {
+                        result = choices[B(found_key)].clone();
+                    } else if let Some(found) = choices.get(B(&strval(value))) {
                         // isset($choices[$value])
                         result = found.clone();
                     } else {
                         result = PhpMixed::Bool(false);
                     }
                 } else if result_key.is_none() {
-                    if let Some(_found) = choices.get(&strval(value)) {
+                    if let Some(_found) = choices.get(B(&strval(value))) {
                         // false === $result && isset($choices[$value])
                         result = value.clone();
                     } else {
@@ -267,9 +269,10 @@ impl QuestionInterface for ChoiceQuestion {
 
 /// array_search operates over the choice values as strings; this projects the
 /// choices map's values into the string-keyed form the shim expects.
-fn choices_as_str(choices: &IndexMap<String, PhpMixed>) -> IndexMap<String, String> {
+fn choices_as_str(choices: &IndexMap<BString, PhpMixed>) -> IndexMap<String, String> {
     choices
         .iter()
-        .map(|(k, v)| (k.clone(), strval(v)))
+        // TODO(bytes): the result is keyed by String, so non-UTF-8 bytes are replaced.
+        .map(|(k, v)| (k.to_str_lossy().into_owned(), strval(v)))
         .collect()
 }

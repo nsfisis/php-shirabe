@@ -9,7 +9,7 @@ use crate::package::{
 use crate::platform::{HhvmDetector, HhvmDetectorInterface, Version};
 use crate::plugin::plugin_interface::{self};
 use crate::repository::{ArrayRepository, RepositoryInterface};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
@@ -50,7 +50,7 @@ impl PlatformRepository {
     /// constructing the repository on its own never starts the worker.
     pub fn new(
         packages: Vec<PackageInterfaceHandle>,
-        overrides: IndexMap<String, PhpMixed>,
+        overrides: IndexMap<BString, PhpMixed>,
         platform_info: Option<PlatformInfo>,
         hhvm_detector: Option<Box<dyn HhvmDetectorInterface>>,
     ) -> anyhow::Result<Self> {
@@ -58,6 +58,8 @@ impl PlatformRepository {
             hhvm_detector.unwrap_or_else(|| Box::new(HhvmDetector::new(None, None)));
         let mut overrides_map: IndexMap<String, PlatformOverride> = IndexMap::new();
         for (name, version) in overrides {
+            // TODO(bytes): platform package names are Strings, so non-UTF-8 bytes are replaced.
+            let name = name.to_str_lossy().into_owned();
             if !is_string(&version) && !matches!(version, PhpMixed::Bool(false)) {
                 return Err(UnexpectedValueException::new(format!(
                     "config.platform.{} should be a string or false, but got {} {}",
@@ -367,7 +369,7 @@ impl PlatformRepository {
                     let curl_version = &platform_info.curl_version;
                     let curl_version_str = curl_version
                         .as_array()
-                        .and_then(|m| m.get("version"))
+                        .and_then(|m| m.get(B("version")))
                         .and_then(|v| v.as_string())
                         .map(|s| s.to_string());
                     if let Some(cv) = curl_version_str.as_deref() {
@@ -1409,8 +1411,8 @@ impl PlatformRepository {
             version_str,
         );
         package.set_description("Package overridden via config.platform".to_string());
-        let mut extra: IndexMap<String, PhpMixed> = IndexMap::new();
-        extra.insert("config.platform".to_string(), PhpMixed::Bool(true));
+        let mut extra: IndexMap<BString, PhpMixed> = IndexMap::new();
+        extra.insert("config.platform".into(), PhpMixed::Bool(true));
         package.inner.set_extra(extra);
         let package = CompletePackageHandle::from_complete_package(package);
         // PHP: parent::addPackage() calls the late-bound $this->initialize() before pushing.
@@ -1440,8 +1442,8 @@ impl PlatformRepository {
             "{}. <warning>Package disabled via config.platform</warning>",
             current_description
         ));
-        let mut extra: IndexMap<String, PhpMixed> = IndexMap::new();
-        extra.insert("config.platform".to_string(), PhpMixed::Bool(true));
+        let mut extra: IndexMap<BString, PhpMixed> = IndexMap::new();
+        extra.insert("config.platform".into(), PhpMixed::Bool(true));
         // TODO(type-model): neither PackageInterface nor CompletePackageInterface exposes
         // setExtra (PHP defines it on BasePackage), and the handle API does not surface
         // it. Disabled packages are always plain CompletePackage objects, so reach the
@@ -1648,7 +1650,7 @@ impl PlatformRepository {
 
     fn php_object_field(value: &PhpMixed, key: &str) -> Option<PhpMixed> {
         match value {
-            PhpMixed::Object(fields) | PhpMixed::Array(fields) => fields.get(key).cloned(),
+            PhpMixed::Object(fields) | PhpMixed::Array(fields) => fields.get(B(key)).cloned(),
             _ => None,
         }
     }

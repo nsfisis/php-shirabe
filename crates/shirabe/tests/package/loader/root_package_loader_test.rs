@@ -6,6 +6,7 @@
 
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
 use crate::test_case::GitVersionGuard;
+use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -41,10 +42,10 @@ fn http_downloader(
 // `$config = new Config; $config->merge(['repositories' => ['packagist' => false]]);`
 fn make_config() -> std::rc::Rc<std::cell::RefCell<Config>> {
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
-    let mut repositories: IndexMap<String, PhpMixed> = IndexMap::new();
-    repositories.insert("packagist".to_string(), PhpMixed::Bool(false));
-    let mut merge: IndexMap<String, PhpMixed> = IndexMap::new();
-    merge.insert("repositories".to_string(), PhpMixed::Array(repositories));
+    let mut repositories: IndexMap<BString, PhpMixed> = IndexMap::new();
+    repositories.insert("packagist".into(), PhpMixed::Bool(false));
+    let mut merge: IndexMap<BString, PhpMixed> = IndexMap::new();
+    merge.insert("repositories".into(), PhpMixed::Array(repositories));
     config.borrow_mut().merge(&merge, "test");
     config
 }
@@ -65,9 +66,9 @@ fn make_manager(
 }
 
 fn require_map(entries: &[(&str, &str)]) -> PhpMixed {
-    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (k, v) in entries {
-        m.insert(k.to_string(), PhpMixed::string(v.to_string()));
+        m.insert(k.to_string().into(), PhpMixed::string(v.to_string()));
     }
     PhpMixed::Array(m)
 }
@@ -79,7 +80,7 @@ mockall::mock! {
     impl VersionGuesserInterface for VersionGuesser {
         fn guess_version(
             &mut self,
-            package_config: &IndexMap<String, PhpMixed>,
+            package_config: &IndexMap<BString, PhpMixed>,
             path: &str,
         ) -> anyhow::Result<Option<VersionData>>;
 
@@ -94,10 +95,10 @@ fn test_stability_flags_parsing() {
     {
         let mut cfg = IndexMap::new();
         cfg.insert(
-            "repositories".to_string(),
+            "repositories".into(),
             PhpMixed::Array({
                 let mut m = IndexMap::new();
-                m.insert("packagist".to_string(), PhpMixed::Bool(false));
+                m.insert("packagist".into(), PhpMixed::Bool(false));
                 m
             }),
         );
@@ -125,46 +126,43 @@ fn test_stability_flags_parsing() {
 
     let mut data = IndexMap::new();
     data.insert(
-        "require".to_string(),
+        "require".into(),
         PhpMixed::Array({
             let mut m = IndexMap::new();
             m.insert(
-                "foo/bar".to_string(),
+                "foo/bar".into(),
                 PhpMixed::string("~2.1.0-beta2".to_string()),
             );
             m.insert(
-                "bar/baz".to_string(),
+                "bar/baz".into(),
                 PhpMixed::string("1.0.x-dev as 1.2.0".to_string()),
             );
+            m.insert("qux/quux".into(), PhpMixed::string("1.0.*@rc".to_string()));
             m.insert(
-                "qux/quux".to_string(),
-                PhpMixed::string("1.0.*@rc".to_string()),
-            );
-            m.insert(
-                "zux/complex".to_string(),
+                "zux/complex".into(),
                 PhpMixed::string("~1.0,>=1.0.2@dev".to_string()),
             );
             m.insert(
-                "or/op".to_string(),
+                "or/op".into(),
                 PhpMixed::string("^2.0@dev || ^2.0@dev".to_string()),
             );
             m.insert(
-                "multi/lowest-wins".to_string(),
+                "multi/lowest-wins".into(),
                 PhpMixed::string("^2.0@rc || >=3.0@dev , ~3.5@alpha".to_string()),
             );
             m.insert(
-                "or/op-without-flags".to_string(),
+                "or/op-without-flags".into(),
                 PhpMixed::string("dev-master || 2.0 , ~3.5-alpha".to_string()),
             );
             m.insert(
-                "or/op-without-flags2".to_string(),
+                "or/op-without-flags2".into(),
                 PhpMixed::string("3.0-beta || 2.0 , ~3.5-alpha".to_string()),
             );
             m
         }),
     );
     data.insert(
-        "minimum-stability".to_string(),
+        "minimum-stability".into(),
         PhpMixed::string("alpha".to_string()),
     );
 
@@ -279,7 +277,7 @@ fn test_feature_branch_pretty_version() {
 
     let mut data = IndexMap::new();
     data.insert(
-        "require".to_string(),
+        "require".into(),
         require_map(&[("foo/bar", "self.version")]),
     );
 
@@ -317,11 +315,11 @@ fn test_non_feature_branch_pretty_version() {
 
     let mut data = IndexMap::new();
     data.insert(
-        "require".to_string(),
+        "require".into(),
         require_map(&[("foo/bar", "self.version")]),
     );
     data.insert(
-        "non-feature-branches".to_string(),
+        "non-feature-branches".into(),
         PhpMixed::List(vec![PhpMixed::string("latest-.*".to_string())]),
     );
 

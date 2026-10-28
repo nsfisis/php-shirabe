@@ -2,7 +2,7 @@
 
 use crate::advisory::Auditor;
 use crate::config::Config;
-use bstr::ByteSlice;
+use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, canonical_int_key};
 
@@ -82,6 +82,8 @@ impl AuditConfig {
         };
 
         for (key, value) in entries {
+            // TODO(bytes): advisory IDs and package names are Strings, so non-UTF-8 bytes are
+            // replaced.
             let (id, apply, reason) = match value {
                 PhpMixed::String(reason_str) => {
                     // TODO(type-model): PHP's `array` type must be modeled more precisely. This is
@@ -94,7 +96,7 @@ impl AuditConfig {
                         )
                     } else {
                         (
-                            key.clone(),
+                            key.to_str_lossy().into_owned(),
                             "all".to_string(),
                             Some(reason_str.to_str_lossy().into_owned()),
                         )
@@ -102,12 +104,12 @@ impl AuditConfig {
                 }
                 PhpMixed::Array(detail) => {
                     let apply = detail
-                        .get("apply")
+                        .get(B("apply"))
                         .and_then(|v| v.as_string())
                         .unwrap_or("all".into())
                         .to_string();
                     let reason = detail
-                        .get("reason")
+                        .get(B("reason"))
                         .and_then(|v| v.as_string())
                         .map(|s| s.to_string());
 
@@ -118,9 +120,9 @@ impl AuditConfig {
                         )).into());
                     }
 
-                    (key.clone(), apply, reason)
+                    (key.to_str_lossy().into_owned(), apply, reason)
                 }
-                PhpMixed::Null => (key.clone(), "all".to_string(), None),
+                PhpMixed::Null => (key.to_str_lossy().into_owned(), "all".to_string(), None),
                 _ => continue,
             };
 
@@ -146,46 +148,46 @@ impl AuditConfig {
         let empty_array = PhpMixed::Array(IndexMap::new());
 
         let ignore_raw = audit_config
-            .and_then(|m| m.get("ignore"))
+            .and_then(|m| m.get(B("ignore")))
             .cloned()
             .unwrap_or_else(|| empty_array.clone());
         let (ignore_list_for_audit, ignore_list_for_blocking) =
             Self::parse_ignore_with_apply(&ignore_raw)?;
 
         let ignore_abandoned_raw = audit_config
-            .and_then(|m| m.get("ignore-abandoned"))
+            .and_then(|m| m.get(B("ignore-abandoned")))
             .cloned()
             .unwrap_or_else(|| empty_array.clone());
         let (ignore_abandoned_for_audit, ignore_abandoned_for_blocking) =
             Self::parse_ignore_with_apply(&ignore_abandoned_raw)?;
 
         let ignore_severity_raw = audit_config
-            .and_then(|m| m.get("ignore-severity"))
+            .and_then(|m| m.get(B("ignore-severity")))
             .cloned()
             .unwrap_or_else(|| empty_array.clone());
         let (ignore_severity_for_audit, ignore_severity_for_blocking) =
             Self::parse_ignore_with_apply(&ignore_severity_raw)?;
 
         let audit_abandoned = audit_config
-            .and_then(|m| m.get("abandoned"))
+            .and_then(|m| m.get(B("abandoned")))
             .and_then(|v| v.as_string())
             .unwrap_or(Auditor::ABANDONED_FAIL.into())
             .to_string();
 
         let block_insecure = audit_config
-            .and_then(|m| m.get("block-insecure"))
+            .and_then(|m| m.get(B("block-insecure")))
             .and_then(|v| v.as_opt())
             .map(|v| v.to_bool())
             .unwrap_or(true);
 
         let block_abandoned = audit_config
-            .and_then(|m| m.get("block-abandoned"))
+            .and_then(|m| m.get(B("block-abandoned")))
             .and_then(|v| v.as_opt())
             .map(|v| v.to_bool())
             .unwrap_or(false);
 
         let ignore_unreachable = audit_config
-            .and_then(|m| m.get("ignore-unreachable"))
+            .and_then(|m| m.get(B("ignore-unreachable")))
             .and_then(|v| v.as_opt())
             .map(|v| v.to_bool())
             .unwrap_or(false);

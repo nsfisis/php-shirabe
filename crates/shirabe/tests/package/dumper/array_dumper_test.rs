@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Dumper/ArrayDumperTest.php
 
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe::package::ArrayDumper;
 use shirabe::package::handle::{CompletePackageHandle, RootPackageHandle};
@@ -25,17 +26,14 @@ fn test_required_information() {
     let dumper = set_up();
     let config = dumper.dump(complete_package().into());
 
-    let mut expected: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut expected: IndexMap<BString, PhpMixed> = IndexMap::new();
+    expected.insert("name".into(), PhpMixed::string("dummy/pkg".to_string()));
+    expected.insert("version".into(), PhpMixed::string("1.0.0".to_string()));
     expected.insert(
-        "name".to_string(),
-        PhpMixed::string("dummy/pkg".to_string()),
-    );
-    expected.insert("version".to_string(), PhpMixed::string("1.0.0".to_string()));
-    expected.insert(
-        "version_normalized".to_string(),
+        "version_normalized".into(),
         PhpMixed::string("1.0.0.0".to_string()),
     );
-    expected.insert("type".to_string(), PhpMixed::string("library".to_string()));
+    expected.insert("type".into(), PhpMixed::string("library".to_string()));
 
     assert_eq!(expected, config);
 }
@@ -50,7 +48,7 @@ fn test_root_package() {
 
     assert_eq!(
         Some(&PhpMixed::string("dev".to_string())),
-        config.get("minimum-stability")
+        config.get(B("minimum-stability"))
     );
 }
 
@@ -62,7 +60,7 @@ fn test_dump_abandoned() {
 
     let config = dumper.dump(package.into());
 
-    assert_eq!(Some(&PhpMixed::Bool(true)), config.get("abandoned"));
+    assert_eq!(Some(&PhpMixed::Bool(true)), config.get(B("abandoned")));
 }
 
 #[test]
@@ -75,7 +73,7 @@ fn test_dump_abandoned_replacement() {
 
     assert_eq!(
         Some(&PhpMixed::string("foo/bar".to_string())),
-        config.get("abandoned")
+        config.get(B("abandoned"))
     );
 }
 

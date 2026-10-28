@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/Loader/ValidatingArrayLoaderTest.php
 
 use crate::test_case;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::{InvalidPackageException, LoaderInterface, ValidatingArrayLoader};
@@ -23,7 +24,7 @@ fn b(v: bool) -> PhpMixed {
 fn arr(entries: Vec<(&str, PhpMixed)>) -> PhpMixed {
     let mut m = IndexMap::new();
     for (k, v) in entries {
-        m.insert(k.to_string(), v);
+        m.insert(k.into(), v);
     }
     PhpMixed::Array(m)
 }
@@ -32,15 +33,15 @@ fn arr(entries: Vec<(&str, PhpMixed)>) -> PhpMixed {
 fn list(items: Vec<PhpMixed>) -> PhpMixed {
     let mut m = IndexMap::new();
     for (idx, v) in items.into_iter().enumerate() {
-        m.insert(idx.to_string(), v);
+        m.insert(idx.to_string().into(), v);
     }
     PhpMixed::Array(m)
 }
 
-fn config(entries: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
+fn config(entries: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
     let mut m = IndexMap::new();
     for (k, v) in entries {
-        m.insert(k.to_string(), v);
+        m.insert(k.into(), v);
     }
     m
 }
@@ -52,7 +53,7 @@ mockall::mock! {
     impl LoaderInterface for Loader {
         fn load(
             &self,
-            config: IndexMap<String, PhpMixed>,
+            config: IndexMap<BString, PhpMixed>,
             class: Option<String>,
         ) -> anyhow::Result<PackageInterfaceHandle>;
         fn as_any(&self) -> &dyn std::any::Any;
@@ -78,7 +79,7 @@ fn invalid_naming_error(name: &str) -> Vec<String> {
 }
 
 /// ref: ValidatingArrayLoaderTest::successProvider
-fn success_provider() -> Vec<IndexMap<String, PhpMixed>> {
+fn success_provider() -> Vec<IndexMap<BString, PhpMixed>> {
     vec![
         // minimal
         config(vec![("name", s("foo/bar"))]),
@@ -368,8 +369,8 @@ fn test_load_success() {
 }
 
 /// ref: ValidatingArrayLoaderTest::errorProvider
-fn error_provider() -> Vec<(IndexMap<String, PhpMixed>, Vec<String>)> {
-    let mut data: Vec<(IndexMap<String, PhpMixed>, Vec<String>)> = Vec::new();
+fn error_provider() -> Vec<(IndexMap<BString, PhpMixed>, Vec<String>)> {
+    let mut data: Vec<(IndexMap<BString, PhpMixed>, Vec<String>)> = Vec::new();
 
     for invalid_name in ["foo", "foo/-bar-", "foo/-bar"] {
         data.push((
@@ -806,10 +807,10 @@ fn test_load_failure_throws_exception() {
 /// ref: ValidatingArrayLoaderTest::warningProvider
 /// Returns (config, expected_warnings, must_check, expected_array).
 fn warning_provider() -> Vec<(
-    IndexMap<String, PhpMixed>,
+    IndexMap<BString, PhpMixed>,
     Vec<String>,
     bool,
-    Option<IndexMap<String, PhpMixed>>,
+    Option<IndexMap<BString, PhpMixed>>,
 )> {
     vec![
         (
@@ -1002,7 +1003,7 @@ fn test_load_skips_warning_data_when_ignoring_errors() {
             None,
             ValidatingArrayLoader::CHECK_ALL,
         );
-        cfg.insert("name".to_string(), s("a/b"));
+        cfg.insert("name".into(), s("a/b"));
         loader
             .load(cfg, Some("Composer\\Package\\CompletePackage".to_string()))
             .unwrap();

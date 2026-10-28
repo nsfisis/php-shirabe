@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Repository/ArrayRepositoryTest.php
 
 use crate::test_case::{get_alias_package, get_package};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::array_loader::ArrayLoader;
@@ -12,11 +13,11 @@ use shirabe_php_shim::PhpMixed;
 /// PHP `setType`/`setAbandoned` operate on non-root packages; the public handle API only allows
 /// such setters on root packages, so packages carrying extra config are built via ArrayLoader.
 fn loaded(name: &str, version: &str, extra: Vec<(&str, PhpMixed)>) -> PackageInterfaceHandle {
-    let mut config: IndexMap<String, PhpMixed> = IndexMap::new();
-    config.insert("name".to_string(), PhpMixed::string(name.to_string()));
-    config.insert("version".to_string(), PhpMixed::string(version.to_string()));
+    let mut config: IndexMap<BString, PhpMixed> = IndexMap::new();
+    config.insert("name".into(), PhpMixed::string(name.to_string()));
+    config.insert("version".into(), PhpMixed::string(version.to_string()));
     for (key, value) in extra {
-        config.insert(key.to_string(), value);
+        config.insert(key.to_string().into(), value);
     }
 
     ArrayLoader::new(None, false)

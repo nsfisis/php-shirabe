@@ -3,6 +3,7 @@
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::HttpDownloader;
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PHP_EOL, PhpMixed, UnexpectedValueException, php_regex, preg_is_match,
@@ -116,7 +117,7 @@ impl Versions {
     pub fn get_latest(
         &mut self,
         channel: Option<&str>,
-    ) -> anyhow::Result<Result<IndexMap<String, PhpMixed>, UnexpectedValueException>> {
+    ) -> anyhow::Result<Result<IndexMap<BString, PhpMixed>, UnexpectedValueException>> {
         let versions = self.get_versions_data()?;
         let effective_channel = match channel {
             Some(c) => c.to_string(),
@@ -124,12 +125,12 @@ impl Versions {
         };
 
         if let PhpMixed::Array(ref map) = versions
-            && let Some(channel_versions) = map.get(&effective_channel)
+            && let Some(channel_versions) = map.get(B(&effective_channel))
             && let PhpMixed::List(ref list) = *channel_versions
         {
             for version in list {
                 if let PhpMixed::Array(ref v) = *version {
-                    let min_php = v.get("min-php").and_then(|p| p.as_int()).unwrap_or(0);
+                    let min_php = v.get(B("min-php")).and_then(|p| p.as_int()).unwrap_or(0);
                     if min_php <= shirabe_php_rpc::get_php_version().version_id {
                         return Ok(Ok(v
                             .iter()

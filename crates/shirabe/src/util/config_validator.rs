@@ -5,7 +5,7 @@ use crate::json::{JsonFile, JsonValidationException};
 use crate::package::loader::{
     ArrayLoader, InvalidPackageException, LoaderInterface, ValidatingArrayLoader,
 };
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use serde::de::Error as _;
 use shirabe_php_shim::{
@@ -37,7 +37,7 @@ impl ConfigValidator {
 
         // validate json schema
         let mut lax_valid = false;
-        let mut manifest: Option<IndexMap<String, PhpMixed>> = None;
+        let mut manifest: Option<IndexMap<BString, PhpMixed>> = None;
 
         let json = JsonFile::new(file.to_string(), None, Some(self.io.clone()))
             .expect("config file path is always local");
@@ -87,13 +87,13 @@ impl ConfigValidator {
 
         // validate actual data
         if manifest
-            .get("license")
+            .get(B("license"))
             .is_none_or(|v| matches!(v, PhpMixed::Null))
-            || !manifest.contains_key("license")
+            || !manifest.contains_key(B("license"))
         {
             warnings.push("No license specified, it is recommended to do so. For closed-source software you may use \"proprietary\" as license.".to_string());
         } else {
-            let license_val = manifest.get("license").unwrap();
+            let license_val = manifest.get(B("license")).unwrap();
             let licenses: Vec<String> = match license_val {
                 PhpMixed::String(s) => vec![s.to_str_lossy().into_owned()],
                 PhpMixed::List(list) => list
@@ -140,11 +140,11 @@ impl ConfigValidator {
             }
         }
 
-        if (flags & Self::CHECK_VERSION != 0) && manifest.contains_key("version") {
+        if (flags & Self::CHECK_VERSION != 0) && manifest.contains_key(B("version")) {
             warnings.push("The version field is present, it is recommended to leave it out if the package is published on Packagist.".to_string());
         }
 
-        if let Some(PhpMixed::String(name)) = manifest.get("name")
+        if let Some(PhpMixed::String(name)) = manifest.get(B("name"))
             && !name.is_empty()
             && preg_is_match(php_regex!(r"{[A-Z]}"), &name.to_str_lossy())
         {
@@ -161,7 +161,7 @@ impl ConfigValidator {
                 ));
         }
 
-        if let Some(PhpMixed::String(t)) = manifest.get("type")
+        if let Some(PhpMixed::String(t)) = manifest.get(B("type"))
             && !t.is_empty()
             && t == "composer-installer"
         {
@@ -170,9 +170,9 @@ impl ConfigValidator {
 
         // check for require-dev overrides
         if let (Some(PhpMixed::Array(require)), Some(PhpMixed::Array(require_dev))) =
-            (manifest.get("require"), manifest.get("require-dev"))
+            (manifest.get(B("require")), manifest.get(B("require-dev")))
         {
-            let require_overrides: Vec<String> = require
+            let require_overrides: Vec<BString> = require
                 .keys()
                 .filter(|k| require_dev.contains_key(*k))
                 .cloned()
@@ -186,7 +186,7 @@ impl ConfigValidator {
                 };
                 warnings.push(format!(
                     "{} {} required both in require and require-dev, this can lead to unexpected behavior",
-                    require_overrides.join(", "),
+                    bstr::join(", ", &require_overrides).as_bstr(),
                     plural
                 ));
             }
@@ -194,9 +194,9 @@ impl ConfigValidator {
 
         // check for meaningless provide/replace satisfying requirements
         for link_type in &["provide", "replace"] {
-            if let Some(PhpMixed::Array(link_map)) = manifest.get(*link_type) {
+            if let Some(PhpMixed::Array(link_map)) = manifest.get(B(link_type)) {
                 for require_type in &["require", "require-dev"] {
-                    if let Some(PhpMixed::Array(require_map)) = manifest.get(*require_type) {
+                    if let Some(PhpMixed::Array(require_map)) = manifest.get(B(require_type)) {
                         for provide in link_map.keys() {
                             if require_map.contains_key(provide) {
                                 warnings.push(format!(
@@ -211,15 +211,15 @@ impl ConfigValidator {
         }
 
         // check for commit references
-        let require = match manifest.get("require") {
+        let require = match manifest.get(B("require")) {
             Some(PhpMixed::Array(m)) => m.clone(),
             _ => IndexMap::new(),
         };
-        let require_dev = match manifest.get("require-dev") {
+        let require_dev = match manifest.get(B("require-dev")) {
             Some(PhpMixed::Array(m)) => m.clone(),
             _ => IndexMap::new(),
         };
-        let mut packages: IndexMap<String, PhpMixed> = require;
+        let mut packages: IndexMap<BString, PhpMixed> = require;
         packages.extend(require_dev);
         for (package, version) in &packages {
             if let PhpMixed::String(version_str) = version
@@ -233,11 +233,11 @@ impl ConfigValidator {
         }
 
         // report scripts-descriptions for non-existent scripts
-        let scripts_descriptions = match manifest.get("scripts-descriptions") {
+        let scripts_descriptions = match manifest.get(B("scripts-descriptions")) {
             Some(PhpMixed::Array(m)) => m.clone(),
             _ => IndexMap::new(),
         };
-        let scripts = match manifest.get("scripts") {
+        let scripts = match manifest.get(B("scripts")) {
             Some(PhpMixed::Array(m)) => m.clone(),
             _ => IndexMap::new(),
         };
@@ -251,7 +251,7 @@ impl ConfigValidator {
         }
 
         // report scripts-aliases for non-existent scripts
-        let script_aliases = match manifest.get("scripts-aliases") {
+        let script_aliases = match manifest.get(B("scripts-aliases")) {
             Some(PhpMixed::Array(m)) => m.clone(),
             _ => IndexMap::new(),
         };
@@ -265,14 +265,14 @@ impl ConfigValidator {
         }
 
         // check for empty psr-0/psr-4 namespace prefixes
-        if let Some(PhpMixed::Array(autoload)) = manifest.get("autoload") {
-            if let Some(PhpMixed::Array(psr0)) = autoload.get("psr-0")
-                && psr0.contains_key("")
+        if let Some(PhpMixed::Array(autoload)) = manifest.get(B("autoload")) {
+            if let Some(PhpMixed::Array(psr0)) = autoload.get(B("psr-0"))
+                && psr0.contains_key(B(""))
             {
                 warnings.push("Defining autoload.psr-0 with an empty namespace prefix is a bad idea for performance".to_string());
             }
-            if let Some(PhpMixed::Array(psr4)) = autoload.get("psr-4")
-                && psr4.contains_key("")
+            if let Some(PhpMixed::Array(psr4)) = autoload.get(B("psr-4"))
+                && psr4.contains_key(B(""))
             {
                 warnings.push("Defining autoload.psr-4 with an empty namespace prefix is a bad idea for performance".to_string());
             }
@@ -285,14 +285,11 @@ impl ConfigValidator {
             array_loader_validation_flags,
         );
         let mut manifest_for_load = manifest;
-        if !manifest_for_load.contains_key("version") {
-            manifest_for_load.insert("version".to_string(), PhpMixed::string("1.0.0".to_string()));
+        if !manifest_for_load.contains_key(B("version")) {
+            manifest_for_load.insert("version".into(), PhpMixed::string("1.0.0".to_string()));
         }
-        if !manifest_for_load.contains_key("name") {
-            manifest_for_load.insert(
-                "name".to_string(),
-                PhpMixed::string("dummy/dummy".to_string()),
-            );
+        if !manifest_for_load.contains_key(B("name")) {
+            manifest_for_load.insert("name".into(), PhpMixed::string("dummy/dummy".to_string()));
         }
         match loader.load(
             manifest_for_load,

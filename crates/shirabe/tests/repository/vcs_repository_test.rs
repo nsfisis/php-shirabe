@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/VcsRepositoryTest.php
 
+use bstr::BString;
 use indexmap::{IndexMap, IndexSet};
 use serial_test::serial;
 use shirabe::config::Config;
@@ -117,10 +118,10 @@ fn set_up() -> Option<SetUp> {
 }
 
 fn composer(version: Option<&str>) -> PhpMixed {
-    let mut m: IndexMap<String, PhpMixed> = IndexMap::new();
-    m.insert("name".to_string(), PhpMixed::string("a/b".to_string()));
+    let mut m: IndexMap<BString, PhpMixed> = IndexMap::new();
+    m.insert("name".into(), PhpMixed::string("a/b".to_string()));
     if let Some(version) = version {
-        m.insert("version".to_string(), PhpMixed::string(version.to_string()));
+        m.insert("version".into(), PhpMixed::string(version.to_string()));
     }
     PhpMixed::Array(m)
 }
@@ -186,13 +187,13 @@ fn test_load_versions() {
     .collect();
 
     let mut config = Config::new(true, None);
-    let mut top: IndexMap<String, PhpMixed> = IndexMap::new();
-    let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut top: IndexMap<BString, PhpMixed> = IndexMap::new();
+    let mut config_section: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_section.insert(
-        "home".to_string(),
+        "home".into(),
         PhpMixed::string(composer_home.to_str().unwrap().to_string()),
     );
-    top.insert("config".to_string(), PhpMixed::Array(config_section));
+    top.insert("config".into(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
     let config = std::rc::Rc::new(std::cell::RefCell::new(config));
 
@@ -211,12 +212,12 @@ fn test_load_versions() {
     // enables async on the shared ProcessExecutor.
     let _loop = Loop::new(http_downloader.clone(), Some(process.clone()));
 
-    let mut repo_config: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
     repo_config.insert(
-        "url".to_string(),
+        "url".into(),
         PhpMixed::string(git_repo.to_str().unwrap().to_string()),
     );
-    repo_config.insert("type".to_string(), PhpMixed::string("vcs".to_string()));
+    repo_config.insert("type".into(), PhpMixed::string("vcs".to_string()));
 
     let mut repo = VcsRepository::new(
         repo_config,

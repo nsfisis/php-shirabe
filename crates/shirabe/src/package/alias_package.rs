@@ -3,6 +3,7 @@
 use crate::package::version::VersionParser;
 use crate::package::{BasePackage, Link, Mirror, PackageHandle, PackageInterface};
 use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle};
+use bstr::BString;
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{LogicException, PhpMixed};
@@ -256,7 +257,7 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_target_dir()
     }
 
-    fn get_extra(&self) -> IndexMap<String, PhpMixed> {
+    fn get_extra(&self) -> IndexMap<BString, PhpMixed> {
         self.alias_of.get_extra()
     }
 
@@ -320,11 +321,11 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_dist_sha1_checksum()
     }
 
-    fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>) {
+    fn set_transport_options(&mut self, options: IndexMap<BString, PhpMixed>) {
         self.alias_of.set_transport_options(options);
     }
 
-    fn get_transport_options(&self) -> IndexMap<String, PhpMixed> {
+    fn get_transport_options(&self) -> IndexMap<BString, PhpMixed> {
         self.alias_of.get_transport_options()
     }
 
@@ -336,11 +337,11 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_dist_mirrors()
     }
 
-    fn get_autoload(&self) -> IndexMap<String, PhpMixed> {
+    fn get_autoload(&self) -> IndexMap<BString, PhpMixed> {
         self.alias_of.get_autoload()
     }
 
-    fn get_dev_autoload(&self) -> IndexMap<String, PhpMixed> {
+    fn get_dev_autoload(&self) -> IndexMap<BString, PhpMixed> {
         self.alias_of.get_dev_autoload()
     }
 
@@ -348,7 +349,7 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_include_paths()
     }
 
-    fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>> {
+    fn get_php_ext(&self) -> Option<IndexMap<BString, PhpMixed>> {
         self.alias_of.get_php_ext()
     }
 

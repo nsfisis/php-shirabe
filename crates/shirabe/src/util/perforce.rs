@@ -2,6 +2,7 @@
 
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::{CommandLine, Filesystem, Platform, ProcessExecutor};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, chdir, date_local, explode, fclose, feof, fgets,
@@ -32,7 +33,7 @@ pub struct Perforce {
 
 impl Perforce {
     pub fn new(
-        repo_config: IndexMap<String, PhpMixed>,
+        repo_config: IndexMap<BString, PhpMixed>,
         port: String,
         path: String,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -63,7 +64,7 @@ impl Perforce {
     }
 
     pub fn create(
-        repo_config: IndexMap<String, PhpMixed>,
+        repo_config: IndexMap<BString, PhpMixed>,
         port: String,
         path: String,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -90,30 +91,30 @@ impl Perforce {
         )? == 0)
     }
 
-    pub fn initialize(&mut self, repo_config: &IndexMap<String, PhpMixed>) {
+    pub fn initialize(&mut self, repo_config: &IndexMap<BString, PhpMixed>) {
         self.unique_perforce_client_name = self.generate_unique_perforce_client_name();
         if repo_config.is_empty() {
             return;
         }
         if let Some(value) = repo_config
-            .get("unique_perforce_client_name")
+            .get(B("unique_perforce_client_name"))
             .and_then(|v| v.as_string())
         {
             self.unique_perforce_client_name = value.to_string();
         }
 
-        if let Some(value) = repo_config.get("depot").and_then(|v| v.as_string()) {
+        if let Some(value) = repo_config.get(B("depot")).and_then(|v| v.as_string()) {
             self.p4_depot = Some(value.to_string());
         }
-        if let Some(value) = repo_config.get("branch").and_then(|v| v.as_string()) {
+        if let Some(value) = repo_config.get(B("branch")).and_then(|v| v.as_string()) {
             self.p4_branch = Some(value.to_string());
         }
-        if let Some(value) = repo_config.get("p4user").and_then(|v| v.as_string()) {
+        if let Some(value) = repo_config.get(B("p4user")).and_then(|v| v.as_string()) {
             self.p4_user = Some(value.to_string());
         } else {
             self.p4_user = self.get_p4_variable("P4USER");
         }
-        if let Some(value) = repo_config.get("p4password").and_then(|v| v.as_string()) {
+        if let Some(value) = repo_config.get(B("p4password")).and_then(|v| v.as_string()) {
             self.p4_password = Some(value.to_string());
         }
     }
@@ -250,7 +251,7 @@ impl Perforce {
         }
         self.p4_user = self
             .io
-            .ask("Enter P4 User:".to_string(), PhpMixed::Null)?
+            .ask("Enter P4 User:".into(), PhpMixed::Null)?
             .as_string()
             .map(|s| s.to_string());
         let command = if self.windows_flag {
@@ -543,7 +544,7 @@ impl Perforce {
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         let composer_file_content = self.get_file_content("composer.json", identifier);
 
         let composer_file_content = match composer_file_content {
@@ -782,7 +783,7 @@ pub trait PerforceInterface: std::fmt::Debug {
     fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>>;
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>>;
 }
 
 impl PerforceInterface for Perforce {
@@ -841,7 +842,7 @@ impl PerforceInterface for Perforce {
     fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>> {
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         Perforce::get_composer_information(self, identifier)
     }
 }

@@ -4,6 +4,7 @@ use crate::package::handle::delegate_package_interface_to_inner;
 use crate::package::{
     AliasPackage, CompletePackageHandle, CompletePackageInterface, PackageHandle,
 };
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -58,11 +59,11 @@ impl CompletePackageInterface for CompleteAliasPackage {
         self.alias_of.set_scripts(scripts);
     }
 
-    fn get_repositories(&self) -> IndexMap<String, PhpMixed> {
+    fn get_repositories(&self) -> IndexMap<BString, PhpMixed> {
         self.alias_of.get_repositories()
     }
 
-    fn set_repositories(&mut self, repositories: IndexMap<String, PhpMixed>) {
+    fn set_repositories(&mut self, repositories: IndexMap<BString, PhpMixed>) {
         self.alias_of.set_repositories(repositories);
     }
 
@@ -114,11 +115,11 @@ impl CompletePackageInterface for CompleteAliasPackage {
         self.alias_of.set_support(support);
     }
 
-    fn get_funding(&self) -> Vec<IndexMap<String, PhpMixed>> {
+    fn get_funding(&self) -> Vec<IndexMap<BString, PhpMixed>> {
         self.alias_of.get_funding()
     }
 
-    fn set_funding(&mut self, funding: Vec<IndexMap<String, PhpMixed>>) {
+    fn set_funding(&mut self, funding: Vec<IndexMap<BString, PhpMixed>>) {
         self.alias_of.set_funding(funding);
     }
 

@@ -5,6 +5,7 @@ use crate::php_worker::{
     load_composer_php_runtime, php_eval, php_runtime_available, php_single_quote,
 };
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd, get_process_executor_mock};
+use bstr::BString;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::autoload::{AutoloadGenerator, AutoloadGeneratorInterface, ClassLoader};
@@ -484,10 +485,10 @@ mockall::mock! {
             package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
             root_package: RootPackageInterfaceHandle,
             filtered_dev_packages: PhpMixed,
-        ) -> IndexMap<String, PhpMixed>;
+        ) -> IndexMap<BString, PhpMixed>;
         fn create_loader<'a>(
             &self,
-            autoloads: &IndexMap<String, PhpMixed>,
+            autoloads: &IndexMap<BString, PhpMixed>,
             vendor_dir: Option<String>,
         ) -> anyhow::Result<ClassLoader>;
     }
@@ -503,7 +504,7 @@ mockall::mock! {
         fn create_repository<'a>(
             &self,
             r#type: &str,
-            config: IndexMap<String, PhpMixed>,
+            config: IndexMap<BString, PhpMixed>,
             name: Option<&'a str>,
         ) -> anyhow::Result<RepositoryInterfaceHandle>;
         fn add_repository(&mut self, repository: RepositoryInterfaceHandle);
@@ -565,11 +566,11 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
             .returning(|_, _, _| Ok(Vec::new()));
         generator.expect_parse_autoloads().returning(|_, _, _| {
             [
-                ("psr-0".to_string(), PhpMixed::List(vec![])),
-                ("psr-4".to_string(), PhpMixed::List(vec![])),
-                ("classmap".to_string(), PhpMixed::List(vec![])),
-                ("files".to_string(), PhpMixed::List(vec![])),
-                ("exclude-from-classmap".to_string(), PhpMixed::List(vec![])),
+                ("psr-0".into(), PhpMixed::List(vec![])),
+                ("psr-4".into(), PhpMixed::List(vec![])),
+                ("classmap".into(), PhpMixed::List(vec![])),
+                ("files".into(), PhpMixed::List(vec![])),
+                ("exclude-from-classmap".into(), PhpMixed::List(vec![])),
             ]
             .into_iter()
             .collect()

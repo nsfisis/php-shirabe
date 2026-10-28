@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Util/Http/RequestProxyTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::util::http::request_proxy::RequestProxy;
 use shirabe_php_shim::{
@@ -129,19 +130,19 @@ fn test_get_curl_options() {
 
 #[test]
 fn test_get_curl_options_with_ssl() {
-    let mut cafile_opts: IndexMap<String, PhpMixed> = IndexMap::new();
+    let mut cafile_opts: IndexMap<BString, PhpMixed> = IndexMap::new();
     cafile_opts.insert(
-        "cafile".to_string(),
+        "cafile".into(),
         PhpMixed::string("/certs/bundle.pem".to_string()),
     );
 
-    let mut capath_opts: IndexMap<String, PhpMixed> = IndexMap::new();
-    capath_opts.insert("capath".to_string(), PhpMixed::string("/certs".to_string()));
+    let mut capath_opts: IndexMap<BString, PhpMixed> = IndexMap::new();
+    capath_opts.insert("capath".into(), PhpMixed::string("/certs".to_string()));
 
     let cases: Vec<(
         &str,
         Option<&str>,
-        IndexMap<String, PhpMixed>,
+        IndexMap<BString, PhpMixed>,
         IndexMap<i64, PhpMixed>,
     )> = vec![
         (

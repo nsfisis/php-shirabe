@@ -9,7 +9,7 @@ use crate::repository::{
     FilesystemRepository, RepositoryInterfaceHandle, RepositoryManager, RepositoryManagerInterface,
 };
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, get_debug_type, json_encode,
@@ -24,11 +24,11 @@ impl RepositoryFactory {
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
         repository: &str,
         allow_filesystem: bool,
-    ) -> anyhow::Result<IndexMap<String, PhpMixed>> {
+    ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         if repository.starts_with("http") {
             let mut repo_config = IndexMap::new();
-            repo_config.insert("type".to_string(), PhpMixed::string("composer".to_string()));
-            repo_config.insert("url".to_string(), PhpMixed::string(repository.to_string()));
+            repo_config.insert("type".into(), PhpMixed::string("composer".to_string()));
+            repo_config.insert("url".into(), PhpMixed::string(repository.to_string()));
             return Ok(repo_config);
         }
 
@@ -56,19 +56,16 @@ impl RepositoryFactory {
                     .unwrap_or_else(|| repository.to_string())
                     .replace('\\', "/");
                 let mut repo_config = IndexMap::new();
-                repo_config.insert("type".to_string(), PhpMixed::string("composer".to_string()));
+                repo_config.insert("type".into(), PhpMixed::string("composer".to_string()));
                 repo_config.insert(
-                    "url".to_string(),
+                    "url".into(),
                     PhpMixed::string(format!("file://{}", real_path)),
                 );
                 return Ok(repo_config);
             } else if allow_filesystem {
                 let mut repo_config = IndexMap::new();
-                repo_config.insert(
-                    "type".to_string(),
-                    PhpMixed::string("filesystem".to_string()),
-                );
-                repo_config.insert("json".to_string(), PhpMixed::string(repository.to_string()));
+                repo_config.insert("type".into(), PhpMixed::string("filesystem".to_string()));
+                repo_config.insert("json".into(), PhpMixed::string(repository.to_string()));
                 return Ok(repo_config);
             } else {
                 return Err(InvalidArgumentException::new(format!("Invalid repository URL ({}) given. This file does not contain a valid composer repository.", repository)).into());
@@ -77,7 +74,7 @@ impl RepositoryFactory {
 
         if repository.starts_with('{') {
             let parsed = JsonFile::parse_json(Some(repository), None)?;
-            let repo_config: IndexMap<String, PhpMixed> =
+            let repo_config: IndexMap<BString, PhpMixed> =
                 parsed.as_array().cloned().unwrap_or_default();
             return Ok(repo_config);
         }
@@ -100,7 +97,7 @@ impl RepositoryFactory {
     pub fn create_repo(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: &std::rc::Rc<std::cell::RefCell<Config>>,
-        repo_config: IndexMap<String, PhpMixed>,
+        repo_config: IndexMap<BString, PhpMixed>,
         rm: Option<&mut dyn RepositoryManagerInterface>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         let mut owned_rm;
@@ -235,7 +232,7 @@ impl RepositoryFactory {
                     return Err(UnexpectedValueException::new("\"repositories\" should be an array of repository definitions, only a single repository was given".to_string()).into());
                 }
                 PhpMixed::Array(repo_arr) => {
-                    if !repo_arr.contains_key("type") {
+                    if !repo_arr.contains_key(B("type")) {
                         return Err(UnexpectedValueException::new(format!(
                             "Repository \"{}\" ({}) must have a type defined",
                             index,
@@ -244,11 +241,11 @@ impl RepositoryFactory {
                         .into());
                     }
                     let repo_type = repo_arr
-                        .get("type")
+                        .get(B("type"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default()
                         .to_string();
-                    let repo_config_map: IndexMap<String, PhpMixed> = repo_arr
+                    let repo_config_map: IndexMap<BString, PhpMixed> = repo_arr
                         .iter()
                         .map(|(k, v)| (k.clone(), v.clone()))
                         .collect();
@@ -257,7 +254,7 @@ impl RepositoryFactory {
 
                     if repo_type == "filesystem" {
                         let json_path = repo_arr
-                            .get("json")
+                            .get(B("json"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
                             .to_string();
@@ -293,21 +290,24 @@ impl RepositoryFactory {
         Ok(repo_map)
     }
 
-    pub fn generate_repository_name<T>(
+    pub fn generate_repository_name<K: AsRef<[u8]>, T>(
         index: &PhpMixed,
-        repo: &IndexMap<String, PhpMixed>,
-        existing_repos: &IndexMap<String, T>,
+        repo: &IndexMap<BString, PhpMixed>,
+        existing_repos: &IndexMap<K, T>,
     ) -> String {
-        let mut name = if matches!(index, PhpMixed::Int(_)) && repo.contains_key("url") {
+        let mut name = if matches!(index, PhpMixed::Int(_)) && repo.contains_key(B("url")) {
             let url = repo
-                .get("url")
+                .get(B("url"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default();
             preg_replace(php_regex!("{^https?://}i"), "", &url.to_str_lossy())
         } else {
             php_to_string(index)
         };
-        while existing_repos.contains_key(&name) {
+        while existing_repos
+            .keys()
+            .any(|key| key.as_ref() == name.as_bytes())
+        {
             name.push('2');
         }
         name
@@ -315,10 +315,10 @@ impl RepositoryFactory {
 
     fn generate_repository_name_indexed(
         index: usize,
-        repo: &IndexMap<String, PhpMixed>,
+        repo: &IndexMap<BString, PhpMixed>,
         existing_repos: &IndexMap<String, RepositoryInterfaceHandle>,
     ) -> String {
-        let mut name = if let Some(url) = repo.get("url").and_then(|v| v.as_string()) {
+        let mut name = if let Some(url) = repo.get(B("url")).and_then(|v| v.as_string()) {
             preg_replace(php_regex!("{^https?://}i"), "", &url.to_str_lossy())
         } else {
             index.to_string()

@@ -10,7 +10,7 @@ use crate::output::{
 };
 use crate::question::{ChoiceQuestion, QuestionInterface};
 use crate::terminal::Terminal;
-use bstr::BString;
+use bstr::{B, BString, ByteSlice};
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, SEEK_SET, copy, dir, explode, feof, fgetc, fgets,
     fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
@@ -307,21 +307,21 @@ impl QuestionHelper {
 
             if !choice_question.is_multiselect() {
                 return choices
-                    .get(&default.to_string())
+                    .get(B(&default.to_string()))
                     .cloned()
                     .unwrap_or(default);
             }
 
             let default_parts = explode(",", &default.to_string());
-            let mut resolved: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
+            let mut resolved: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
             for (k, v) in default_parts.iter().enumerate() {
                 let v = if question.is_trimmable() {
                     trim(v, None)
                 } else {
                     v.clone()
                 };
-                let value = choices.get(&v).cloned().unwrap_or(PhpMixed::string(v));
-                resolved.insert(k.to_string(), value);
+                let value = choices.get(B(&v)).cloned().unwrap_or(PhpMixed::string(v));
+                resolved.insert(k.to_string().into(), value);
             }
 
             return PhpMixed::Array(resolved);
@@ -363,12 +363,16 @@ impl QuestionHelper {
         let choices = question.get_choices();
         let max_width = choices
             .keys()
-            .map(|key| Helper::width(key))
+            // TODO(bytes): widths are measured on UTF-8 text, so non-UTF-8 bytes are replaced.
+            .map(|key| Helper::width(&key.to_str_lossy()))
             .max()
             .unwrap_or(0);
 
         for (key, value) in choices {
-            let padding = str_repeat(" ", (max_width - Helper::width(key)) as usize);
+            let padding = str_repeat(
+                " ",
+                (max_width - Helper::width(&key.to_str_lossy())) as usize,
+            );
 
             messages.push(format!(
                 "  [<{tag}>{}{padding}</{tag}>] {}",

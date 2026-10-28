@@ -1,6 +1,6 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/PoolBuilderTest.php
 
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
@@ -29,18 +29,18 @@ use std::path::PathBuf;
 fn load_package(
     loader: &ArrayLoader,
     package_ids: &mut IndexMap<i64, BasePackageHandle>,
-    data: &IndexMap<String, PhpMixed>,
+    data: &IndexMap<BString, PhpMixed>,
 ) -> BasePackageHandle {
     let mut data = data.clone();
 
     let mut id: Option<i64> = None;
     // PHP: !empty($data['id'])
-    if let Some(id_val) = data.get("id")
+    if let Some(id_val) = data.get(B("id"))
         && let Some(i) = id_val.as_int()
         && i != 0
     {
         id = Some(i);
-        data.shift_remove("id");
+        data.shift_remove(B("id"));
     }
 
     let pkg = loader.load(data, None).unwrap();
@@ -319,7 +319,7 @@ fn run_test_pool_builder(
 ) {
     // PHP: $root is array; empty checks against keys.
     let root_map = root.as_array();
-    let get_root = |key: &str| -> Option<&PhpMixed> { root_map.and_then(|m| m.get(key)) };
+    let get_root = |key: &str| -> Option<&PhpMixed> { root_map.and_then(|m| m.get(B(key))) };
     let is_empty = |v: Option<&PhpMixed>| -> bool {
         match v {
             None => true,
@@ -335,7 +335,7 @@ fn run_test_pool_builder(
     };
 
     // PHP: $rootAliases = !empty($root['aliases']) ? $root['aliases'] : [];
-    let root_aliases_data: Vec<IndexMap<String, PhpMixed>> = if !is_empty(get_root("aliases")) {
+    let root_aliases_data: Vec<IndexMap<BString, PhpMixed>> = if !is_empty(get_root("aliases")) {
         get_root("aliases")
             .and_then(|v| v.as_list())
             .map(|l| {
@@ -363,7 +363,10 @@ fn run_test_pool_builder(
             .and_then(|v| v.as_array())
             .map(|m| {
                 m.iter()
-                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_string())))
+                    .filter_map(|(k, v)| {
+                        v.as_string()
+                            .map(|s| (k.to_str_lossy().into_owned(), s.to_string()))
+                    })
                     .collect()
             })
             .unwrap_or_default()
@@ -376,7 +379,10 @@ fn run_test_pool_builder(
             .and_then(|v| v.as_array())
             .map(|m| {
                 m.iter()
-                    .filter_map(|(k, v)| v.as_string().map(|s| (k.clone(), s.to_string())))
+                    .filter_map(|(k, v)| {
+                        v.as_string()
+                            .map(|s| (k.to_str_lossy().into_owned(), s.to_string()))
+                    })
                     .collect()
             })
             .unwrap_or_default()
@@ -398,14 +404,14 @@ fn run_test_pool_builder(
     let mut root_aliases: Vec<RootAliasInput> = Vec::new();
     for alias in &root_aliases_data {
         let package = alias
-            .get("package")
+            .get(B("package"))
             .and_then(|v| v.as_string())
             .unwrap_or_default()
             .to_string();
         let version = parser
             .normalize(
                 &alias
-                    .get("version")
+                    .get(B("version"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_str_lossy(),
@@ -413,14 +419,14 @@ fn run_test_pool_builder(
             )
             .unwrap();
         let alias_str = alias
-            .get("alias")
+            .get(B("alias"))
             .and_then(|v| v.as_string())
             .unwrap_or_default()
             .to_string();
         let alias_normalized = parser
             .normalize(
                 &alias
-                    .get("alias")
+                    .get(B("alias"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
                     .to_str_lossy(),
@@ -459,7 +465,7 @@ fn run_test_pool_builder(
     for repo_entry in package_repos.as_list().unwrap() {
         // PHP: isset($packages['type'])
         if let Some(repo_map) = repo_entry.as_array()
-            && repo_map.contains_key("type")
+            && repo_map.contains_key(B("type"))
         {
             let repo = RepositoryFactory::create_repo(
                 io.clone(),
@@ -476,15 +482,15 @@ fn run_test_pool_builder(
         let repo_handle = RepositoryInterfaceHandle::new(repo);
 
         // PHP: isset($packages['canonical']) || isset($packages['only']) || isset($packages['exclude'])
-        let packages_list: Vec<IndexMap<String, PhpMixed>>;
+        let packages_list: Vec<IndexMap<BString, PhpMixed>>;
         if let Some(repo_map) = repo_entry.as_array() {
-            if repo_map.contains_key("canonical")
-                || repo_map.contains_key("only")
-                || repo_map.contains_key("exclude")
+            if repo_map.contains_key(B("canonical"))
+                || repo_map.contains_key(B("only"))
+                || repo_map.contains_key(B("exclude"))
             {
                 let mut options = repo_map.clone();
                 let packages = options
-                    .shift_remove("packages")
+                    .shift_remove(B("packages"))
                     .unwrap_or(PhpMixed::List(vec![]));
                 repository_set
                     .add_repository(RepositoryInterfaceHandle::new(
@@ -527,7 +533,7 @@ fn run_test_pool_builder(
     let request_map = request_data.as_array().unwrap();
 
     // PHP: if (isset($requestData['locked']))
-    if let Some(locked) = request_map.get("locked") {
+    if let Some(locked) = request_map.get(B("locked")) {
         for package in locked.as_list().unwrap() {
             locked_repo
                 .borrow()
@@ -541,10 +547,10 @@ fn run_test_pool_builder(
     }
 
     let mut request = Request::new(Some(locked_repo));
-    for (package, constraint) in request_map["require"].as_array().unwrap() {
+    for (package, constraint) in request_map[B("require")].as_array().unwrap() {
         request
             .require_name(
-                package,
+                &package.to_str_lossy(),
                 Some(
                     parser
                         .parse_constraints(&constraint.as_string().unwrap().to_str_lossy())
@@ -555,10 +561,10 @@ fn run_test_pool_builder(
     }
 
     // PHP: if (isset($requestData['allowList']))
-    if let Some(allow_list) = request_map.get("allowList") {
+    if let Some(allow_list) = request_map.get(B("allowList")) {
         let mut transitive_deps = UpdateAllowTransitiveDeps::UpdateOnlyListed;
         if request_map
-            .get("allowTransitiveDepsNoRootRequire")
+            .get(B("allowTransitiveDepsNoRootRequire"))
             .and_then(|v| v.as_bool())
             .unwrap_or(false)
         {
@@ -566,7 +572,7 @@ fn run_test_pool_builder(
                 UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDepsNoRootRequire;
         }
         if request_map
-            .get("allowTransitiveDeps")
+            .get(B("allowTransitiveDeps"))
             .and_then(|v| v.as_bool())
             .unwrap_or(false)
         {

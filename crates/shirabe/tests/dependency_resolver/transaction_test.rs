@@ -166,14 +166,14 @@ fn test_transaction_generation_and_sorting() {
         .as_complete_package()
         .unwrap()
         .__set_extra(IndexMap::from([(
-            "plugin-modifies-downloads".to_string(),
+            "plugin-modifies-downloads".into(),
             PhpMixed::Bool(true),
         )]));
     dl_modifying_plugin2
         .as_complete_package()
         .unwrap()
         .__set_extra(IndexMap::from([(
-            "plugin-modifies-downloads".to_string(),
+            "plugin-modifies-downloads".into(),
             PhpMixed::Bool(true),
         )]));
 

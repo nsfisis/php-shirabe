@@ -7,6 +7,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::base_package::{self};
 use crate::repository::{CompositeRepository, RepositoryInterface};
+use bstr::B;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, impl_php_class, php_regex, preg_match};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
@@ -49,13 +50,13 @@ impl FundCommand {
             .unwrap_or(("", pretty_name.as_str()));
 
         for funding_option in package.get_funding() {
-            let url_val = funding_option.get("url").and_then(|v| v.as_string());
+            let url_val = funding_option.get(B("url")).and_then(|v| v.as_string());
             if url_val.is_none_or(|s| s.is_empty()) {
                 continue;
             }
             let mut url = url_val.unwrap().to_string();
             let r#type = funding_option
-                .get("type")
+                .get(B("type"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default();
             if r#type == "github"

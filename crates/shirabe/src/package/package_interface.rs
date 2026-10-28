@@ -2,6 +2,7 @@
 
 use crate::package::{Link, Mirror};
 use crate::repository::RepositoryInterfaceHandle;
+use bstr::BString;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
@@ -50,7 +51,7 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn get_target_dir(&self) -> Option<String>;
 
     /// Returns the package extra data
-    fn get_extra(&self) -> IndexMap<String, PhpMixed>;
+    fn get_extra(&self) -> IndexMap<BString, PhpMixed>;
 
     /// Sets source from which this package was installed (source/dist).
     fn set_installation_source(&mut self, r#type: Option<String>);
@@ -158,7 +159,7 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     ///
     /// Type is either "psr-4", "psr-0", "classmap" or "files". Namespaces are mapped to
     /// directories for autoloading using the type specified.
-    fn get_autoload(&self) -> IndexMap<String, PhpMixed>;
+    fn get_autoload(&self) -> IndexMap<BString, PhpMixed>;
 
     /// Returns an associative array of dev autoloading rules
     ///
@@ -166,14 +167,14 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     ///
     /// Type is either "psr-4", "psr-0", "classmap" or "files". Namespaces are mapped to
     /// directories for autoloading using the type specified.
-    fn get_dev_autoload(&self) -> IndexMap<String, PhpMixed>;
+    fn get_dev_autoload(&self) -> IndexMap<BString, PhpMixed>;
 
     /// Returns a list of directories which should get added to PHP's
     /// include path.
     fn get_include_paths(&self) -> Vec<String>;
 
     /// Returns the settings for php extension packages
-    fn get_php_ext(&self) -> Option<IndexMap<String, PhpMixed>>;
+    fn get_php_ext(&self) -> Option<IndexMap<BString, PhpMixed>>;
 
     /// Stores a reference to the repository that owns the package
     fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()>;
@@ -198,10 +199,10 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn is_default_branch(&self) -> bool;
 
     /// Returns a list of options to download package dist files
-    fn get_transport_options(&self) -> IndexMap<String, PhpMixed>;
+    fn get_transport_options(&self) -> IndexMap<BString, PhpMixed>;
 
     /// Configures the list of options to download package dist files
-    fn set_transport_options(&mut self, options: IndexMap<String, PhpMixed>);
+    fn set_transport_options(&mut self, options: IndexMap<BString, PhpMixed>);
 
     fn set_source_reference(&mut self, reference: Option<String>);
 

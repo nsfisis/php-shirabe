@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Package/CompletePackageInterface.php
 
 use crate::package::PackageInterface;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -9,9 +10,9 @@ pub trait CompletePackageInterface: PackageInterface {
 
     fn set_scripts(&mut self, scripts: IndexMap<String, Vec<String>>);
 
-    fn get_repositories(&self) -> IndexMap<String, PhpMixed>;
+    fn get_repositories(&self) -> IndexMap<BString, PhpMixed>;
 
-    fn set_repositories(&mut self, repositories: IndexMap<String, PhpMixed>);
+    fn set_repositories(&mut self, repositories: IndexMap<BString, PhpMixed>);
 
     fn get_license(&self) -> Vec<String>;
 
@@ -37,9 +38,9 @@ pub trait CompletePackageInterface: PackageInterface {
 
     fn set_support(&mut self, support: IndexMap<String, String>);
 
-    fn get_funding(&self) -> Vec<IndexMap<String, PhpMixed>>;
+    fn get_funding(&self) -> Vec<IndexMap<BString, PhpMixed>>;
 
-    fn set_funding(&mut self, funding: Vec<IndexMap<String, PhpMixed>>);
+    fn set_funding(&mut self, funding: Vec<IndexMap<BString, PhpMixed>>);
 
     fn is_abandoned(&self) -> bool;
 

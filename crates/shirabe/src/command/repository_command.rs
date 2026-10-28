@@ -5,7 +5,7 @@ use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
 use crate::console::input::{InputArgument, InputOption};
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
-use bstr::ByteSlice;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class, parse_url, php_regex,
@@ -46,18 +46,18 @@ impl RepositoryCommand {
         command
     }
 
-    fn list_repositories(&self, mut repos: IndexMap<String, PhpMixed>) -> anyhow::Result<()> {
+    fn list_repositories(&self, mut repos: IndexMap<BString, PhpMixed>) -> anyhow::Result<()> {
         let io = self.get_io();
 
         let mut packagist_present = false;
         for (_key, repo) in &repos {
             if let PhpMixed::Array(ref repo_map) = *repo {
                 let has_type_and_url =
-                    repo_map.contains_key("type") && repo_map.contains_key("url");
+                    repo_map.contains_key(B("type")) && repo_map.contains_key(B("url"));
                 let is_composer_type =
-                    repo_map.get("type").and_then(|v| v.as_string()) == Some("composer".into());
+                    repo_map.get(B("type")).and_then(|v| v.as_string()) == Some("composer".into());
                 let url_host_ends_with_packagist = repo_map
-                    .get("url")
+                    .get(B("url"))
                     .and_then(|v| v.as_string())
                     .map(|url| {
                         parse_url(&url.to_str_lossy())
@@ -74,8 +74,11 @@ impl RepositoryCommand {
         }
         if !packagist_present {
             let mut packagist_entry = IndexMap::new();
-            packagist_entry.insert("packagist.org".to_string(), PhpMixed::Bool(false));
-            repos.insert(repos.len().to_string(), PhpMixed::Array(packagist_entry));
+            packagist_entry.insert("packagist.org".into(), PhpMixed::Bool(false));
+            repos.insert(
+                repos.len().to_string().into(),
+                PhpMixed::Array(packagist_entry),
+            );
         }
 
         if repos.is_empty() {
@@ -100,15 +103,15 @@ impl RepositoryCommand {
                 }
 
                 let name = repo_map
-                    .get("name")
+                    .get(B("name"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or(key.as_str().into());
+                    .unwrap_or(key.as_bstr());
                 let r#type = repo_map
-                    .get("type")
+                    .get(B("type"))
                     .and_then(|v| v.as_string())
                     .unwrap_or("unknown".into());
                 let url = match repo_map
-                    .get("url")
+                    .get(B("url"))
                     .and_then(|v| v.as_string())
                     .map(|s| s.to_string())
                 {
@@ -168,16 +171,16 @@ impl RepositoryCommand {
             let data = config_file.read()?;
             let mut repos: Vec<String> = vec![];
 
-            if let Some(repositories) = data.as_array().and_then(|d| d.get("repositories")) {
+            if let Some(repositories) = data.as_array().and_then(|d| d.get(B("repositories"))) {
                 if let Some(list) = repositories.as_list() {
                     for repo in list {
-                        if let Some(name) = repo.as_array().and_then(|r| r.get("name")) {
+                        if let Some(name) = repo.as_array().and_then(|r| r.get(B("name"))) {
                             repos.push(name.to_string());
                         }
                     }
                 } else if let Some(map) = repositories.as_array() {
                     for repo in map.values() {
-                        if let Some(name) = repo.as_array().and_then(|r| r.get("name")) {
+                        if let Some(name) = repo.as_array().and_then(|r| r.get(B("name"))) {
                             repos.push(name.to_string());
                         }
                     }
@@ -340,7 +343,7 @@ impl Command for RepositoryCommand {
         let config_file = self.config_file.borrow().as_ref().unwrap().clone();
         let config_data = config_file.borrow_mut().read()?;
         let config_file_path = config_file.borrow().get_path().to_string();
-        let config_data_map: IndexMap<String, PhpMixed> = match config_data {
+        let config_data_map: IndexMap<BString, PhpMixed> = match config_data {
             PhpMixed::Array(m) => m.into_iter().collect(),
             _ => IndexMap::new(),
         };
@@ -373,8 +376,8 @@ impl Command for RepositoryCommand {
                         return Err(RuntimeException::new("You must pass the type and a url. Example: shirabe repo add foo vcs https://example.org".to_string()).into());
                     }
                     let mut m = IndexMap::new();
-                    m.insert("type".to_string(), PhpMixed::string(arg1_str.to_string()));
-                    m.insert("url".to_string(), PhpMixed::string(arg2.unwrap()));
+                    m.insert("type".into(), PhpMixed::string(arg1_str.to_string()));
+                    m.insert("url".into(), PhpMixed::string(arg2.unwrap()));
                     PhpMixed::Array(m)
                 };
 
@@ -474,10 +477,10 @@ impl Command for RepositoryCommand {
                     .into());
                 }
                 let name_str = name.as_deref().unwrap();
-                if let Some(repo) = repos.get(name_str)
+                if let Some(repo) = repos.get(B(name_str))
                     && let PhpMixed::Array(ref repo_map) = *repo
                 {
-                    let url = repo_map.get("url").and_then(|v| v.as_string());
+                    let url = repo_map.get(B("url")).and_then(|v| v.as_string());
                     if let Some(url) = url {
                         self.get_io().write(&url.to_str_lossy());
                         return Ok(0);
@@ -490,10 +493,10 @@ impl Command for RepositoryCommand {
                 }
                 for (_key, val) in &repos {
                     if let PhpMixed::Array(ref repo_map) = *val
-                        && let Some(n) = repo_map.get("name").and_then(|v| v.as_string())
+                        && let Some(n) = repo_map.get(B("name")).and_then(|v| v.as_string())
                         && n == name_str
                     {
-                        let url = repo_map.get("url").and_then(|v| v.as_string());
+                        let url = repo_map.get(B("url")).and_then(|v| v.as_string());
                         if let Some(url) = url {
                             self.get_io().write(&url.to_str_lossy());
                             return Ok(0);

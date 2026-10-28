@@ -5,6 +5,7 @@
 //! `keep` parameter is that acceptance rate, which is what decides how much of the expansion has
 //! to be copied out.
 
+use bstr::BString;
 use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use indexmap::IndexMap;
 use shirabe::json::json_file::JsonFile;
@@ -24,7 +25,7 @@ const KEEP_PERCENTS: &[u32] = &[0, 10, 50, 100];
 
 /// The minified version list for `package`, in the shape `load_async_packages` hands to the
 /// minifier.
-fn minified_versions(package: &str) -> Vec<IndexMap<String, PhpMixed>> {
+fn minified_versions(package: &str) -> Vec<IndexMap<BString, PhpMixed>> {
     let response = JsonFile::parse_json(Some(&packagist_fixture::fetch(package)), None)
         .expect("invalid fixture JSON");
     let response = response.as_array().expect("the fixture is not an object");
@@ -53,12 +54,12 @@ fn minified_versions(package: &str) -> Vec<IndexMap<String, PhpMixed>> {
 /// Reads one field of every expanded version and keeps the newest `keep` of them, the way the
 /// repository keeps only the versions its filters accept.
 fn consume(
-    versions: Vec<IndexMap<String, PhpMixed>>,
+    versions: Vec<IndexMap<BString, PhpMixed>>,
     keep: usize,
-) -> Vec<IndexMap<String, PhpMixed>> {
+) -> Vec<IndexMap<BString, PhpMixed>> {
     let expanded = MetadataMinifier::expand(versions);
     let first_kept = expanded.len() - keep;
-    let mut kept: Vec<IndexMap<String, PhpMixed>> = Vec::with_capacity(keep);
+    let mut kept: Vec<IndexMap<BString, PhpMixed>> = Vec::with_capacity(keep);
     for index in 0..expanded.len() {
         black_box(expanded.version(index).get("version_normalized"));
         if index >= first_kept {

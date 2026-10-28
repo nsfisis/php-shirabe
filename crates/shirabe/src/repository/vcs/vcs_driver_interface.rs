@@ -2,6 +2,7 @@
 
 use crate::config::Config;
 use crate::io::IOInterface;
+use bstr::BString;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
@@ -12,7 +13,7 @@ pub trait VcsDriverInterface: std::fmt::Debug {
     fn get_composer_information(
         &mut self,
         identifier: &str,
-    ) -> anyhow::Result<Option<IndexMap<String, PhpMixed>>>;
+    ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>>;
 
     fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>>;
 

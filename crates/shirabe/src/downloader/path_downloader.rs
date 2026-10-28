@@ -11,6 +11,7 @@ use crate::package::archiver::ArchivableFilesFinder;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, RuntimeException, file_exists, impl_php_class, is_dir, realpath};
 use shirabe_symfony_filesystem::Filesystem as SymfonyFilesystem;
@@ -111,7 +112,7 @@ impl PathDownloader {
 
     fn compute_allowed_strategies(
         &self,
-        transport_options: &IndexMap<String, PhpMixed>,
+        transport_options: &IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<(i64, Vec<i64>)> {
         // When symlink transport option is null, both symlink and mirror are allowed
         let mut current_strategy = Self::STRATEGY_SYMLINK;
@@ -122,7 +123,7 @@ impl PathDownloader {
             current_strategy = Self::STRATEGY_MIRROR;
         }
 
-        let symlink_option = transport_options.get("symlink");
+        let symlink_option = transport_options.get(B("symlink"));
 
         match symlink_option {
             Some(PhpMixed::Bool(true)) => {
@@ -299,7 +300,7 @@ impl DownloaderInterface for PathDownloader {
         // Get the transport options with default values
         let mut transport_options = package.get_transport_options();
         transport_options
-            .entry("relative".to_string())
+            .entry("relative".into())
             .or_insert(PhpMixed::Bool(true));
 
         let (mut current_strategy, allowed_strategies) =
@@ -343,7 +344,7 @@ impl DownloaderInterface for PathDownloader {
                         );
                     }
                     if transport_options
-                        .get("relative")
+                        .get(B("relative"))
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false)
                     {

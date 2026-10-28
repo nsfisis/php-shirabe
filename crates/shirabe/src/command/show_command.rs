@@ -19,7 +19,7 @@ use crate::repository::{
     RootPackageRepository,
 };
 use crate::util::PackageInfo;
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
@@ -514,7 +514,11 @@ impl ShowCommand {
                                 }
                                 _ => ".".to_string(),
                             };
-                            let name_disp = if name.is_empty() { "*" } else { name };
+                            let name_disp = if name.is_empty() {
+                                "*".into()
+                            } else {
+                                name.as_bstr()
+                            };
                             self.get_io()
                                 .write(&format!("{} => {}", name_disp, path_str));
                         }
@@ -782,11 +786,11 @@ impl ShowCommand {
     fn append_autoload(json: &mut PackageInfoJson, package: CompletePackageInterfaceHandle) {
         let autoload_config = package.get_autoload();
         if !autoload_config.is_empty() {
-            let mut autoload: IndexMap<String, PhpMixed> = IndexMap::new();
+            let mut autoload: IndexMap<BString, PhpMixed> = IndexMap::new();
 
             for (r#type, autoloads) in autoload_config.iter() {
                 if r#type == "psr-0" || r#type == "psr-4" {
-                    let mut psr: IndexMap<String, PhpMixed> = IndexMap::new();
+                    let mut psr: IndexMap<BString, PhpMixed> = IndexMap::new();
 
                     if let PhpMixed::Array(map) = autoloads {
                         for (name, path) in map.iter() {
@@ -801,7 +805,7 @@ impl ShowCommand {
                             }
 
                             let key = if name.is_empty() {
-                                "*".to_string()
+                                "*".into()
                             } else {
                                 name.clone()
                             };
@@ -811,7 +815,7 @@ impl ShowCommand {
 
                     autoload.insert(r#type.clone(), PhpMixed::Array(psr));
                 } else if r#type == "classmap" {
-                    autoload.insert("classmap".to_string(), autoloads.clone());
+                    autoload.insert("classmap".into(), autoloads.clone());
                 }
             }
 
@@ -1560,7 +1564,7 @@ impl Command for ShowCommand {
         let platform_req_filter = self.get_platform_requirement_filter(input.clone())?;
 
         // init repos
-        let mut platform_overrides: IndexMap<String, PhpMixed> = IndexMap::new();
+        let mut platform_overrides: IndexMap<BString, PhpMixed> = IndexMap::new();
         if let Some(ref composer) = composer {
             let composer = crate::composer::composer_full(composer);
             if let Some(p) = composer
@@ -1684,7 +1688,7 @@ impl Command for ShowCommand {
                     installed_repo.clone(),
                     {
                         let mut m = IndexMap::new();
-                        m.insert("canonical".to_string(), PhpMixed::Bool(false));
+                        m.insert("canonical".into(), PhpMixed::Bool(false));
                         m
                     },
                 )?)];

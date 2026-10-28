@@ -1,5 +1,5 @@
 use crate::PhpMixed;
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -39,17 +39,20 @@ pub fn parse_url(url: &str) -> Option<UrlComponents> {
 }
 
 pub fn http_build_query_mixed(
-    data: &IndexMap<String, PhpMixed>,
+    data: &IndexMap<BString, PhpMixed>,
     numeric_prefix: &str,
     arg_separator: &str,
 ) -> String {
     let mut pairs: Vec<(String, String)> = Vec::new();
     for (key, value) in data {
         // numeric_prefix is prepended only to integer keys at the top level.
+        // TODO(bytes): pairs hold Strings, so non-UTF-8 bytes in keys are replaced instead of
+        // being percent-encoded as-is.
+        let key = key.to_str_lossy().into_owned();
         let key = if key.parse::<i64>().is_ok() {
             format!("{numeric_prefix}{key}")
         } else {
-            key.clone()
+            key
         };
         append_query_pairs(&mut pairs, key, value);
     }

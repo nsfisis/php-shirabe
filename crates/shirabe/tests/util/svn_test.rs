@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Util/SvnTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -7,13 +8,16 @@ use shirabe::io::null_io::NullIO;
 use shirabe::util::svn::Svn;
 use shirabe_php_shim::PhpMixed;
 
-fn map(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<String, PhpMixed> {
-    pairs.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
+fn map(pairs: Vec<(&str, PhpMixed)>) -> IndexMap<BString, PhpMixed> {
+    pairs
+        .into_iter()
+        .map(|(k, v)| (k.to_string().into(), v))
+        .collect()
 }
 
 /// Builds a `['config' => ['http-basic' => [host => ['username' => .., 'password' => ..]]]]`
 /// map for `Config::merge`.
-fn http_basic_config(host: &str, username: &str, password: &str) -> IndexMap<String, PhpMixed> {
+fn http_basic_config(host: &str, username: &str, password: &str) -> IndexMap<BString, PhpMixed> {
     let creds = map(vec![
         ("username", PhpMixed::string(username.to_string())),
         ("password", PhpMixed::string(password.to_string())),
