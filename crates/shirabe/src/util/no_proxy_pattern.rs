@@ -10,11 +10,8 @@ use shirabe_php_shim::{
 /// Tests URLs against NO_PROXY patterns
 #[derive(Debug)]
 pub struct NoProxyPattern {
-    /// @var string[]
     host_names: Vec<String>,
-    /// @var (null|object)[]
     rules: IndexMap<i64, Option<UrlData>>,
-    /// @var bool
     noproxy: bool,
 }
 
@@ -34,7 +31,6 @@ pub struct IpData {
 }
 
 impl NoProxyPattern {
-    /// @param string $pattern NO_PROXY pattern
     pub fn new(pattern: &str) -> Self {
         let host_names: Vec<String> = preg_split(php_regex!(r"{[\s,]+}"), pattern)
             .into_iter()
@@ -186,8 +182,6 @@ impl NoProxyPattern {
     }
 
     /// Finds or creates rule data for a hostname
-    ///
-    /// @return null|stdClass Null if the hostname is invalid
     fn get_rule(&mut self, index: i64, host_name: &str) -> anyhow::Result<Option<UrlData>> {
         if array_key_exists(&index.to_string(), &{
             let mut m: IndexMap<String, ()> = IndexMap::new();
@@ -214,11 +208,6 @@ impl NoProxyPattern {
     }
 
     /// Creates an object containing IP data if the host is an IP address
-    ///
-    /// @param null|stdClass $ipdata      Set by method if IP address found
-    /// @param bool          $allowPrefix Whether a CIDR prefix-length is expected
-    ///
-    /// @return bool False if the host contains invalid data
     fn ip_check_data(
         &self,
         host: &str,
@@ -272,8 +261,6 @@ impl NoProxyPattern {
     ///
     /// IPv4 addresses are always mapped to IPv6, which simplifies handling
     /// and comparison.
-    ///
-    /// @return mixed[] in_addr, size
     fn ip_get_addr(&self, host: &str) -> (Vec<u8>, i64) {
         let ip = inet_pton(host).unwrap_or_default();
         let size = ip.len() as i64;
@@ -283,9 +270,6 @@ impl NoProxyPattern {
     }
 
     /// Returns the binary network mask mapped to IPv6
-    ///
-    /// @param int $prefix CIDR prefix-length
-    /// @param int $size   Byte size of in_addr
     fn ip_get_mask(&self, prefix: i64, size: i64) -> Vec<u8> {
         let mut mask: Vec<u8> = Vec::new();
 
@@ -307,12 +291,6 @@ impl NoProxyPattern {
     }
 
     /// Calculates and returns the network and mask
-    ///
-    /// @param string $rangeIp IP in_addr
-    /// @param int    $size    Byte size of in_addr
-    /// @param int    $prefix  CIDR prefix-length
-    ///
-    /// @return string[] network in_addr, binary mask
     fn ip_get_network(
         &self,
         range_ip: &[u8],
@@ -348,11 +326,6 @@ impl NoProxyPattern {
     }
 
     /// Maps an IPv4 address to IPv6
-    ///
-    /// @param string $binary in_addr
-    /// @param int    $size   Byte size of in_addr
-    ///
-    /// @return string Mapped or existing in_addr
     fn ip_map_to_6(&self, binary: &[u8], size: i64) -> Vec<u8> {
         if size == 4 {
             let mut prefix = vec![0u8; 10];
@@ -375,10 +348,6 @@ impl NoProxyPattern {
     }
 
     /// Creates an ip data object
-    ///
-    /// @param string      $ip      in_addr
-    /// @param int         $size    Byte size of in_addr
-    /// @param null|string $netmask Network mask
     fn make_ip_data(&self, ip: &[u8], size: i64, netmask: Option<Vec<u8>>) -> IpData {
         IpData {
             ip: ip.to_vec(),
@@ -388,8 +357,6 @@ impl NoProxyPattern {
     }
 
     /// Splits the hostname into host and port components
-    ///
-    /// @return mixed[] host, port, if there was error
     fn split_host_port(&self, host_name: &str) -> anyhow::Result<(String, i64, bool)> {
         // host, port, err
         let error = (String::new(), 0_i64, true);

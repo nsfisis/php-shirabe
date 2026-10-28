@@ -25,19 +25,14 @@ use crate::util::ProcessExecutor;
 
 #[derive(Debug)]
 pub struct Config {
-    /// @var array<string, mixed>
     config: IndexMap<String, PhpMixed>,
-    /// @var ?non-empty-string
     base_dir: Option<String>,
-    /// @var array<int|string, mixed>
     repositories: IndexMap<String, PhpMixed>,
     config_source: Option<Box<dyn ConfigSourceInterface>>,
     auth_config_source: Option<Box<dyn ConfigSourceInterface>>,
     local_auth_config_source: Option<Box<dyn ConfigSourceInterface>>,
     use_environment: bool,
-    /// @var array<string, true>
     warned_hosts: IndexMap<String, bool>,
-    /// @var array<string, true>
     ssl_verify_warned_hosts: IndexMap<String, bool>,
     source_of_config_value: std::cell::RefCell<IndexMap<String, String>>,
 }
@@ -49,7 +44,6 @@ impl Config {
 
     pub const RELATIVE_PATHS: i64 = 1;
 
-    /// @var array<string, mixed>
     pub fn default_config() -> IndexMap<String, PhpMixed> {
         let mut c: IndexMap<String, PhpMixed> = IndexMap::new();
         c.insert("process-timeout".to_string(), PhpMixed::Int(300));
@@ -201,7 +195,6 @@ impl Config {
         c
     }
 
-    /// @var array<string, mixed>
     pub fn default_repositories() -> IndexMap<String, PhpMixed> {
         let mut r: IndexMap<String, PhpMixed> = IndexMap::new();
         let mut packagist: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -214,8 +207,6 @@ impl Config {
         r
     }
 
-    /// @param bool    $useEnvironment Use COMPOSER_ environment variables to replace config settings
-    /// @param ?string $baseDir        Optional base directory of the config
     pub fn new(use_environment: bool, base_dir: Option<String>) -> Self {
         let this = Self {
             // load defaults
@@ -546,9 +537,6 @@ impl Config {
     }
 
     /// Returns a setting
-    ///
-    /// @param  int               $flags Options (see class constants)
-    /// @throws \RuntimeException
     pub fn get(&self, key: &str) -> PhpMixed {
         self.get_with_flags(key, 0).unwrap_or(PhpMixed::Null)
     }
@@ -947,9 +935,6 @@ impl Config {
     }
 
     /// Replaces {$refs} inside a config string
-    ///
-    /// @param  string|mixed $value a config string that can contain {$refs-to-other-config}
-    /// @param  int          $flags Options (see class constants)
     fn process(&self, value: PhpMixed, flags: i64) -> anyhow::Result<PhpMixed> {
         if !is_string(&value) {
             return Ok(value);

@@ -45,8 +45,6 @@ impl CompleteCommand {
     pub const DEFAULT_DESCRIPTION: &'static str =
         "Internal command to provide shell completion suggestions";
 
-    /// @param completion_outputs A list of additional completion outputs, with shell name as
-    /// key and FQCN as value
     pub fn new(completion_outputs: IndexMap<String, PhpMixed>) -> anyhow::Result<Self> {
         // must be set before the parent constructor, as the property value is used in configure()
         let mut completion_outputs = completion_outputs;

@@ -26,7 +26,6 @@ static IS_WINDOWS: Mutex<Option<bool>> = Mutex::new(None);
 pub struct ZipDownloader {
     inner: FileDownloader,
     cleanup_executed: std::cell::RefCell<IndexMap<String, bool>>,
-    // @phpstan-ignore property.onlyRead (helper property that is set via reflection for testing purposes)
     zip_archive_object: std::cell::RefCell<Option<ZipArchive>>,
 }
 

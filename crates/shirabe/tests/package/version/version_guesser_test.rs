@@ -598,7 +598,6 @@ fn test_remote_branches_are_selected() {
 #[test]
 #[serial]
 fn test_get_root_version_from_env() {
-    // @dataProvider rootEnvVersionsProvider
     let root_env_versions: Vec<(&str, &str)> = vec![
         ("1.0-dev", "1.0.x-dev"),
         ("1.0.x-dev", "1.0.x-dev"),

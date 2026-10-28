@@ -172,7 +172,6 @@ impl Problem {
                     .collect::<Vec<_>>(),
             ),
             _ => {
-                // @phpstan-ignore deadCode.unreachable
                 panic!("Unknown rule type: {}", rule.get_reason());
             }
         }
@@ -188,7 +187,6 @@ impl Problem {
             | rule::RULE_PACKAGE_ALIAS
             | rule::RULE_PACKAGE_INVERSE_ALIAS => 0,
             _ => {
-                // @phpstan-ignore deadCode.unreachable
                 panic!("Unknown rule type: {}", rule.get_reason());
             }
         }
@@ -371,7 +369,6 @@ impl Problem {
         self.section += 1;
     }
 
-    /// @internal
     pub fn get_missing_package_reason(
         repository_set: &RepositorySet,
         request: &Request,
@@ -1024,7 +1021,6 @@ impl Problem {
         ))
     }
 
-    /// @internal
     pub fn get_package_list(
         packages: &Vec<BasePackageHandle>,
         is_verbose: bool,
@@ -1122,8 +1118,6 @@ impl Problem {
         implode(", ", &prepared_strings)
     }
 
-    /// @param string $version the effective runtime version of the platform package
-    /// @return ?string a version string or null if it appears the package was artificially disabled
     fn get_platform_package_version(
         pool: &mut Pool,
         package_name: &str,
@@ -1182,8 +1176,6 @@ impl Problem {
         None
     }
 
-    /// @param array<string|int, string> $versions an array of pretty versions, with normalized versions as keys
-    /// @return list<string> a list of pretty versions and '...' where versions were removed
     fn condense_version_list(
         versions: &IndexMap<String, String>,
         max: i64,

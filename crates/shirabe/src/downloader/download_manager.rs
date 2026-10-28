@@ -18,26 +18,16 @@ use shirabe_php_shim::{
 /// Downloaders manager.
 #[derive(Debug)]
 pub struct DownloadManager {
-    /// @var IOInterface
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    /// @var bool
     prefer_dist: std::cell::Cell<bool>,
-    /// @var bool
     prefer_source: std::cell::Cell<bool>,
-    /// @var array<string, string>
     package_preferences: IndexMap<String, String>,
-    /// @var Filesystem
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    /// @var array<string, DownloaderInterface>
     downloaders: IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn DownloaderInterface>>>,
 }
 
 impl DownloadManager {
     /// Initializes download manager.
-    ///
-    /// @param IOInterface     $io           The Input Output Interface
-    /// @param bool            $preferSource prefer downloading from source
-    /// @param Filesystem|null $filesystem   custom Filesystem object
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         prefer_source: bool,
@@ -56,30 +46,21 @@ impl DownloadManager {
     }
 
     /// Makes downloader prefer source installation over the dist.
-    ///
-    /// @param  bool            $preferSource prefer downloading from source
     pub fn set_prefer_source(&self, prefer_source: bool) {
         self.prefer_source.set(prefer_source);
     }
 
     /// Makes downloader prefer dist installation over the source.
-    ///
-    /// @param  bool            $preferDist prefer downloading from dist
     pub fn set_prefer_dist(&self, prefer_dist: bool) {
         self.prefer_dist.set(prefer_dist);
     }
 
     /// Sets fine tuned preference settings for package level source/dist selection.
-    ///
-    /// @param array<string, string> $preferences array of preferences by package patterns
     pub fn set_preferences(&mut self, preferences: IndexMap<String, String>) {
         self.package_preferences = preferences;
     }
 
     /// Sets installer downloader for a specific installation type.
-    ///
-    /// @param  string              $type       installation type
-    /// @param  DownloaderInterface $downloader downloader instance
     pub fn set_downloader(
         &mut self,
         r#type: &str,
@@ -90,9 +71,6 @@ impl DownloadManager {
     }
 
     /// Returns downloader for a specific installation type.
-    ///
-    /// @param  string                    $type installation type
-    /// @throws \InvalidArgumentException if downloader for provided type is not registered
     pub fn get_downloader(
         &self,
         r#type: &str,
@@ -111,11 +89,6 @@ impl DownloadManager {
     }
 
     /// Returns downloader for already installed package.
-    ///
-    /// @param  PackageInterface          $package package instance
-    /// @throws \InvalidArgumentException if package has no installation source specified
-    /// @throws \LogicException           if specific downloader used to load package with
-    ///                                           wrong type
     pub fn get_downloader_for_package(
         &self,
         package: PackageInterfaceHandle,
@@ -167,13 +140,6 @@ impl DownloadManager {
     }
 
     /// Downloads package into target dir.
-    ///
-    /// @param PackageInterface      $package     package instance
-    /// @param string                $targetDir   target dir
-    /// @param PackageInterface|null $prevPackage previous package instance in case of updates
-    ///
-    /// @throws \InvalidArgumentException if package have no urls to download from
-    /// @throws \RuntimeException
     pub async fn download(
         &self,
         package: PackageInterfaceHandle,
@@ -254,11 +220,6 @@ impl DownloadManager {
     }
 
     /// Prepares an operation execution
-    ///
-    /// @param string                $type        one of install/update/uninstall
-    /// @param PackageInterface      $package     package instance
-    /// @param string                $targetDir   target dir
-    /// @param PackageInterface|null $prevPackage previous package instance in case of updates
     pub async fn prepare(
         &self,
         r#type: &str,
@@ -278,12 +239,6 @@ impl DownloadManager {
     }
 
     /// Installs package into target dir.
-    ///
-    /// @param PackageInterface $package   package instance
-    /// @param string           $targetDir target dir
-    ///
-    /// @throws \InvalidArgumentException if package have no urls to download from
-    /// @throws \RuntimeException
     pub async fn install(
         &self,
         package: PackageInterfaceHandle,
@@ -298,12 +253,6 @@ impl DownloadManager {
     }
 
     /// Updates package from initial to target version.
-    ///
-    /// @param PackageInterface $initial   initial package version
-    /// @param PackageInterface $target    target package version
-    /// @param string           $targetDir target dir
-    ///
-    /// @throws \InvalidArgumentException if initial package is not installed
     pub async fn update(
         &self,
         initial: PackageInterfaceHandle,
@@ -381,9 +330,6 @@ impl DownloadManager {
     }
 
     /// Removes package from target dir.
-    ///
-    /// @param PackageInterface $package   package instance
-    /// @param string           $targetDir target dir
     pub async fn remove(
         &self,
         package: PackageInterfaceHandle,
@@ -398,11 +344,6 @@ impl DownloadManager {
     }
 
     /// Cleans up a failed operation
-    ///
-    /// @param string                $type        one of install/update/uninstall
-    /// @param PackageInterface      $package     package instance
-    /// @param string                $targetDir   target dir
-    /// @param PackageInterface|null $prevPackage previous package instance in case of updates
     pub async fn cleanup(
         &self,
         r#type: &str,
@@ -422,8 +363,6 @@ impl DownloadManager {
     }
 
     /// Determines the install preference of a package
-    ///
-    /// @param PackageInterface $package package instance
     fn resolve_package_install_preference(&self, package: PackageInterfaceHandle) -> String {
         for (pattern, preference) in &self.package_preferences {
             let pattern_regex = format!(

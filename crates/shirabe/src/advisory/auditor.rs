@@ -74,7 +74,6 @@ where
     serialize_php_array(map, serializer)
 }
 
-/// @internal
 #[derive(Debug)]
 pub struct Auditor;
 
@@ -98,7 +97,6 @@ impl Auditor {
     pub const ABANDONED_REPORT: &'static str = "report";
     pub const ABANDONED_FAIL: &'static str = "fail";
 
-    /// @internal
     pub const ABANDONEDS: [&'static str; 3] = [
         Self::ABANDONED_IGNORE,
         Self::ABANDONED_REPORT,
@@ -390,7 +388,6 @@ impl Auditor {
         }
     }
 
-    /// @return array{int, int} Count of affected packages and total count of advisories
     fn count_advisories(
         &self,
         advisories: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
@@ -403,7 +400,6 @@ impl Auditor {
         (advisories.len() as i64, count)
     }
 
-    /// @param self::FORMAT_* $format The format that will be used to output audit results.
     fn output_advisories(
         &self,
         io: &std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,

@@ -13,24 +13,15 @@ use std::fmt;
 /// A package pool contains all packages for dependency resolution
 #[derive(Debug)]
 pub struct Pool {
-    /// @var BasePackage[]
     packages: Vec<BasePackageHandle>,
-    /// @var array<string, BasePackage[]>
     package_by_name: IndexMap<String, Vec<BasePackageHandle>>,
-    /// @var VersionParser
     version_parser: VersionParser,
-    /// @var array<string, array<string, BasePackage[]>>
     provider_cache: IndexMap<String, IndexMap<String, Vec<BasePackageHandle>>>,
-    /// @var BasePackage[]
     unacceptable_fixed_or_locked_packages: Vec<BasePackageHandle>,
-    /// @var array<string, array<string, string>> Map of package name => normalized version => pretty version
     removed_versions: IndexMap<String, IndexMap<String, String>>,
-    /// @var array<string, array<string, string>> Map of package object hash => removed normalized versions => removed pretty version
     removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
-    /// @var array<string, array<string, array<SecurityAdvisory|PartialSecurityAdvisory>>> Map of package name => normalized version => security advisories
     security_removed_versions:
         IndexMap<String, IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>>,
-    /// @var array<string, array<string, string>> Map of package name => normalized version => pretty version
     abandoned_removed_versions: IndexMap<String, IndexMap<String, String>>,
 }
 
@@ -212,11 +203,6 @@ impl Pool {
     }
 
     /// Searches all packages providing the given package name and match the constraint
-    ///
-    /// @param string $name The package name to be searched for
-    /// @param ?ConstraintInterface $constraint A constraint that all returned
-    ///                                         packages must match or null to return all
-    /// @return BasePackage[] A set of packages
     pub fn what_provides(
         &mut self,
         name: &str,
@@ -241,9 +227,6 @@ impl Pool {
         computed
     }
 
-    /// @param  string               $name       The package name to be searched for
-    /// @param  ?ConstraintInterface $constraint A constraint that all returned
-    ///                                          packages must match or null to return all
     pub(crate) fn compute_what_provides(
         &self,
         name: &str,
@@ -292,8 +275,6 @@ impl Pool {
 
     /// Checks if the package matches the given constraint directly or through
     /// provided or replaced packages
-    ///
-    /// @param  string              $name       Name of the package to be matched
     pub fn r#match(
         &self,
         candidate: BasePackageHandle,

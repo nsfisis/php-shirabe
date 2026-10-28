@@ -8,7 +8,6 @@ use shirabe_php_shim::{
 };
 use std::sync::{LazyLock, Mutex};
 
-/// @var array<string, self>
 static REGISTERED_LOADERS: LazyLock<Mutex<IndexMap<String, ClassLoader>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
@@ -19,40 +18,24 @@ static REGISTERED_LOADERS: LazyLock<Mutex<IndexMap<String, ClassLoader>>> =
 /// them. `$includeFile` and `initializeIncludeClosure` are not ported for the same reason.
 #[derive(Debug, Clone)]
 pub struct ClassLoader {
-    /// @var string|null
     vendor_dir: Option<String>,
 
     // PSR-4
-    /// @var array<string, array<string, int>>
     prefix_lengths_psr4: IndexMap<String, IndexMap<String, i64>>,
-    /// @var array<string, list<string>>
     prefix_dirs_psr4: IndexMap<String, Vec<String>>,
-    /// @var list<string>
     fallback_dirs_psr4: Vec<String>,
 
     // PSR-0
     /// List of PSR-0 prefixes
     ///
     /// Structured as array('F (first letter)' => array('Foo\Bar (full prefix)' => array('path', 'path2')))
-    ///
-    /// @var array<string, array<string, list<string>>>
     prefixes_psr0: IndexMap<String, IndexMap<String, Vec<String>>>,
-    /// @var list<string>
     fallback_dirs_psr0: Vec<String>,
 
-    /// @var bool
     use_include_path: bool,
-
-    /// @var array<string, string>
     class_map: IndexMap<String, String>,
-
-    /// @var bool
     class_map_authoritative: bool,
-
-    /// @var array<string, bool>
     missing_classes: IndexMap<String, bool>,
-
-    /// @var string|null
     apcu_prefix: Option<String>,
 }
 
@@ -103,12 +86,10 @@ impl ClassLoader {
         &self.fallback_dirs_psr4
     }
 
-    /// @return array<string, string> Array of classname => path
     pub fn get_class_map(&self) -> &IndexMap<String, String> {
         &self.class_map
     }
 
-    /// @param array<string, string> $classMap Class to filename map
     pub fn add_class_map(&mut self, class_map: IndexMap<String, String>) {
         if !self.class_map.is_empty() {
             // PHP: $this->classMap = array_merge($this->classMap, $classMap);
@@ -153,8 +134,6 @@ impl ClassLoader {
 
     /// Registers a set of PSR-4 directories for a given namespace, either
     /// appending or prepending to the ones previously set for this namespace.
-    ///
-    /// @throws \InvalidArgumentException
     pub fn add_psr4(
         &mut self,
         prefix: &str,
@@ -215,8 +194,6 @@ impl ClassLoader {
 
     /// Registers a set of PSR-4 directories for a given namespace,
     /// replacing any others previously set for this namespace.
-    ///
-    /// @throws \InvalidArgumentException
     pub fn set_psr4(&mut self, prefix: &str, paths: Vec<String>) -> anyhow::Result<()> {
         if prefix.is_empty() {
             self.fallback_dirs_psr4 = paths;
@@ -311,8 +288,6 @@ impl ClassLoader {
     }
 
     /// Finds the path to the file where the class is defined.
-    ///
-    /// @return string|false The path if found, false otherwise
     pub fn find_file(&mut self, class: &str) -> Option<String> {
         // class map lookup
         if let Some(path) = self.class_map.get(class) {

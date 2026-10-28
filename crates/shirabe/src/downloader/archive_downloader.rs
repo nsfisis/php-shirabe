@@ -56,10 +56,6 @@ pub trait ArchiveDownloader {
             .await
     }
 
-    /// @inheritDoc
-    ///
-    /// @throws \RuntimeException
-    /// @throws \UnexpectedValueException
     async fn install(
         &self,
         package: PackageInterfaceHandle,
@@ -201,7 +197,6 @@ pub trait ArchiveDownloader {
         }
     }
 
-    /// @inheritDoc
     fn get_install_operation_appendix(
         &self,
         _package: PackageInterfaceHandle,

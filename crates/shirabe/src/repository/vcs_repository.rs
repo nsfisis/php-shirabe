@@ -38,47 +38,28 @@ use shirabe_semver::constraint::SimpleConstraint;
 #[derive(Debug)]
 pub struct VcsRepository {
     inner: ArrayRepository,
-    /// @var string
     url: String,
-    /// @var ?string
     package_name: std::cell::RefCell<Option<String>>,
-    /// @var bool
     is_verbose: bool,
-    /// @var bool
     is_very_verbose: bool,
-    /// @var IOInterface
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    /// @var Config
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    /// @var VersionParser
     version_parser: std::cell::RefCell<Option<VersionParser>>,
-    /// @var string
     r#type: String,
-    /// @var ?LoaderInterface
     loader: std::cell::RefCell<Option<Box<dyn LoaderInterface>>>,
-    /// @var array<string, mixed>
     repo_config: IndexMap<String, PhpMixed>,
-    /// @var HttpDownloader
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-    /// @var ProcessExecutor
     process_executor: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    /// @var bool
     branch_error_occurred: std::cell::Cell<bool>,
-    /// @var array<string, class-string<VcsDriverInterface>>
     drivers: IndexMap<String, VcsDriverKind>,
-    /// @var ?VcsDriverInterface
     driver: std::cell::RefCell<Option<Box<dyn VcsDriverInterface>>>,
     /// Kind of the resolved `driver`, used by `get_repo_name` to recover the driver type
     /// (PHP `array_search(get_class($driver), $this->drivers)`).
     driver_kind: std::cell::Cell<Option<VcsDriverKind>>,
-    /// @var ?VersionCacheInterface
     version_cache: Option<Box<dyn VersionCacheInterface>>,
-    /// @var list<string>
     empty_references: std::cell::RefCell<Vec<String>>,
-    /// @var array<'tags'|'branches', array<string, TransportException>>
     version_transport_exceptions:
         std::cell::RefCell<IndexMap<String, IndexMap<String, TransportException>>>,
-    /// @var ?EventDispatcher (preserved for plugin events)
     _dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
 }
 
@@ -937,7 +918,6 @@ impl VcsRepository {
             .ok()
     }
 
-    /// @return \Composer\Package\CompletePackage|\Composer\Package\CompleteAliasPackage|null|false null if no cache present, false if the absence of a version was cached
     fn get_cached_package_version(
         &self,
         version: &str,

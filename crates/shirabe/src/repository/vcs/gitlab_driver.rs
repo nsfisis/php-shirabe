@@ -26,27 +26,19 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct GitLabDriver {
     inner: VcsDriverBase,
-    /// @phpstan-var 'https'|'http'
     scheme: String,
     namespace: String,
     repository: String,
-    /// @var mixed[] Project data returned by GitLab API
     project: Option<IndexMap<String, PhpMixed>>,
-    /// @var array<string|int, mixed[]> Keeps commits returned by GitLab API as commit id => info
     commits: IndexMap<String, IndexMap<String, PhpMixed>>,
-    /// @var array<int|string, string> Map of tag name to identifier
     tags: Option<IndexMap<String, String>>,
-    /// @var array<int|string, string> Map of branch name to identifier
     branches: Option<IndexMap<String, String>>,
     /// Git Driver
     git_driver: Option<GitDriver>,
     /// Protocol to force use of for repository URLs.
-    /// @var string One of ssh, http
     protocol: String,
     /// Defaults to true unless we can make sure it is public
-    /// @var bool defines whether the repo is private or not
     is_private: bool,
-    /// @var bool true if the origin has a port number or a path component in it
     has_nonstandard_origin: bool,
 }
 
@@ -205,8 +197,6 @@ impl GitLabDriver {
 
     /// Updates the HttpDownloader instance.
     /// Mainly useful for tests.
-    ///
-    /// @internal
     pub fn set_http_downloader(
         &mut self,
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
@@ -546,7 +536,6 @@ impl GitLabDriver {
         Ok(self.tags.clone().unwrap_or_default())
     }
 
-    /// @return string Base URL for GitLab API v3
     pub fn get_api_url(&self) -> String {
         format!(
             "{}://{}/api/v4/projects/{}%2F{}",
@@ -575,7 +564,6 @@ impl GitLabDriver {
         encoded
     }
 
-    /// @return string[] where keys are named references like tags or branches and the value a sha
     fn get_references(&mut self, r#type: &str) -> anyhow::Result<IndexMap<String, String>> {
         let per_page = 100;
         let mut resource: Option<String> = Some(format!(
@@ -664,9 +652,6 @@ impl GitLabDriver {
         Ok(())
     }
 
-    /// @phpstan-impure
-    ///
-    /// @throws \RuntimeException
     fn attempt_clone_fallback(&mut self) -> anyhow::Result<bool> {
         let url = if !self.is_private {
             self.generate_public_url()

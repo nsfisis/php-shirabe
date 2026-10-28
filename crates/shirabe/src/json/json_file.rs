@@ -64,13 +64,9 @@ impl JsonEncodeOptions {
 /// Reads/writes json files.
 #[derive(Debug)]
 pub struct JsonFile {
-    /// @var string
     path: String,
-    /// @var ?HttpDownloader
     http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
-    /// @var ?IOInterface
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-    /// @var string
     indent: std::cell::RefCell<String>,
 }
 
@@ -95,10 +91,6 @@ impl JsonFile {
         include_str!("../../../../composer/res/composer-lock-schema.json");
 
     /// Initializes json file reader/parser.
-    ///
-    /// @param  string                    $path           path to a lockfile
-    /// @param  ?HttpDownloader           $httpDownloader required for loading http/https json files
-    /// @throws \InvalidArgumentException
     pub fn new(
         path: String,
         http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
@@ -128,9 +120,6 @@ impl JsonFile {
     }
 
     /// Reads json file.
-    ///
-    /// @throws ParsingException
-    /// @throws \RuntimeException
     pub fn read(&self) -> anyhow::Result<PhpMixed> {
         let json: Option<Vec<u8>> = match (|| -> anyhow::Result<Option<Vec<u8>>> {
             if let Some(http_downloader) = &self.http_downloader {
@@ -287,12 +276,6 @@ impl JsonFile {
     }
 
     /// Validates the schema of the current json file according to composer-schema.json rules
-    ///
-    /// @param  int                     $schema     a JsonFile::*_SCHEMA constant
-    /// @param  string|null             $schemaFile a path to the schema file
-    /// @throws JsonValidationException
-    /// @throws ParsingException
-    /// @return true                    true on success
     pub fn validate_schema(&self, schema: i64, schema_file: Option<&str>) -> anyhow::Result<bool> {
         if !Filesystem::is_readable(&self.path) {
             return Err(RuntimeException::new(format!(
@@ -312,12 +295,6 @@ impl JsonFile {
     }
 
     /// Validates the schema of the current json file according to composer-schema.json rules
-    ///
-    /// @param  mixed                   $data       Decoded JSON data to validate
-    /// @param  int                     $schema     a JsonFile::*_SCHEMA constant
-    /// @param  string|null             $schemaFile a path to the schema file
-    /// @throws JsonValidationException
-    /// @return true                    true on success
     pub fn validate_json_schema(
         source: &str,
         data: &PhpMixed,
@@ -457,11 +434,6 @@ impl JsonFile {
     }
 
     /// Parses json string and returns hash.
-    ///
-    /// @param null|string $json json string
-    /// @param string $file the json file
-    ///
-    /// @throws ParsingException
     pub fn parse_json(
         json: Option<impl AsRef<[u8]>>,
         file: Option<&str>,
@@ -510,10 +482,6 @@ impl JsonFile {
     }
 
     /// Validates the syntax of a JSON string
-    ///
-    /// @throws \UnexpectedValueException
-    /// @throws ParsingException
-    /// @return bool                      true on success
     fn validate_syntax(json: &[u8], file: Option<&str>) -> anyhow::Result<bool> {
         // PHP's linter checks the syntax byte-wise and leaves the encoding to the json_decode()
         // that ran before. A lossy decode keeps the syntax and the line numbers intact, so it

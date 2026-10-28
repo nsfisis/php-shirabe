@@ -226,7 +226,6 @@ pub trait BaseCommand: Command {
 
     fn get_terminal_width(&self) -> i64;
 
-    /// @internal
     fn get_audit_format(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,

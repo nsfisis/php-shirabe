@@ -25,33 +25,19 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct GitBitbucketDriver {
     inner: VcsDriverBase,
-    /// @var string
     owner: String,
-    /// @var string
     repository: String,
-    /// @var bool
     has_issues: bool,
-    /// @var ?string
     root_identifier: Option<String>,
-    /// @var array<int|string, string> Map of tag name to identifier
     tags: Option<IndexMap<String, String>>,
-    /// @var array<int|string, string> Map of branch name to identifier
     branches: Option<IndexMap<String, String>>,
-    /// @var string
     branches_url: String,
-    /// @var string
     tags_url: String,
-    /// @var string
     home_url: String,
-    /// @var string
     website: String,
-    /// @var string
     clone_https_url: String,
-    /// @var array<string, mixed>
     repo_data: IndexMap<String, PhpMixed>,
-    /// @var ?VcsDriver
     fallback_driver: Option<Box<dyn VcsDriverInterface>>,
-    /// @var string|null if set either git or hg
     vcs_type: Option<String>,
 }
 
@@ -82,7 +68,6 @@ impl GitBitbucketDriver {
         }
     }
 
-    /// @inheritDoc
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let Some(m) = preg_match(
             php_regex!(r"#^https?://bitbucket\.org/([^/]+)/([^/]+?)(?:\.git|/?)?$#i"),
@@ -131,7 +116,6 @@ impl GitBitbucketDriver {
         Ok(())
     }
 
-    /// @inheritDoc
     pub fn get_url(&self) -> String {
         if let Some(fallback) = self.fallback_driver.as_ref() {
             return fallback.get_url();
@@ -142,8 +126,6 @@ impl GitBitbucketDriver {
 
     /// Attempts to fetch the repository data via the BitBucket API and
     /// sets some parameters which are used in other methods
-    ///
-    /// @phpstan-impure
     fn get_repo_data(&mut self) -> anyhow::Result<bool> {
         let resource = format!(
             "https://api.bitbucket.org/2.0/repositories/{}/{}?{}",
@@ -225,7 +207,6 @@ impl GitBitbucketDriver {
         Ok(true)
     }
 
-    /// @inheritDoc
     pub fn get_composer_information(
         &mut self,
         identifier: &str,
@@ -398,7 +379,6 @@ impl GitBitbucketDriver {
         Ok(self.inner.info_cache.get(identifier).cloned().flatten())
     }
 
-    /// @inheritDoc
     pub fn get_file_content(
         &mut self,
         file: &str,
@@ -430,7 +410,6 @@ impl GitBitbucketDriver {
             .map(|s| s.to_string()))
     }
 
-    /// @inheritDoc
     pub fn get_change_date(
         &mut self,
         identifier: &str,
@@ -462,7 +441,6 @@ impl GitBitbucketDriver {
         Ok(Some(date))
     }
 
-    /// @inheritDoc
     pub fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
         if let Some(fallback) = self.fallback_driver.as_ref() {
             return fallback.get_source(identifier);
@@ -478,7 +456,6 @@ impl GitBitbucketDriver {
         m
     }
 
-    /// @inheritDoc
     pub fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
         if let Some(fallback) = self.fallback_driver.as_ref() {
             return fallback.get_dist(identifier);
@@ -499,7 +476,6 @@ impl GitBitbucketDriver {
         Some(m)
     }
 
-    /// @inheritDoc
     pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_tags();
@@ -566,7 +542,6 @@ impl GitBitbucketDriver {
         Ok(self.tags.clone().unwrap_or_default())
     }
 
-    /// @inheritDoc
     pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_branches();
@@ -634,8 +609,6 @@ impl GitBitbucketDriver {
     }
 
     /// Get the remote content.
-    ///
-    /// @phpstan-impure
     fn fetch_with_oauth_credentials(
         &mut self,
         url: &str,
@@ -688,9 +661,6 @@ impl GitBitbucketDriver {
         )
     }
 
-    /// @phpstan-impure
-    ///
-    /// @throws \RuntimeException
     fn attempt_clone_fallback(&mut self) -> anyhow::Result<bool> {
         match self.setup_fallback_driver(&self.generate_ssh_url()) {
             Ok(()) => Ok(true),
@@ -743,7 +713,6 @@ impl GitBitbucketDriver {
         }
     }
 
-    /// @inheritDoc
     pub fn get_root_identifier(&mut self) -> anyhow::Result<String> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_root_identifier();
@@ -785,7 +754,6 @@ impl GitBitbucketDriver {
         Ok(self.root_identifier.clone().unwrap_or_default())
     }
 
-    /// @inheritDoc
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         _config: std::rc::Rc<std::cell::RefCell<Config>>,

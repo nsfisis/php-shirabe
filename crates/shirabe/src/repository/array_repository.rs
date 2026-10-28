@@ -22,7 +22,6 @@ use std::rc::Weak;
 pub struct ArrayRepository {
     pub(crate) packages: std::cell::RefCell<Option<Vec<BasePackageHandle>>>,
 
-    /// @var ?array<BasePackage> indexed by package unique name and used to cache hasPackage calls
     pub(crate) package_map: std::cell::RefCell<Option<IndexMap<String, BasePackageHandle>>>,
 
     /// Weak reference to the outermost repository handle wrapping this `ArrayRepository`,

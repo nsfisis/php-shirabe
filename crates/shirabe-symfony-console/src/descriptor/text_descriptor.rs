@@ -15,8 +15,6 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, preg_replace};
 
 /// Text descriptor.
-///
-/// @internal
 #[derive(Debug, Default)]
 pub struct TextDescriptor {
     output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,

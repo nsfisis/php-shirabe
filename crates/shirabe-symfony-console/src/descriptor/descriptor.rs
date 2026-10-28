@@ -10,7 +10,6 @@ use crate::output::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-/// @internal
 pub trait Descriptor: DescriptorInterface {
     fn output(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>;
 

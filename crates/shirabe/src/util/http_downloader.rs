@@ -27,11 +27,8 @@ use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
 pub struct HttpDownloader {
-    /// @var IOInterface
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    /// @var Config
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    /// @var mixed[]
     options: IndexMap<String, PhpMixed>,
     /// Replaces PHP's `$runningJobs`/`$maxJobs` counters: a permit is held for the duration of
     /// each in-flight request and released when it settles.
@@ -42,9 +39,7 @@ pub struct HttpDownloader {
     local: LocalFilesystem,
     /// Takes whatever neither of the above does. Composer's `RemoteFilesystem`, in the worker.
     rfs: RemoteFilesystem,
-    /// @var bool
     disabled: bool,
-    /// @var bool
     allow_async: bool,
     /// Test-only internal hook. `None` in production. When `Some`, the request methods
     /// (`get`/`copy`/`add`/`add_copy`) short-circuit to canned responses from the
@@ -102,9 +97,6 @@ impl Default for HttpDownloaderMockHandler {
 }
 
 impl HttpDownloader {
-    /// @param IOInterface $io         The IO instance
-    /// @param Config      $config     The config
-    /// @param mixed[]     $options    The options
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
@@ -491,12 +483,10 @@ impl HttpDownloader {
         self.options = array_replace_recursive(self.options.clone(), options);
     }
 
-    /// @internal
     pub fn enable_async(&mut self) {
         self.allow_async = true;
     }
 
-    /// @internal
     pub fn output_warnings(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         url: &str,
@@ -594,7 +584,6 @@ impl HttpDownloader {
         Ok(())
     }
 
-    /// @internal
     pub fn get_exception_hints(e: &anyhow::Error) -> Option<Vec<String>> {
         let e_as_transport: Option<&TransportException> = e.catch::<TransportException>();
         e_as_transport?;
@@ -653,7 +642,6 @@ impl HttpDownloader {
         true
     }
 
-    /// @internal
     pub fn is_curl_enabled() -> bool {
         extension_loaded("curl")
     }

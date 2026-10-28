@@ -26,12 +26,9 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct GitDownloader {
     inner: VcsDownloaderBase,
-    /// @var array<string, bool>
     has_stashed_changes: std::cell::RefCell<IndexMap<String, bool>>,
-    /// @var array<string, bool>
     has_discarded_changes: std::cell::RefCell<IndexMap<String, bool>>,
     git_util: std::cell::RefCell<GitUtil>,
-    /// @var array<int, array<string, bool>>
     cached_packages: std::cell::RefCell<IndexMap<i64, IndexMap<String, bool>>>,
 }
 
@@ -242,9 +239,6 @@ impl GitDownloader {
     }
 
     /// Updates the given path to the given commit ref
-    ///
-    /// @throws \RuntimeException
-    /// @return null|string       if a string is returned, it is the commit reference that was checked out if the original could not be found
     fn update_to_commit(
         &self,
         package: PackageInterfaceHandle,
@@ -535,7 +529,6 @@ impl GitDownloader {
         Ok(())
     }
 
-    /// @throws \RuntimeException
     async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
         let mut output = String::new();
@@ -566,7 +559,6 @@ impl GitDownloader {
         Ok(None)
     }
 
-    /// @throws \RuntimeException
     async fn stash_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
         let mut output = String::new();
@@ -590,7 +582,6 @@ impl GitDownloader {
         Ok(None)
     }
 
-    /// @throws \RuntimeException
     fn view_diff(&self, path: &str) -> anyhow::Result<()> {
         let path = self.normalize_path(path);
         let mut output = String::new();

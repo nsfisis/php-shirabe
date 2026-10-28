@@ -28,23 +28,15 @@ use shirabe_semver::constraint::AnyConstraint;
 #[derive(Debug)]
 pub struct FilesystemRepository {
     pub(crate) inner: WritableArrayRepository,
-    /// @var JsonFile
     pub(crate) file: JsonFile,
-    /// @var bool
     dump_versions: bool,
-    /// @var ?RootPackageInterface
     root_package: Option<RootPackageInterfaceHandle>,
-    /// @var Filesystem
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    /// @var bool|null
     dev_mode: std::cell::Cell<Option<bool>>,
 }
 
 impl FilesystemRepository {
     /// Initializes filesystem repository.
-    ///
-    /// @param JsonFile              $repositoryFile repository json file
-    /// @param ?RootPackageInterface $rootPackage    Must be provided if $dumpVersions is true
     pub fn new(
         repository_file: JsonFile,
         dump_versions: bool,
@@ -69,7 +61,6 @@ impl FilesystemRepository {
         })
     }
 
-    /// @return bool|null true if dev requirements were installed, false if --no-dev was used, null if yet unknown
     pub fn get_dev_mode(&self) -> Option<bool> {
         self.dev_mode.get()
     }
@@ -356,8 +347,6 @@ impl FilesystemRepository {
     }
 
     /// As we load the file from vendor dir during bootstrap, we need to make sure it contains only expected code before executing it
-    ///
-    /// @internal
     pub fn safely_load_installed_versions(_path: &str) -> bool {
         // TODO(php-runtime): call `InstalledVersions::reload()` in PHP runtime process, not in
         // Rust.

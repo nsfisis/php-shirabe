@@ -27,17 +27,13 @@ pub struct GitHubDriver {
     inner: VcsDriverBase,
     owner: String,
     repository: String,
-    /// @var array<int|string, string> Map of tag name to identifier
     tags: Option<IndexMap<String, String>>,
-    /// @var array<int|string, string> Map of branch name to identifier
     branches: Option<IndexMap<String, String>>,
     root_identifier: String,
-    /// @var mixed[]
     repo_data: Option<IndexMap<String, PhpMixed>>,
     has_issues: bool,
     is_private: bool,
     is_archived: bool,
-    /// @var array<int, array{type: string, url: string}>|false|null
     funding_info: Option<PhpMixed>,
     allow_git_fallback: bool,
     /// Git Driver
@@ -1092,8 +1088,6 @@ impl GitHubDriver {
     }
 
     /// Fetch root identifier from GitHub
-    ///
-    /// @throws TransportException
     fn fetch_root_identifier(&mut self) -> anyhow::Result<()> {
         if self.repo_data.is_some() {
             return Ok(());
@@ -1162,9 +1156,6 @@ impl GitHubDriver {
         Ok(())
     }
 
-    /// @phpstan-impure
-    ///
-    /// @throws \RuntimeException
     fn attempt_clone_fallback(
         &mut self,
         e: Option<std::sync::Arc<anyhow::Error>>,

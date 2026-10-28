@@ -20,25 +20,16 @@ pub struct SvnCredentials {
 
 #[derive(Debug)]
 pub struct Svn {
-    /// @var ?array{username: string, password: string}
     credentials: Option<SvnCredentials>,
-    /// @var bool
     has_auth: Option<bool>,
-    /// @var IOInterface
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    /// @var string
     url: String,
-    /// @var bool
     cache_credentials: bool,
-    /// @var ProcessExecutor
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    /// @var int
     qty_auth_tries: i64,
-    /// @var Config
     config: std::rc::Rc<std::cell::RefCell<Config>>,
 }
 
-/// @var string|null
 static VERSION: Mutex<Option<String>> = Mutex::new(None);
 
 impl Svn {
@@ -74,14 +65,6 @@ impl Svn {
 
     /// Execute an SVN remote command and try to fix up the process with credentials
     /// if necessary.
-    ///
-    /// @param non-empty-list<string> $command SVN command to run
-    /// @param string  $url     SVN url
-    /// @param ?string $cwd     Working directory
-    /// @param ?string $path    Target for a checkout
-    /// @param bool    $verbose Output all output to the user
-    ///
-    /// @throws \RuntimeException
     pub fn execute(
         &mut self,
         command: Vec<String>,
@@ -103,13 +86,6 @@ impl Svn {
 
     /// Execute an SVN local command and try to fix up the process with credentials
     /// if necessary.
-    ///
-    /// @param non-empty-list<string> $command SVN command to run
-    /// @param string $path    Path argument passed thru to the command
-    /// @param string $cwd     Working directory
-    /// @param bool   $verbose Output all output to the user
-    ///
-    /// @throws \RuntimeException
     pub fn execute_local(
         &mut self,
         command: Vec<String>,
@@ -198,8 +174,6 @@ impl Svn {
     }
 
     /// Repositories requests credentials, let's put them in.
-    ///
-    /// @throws \RuntimeException
     fn do_auth_dance(&mut self) -> anyhow::Result<&mut Self> {
         // cannot ask for credentials in non interactive mode
         if !self.io.is_interactive() {
@@ -241,10 +215,6 @@ impl Svn {
     }
 
     /// A method to create the svn commands run.
-    ///
-    /// @param non-empty-list<string> $cmd  Usually 'svn ls' or something like that.
-    /// @param string $url  Repo URL.
-    /// @param string $path Target for a checkout
     fn get_command(&mut self, mut cmd: Vec<String>, url: &str, path: Option<&str>) -> Vec<String> {
         cmd.push("--non-interactive".to_string());
         cmd.extend(self.get_credential_args());
@@ -290,8 +260,6 @@ impl Svn {
     }
 
     /// Get the password for the svn command. Can be empty.
-    ///
-    /// @throws \LogicException
     fn get_password(&self) -> anyhow::Result<String> {
         if self.credentials.is_none() {
             return Err(LogicException::new("No svn auth detected.".to_string()).into());
@@ -301,8 +269,6 @@ impl Svn {
     }
 
     /// Get the username for the svn command.
-    ///
-    /// @throws \LogicException
     fn get_username(&self) -> anyhow::Result<String> {
         if self.credentials.is_none() {
             return Err(LogicException::new("No svn auth detected.".to_string()).into());

@@ -647,7 +647,6 @@ fn test_metapackage_remove() {
     );
 }
 
-/// @covers Composer\Downloader\DownloadManager::resolvePackageInstallPreference
 #[test]
 fn test_install_preference_without_preference_dev() {
     let package = make_package("dummy/pkg", true);
@@ -669,7 +668,6 @@ fn test_install_preference_without_preference_dev() {
     assert_eq!(package.get_installation_source().as_deref(), Some("source"));
 }
 
-/// @covers Composer\Downloader\DownloadManager::resolvePackageInstallPreference
 #[test]
 fn test_install_preference_without_preference_no_dev() {
     let package = make_package("dummy/pkg", false);
@@ -691,7 +689,6 @@ fn test_install_preference_without_preference_no_dev() {
     assert_eq!(package.get_installation_source().as_deref(), Some("dist"));
 }
 
-/// @covers Composer\Downloader\DownloadManager::resolvePackageInstallPreference
 #[test]
 fn test_install_preference_without_match_dev() {
     let package = make_package("bar/package", true);
@@ -717,7 +714,6 @@ fn test_install_preference_without_match_dev() {
     assert_eq!(package.get_installation_source().as_deref(), Some("source"));
 }
 
-/// @covers Composer\Downloader\DownloadManager::resolvePackageInstallPreference
 #[test]
 fn test_install_preference_without_match_no_dev() {
     let package = make_package("bar/package", false);
@@ -743,7 +739,6 @@ fn test_install_preference_without_match_no_dev() {
     assert_eq!(package.get_installation_source().as_deref(), Some("dist"));
 }
 
-/// @covers Composer\Downloader\DownloadManager::resolvePackageInstallPreference
 #[test]
 fn test_install_preference_with_match_auto_dev() {
     let package = make_package("foo/package", true);
@@ -766,7 +761,6 @@ fn test_install_preference_with_match_auto_dev() {
     assert_eq!(package.get_installation_source().as_deref(), Some("source"));
 }
 
-/// @covers Composer\Downloader\DownloadManager::resolvePackageInstallPreference
 #[test]
 fn test_install_preference_with_match_auto_no_dev() {
     let package = make_package("foo/package", false);
@@ -789,7 +783,6 @@ fn test_install_preference_with_match_auto_no_dev() {
     assert_eq!(package.get_installation_source().as_deref(), Some("dist"));
 }
 
-/// @covers Composer\Downloader\DownloadManager::resolvePackageInstallPreference
 #[test]
 fn test_install_preference_with_match_source() {
     let package = make_package("foo/package", false);
@@ -815,7 +808,6 @@ fn test_install_preference_with_match_source() {
     assert_eq!(package.get_installation_source().as_deref(), Some("source"));
 }
 
-/// @covers Composer\Downloader\DownloadManager::resolvePackageInstallPreference
 #[test]
 fn test_install_preference_with_match_dist() {
     let package = make_package("foo/package", false);

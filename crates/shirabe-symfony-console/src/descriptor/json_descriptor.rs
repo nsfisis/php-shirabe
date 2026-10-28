@@ -13,8 +13,6 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, php_regex, preg_replace};
 
 /// JSON descriptor.
-///
-/// @internal
 #[derive(Debug, Default)]
 pub struct JsonDescriptor {
     output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,

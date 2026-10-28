@@ -6,21 +6,14 @@ use crate::exception::CommandNotFoundException;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
-/// @internal
 #[derive(Debug)]
 pub struct ApplicationDescription {
     application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
     namespace: Option<String>,
     show_hidden: bool,
-
-    /// @var array
     /// Each namespace entry is `['id' => string, 'commands' => string[]]`.
     namespaces: Option<IndexMap<String, IndexMap<String, PhpMixed>>>,
-
-    /// @var array<string, Command>
     commands: Option<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
-
-    /// @var array<string, Command>
     aliases: Option<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>>,
 }
 
@@ -60,7 +53,6 @@ impl ApplicationDescription {
         self.commands.as_ref().unwrap()
     }
 
-    /// @throws CommandNotFoundException
     pub fn get_command(
         &self,
         name: &str,

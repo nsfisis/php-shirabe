@@ -35,23 +35,14 @@ use shirabe_seld_json_lint::ParsingException;
 /// Reads/writes project lockfile (composer.lock).
 #[derive(Debug)]
 pub struct Locker {
-    /// @var JsonFile
     lock_file: JsonFile,
-    /// @var InstallationManager
     installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>>,
-    /// @var string
     hash: String,
-    /// @var string
     content_hash: String,
-    /// @var ArrayLoader
     loader: ArrayLoader,
-    /// @var ArrayDumper
     dumper: ArrayDumper,
-    /// @var ProcessExecutor
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    /// @var mixed[]|null
     lock_data_cache: std::cell::RefCell<Option<IndexMap<String, PhpMixed>>>,
-    /// @var bool
     virtual_file_written: bool,
 }
 
@@ -78,7 +69,6 @@ impl Locker {
         }
     }
 
-    /// @internal
     pub fn get_json_file(&self) -> &JsonFile {
         &self.lock_file
     }
@@ -275,7 +265,6 @@ impl Locker {
         .into())
     }
 
-    /// @return string[] Names of dependencies installed through require-dev
     pub fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<String>> {
         let mut names: Vec<String> = vec![];
         let lock_data = self.get_lock_data()?;
@@ -348,8 +337,8 @@ impl Locker {
             .to_string())
     }
 
-    /// @return array<string, int> despite the upstream `@return array<string, string>` docblock;
-    /// the values are BasePackage::STABILITIES ints, written verbatim by set_lock_data.
+    /// The values are BasePackage::STABILITIES ints, written verbatim by set_lock_data,
+    /// despite the upstream `@return array<string, string>` docblock.
     pub fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, i64>> {
         let lock_data = self.get_lock_data()?;
 

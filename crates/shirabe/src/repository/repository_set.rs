@@ -42,41 +42,25 @@ pub struct RootAliasInput {
     pub alias_normalized: String,
 }
 
-/// @see RepositoryUtils for ways to work with single repos
 #[derive(Debug)]
 pub struct RepositorySet {
     /// Packages are returned even though their stability does not match the required stability
     /// PHP: ALLOW_UNACCEPTABLE_STABILITIES = 1
-
-    /// @var array[]
-    /// @phpstan-var array<string, array<string, array{alias: string, alias_normalized: string}>>
     root_aliases: IndexMap<String, IndexMap<String, RootAliasEntry>>,
 
-    /// @var string[]
-    /// @phpstan-var array<string, string>
     root_references: IndexMap<String, String>,
 
-    /// @var RepositoryInterface[]
     repositories: Vec<RepositoryInterfaceHandle>,
 
-    /// @var int[] array of stability => BasePackage::STABILITY_* value
-    /// @phpstan-var array<key-of<BasePackage::STABILITIES>, BasePackage::STABILITY_*>
     acceptable_stabilities: IndexMap<String, i64>,
 
-    /// @var int[] array of package name => BasePackage::STABILITY_* value
-    /// @phpstan-var array<string, BasePackage::STABILITY_*>
     stability_flags: IndexMap<String, i64>,
 
-    /// @var ConstraintInterface[]
-    /// @phpstan-var array<string, ConstraintInterface>
     root_requires: IndexMap<String, AnyConstraint>,
 
-    /// @var array<string, ConstraintInterface>
     temporary_constraints: IndexMap<String, AnyConstraint>,
 
-    /// @var bool
     locked: bool,
-    /// @var bool
     allow_installed_repositories: bool,
 }
 
@@ -89,11 +73,6 @@ impl RepositorySet {
     /// In most cases if you are looking to use this class as a way to find packages from repositories
     /// passing minimumStability is all you need to worry about. The rest is for advanced pool creation including
     /// aliases, pinned references and other special cases.
-    ///
-    /// @param int[]  $stabilityFlags   an array of package name => BasePackage::STABILITY_* value
-    /// @param string[] $rootReferences an array of package name => source reference
-    /// @param ConstraintInterface[] $rootRequires an array of package name => constraint from the root package
-    /// @param array<string, ConstraintInterface> $temporaryConstraints Runtime temporary constraints that will be used to filter packages
     pub fn new(
         minimum_stability: &str,
         stability_flags: IndexMap<String, i64>,
@@ -138,12 +117,10 @@ impl RepositorySet {
         self.allow_installed_repositories = allow;
     }
 
-    /// @return ConstraintInterface[] an array of package name => constraint from the root package, platform requirements excluded
     pub fn get_root_requires(&self) -> &IndexMap<String, AnyConstraint> {
         &self.root_requires
     }
 
-    /// @return array<string, ConstraintInterface> Runtime temporary constraints that will be used to filter packages
     pub fn get_temporary_constraints(&self) -> &IndexMap<String, AnyConstraint> {
         &self.temporary_constraints
     }
@@ -152,8 +129,6 @@ impl RepositorySet {
     ///
     /// The first repos added have a higher priority. As soon as a package is found in any
     /// repository the search for that package ends, and following repos will not be consulted.
-    ///
-    /// @param RepositoryInterface $repo A package repository
     pub fn add_repository(&mut self, repo: RepositoryInterfaceHandle) -> anyhow::Result<()> {
         if self.locked {
             return Err(RuntimeException::new("Pool has already been created from this repository set, it cannot be modified anymore.".to_string())
@@ -180,8 +155,6 @@ impl RepositorySet {
     /// Find packages providing or matching a name and optionally meeting a constraint in all repositories
     ///
     /// Returned in the order of repositories, matching priority
-    ///
-    /// @param  int                      $flags      any of the ALLOW_* constants from this class to tweak what is returned
     pub fn find_packages(
         &self,
         name: &str,
@@ -340,7 +313,6 @@ impl RepositorySet {
         })
     }
 
-    /// @param array<string> &$unreachableRepos Array to store messages about unreachable repositories
     fn get_security_advisories_for_constraints(
         &self,
         package_constraint_map: IndexMap<String, AnyConstraint>,
@@ -400,7 +372,6 @@ impl RepositorySet {
         Ok(advisories)
     }
 
-    /// @return array[] an array with the provider name as key and value of array('name' => '...', 'description' => '...', 'type' => '...')
     pub fn get_providers(
         &self,
         package_name: &str,
@@ -417,8 +388,6 @@ impl RepositorySet {
     }
 
     /// Check for each given package name whether it would be accepted by this RepositorySet in the given $stability
-    ///
-    /// @param key-of<BasePackage::STABILITIES> $stability one of 'stable', 'RC', 'beta', 'alpha' or 'dev'
     pub fn is_package_acceptable(&self, names: &[String], stability: &str) -> bool {
         StabilityFilter::is_package_acceptable(
             &self.acceptable_stabilities,

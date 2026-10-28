@@ -14,8 +14,6 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, preg_replace};
 
 /// Markdown descriptor.
-///
-/// @internal
 #[derive(Debug, Default)]
 pub struct MarkdownDescriptor {
     output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,
@@ -319,7 +317,6 @@ impl Descriptor for MarkdownDescriptor {
         self.output = Some(output);
     }
 
-    /// {@inheritdoc}
     fn write(&self, content: &str, decorated: bool) {
         // PHP overrides write() only to flip the default of $decorated to true;
         // it still delegates to parent::write.

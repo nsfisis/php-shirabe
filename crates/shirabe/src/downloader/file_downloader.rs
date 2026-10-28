@@ -36,40 +36,24 @@ use shirabe_php_shim::{
 };
 use std::sync::{LazyLock, Mutex};
 
-/// @var array<string, int|string>
-/// @private
-/// @internal
 pub static DOWNLOAD_METADATA: LazyLock<Mutex<IndexMap<String, PhpMixed>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 /// Collects response headers when running on GH Actions
-///
-/// @var array<string, array<string>>
-/// @private
-/// @internal
 pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<String, Vec<String>>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 /// Base downloader for files
 #[derive(Debug)]
 pub struct FileDownloader {
-    /// @var IOInterface
     pub(crate) io: std::cell::RefCell<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-    /// @var Config
     pub(crate) config: std::rc::Rc<std::cell::RefCell<Config>>,
-    /// @var HttpDownloader
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
-    /// @var Filesystem
     pub(crate) filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    /// @var ?Cache
     cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
-    /// @var ?EventDispatcher
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
-    /// @var ProcessExecutor
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    /// @var array<string, string> Map of package name to cache key
     last_cache_writes: Mutex<IndexMap<String, String>>,
-    /// @var array<string, string[]> Map of package name to list of paths
     additional_cleanup_paths: std::cell::RefCell<IndexMap<String, Vec<String>>>,
 }
 
@@ -372,7 +356,6 @@ impl FileDownloader {
 
 #[async_trait::async_trait(?Send)]
 impl DownloaderInterface for FileDownloader {
-    /// @inheritDoc
     fn get_installation_source(&self) -> String {
         "dist".to_owned()
     }
@@ -381,7 +364,6 @@ impl DownloaderInterface for FileDownloader {
         Some(self)
     }
 
-    /// @inheritDoc
     async fn download(
         &self,
         package: PackageInterfaceHandle,
@@ -678,7 +660,6 @@ impl DownloaderInterface for FileDownloader {
         }
     }
 
-    /// @inheritDoc
     async fn prepare(
         &self,
         _type: &str,
@@ -689,7 +670,6 @@ impl DownloaderInterface for FileDownloader {
         Ok(Some(PhpMixed::Null))
     }
 
-    /// @inheritDoc
     async fn cleanup(
         &self,
         _type: &str,
@@ -745,7 +725,6 @@ impl DownloaderInterface for FileDownloader {
         Ok(Some(PhpMixed::Null))
     }
 
-    /// @inheritDoc
     async fn install(
         &self,
         package: PackageInterfaceHandle,
@@ -803,7 +782,6 @@ impl DownloaderInterface for FileDownloader {
         Ok(Some(PhpMixed::Null))
     }
 
-    /// @inheritDoc
     async fn update(
         &self,
         initial: PackageInterfaceHandle,
@@ -815,7 +793,6 @@ impl DownloaderInterface for FileDownloader {
             .await
     }
 
-    /// @inheritDoc
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
@@ -843,8 +820,6 @@ impl DownloaderInterface for FileDownloader {
 
 #[async_trait::async_trait(?Send)]
 impl ChangeReportInterface for FileDownloader {
-    /// @inheritDoc
-    /// @throws \RuntimeException
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,

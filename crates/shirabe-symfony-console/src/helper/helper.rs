@@ -24,8 +24,6 @@ impl Helper {
     }
 
     /// Returns the length of a string, using mb_strwidth if it is available.
-    ///
-    /// @deprecated since Symfony 5.3
     pub fn strlen(string: &str) -> i64 {
         shirabe_php_shim::trigger_deprecation(
             "symfony/console",
@@ -127,7 +125,6 @@ impl Helper {
         format!("{} B", memory)
     }
 
-    /// @deprecated since Symfony 5.3
     pub fn strlen_without_decoration(
         formatter: &mut dyn OutputFormatterInterface,
         string: &str,

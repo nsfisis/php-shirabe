@@ -15,7 +15,6 @@ use shirabe_php_shim::{
 use shirabe_symfony_process::ExecutableFinder;
 use shirabe_symfony_process::Process;
 
-/// @phpstan-type RepoConfig array{unique_perforce_client_name?: string, depot?: string, branch?: string, p4user?: string, p4password?: string}
 #[derive(Debug)]
 pub struct Perforce {
     path: String,
@@ -323,8 +322,6 @@ impl Perforce {
         Ok(password)
     }
 
-    /// @internal
-    /// @param non-empty-list<string> $arguments Additional arguments for git rev-list
     pub fn generate_p4_command(&mut self, arguments: Vec<String>, use_client: bool) -> Vec<String> {
         let mut p4_command: Vec<String> = vec![Self::get_p4_executable()];
         if self.get_user().is_some() {

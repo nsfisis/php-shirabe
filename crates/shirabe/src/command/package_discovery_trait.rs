@@ -29,7 +29,6 @@ use shirabe_php_shim::{
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 
-/// @internal
 pub trait PackageDiscoveryTrait: BaseCommand {
     fn get_repos_mut(
         &self,
@@ -96,7 +95,6 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> String {
         if input.borrow().has_option("stability") {
-            // @phpstan-ignore-line as InitCommand does have this option but not all classes using this trait do
             return VersionParser::normalize_stability(
                 &input
                     .borrow()
@@ -109,7 +107,6 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             .unwrap_or_default();
         }
 
-        // @phpstan-ignore-next-line as RequireCommand does not have the option above so this code is reachable there
         let file = Factory::get_composer_file().unwrap_or_default();
         if is_file(&file) && Filesystem::is_readable(&file) {
             let contents = file_get_contents(&file).unwrap_or_default();
@@ -431,9 +428,6 @@ pub trait PackageDiscoveryTrait: BaseCommand {
     /// Given a package name, this determines the best version to use in the require key.
     ///
     /// This returns a version with the ~ operator prefixed when possible.
-    ///
-    /// @throws \InvalidArgumentException
-    /// @return array{string, string}     name version
     fn find_best_version_and_name_for_package(
         &self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,

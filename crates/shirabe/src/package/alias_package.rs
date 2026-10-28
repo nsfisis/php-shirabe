@@ -22,40 +22,23 @@ pub struct AliasPackage {
     /// Back-reference to the owning repository. `Weak` breaks the repository -> packages cycle.
     repository: Option<RepositoryInterfaceWeakHandle>,
 
-    /// @var string
     version: String,
-    /// @var string
     pretty_version: String,
-    /// @var bool
     dev: bool,
-    /// @var bool
     root_package_alias: bool,
-    /// @var string
-    /// @phpstan-var 'stable'|'RC'|'beta'|'alpha'|'dev'
     stability: String,
-    /// @var bool
     has_self_version_requires: bool,
 
-    /// @var BasePackage
     pub(crate) alias_of: PackageHandle,
-    /// @var Link[]
     pub(crate) requires: std::rc::Rc<IndexMap<String, Link>>,
-    /// @var Link[]
     pub(crate) dev_requires: std::rc::Rc<IndexMap<String, Link>>,
-    /// @var array<string, Link>
     pub(crate) conflicts: std::rc::Rc<IndexMap<String, Link>>,
-    /// @var array<string, Link>
     pub(crate) provides: std::rc::Rc<IndexMap<String, Link>>,
-    /// @var array<string, Link>
     pub(crate) replaces: std::rc::Rc<IndexMap<String, Link>>,
 }
 
 impl AliasPackage {
     /// All descendants' constructors should call this parent constructor
-    ///
-    /// @param BasePackage $aliasOf       The package this package is an alias of
-    /// @param string      $version       The version the alias must report
-    /// @param string      $prettyVersion The alias's non-normalized version
     pub fn new(alias_of: PackageHandle, version: String, pretty_version: String) -> Self {
         let alias_name = alias_of.get_name();
 
@@ -116,7 +99,6 @@ impl AliasPackage {
         self.root_package_alias = value;
     }
 
-    /// @see setRootPackageAlias
     pub fn is_root_package_alias(&self) -> bool {
         self.root_package_alias
     }
@@ -256,17 +238,14 @@ impl PackageInterface for AliasPackage {
         std::rc::Rc::clone(&self.requires)
     }
 
-    /// @inheritDoc
     fn get_conflicts(&self) -> std::rc::Rc<IndexMap<String, Link>> {
         std::rc::Rc::clone(&self.conflicts)
     }
 
-    /// @inheritDoc
     fn get_provides(&self) -> std::rc::Rc<IndexMap<String, Link>> {
         std::rc::Rc::clone(&self.provides)
     }
 
-    /// @inheritDoc
     fn get_replaces(&self) -> std::rc::Rc<IndexMap<String, Link>> {
         std::rc::Rc::clone(&self.replaces)
     }

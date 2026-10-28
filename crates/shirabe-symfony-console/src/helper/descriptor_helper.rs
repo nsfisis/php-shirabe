@@ -16,7 +16,6 @@ use indexmap::IndexMap;
 #[derive(Default)]
 pub struct DescriptorHelper {
     inner: Helper,
-    /// @var DescriptorInterface[]
     descriptors: IndexMap<String, Box<dyn DescriptorInterface>>,
 }
 
@@ -49,8 +48,6 @@ impl DescriptorHelper {
     /// Available options are:
     /// * format: string, the output format name
     /// * raw_text: boolean, sets output type as raw
-    ///
-    /// @throws InvalidArgumentException when the given format is not supported
     pub fn describe2(
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

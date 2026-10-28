@@ -22,26 +22,17 @@ use shirabe_php_shim::{
 #[derive(Debug)]
 pub struct SvnDriver {
     inner: VcsDriverBase,
-    /// @var string
     base_url: String,
-    /// @var array<int|string, string> Map of tag name to identifier
     tags: Option<IndexMap<String, String>>,
-    /// @var array<int|string, string> Map of branch name to identifier
     branches: Option<IndexMap<String, String>>,
-    /// @var ?string
     root_identifier: Option<String>,
 
     trunk_path: Option<String>,
-    /// @var string
     branches_path: String,
-    /// @var string
     tags_path: String,
-    /// @var string
     package_path: String,
-    /// @var bool
     cache_credentials: bool,
 
-    /// @var SvnUtil
     util: Option<SvnUtil>,
 }
 
@@ -497,10 +488,6 @@ impl SvnDriver {
 
     /// Execute an SVN command and try to fix up the process with credentials
     /// if necessary.
-    ///
-    /// @param  non-empty-list<string> $command The svn command to run.
-    /// @param  string            $url     The SVN URL.
-    /// @throws \RuntimeException
     fn execute(&mut self, command: Vec<String>, url: &str) -> anyhow::Result<String> {
         if self.util.is_none() {
             self.util = Some(SvnUtil::new(
@@ -542,9 +529,6 @@ impl SvnDriver {
     }
 
     /// Build the identifier respecting "package-path" config option
-    ///
-    /// @param string $baseDir  The path to trunk/branch/tag
-    /// @param int $revision The revision mark to add to identifier
     fn build_identifier(&self, base_dir: &str, revision: i64) -> String {
         format!(
             "{}{}/@{}",

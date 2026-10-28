@@ -162,7 +162,6 @@ impl RequireCommand {
         .unwrap_or_default()
     }
 
-    /// @throws \Exception
     async fn do_update(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
@@ -791,7 +790,6 @@ impl Command for RequireCommand {
         Ok(())
     }
 
-    /// @throws \Seld\JsonLint\ParsingException
     async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,

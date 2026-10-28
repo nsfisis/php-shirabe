@@ -86,7 +86,6 @@ impl ConsoleSectionOutput {
         self.content.borrow().join("")
     }
 
-    /// @internal
     pub fn add_content(&self, input: &str) {
         for line_content in shirabe_php_shim::explode(shirabe_php_shim::PHP_EOL, input) {
             let count = (self.get_display_length(&line_content) as f64

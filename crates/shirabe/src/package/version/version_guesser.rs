@@ -32,20 +32,14 @@ pub trait VersionGuesserInterface: std::fmt::Debug {
 }
 
 /// Try to guess the current version number based on different VCS configuration.
-///
-/// @phpstan-type Version array{version: string, commit: string|null, pretty_version: string|null}|array{version: string, commit: string|null, pretty_version: string|null, feature_version: string|null, feature_pretty_version: string|null}
 #[derive(Debug)]
 pub struct VersionGuesser {
-    /// @var Config
     config: std::rc::Rc<std::cell::RefCell<Config>>,
 
-    /// @var ProcessExecutor
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
 
-    /// @var SemverVersionParser
     version_parser: VersionParser,
 
-    /// @var IOInterface|null
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
 
     /// For testing only: when true, `guess_version` always returns `None`, mirroring
@@ -53,7 +47,6 @@ pub struct VersionGuesser {
     mock: bool,
 }
 
-/// PHP: @phpstan-type Version array{version, commit, pretty_version, feature_version?, feature_pretty_version?}
 #[derive(Debug, Clone)]
 pub struct VersionData {
     pub version: Option<String>,
@@ -93,7 +86,6 @@ impl VersionGuesser {
         }
     }
 
-    /// @param string               $path Path to guess into
     pub fn guess_version(
         &mut self,
         package_config: &IndexMap<String, PhpMixed>,

@@ -22,83 +22,53 @@ pub enum DisplayMode {
 /// Defines the essential information a package has that is used during solving/installation
 ///
 /// PackageInterface & derivatives are considered internal, you may use them in type hints but extending/implementing them is not recommended and not supported. Things may change without notice.
-///
-/// @phpstan-type AutoloadRules    array{psr-0?: array<string, string|string[]>, psr-4?: array<string, string|string[]>, classmap?: list<string>, files?: list<string>, exclude-from-classmap?: list<string>}
-/// @phpstan-type DevAutoloadRules array{psr-0?: array<string, string|string[]>, psr-4?: array<string, string|string[]>, classmap?: list<string>, files?: list<string>}
-/// @phpstan-type PhpExtConfig     array{extension-name?: string, priority?: int, support-zts?: bool, support-nts?: bool, build-path?: string|null, download-url-method?: string|list<string>, os-families?: non-empty-list<non-empty-string>, os-families-exclude?: non-empty-list<non-empty-string>, configure-options?: list<array{name: string, description?: string}>}
 pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     /// Returns the package's name without version info, thus not a unique identifier
-    ///
-    /// @return string package name
     fn get_name(&self) -> &str;
 
     /// Returns the package's pretty (i.e. with proper case) name
-    ///
-    /// @return string package name
     fn get_pretty_name(&self) -> &str;
 
     /// Returns a set of names that could refer to this package
     ///
     /// No version or release type information should be included in any of the
     /// names. Provided or replaced package names need to be returned as well.
-    ///
-    /// @param bool $provides Whether provided names should be included
-    ///
-    /// @return string[] An array of strings referring to this package
     fn get_names(&self, provides: bool) -> Vec<String>;
 
     /// Allows the solver to set an id for this package to refer to it.
     fn set_id(&mut self, id: i64);
 
     /// Retrieves the package's id set through setId
-    ///
-    /// @return int The previously set package id
     fn get_id(&self) -> i64;
 
     /// Returns whether the package is a development virtual package or a concrete one
     fn is_dev(&self) -> bool;
 
     /// Returns the package type, e.g. library
-    ///
-    /// @return string The package type
     fn get_type(&self) -> String;
 
     /// Returns the package targetDir property
-    ///
-    /// @return ?string The package targetDir
     fn get_target_dir(&self) -> Option<String>;
 
     /// Returns the package extra data
-    ///
-    /// @return mixed[] The package extra data
     fn get_extra(&self) -> IndexMap<String, PhpMixed>;
 
     /// Sets source from which this package was installed (source/dist).
-    ///
-    /// @param ?string $type source/dist
     fn set_installation_source(&mut self, r#type: Option<String>);
 
     /// Returns source from which this package was installed (source/dist).
-    ///
-    /// @return ?string source/dist
     fn get_installation_source(&self) -> Option<String>;
 
     /// Returns the repository type of this package, e.g. git, svn
-    ///
-    /// @return ?string The repository type
     fn get_source_type(&self) -> Option<String>;
 
     /// Returns the repository url of this package, e.g. git://github.com/naderman/composer.git
-    ///
-    /// @return ?string The repository url
     fn get_source_url(&self) -> Option<String>;
 
     /// Returns the repository urls of this package including mirrors, e.g. git://github.com/naderman/composer.git
     fn get_source_urls(&self) -> Vec<String>;
 
     /// Returns the repository reference of this package, e.g. master, 1.0.0 or a commit hash for git
-    ///
-    /// @return ?string The repository reference
     fn get_source_reference(&self) -> Option<String>;
 
     /// Returns the source mirrors of this package
@@ -107,8 +77,6 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn set_source_mirrors(&mut self, mirrors: Option<Vec<Mirror>>);
 
     /// Returns the type of the distribution archive of this version, e.g. zip, tarball
-    ///
-    /// @return ?string The repository type
     fn get_dist_type(&self) -> Option<String>;
 
     /// Returns the url of the distribution archive of this version
@@ -131,22 +99,12 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     fn set_dist_mirrors(&mut self, mirrors: Option<Vec<Mirror>>);
 
     /// Returns the version of this package
-    ///
-    /// @return string version
     fn get_version(&self) -> &str;
 
     /// Returns the pretty (i.e. non-normalized) version string of this package
-    ///
-    /// @return string version
     fn get_pretty_version(&self) -> &str;
 
     /// Returns the pretty version string plus a git or hg commit hash of this package
-    ///
-    /// @see getPrettyVersion
-    ///
-    /// @param  bool   $truncate    If the source reference is a sha1 hash, truncate it
-    /// @param  int    $displayMode One of the DISPLAY_ constants on this interface determining display of references
-    /// @return string version
     fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> String;
 
     /// Returns the release date of the package
@@ -157,38 +115,26 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
 
     /// Returns a set of links to packages which need to be installed before
     /// this package can be installed
-    ///
-    /// @return array<string, Link> A map of package links defining required packages, indexed by the require package's name
     fn get_requires(&self) -> std::rc::Rc<IndexMap<String, Link>>;
 
     /// Returns a set of links to packages which must not be installed at the
     /// same time as this package
-    ///
-    /// @return array<string, Link> A map of package links defining conflicting packages
     fn get_conflicts(&self) -> std::rc::Rc<IndexMap<String, Link>>;
 
     /// Returns a set of links to virtual packages that are provided through
     /// this package
-    ///
-    /// @return array<string, Link> A map of package links defining provided packages
     fn get_provides(&self) -> std::rc::Rc<IndexMap<String, Link>>;
 
     /// Returns a set of links to packages which can alternatively be
     /// satisfied by installing this package
-    ///
-    /// @return array<string, Link> A map of package links defining replaced packages
     fn get_replaces(&self) -> std::rc::Rc<IndexMap<String, Link>>;
 
     /// Returns a set of links to packages which are required to develop
     /// this package. These are installed if in dev mode.
-    ///
-    /// @return array<string, Link> A map of package links defining packages required for development, indexed by the require package's name
     fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<String, Link>>;
 
     /// Returns a set of package names and reasons why they are useful in
     /// combination with this package.
-    ///
-    /// @return array An array of package suggestions with descriptions
     fn get_suggests(&self) -> IndexMap<String, String>;
 
     /// Stands in for PHP's `$package->{'get'.ucfirst($linkType)}()`, so `link_type` is one of the
@@ -213,8 +159,6 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     ///
     /// Type is either "psr-4", "psr-0", "classmap" or "files". Namespaces are mapped to
     /// directories for autoloading using the type specified.
-    ///
-    /// @return array Mapping of autoloading rules
     fn get_autoload(&self) -> IndexMap<String, PhpMixed>;
 
     /// Returns an associative array of dev autoloading rules
@@ -223,8 +167,6 @@ pub trait PackageInterface: std::fmt::Display + std::fmt::Debug {
     ///
     /// Type is either "psr-4", "psr-0", "classmap" or "files". Namespaces are mapped to
     /// directories for autoloading using the type specified.
-    ///
-    /// @return array Mapping of dev autoloading rules
     fn get_dev_autoload(&self) -> IndexMap<String, PhpMixed>;
 
     /// Returns a list of directories which should get added to PHP's

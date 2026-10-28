@@ -20,8 +20,6 @@ static IS_DOCKER: Mutex<Option<bool>> = Mutex::new(None);
 
 impl Platform {
     /// getcwd() equivalent which always returns a string
-    ///
-    /// @throws \RuntimeException
     pub fn get_cwd(allow_empty: bool) -> anyhow::Result<String> {
         // TODO(bytes): the cwd is returned as a String.
         let mut cwd = getcwd().map(|cwd| {
@@ -136,8 +134,6 @@ impl Platform {
         .expect("the replacement callback cannot fail")
     }
 
-    /// @throws \RuntimeException If the user home could not reliably be determined
-    /// @return string            The formal user home as detected from environment parameters
     pub fn get_user_directory() -> anyhow::Result<String> {
         if let Some(home) = Self::get_env("HOME") {
             return Ok(home);
@@ -164,7 +160,6 @@ impl Platform {
         Err(RuntimeException::new("Could not determine user directory".to_string()).into())
     }
 
-    /// @return bool Whether the host machine is running on the Windows Subsystem for Linux (WSL)
     pub fn is_windows_subsystem_for_linux() -> bool {
         let mut cached = IS_WINDOWS_SUBSYSTEM_FOR_LINUX.lock().unwrap();
         if cached.is_none() {
@@ -192,7 +187,6 @@ impl Platform {
         cached.unwrap()
     }
 
-    /// @return bool Whether the host machine is running a Windows OS
     pub fn is_windows() -> bool {
         defined("PHP_WINDOWS_VERSION_BUILD")
     }
@@ -246,7 +240,6 @@ impl Platform {
         false
     }
 
-    /// @return int    return a guaranteed binary length of the string, regardless of silly mbstring configs
     pub fn strlen(str: &str) -> i64 {
         static USE_MB_STRING: Mutex<Option<bool>> = Mutex::new(None);
         let mut use_mb_string = USE_MB_STRING.lock().unwrap();
@@ -263,7 +256,6 @@ impl Platform {
         strlen(str)
     }
 
-    /// @param  ?resource $fd Open file descriptor or null to default to STDOUT
     pub fn is_tty(fd: Option<PhpResource>) -> bool {
         let fd = fd.unwrap_or(shirabe_php_shim::STDOUT);
 

@@ -258,7 +258,6 @@ impl Rule {
         false
     }
 
-    /// @internal
     pub fn get_source_package(&self, pool: &Pool) -> anyhow::Result<BasePackageHandle> {
         let literals = self.get_literals();
 

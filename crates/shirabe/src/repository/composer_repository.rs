@@ -88,7 +88,6 @@ pub struct ComposerRepository {
     /// Weak reference to the outermost repository handle wrapping this `ComposerRepository`,
     /// injected via `set_self_handle`. Used to wire package -> repository back-references.
     self_weak: std::cell::RefCell<Option<RepositoryInterfaceWeakHandle>>,
-    /// @phpstan-var array{url: string, options?: mixed[], type?: 'composer', allow_ssl_downgrade?: bool}
     repo_config: IndexMap<String, PhpMixed>,
     options: IndexMap<String, PhpMixed>,
     /// non-empty-string
@@ -497,7 +496,6 @@ impl ComposerRepository {
         self.inner.get_packages()
     }
 
-    /// @param packageFilter Package pattern filter which can include "*" as a wildcard
     pub fn get_package_names(
         &mut self,
         package_filter: Option<&str>,
@@ -780,7 +778,6 @@ impl ComposerRepository {
         })
     }
 
-    /// @inheritDoc
     pub fn search(
         &mut self,
         query: String,
@@ -957,7 +954,6 @@ impl ComposerRepository {
             .is_some_and(|c| c.metadata || c.api_url.is_some()))
     }
 
-    /// @inheritDoc
     pub fn get_security_advisories(
         &mut self,
         mut package_constraint_map: IndexMap<String, AnyConstraint>,
@@ -1340,7 +1336,6 @@ impl ComposerRepository {
         Ok(self.has_providers)
     }
 
-    /// @param  name package name
     fn what_provides(
         &mut self,
         name: &str,
@@ -1670,7 +1665,6 @@ impl ComposerRepository {
         Ok(result)
     }
 
-    /// @inheritDoc
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         self.inner.initialize();
 
@@ -1748,7 +1742,6 @@ impl ComposerRepository {
         self.providers_url = Some(providers_url.into());
     }
 
-    /// @param packageNames array of package name => ConstraintInterface|null - if a constraint is provided, only packages matching it will be loaded
     #[tracing::instrument(skip_all)]
     fn load_async_packages(
         &mut self,
@@ -2056,7 +2049,6 @@ impl ComposerRepository {
         ]))
     }
 
-    /// @param name package name (must be lowercased already)
     fn is_version_acceptable(
         &self,
         constraint: Option<&AnyConstraint>,
@@ -3330,8 +3322,6 @@ impl ComposerRepository {
     }
 
     /// Checks if the package name is present in this lazy providers repo
-    ///
-    /// @return true if the package name is present in availablePackages or matched by availablePackagePatterns
     fn lazy_providers_repo_contains(&self, name: &str) -> anyhow::Result<bool> {
         if !self.has_available_package_list {
             return Err(LogicException::new("lazyProvidersRepoContains should not be called unless hasAvailablePackageList is true".to_string()).into());
@@ -3411,7 +3401,6 @@ impl RepositoryInterface for ComposerRepository {
             .contains_key(&package.get_unique_name()))
     }
 
-    /// @inheritDoc
     fn find_package(
         &mut self,
         name: &str,
@@ -3490,7 +3479,6 @@ impl RepositoryInterface for ComposerRepository {
         )
     }
 
-    /// @inheritDoc
     fn find_packages(
         &mut self,
         name: &str,

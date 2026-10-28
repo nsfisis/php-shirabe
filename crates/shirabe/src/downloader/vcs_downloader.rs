@@ -440,9 +440,6 @@ pub trait VcsDownloader:
     }
 
     /// Prompt the user to check if changes should be stashed/removed or the operation aborted
-    ///
-    /// @param  bool $update  if true (update) the changes can be stashed and reapplied after an update,
-    ///                       if false (remove) the changes should be assumed to be lost if the operation is not aborted
     async fn clean_changes(
         &self,
         package: PackageInterfaceHandle,

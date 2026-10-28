@@ -46,9 +46,7 @@ impl VersionFields for IndexMap<String, PhpMixed> {
 
 #[derive(Debug)]
 pub struct ArrayLoader {
-    /// @var VersionParser
     pub(crate) version_parser: VersionParser,
-    /// @var bool
     load_options: bool,
 }
 
@@ -627,10 +625,6 @@ impl ArrayLoader {
         Ok(())
     }
 
-    /// @param  string                    $source        source package name
-    /// @param  string                    $sourceVersion source package version (pretty version ideally)
-    /// @param  string                    $description   link description (e.g. requires, replaces, ..)
-    /// @param  array<string|int, string> $links         array of package name => constraint mappings
     pub fn parse_links(
         &self,
         source: &str,
@@ -657,11 +651,6 @@ impl ArrayLoader {
         Ok(res)
     }
 
-    /// @param  string       $source           source package name
-    /// @param  string       $sourceVersion    source package version (pretty version ideally)
-    /// @param  Link::TYPE_* $description      link description (e.g. requires, replaces, ..)
-    /// @param  string       $target           target package name
-    /// @param  string       $prettyConstraint constraint string
     fn create_link(
         &self,
         source: &str,
@@ -706,10 +695,6 @@ impl ArrayLoader {
     }
 
     /// Retrieves a branch alias (dev-master => 1.0.x-dev for example) if it exists
-    ///
-    /// @param mixed[] $config the entire package config
-    ///
-    /// @return string|null normalized version of the branch alias or null if there is none
     pub fn get_branch_alias(&self, config: &impl VersionFields) -> anyhow::Result<Option<String>> {
         if !config.contains_key("version") || !is_scalar(config.get("version").unwrap()) {
             return Err(

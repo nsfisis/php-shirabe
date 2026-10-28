@@ -34,19 +34,14 @@ pub enum CommandLine {
 
 #[derive(Debug)]
 pub struct ProcessExecutor {
-    /// @var bool
     capture_output: std::cell::Cell<bool>,
-    /// @var string
     error_output: std::cell::RefCell<String>,
-    /// @var ?IOInterface
     io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
-    /// @var int
     max_jobs: std::cell::Cell<i64>,
     /// PHP throttles async jobs through the $jobs queue and $maxJobs; here concurrent
     /// `execute_async`/`execute_async_php` calls hold a permit for the duration of the
     /// child process instead (same design as HttpDownloader).
     semaphore: std::cell::RefCell<std::rc::Rc<tokio::sync::Semaphore>>,
-    /// @var bool
     allow_async: std::cell::Cell<bool>,
     /// Test-only mock state. `None` in production; set via [`ProcessExecutor::__expects`] in tests.
     /// Mirrors `composer/tests/Composer/Test/Mock/ProcessExecutorMock.php`.
@@ -681,7 +676,6 @@ impl ProcessExecutor {
             std::rc::Rc::new(tokio::sync::Semaphore::new(self.max_jobs.get() as usize));
     }
 
-    /// @internal
     pub fn enable_async(&self) {
         self.allow_async.set(true);
     }
@@ -701,12 +695,10 @@ impl ProcessExecutor {
         self.error_output.borrow().clone()
     }
 
-    /// @return int the timeout in seconds
     pub fn get_timeout() -> i64 {
         *TIMEOUT.lock().unwrap()
     }
 
-    /// @param  int  $timeout the timeout in seconds
     pub fn set_timeout<T: ToTimeoutSeconds>(timeout: T) {
         *TIMEOUT.lock().unwrap() = timeout.to_timeout_seconds();
     }

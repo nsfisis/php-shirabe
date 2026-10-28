@@ -13,8 +13,6 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{DOMDocument, DOMNode, PhpMixed};
 
 /// XML descriptor.
-///
-/// @internal
 #[derive(Debug, Default)]
 pub struct XmlDescriptor {
     output: Option<std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>>,

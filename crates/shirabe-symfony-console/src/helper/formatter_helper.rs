@@ -18,8 +18,6 @@ impl FormatterHelper {
     }
 
     /// Formats a message as a block of text.
-    ///
-    /// @param string|array $messages The message to write in the block
     pub fn format_block(&self, messages: FormatBlockMessages, style: &str, large: bool) -> String {
         let messages = match messages {
             FormatBlockMessages::String(message) => vec![message],

@@ -16,25 +16,12 @@ use shirabe_semver::constraint::SimpleConstraint;
 /// Optimizes a given pool
 #[derive(Debug)]
 pub struct PoolOptimizer {
-    /// @var PolicyInterface
     policy: std::rc::Rc<dyn PolicyInterface>,
-
-    /// @var array<int, true>
     irremovable_packages: IndexMap<i64, bool>,
-
-    /// @var array<string, array<string, ConstraintInterface>>
     require_constraints_per_package: IndexMap<String, IndexMap<String, AnyConstraint>>,
-
-    /// @var array<string, array<string, ConstraintInterface>>
     conflict_constraints_per_package: IndexMap<String, IndexMap<String, AnyConstraint>>,
-
-    /// @var array<int, true>
     packages_to_remove: IndexMap<i64, bool>,
-
-    /// @var array<int, BasePackage[]>
     aliases_per_package: IndexMap<i64, Vec<BasePackageHandle>>,
-
-    /// @var array<string, array<string, string>>
     removed_versions_by_package: IndexMap<String, IndexMap<String, String>>,
 }
 
@@ -181,7 +168,6 @@ impl PoolOptimizer {
         }
     }
 
-    /// @return Pool Optimized pool
     #[tracing::instrument(skip_all)]
     fn apply_removals_to_pool(&self, pool: &Pool) -> Pool {
         let mut packages: Vec<BasePackageHandle> = vec![];

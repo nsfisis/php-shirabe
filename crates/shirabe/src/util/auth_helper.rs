@@ -19,16 +19,13 @@ use shirabe_php_shim::{
 pub struct AuthHelper {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
-    /// @var array<string, string> Map of origins to message displayed
     displayed_origin_authentications: IndexMap<String, String>,
-    /// @var array<string, bool> Map of URLs and whether they already retried with authentication from Bitbucket
     bitbucket_retry: IndexMap<String, bool>,
 }
 
 #[derive(Debug)]
 pub struct PromptAuthResult {
     pub retry: bool,
-    /// @phpstan-var 'prompt'|bool
     pub store_auth: StoreAuth,
 }
 
@@ -433,9 +430,6 @@ impl AuthHelper {
         })
     }
 
-    /// @param string[] $headers
-    ///
-    /// @return string[] updated headers array
     pub fn add_authentication_header(
         &mut self,
         headers: Vec<String>,
@@ -466,7 +460,6 @@ impl AuthHelper {
             .collect())
     }
 
-    /// @return array<string, mixed> updated options
     pub fn add_authentication_options(
         &mut self,
         mut options: IndexMap<String, PhpMixed>,
@@ -627,11 +620,6 @@ impl AuthHelper {
         Ok(options)
     }
 
-    /// @link https://github.com/composer/composer/issues/5584
-    ///
-    /// @param string $urlToBitBucketFile URL to a file at bitbucket.org.
-    ///
-    /// @return bool Whether the given URL is a public BitBucket download which requires no authentication.
     pub fn is_public_bit_bucket_download(&self, url_to_bit_bucket_file: &str) -> bool {
         let parsed = parse_url(url_to_bit_bucket_file);
         let domain_str = parsed

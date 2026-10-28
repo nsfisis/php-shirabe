@@ -48,14 +48,9 @@ pub struct GcFinderMock {
     pub by_accessed_time: Vec<std::path::PathBuf>,
 }
 
-/// @var bool|null
 static CACHE_COLLECTED: Mutex<Option<bool>> = Mutex::new(None);
 
 impl Cache {
-    /// @param string      $cacheDir   location of the cache
-    /// @param string      $allowlist  List of characters that are allowed in path names (used in a regex character class)
-    /// @param Filesystem  $filesystem optional filesystem instance
-    /// @param bool        $readOnly   whether the cache is in readOnly mode
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         cache_dir: &str,

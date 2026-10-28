@@ -39,7 +39,6 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
         &mut self.inner
     }
 
-    /// {@inheritdoc}
     fn write_prompt(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -128,7 +127,6 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
             .write(&[prompt], false, output_interface::OUTPUT_NORMAL);
     }
 
-    /// {@inheritdoc}
     fn write_error(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

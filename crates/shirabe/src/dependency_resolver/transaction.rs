@@ -17,21 +17,16 @@ use shirabe_php_shim::{
     uasort_map,
 };
 
-/// @internal
 #[derive(Debug, Clone)]
 pub struct Transaction {
-    /// @var OperationInterface[]
     operations: Vec<std::rc::Rc<AnyOperation>>,
 
     /// Packages present at the beginning of the transaction
-    /// @var PackageInterface[]
     present_packages: Vec<PackageInterfaceHandle>,
 
     /// Package set resulting from this transaction
-    /// @var array<string, PackageInterface>
     result_package_map: IndexMap<String, PackageInterfaceHandle>,
 
-    /// @var array<string, PackageInterface[]>
     result_packages_by_name: IndexMap<String, Vec<PackageInterfaceHandle>>,
 }
 
@@ -261,8 +256,6 @@ impl Transaction {
     /// While this does not fix the root-causes of https://github.com/composer/composer/issues/1147,
     /// it at least fixes the symptoms and makes usage of composer possible (again)
     /// in such scenarios.
-    ///
-    /// @return OperationInterface[] reordered operation list
     fn move_plugins_to_front(&self, mut operations: Vec<AnyOperation>) -> Vec<AnyOperation> {
         let mut dl_modifying_plugins_no_deps: Vec<AnyOperation> = vec![];
         let mut dl_modifying_plugins_with_deps: Vec<AnyOperation> = vec![];
@@ -361,8 +354,6 @@ impl Transaction {
 
     /// Removals of packages should be executed before installations in
     /// case two packages resolve to the same path (due to custom installers)
-    ///
-    /// @return OperationInterface[] reordered operation list
     fn move_uninstalls_to_front(&self, mut operations: Vec<AnyOperation>) -> Vec<AnyOperation> {
         let mut uninst_ops: Vec<AnyOperation> = vec![];
         let mut to_remove: Vec<usize> = vec![];

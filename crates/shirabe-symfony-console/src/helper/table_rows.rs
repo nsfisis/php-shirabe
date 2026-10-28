@@ -2,8 +2,6 @@
 
 use crate::helper::Row;
 
-/// @internal
-///
 /// In PHP this wraps a `\Closure` yielding a `\Traversable` of row groups. The generator
 /// borrows the Table to lazily call `fillCells()`. For the Rust port we precompute the row
 /// groups eagerly (see `Table::build_table_rows`) and store them here.

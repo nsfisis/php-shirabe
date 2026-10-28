@@ -10,8 +10,6 @@ use shirabe_symfony_process::exception::ProcessFailedException;
 use shirabe_symfony_process::process::Process;
 
 /// The ProcessHelper class provides helpers to run external processes.
-///
-/// @final
 #[derive(Debug, Default)]
 pub struct ProcessHelper {
     inner: Helper,
@@ -33,10 +31,6 @@ pub enum ProcessHelperCmdElement {
 
 impl ProcessHelper {
     /// Runs an external process.
-    ///
-    /// @param array|Process $cmd      An instance of Process or an array of the command and arguments
-    /// @param callable|null $callback A PHP callback to run whenever there is some
-    ///                                output available on STDOUT or STDERR
     pub fn run(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -186,14 +180,6 @@ impl ProcessHelper {
     ///
     /// This is identical to run() except that an exception is thrown if the process
     /// exits with a non-zero exit code.
-    ///
-    /// @param array|Process $cmd      An instance of Process or a command to run
-    /// @param callable|null $callback A PHP callback to run whenever there is some
-    ///                                output available on STDOUT or STDERR
-    ///
-    /// @throws ProcessFailedException
-    ///
-    /// @see run()
     pub fn must_run(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,

@@ -55,7 +55,6 @@ use std::path::PathBuf;
 pub struct CreateProjectCommand {
     base_command_data: BaseCommandData,
 
-    /// @var SuggestedPackagesReporter
     suggested_packages_reporter:
         std::cell::RefCell<Option<std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>>>,
 }
@@ -83,7 +82,6 @@ impl CreateProjectCommand {
         command
     }
 
-    /// @throws \Exception
     #[allow(clippy::too_many_arguments)]
     pub async fn install_project(
         &self,
@@ -422,7 +420,6 @@ impl CreateProjectCommand {
         Ok(0)
     }
 
-    /// @throws \Exception
     #[allow(clippy::too_many_arguments)]
     async fn install_root_package(
         &self,

@@ -32,7 +32,6 @@ pub struct Git {
     http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
 }
 
-/// @var string|false|null
 static VERSION: Mutex<Option<Option<String>>> = Mutex::new(None);
 
 impl Git {
@@ -51,7 +50,6 @@ impl Git {
         }
     }
 
-    /// @param IOInterface|null $io If present, a warning is output there instead of throwing, so pass this in only for cases where this is a soft failure
     pub fn check_for_repo_ownership_error(
         output: &str,
         path: &str,
@@ -91,9 +89,6 @@ impl Git {
     /// %sanitizedUrl% is also automatically replaced by the url without user/pass
     ///
     /// As soon as a single command fails it will halt, so assume the commands are run as && in bash
-    ///
-    /// @param mixed $commandOutput  the output will be written into this var if passed by ref
-    ///                              if a callable is passed it will be used as output handler
     pub fn run_commands(
         &mut self,
         commands: Vec<Vec<String>>,
@@ -120,7 +115,6 @@ impl Git {
             }));
         }
 
-        // @phpstan-ignore method.deprecated
         self.run_command(callables, url, cwd, initial_clone, command_output)
     }
 
@@ -137,8 +131,6 @@ impl Git {
         self.run_command(command_callable, url, cwd, initial_clone, command_output)
     }
 
-    /// @param mixed       $commandOutput  the output will be written into this var if passed by ref
-    ///                                    if a callable is passed it will be used as output handler
     fn run_command(
         &mut self,
         command_callable: Vec<Box<dyn Fn(&str) -> CommandLine>>,
@@ -239,7 +231,6 @@ impl Git {
 
         let protocols = self.config.borrow_mut().get("github-protocols");
         // public github, autoswitch protocols
-        // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
         if let Some(m) = preg_match(
             format!(
                 "{{^(?:https?|git)://{}/(.*)}}",
@@ -333,7 +324,6 @@ impl Git {
         {
             let mut error_msg = self.process.borrow().get_error_output().to_string();
             // private github repository without ssh key access, try https with auth
-            // @phpstan-ignore composerPcre.maybeUnsafeStrictGroups
             let github_matched = preg_match(
                 format!(
                     "{{^git@{}:(.+?)\\.git$}}i",
@@ -988,8 +978,6 @@ impl Git {
     }
 
     /// Checks if git version supports --no-commit-header flag (git 2.33+)
-    ///
-    /// @internal
     pub fn supports_no_commit_header_flag(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> anyhow::Result<bool> {
@@ -1001,9 +989,6 @@ impl Git {
     }
 
     /// Builds a git rev-list command with --no-commit-header flag when supported (git 2.33+)
-    ///
-    /// @internal
-    /// @param list<string> $arguments Additional arguments for git rev-list
     pub fn build_rev_list_command(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         arguments: Vec<String>,
@@ -1021,8 +1006,6 @@ impl Git {
     ///
     /// When --no-commit-header is not available (git < 2.33), git rev-list --format outputs
     /// "commit <hash>" before formatted output. This removes those lines.
-    ///
-    /// @internal
     pub fn parse_rev_list_output(
         output: &str,
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -1268,8 +1251,6 @@ impl Git {
     }
 
     /// Retrieves the current git version.
-    ///
-    /// @return string|null The git version number, if present.
     pub fn get_version(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> anyhow::Result<Option<String>> {

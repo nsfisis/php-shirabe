@@ -38,7 +38,6 @@ use shirabe_symfony_console::output::OutputInterface;
 pub struct InitCommand {
     base_command_data: BaseCommandData,
 
-    /// @var array<string, string>
     git_config: std::cell::RefCell<Option<IndexMap<String, String>>>,
     repos: std::cell::RefCell<Option<crate::repository::RepositoryInterfaceHandle>>,
     repository_sets: std::cell::RefCell<
@@ -485,7 +484,6 @@ impl Command for InitCommand {
         Ok(())
     }
 
-    /// @throws \Seld\JsonLint\ParsingException
     async fn execute(
         &self,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
