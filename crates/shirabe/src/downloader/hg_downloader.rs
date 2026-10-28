@@ -1,17 +1,13 @@
 //! ref: composer/src/Composer/Downloader/HgDownloader.php
 
 use crate::config::Config;
-use crate::downloader::ChangeReportInterface;
-use crate::downloader::DownloaderInterface;
-use crate::downloader::VcsCapableDownloaderInterface;
-use crate::downloader::VcsDownloader;
-use crate::downloader::VcsDownloaderBase;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::downloader::{
+    ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
+    VcsDownloaderBase,
+};
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::PackageInterfaceHandle;
-use crate::util::Filesystem;
-use crate::util::Hg as HgUtils;
-use crate::util::ProcessExecutor;
+use crate::util::{Filesystem, Hg as HgUtils, ProcessExecutor};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class, realpath};
 

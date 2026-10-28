@@ -4,24 +4,14 @@ use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::loader::ArrayLoader;
-use crate::package::loader::LoaderInterface;
-use crate::package::version::VersionGuesser;
-use crate::package::version::VersionParser;
-use crate::repository::ArrayRepository;
-use crate::repository::ConfigurableRepositoryInterface;
-use crate::repository::RepositoryInterfaceWeakHandle;
+use crate::package::loader::{ArrayLoader, LoaderInterface};
+use crate::package::version::{VersionGuesser, VersionParser};
+use crate::package::{BasePackageHandle, PackageInterfaceHandle};
 use crate::repository::{
-    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
+    ArrayRepository, ConfigurableRepositoryInterface, FindPackageConstraint, LoadPackagesResult,
+    ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
 };
-use crate::util::Filesystem;
-use crate::util::Git as GitUtil;
-use crate::util::HttpDownloader;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
-use crate::util::Url;
+use crate::util::{Filesystem, Git as GitUtil, HttpDownloader, Platform, ProcessExecutor, Url};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined, dirname, file_exists,

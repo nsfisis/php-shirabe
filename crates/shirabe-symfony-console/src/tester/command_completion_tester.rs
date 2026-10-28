@@ -1,8 +1,7 @@
 //! ref: composer/vendor/symfony/console/Tester/CommandCompletionTester.php
 
 use crate::command::Command;
-use crate::completion::CompletionInput;
-use crate::completion::CompletionSuggestions;
+use crate::completion::{CompletionInput, CompletionSuggestions};
 
 /// Eases the testing of command completion.
 #[derive(Debug)]

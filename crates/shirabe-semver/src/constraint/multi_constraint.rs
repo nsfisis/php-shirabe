@@ -1,8 +1,6 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/MultiConstraint.php
 
-use crate::constraint::AnyConstraint;
-use crate::constraint::Bound;
-use crate::constraint::MatchAllConstraint;
+use crate::constraint::{AnyConstraint, Bound, MatchAllConstraint};
 use shirabe_php_shim::CmpOp;
 use std::sync::OnceLock;
 

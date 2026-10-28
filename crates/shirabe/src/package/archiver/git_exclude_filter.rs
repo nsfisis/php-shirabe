@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Package/Archiver/GitExcludeFilter.php
 
-use crate::package::archiver::BaseExcludeFilter;
-use crate::package::archiver::BaseExcludeFilterBase;
+use crate::package::archiver::{BaseExcludeFilter, BaseExcludeFilterBase};
 use shirabe_php_shim::{php_regex, preg_split};
 use std::path::Path;
 

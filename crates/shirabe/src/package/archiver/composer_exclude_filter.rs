@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Package/Archiver/ComposerExcludeFilter.php
 
-use super::BaseExcludeFilter;
-use super::BaseExcludeFilterBase;
+use super::{BaseExcludeFilter, BaseExcludeFilterBase};
 
 #[derive(Debug)]
 pub struct ComposerExcludeFilter {

@@ -1,7 +1,6 @@
 //! ref: composer/vendor/symfony/console/Cursor.php
 
-use crate::output::OutputInterface;
-use crate::output::output_interface;
+use crate::output::{OutputInterface, output_interface};
 use shirabe_php_shim::{PhpResource, STDIN};
 
 #[derive(Debug)]

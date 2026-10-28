@@ -10,8 +10,7 @@ use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::plugin::plugin_interface;
 use shirabe::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
 use shirabe::util::process_executor::ProcessExecutor;
-use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{LogicException, PhpMixed, hash};
+use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, hash};
 use tempfile::TempDir;
 
 fn null_io() -> std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {

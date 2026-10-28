@@ -2,11 +2,9 @@
 
 use crate::formatter::OutputFormatter;
 use crate::helper::{QuestionHelper, QuestionHelperInterface};
-use crate::output::OutputInterface;
-use crate::output::output_interface;
+use crate::output::{OutputInterface, output_interface};
 use crate::question::QuestionInterface;
-use crate::style::StyleInterface;
-use crate::style::SymfonyStyle;
+use crate::style::{StyleInterface, SymfonyStyle};
 use shirabe_php_shim::{Exception, PhpMixed, boolval, explode, php_os_family, trim};
 use std::ops::{Deref, DerefMut};
 

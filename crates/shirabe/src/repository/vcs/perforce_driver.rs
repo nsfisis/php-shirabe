@@ -4,10 +4,8 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::io::IOInterface;
 use crate::repository::vcs::VcsDriverBase;
-use crate::util::Perforce;
-use crate::util::PerforceInterface;
-use crate::util::ProcessExecutor;
 use crate::util::http::Response;
+use crate::util::{Perforce, PerforceInterface, ProcessExecutor};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     BadMethodCallException, PhpMixed, RuntimeException, php_regex, preg_is_match,

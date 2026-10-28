@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Config/JsonConfigSourceTest.php
 
 use indexmap::IndexMap;
-use shirabe::config::ConfigSourceInterface;
-use shirabe::config::JsonConfigSource;
+use shirabe::config::{ConfigSourceInterface, JsonConfigSource};
 use shirabe::json::JsonFile;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_shim::PhpMixed;

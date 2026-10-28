@@ -1,25 +1,18 @@
 //! ref: composer/src/Composer/Command/AuditCommand.php
 
-use crate::advisory::AuditConfig;
-use crate::advisory::Auditor;
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
+use crate::advisory::{AuditConfig, Auditor};
 use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
-use crate::console::input::InputOption;
-use crate::console::input::SuggestedValues;
+use crate::console::input::{InputOption, SuggestedValues};
 use crate::io::IOInterfaceImmutable;
-use crate::repository::InstalledRepository;
-use crate::repository::RepositoryInterface;
-use crate::repository::RepositorySet;
-use crate::repository::RepositoryUtils;
+use crate::repository::{InstalledRepository, RepositoryInterface, RepositorySet, RepositoryUtils};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, impl_php_class, implode,
     in_array_strict,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]

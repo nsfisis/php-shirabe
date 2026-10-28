@@ -1,8 +1,7 @@
 //! ref: composer/vendor/symfony/console/Helper/Table.php
 
 use crate::exception::InvalidArgumentException;
-use crate::formatter::OutputFormatter;
-use crate::formatter::WrappableOutputFormatterInterface;
+use crate::formatter::{OutputFormatter, WrappableOutputFormatterInterface};
 use crate::helper::{
     Helper, TableCell, TableCellOption, TableCellStyle, TableRows, TableSeparator, TableStyle,
 };

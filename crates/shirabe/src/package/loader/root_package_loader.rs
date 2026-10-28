@@ -1,19 +1,12 @@
 //! ref: composer/src/Composer/Package/Loader/RootPackageLoader.php
 
 use crate::config::Config;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::package::loader::ArrayLoader;
-use crate::package::loader::LoaderInterface;
-use crate::package::loader::ValidatingArrayLoader;
-use crate::package::version::VersionGuesser;
-use crate::package::version::VersionGuesserInterface;
-use crate::package::version::VersionParser;
+use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::package::loader::{ArrayLoader, LoaderInterface, ValidatingArrayLoader};
+use crate::package::version::{VersionGuesser, VersionGuesserInterface, VersionParser};
 use crate::package::{RootPackage, STABILITIES, SUPPORTED_LINK_TYPES};
-use crate::repository::RepositoryFactory;
-use crate::repository::RepositoryManager;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
+use crate::repository::{RepositoryFactory, RepositoryManager};
+use crate::util::{Platform, ProcessExecutor};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

@@ -3,8 +3,7 @@
 use indexmap::IndexMap;
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
 use shirabe::config::Config;
-use shirabe::event_dispatcher::Event as BaseEvent;
-use shirabe::event_dispatcher::EventInterface;
+use shirabe::event_dispatcher::{Event as BaseEvent, EventInterface};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::package::{RootPackageHandle, RootPackageInterfaceHandle};

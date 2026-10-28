@@ -1,17 +1,12 @@
 //! ref: composer/src/Composer/DependencyResolver/Transaction.php
 
-use crate::dependency_resolver::operation::AnyOperation;
-use crate::dependency_resolver::operation::InstallOperation;
-use crate::dependency_resolver::operation::MarkAliasInstalledOperation;
-use crate::dependency_resolver::operation::MarkAliasUninstalledOperation;
-use crate::dependency_resolver::operation::UninstallOperation;
-use crate::dependency_resolver::operation::UpdateOperation;
-use crate::package::AliasPackageHandle;
-use crate::package::Link;
-use crate::package::PackageInterfaceHandle;
+use crate::dependency_resolver::operation::{
+    AnyOperation, InstallOperation, MarkAliasInstalledOperation, MarkAliasUninstalledOperation,
+    UninstallOperation, UpdateOperation,
+};
+use crate::package::{AliasPackageHandle, Link, PackageInterfaceHandle};
 use crate::repository::PlatformRepository;
-use indexmap::IndexMap;
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
     PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, strcmp, uasort,
     uasort_map,

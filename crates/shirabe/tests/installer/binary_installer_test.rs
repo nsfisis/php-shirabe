@@ -5,8 +5,7 @@ use base64::Engine;
 use shirabe::installer::BinaryInstaller;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
-use shirabe::util::Filesystem;
-use shirabe::util::ProcessExecutor;
+use shirabe::util::{Filesystem, ProcessExecutor};
 use std::fs;
 use tempfile::TempDir;
 

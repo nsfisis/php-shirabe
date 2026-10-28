@@ -2,9 +2,7 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::ProgressBar;
-use crate::output::ConsoleOutputInterface;
-use crate::output::OUTPUT_NORMAL;
-use crate::output::OutputInterface;
+use crate::output::{ConsoleOutputInterface, OUTPUT_NORMAL, OutputInterface};
 use shirabe_php_shim::{AsAny, PHP_EOL, str_repeat};
 
 /// Decorates output to add console style guide helpers.

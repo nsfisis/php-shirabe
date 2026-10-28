@@ -2,27 +2,20 @@
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::console::input::InputOption;
-use crate::console::input::SuggestedValues;
+use crate::console::input::{InputOption, SuggestedValues};
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
-use crate::repository::RepositoryInterface;
-use crate::repository::RepositoryUtils;
-use crate::util::PackageInfo;
-use crate::util::PackageSorter;
+use crate::plugin::{CommandEvent, PluginEvents};
+use crate::repository::{RepositoryInterface, RepositoryUtils};
+use crate::util::{PackageInfo, PackageSorter};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException, impl_php_class};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::helper::Row;
-use shirabe_symfony_console::helper::Table;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::helper::{Row, Table};
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
-use shirabe_symfony_console::style::StyleInterface;
-use shirabe_symfony_console::style::SymfonyStyle;
+use shirabe_symfony_console::style::{StyleInterface, SymfonyStyle};
 
 #[derive(Debug)]
 pub struct LicensesCommand {

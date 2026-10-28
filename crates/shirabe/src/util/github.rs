@@ -2,15 +2,12 @@
 
 use crate::config::Config;
 use crate::factory::Factory;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::util::HttpDownloader;
-use crate::util::ProcessExecutor;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::util::{HttpDownloader, ProcessExecutor};
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, rawurlencode};
 use shirabe_php_shim::{
-    PhpMixed, date_local, in_array_loose, php_regex, preg_is_match, preg_match, stripos, strtolower,
+    Catch as _, PhpMixed, date_local, in_array_loose, php_regex, preg_is_match, preg_match,
+    rawurlencode, stripos, strtolower,
 };
 
 #[derive(Debug)]

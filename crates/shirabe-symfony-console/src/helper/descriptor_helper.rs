@@ -1,14 +1,11 @@
 //! ref: composer/vendor/symfony/console/Helper/DescriptorHelper.php
 
-use crate::descriptor::JsonDescriptor;
-use crate::descriptor::MarkdownDescriptor;
-use crate::descriptor::TextDescriptor;
-use crate::descriptor::XmlDescriptor;
-use crate::descriptor::{DescribableObject, DescriptorInterface};
+use crate::descriptor::{
+    DescribableObject, DescriptorInterface, JsonDescriptor, MarkdownDescriptor, TextDescriptor,
+    XmlDescriptor,
+};
 use crate::exception::InvalidArgumentException;
-use crate::helper::Helper;
-use crate::helper::HelperInterface;
-use crate::helper::HelperSet;
+use crate::helper::{Helper, HelperInterface, HelperSet};
 use crate::output::OutputInterface;
 use bstr::ByteSlice;
 use indexmap::IndexMap;

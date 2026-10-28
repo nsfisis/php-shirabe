@@ -6,8 +6,7 @@ use crate::io_mock::{Expectation, IOMock, get_io_mock};
 use crate::process_executor_mock::get_process_executor_mock;
 use indexmap::IndexMap;
 use shirabe::config::{Config, ConfigSourceInterface};
-use shirabe::io::IOInterface;
-use shirabe::io::io_interface;
+use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::Bitbucket;
 use shirabe::util::http_downloader::{
     HttpDownloader, HttpDownloaderMockExpectation, HttpDownloaderMockHandler,

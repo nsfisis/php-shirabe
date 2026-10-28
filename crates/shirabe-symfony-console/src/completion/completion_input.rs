@@ -1,9 +1,6 @@
 //! ref: composer/vendor/symfony/console/Completion/CompletionInput.php
 
-use crate::input::ArgvInput;
-use crate::input::InputDefinition;
-use crate::input::InputOption;
-use crate::input::InputValue;
+use crate::input::{ArgvInput, InputDefinition, InputOption, InputValue};
 use shirabe_php_shim::{explode_with_limit, ltrim, php_regex, preg_match_all, rtrim, substr, trim};
 
 /// An input specialized for shell completion.

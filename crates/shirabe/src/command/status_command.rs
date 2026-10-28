@@ -1,15 +1,12 @@
 //! ref: composer/src/Composer/Command/StatusCommand.php
 
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
 use crate::package::dumper::ArrayDumper;
-use crate::package::version::VersionGuesser;
-use crate::package::version::VersionParser;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
+use crate::package::version::{VersionGuesser, VersionParser};
+use crate::plugin::{CommandEvent, PluginEvents};
 use crate::script::ScriptEvents;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;

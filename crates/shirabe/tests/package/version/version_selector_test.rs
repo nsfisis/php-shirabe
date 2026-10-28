@@ -3,18 +3,15 @@
 use crate::test_case::get_package;
 use indexmap::IndexMap;
 use shirabe::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
-use shirabe::io::BufferIO;
-use shirabe::io::IOInterface;
-use shirabe::package::BasePackageHandle;
-use shirabe::package::CompleteAliasPackageHandle;
-use shirabe::package::CompletePackageHandle;
-use shirabe::package::Link;
-use shirabe::package::PackageInterfaceHandle;
+use shirabe::io::{BufferIO, IOInterface};
 use shirabe::package::handle::PackageHandle;
 use shirabe::package::version::VersionSelector;
 use shirabe::package::version::version_parser::VersionParser;
-use shirabe::repository::PlatformRepository;
-use shirabe::repository::RepositorySetInterface;
+use shirabe::package::{
+    BasePackageHandle, CompleteAliasPackageHandle, CompletePackageHandle, Link,
+    PackageInterfaceHandle,
+};
+use shirabe::repository::{PlatformRepository, RepositorySetInterface};
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_symfony_console::output::output_interface;

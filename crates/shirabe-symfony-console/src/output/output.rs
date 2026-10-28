@@ -1,7 +1,6 @@
 //! ref: composer/vendor/symfony/console/Output/Output.php
 
-use crate::formatter::OutputFormatter;
-use crate::formatter::OutputFormatterInterface;
+use crate::formatter::{OutputFormatter, OutputFormatterInterface};
 use crate::output::{
     OUTPUT_NORMAL, OUTPUT_PLAIN, OUTPUT_RAW, VERBOSITY_DEBUG, VERBOSITY_NORMAL, VERBOSITY_QUIET,
     VERBOSITY_VERBOSE, VERBOSITY_VERY_VERBOSE,

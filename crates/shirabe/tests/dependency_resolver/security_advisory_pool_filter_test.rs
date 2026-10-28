@@ -6,8 +6,7 @@
 // and run the Auditor.
 
 use indexmap::IndexMap;
-use shirabe::advisory::AuditConfig;
-use shirabe::advisory::Auditor;
+use shirabe::advisory::{AuditConfig, Auditor};
 use shirabe::dependency_resolver::SecurityAdvisoryPoolFilter;
 use shirabe::dependency_resolver::pool::Pool;
 use shirabe::dependency_resolver::request::Request;

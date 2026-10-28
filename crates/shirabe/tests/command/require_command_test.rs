@@ -6,8 +6,7 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::json::JsonFile;
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 fn input(pairs: Vec<(&str, InputValue)>) -> Vec<(ParameterName, InputValue)> {
     pairs

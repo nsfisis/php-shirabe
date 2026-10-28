@@ -1,9 +1,6 @@
 //! ref: composer/src/Composer/IO/NullIO.php
 
-use crate::io::BaseIO;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::IOInterfaceMutable;
+use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
 use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]

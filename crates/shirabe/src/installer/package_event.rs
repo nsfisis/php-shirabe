@@ -2,8 +2,7 @@
 
 use crate::composer::ComposerWeakHandle;
 use crate::dependency_resolver::operation::AnyOperation;
-use crate::event_dispatcher::Event;
-use crate::event_dispatcher::EventInterface;
+use crate::event_dispatcher::{Event, EventInterface};
 use crate::io::IOInterface;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use indexmap::IndexMap;

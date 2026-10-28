@@ -1,8 +1,7 @@
 //! ref: composer/src/Composer/Plugin/PrePoolCreateEvent.php
 
 use crate::dependency_resolver::Request;
-use crate::event_dispatcher::Event;
-use crate::event_dispatcher::EventInterface;
+use crate::event_dispatcher::{Event, EventInterface};
 use crate::package::BasePackageHandle;
 use crate::repository::RepositoryInterfaceHandle;
 use indexmap::IndexMap;

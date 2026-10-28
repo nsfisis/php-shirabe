@@ -1,10 +1,7 @@
 //! ref: composer/vendor/symfony/console/Input/InputDefinition.php
 
-use crate::exception::InvalidArgumentException;
-use crate::exception::LogicException;
-use crate::input::InputArgument;
-use crate::input::InputOption;
-use crate::input::InputValue;
+use crate::exception::{InvalidArgumentException, LogicException};
+use crate::input::{InputArgument, InputOption, InputValue};
 use indexmap::IndexMap;
 use shirabe_php_shim::{explode, implode, strtoupper};
 

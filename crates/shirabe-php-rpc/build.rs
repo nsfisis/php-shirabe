@@ -4,8 +4,7 @@
 //! ref: composer/src/Composer/Compiler.php
 
 use std::io::Write as _;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// The directory names Symfony's `Finder::ignoreVCS(true)` excludes.
 const VCS_DIRECTORIES: &[&str] = &[

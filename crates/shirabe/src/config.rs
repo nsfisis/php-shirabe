@@ -6,7 +6,7 @@ mod json_config_source;
 pub use config_source_interface::*;
 pub use json_config_source::*;
 
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -19,10 +19,7 @@ use shirabe_php_shim::{
 
 use crate::advisory::Auditor;
 use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
+use crate::util::{Platform, ProcessExecutor};
 
 #[derive(Debug)]
 pub struct Config {

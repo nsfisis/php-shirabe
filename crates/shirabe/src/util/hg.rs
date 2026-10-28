@@ -1,10 +1,8 @@
 //! ref: composer/src/Composer/Util/Hg.php
 
 use crate::config::Config;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::util::ProcessExecutor;
-use crate::util::Url;
+use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::util::{ProcessExecutor, Url};
 use shirabe_php_shim::{php_regex, preg_match, rawurlencode};
 use std::sync::Mutex;
 

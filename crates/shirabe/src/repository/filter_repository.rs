@@ -1,12 +1,9 @@
 //! ref: composer/src/Composer/Repository/FilterRepository.php
 
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::base_package::{self};
-use crate::repository::{AdvisoryProviderInterface, SecurityAdvisoryResult};
+use crate::package::{BasePackageHandle, PackageInterfaceHandle, base_package};
 use crate::repository::{
-    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
-    RepositoryInterfaceHandle, SearchResult,
+    AdvisoryProviderInterface, FindPackageConstraint, LoadPackagesResult, ProviderInfo,
+    RepositoryInterface, RepositoryInterfaceHandle, SearchResult, SecurityAdvisoryResult,
 };
 use bstr::ByteSlice;
 use indexmap::IndexMap;

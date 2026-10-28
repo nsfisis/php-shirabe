@@ -27,15 +27,12 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
-use shirabe_symfony_console::input::ArrayInput;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
-use shirabe_symfony_console::input::StreamableInputInterface;
-use shirabe_symfony_console::output::ConsoleOutput;
-use shirabe_symfony_console::output::ConsoleOutputInterface;
-use shirabe_symfony_console::output::OutputInterface;
-use shirabe_symfony_console::output::StreamOutput;
+use shirabe_symfony_console::input::{
+    ArrayInput, InputInterface, InputValue, ParameterName, StreamableInputInterface,
+};
+use shirabe_symfony_console::output::{
+    ConsoleOutput, ConsoleOutputInterface, OutputInterface, StreamOutput,
+};
 use std::path::PathBuf;
 use tempfile::TempDir;
 

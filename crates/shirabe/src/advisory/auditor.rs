@@ -1,14 +1,9 @@
 //! ref: composer/src/Composer/Advisory/Auditor.php
 
-use crate::advisory::AnySecurityAdvisory;
-use crate::advisory::SecurityAdvisory;
-use crate::io::ConsoleIO;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::advisory::{AnySecurityAdvisory, SecurityAdvisory};
+use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable};
 use crate::json::JsonFile;
-use crate::package::CompletePackageInterfaceHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::base_package;
+use crate::package::{CompletePackageInterfaceHandle, PackageInterfaceHandle, base_package};
 use crate::repository::RepositorySet;
 use crate::util::PackageInfo;
 use indexmap::IndexMap;

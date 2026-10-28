@@ -1,14 +1,9 @@
 //! ref: composer/vendor/symfony/console/Command/DumpCompletionCommand.php
 
 use crate::command::{Command, CommandData};
-use crate::completion::CompletionInput;
-use crate::completion::{CompletionSuggestions, StringOrSuggestion};
-use crate::input::InputArgument;
-use crate::input::InputInterface;
-use crate::input::InputOption;
-use crate::input::InputValue;
-use crate::output::OutputInterface;
-use crate::output::output_interface;
+use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};
+use crate::input::{InputArgument, InputInterface, InputOption, InputValue};
+use crate::output::{OutputInterface, output_interface};
 use shirabe_php_shim::{
     PHP_SERVER, PhpMixed, basename, file_exists, impl_php_class, realpath, str_replace_arrays,
     sys_get_temp_dir, touch,

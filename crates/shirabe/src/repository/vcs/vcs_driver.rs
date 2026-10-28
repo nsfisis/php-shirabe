@@ -4,16 +4,15 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
-use crate::json::JsonEncodeOptions;
-use crate::json::JsonFile;
+use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::VcsDriverInterface;
-use crate::util::HttpDownloader;
-use crate::util::ProcessExecutor;
 use crate::util::http::Response;
+use crate::util::{HttpDownloader, ProcessExecutor};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{DATE_RFC3339, PhpMixed, extension_loaded, php_regex, preg_is_match};
+use shirabe_php_shim::{
+    Catch as _, DATE_RFC3339, PhpMixed, extension_loaded, php_regex, preg_is_match,
+};
 
 #[derive(Debug)]
 pub struct VcsDriverBase {

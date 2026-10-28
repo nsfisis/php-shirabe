@@ -3,23 +3,15 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::repository::vcs::VcsDriverBase;
-use crate::util::Filesystem;
-use crate::util::Git as GitUtil;
-use crate::util::ProcessExecutor;
-use crate::util::Url;
-use chrono::TimeZone;
-use chrono::{DateTime, FixedOffset, Utc};
+use crate::util::{Filesystem, Git as GitUtil, ProcessExecutor, Url};
+use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, RuntimeException, dirname, is_dir, is_writable, preg_is_match,
-    preg_match, preg_replace, realpath, sys_get_temp_dir,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, dirname, is_dir, is_writable,
+    php_regex, preg_is_match, preg_match, preg_replace, realpath, sys_get_temp_dir,
 };
-use shirabe_php_shim::{PhpMixed, php_regex};
 
 #[derive(Debug)]
 pub struct GitDriver {

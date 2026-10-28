@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Plugin/PreFileDownloadEvent.php
 
-use crate::event_dispatcher::Event;
-use crate::event_dispatcher::EventInterface;
+use crate::event_dispatcher::{Event, EventInterface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::HttpDownloader;
 use indexmap::IndexMap;

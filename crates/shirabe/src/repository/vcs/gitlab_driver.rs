@@ -3,24 +3,19 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::json::JsonEncodeOptions;
-use crate::json::JsonFile;
-use crate::repository::vcs::GitDriver;
-use crate::repository::vcs::VcsDriverBase;
-use crate::util::GitLab;
-use crate::util::HttpDownloader;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::json::{JsonEncodeOptions, JsonFile};
+use crate::repository::vcs::{GitDriver, VcsDriverBase};
 use crate::util::http::Response;
+use crate::util::{GitLab, HttpDownloader};
 use bstr::ByteSlice;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, date_create};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_search_mixed,
-    array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array_loose, is_array,
-    is_string, ord, php_regex, preg_is_match, preg_match, preg_replace, strpos, strtolower,
+    Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
+    array_search_mixed, array_shift, ctype_alnum, date_create, empty, explode, extension_loaded,
+    implode, in_array_loose, is_array, is_string, ord, php_regex, preg_is_match, preg_match,
+    preg_replace, strpos, strtolower,
 };
 
 /// Driver for GitLab API, use the Git driver for local checkouts.

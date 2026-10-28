@@ -3,9 +3,8 @@
 use crate::composer;
 use crate::downloader::TransportException;
 use crate::repository::PlatformRepository;
-use crate::util::Filesystem;
-use crate::util::Platform;
 use crate::util::http::ProxyManager;
+use crate::util::{Filesystem, Platform};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;

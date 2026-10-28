@@ -1,24 +1,19 @@
 //! ref: composer/src/Composer/Util/ProcessExecutor.php
 
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::signal::SignalSubscription;
-use crate::util::GitHub;
-use crate::util::Platform;
+use crate::util::{GitHub, Platform};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect, array_map,
-    escapeshellarg, explode, implode, in_array_strict, is_dir, is_numeric, php_regex,
+    Catch as _, LogicException, PHP_EOL, PhpMixed, PregMatches, RuntimeException, array_intersect,
+    array_map, escapeshellarg, explode, implode, in_array_strict, is_dir, is_numeric, php_regex,
     preg_is_match, preg_match, preg_replace, preg_replace_callback, preg_replace2, preg_split,
     rtrim, str_replace, strcspn, strlen, strpbrk, strtolower, strtr_array, substr_replace, trim,
 };
-use shirabe_symfony_process::ExecutableFinder;
-use shirabe_symfony_process::Process;
-use shirabe_symfony_process::ProcessMock;
-use shirabe_symfony_process::exception::ProcessSignaledException;
-use shirabe_symfony_process::exception::RuntimeException as SymfonyProcessRuntimeException;
+use shirabe_symfony_process::exception::{
+    ProcessSignaledException, RuntimeException as SymfonyProcessRuntimeException,
+};
+use shirabe_symfony_process::{ExecutableFinder, Process, ProcessMock};
 use std::sync::{LazyLock, Mutex};
 
 static EXECUTABLES: LazyLock<Mutex<IndexMap<String, String>>> =

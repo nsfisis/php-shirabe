@@ -1,13 +1,10 @@
 //! ref: composer/src/Composer/Package/Archiver/PharArchiver.php
 
-use crate::package::archiver::ArchivableFilesFilter;
-use crate::package::archiver::ArchivableFilesFinder;
-use crate::package::archiver::ArchiverInterface;
+use crate::package::archiver::{ArchivableFilesFilter, ArchivableFilesFinder, ArchiverInterface};
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, realpath};
 use shirabe_php_shim::{
-    FilesystemIterator, Phar, PharData, RuntimeException, UnexpectedValueException, bzcompress,
-    file_exists, file_put_contents, gzcompress, str_repeat, strrpos, unlink,
+    Catch as _, FilesystemIterator, Phar, PharData, RuntimeException, UnexpectedValueException,
+    bzcompress, file_exists, file_put_contents, gzcompress, realpath, str_repeat, strrpos, unlink,
 };
 
 fn formats() -> IndexMap<&'static str, i64> {

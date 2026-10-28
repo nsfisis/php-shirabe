@@ -1,19 +1,14 @@
 //! ref: composer/src/Composer/Downloader/SvnDownloader.php
 
 use crate::config::Config;
-use crate::downloader::ChangeReportInterface;
-use crate::downloader::DownloaderInterface;
-use crate::downloader::VcsCapableDownloaderInterface;
-use crate::downloader::VcsDownloader;
-use crate::downloader::VcsDownloaderBase;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::downloader::{
+    ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
+    VcsDownloaderBase,
+};
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
-use crate::util::Filesystem;
-use crate::util::ProcessExecutor;
-use crate::util::Svn as SvnUtil;
+use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

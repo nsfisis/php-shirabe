@@ -5,12 +5,10 @@ use crate::event_dispatcher::EventDispatcher;
 use crate::factory::Factory;
 use crate::io::IOInterface;
 use crate::json::JsonFile;
-use crate::repository::FilesystemRepository;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::RepositoryManager;
-use crate::repository::RepositoryManagerInterface;
-use crate::util::HttpDownloader;
-use crate::util::ProcessExecutor;
+use crate::repository::{
+    FilesystemRepository, RepositoryInterfaceHandle, RepositoryManager, RepositoryManagerInterface,
+};
+use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

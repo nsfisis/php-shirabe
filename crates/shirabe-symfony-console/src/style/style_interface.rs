@@ -1,7 +1,6 @@
 //! ref: composer/vendor/symfony/console/Style/StyleInterface.php
 
-use crate::helper::Cell;
-use crate::helper::Row;
+use crate::helper::{Cell, Row};
 
 /// Output style helpers.
 pub trait StyleInterface {

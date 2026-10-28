@@ -2,15 +2,13 @@
 
 use crate::composer::PartialComposerWeakHandle;
 use crate::downloader::DownloadManagerInterface;
-use crate::installer::BinaryInstaller;
-use crate::installer::BinaryInstallerInterface;
-use crate::installer::BinaryPresenceInterface;
-use crate::installer::InstallerInterface;
+use crate::installer::{
+    BinaryInstaller, BinaryInstallerInterface, BinaryPresenceInterface, InstallerInterface,
+};
 use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
-use crate::util::Filesystem;
-use crate::util::Platform;
+use crate::util::{Filesystem, Platform};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, dirname, is_dir, is_link, preg_quote,
     preg_replace, realpath, rmdir, rtrim, strpos,

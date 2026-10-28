@@ -2,8 +2,7 @@
 //!
 //! See `docs/dev/composer-runtime-bundle.md`.
 
-use crate::PluginValue;
-use crate::call_function;
+use crate::{PluginValue, call_function};
 use shirabe_php_shim::{Phar, RuntimeException, getenv};
 
 const BUNDLE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/composer-runtime-bundle.phar"));

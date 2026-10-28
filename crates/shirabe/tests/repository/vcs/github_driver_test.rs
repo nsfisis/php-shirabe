@@ -8,8 +8,7 @@ use crate::process_executor_mock::{
 use crate::test_case::GitVersionGuard;
 use indexmap::IndexMap;
 use serial_test::serial;
-use shirabe::config::Config;
-use shirabe::config::ConfigSourceInterface;
+use shirabe::config::{Config, ConfigSourceInterface};
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::vcs::GitHubDriver;

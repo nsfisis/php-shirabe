@@ -1,5 +1,4 @@
-use crate::PhpMixed;
-use crate::php_to_string;
+use crate::{PhpMixed, php_to_string};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 

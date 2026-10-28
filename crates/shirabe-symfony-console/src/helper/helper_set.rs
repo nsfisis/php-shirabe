@@ -1,10 +1,8 @@
 //! ref: composer/vendor/symfony/console/Helper/HelperSet.php
 
-use crate::helper::DebugFormatterHelper;
-use crate::helper::FormatterHelper;
-use crate::helper::HelperInterface;
-use crate::helper::ProcessHelper;
-use crate::helper::QuestionHelper;
+use crate::helper::{
+    DebugFormatterHelper, FormatterHelper, HelperInterface, ProcessHelper, QuestionHelper,
+};
 
 /// HelperSet represents a set of helpers to be used with a command.
 ///

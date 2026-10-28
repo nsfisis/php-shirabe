@@ -3,12 +3,10 @@
 use shirabe::question::StrictConfirmationQuestion;
 use shirabe_php_shim::{PhpMixed, PhpResource, fwrite_resource, php_fopen_resource, rewind};
 use shirabe_symfony_console::helper::{QuestionHelper, QuestionHelperInterface};
-use shirabe_symfony_console::input::ArrayInput;
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
-use shirabe_symfony_console::input::StreamableInputInterface;
-use shirabe_symfony_console::output::OutputInterface;
-use shirabe_symfony_console::output::StreamOutput;
+use shirabe_symfony_console::input::{
+    ArrayInput, InputValue, ParameterName, StreamableInputInterface,
+};
+use shirabe_symfony_console::output::{OutputInterface, StreamOutput};
 
 const TRUE_ANSWER_REGEX: &str = "/^y(?:es)?$/i";
 const FALSE_ANSWER_REGEX: &str = "/^no?$/i";

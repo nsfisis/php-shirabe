@@ -1,27 +1,21 @@
 //! ref: composer/src/Composer/Package/Version/VersionSelector.php
 
-use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::package::PackageInterfaceHandle;
-use crate::package::base_package;
+use crate::filter::platform_requirement_filter::{
+    IgnoreAllPlatformRequirementFilter, IgnoreListPlatformRequirementFilter,
+    PlatformRequirementFilterFactory, PlatformRequirementFilterInterface,
+};
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterface;
-use crate::repository::RepositorySetInterface;
+use crate::package::{PackageInterfaceHandle, base_package};
+use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySetInterface};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, UnexpectedValueException, php_regex, preg_is_match, preg_replace, strtolower,
     version_compare,
 };
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 /// PHP `$showWarnings` (`true` or a `callable(PackageInterface): bool`) as passed to
 /// `VersionSelector::findBestCandidate`.

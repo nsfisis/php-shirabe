@@ -1,12 +1,10 @@
 //! ref: composer/src/Composer/Installer/MetapackageInstaller.php
 
-use crate::dependency_resolver::operation::InstallOperation;
-use crate::dependency_resolver::operation::UninstallOperation;
-use crate::dependency_resolver::operation::UpdateOperation;
+use crate::dependency_resolver::operation::{
+    InstallOperation, UninstallOperation, UpdateOperation,
+};
 use crate::installer::InstallerInterface;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};

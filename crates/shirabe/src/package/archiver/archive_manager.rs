@@ -3,12 +3,9 @@
 use crate::downloader::DownloadManager;
 use crate::json::JsonFile;
 use crate::package::CompletePackageInterfaceHandle;
-use crate::package::archiver::ArchiverInterface;
-use crate::package::archiver::PharArchiver;
-use crate::package::archiver::ZipArchiver;
-use crate::util::Filesystem;
-use crate::util::SyncHelper;
+use crate::package::archiver::{ArchiverInterface, PharArchiver, ZipArchiver};
 use crate::util::r#loop::Loop;
+use crate::util::{Filesystem, SyncHelper};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, bin2hex, file_exists, hash, php_regex,

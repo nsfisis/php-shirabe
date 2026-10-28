@@ -1,7 +1,4 @@
-use crate::PhpResource;
-use crate::StreamBacking;
-use crate::StreamState;
-use crate::UnexpectedValueException;
+use crate::{PhpResource, StreamBacking, StreamState, UnexpectedValueException};
 use bstr::BString;
 use std::io::{Read as _, Write as _};
 

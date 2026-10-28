@@ -1,8 +1,7 @@
 //! ref: composer/vendor/symfony/console/Question/ConfirmationQuestion.php
 
 use crate::exception::InvalidArgumentException;
-use crate::question::Question;
-use crate::question::QuestionInterface;
+use crate::question::{Question, QuestionInterface};
 use shirabe_php_shim::{PhpMixed, empty, preg_is_match, strval};
 
 /// Represents a yes/no question.

@@ -1,12 +1,11 @@
 //! ref: composer/src/Composer/Repository/WritableArrayRepository.php
 
 use crate::installer::InstallationManager;
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::repository::ArrayRepository;
-use crate::repository::RepositoryInterface;
-use crate::repository::RepositoryInterfaceWeakHandle;
-use crate::repository::{FindPackageConstraint, LoadPackagesResult, ProviderInfo, SearchResult};
+use crate::package::{BasePackageHandle, PackageInterfaceHandle};
+use crate::repository::{
+    ArrayRepository, FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
+    RepositoryInterfaceWeakHandle, SearchResult,
+};
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 

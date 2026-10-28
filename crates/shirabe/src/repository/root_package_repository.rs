@@ -1,11 +1,9 @@
 //! ref: composer/src/Composer/Repository/RootPackageRepository.php
 
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackageInterfaceHandle;
-use crate::repository::ArrayRepository;
-use crate::repository::RepositoryInterfaceWeakHandle;
-use crate::repository::{ProviderInfo, RepositoryInterface, SearchResult};
+use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle};
+use crate::repository::{
+    ArrayRepository, ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
+};
 use indexmap::IndexMap;
 
 #[derive(Debug)]

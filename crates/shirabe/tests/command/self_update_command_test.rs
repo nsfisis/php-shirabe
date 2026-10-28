@@ -4,8 +4,7 @@ use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe_php_shim::{PHP_BINARY, PhpMixed};
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 use shirabe_symfony_process::Process;
 
 /// ref: SelfUpdateCommandTest::setUp. The `composer-test.phar` copy PHP also performs here lives in

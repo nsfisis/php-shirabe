@@ -2,66 +2,43 @@
 
 use crate::autoload::AutoloadGenerator;
 use crate::cache::Cache;
-use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialOrFullComposer};
-use crate::composer::{PartialComposerHandle, PartialComposerWeakHandle};
-use crate::config::Config;
-use crate::config::JsonConfigSource;
-use crate::downloader::DownloadManager;
-use crate::downloader::FileDownloader;
-use crate::downloader::FossilDownloader;
-use crate::downloader::GitDownloader;
-use crate::downloader::GzipDownloader;
-use crate::downloader::HgDownloader;
-use crate::downloader::PathDownloader;
-use crate::downloader::PerforceDownloader;
-use crate::downloader::PharDownloader;
-use crate::downloader::RarDownloader;
-use crate::downloader::SvnDownloader;
-use crate::downloader::TarDownloader;
-use crate::downloader::TransportException;
-use crate::downloader::XzDownloader;
-use crate::downloader::ZipDownloader;
-use crate::event_dispatcher::Event;
-use crate::event_dispatcher::EventDispatcher;
+use crate::composer::{
+    ComposerHandle, ComposerWeakHandle, PartialComposerHandle, PartialComposerWeakHandle,
+    PartialOrFullComposer,
+};
+use crate::config::{Config, JsonConfigSource};
+use crate::downloader::{
+    DownloadManager, FileDownloader, FossilDownloader, GitDownloader, GzipDownloader, HgDownloader,
+    PathDownloader, PerforceDownloader, PharDownloader, RarDownloader, SvnDownloader,
+    TarDownloader, TransportException, XzDownloader, ZipDownloader,
+};
+use crate::event_dispatcher::{Event, EventDispatcher};
 use crate::exception::NoSslException;
-use crate::installer::BinaryInstaller;
-use crate::installer::InstallationManager;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::json::JsonFile;
-use crate::json::JsonValidationException;
-use crate::package::Locker;
-use crate::package::RootPackageInterfaceHandle;
-use crate::package::archiver::ArchiveManager;
-use crate::package::archiver::PharArchiver;
-use crate::package::archiver::ZipArchiver;
+use crate::installer::{BinaryInstaller, InstallationManager};
+use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::json::{JsonFile, JsonValidationException};
+use crate::package::archiver::{ArchiveManager, PharArchiver, ZipArchiver};
 use crate::package::loader::RootPackageLoader;
-use crate::package::version::VersionGuesser;
-use crate::package::version::VersionParser;
-use crate::plugin::PluginEvents;
-use crate::plugin::PluginManager;
-use crate::repository::FilesystemRepository;
-use crate::repository::InstalledFilesystemRepository;
-use crate::repository::RepositoryFactory;
-use crate::repository::RepositoryManager;
-use crate::util::Filesystem;
-use crate::util::HttpDownloader;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
+use crate::package::version::{VersionGuesser, VersionParser};
+use crate::package::{Locker, RootPackageInterfaceHandle};
+use crate::plugin::{PluginEvents, PluginManager};
+use crate::repository::{
+    FilesystemRepository, InstalledFilesystemRepository, RepositoryFactory, RepositoryManager,
+};
 use crate::util::r#loop::Loop;
+use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER, PhpMixed,
-    RuntimeException, UnexpectedValueException, array_replace_recursive, class_exists, dirname,
-    extension_loaded, file_exists, file_get_contents, file_put_contents, implode, is_dir, is_file,
-    json_decode_assoc, json_decode_obj, mkdir, pathinfo, realpath, rename, rtrim, strpos, strtr,
-    substr, trim,
+    Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
+    PhpMixed, RuntimeException, UnexpectedValueException, array_replace_recursive, class_exists,
+    dirname, extension_loaded, file_exists, file_get_contents, file_put_contents, implode, is_dir,
+    is_file, json_decode_assoc, json_decode_obj, mkdir, pathinfo, realpath, rename, rtrim, strpos,
+    strtr, substr, trim,
 };
-use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::formatter::OutputFormatterStyle;
-use shirabe_symfony_console::formatter::OutputFormatterStyleInterface;
+use shirabe_symfony_console::formatter::{
+    OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface,
+};
 use shirabe_symfony_console::output::ConsoleOutput;
 
 /// Either a configuration array or a filename to read from. PHP's `$localConfig` accepts both.

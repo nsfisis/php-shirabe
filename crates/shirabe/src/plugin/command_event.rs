@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Plugin/CommandEvent.php
 
-use crate::event_dispatcher::Event;
-use crate::event_dispatcher::EventInterface;
+use crate::event_dispatcher::{Event, EventInterface};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_console::input::InputInterface;

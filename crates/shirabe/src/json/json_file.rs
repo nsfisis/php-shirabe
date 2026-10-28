@@ -1,19 +1,15 @@
 //! ref: composer/src/Composer/Json/JsonFile.php
 
 use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::json::JsonValidationException;
-use crate::util::Filesystem;
-use crate::util::HttpDownloader;
-use shirabe_php_shim::{Catch as _, Error};
+use crate::util::{Filesystem, HttpDownloader};
 use shirabe_php_shim::{
-    InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
-    PhpMixed, PregMatches, RuntimeException, UnexpectedValueException, dirname, file_exists,
-    file_get_contents, file_put_contents, is_dir, is_file, json_decode_assoc, json_decode_obj,
-    json_encode_ex, mkdir, php_regex, preg_is_match, preg_match, preg_replace_callback,
-    preg_replace2, realpath, str_repeat, strlen, strpos, usleep,
+    Catch as _, Error, InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
+    JSON_UNESCAPED_UNICODE, PhpMixed, PregMatches, RuntimeException, UnexpectedValueException,
+    dirname, file_exists, file_get_contents, file_put_contents, is_dir, is_file, json_decode_assoc,
+    json_decode_obj, json_encode_ex, mkdir, php_regex, preg_is_match, preg_match,
+    preg_replace_callback, preg_replace2, realpath, str_repeat, strlen, strpos, usleep,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
 

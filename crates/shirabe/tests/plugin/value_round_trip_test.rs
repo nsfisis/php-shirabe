@@ -8,9 +8,8 @@ use crate::php_worker::{lock_php_worker, php_runtime_available};
 use crate::plugin_installer_test::{new_installer, set_up};
 use indexmap::IndexMap;
 use shirabe::installer::InstallerInterface;
-use shirabe::package::Link;
-use shirabe::package::PackageInterfaceHandle;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
+use shirabe::package::{Link, PackageInterfaceHandle};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };

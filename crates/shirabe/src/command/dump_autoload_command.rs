@@ -1,12 +1,10 @@
 //! ref: composer/src/Composer/Command/DumpAutoloadCommand.php
 
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputOption;
 use crate::io::IOInterfaceImmutable;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
+use crate::plugin::{CommandEvent, PluginEvents};
 use shirabe_php_shim::{InvalidArgumentException, file_exists, impl_php_class};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;

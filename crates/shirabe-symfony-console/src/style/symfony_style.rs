@@ -1,20 +1,12 @@
 //! ref: composer/vendor/symfony/console/Style/SymfonyStyle.php
 
-use crate::formatter::OutputFormatter;
-use crate::formatter::OutputFormatterInterface;
-use crate::helper::Helper;
-use crate::helper::QuestionHelperInterface;
-use crate::helper::SymfonyQuestionHelper;
-use crate::helper::Table;
-use crate::helper::{Cell, Row};
+use crate::formatter::{OutputFormatter, OutputFormatterInterface};
+use crate::helper::{Cell, Helper, QuestionHelperInterface, Row, SymfonyQuestionHelper, Table};
 use crate::input::InputInterface;
-use crate::output::ConsoleOutput;
-use crate::output::ConsoleOutputInterface;
-use crate::output::OUTPUT_NORMAL;
-use crate::output::OutputInterface;
-use crate::output::TrimmedBufferOutput;
-use crate::question::ConfirmationQuestion;
-use crate::question::QuestionInterface;
+use crate::output::{
+    ConsoleOutput, ConsoleOutputInterface, OUTPUT_NORMAL, OutputInterface, TrimmedBufferOutput,
+};
+use crate::question::{ConfirmationQuestion, QuestionInterface};
 use crate::style::output_style::OutputStyle;
 use crate::style::style_interface::StyleInterface;
 use crate::terminal::Terminal;

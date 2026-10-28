@@ -1,24 +1,15 @@
 //! ref: composer/src/Composer/DependencyResolver/Solver.php
 
-use crate::dependency_resolver::Decisions;
-use crate::dependency_resolver::GenericRule;
-use crate::dependency_resolver::LockTransaction;
-use crate::dependency_resolver::PolicyInterface;
-use crate::dependency_resolver::Pool;
-use crate::dependency_resolver::Problem;
-use crate::dependency_resolver::Request;
-use crate::dependency_resolver::RuleSet;
-use crate::dependency_resolver::RuleSetGenerator;
-use crate::dependency_resolver::RuleWatchGraph;
-use crate::dependency_resolver::RuleWatchNode;
-use crate::dependency_resolver::SolverBugException;
-use crate::dependency_resolver::SolverProblemsException;
 use crate::dependency_resolver::rule::{self, Rule};
-use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::dependency_resolver::{
+    Decisions, GenericRule, LockTransaction, PolicyInterface, Pool, Problem, Request, RuleSet,
+    RuleSetGenerator, RuleWatchGraph, RuleWatchNode, SolverBugException, SolverProblemsException,
+};
+use crate::filter::platform_requirement_filter::{
+    IgnoreListPlatformRequirementFilter, PlatformRequirementFilterFactory,
+    PlatformRequirementFilterInterface,
+};
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::BasePackageHandle;
 use indexmap::IndexMap;
 use shirabe_php_shim::{array_shift, array_unshift, microtime, spl_object_hash};

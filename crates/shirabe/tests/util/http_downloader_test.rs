@@ -5,13 +5,11 @@ use crate::io_mock::{Expectation, get_io_mock};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::downloader::TransportException;
-use shirabe::io::IOInterface;
 use shirabe::io::buffer_io::BufferIO;
-use shirabe::io::io_interface;
+use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::Platform;
 use shirabe::util::http_downloader::HttpDownloader;
-use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{PHP_EOL, PhpMixed};
+use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed};
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 
 // PHP performs a live HTTP get to assert the URL's user:pass is captured via

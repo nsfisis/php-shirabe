@@ -2,13 +2,10 @@
 
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::PackageInterfaceHandle;
-use crate::repository::FilterRepository;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::util::HttpDownloader;
-use crate::util::ProcessExecutor;
+use crate::repository::{FilterRepository, RepositoryInterfaceHandle};
+use crate::util::{HttpDownloader, ProcessExecutor};
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException, json_encode};
 use shirabe_semver::constraint::AnyConstraint;

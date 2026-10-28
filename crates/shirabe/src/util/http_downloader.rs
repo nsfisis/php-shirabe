@@ -4,25 +4,20 @@ use crate::composer;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::version::VersionParser;
-use crate::util::GetResult;
-use crate::util::LocalFilesystem;
-use crate::util::Platform;
-use crate::util::RemoteFilesystem;
-use crate::util::StreamContextFactory;
-use crate::util::Url;
-use crate::util::http::NativeHttpDownloader;
-use crate::util::http::Response;
-use crate::util::sync_executor;
+use crate::util::http::{NativeHttpDownloader, Response};
+use crate::util::{
+    GetResult, LocalFilesystem, Platform, RemoteFilesystem, StreamContextFactory, Url,
+    sync_executor,
+};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, PHP_EOL, empty};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, extension_loaded,
-    file_get_contents, implode, is_numeric, php_regex, preg_is_match, preg_match, preg_replace,
-    rawurldecode, stream_context_create, stripos, strpos, substr, ucfirst,
+    Catch as _, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
+    array_replace_recursive, empty, extension_loaded, file_get_contents, implode, is_numeric,
+    php_regex, preg_is_match, preg_match, preg_replace, rawurldecode, stream_context_create,
+    stripos, strpos, substr, ucfirst,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 

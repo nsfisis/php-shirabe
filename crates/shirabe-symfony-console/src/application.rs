@@ -1,8 +1,7 @@
 //! ref: composer/vendor/symfony/console/Application.php
 
 use crate::command::Command;
-use crate::completion::CompletionInput;
-use crate::completion::CompletionSuggestions;
+use crate::completion::{CompletionInput, CompletionSuggestions};
 use crate::helper::HelperSet;
 use crate::input::InputDefinition;
 use indexmap::IndexMap;

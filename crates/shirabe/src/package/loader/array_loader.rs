@@ -1,20 +1,12 @@
 //! ref: composer/src/Composer/Package/Loader/ArrayLoader.php
 
-use crate::package::CompleteAliasPackageHandle;
-use crate::package::CompletePackage;
-use crate::package::CompletePackageHandle;
-use crate::package::CompletePackageInterface;
-use crate::package::Link;
-use crate::package::Mirror;
-use crate::package::Package;
-use crate::package::PackageInterface;
-use crate::package::PackageInterfaceHandle;
-use crate::package::RootAliasPackageHandle;
-use crate::package::RootPackage;
-use crate::package::RootPackageHandle;
-use crate::package::SUPPORTED_LINK_TYPES;
 use crate::package::loader::LoaderInterface;
 use crate::package::version::VersionParser;
+use crate::package::{
+    CompleteAliasPackageHandle, CompletePackage, CompletePackageHandle, CompletePackageInterface,
+    Link, Mirror, Package, PackageInterface, PackageInterfaceHandle, RootAliasPackageHandle,
+    RootPackage, RootPackageHandle, SUPPORTED_LINK_TYPES,
+};
 use bstr::ByteSlice;
 use chrono::Utc;
 use indexmap::IndexMap;

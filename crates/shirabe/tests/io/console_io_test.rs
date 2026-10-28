@@ -12,19 +12,14 @@
 //     the returned value.
 
 use indexmap::IndexMap;
-use shirabe::io::ConsoleIO;
-use shirabe::io::IOInterfaceImmutable;
-use shirabe::io::IOInterfaceMutable;
 use shirabe::io::io_interface::NORMAL;
+use shirabe::io::{ConsoleIO, IOInterfaceImmutable, IOInterfaceMutable};
 use shirabe_php_shim::{PhpMixed, PhpResource, fwrite_resource, php_fopen_resource, rewind};
 use shirabe_symfony_console::helper::QuestionHelper;
-use shirabe_symfony_console::input::ArrayInput;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::StreamableInputInterface;
-use shirabe_symfony_console::output::BufferedOutput;
-use shirabe_symfony_console::output::ConsoleOutput;
-use shirabe_symfony_console::output::ConsoleOutputInterface;
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::input::{ArrayInput, InputInterface, StreamableInputInterface};
+use shirabe_symfony_console::output::{
+    BufferedOutput, ConsoleOutput, ConsoleOutputInterface, OutputInterface,
+};
 
 /// Builds a ConsoleIO backed by real, side-effect-free Input/Output/QuestionHelper. PHP uses
 /// PHPUnit mocks here, but for tests that exercise only the authentication map they carry no

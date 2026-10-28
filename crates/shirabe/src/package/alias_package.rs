@@ -1,16 +1,10 @@
 //! ref: composer/src/Composer/Package/AliasPackage.php
 
-use crate::package::BasePackage;
-use crate::package::Link;
-use crate::package::Mirror;
-use crate::package::PackageHandle;
-use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::RepositoryInterfaceWeakHandle;
+use crate::package::{BasePackage, Link, Mirror, PackageHandle, PackageInterface};
+use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle};
 use chrono::{DateTime, Utc};
-use indexmap::IndexMap;
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{LogicException, PhpMixed};
 use shirabe_semver::constraint::SimpleConstraint;
 

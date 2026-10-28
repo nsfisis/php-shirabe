@@ -1,12 +1,10 @@
 //! ref: composer/vendor/composer/semver/src/CompilingMatcher.php
 
-use crate::constraint::AnyConstraint;
-use crate::constraint::SimpleConstraint;
+use crate::constraint::{AnyConstraint, SimpleConstraint};
 use indexmap::IndexMap;
 use shirabe_php_shim::CmpOp;
 use std::fmt::Write as _;
-use std::sync::Mutex;
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 thread_local! {
     static KEY_BUFFER: std::cell::RefCell<String> =

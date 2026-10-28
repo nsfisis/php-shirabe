@@ -1,10 +1,8 @@
 //! ref: composer/vendor/composer/semver/src/Intervals.php
 
-use crate::constraint::AnyConstraint;
-use crate::constraint::MatchAllConstraint;
-use crate::constraint::MatchNoneConstraint;
-use crate::constraint::MultiConstraint;
-use crate::constraint::SimpleConstraint;
+use crate::constraint::{
+    AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
+};
 use crate::interval::{DevConstraintSet, Interval};
 use indexmap::IndexMap;
 use shirabe_php_shim::{CmpOp, array_unique, version_compare, version_compare_ordering};

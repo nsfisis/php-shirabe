@@ -1,19 +1,14 @@
 //! ref: composer/src/Composer/Util/Perforce.php
 
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::util::CommandLine;
-use crate::util::Filesystem;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
+use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::util::{CommandLine, Filesystem, Platform, ProcessExecutor};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, chdir, date_local, explode, fclose, feof, fgets,
     file_get_contents, fopen, fwrite, gethostname, json_decode_assoc, php_regex, preg_replace,
     str_replace_array, strcmp, strlen, strpos, strrpos, substr, time, trim,
 };
-use shirabe_symfony_process::ExecutableFinder;
-use shirabe_symfony_process::Process;
+use shirabe_symfony_process::{ExecutableFinder, Process};
 
 #[derive(Debug)]
 pub struct Perforce {

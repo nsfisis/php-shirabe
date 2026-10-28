@@ -1,10 +1,8 @@
 //! ref: composer/src/Composer/Command/ScriptAliasCommand.php
 
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::console::input::{InputArgument, InputOption};
 use crate::util::Platform;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, impl_php_class, is_string, php_regex,

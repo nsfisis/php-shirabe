@@ -1,10 +1,9 @@
 //! ref: composer/tests/Composer/Test/Package/Loader/ArrayLoaderTest.php
 
 use indexmap::IndexMap;
-use shirabe::package::ArrayDumper;
-use shirabe::package::Link;
 use shirabe::package::loader::{ArrayLoader, LoaderInterface};
 use shirabe::package::version::VersionParser;
+use shirabe::package::{ArrayDumper, Link};
 use shirabe_php_shim::PhpMixed;
 
 fn set_up() -> ArrayLoader {

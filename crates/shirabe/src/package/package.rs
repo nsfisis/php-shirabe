@@ -1,12 +1,8 @@
 //! ref: composer/src/Composer/Package/Package.php
 
-use crate::package::BasePackage;
-use crate::package::DisplayMode;
-use crate::package::Link;
-use crate::package::PackageInterface;
 use crate::package::version::VersionParser;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::RepositoryInterfaceWeakHandle;
+use crate::package::{BasePackage, DisplayMode, Link, PackageInterface};
+use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle};
 use crate::util::ComposerMirror;
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};

@@ -1,38 +1,30 @@
 //! ref: composer/src/Composer/Command/InitCommand.php
 
-use crate::command::CompletionTrait;
-use crate::command::PackageDiscoveryTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, CompletionTrait, PackageDiscoveryTrait};
 use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::json::JsonFile;
-use crate::json::JsonValidationException;
+use crate::io::{IOInterfaceImmutable, io_interface};
+use crate::json::{JsonFile, JsonValidationException};
 use crate::package::base_package::{self};
-use crate::repository::CompositeRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::PlatformRepositoryHandle;
-use crate::repository::RepositoryFactory;
-use crate::util::Filesystem;
-use crate::util::ProcessExecutor;
+use crate::repository::{
+    CompositeRepository, PlatformRepository, PlatformRepositoryHandle, RepositoryFactory,
+};
+use crate::util::{Filesystem, ProcessExecutor};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, array_filter_map, filter_var_email, unlink};
 use shirabe_php_shim::{
-    FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
-    array_flip_strings, array_intersect_key, array_map, basename, empty, explode, file,
-    file_exists, file_get_contents, file_put_contents, get_current_user, impl_php_class, implode,
-    is_dir, is_string, php_regex, preg_is_match, preg_match, preg_match_all, preg_quote,
-    preg_replace, realpath, str_replace, strpos, strtolower, trim, ucwords,
+    Catch as _, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
+    array_filter_map, array_flip_strings, array_intersect_key, array_map, basename, empty, explode,
+    file, file_exists, file_get_contents, file_put_contents, filter_var_email, get_current_user,
+    impl_php_class, implode, is_dir, is_string, php_regex, preg_is_match, preg_match,
+    preg_match_all, preg_quote, preg_replace, realpath, str_replace, strpos, strtolower, trim,
+    ucwords, unlink,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::helper::FormatBlockMessages;
-use shirabe_symfony_console::input::ArrayInput;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]

@@ -1,18 +1,13 @@
 //! ref: composer/src/Composer/Command/ValidateCommand.php
 
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::console::input::{InputArgument, InputOption};
 use crate::factory::Factory;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::loader::ValidatingArrayLoader;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
-use crate::util::ConfigValidator;
-use crate::util::Filesystem;
+use crate::plugin::{CommandEvent, PluginEvents};
+use crate::util::{ConfigValidator, Filesystem};
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;

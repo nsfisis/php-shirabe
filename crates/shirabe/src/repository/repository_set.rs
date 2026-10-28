@@ -1,32 +1,25 @@
 //! ref: composer/src/Composer/Repository/RepositorySet.php
 
 use crate::advisory::AnySecurityAdvisory;
-use crate::dependency_resolver::Pool;
-use crate::dependency_resolver::PoolBuilder;
-use crate::dependency_resolver::PoolOptimizer;
-use crate::dependency_resolver::Request;
-use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
+use crate::dependency_resolver::{
+    Pool, PoolBuilder, PoolOptimizer, Request, SecurityAdvisoryPoolFilter,
+};
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcherInterface;
-use crate::io::IOInterface;
-use crate::io::NullIO;
-use crate::package::AliasPackageHandle;
-use crate::package::BasePackageHandle;
-use crate::package::CompleteAliasPackageHandle;
-use crate::package::PackageInterfaceHandle;
+use crate::io::{IOInterface, NullIO};
 use crate::package::version::StabilityFilter;
-use crate::repository::CompositeRepository;
-use crate::repository::InstalledRepository;
-use crate::repository::LockArrayRepositoryHandle;
-use crate::repository::PlatformRepository;
-use crate::repository::{FindPackageConstraint, RepositoryInterfaceHandle};
+use crate::package::{
+    AliasPackageHandle, BasePackageHandle, CompleteAliasPackageHandle, PackageInterfaceHandle,
+};
+use crate::repository::{
+    CompositeRepository, FindPackageConstraint, InstalledRepository, LockArrayRepositoryHandle,
+    PlatformRepository, RepositoryInterfaceHandle,
+};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{LogicException, RuntimeException, ksort, strtolower};
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::MatchAllConstraint;
-use shirabe_semver::constraint::MultiConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_php_shim::{Catch as _, LogicException, RuntimeException, ksort, strtolower};
+use shirabe_semver::constraint::{
+    AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint,
+};
 
 #[derive(Debug, Clone)]
 pub struct RootAliasEntry {

@@ -3,24 +3,19 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::json::JsonEncodeOptions;
-use crate::json::JsonFile;
-use crate::repository::vcs::GitDriver;
-use crate::repository::vcs::VcsDriverBase;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::json::{JsonEncodeOptions, JsonFile};
+use crate::repository::vcs::{GitDriver, VcsDriverBase};
 use crate::util::GitHub;
 use crate::util::http::Response;
 use bstr::ByteSlice;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, date_create};
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_map,
-    array_search_mixed, base64_decode, basename, empty, explode, extension_loaded, in_array_loose,
-    parse_url, php_regex, preg_is_match, preg_match, preg_replace, preg_split, strpos, strtolower,
-    substr, trim, urlencode,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_map,
+    array_search_mixed, base64_decode, basename, date_create, empty, explode, extension_loaded,
+    in_array_loose, parse_url, php_regex, preg_is_match, preg_match, preg_replace, preg_split,
+    strpos, strtolower, substr, trim, urlencode,
 };
 
 #[derive(Debug)]

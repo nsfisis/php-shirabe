@@ -2,9 +2,7 @@
 
 use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatterInterface;
-use crate::output::OutputInterface;
-use crate::output::VERBOSITY_NORMAL;
-use crate::output::{DoWrite, Output};
+use crate::output::{DoWrite, Output, OutputInterface, VERBOSITY_NORMAL};
 use shirabe_php_shim::{
     PHP_EOL, PhpResource, fflush_resource, fwrite_resource, get_resource_type, getenv, php_regex,
     preg_is_match, sapi_windows_vt100_support, stream_isatty_resource,

@@ -6,8 +6,7 @@ use crate::package::version::VersionParser;
 use indexmap::IndexMap;
 use shirabe_php_shim::{CmpOp, STR_PAD_LEFT, str_pad};
 use shirabe_semver::CompilingMatcher;
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use std::fmt;
 
 /// A package pool contains all packages for dependency resolution

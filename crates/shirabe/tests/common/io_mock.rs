@@ -2,8 +2,7 @@
 
 use shirabe::config::Config;
 use shirabe::io::buffer_io::BufferIO;
-use shirabe::io::io_interface;
-use shirabe::io::{IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
+use shirabe::io::{IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
 use shirabe::util::platform::Platform;
 use shirabe_php_shim::{PHP_EOL, PhpMixed, php_regex, preg_is_match, preg_quote, preg_split};
 use shirabe_symfony_console::output::output_interface;

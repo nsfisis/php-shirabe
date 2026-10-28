@@ -8,8 +8,7 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe_php_shim::PhpMixed;
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 fn funding_entry(r#type: &str, url: &str) -> IndexMap<String, PhpMixed> {
     let mut m = IndexMap::new();

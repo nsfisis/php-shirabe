@@ -1,35 +1,24 @@
 //! ref: composer/src/Composer/DependencyResolver/PoolBuilder.php
 
-use crate::dependency_resolver::Pool;
-use crate::dependency_resolver::PoolOptimizer;
-use crate::dependency_resolver::Request;
-use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
+use crate::dependency_resolver::{Pool, PoolOptimizer, Request, SecurityAdvisoryPoolFilter};
 use crate::event_dispatcher::EventDispatcherInterface;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::package::AliasPackageHandle;
-use crate::package::BasePackageHandle;
-use crate::package::CompleteAliasPackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::base_package;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::version::StabilityFilter;
-use crate::plugin::PluginEvents;
-use crate::plugin::PrePoolCreateEvent;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterface;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::RootPackageRepository;
+use crate::package::{
+    AliasPackageHandle, BasePackageHandle, CompleteAliasPackageHandle, PackageInterfaceHandle,
+    base_package,
+};
+use crate::plugin::{PluginEvents, PrePoolCreateEvent};
+use crate::repository::{
+    PlatformRepository, RepositoryInterface, RepositoryInterfaceHandle, RootPackageRepository,
+};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, array_flip_strings, array_map, in_array_strict, microtime,
     number_format, preg_is_match, round, strpos,
 };
-use shirabe_semver::CompilingMatcher;
-use shirabe_semver::Intervals;
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::MatchAllConstraint;
-use shirabe_semver::constraint::MultiConstraint;
+use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
+use shirabe_semver::{CompilingMatcher, Intervals};
 
 #[derive(Debug)]
 pub struct PoolBuilder {

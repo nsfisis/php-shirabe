@@ -5,11 +5,7 @@
 //! `keep` parameter is that acceptance rate, which is what decides how much of the expansion has
 //! to be copied out.
 
-use criterion::BatchSize;
-use criterion::BenchmarkId;
-use criterion::Criterion;
-use criterion::criterion_group;
-use criterion::criterion_main;
+use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use indexmap::IndexMap;
 use shirabe::json::json_file::JsonFile;
 use shirabe_metadata_minifier::MetadataMinifier;

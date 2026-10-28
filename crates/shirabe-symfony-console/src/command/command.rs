@@ -1,15 +1,10 @@
 //! ref: composer/vendor/symfony/console/Command/Command.php
 
 use crate::application::Application;
-use crate::completion::CompletionInput;
-use crate::completion::CompletionSuggestions;
+use crate::completion::{CompletionInput, CompletionSuggestions};
 use crate::exception::InvalidArgumentException;
 use crate::helper::HelperSet;
-use crate::input::InputArgument;
-use crate::input::InputDefinition;
-use crate::input::InputInterface;
-use crate::input::InputOption;
-use crate::input::InputValue;
+use crate::input::{InputArgument, InputDefinition, InputInterface, InputOption, InputValue};
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

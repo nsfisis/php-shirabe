@@ -1,7 +1,6 @@
 //! ref: composer/vendor/symfony/console/Input/InputArgument.php
 
-use crate::exception::InvalidArgumentException;
-use crate::exception::LogicException;
+use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
 
 #[derive(Debug, Clone)]

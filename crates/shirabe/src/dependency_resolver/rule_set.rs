@@ -1,9 +1,6 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleSet.php
 
-use crate::dependency_resolver::Pool;
-use crate::dependency_resolver::Request;
-use crate::dependency_resolver::Rule;
-use crate::dependency_resolver::RuleSetIterator;
+use crate::dependency_resolver::{Pool, Request, Rule, RuleSetIterator};
 use crate::repository::RepositorySet;
 use indexmap::IndexMap;
 use shirabe_php_shim::OutOfBoundsException;

@@ -1,7 +1,6 @@
 //! ref: composer/vendor/symfony/process/Exception/ProcessFailedException.php
 
-use crate::exception::InvalidArgumentException;
-use crate::exception::RuntimeException;
+use crate::exception::{InvalidArgumentException, RuntimeException};
 use crate::process::Process;
 
 #[derive(Debug)]

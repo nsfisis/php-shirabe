@@ -5,21 +5,16 @@
 use crate::autoload::ClassLoader;
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
-use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::filter::platform_requirement_filter::{
+    IgnoreAllPlatformRequirementFilter, PlatformRequirementFilterFactory,
+    PlatformRequirementFilterInterface,
+};
 use crate::installer::InstallationManagerInterface;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::NullIO;
+use crate::io::{IOInterface, IOInterfaceImmutable, NullIO};
 use crate::json::JsonFile;
-use crate::package::LockerInterface;
-use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackageInterfaceHandle;
+use crate::package::{LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::script::ScriptEvents;
-use crate::util::Filesystem;
-use crate::util::PackageSorter;
-use crate::util::Platform;
+use crate::util::{Filesystem, PackageSorter, Platform};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;

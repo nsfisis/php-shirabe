@@ -2,8 +2,7 @@
 
 use crate::plugin::job_registry;
 use crate::plugin::job_registry::JobOwner;
-use crate::util::HttpDownloader;
-use crate::util::ProcessExecutor;
+use crate::util::{HttpDownloader, ProcessExecutor};
 use futures::StreamExt;
 use futures::stream::FuturesUnordered;
 use shirabe_symfony_console::helper::ProgressBar;

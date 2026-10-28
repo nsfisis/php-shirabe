@@ -2,27 +2,22 @@
 
 use crate::command::BaseCommand;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::filter::platform_requirement_filter::{
+    IgnoreAllPlatformRequirementFilter, PlatformRequirementFilterFactory,
+};
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
-use crate::package::version::VersionParser;
-use crate::package::version::VersionSelector;
 use crate::package::version::version_selector::ShowWarnings;
-use crate::repository::CompositeRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::PlatformRepositoryHandle;
-use crate::repository::RepositoryFactory;
-use crate::repository::RepositorySet;
-use crate::repository::{RepositoryInterface, SearchResult};
+use crate::package::version::{VersionParser, VersionSelector};
+use crate::repository::{
+    CompositeRepository, PlatformRepository, PlatformRepositoryHandle, RepositoryFactory,
+    RepositoryInterface, RepositorySet, SearchResult,
+};
 use crate::util::Filesystem;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
+    Catch as _, Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
     array_slice, asort, explode, file_get_contents, implode, in_array_strict, is_array, is_file,
     is_numeric, json_decode_assoc, levenshtein, php_regex, preg_is_match, preg_match, strlen,
     strpos, trim,

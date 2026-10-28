@@ -2,20 +2,13 @@
 
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::downloader::ChangeReportInterface;
-use crate::downloader::DvcsDownloaderInterface;
-use crate::downloader::VcsCapableDownloaderInterface;
-use crate::downloader::VcsDownloader;
-use crate::downloader::VcsDownloaderBase;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::downloader::{
+    ChangeReportInterface, DvcsDownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
+    VcsDownloaderBase,
+};
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
-use crate::util::Filesystem;
-use crate::util::Git as GitUtil;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
-use crate::util::Url;
+use crate::util::{Filesystem, Git as GitUtil, Platform, ProcessExecutor, Url};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class, implode,

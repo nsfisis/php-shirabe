@@ -1,8 +1,7 @@
 //! ref: composer/src/Composer/Command/AboutCommand.php
 
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer;
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;

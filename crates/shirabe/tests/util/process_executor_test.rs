@@ -4,16 +4,15 @@
 // password hiding, line splitting and argument escaping. A few data points remain unportable —
 // see the individual `// TODO(async)` comments below.
 
-use shirabe::io::ConsoleIO;
-use shirabe::io::IOInterface;
 use shirabe::io::buffer_io::BufferIO;
+use shirabe::io::{ConsoleIO, IOInterface};
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_shim::{PHP_EOL, trim};
 use shirabe_symfony_console::helper::QuestionHelper;
-use shirabe_symfony_console::input::ArrayInput;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::BufferedOutput;
-use shirabe_symfony_console::output::{OutputInterface, VERBOSITY_DEBUG, VERBOSITY_NORMAL};
+use shirabe_symfony_console::input::{ArrayInput, InputInterface};
+use shirabe_symfony_console::output::{
+    BufferedOutput, OutputInterface, VERBOSITY_DEBUG, VERBOSITY_NORMAL,
+};
 
 #[test]
 fn test_execute_captures_output() {

@@ -1,20 +1,14 @@
 //! ref: composer/src/Composer/Repository/PlatformRepository.php
 
 use crate::composer;
-use crate::package::CompletePackage;
-use crate::package::CompletePackageHandle;
-use crate::package::CompletePackageInterface;
-use crate::package::CompletePackageInterfaceHandle;
-use crate::package::Link;
-use crate::package::PackageInterface;
-use crate::package::PackageInterfaceHandle;
 use crate::package::version::VersionParser;
-use crate::platform::HhvmDetector;
-use crate::platform::HhvmDetectorInterface;
-use crate::platform::Version;
+use crate::package::{
+    CompletePackage, CompletePackageHandle, CompletePackageInterface,
+    CompletePackageInterfaceHandle, Link, PackageInterface, PackageInterfaceHandle,
+};
+use crate::platform::{HhvmDetector, HhvmDetectorInterface, Version};
 use crate::plugin::plugin_interface::{self};
-use crate::repository::ArrayRepository;
-use crate::repository::RepositoryInterface;
+use crate::repository::{ArrayRepository, RepositoryInterface};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_rpc::PlatformInfo;

@@ -1,10 +1,7 @@
 //! ref: composer/src/Composer/Package/BasePackage.php
 
-use crate::package::DisplayMode;
-use crate::package::Link;
-use crate::package::PackageInterface;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterfaceHandle;
+use crate::package::{DisplayMode, Link, PackageInterface};
+use crate::repository::{PlatformRepository, RepositoryInterfaceHandle};
 use indexmap::IndexMap;
 use shirabe_php_shim::preg_quote;
 use std::sync::LazyLock;

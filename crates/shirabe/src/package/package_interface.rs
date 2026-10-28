@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Package/PackageInterface.php
 
-use crate::package::Link;
-use crate::package::Mirror;
+use crate::package::{Link, Mirror};
 use crate::repository::RepositoryInterfaceHandle;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;

@@ -1,9 +1,6 @@
 //! ref: composer/vendor/composer/semver/src/VersionParser.php
 
-use crate::constraint::AnyConstraint;
-use crate::constraint::MatchAllConstraint;
-use crate::constraint::MultiConstraint;
-use crate::constraint::SimpleConstraint;
+use crate::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint};
 use shirabe_php_shim::{
     PregMatches, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_split,
     strtolower, trim,

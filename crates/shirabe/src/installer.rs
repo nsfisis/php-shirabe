@@ -28,70 +28,49 @@ pub use package_event::*;
 pub use package_events::*;
 pub use plugin_installer::*;
 pub use project_installer::*;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{
+    Catch as _, PhpMixed, RuntimeException, array_map, array_unique, implode, intval, is_dir,
+    is_numeric, strcmp, strpos, strtolower, touch, usort,
+};
 pub use suggested_packages_reporter::*;
 
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use indexmap::IndexMap;
 
-use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_map, array_unique, implode, intval, is_dir, is_numeric,
-    strcmp, strpos, strtolower, touch, usort,
-};
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_semver;
 
-use crate::advisory::AuditConfig;
-use crate::advisory::Auditor;
+use crate::advisory::{AuditConfig, Auditor};
 use crate::autoload::AutoloadGeneratorInterface;
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::GithubActionError;
-use crate::dependency_resolver::AnyTransaction;
-use crate::dependency_resolver::DefaultPolicy;
-use crate::dependency_resolver::LocalRepoTransaction;
-use crate::dependency_resolver::LockTransaction;
-use crate::dependency_resolver::PolicyInterface;
-use crate::dependency_resolver::PoolOptimizer;
-use crate::dependency_resolver::Request;
-use crate::dependency_resolver::SecurityAdvisoryPoolFilter;
-use crate::dependency_resolver::Solver;
-use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::dependency_resolver::operation::AnyOperation;
-use crate::downloader::DownloadManagerInterface;
-use crate::downloader::TransportException;
+use crate::dependency_resolver::{
+    AnyTransaction, DefaultPolicy, LocalRepoTransaction, LockTransaction, PolicyInterface,
+    PoolOptimizer, Request, SecurityAdvisoryPoolFilter, Solver, UpdateAllowTransitiveDeps,
+};
+use crate::downloader::{DownloadManagerInterface, TransportException};
 use crate::event_dispatcher::EventDispatcherInterface;
-use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::package::AliasPackageHandle;
-use crate::package::CompleteAliasPackageHandle;
-use crate::package::Link;
-use crate::package::LockerInterface;
-use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackageInterfaceHandle;
-use crate::package::base_package;
+use crate::filter::platform_requirement_filter::{
+    IgnoreListPlatformRequirementFilter, PlatformRequirementFilterFactory,
+    PlatformRequirementFilterInterface,
+};
 use crate::package::dumper::ArrayDumper;
-use crate::package::loader::ArrayLoader;
-use crate::package::loader::LoaderInterface;
+use crate::package::loader::{ArrayLoader, LoaderInterface};
 use crate::package::version::VersionParser;
-use crate::repository::ArrayRepository;
-use crate::repository::CanonicalPackagesTrait;
-use crate::repository::CompositeRepository;
-use crate::repository::InstalledArrayRepository;
-use crate::repository::InstalledRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::PlatformRepositoryHandle;
-use crate::repository::RepositoryInterface;
-use crate::repository::RepositoryManagerInterface;
-use crate::repository::RepositorySet;
-use crate::repository::RootPackageRepository;
+use crate::package::{
+    AliasPackageHandle, CompleteAliasPackageHandle, Link, LockerInterface, PackageInterfaceHandle,
+    RootPackageInterfaceHandle, base_package,
+};
+use crate::repository::{
+    ArrayRepository, CanonicalPackagesTrait, CompositeRepository, InstalledArrayRepository,
+    InstalledRepository, PlatformRepository, PlatformRepositoryHandle, RepositoryInterface,
+    RepositoryManagerInterface, RepositorySet, RootPackageRepository,
+};
 use crate::script::ScriptEvents;
 use crate::util::Platform;
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 #[derive(Debug)]
 pub struct Installer {

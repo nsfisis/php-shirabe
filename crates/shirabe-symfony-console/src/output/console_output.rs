@@ -1,11 +1,9 @@
 //! ref: composer/vendor/symfony/console/Output/ConsoleOutput.php
 
 use crate::formatter::OutputFormatterInterface;
-use crate::output::ConsoleOutputInterface;
-use crate::output::ConsoleSectionOutput;
-use crate::output::OutputInterface;
-use crate::output::StreamOutput;
-use crate::output::VERBOSITY_NORMAL;
+use crate::output::{
+    ConsoleOutputInterface, ConsoleSectionOutput, OutputInterface, StreamOutput, VERBOSITY_NORMAL,
+};
 use shirabe_php_shim::{
     PHP_OS, PhpResource, getenv, implode, php_fopen_resource, php_stderr_resource,
     php_stdout_resource, php_uname, stripos,

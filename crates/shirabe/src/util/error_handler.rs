@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Util/ErrorHandler.php
 
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use shirabe_php_shim::{
     E_ALL, E_DEPRECATED, E_USER_DEPRECATED, E_USER_WARNING, E_WARNING, ErrorException, PHP_EOL,
     STDERR, debug_backtrace, error_reporting, filter_var_boolean, fwrite, ini_get,

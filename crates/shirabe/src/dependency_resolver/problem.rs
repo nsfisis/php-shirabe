@@ -1,23 +1,17 @@
 //! ref: composer/src/Composer/DependencyResolver/Problem.php
 
-use crate::dependency_resolver::Pool;
-use crate::dependency_resolver::Request;
 use crate::dependency_resolver::rule::{self, Rule};
-use crate::package::BasePackageHandle;
-use crate::package::Link;
+use crate::dependency_resolver::{Pool, Request};
 use crate::package::version::VersionParser;
-use crate::repository::LockArrayRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositorySet;
+use crate::package::{BasePackageHandle, Link};
+use crate::repository::{LockArrayRepository, PlatformRepository, RepositorySet};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, extension_loaded, implode, loosely_compare, php_regex,
     preg_is_match, preg_match, preg_replace, spl_object_hash, sprintf, str_replace, stripos,
     strpos, strtolower, substr, substr_count, version_compare,
 };
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::MultiConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_semver::constraint::{AnyConstraint, MultiConstraint, SimpleConstraint};
 use shirabe_symfony_console::formatter::OutputFormatter;
 
 /// Represents a problem detected while solving dependencies

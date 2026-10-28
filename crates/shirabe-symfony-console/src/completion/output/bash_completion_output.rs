@@ -1,7 +1,6 @@
 //! ref: composer/vendor/symfony/console/Completion/Output/BashCompletionOutput.php
 
-use crate::completion::CompletionOutputInterface;
-use crate::completion::CompletionSuggestions;
+use crate::completion::{CompletionOutputInterface, CompletionSuggestions};
 use crate::output::OutputInterface;
 
 #[derive(Debug)]

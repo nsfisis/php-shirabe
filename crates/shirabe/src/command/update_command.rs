@@ -1,30 +1,21 @@
 //! ref: composer/src/Composer/Command/UpdateCommand.php
 
 use crate::advisory::Auditor;
-use crate::command::BumpCommand;
-use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, BumpCommand, CompletionTrait};
 use crate::composer::PartialComposerHandle;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::console::input::SuggestedValues;
+use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::request::UpdateAllowTransitiveDeps;
 use crate::installer::Installer;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::base_package;
 use crate::package::loader::RootPackageLoader;
-use crate::package::version::VersionParser;
-use crate::package::version::VersionSelector;
 use crate::package::version::version_selector::ShowWarnings;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
-use crate::repository::CanonicalPackagesTrait;
-use crate::repository::CompositeRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositorySet;
+use crate::package::version::{VersionParser, VersionSelector};
+use crate::plugin::{CommandEvent, PluginEvents};
+use crate::repository::{
+    CanonicalPackagesTrait, CompositeRepository, PlatformRepository, RepositorySet,
+};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
@@ -35,8 +26,7 @@ use shirabe_semver::Intervals;
 use shirabe_semver::constraint::MultiConstraint;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::helper::Table;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]

@@ -2,12 +2,8 @@
 
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::util::Bitbucket;
-use crate::util::GitHub;
-use crate::util::GitLab;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::util::{Bitbucket, GitHub, GitLab};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

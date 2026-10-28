@@ -1,11 +1,9 @@
 //! ref: composer/vendor/symfony/console/Input/StringInput.php
 
 use crate::exception::InvalidArgumentException;
-use crate::input::ArgvInput;
-use crate::input::InputDefinition;
-use crate::input::InputInterface;
-use crate::input::InputValue;
-use crate::input::StreamableInputInterface;
+use crate::input::{
+    ArgvInput, InputDefinition, InputInterface, InputValue, StreamableInputInterface,
+};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpResource, php_regex, preg_match, str_replace_arr, stripcslashes, strlen, substr,

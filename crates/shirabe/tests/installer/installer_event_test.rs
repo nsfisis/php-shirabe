@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Installer/InstallerEventTest.php
 
 use shirabe::composer::{ComposerHandle, PartialOrFullComposer};
-use shirabe::dependency_resolver::AnyTransaction;
-use shirabe::dependency_resolver::Transaction;
+use shirabe::dependency_resolver::{AnyTransaction, Transaction};
 use shirabe::event_dispatcher::EventInterface;
 use shirabe::installer::InstallerEvent;
 use shirabe::io::IOInterface;

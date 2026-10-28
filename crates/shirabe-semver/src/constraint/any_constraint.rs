@@ -1,10 +1,8 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/ConstraintInterface.php
 
-use crate::constraint::Bound;
-use crate::constraint::MatchAllConstraint;
-use crate::constraint::MatchNoneConstraint;
-use crate::constraint::MultiConstraint;
-use crate::constraint::SimpleConstraint;
+use crate::constraint::{
+    Bound, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
+};
 use shirabe_php_shim::CmpOp;
 
 /// Corresponds to PHP's `ConstraintInterface`.

@@ -1,10 +1,6 @@
 //! ref: composer/src/Composer/Package/CompletePackage.php
 
-use crate::package::CompletePackageInterface;
-use crate::package::DisplayMode;
-use crate::package::Mirror;
-use crate::package::Package;
-use crate::package::PackageInterface;
+use crate::package::{CompletePackageInterface, DisplayMode, Mirror, Package, PackageInterface};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;

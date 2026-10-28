@@ -11,12 +11,11 @@ use serial_test::serial;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
-use shirabe::package::RootPackage;
 use shirabe::package::loader::RootPackageLoader;
 use shirabe::package::version::{
     VersionData, VersionGuesser, VersionGuesserInterface, VersionParser,
 };
-use shirabe::package::{STABILITY_ALPHA, STABILITY_DEV, STABILITY_RC};
+use shirabe::package::{RootPackage, STABILITY_ALPHA, STABILITY_DEV, STABILITY_RC};
 use shirabe::repository::RepositoryManager;
 use shirabe::util::Git as GitUtil;
 use shirabe::util::http_downloader::HttpDownloader;

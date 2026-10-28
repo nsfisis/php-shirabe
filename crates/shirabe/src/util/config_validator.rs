@@ -1,17 +1,16 @@
 //! ref: composer/src/Composer/Util/ConfigValidator.php
 
 use crate::io::IOInterface;
-use crate::json::JsonFile;
-use crate::json::JsonValidationException;
-use crate::package::loader::ArrayLoader;
-use crate::package::loader::InvalidPackageException;
-use crate::package::loader::LoaderInterface;
-use crate::package::loader::ValidatingArrayLoader;
+use crate::json::{JsonFile, JsonValidationException};
+use crate::package::loader::{
+    ArrayLoader, InvalidPackageException, LoaderInterface, ValidatingArrayLoader,
+};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use serde::de::Error as _;
-use shirabe_php_shim::{Catch as _, file_get_contents};
-use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_replace};
+use shirabe_php_shim::{
+    Catch as _, PhpMixed, file_get_contents, php_regex, preg_is_match, preg_replace,
+};
 use shirabe_spdx_licenses::SpdxLicenses;
 
 #[derive(Debug)]

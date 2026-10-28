@@ -1,12 +1,8 @@
 //! ref: composer/src/Composer/Command/RepositoryCommand.php
 
-use crate::command::BaseConfigCommand;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::config::Config;
-use crate::config::ConfigSourceInterface;
-use crate::config::JsonConfigSource;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
+use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand};
+use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
+use crate::console::input::{InputArgument, InputOption};
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use bstr::ByteSlice;
@@ -16,8 +12,7 @@ use shirabe_php_shim::{
     preg_is_match, strtolower,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]

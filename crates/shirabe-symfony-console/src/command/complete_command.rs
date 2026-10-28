@@ -1,13 +1,11 @@
 //! ref: composer/vendor/symfony/console/Command/CompleteCommand.php
 
 use crate::command::{Command, CommandData};
-use crate::completion::BashCompletionOutput;
-use crate::completion::CompletionInput;
-use crate::completion::CompletionOutputInterface;
-use crate::completion::{CompletionSuggestions, StringOrSuggestion};
-use crate::input::InputInterface;
-use crate::input::InputOption;
-use crate::input::InputValue;
+use crate::completion::{
+    BashCompletionOutput, CompletionInput, CompletionOutputInterface, CompletionSuggestions,
+    StringOrSuggestion,
+};
+use crate::input::{InputInterface, InputOption, InputValue};
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

@@ -4,12 +4,10 @@ use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterfa
 use crate::package::base_package::{self};
 use crate::repository::PlatformRepository;
 use shirabe_php_shim::preg_is_match;
-use shirabe_semver::Interval;
-use shirabe_semver::Intervals;
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::MatchAllConstraint;
-use shirabe_semver::constraint::MultiConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_semver::constraint::{
+    AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint,
+};
+use shirabe_semver::{Interval, Intervals};
 
 #[derive(Debug)]
 pub struct IgnoreListPlatformRequirementFilter {

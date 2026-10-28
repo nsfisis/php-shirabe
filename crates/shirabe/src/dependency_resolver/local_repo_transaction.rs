@@ -2,8 +2,7 @@
 
 use super::Transaction;
 use crate::dependency_resolver::operation::AnyOperation;
-use crate::repository::InstalledRepositoryInterface;
-use crate::repository::RepositoryInterface;
+use crate::repository::{InstalledRepositoryInterface, RepositoryInterface};
 
 #[derive(Debug)]
 pub struct LocalRepoTransaction {

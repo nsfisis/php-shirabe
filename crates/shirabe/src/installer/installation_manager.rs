@@ -1,22 +1,15 @@
 //! ref: composer/src/Composer/Installer/InstallationManager.php
 
-use crate::dependency_resolver::operation::AnyOperation;
-use crate::dependency_resolver::operation::InstallOperation;
-use crate::dependency_resolver::operation::MarkAliasInstalledOperation;
-use crate::dependency_resolver::operation::MarkAliasUninstalledOperation;
-use crate::dependency_resolver::operation::UninstallOperation;
-use crate::dependency_resolver::operation::UpdateOperation;
+use crate::dependency_resolver::operation::{
+    AnyOperation, InstallOperation, MarkAliasInstalledOperation, MarkAliasUninstalledOperation,
+    UninstallOperation, UpdateOperation,
+};
 use crate::downloader::FileDownloader;
 use crate::event_dispatcher::EventDispatcher;
-use crate::installer::InstallerInterface;
-use crate::installer::PackageEvents;
-use crate::io::ConsoleIO;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::installer::{InstallerInterface, PackageEvents};
+use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
-use crate::repository::InstalledRepositoryInterface;
-use crate::repository::InstalledRepositoryInterfaceHandle;
+use crate::repository::{InstalledRepositoryInterface, InstalledRepositoryInterfaceHandle};
 use crate::signal::SignalSubscription;
 use crate::util::Platform;
 use crate::util::r#loop::Loop;

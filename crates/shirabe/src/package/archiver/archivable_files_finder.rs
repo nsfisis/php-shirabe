@@ -1,8 +1,6 @@
 //! ref: composer/src/Composer/Package/Archiver/ArchivableFilesFinder.php
 
-use crate::package::archiver::BaseExcludeFilter;
-use crate::package::archiver::ComposerExcludeFilter;
-use crate::package::archiver::GitExcludeFilter;
+use crate::package::archiver::{BaseExcludeFilter, ComposerExcludeFilter, GitExcludeFilter};
 use crate::util::Filesystem;
 use shirabe_php_shim::{RuntimeException, preg_quote, preg_replace, realpath};
 use shirabe_symfony_finder::Finder;

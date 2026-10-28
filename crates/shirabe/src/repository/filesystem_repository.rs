@@ -3,19 +3,14 @@
 use crate::config::is_php_integer_key;
 use crate::installer::InstallationManagerInterface;
 use crate::json::JsonFile;
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
-use crate::package::loader::ArrayLoader;
-use crate::package::loader::LoaderInterface;
-use crate::repository::InvalidRepositoryException;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterface;
-use crate::repository::WritableArrayRepository;
-use crate::repository::{FindPackageConstraint, LoadPackagesResult, ProviderInfo, SearchResult};
-use crate::util::Filesystem;
-use crate::util::Platform;
+use crate::package::loader::{ArrayLoader, LoaderInterface};
+use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle};
+use crate::repository::{
+    FindPackageConstraint, InvalidRepositoryException, LoadPackagesResult, PlatformRepository,
+    ProviderInfo, RepositoryInterface, SearchResult, WritableArrayRepository,
+};
+use crate::util::{Filesystem, Platform};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

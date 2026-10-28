@@ -1,11 +1,7 @@
 //! ref: composer/vendor/symfony/console/Helper/ProcessHelper.php
 
-use crate::helper::DebugFormatterHelper;
-use crate::helper::Helper;
-use crate::helper::HelperInterface;
-use crate::helper::HelperSet;
-use crate::output::ConsoleOutputInterface;
-use crate::output::{OutputInterface, output_interface};
+use crate::helper::{DebugFormatterHelper, Helper, HelperInterface, HelperSet};
+use crate::output::{ConsoleOutputInterface, OutputInterface, output_interface};
 use shirabe_php_shim::{AsAny, InvalidArgumentException, PhpMixed, spl_object_hash, str_replace};
 use shirabe_symfony_process::exception::ProcessFailedException;
 use shirabe_symfony_process::process::Process;

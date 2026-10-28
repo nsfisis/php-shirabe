@@ -1,7 +1,6 @@
 //! ref: composer/vendor/symfony/console/Input/InputOption.php
 
-use crate::exception::InvalidArgumentException;
-use crate::exception::LogicException;
+use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::InputValue;
 use shirabe_php_shim::{array_filter, implode, ltrim, php_regex, preg_split};
 

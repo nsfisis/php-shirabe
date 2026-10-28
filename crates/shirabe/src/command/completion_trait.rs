@@ -3,13 +3,11 @@
 use crate::command::BaseCommand;
 use crate::console::input::SuggestedValues;
 use crate::package::base_package;
-use crate::repository::CompositeRepository;
-use crate::repository::InstalledRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterface;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::RootPackageRepository;
 use crate::repository::repository_interface::{SEARCH_NAME, SEARCH_VENDOR, SearchResult};
+use crate::repository::{
+    CompositeRepository, InstalledRepository, PlatformRepository, RepositoryInterface,
+    RepositoryInterfaceHandle, RootPackageRepository,
+};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_quote, substr};
 

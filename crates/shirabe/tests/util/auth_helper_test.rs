@@ -4,11 +4,9 @@ use crate::config_stub::ConfigStubBuilder;
 use crate::io_mock::{Expectation, IOMock, get_io_mock};
 use indexmap::IndexMap;
 use shirabe::config::ConfigSourceInterface;
-use shirabe::io::IOInterface;
-use shirabe::io::io_interface;
+use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::{AuthHelper, Bitbucket, StoreAuth};
-use shirabe_php_shim::{Catch as _, time};
-use shirabe_php_shim::{PhpMixed, base64_encode, json_encode};
+use shirabe_php_shim::{Catch as _, PhpMixed, base64_encode, json_encode, time};
 
 // Mirrors AuthHelperTest::setUp: a DEBUG-verbosity IOMock plus a real Config, both
 // shared with the AuthHelper under test. The IOMockGuard runs assert_complete on drop.

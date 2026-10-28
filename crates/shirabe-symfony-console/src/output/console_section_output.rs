@@ -2,9 +2,7 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::Helper;
-use crate::output::DoWrite;
-use crate::output::OutputInterface;
-use crate::output::StreamOutput;
+use crate::output::{DoWrite, OutputInterface, StreamOutput};
 use crate::terminal::Terminal;
 use shirabe_php_shim::{
     PHP_EOL, PhpResource, array_reverse, array_splice, array_unshift, explode, str_replace,

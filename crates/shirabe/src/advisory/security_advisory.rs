@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Advisory/SecurityAdvisory.php
 
-use crate::advisory::IgnoredSecurityAdvisory;
-use crate::advisory::PartialSecurityAdvisory;
+use crate::advisory::{IgnoredSecurityAdvisory, PartialSecurityAdvisory};
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::DATE_RFC3339;

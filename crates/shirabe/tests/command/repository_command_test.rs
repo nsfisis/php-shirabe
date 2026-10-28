@@ -3,8 +3,7 @@
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
 use shirabe::json::JsonFile;
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// Read the composer.json in the CWD and decode it.
 fn read_composer_json() -> serde_json::Value {

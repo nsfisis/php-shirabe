@@ -8,8 +8,7 @@ use serial_test::serial;
 use shirabe::json::JsonFile;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe_php_shim::{chmod, function_exists, posix_getuid};
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: BumpCommandTest::testBump (data provider rolled into one body).
 fn run_bump_case(

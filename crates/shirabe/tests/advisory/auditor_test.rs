@@ -1,33 +1,21 @@
 //! ref: composer/tests/Composer/Test/Advisory/AuditorTest.php
 
 use crate::io_mock::{Expectation, get_io_mock};
-use crate::test_case::get_complete_package;
-use crate::test_case::get_package;
+use crate::test_case::{get_complete_package, get_package};
 use chrono::Utc;
 use indexmap::IndexMap;
-use shirabe::advisory::AnySecurityAdvisory;
-use shirabe::advisory::Auditor;
-use shirabe::advisory::PartialSecurityAdvisory;
-use shirabe::advisory::SecurityAdvisory;
+use shirabe::advisory::{AnySecurityAdvisory, Auditor, PartialSecurityAdvisory, SecurityAdvisory};
 use shirabe::downloader::TransportException;
-use shirabe::io::BufferIO;
-use shirabe::io::IOInterface;
-use shirabe::io::io_interface;
-use shirabe::package::BasePackageHandle;
-use shirabe::package::PackageInterfaceHandle;
-use shirabe::repository::AdvisoryProviderInterface;
-use shirabe::repository::FindPackageConstraint;
-use shirabe::repository::LoadPackagesResult;
-use shirabe::repository::ProviderInfo;
-use shirabe::repository::RepositoryInterface;
-use shirabe::repository::RepositoryInterfaceHandle;
-use shirabe::repository::RepositorySet;
-use shirabe::repository::SearchResult;
-use shirabe::repository::SecurityAdvisoryResult;
+use shirabe::io::{BufferIO, IOInterface, io_interface};
+use shirabe::package::{BasePackageHandle, PackageInterfaceHandle};
+use shirabe::repository::{
+    AdvisoryProviderInterface, FindPackageConstraint, LoadPackagesResult, ProviderInfo,
+    RepositoryInterface, RepositoryInterfaceHandle, RepositorySet, SearchResult,
+    SecurityAdvisoryResult,
+};
 use shirabe_php_shim::{PhpMixed, date_create};
 use shirabe_semver::VersionParser;
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::output::output_interface;
 
 fn constraint(operator: &str, version: &str) -> shirabe_semver::constraint::AnyConstraint {

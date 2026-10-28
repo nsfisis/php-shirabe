@@ -1,8 +1,7 @@
 //! ref: composer/src/Composer/IO/BaseIO.php
 
 use crate::config::Config;
-use crate::io::IOInterface;
-use crate::io::io_interface;
+use crate::io::{IOInterface, io_interface};
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

@@ -1,30 +1,20 @@
 //! ref: composer/src/Composer/Command/ArchiveCommand.php
 
-use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::console::input::SuggestedValues;
+use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::factory::Factory;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::archiver::ArchiveManagerInterface;
-use crate::package::version::VersionParser;
-use crate::package::version::VersionSelector;
 use crate::package::version::version_selector::ShowWarnings;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
-use crate::repository::CompositeRepository;
-use crate::repository::RepositoryFactory;
-use crate::repository::RepositorySet;
+use crate::package::version::{VersionParser, VersionSelector};
+use crate::plugin::{CommandEvent, PluginEvents};
+use crate::repository::{CompositeRepository, RepositoryFactory, RepositorySet};
 use crate::script::ScriptEvents;
-use crate::util::Filesystem;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
 use crate::util::r#loop::Loop;
+use crate::util::{Filesystem, Platform, ProcessExecutor};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     LogicException, PhpMixed, get_debug_type, impl_php_class, php_regex, preg_match,

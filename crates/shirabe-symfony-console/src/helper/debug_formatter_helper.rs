@@ -1,8 +1,6 @@
 //! ref: composer/vendor/symfony/console/Helper/DebugFormatterHelper.php
 
-use crate::helper::Helper;
-use crate::helper::HelperInterface;
-use crate::helper::HelperSet;
+use crate::helper::{Helper, HelperInterface, HelperSet};
 use indexmap::IndexMap;
 use shirabe_php_shim::str_replace;
 

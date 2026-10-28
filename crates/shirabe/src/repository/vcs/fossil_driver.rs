@@ -3,18 +3,14 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::repository::vcs::VcsDriverBase;
-use crate::util::Filesystem;
-use crate::util::ProcessExecutor;
+use crate::util::{Filesystem, ProcessExecutor};
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, date_create};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable, php_regex, preg_is_match,
-    preg_replace,
+    Catch as _, PhpMixed, RuntimeException, date_create, dirname, is_dir, is_file, is_writable,
+    php_regex, preg_is_match, preg_replace,
 };
 
 #[derive(Debug)]

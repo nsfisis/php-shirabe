@@ -1,6 +1,4 @@
-use crate::advisory::IgnoredSecurityAdvisory;
-use crate::advisory::PartialSecurityAdvisory;
-use crate::advisory::SecurityAdvisory;
+use crate::advisory::{IgnoredSecurityAdvisory, PartialSecurityAdvisory, SecurityAdvisory};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug, Clone, serde::Serialize)]

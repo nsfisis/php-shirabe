@@ -1,5 +1,4 @@
-use crate::ErrorException;
-use crate::{StreamBacking, StreamState};
+use crate::{ErrorException, StreamBacking, StreamState};
 use zip::write::SimpleFileOptions;
 
 /// Test-only behaviour mirroring PHPUnit's `getMockBuilder('ZipArchive')->getMock()`, where

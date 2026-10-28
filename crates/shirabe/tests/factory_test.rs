@@ -3,8 +3,7 @@
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::factory::Factory;
-use shirabe::io::IOInterface;
-use shirabe::io::io_interface;
+use shirabe::io::{IOInterface, io_interface};
 use shirabe::util::platform::Platform;
 use shirabe_php_shim::PhpMixed;
 

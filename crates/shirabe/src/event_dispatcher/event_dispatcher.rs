@@ -1,50 +1,39 @@
 //! ref: composer/src/Composer/EventDispatcher/EventDispatcher.php
 
 use crate::autoload::ClassLoader;
-use crate::composer::PartialComposerHandle;
-use crate::composer::PartialComposerWeakHandle;
+use crate::composer::{PartialComposerHandle, PartialComposerWeakHandle};
 use crate::dependency_resolver::AnyTransaction;
 use crate::dependency_resolver::operation::AnyOperation;
-use crate::event_dispatcher::Event;
-use crate::event_dispatcher::EventInterface;
-use crate::event_dispatcher::EventSubscriberInterface;
-use crate::event_dispatcher::ScriptExecutionException;
-use crate::event_dispatcher::SubscribedEventEntry;
-use crate::installer::BinaryInstaller;
-use crate::installer::InstallerEvent;
-use crate::installer::PackageEvent;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::plugin::CommandEvent;
-use crate::plugin::PreCommandRunEvent;
+use crate::event_dispatcher::{
+    Event, EventInterface, EventSubscriberInterface, ScriptExecutionException, SubscribedEventEntry,
+};
+use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
 use crate::plugin::pre_pool_create_event::PrePoolCreateEvent;
 use crate::plugin::throwable_bridge::{described_throw, throw_into_error};
+use crate::plugin::{CommandEvent, PreCommandRunEvent};
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::script::Event as ScriptEvent;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
-use bstr::BString;
-use bstr::ByteSlice;
+use crate::util::{Platform, ProcessExecutor};
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
     call_function_with_dispatcher, call_php_method, call_static_method,
 };
-use shirabe_php_shim::{Catch as _, is_dir};
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, file_exists, get_class, hash, implode, ini_get, is_array,
-    is_callable, is_object, is_string, krsort, php_regex, preg_is_match, preg_match, preg_quote,
-    preg_replace, preg_replace_callback, realpath, spl_autoload_functions, spl_autoload_register,
-    spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos, strtoupper, substr,
-    trim,
+    is_callable, is_dir, is_object, is_string, krsort, php_regex, preg_is_match, preg_match,
+    preg_quote, preg_replace, preg_replace_callback, realpath, spl_autoload_functions,
+    spl_autoload_register, spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos,
+    strtoupper, substr, trim,
 };
 use shirabe_symfony_console::output::output_interface;
-use shirabe_symfony_process::ExecutableFinder;
-use shirabe_symfony_process::PhpExecutableFinder;
+use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
 
 /// Represents a callable listener. PHP's `callable` may be a string (command, script, or
 /// "Class::method"), a `[object|string, method]` pair, or a `\Closure`.

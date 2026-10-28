@@ -1,10 +1,9 @@
 //! ref: composer/src/Composer/Repository/RepositoryUtils.php
 
 use crate::package::Link;
-use crate::repository::CompositeRepository;
-use crate::repository::FilterRepository;
-use crate::repository::InstalledRepository;
-use crate::repository::RepositoryInterfaceHandle;
+use crate::repository::{
+    CompositeRepository, FilterRepository, InstalledRepository, RepositoryInterfaceHandle,
+};
 use indexmap::IndexMap;
 
 pub struct RepositoryUtils;

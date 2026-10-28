@@ -7,39 +7,24 @@ use crate::composer;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::BufferIO;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::NullIO;
-use crate::json::JsonFile;
-use crate::json::JsonValidationException;
-use crate::package::LockerInterface;
-use crate::package::RootPackage;
+use crate::io::{BufferIO, IOInterface, IOInterfaceImmutable, NullIO};
+use crate::json::{JsonFile, JsonValidationException};
 use crate::package::version::VersionParser;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
-use crate::repository::ComposerRepository;
-use crate::repository::FilesystemRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositorySet;
-use crate::self_update::Keys;
-use crate::self_update::Versions;
-use crate::util::ConfigValidator;
-use crate::util::Git;
-use crate::util::HttpDownloader;
-use crate::util::IniHelper;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
-use crate::util::http::ProxyManager;
-use crate::util::http::RequestProxy;
+use crate::package::{LockerInterface, RootPackage};
+use crate::plugin::{CommandEvent, PluginEvents};
+use crate::repository::{
+    ComposerRepository, FilesystemRepository, PlatformRepository, RepositorySet,
+};
+use crate::self_update::{Keys, Versions};
+use crate::util::http::{ProxyManager, RequestProxy};
+use crate::util::{ConfigValidator, Git, HttpDownloader, IniHelper, Platform, ProcessExecutor};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpClass as _;
 use shirabe_php_shim::{
-    AnyThrowable, Catch as _, CmpOp, Exception, InvalidArgumentException, PHP_EOL, PhpMixed,
-    RuntimeException, disk_free_space, file_exists, filter_var_boolean, hash, impl_php_class,
-    implode, php_regex, preg_match, rtrim, str_replace, strpos, strstr, strstr3, strtolower, trim,
-    version_compare,
+    AnyThrowable, Catch as _, CmpOp, Exception, InvalidArgumentException, PHP_EOL, PhpClass as _,
+    PhpMixed, RuntimeException, disk_free_space, file_exists, filter_var_boolean, hash,
+    impl_php_class, implode, php_regex, preg_match, rtrim, str_replace, strpos, strstr, strstr3,
+    strtolower, trim, version_compare,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;

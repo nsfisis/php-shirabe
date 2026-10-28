@@ -1,16 +1,11 @@
 //! ref: composer/src/Composer/Command/BumpCommand.php
 
-use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
+use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::console::input::{InputArgument, InputOption};
 use crate::factory::Factory;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::json::JsonFile;
-use crate::json::JsonManipulator;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::json::{JsonFile, JsonManipulator};
 use crate::package::base_package;
 use crate::package::version::VersionBumper;
 use crate::repository::PlatformRepository;

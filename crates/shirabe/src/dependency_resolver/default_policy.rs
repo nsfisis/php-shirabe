@@ -1,13 +1,10 @@
 //! ref: composer/src/Composer/DependencyResolver/DefaultPolicy.php
 
-use crate::dependency_resolver::PolicyInterface;
-use crate::dependency_resolver::Pool;
-use crate::package::BasePackageHandle;
-use crate::package::STABILITIES;
+use crate::dependency_resolver::{PolicyInterface, Pool};
+use crate::package::{BasePackageHandle, STABILITIES};
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_php_shim::CmpOp;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{CmpOp, PhpMixed};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::SimpleConstraint;
 

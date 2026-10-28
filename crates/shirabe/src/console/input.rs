@@ -4,8 +4,9 @@ pub mod input_option;
 pub use input_argument::*;
 pub use input_option::*;
 
-use shirabe_symfony_console::completion::CompletionInput;
-use shirabe_symfony_console::completion::{CompletionSuggestions, StringOrSuggestion};
+use shirabe_symfony_console::completion::{
+    CompletionInput, CompletionSuggestions, StringOrSuggestion,
+};
 
 /// PHP: `\Closure(CompletionInput,CompletionSuggestions):list<string|Suggestion>`.
 ///

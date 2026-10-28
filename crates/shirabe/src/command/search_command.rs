@@ -2,25 +2,19 @@
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::console::input::SuggestedValues;
+use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
-use crate::repository::CompositeRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterfaceHandle;
+use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::repository_interface::{self, AbandonedInfo, RepositoryInterface};
+use crate::repository::{CompositeRepository, PlatformRepository, RepositoryInterfaceHandle};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, impl_php_class, implode, in_array_loose, preg_quote, substr,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]

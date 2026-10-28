@@ -1,10 +1,9 @@
 //! ref: composer/src/Composer/Package/CompleteAliasPackage.php
 
-use crate::package::AliasPackage;
-use crate::package::CompletePackageHandle;
-use crate::package::CompletePackageInterface;
-use crate::package::PackageHandle;
 use crate::package::handle::delegate_package_interface_to_inner;
+use crate::package::{
+    AliasPackage, CompletePackageHandle, CompletePackageInterface, PackageHandle,
+};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 

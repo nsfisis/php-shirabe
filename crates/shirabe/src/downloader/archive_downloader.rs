@@ -1,16 +1,13 @@
 //! ref: composer/src/Composer/Downloader/ArchiveDownloader.php
 
 use crate::dependency_resolver::operation::InstallOperation;
-use crate::downloader::DownloaderInterface;
-use crate::downloader::FileDownloader;
+use crate::downloader::{DownloaderInterface, FileDownloader};
 use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
-use crate::util::Filesystem;
-use crate::util::Platform;
+use crate::util::{Filesystem, Platform};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, bin2hex, file_exists, is_dir, random_bytes, realpath,
+    Catch as _, PhpMixed, RuntimeException, bin2hex, file_exists, is_dir, random_bytes, realpath,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};

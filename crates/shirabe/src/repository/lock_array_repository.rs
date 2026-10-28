@@ -1,12 +1,9 @@
 //! ref: composer/src/Composer/Repository/LockArrayRepository.php
 
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::repository::ArrayRepository;
-use crate::repository::CanonicalPackagesTrait;
+use crate::package::{BasePackageHandle, PackageInterfaceHandle};
 use crate::repository::{
-    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
-    RepositoryInterfaceWeakHandle, SearchResult,
+    ArrayRepository, CanonicalPackagesTrait, FindPackageConstraint, LoadPackagesResult,
+    ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
 };
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;

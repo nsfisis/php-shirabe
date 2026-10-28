@@ -1,15 +1,11 @@
 //! ref: composer/src/Composer/Repository/InstalledFilesystemRepository.php
 
 use crate::json::JsonFile;
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackageInterfaceHandle;
-use crate::repository::AdvisoryProviderInterface;
-use crate::repository::FilesystemRepository;
-use crate::repository::InstalledRepositoryInterface;
-use crate::repository::WritableRepositoryInterface;
+use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::repository::{
-    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
+    AdvisoryProviderInterface, FilesystemRepository, FindPackageConstraint,
+    InstalledRepositoryInterface, LoadPackagesResult, ProviderInfo, RepositoryInterface,
+    SearchResult, WritableRepositoryInterface,
 };
 use crate::util::Filesystem;
 use indexmap::IndexMap;

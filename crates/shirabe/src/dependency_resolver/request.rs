@@ -1,12 +1,10 @@
 //! ref: composer/src/Composer/DependencyResolver/Request.php
 
 use crate::package::BasePackageHandle;
-use crate::repository::LockArrayRepositoryHandle;
-use crate::repository::RepositoryInterface;
+use crate::repository::{LockArrayRepositoryHandle, RepositoryInterface};
 use indexmap::IndexMap;
 use shirabe_php_shim::{LogicException, strtolower};
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::MatchAllConstraint;
+use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 
 /// Identifies a partial update for listed packages only, all dependencies will remain at locked versions
 pub const UPDATE_ONLY_LISTED: i64 = 0;

@@ -2,15 +2,12 @@
 
 use crate::downloader::DownloaderInterface;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
+    Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
     array_reverse, array_shift, dirname, implode, in_array_strict, preg_is_match, preg_quote,
     rtrim, str_replace, strtolower, usort,
 };

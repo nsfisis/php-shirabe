@@ -1,22 +1,14 @@
 //! ref: composer/vendor/symfony/console/Helper/QuestionHelper.php
 
 use crate::cursor::Cursor;
-use crate::exception::MissingInputException;
-use crate::exception::RuntimeException;
-use crate::formatter::OutputFormatter;
-use crate::formatter::OutputFormatterStyle;
-use crate::helper::FormatBlockMessages;
-use crate::helper::Helper;
-use crate::helper::HelperInterface;
-use crate::helper::HelperSet;
+use crate::exception::{MissingInputException, RuntimeException};
+use crate::formatter::{OutputFormatter, OutputFormatterStyle};
+use crate::helper::{FormatBlockMessages, Helper, HelperInterface, HelperSet};
 use crate::input::InputInterface;
-use crate::output::ConsoleOutput;
-use crate::output::ConsoleOutputInterface;
-use crate::output::ConsoleSectionOutput;
-use crate::output::OutputInterface;
-use crate::output::output_interface;
-use crate::question::ChoiceQuestion;
-use crate::question::QuestionInterface;
+use crate::output::{
+    ConsoleOutput, ConsoleOutputInterface, ConsoleSectionOutput, OutputInterface, output_interface,
+};
+use crate::question::{ChoiceQuestion, QuestionInterface};
 use crate::terminal::Terminal;
 use bstr::BString;
 use shirabe_php_shim::{

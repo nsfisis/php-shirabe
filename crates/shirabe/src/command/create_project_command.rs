@@ -1,51 +1,38 @@
 //! ref: composer/src/Composer/Command/CreateProjectCommand.php
 
 use crate::advisory::Auditor;
-use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::config::Config;
-use crate::config::ConfigSourceInterface;
-use crate::config::JsonConfigSource;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::console::input::SuggestedValues;
+use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
+use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::IgnoreAllPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::installer::Installer;
-use crate::installer::ProjectInstaller;
-use crate::installer::SuggestedPackagesReporter;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::filter::platform_requirement_filter::{
+    IgnoreAllPlatformRequirementFilter, PlatformRequirementFilterFactory,
+    PlatformRequirementFilterInterface,
+};
+use crate::installer::{Installer, ProjectInstaller, SuggestedPackagesReporter};
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::json::JsonFile;
-use crate::package::version::VersionParser;
-use crate::package::version::VersionSelector;
 use crate::package::version::version_selector::ShowWarnings;
+use crate::package::version::{VersionParser, VersionSelector};
 use crate::package::{STABILITIES, SUPPORTED_LINK_TYPES};
 use crate::plugin::PluginBlockedException;
-use crate::repository::CompositeRepository;
-use crate::repository::InstalledArrayRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryFactory;
-use crate::repository::RepositorySet;
+use crate::repository::{
+    CompositeRepository, InstalledArrayRepository, PlatformRepository, RepositoryFactory,
+    RepositorySet,
+};
 use crate::script::ScriptEvents;
 use crate::signal::SignalSubscription;
-use crate::util::Filesystem;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
+use crate::util::{Filesystem, Platform, ProcessExecutor};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException, array_pop,
-    chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode, is_dir, is_file,
-    mkdir, preg_match, realpath, rtrim, strtolower, unlink,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
+    array_pop, chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode, is_dir,
+    is_file, mkdir, preg_match, realpath, rtrim, strtolower, unlink,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 use shirabe_symfony_finder::Finder;
 use std::path::PathBuf;

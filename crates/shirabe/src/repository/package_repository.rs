@@ -1,18 +1,13 @@
 //! ref: composer/src/Composer/Repository/PackageRepository.php
 
 use crate::advisory::{AnySecurityAdvisory, PartialSecurityAdvisory};
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::loader::ArrayLoader;
-use crate::package::loader::LoaderInterface;
-use crate::package::loader::ValidatingArrayLoader;
+use crate::package::loader::{ArrayLoader, LoaderInterface, ValidatingArrayLoader};
 use crate::package::version::VersionParser;
-use crate::repository::ArrayRepository;
-use crate::repository::InvalidRepositoryException;
-use crate::repository::RepositoryInterfaceWeakHandle;
+use crate::package::{BasePackageHandle, PackageInterfaceHandle};
 use crate::repository::{
-    AdvisoryProviderInterface, FindPackageConstraint, LoadPackagesResult, ProviderInfo,
-    RepositoryInterface, SearchResult, SecurityAdvisoryResult,
+    AdvisoryProviderInterface, ArrayRepository, FindPackageConstraint, InvalidRepositoryException,
+    LoadPackagesResult, ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle,
+    SearchResult, SecurityAdvisoryResult,
 };
 use indexmap::IndexMap;
 use shirabe_php_shim::{

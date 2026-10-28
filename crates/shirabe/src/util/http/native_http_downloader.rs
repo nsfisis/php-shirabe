@@ -21,17 +21,10 @@
 //! a cancelled file download leaves its partial `~` file behind.
 
 use crate::config::Config;
-use crate::downloader::MaxFileSizeExceededException;
-use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::util::HttpDownloader;
-use crate::util::Platform;
-use crate::util::Url;
-use crate::util::http::NativeHttpResponse;
-use crate::util::http::ProxyManager;
-use crate::util::http::Response;
-use crate::util::{AuthHelper, PromptAuthResult, StoreAuth};
+use crate::downloader::{MaxFileSizeExceededException, TransportException};
+use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::util::http::{NativeHttpResponse, ProxyManager, Response};
+use crate::util::{AuthHelper, HttpDownloader, Platform, PromptAuthResult, StoreAuth, Url};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, implode, in_array_loose, in_array_strict, json_decode_assoc, parse_url,

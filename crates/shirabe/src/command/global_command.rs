@@ -1,23 +1,19 @@
 //! ref: composer/src/Composer/Command/GlobalCommand.php
 
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::Application;
 use crate::console::input::InputArgument;
 use crate::factory::Factory;
-use crate::util::Filesystem;
-use crate::util::Platform;
+use crate::util::{Filesystem, Platform};
 use shirabe_php_shim::{
     LogicException, RuntimeException, chdir, impl_php_class, php_regex, preg_replace2, preg_split,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::completion::CompletionInput;
-use shirabe_symfony_console::completion::{CompletionSuggestions, StringOrSuggestion};
-use shirabe_symfony_console::input::ArgvInput;
-use shirabe_symfony_console::input::ArrayInput;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::StringInput;
+use shirabe_symfony_console::completion::{
+    CompletionInput, CompletionSuggestions, StringOrSuggestion,
+};
+use shirabe_symfony_console::input::{ArgvInput, ArrayInput, InputInterface, StringInput};
 use shirabe_symfony_console::output::OutputInterface;
 use std::path::Path;
 

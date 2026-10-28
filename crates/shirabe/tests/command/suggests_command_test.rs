@@ -8,8 +8,7 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::package::Link;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: SuggestsCommandTest::getPackageWithSuggestAndRequires
 fn get_package_with_suggest_and_requires(

@@ -3,10 +3,9 @@
 use crate::cursor::Cursor;
 use crate::exception::LogicException;
 use crate::helper::Helper;
-use crate::output::ConsoleOutputInterface;
-use crate::output::ConsoleSectionOutput;
-use crate::output::OutputInterface;
-use crate::output::output_interface;
+use crate::output::{
+    ConsoleOutputInterface, ConsoleSectionOutput, OutputInterface, output_interface,
+};
 use crate::terminal::Terminal;
 use bstr::ByteSlice;
 use indexmap::IndexMap;

@@ -2,12 +2,10 @@
 
 use crate::application::Application;
 use crate::command::Command;
-use crate::descriptor::ApplicationDescription;
-use crate::descriptor::Descriptor;
-use crate::descriptor::{DescribableObject, DescriptorInterface};
-use crate::input::InputArgument;
-use crate::input::InputDefinition;
-use crate::input::InputOption;
+use crate::descriptor::{
+    ApplicationDescription, DescribableObject, Descriptor, DescriptorInterface,
+};
+use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
 use bstr::ByteSlice;
 use indexmap::IndexMap;

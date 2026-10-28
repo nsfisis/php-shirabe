@@ -2,8 +2,7 @@
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// `['command' => 'config'] + $command`, with the command name prepended.
 fn config_input(command: Vec<(ParameterName, InputValue)>) -> Vec<(ParameterName, InputValue)> {

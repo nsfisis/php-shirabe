@@ -7,19 +7,16 @@ use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::cache::{Cache, CacheMock};
 use shirabe::config::Config;
-use shirabe::downloader::DownloaderInterface;
-use shirabe::downloader::FileDownloader;
-use shirabe::io::IOInterface;
-use shirabe::io::io_interface;
+use shirabe::downloader::{DownloaderInterface, FileDownloader};
 use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, io_interface};
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::HttpDownloader;
 use shirabe::util::filesystem::{Filesystem, FilesystemMock};
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::r#loop::Loop;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
 };
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;

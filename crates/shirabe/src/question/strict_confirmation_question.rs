@@ -3,8 +3,7 @@
 use bstr::ByteSlice;
 use shirabe_php_shim::{PhpMixed, empty, is_bool, preg_is_match};
 use shirabe_symfony_console::exception::InvalidArgumentException;
-use shirabe_symfony_console::question::Question;
-use shirabe_symfony_console::question::QuestionInterface;
+use shirabe_symfony_console::question::{Question, QuestionInterface};
 
 #[derive(Debug)]
 pub struct StrictConfirmationQuestion {

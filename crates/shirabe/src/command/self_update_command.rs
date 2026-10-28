@@ -1,12 +1,9 @@
 //! ref: composer/src/Composer/Command/SelfUpdateCommand.php
 
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::console::input::{InputArgument, InputOption};
+use crate::io::{IOInterfaceImmutable, io_interface};
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;

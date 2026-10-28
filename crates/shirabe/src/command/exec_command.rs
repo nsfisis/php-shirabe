@@ -1,16 +1,13 @@
 //! ref: composer/src/Composer/Command/ExecCommand.php
 
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::Application;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
+use crate::console::input::{InputArgument, InputOption};
 use crate::io::IOInterfaceImmutable;
 use shirabe_php_shim::{PhpMixed, RuntimeException, basename, chdir, getcwd, glob, impl_php_class};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]

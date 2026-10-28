@@ -4,20 +4,15 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::IOInterface;
-use crate::json::JsonEncodeOptions;
-use crate::json::JsonFile;
+use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::VcsDriverBase;
-use crate::util::Filesystem;
-use crate::util::ProcessExecutor;
-use crate::util::Svn as SvnUtil;
-use crate::util::Url;
+use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil, Url};
 use bstr::ByteSlice;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, date_create};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, php_regex, preg_is_match, preg_match, preg_replace, stripos,
-    strrpos, strtr, substr, trim,
+    Catch as _, PhpMixed, RuntimeException, date_create, php_regex, preg_is_match, preg_match,
+    preg_replace, stripos, strrpos, strtr, substr, trim,
 };
 
 #[derive(Debug)]

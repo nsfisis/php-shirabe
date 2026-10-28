@@ -1,12 +1,8 @@
 //! ref: composer/src/Composer/Installer/BinaryInstaller.php
 
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
-use crate::util::Filesystem;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
+use crate::util::{Filesystem, Platform, ProcessExecutor};
 use bstr::BString;
 use shirabe_php_shim::{
     basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,

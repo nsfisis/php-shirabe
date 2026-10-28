@@ -10,8 +10,7 @@ use shirabe::json::JsonFile;
 use shirabe::package::Link;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 // Symfony\Component\Console\Command\Command exit codes.
 const SUCCESS: i32 = 0;

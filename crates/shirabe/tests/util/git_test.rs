@@ -11,8 +11,7 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::git::Git;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::{CommandLine, MockExpectation, MockHandler, ProcessExecutor};
-use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{PhpMixed, RuntimeException};
+use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException};
 
 // No-op ConfigSourceInterface, equivalent to PHPUnit's
 // `getMockBuilder(Config::class)` auto-stubbing getConfigSource/getAuthConfigSource:

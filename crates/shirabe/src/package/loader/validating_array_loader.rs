@@ -1,10 +1,8 @@
 //! ref: composer/src/Composer/Package/Loader/ValidatingArrayLoader.php
 
-use crate::package::PackageInterfaceHandle;
-use crate::package::loader::InvalidPackageException;
-use crate::package::loader::LoaderInterface;
+use crate::package::loader::{InvalidPackageException, LoaderInterface};
 use crate::package::version::VersionParser;
-use crate::package::{STABILITIES, SUPPORTED_LINK_TYPES};
+use crate::package::{PackageInterfaceHandle, STABILITIES, SUPPORTED_LINK_TYPES};
 use crate::repository::PlatformRepository;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
@@ -15,8 +13,7 @@ use shirabe_php_shim::{
     strcasecmp, strtolower, strtotime, substr, trigger_error, trim, var_export,
 };
 use shirabe_semver::Intervals;
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_spdx_licenses::SpdxLicenses;
 
 #[derive(Debug)]

@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Installer/InstallerInterface.php
 
-use crate::installer::BinaryPresenceInterface;
-use crate::installer::PluginInstaller;
+use crate::installer::{BinaryPresenceInterface, PluginInstaller};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use shirabe_php_shim::PhpMixed;

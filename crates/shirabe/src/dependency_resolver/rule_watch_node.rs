@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleWatchNode.php
 
-use crate::dependency_resolver::Decisions;
-use crate::dependency_resolver::Rule;
+use crate::dependency_resolver::{Decisions, Rule};
 
 pub struct RuleWatchNode {
     pub watch1: i64,

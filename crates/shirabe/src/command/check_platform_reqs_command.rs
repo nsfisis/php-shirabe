@@ -2,22 +2,18 @@
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::console::input::InputOption;
-use crate::console::input::SuggestedValues;
+use crate::console::input::{InputOption, SuggestedValues};
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::Link;
-use crate::repository::InstalledRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterface;
-use crate::repository::RootPackageRepository;
+use crate::repository::{
+    InstalledRepository, PlatformRepository, RepositoryInterface, RootPackageRepository,
+};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, array_merge_map, impl_php_class, strip_tags};
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 struct CheckResult {

@@ -2,9 +2,9 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{PregMatches, preg_replace_callback};
-use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::formatter::OutputFormatterInterface;
-use shirabe_symfony_console::formatter::OutputFormatterStyleInterface;
+use shirabe_symfony_console::formatter::{
+    OutputFormatter, OutputFormatterInterface, OutputFormatterStyleInterface,
+};
 
 #[derive(Debug)]
 pub struct HtmlOutputFormatter {

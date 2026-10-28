@@ -7,6 +7,7 @@ namespace Shirabe\Lint\Linters;
 use Shirabe\Lint\Linter;
 use Shirabe\Lint\Support\FileFinder;
 use Shirabe\Lint\Support\Paths;
+use Shirabe\Lint\Support\UseTree;
 
 final class NoBannedUse implements Linter
 {
@@ -97,28 +98,11 @@ final class NoBannedUse implements Linter
             return [];
         }
 
-        $tree = trim($tree);
-        $brace = strpos($tree, '{');
-
-        if ($brace === false) {
-            $stripped = $this->stripUseAlias($tree);
-
-            return $stripped === null || $stripped === '' ? [] : [$stripped];
-        }
-
-        $prefix = trim(preg_replace('/::\s*\z/', '', substr($tree, 0, $brace)));
-        $inner = preg_replace('/\}\s*\z/', '', substr($tree, $brace + 1));
-
         $result = [];
-        foreach ($this->splitTopLevel($inner) as $child) {
-            foreach ($this->expandUseTree($child) as $sub) {
-                if ($sub === '' || $sub === 'self') {
-                    $result[] = $prefix;
-                } elseif ($prefix === '') {
-                    $result[] = $sub;
-                } else {
-                    $result[] = "{$prefix}::{$sub}";
-                }
+        foreach (UseTree::expand($tree) as $path) {
+            $stripped = $this->stripUseAlias($path);
+            if ($stripped !== null && $stripped !== '') {
+                $result[] = $stripped;
             }
         }
 
@@ -132,39 +116,5 @@ final class NoBannedUse implements Linter
         }
 
         return trim(preg_replace('/\s+as\s+\S+\s*\z/', '', $segment));
-    }
-
-    /** @return list<string> */
-    private function splitTopLevel(string $str): array
-    {
-        $parts = [];
-        $current = '';
-        $depth = 0;
-
-        foreach (str_split($str) as $ch) {
-            switch ($ch) {
-                case '{':
-                    $depth++;
-                    $current .= $ch;
-                    break;
-                case '}':
-                    $depth--;
-                    $current .= $ch;
-                    break;
-                case ',':
-                    if ($depth === 0) {
-                        $parts[] = $current;
-                        $current = '';
-                    } else {
-                        $current .= $ch;
-                    }
-                    break;
-                default:
-                    $current .= $ch;
-            }
-        }
-        $parts[] = $current;
-
-        return array_values(array_filter(array_map('trim', $parts), static fn (string $p): bool => $p !== ''));
     }
 }

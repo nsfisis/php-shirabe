@@ -3,8 +3,7 @@
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
 use serial_test::serial;
 use shirabe::util::platform::Platform;
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 #[test]
 #[serial]

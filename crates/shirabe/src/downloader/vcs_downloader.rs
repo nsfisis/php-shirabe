@@ -1,21 +1,17 @@
 //! ref: composer/src/Composer/Downloader/VcsDownloader.php
 
 use crate::config::Config;
-use crate::dependency_resolver::operation::InstallOperation;
-use crate::dependency_resolver::operation::UninstallOperation;
-use crate::dependency_resolver::operation::UpdateOperation;
-use crate::downloader::ChangeReportInterface;
-use crate::downloader::DownloaderInterface;
-use crate::downloader::VcsCapableDownloaderInterface;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::dependency_resolver::operation::{
+    InstallOperation, UninstallOperation, UpdateOperation,
+};
+use crate::downloader::{
+    ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface,
+};
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
-use crate::package::version::VersionGuesser;
-use crate::package::version::VersionParser;
-use crate::util::Filesystem;
-use crate::util::ProcessExecutor;
+use crate::package::version::{VersionGuesser, VersionParser};
+use crate::util::{Filesystem, ProcessExecutor};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, PhpClass as _, PhpMixed, RuntimeException, array_map,

@@ -6,11 +6,7 @@
 //! constraint decides how many versions survive that filter, which is what the lazy expansion is
 //! meant to exploit.
 
-use criterion::BatchSize;
-use criterion::BenchmarkId;
-use criterion::Criterion;
-use criterion::criterion_group;
-use criterion::criterion_main;
+use criterion::{BatchSize, BenchmarkId, Criterion, criterion_group, criterion_main};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;

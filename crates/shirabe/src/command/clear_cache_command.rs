@@ -1,9 +1,8 @@
 //! ref: composer/src/Composer/Command/ClearCacheCommand.php
 
 use crate::cache::Cache;
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
+use crate::command::{BaseCommand, BaseCommandData};
 use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::factory::Factory;

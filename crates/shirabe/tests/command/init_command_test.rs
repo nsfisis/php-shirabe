@@ -6,8 +6,7 @@ use shirabe::command::init_command::InitCommand;
 use shirabe::json::JsonFile;
 use shirabe::util::platform::Platform;
 use shirabe_php_shim::{PHP_SERVER, PhpMixed};
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 use tempfile::TempDir;
 
 fn set_up() {

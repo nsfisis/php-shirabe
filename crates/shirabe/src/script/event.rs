@@ -1,8 +1,7 @@
 //! ref: composer/src/Composer/Script/Event.php
 
 use crate::composer::ComposerWeakHandle;
-use crate::event_dispatcher::Event as BaseEvent;
-use crate::event_dispatcher::EventInterface;
+use crate::event_dispatcher::{Event as BaseEvent, EventInterface};
 use crate::io::IOInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;

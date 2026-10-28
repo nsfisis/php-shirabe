@@ -2,8 +2,7 @@
 //! (`https://www.php.net/manual/en/phar.fileformat.php`); no PHP C sources were referenced.
 
 use crate::UnexpectedValueException;
-use std::io::Read as _;
-use std::io::Write as _;
+use std::io::{Read as _, Write as _};
 
 #[derive(Debug, Clone)]
 enum PharEntryData {

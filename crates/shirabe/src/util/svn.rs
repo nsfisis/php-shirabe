@@ -1,11 +1,8 @@
 //! ref: composer/src/Composer/Util/Svn.php
 
 use crate::config::Config;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::util::{Platform, ProcessExecutor};
 use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, implode, parse_url, php_regex, preg_match, stripos,
     strpos, trim,

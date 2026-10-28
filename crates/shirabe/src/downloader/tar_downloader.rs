@@ -2,16 +2,13 @@
 
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::downloader::ArchiveDownloader;
-use crate::downloader::ChangeReportInterface;
-use crate::downloader::DownloaderInterface;
-use crate::downloader::FileDownloader;
+use crate::downloader::{
+    ArchiveDownloader, ChangeReportInterface, DownloaderInterface, FileDownloader,
+};
 use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
-use crate::util::Filesystem;
-use crate::util::HttpDownloader;
-use crate::util::ProcessExecutor;
+use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PharData, PhpMixed, impl_php_class};
 

@@ -6,8 +6,7 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::package::handle::PackageInterfaceHandle;
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: CheckPlatformReqsCommandTest::testPlatformReqsAreSatisfied (data provider rolled into one body).
 fn run_platform_reqs_are_satisfied_case(

@@ -1,22 +1,14 @@
 //! ref: composer/src/Composer/Repository/ArtifactRepository.php
 
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::json::JsonFile;
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::loader::ArrayLoader;
-use crate::package::loader::LoaderInterface;
-use crate::repository::ArrayRepository;
-use crate::repository::ConfigurableRepositoryInterface;
-use crate::repository::RepositoryInterfaceWeakHandle;
+use crate::package::loader::{ArrayLoader, LoaderInterface};
+use crate::package::{BasePackageHandle, PackageInterfaceHandle};
 use crate::repository::{
-    FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface, SearchResult,
+    ArrayRepository, ConfigurableRepositoryInterface, FindPackageConstraint, LoadPackagesResult,
+    ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
 };
-use crate::util::Platform;
-use crate::util::Tar;
-use crate::util::Zip;
+use crate::util::{Platform, Tar, Zip};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash_file,

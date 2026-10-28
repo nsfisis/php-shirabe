@@ -14,8 +14,7 @@ use shirabe::repository::RepositoryInterface;
 use shirabe::repository::filesystem_repository::FilesystemRepository;
 use shirabe::util::filesystem::Filesystem;
 use shirabe_php_rpc::PluginValue;
-use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{Catch as _, PhpMixed};
 use shirabe_semver::VersionParser;
 
 /// PHP mocks JsonFile::read()/exists(); without a mocking framework the canned read value is

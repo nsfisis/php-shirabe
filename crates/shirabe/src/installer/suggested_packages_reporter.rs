@@ -1,10 +1,8 @@
 //! ref: composer/src/Composer/Installer/SuggestedPackagesReporter.php
 
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::PackageInterfaceHandle;
-use crate::repository::InstalledRepository;
-use crate::repository::RepositoryInterface;
+use crate::repository::{InstalledRepository, RepositoryInterface};
 use indexmap::IndexMap;
 use shirabe_php_shim::{php_regex, preg_replace};
 use shirabe_symfony_console::formatter::OutputFormatter;

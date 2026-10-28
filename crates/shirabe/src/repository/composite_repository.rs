@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Repository/CompositeRepository.php
 
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
+use crate::package::{BasePackageHandle, PackageInterfaceHandle};
 use crate::repository::{
     FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
     RepositoryInterfaceHandle, SearchResult,

@@ -1,36 +1,23 @@
 //! ref: composer/src/Composer/Command/RequireCommand.php
 
 use crate::advisory::Auditor;
-use crate::command::CompletionTrait;
-use crate::command::PackageDiscoveryTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::console::input::SuggestedValues;
+use crate::command::{BaseCommand, BaseCommandData, CompletionTrait, PackageDiscoveryTrait};
+use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
-use crate::installer::Installer;
-use crate::installer::InstallerEvents;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::json::JsonFile;
-use crate::json::JsonManipulator;
+use crate::installer::{Installer, InstallerEvents};
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::json::{JsonFile, JsonManipulator};
 use crate::package::base_package;
-use crate::package::loader::ArrayLoader;
-use crate::package::loader::RootPackageLoader;
-use crate::package::version::VersionParser;
-use crate::package::version::VersionSelector;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
-use crate::repository::CompositeRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::PlatformRepositoryHandle;
-use crate::repository::RepositorySet;
+use crate::package::loader::{ArrayLoader, RootPackageLoader};
+use crate::package::version::{VersionParser, VersionSelector};
+use crate::plugin::{CommandEvent, PluginEvents};
+use crate::repository::{
+    CompositeRepository, PlatformRepository, PlatformRepositoryHandle, RepositorySet,
+};
 use crate::signal::SignalSubscription;
-use crate::util::Filesystem;
-use crate::util::PackageSorter;
+use crate::util::{Filesystem, PackageSorter};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_fill_keys, array_intersect, array_keys, array_map,
@@ -38,8 +25,7 @@ use shirabe_php_shim::{
     impl_php_class, implode, is_writable, strtolower, unlink,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]

@@ -1,21 +1,18 @@
 //! ref: composer/src/Composer/Command/BaseCommand.php
 //! ref: composer/vendor/symfony/console/Command/Command.php
 
-use crate::advisory::AuditConfig;
-use crate::advisory::Auditor;
+use crate::advisory::{AuditConfig, Auditor};
 use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::Application;
 use crate::console::input::InputDefinitionItem;
 use crate::factory::Factory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::NullIO;
+use crate::filter::platform_requirement_filter::{
+    PlatformRequirementFilterFactory, PlatformRequirementFilterInterface,
+};
+use crate::io::{IOInterface, IOInterfaceImmutable, NullIO};
 use crate::package::version::VersionParser;
-use crate::plugin::PluginEvents;
-use crate::plugin::PreCommandRunEvent;
+use crate::plugin::{PluginEvents, PreCommandRunEvent};
 use crate::util::Platform;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
@@ -25,11 +22,8 @@ use shirabe_php_shim::{
 };
 use shirabe_symfony_console::Terminal;
 use shirabe_symfony_console::command::{Command, CommandData, SetDefinitionArg};
-use shirabe_symfony_console::helper::Table;
-use shirabe_symfony_console::helper::TableSeparator;
-use shirabe_symfony_console::input::ArgumentName;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::helper::{Table, TableSeparator};
+use shirabe_symfony_console::input::{ArgumentName, InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 pub const SUCCESS: i64 = 0;

@@ -1,8 +1,7 @@
 //! ref: composer/vendor/symfony/console/Output/BufferedOutput.php
 
 use crate::formatter::OutputFormatterInterface;
-use crate::output::OutputInterface;
-use crate::output::{DoWrite, Output};
+use crate::output::{DoWrite, Output, OutputInterface};
 use shirabe_php_shim::PHP_EOL;
 
 #[derive(Debug)]

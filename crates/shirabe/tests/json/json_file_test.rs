@@ -2,8 +2,7 @@
 
 use indexmap::IndexMap;
 use shirabe::json::{JsonEncodeOptions, JsonFile, JsonValidationException};
-use shirabe_php_shim::PhpMixed;
-use shirabe_php_shim::{Catch as _, json_decode_assoc, json_decode_obj};
+use shirabe_php_shim::{Catch as _, PhpMixed, json_decode_assoc, json_decode_obj};
 use shirabe_seld_json_lint::ParsingException;
 
 /// ref: JsonFileTest::expectParseException

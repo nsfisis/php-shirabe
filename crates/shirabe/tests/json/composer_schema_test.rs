@@ -9,8 +9,7 @@
 //! which property) is identical to upstream.
 
 use shirabe::json::{JsonFile, JsonValidationException};
-use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::json_decode_obj;
+use shirabe_php_shim::{Catch as _, json_decode_obj};
 
 const NAME_PATTERN: &str = r#"^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$"#;
 const VERSION_PATTERN: &str = r#"^[vV]?\d+(?:[.-]\d+){0,3}[._-]?(?:(?:[sS][tT][aA][bB][lL][eE]|[bB][eE][tT][aA]|[bB]|[rR][cC]|[aA][lL][pP][hH][aA]|[aA]|[pP][aA][tT][cC][hH]|[pP][lL]|[pP])(?:(?:[.-]?\d+)*)?)?(?:[.-]?[dD][eE][vV]|\.x-dev)?(?:\+.*)?$|^dev-.*$"#;

@@ -3,35 +3,24 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::loader::ArrayLoader;
-use crate::package::loader::InvalidPackageException;
-use crate::package::loader::LoaderInterface;
-use crate::package::loader::ValidatingArrayLoader;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::package::loader::{
+    ArrayLoader, InvalidPackageException, LoaderInterface, ValidatingArrayLoader,
+};
 use crate::package::version::VersionParser;
-use crate::repository::ArrayRepository;
-use crate::repository::ConfigurableRepositoryInterface;
-use crate::repository::InvalidRepositoryException;
-use crate::repository::RepositoryInterface;
-use crate::repository::RepositoryInterfaceWeakHandle;
-use crate::repository::vcs::VcsDriverInterface;
-use crate::repository::vcs::VcsDriverKind;
-use crate::repository::{FindPackageConstraint, LoadPackagesResult, ProviderInfo, SearchResult};
-use crate::repository::{VersionCacheInterface, VersionCacheResult};
-use crate::util::HttpDownloader;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
-use crate::util::Url;
+use crate::package::{BasePackageHandle, PackageInterfaceHandle};
+use crate::repository::vcs::{VcsDriverInterface, VcsDriverKind};
+use crate::repository::{
+    ArrayRepository, ConfigurableRepositoryInterface, FindPackageConstraint,
+    InvalidRepositoryException, LoadPackagesResult, ProviderInfo, RepositoryInterface,
+    RepositoryInterfaceWeakHandle, SearchResult, VersionCacheInterface, VersionCacheResult,
+};
+use crate::util::{HttpDownloader, Platform, ProcessExecutor, Url};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpClass, PhpMixed, php_regex, preg_is_match, preg_replace,
-    str_replace, strpos,
+    Catch as _, InvalidArgumentException, PhpClass, PhpMixed, php_regex, preg_is_match,
+    preg_replace, str_replace, strpos,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 

@@ -1,109 +1,63 @@
 //! ref: composer/src/Composer/Console/Application.php
 //! ref: composer/vendor/symfony/console/Application.php
 
-use crate::command::AboutCommand;
-use crate::command::ArchiveCommand;
-use crate::command::AuditCommand;
-use crate::command::BumpCommand;
-use crate::command::CheckPlatformReqsCommand;
-use crate::command::ClearCacheCommand;
-use crate::command::ConfigCommand;
-use crate::command::CreateProjectCommand;
-use crate::command::DependsCommand;
-use crate::command::DiagnoseCommand;
-use crate::command::DumpAutoloadCommand;
-use crate::command::ExecCommand;
-use crate::command::FundCommand;
-use crate::command::GlobalCommand;
-use crate::command::HomeCommand;
-use crate::command::InitCommand;
-use crate::command::InstallCommand;
-use crate::command::LicensesCommand;
-use crate::command::OutdatedCommand;
-use crate::command::ProhibitsCommand;
-use crate::command::ReinstallCommand;
-use crate::command::RemoveCommand;
-use crate::command::RepositoryCommand;
-use crate::command::RequireCommand;
-use crate::command::RunScriptCommand;
-use crate::command::ScriptAliasCommand;
-use crate::command::SearchCommand;
-use crate::command::SelfUpdateCommand;
-use crate::command::ShowCommand;
-use crate::command::StatusCommand;
-use crate::command::SuggestsCommand;
-use crate::command::UpdateCommand;
-use crate::command::ValidateCommand;
+use crate::command::{
+    AboutCommand, ArchiveCommand, AuditCommand, BumpCommand, CheckPlatformReqsCommand,
+    ClearCacheCommand, ConfigCommand, CreateProjectCommand, DependsCommand, DiagnoseCommand,
+    DumpAutoloadCommand, ExecCommand, FundCommand, GlobalCommand, HomeCommand, InitCommand,
+    InstallCommand, LicensesCommand, OutdatedCommand, ProhibitsCommand, ReinstallCommand,
+    RemoveCommand, RepositoryCommand, RequireCommand, RunScriptCommand, ScriptAliasCommand,
+    SearchCommand, SelfUpdateCommand, ShowCommand, StatusCommand, SuggestsCommand, UpdateCommand,
+    ValidateCommand,
+};
 use crate::composer;
 use crate::composer::PartialComposerHandle;
 use crate::console::GithubActionError;
 use crate::downloader::TransportException;
-use crate::event_dispatcher::EventDispatcher;
-use crate::event_dispatcher::ScriptExecutionException;
+use crate::event_dispatcher::{EventDispatcher, ScriptExecutionException};
 use crate::exception::NoSslException;
 use crate::factory::Factory;
 use crate::installer::Installer;
-use crate::io::ConsoleIO;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::NullIO;
-use crate::io::io_interface;
+use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable, NullIO, io_interface};
 use crate::json::JsonValidationException;
-use crate::util::ErrorHandler;
-use crate::util::Filesystem;
-use crate::util::HttpDownloader;
-use crate::util::Platform;
-use crate::util::Silencer;
+use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AnyThrowable, LogicException as ShimLogicException, PhpMixed, RuntimeException, bin2hex, chdir,
-    defined, dirname, disk_free_space, extension_loaded, file_exists, file_get_contents,
-    file_put_contents, function_exists, getcwd, getmypid, glob, ini_set, is_array, is_dir, is_file,
-    is_string, json_decode_assoc, memory_get_peak_usage, memory_get_usage, microtime, php_regex,
-    php_uname, posix_getuid, preg_grep, preg_match, preg_quote, preg_split, random_bytes, realpath,
-    restore_error_handler, round, str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
-};
-use shirabe_php_shim::{
-    AsAny, Catch as _, Error, ExitException, InvalidArgumentException, PHP_ENV, PHP_SERVER,
-    PhpClass, STDIN, STR_PAD_RIGHT, basename, exec, explode, explode_limit, get_debug_type_obj,
-    getenv, implode, is_numeric_string, levenshtein, ltrim, mb_convert_encoding,
-    mb_convert_variables, mb_detect_encoding, mb_strwidth, php_to_string, php_truthy, putenv,
-    sort_natural_flag_case, str_pad, str_repeat, str_split, strlen, strrpos, substr, substr_count,
-    trim,
+    AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
+    LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpClass, PhpMixed,
+    RuntimeException, STDIN, STR_PAD_RIGHT, basename, bin2hex, chdir, defined, dirname,
+    disk_free_space, exec, explode, explode_limit, extension_loaded, file_exists,
+    file_get_contents, file_put_contents, function_exists, get_debug_type_obj, getcwd, getenv,
+    getmypid, glob, implode, ini_set, is_array, is_dir, is_file, is_numeric_string, is_string,
+    json_decode_assoc, levenshtein, ltrim, mb_convert_encoding, mb_convert_variables,
+    mb_detect_encoding, mb_strwidth, memory_get_peak_usage, memory_get_usage, microtime, php_regex,
+    php_to_string, php_truthy, php_uname, posix_getuid, preg_grep, preg_match, preg_quote,
+    preg_split, putenv, random_bytes, realpath, restore_error_handler, round,
+    sort_natural_flag_case, str_pad, str_repeat, str_replace, str_split, strlen, strpos, strrpos,
+    strtoupper, substr, substr_count, sys_get_temp_dir, time, trim, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::application::Application as BaseApplication;
-use shirabe_symfony_console::command::Command as SymfonyCommand;
-use shirabe_symfony_console::command::HelpCommand;
+use shirabe_symfony_console::command::{Command as SymfonyCommand, HelpCommand};
 use shirabe_symfony_console::command_loader::CommandLoaderInterface;
-use shirabe_symfony_console::completion::CompletionInput;
-use shirabe_symfony_console::completion::CompletionSuggestions;
-use shirabe_symfony_console::exception::CommandNotFoundException;
-use shirabe_symfony_console::exception::InvalidArgumentException as ConsoleInvalidArgumentException;
-use shirabe_symfony_console::exception::InvalidOptionException;
-use shirabe_symfony_console::exception::LogicException as ConsoleLogicException;
-use shirabe_symfony_console::exception::MissingInputException;
-use shirabe_symfony_console::exception::NamespaceNotFoundException;
-use shirabe_symfony_console::exception::RuntimeException as ConsoleRuntimeException;
+use shirabe_symfony_console::completion::{CompletionInput, CompletionSuggestions};
+use shirabe_symfony_console::exception::{
+    CommandNotFoundException, InvalidArgumentException as ConsoleInvalidArgumentException,
+    InvalidOptionException, LogicException as ConsoleLogicException, MissingInputException,
+    NamespaceNotFoundException, RuntimeException as ConsoleRuntimeException,
+};
 use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::helper::Helper;
-use shirabe_symfony_console::helper::HelperSet;
-use shirabe_symfony_console::helper::QuestionHelper;
-use shirabe_symfony_console::helper::{FormatBlockMessages, FormatterHelper};
-use shirabe_symfony_console::input::ArgumentName;
-use shirabe_symfony_console::input::ArgvInput;
-use shirabe_symfony_console::input::ArrayInput;
-use shirabe_symfony_console::input::InputArgument;
-use shirabe_symfony_console::input::InputDefinition;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputOption;
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
-use shirabe_symfony_console::output::ConsoleOutput;
-use shirabe_symfony_console::output::ConsoleOutputInterface;
-use shirabe_symfony_console::output::{OutputInterface, output_interface};
-use shirabe_symfony_console::style::StyleInterface;
-use shirabe_symfony_console::style::SymfonyStyle;
+use shirabe_symfony_console::helper::{
+    FormatBlockMessages, FormatterHelper, Helper, HelperSet, QuestionHelper,
+};
+use shirabe_symfony_console::input::{
+    ArgumentName, ArgvInput, ArrayInput, InputArgument, InputDefinition, InputInterface,
+    InputOption, InputValue, ParameterName,
+};
+use shirabe_symfony_console::output::{
+    ConsoleOutput, ConsoleOutputInterface, OutputInterface, output_interface,
+};
+use shirabe_symfony_console::style::{StyleInterface, SymfonyStyle};
 use shirabe_symfony_console::terminal::Terminal;
 use shirabe_symfony_process::exception::ProcessTimedOutException;
 
@@ -1607,10 +1561,9 @@ impl Application {
     pub fn base_get_default_commands(
         &self,
     ) -> Vec<std::rc::Rc<std::cell::RefCell<dyn SymfonyCommand>>> {
-        use shirabe_symfony_console::command::CompleteCommand;
-        use shirabe_symfony_console::command::DumpCompletionCommand;
-        use shirabe_symfony_console::command::HelpCommand;
-        use shirabe_symfony_console::command::ListCommand;
+        use shirabe_symfony_console::command::{
+            CompleteCommand, DumpCompletionCommand, HelpCommand, ListCommand,
+        };
 
         vec![
             std::rc::Rc::new(std::cell::RefCell::new(HelpCommand::new()))

@@ -37,8 +37,7 @@ use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
     LockArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
-use bstr::BString;
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle,
@@ -49,8 +48,7 @@ use shirabe_php_shim::{
     UnexpectedValueException,
 };
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 /// A Rust-side entity a PHP proxy stub points back to.
@@ -4484,9 +4482,9 @@ impl PhpCommandProxy {
         handle: &PhpObjHandle,
         data: &crate::command::BaseCommandData,
     ) -> anyhow::Result<()> {
-        use shirabe_symfony_console::input::InputArgument;
-        use shirabe_symfony_console::input::InputOption;
-        use shirabe_symfony_console::input::{DefinitionItem, InputDefinition};
+        use shirabe_symfony_console::input::{
+            DefinitionItem, InputArgument, InputDefinition, InputOption,
+        };
 
         let value = unwrap_php_result(call_function_with_dispatcher(
             "__shirabe_read_command_definition",

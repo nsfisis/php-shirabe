@@ -2,37 +2,28 @@
 
 use crate::cache::Cache;
 use crate::config::Config;
-use crate::dependency_resolver::operation::InstallOperation;
-use crate::dependency_resolver::operation::UninstallOperation;
-use crate::dependency_resolver::operation::UpdateOperation;
-use crate::downloader::ChangeReportInterface;
-use crate::downloader::DownloaderInterface;
-use crate::downloader::MaxFileSizeExceededException;
-use crate::downloader::TransportException;
+use crate::dependency_resolver::operation::{
+    InstallOperation, UninstallOperation, UpdateOperation,
+};
+use crate::downloader::{
+    ChangeReportInterface, DownloaderInterface, MaxFileSizeExceededException, TransportException,
+};
 use crate::event_dispatcher::EventDispatcher;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::NullIO;
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, NullIO, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::package::comparer::Comparer;
-use crate::plugin::FileDownloadContext;
-use crate::plugin::PluginEvents;
-use crate::plugin::PostFileDownloadEvent;
-use crate::plugin::PreFileDownloadEvent;
-use crate::util::Filesystem;
-use crate::util::HttpDownloader;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
-use crate::util::Url as UrlUtil;
+use crate::plugin::{
+    FileDownloadContext, PluginEvents, PostFileDownloadEvent, PreFileDownloadEvent,
+};
+use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor, Url as UrlUtil};
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, chmod, dirname, extension_loaded};
 use shirabe_php_shim::{
-    InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed, RuntimeException,
-    UnexpectedValueException, array_search, file_exists, filesize, get_class, hash, hash_file,
-    impl_php_class, is_dir, is_executable, parse_url, pathinfo, realpath, rtrim, spl_object_hash,
-    strlen, strpos, strtr, trim, umask, usleep,
+    Catch as _, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed,
+    RuntimeException, UnexpectedValueException, array_search, chmod, dirname, extension_loaded,
+    file_exists, filesize, get_class, hash, hash_file, impl_php_class, is_dir, is_executable,
+    parse_url, pathinfo, realpath, rtrim, spl_object_hash, strlen, strpos, strtr, trim, umask,
+    usleep,
 };
 use std::sync::{LazyLock, Mutex};
 

@@ -1,21 +1,15 @@
 //! ref: composer/src/Composer/Command/InstallCommand.php
 
 use crate::advisory::Auditor;
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
-use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::console::input::SuggestedValues;
+use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::installer::Installer;
 use crate::io::IOInterfaceImmutable;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
+use crate::plugin::{CommandEvent, PluginEvents};
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]

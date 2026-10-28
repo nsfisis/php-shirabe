@@ -3,23 +3,16 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::json::JsonEncodeOptions;
-use crate::json::JsonFile;
-use crate::repository::vcs::GitDriver;
-use crate::repository::vcs::VcsDriverBase;
-use crate::util::Forgejo;
-use crate::util::ForgejoRepositoryData;
-use crate::util::ForgejoUrl;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::json::{JsonEncodeOptions, JsonFile};
+use crate::repository::vcs::{GitDriver, VcsDriverBase};
 use crate::util::http::Response;
+use crate::util::{Forgejo, ForgejoRepositoryData, ForgejoUrl};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, date_create};
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, php_regex, preg_match,
-    urlencode,
+    Catch as _, PhpMixed, RuntimeException, base64_decode, date_create, explode, extension_loaded,
+    php_regex, preg_match, urlencode,
 };
 
 #[derive(Debug)]

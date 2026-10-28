@@ -1,20 +1,17 @@
 //! ref: composer/src/Composer/Repository/ArrayRepository.php
 
-use crate::package::AliasPackageHandle;
-use crate::package::BasePackageHandle;
-use crate::package::CompleteAliasPackageHandle;
-use crate::package::PackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::version::StabilityFilter;
-use crate::package::version::VersionParser;
+use crate::package::version::{StabilityFilter, VersionParser};
+use crate::package::{
+    AliasPackageHandle, BasePackageHandle, CompleteAliasPackageHandle, PackageHandle,
+    PackageInterfaceHandle,
+};
 use crate::repository::{
     AbandonedInfo, FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
     RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle, SearchResult,
 };
 use indexmap::IndexMap;
 use shirabe_php_shim::{implode, php_regex, preg_is_match, preg_quote, preg_split, strtolower};
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use std::rc::Weak;
 
 /// A repository implementation that simply stores packages in an array

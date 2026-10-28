@@ -1,8 +1,6 @@
 //! ref: composer/src/Composer/Package/Dumper/ArrayDumper.php
 
-use crate::package::Mirror;
-use crate::package::PackageInterfaceHandle;
-use crate::package::SUPPORTED_LINK_TYPES;
+use crate::package::{Mirror, PackageInterfaceHandle, SUPPORTED_LINK_TYPES};
 use indexmap::IndexMap;
 use shirabe_php_shim::{DATE_RFC3339, PhpMixed};
 

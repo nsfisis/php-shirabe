@@ -1,8 +1,6 @@
 //! ref: composer/src/Composer/DependencyResolver/LockTransaction.php
 
-use crate::dependency_resolver::Decisions;
-use crate::dependency_resolver::Pool;
-use crate::dependency_resolver::Transaction;
+use crate::dependency_resolver::{Decisions, Pool, Transaction};
 use crate::package::PackageInterfaceHandle;
 use indexmap::IndexMap;
 use shirabe_php_shim::{PregMatches, php_regex, preg_is_match, preg_replace_callback};

@@ -3,17 +3,13 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::util::HttpDownloader;
-use crate::util::ProcessExecutor;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, http_build_query, in_array_strict, json_decode_assoc, php_regex,
-    preg_replace, time,
+    Catch as _, PhpMixed, RuntimeException, http_build_query, in_array_strict, json_decode_assoc,
+    php_regex, preg_replace, time,
 };
 
 #[derive(Debug)]

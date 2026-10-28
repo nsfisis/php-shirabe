@@ -2,8 +2,7 @@
 
 use crate::command::BaseCommand;
 use crate::command::base_command::base_command_initialize;
-use crate::config::Config;
-use crate::config::JsonConfigSource;
+use crate::config::{Config, JsonConfigSource};
 use crate::factory::Factory;
 use crate::json::JsonFile;
 use crate::util::Platform;

@@ -1,12 +1,9 @@
 //! ref: composer/vendor/symfony/console/Input/ArgvInput.php
 
 use crate::exception::RuntimeException;
-use crate::input::ArgumentName;
-use crate::input::Input;
-use crate::input::InputDefinition;
-use crate::input::InputInterface;
-use crate::input::InputValue;
-use crate::input::StreamableInputInterface;
+use crate::input::{
+    ArgumentName, Input, InputDefinition, InputInterface, InputValue, StreamableInputInterface,
+};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpResource, implode, mb_detect_encoding, mb_substr, php_regex, preg_match, strlen, strpos,

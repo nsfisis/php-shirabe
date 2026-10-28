@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Util/SyncHelper.php
 
-use crate::downloader::DownloadManagerInterface;
-use crate::downloader::DownloaderInterface;
+use crate::downloader::{DownloadManagerInterface, DownloaderInterface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::r#loop::Loop;
 use shirabe_php_shim::PhpMixed;

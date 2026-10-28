@@ -1,19 +1,15 @@
 //! ref: composer/src/Composer/Downloader/ZipDownloader.php
 
-use crate::downloader::ArchiveDownloader;
-use crate::downloader::ChangeReportInterface;
-use crate::downloader::FileDownloader;
+use crate::downloader::{ArchiveDownloader, ChangeReportInterface, FileDownloader};
 use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
-use crate::util::IniHelper;
-use crate::util::Platform;
+use crate::util::{IniHelper, Platform};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
-    CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException, ZipArchive,
-    bin2hex, class_exists, file_exists, file_get_contents, filesize, hash_file, impl_php_class,
-    is_file, json_encode, php_regex, preg_match, random_int, str_replace, strlen, substr_bytes,
-    version_compare,
+    Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
+    ZipArchive, bin2hex, class_exists, file_exists, file_get_contents, filesize, hash_file,
+    impl_php_class, is_file, json_encode, php_regex, preg_match, random_int, str_replace, strlen,
+    substr_bytes, version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;

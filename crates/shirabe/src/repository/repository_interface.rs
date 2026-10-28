@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Repository/RepositoryInterface.php
 
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
+use crate::package::{BasePackageHandle, PackageInterfaceHandle};
 use crate::repository::AdvisoryProviderInterface;
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;

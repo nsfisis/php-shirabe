@@ -1,9 +1,7 @@
 //! ref: composer/src/Composer/Cache.php
 
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::util::Filesystem;
-use crate::util::Platform;
+use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::util::{Filesystem, Platform};
 use chrono::Utc;
 use shirabe_php_shim::{
     bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space, file_exists,

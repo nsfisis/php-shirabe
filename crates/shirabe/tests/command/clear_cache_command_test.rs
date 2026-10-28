@@ -3,8 +3,7 @@
 use crate::test_case::{RunOptions, get_application_tester};
 use serial_test::serial;
 use shirabe::util::platform::Platform;
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 fn tear_down() {
     // --no-cache triggers the env to change so make sure the env is cleaned up after these tests run

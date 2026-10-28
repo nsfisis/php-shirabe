@@ -2,25 +2,19 @@
 
 use crate::command::BaseCommand;
 use crate::io::IOInterfaceImmutable;
-use crate::package::Package;
-use crate::package::RootPackage;
 use crate::package::version::VersionParser;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
-use crate::repository::CompositeRepository;
-use crate::repository::InstalledArrayRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryFactory;
-use crate::repository::RootPackageRepository;
-use crate::repository::{DependentsEntry, InstalledRepository, NeedleInput};
-use crate::repository::{FindPackageConstraint, RepositoryInterface};
+use crate::package::{Package, RootPackage};
+use crate::plugin::{CommandEvent, PluginEvents};
+use crate::repository::{
+    CompositeRepository, DependentsEntry, FindPackageConstraint, InstalledArrayRepository,
+    InstalledRepository, NeedleInput, PlatformRepository, RepositoryFactory, RepositoryInterface,
+    RootPackageRepository,
+};
 use crate::util::PackageInfo;
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueException};
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::Bound;
-use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::formatter::OutputFormatterStyle;
+use shirabe_semver::constraint::{AnyConstraint, Bound};
+use shirabe_symfony_console::formatter::{OutputFormatter, OutputFormatterStyle};
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 

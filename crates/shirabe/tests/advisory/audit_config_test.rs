@@ -1,8 +1,7 @@
 //! ref: composer/tests/Composer/Test/Advisory/AuditConfigTest.php
 
 use indexmap::IndexMap;
-use shirabe::advisory::AuditConfig;
-use shirabe::advisory::Auditor;
+use shirabe::advisory::{AuditConfig, Auditor};
 use shirabe::config::Config;
 use shirabe_php_shim::PhpMixed;
 

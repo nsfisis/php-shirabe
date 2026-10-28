@@ -1,16 +1,12 @@
 //! ref: composer/src/Composer/Installer/PluginInstaller.php
 
 use crate::composer::PartialComposerWeakHandle;
-use crate::installer::BinaryPresenceInterface;
-use crate::installer::InstallerInterface;
-use crate::installer::LibraryInstaller;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::installer::{BinaryPresenceInterface, InstallerInterface, LibraryInstaller};
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterfaceHandle;
-use crate::util::Filesystem;
-use crate::util::Platform;
+use crate::util::{Filesystem, Platform};
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException, empty};
 
 #[derive(Debug)]

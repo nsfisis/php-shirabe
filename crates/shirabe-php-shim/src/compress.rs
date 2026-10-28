@@ -1,5 +1,4 @@
-use std::io::Read as _;
-use std::io::Write as _;
+use std::io::{Read as _, Write as _};
 
 /// Handle returned by `gzopen()`. PHP models this as a zlib stream resource;
 /// clones share the same underlying stream, like PHP resource copies do.

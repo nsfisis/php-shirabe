@@ -1,9 +1,7 @@
 //! ref: composer/vendor/symfony/console/Question/ChoiceQuestion.php
 
-use crate::exception::InvalidArgumentException;
-use crate::exception::LogicException;
-use crate::question::Question;
-use crate::question::QuestionInterface;
+use crate::exception::{InvalidArgumentException, LogicException};
+use crate::question::{Question, QuestionInterface};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, array_search, explode, implode, php_regex, preg_is_match, sprintf, strval, trim,

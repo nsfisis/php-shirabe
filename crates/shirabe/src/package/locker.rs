@@ -2,34 +2,27 @@
 
 use crate::installer::InstallationManager;
 use crate::io::IOInterface;
-use crate::json::JsonEncodeOptions;
-use crate::json::JsonFile;
-use crate::package::BasePackageHandle;
-use crate::package::CompleteAliasPackageHandle;
-use crate::package::Link;
-use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackageInterfaceHandle;
+use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::package::dumper::ArrayDumper;
-use crate::package::loader::ArrayLoader;
-use crate::package::loader::LoaderInterface;
+use crate::package::loader::{ArrayLoader, LoaderInterface};
 use crate::package::version::VersionParser;
+use crate::package::{
+    BasePackageHandle, CompleteAliasPackageHandle, Link, PackageInterfaceHandle,
+    RootPackageInterfaceHandle,
+};
 use crate::plugin::plugin_interface::{self};
-use crate::repository::FindPackageConstraint;
-use crate::repository::InstalledRepository;
-use crate::repository::LockArrayRepository;
-use crate::repository::LockArrayRepositoryHandle;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::RootPackageRepository;
-use crate::util::Git as GitUtil;
-use crate::util::ProcessExecutor;
+use crate::repository::{
+    FindPackageConstraint, InstalledRepository, LockArrayRepository, LockArrayRepositoryHandle,
+    PlatformRepository, RepositoryInterfaceHandle, RootPackageRepository,
+};
+use crate::util::{Git as GitUtil, ProcessExecutor};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, empty};
 use shirabe_php_shim::{
-    DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
-    array_map, array_merge, file_get_contents, filemtime, hash, in_array_loose, is_int, ksort,
-    php_regex, preg_is_match, preg_match, realpath, strcmp, strtolower, touch2, trim, usort,
+    Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect,
+    array_keys, array_map, array_merge, empty, file_get_contents, filemtime, hash, in_array_loose,
+    is_int, ksort, php_regex, preg_is_match, preg_match, realpath, strcmp, strtolower, touch2,
+    trim, usort,
 };
 use shirabe_seld_json_lint::ParsingException;
 

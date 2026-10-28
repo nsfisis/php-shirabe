@@ -1,9 +1,7 @@
 //! ref: composer/vendor/symfony/console/Helper/FormatterHelper.php
 
 use crate::formatter::OutputFormatter;
-use crate::helper::Helper;
-use crate::helper::HelperInterface;
-use crate::helper::HelperSet;
+use crate::helper::{Helper, HelperInterface, HelperSet};
 use shirabe_php_shim::str_repeat;
 
 /// The Formatter class provides helpers to format messages.

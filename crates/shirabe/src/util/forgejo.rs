@@ -2,9 +2,7 @@
 
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::HttpDownloader;
 use bstr::ByteSlice;
 use shirabe_php_shim::{Catch as _, PhpMixed};

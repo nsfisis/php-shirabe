@@ -1,7 +1,6 @@
 //! ref: composer/vendor/symfony/console/Output/ConsoleOutputInterface.php
 
-use crate::output::ConsoleSectionOutput;
-use crate::output::OutputInterface;
+use crate::output::{ConsoleSectionOutput, OutputInterface};
 
 /// ConsoleOutputInterface is the interface implemented by ConsoleOutput class.
 /// This adds information about stderr and section output stream.

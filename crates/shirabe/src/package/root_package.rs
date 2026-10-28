@@ -1,12 +1,9 @@
 //! ref: composer/src/Composer/Package/RootPackage.php
 
-use crate::package::CompletePackage;
-use crate::package::CompletePackageInterface;
-use crate::package::DisplayMode;
-use crate::package::Link;
-use crate::package::Mirror;
-use crate::package::PackageInterface;
-use crate::package::RootPackageInterface;
+use crate::package::{
+    CompletePackage, CompletePackageInterface, DisplayMode, Link, Mirror, PackageInterface,
+    RootPackageInterface,
+};
 use crate::repository::RepositoryInterfaceHandle;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;

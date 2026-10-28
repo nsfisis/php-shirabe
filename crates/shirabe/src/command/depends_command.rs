@@ -1,12 +1,8 @@
 //! ref: composer/src/Composer/Command/DependsCommand.php
 
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
-use crate::command::BaseDependencyCommand;
-use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
+use crate::command::{BaseCommand, BaseCommandData, BaseDependencyCommand, CompletionTrait};
+use crate::console::input::{InputArgument, InputOption};
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;

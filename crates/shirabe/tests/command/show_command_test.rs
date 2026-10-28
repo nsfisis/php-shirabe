@@ -80,8 +80,7 @@ fn run_show_case(
 }
 
 use crate::test_case::{create_composer_lock, create_installed_json};
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 #[test]
 #[serial]

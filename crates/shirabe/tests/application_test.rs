@@ -6,8 +6,7 @@ mod bootstrap;
 mod test_case;
 
 use serial_test::serial;
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue, ParameterName};
 use test_case::init_temp_composer;
 
 use shirabe::command::about_command::AboutCommand;
@@ -16,10 +15,7 @@ use shirabe::console::application::ApplicationHandle;
 use shirabe::util::platform::Platform;
 use shirabe_php_shim::{PHP_EOL, PHP_SERVER, time};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::ArrayInput;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::BufferedOutput;
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::output::{BufferedOutput, OutputInterface};
 
 fn set_up() {
     Platform::put_env("COMPOSER_DISABLE_XDEBUG_WARN", "1");

@@ -3,9 +3,7 @@
 use crate::application::Application;
 use crate::command::Command;
 use crate::descriptor::{DescribableObject, DescriptorInterface};
-use crate::input::InputArgument;
-use crate::input::InputDefinition;
-use crate::input::InputOption;
+use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;

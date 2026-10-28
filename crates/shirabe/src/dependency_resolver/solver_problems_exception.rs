@@ -1,9 +1,6 @@
 //! ref: composer/src/Composer/DependencyResolver/SolverProblemsException.php
 
-use crate::dependency_resolver::Pool;
-use crate::dependency_resolver::Problem;
-use crate::dependency_resolver::Request;
-use crate::dependency_resolver::Rule;
+use crate::dependency_resolver::{Pool, Problem, Request, Rule};
 use crate::repository::RepositorySet;
 use crate::util::IniHelper;
 use shirabe_php_shim::{RuntimeException, array_unique};

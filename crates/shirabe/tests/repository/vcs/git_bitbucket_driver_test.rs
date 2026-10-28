@@ -10,8 +10,7 @@ use shirabe::repository::vcs::GitBitbucketDriver;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::ProcessExecutor;
-use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException};
+use shirabe_php_shim::{Catch as _, InvalidArgumentException, PhpMixed, RuntimeException};
 use tempfile::TempDir;
 
 struct SetUp {

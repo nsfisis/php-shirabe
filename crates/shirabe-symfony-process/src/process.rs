@@ -1,10 +1,9 @@
 //! ref: composer/vendor/symfony/process/Process.php
 
-use crate::exception::InvalidArgumentException;
-use crate::exception::LogicException;
-use crate::exception::ProcessSignaledException;
-use crate::exception::ProcessTimedOutException;
-use crate::exception::RuntimeException;
+use crate::exception::{
+    InvalidArgumentException, LogicException, ProcessSignaledException, ProcessTimedOutException,
+    RuntimeException,
+};
 use crate::executable_finder::ExecutableFinder;
 use crate::pipes::pipes_interface::PipesInterface;
 use crate::pipes::unix_pipes::UnixPipes;

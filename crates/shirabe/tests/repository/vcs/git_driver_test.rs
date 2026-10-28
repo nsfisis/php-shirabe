@@ -12,8 +12,7 @@ use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::MockHandler;
-use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{PhpMixed, RuntimeException};
+use shirabe_php_shim::{Catch as _, PhpMixed, RuntimeException};
 use tempfile::TempDir;
 
 struct SetUp {

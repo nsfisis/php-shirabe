@@ -6,8 +6,7 @@ use crate::test_case::{
 use serial_test::serial;
 use shirabe::util::platform::Platform;
 use shirabe_php_shim::{chmod, function_exists, posix_getuid};
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
+use shirabe_symfony_console::input::{InputValue, ParameterName};
 
 /// ref: ValidateCommandTest::MINIMAL_VALID_CONFIGURATION
 fn minimal_valid_configuration() -> serde_json::Value {

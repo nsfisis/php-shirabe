@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Util/PackageSorter.php
 
-use crate::package::Link;
-use crate::package::PackageInterfaceHandle;
+use crate::package::{Link, PackageInterfaceHandle};
 use indexmap::IndexMap;
 use shirabe_php_shim::{CmpOp, strnatcasecmp, version_compare};
 

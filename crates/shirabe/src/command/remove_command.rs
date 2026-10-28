@@ -1,14 +1,10 @@
 //! ref: composer/src/Composer/Command/RemoveCommand.php
 
 use crate::advisory::Auditor;
-use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::config::ConfigSourceInterface;
-use crate::config::JsonConfigSource;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::console::input::SuggestedValues;
+use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::config::{ConfigSourceInterface, JsonConfigSource};
+use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
 use crate::installer::Installer;
@@ -20,8 +16,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, UnexpectedValueException, impl_php_class, preg_grep, strtolower};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::InvalidArgumentException;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]

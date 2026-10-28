@@ -5,54 +5,35 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::json::JsonEncodeOptions;
-use crate::json::JsonFile;
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
-use crate::package::base_package;
-use crate::package::loader::ArrayLoader;
-use crate::package::loader::VersionFields;
-use crate::package::version::StabilityFilter;
-use crate::package::version::VersionParser;
-use crate::plugin::FileDownloadContext;
-use crate::plugin::PluginEvents;
-use crate::plugin::PostFileDownloadEvent;
-use crate::plugin::PreFileDownloadEvent;
-use crate::repository::ArrayRepository;
-use crate::repository::ConfigurableRepositoryInterface;
-use crate::repository::LoadPackagesResult;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterface;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::RepositoryInterfaceWeakHandle;
-use crate::repository::RepositorySecurityException;
-use crate::repository::SecurityAdvisoryResult;
-use crate::repository::{SEARCH_FULLTEXT, SEARCH_VENDOR};
-use crate::util::HttpDownloader;
-use crate::util::Url;
+use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::json::{JsonEncodeOptions, JsonFile};
+use crate::package::loader::{ArrayLoader, VersionFields};
+use crate::package::version::{StabilityFilter, VersionParser};
+use crate::package::{BasePackageHandle, PackageInterfaceHandle, base_package};
+use crate::plugin::{
+    FileDownloadContext, PluginEvents, PostFileDownloadEvent, PreFileDownloadEvent,
+};
+use crate::repository::{
+    ArrayRepository, ConfigurableRepositoryInterface, LoadPackagesResult, PlatformRepository,
+    RepositoryInterface, RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle,
+    RepositorySecurityException, SEARCH_FULLTEXT, SEARCH_VENDOR, SecurityAdvisoryResult,
+};
 use crate::util::http::Response;
 use crate::util::r#loop::Loop;
-use crate::util::sync_executor;
+use crate::util::{HttpDownloader, Url, sync_executor};
 use bstr::ByteSlice;
 use futures::StreamExt;
 use futures::stream::FuturesOrdered;
 use indexmap::IndexMap;
-use shirabe_metadata_minifier::ExpandedVersion;
-use shirabe_metadata_minifier::ExpandedVersions;
-use shirabe_metadata_minifier::MetadataMinifier;
+use shirabe_metadata_minifier::{ExpandedVersion, ExpandedVersions, MetadataMinifier};
 use shirabe_php_shim::{
-    AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpClass, PhpMixed,
-    RuntimeException, UnexpectedValueException, extension_loaded, hash, http_build_query_mixed,
-    json_decode_assoc, parse_url, php_regex, preg_split, realpath, strtolower, strtr, urlencode,
-    var_export,
+    AnyThrowable, Catch as _, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpClass,
+    PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash,
+    http_build_query_mixed, json_decode_assoc, parse_url, php_regex, preg_grep, preg_is_match,
+    preg_match, preg_replace, preg_split, realpath, strtolower, strtr, urlencode, var_export,
 };
-use shirabe_php_shim::{Catch as _, preg_grep, preg_is_match, preg_match, preg_replace};
 use shirabe_semver::CompilingMatcher;
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::MatchAllConstraint;
-use shirabe_semver::constraint::SimpleConstraint;
+use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 
 #[derive(Debug)]
 pub enum RootData {

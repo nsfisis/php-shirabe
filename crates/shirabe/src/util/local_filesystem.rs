@@ -5,13 +5,10 @@
 //! content decoding) have nothing to act on here: a local read yields no response headers.
 
 use crate::config::Config;
-use crate::downloader::MaxFileSizeExceededException;
-use crate::downloader::TransportException;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::util::GetResult;
-use crate::util::Url;
+use crate::downloader::{MaxFileSizeExceededException, TransportException};
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::http::ProxyManager;
+use crate::util::{GetResult, Url};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, file_get_contents, file_get_contents_with_max_length,

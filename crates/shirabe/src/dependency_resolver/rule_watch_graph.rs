@@ -1,9 +1,6 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleWatchGraph.php
 
-use crate::dependency_resolver::Decisions;
-use crate::dependency_resolver::Rule;
-use crate::dependency_resolver::RuleWatchChain;
-use crate::dependency_resolver::RuleWatchNode;
+use crate::dependency_resolver::{Decisions, Rule, RuleWatchChain, RuleWatchNode};
 use indexmap::IndexMap;
 
 #[derive(Debug)]

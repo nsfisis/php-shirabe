@@ -1,13 +1,9 @@
 //! ref: composer/vendor/symfony/console/Input/ArrayInput.php
 
-use crate::exception::InvalidArgumentException;
-use crate::exception::InvalidOptionException;
-use crate::input::ArgumentName;
-use crate::input::Input;
-use crate::input::InputDefinition;
-use crate::input::InputInterface;
-use crate::input::InputValue;
-use crate::input::StreamableInputInterface;
+use crate::exception::{InvalidArgumentException, InvalidOptionException};
+use crate::input::{
+    ArgumentName, Input, InputDefinition, InputInterface, InputValue, StreamableInputInterface,
+};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpResource, implode, substr};
 

@@ -1,16 +1,13 @@
 //! ref: composer/src/Composer/DependencyResolver/RuleSetGenerator.php
 
-use crate::dependency_resolver::GenericRule;
-use crate::dependency_resolver::MultiConflictRule;
-use crate::dependency_resolver::PolicyInterface;
-use crate::dependency_resolver::Pool;
-use crate::dependency_resolver::Request;
-use crate::dependency_resolver::Rule2Literals;
-use crate::dependency_resolver::RuleSet;
 use crate::dependency_resolver::rule::{self, Rule};
-use crate::filter::platform_requirement_filter::IgnoreListPlatformRequirementFilter;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
-use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
+use crate::dependency_resolver::{
+    GenericRule, MultiConflictRule, PolicyInterface, Pool, Request, Rule2Literals, RuleSet,
+};
+use crate::filter::platform_requirement_filter::{
+    IgnoreListPlatformRequirementFilter, PlatformRequirementFilterFactory,
+    PlatformRequirementFilterInterface,
+};
 use crate::package::PackageInterfaceHandle;
 use indexmap::IndexMap;
 use shirabe_php_shim::LogicException;

@@ -1,6 +1,5 @@
 use crate::PhpMixed;
-use bstr::BString;
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::string::{addcslashes, strip_tags, stripcslashes};
 use shirabe_php_src::standard::string::{php_trim_mask, php_wordwrap};
@@ -1113,8 +1112,7 @@ pub fn uniqid(prefix: &str, more_entropy: bool) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::str_bitand;
-    use super::substr_replace;
+    use super::{str_bitand, substr_replace};
 
     #[test]
     fn substr_replace_matches_php() {

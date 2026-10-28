@@ -18,12 +18,8 @@ use shirabe::util::Platform;
 use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::input::ArrayInput;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
-use shirabe_symfony_console::input::ParameterName;
-use shirabe_symfony_console::output::BufferedOutput;
-use shirabe_symfony_console::output::OutputInterface;
+use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue, ParameterName};
+use shirabe_symfony_console::output::{BufferedOutput, OutputInterface};
 
 // PHP mocks `Composer\Package\Archiver\ArchiveManager` with
 // getMockBuilder(...)->disableOriginalConstructor().

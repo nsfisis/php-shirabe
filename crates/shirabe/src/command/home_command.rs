@@ -1,19 +1,13 @@
 //! ref: composer/src/Composer/Command/HomeCommand.php
 
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
-use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
+use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::console::input::{InputArgument, InputOption};
 use crate::io::IOInterfaceImmutable;
 use crate::package::CompletePackageInterfaceHandle;
-use crate::repository::RepositoryFactory;
-use crate::repository::RootPackageRepository;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
-use shirabe_php_shim::filter_var_url;
-use shirabe_php_shim::impl_php_class;
+use crate::repository::{RepositoryFactory, RootPackageRepository};
+use crate::util::{Platform, ProcessExecutor};
+use shirabe_php_shim::{filter_var_url, impl_php_class};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;

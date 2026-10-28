@@ -1,21 +1,14 @@
 //! ref: composer/src/Composer/Command/ConfigCommand.php
 
 use crate::advisory::Auditor;
-use crate::command::BaseConfigCommand;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::config::Config;
-use crate::config::ConfigSourceInterface;
-use crate::config::JsonConfigSource;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
+use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand};
+use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
+use crate::console::input::{InputArgument, InputOption};
 use crate::factory::Factory;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::json::JsonEncodeOptions;
-use crate::json::JsonFile;
+use crate::io::{IOInterfaceImmutable, io_interface};
+use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::package::base_package::{self};
-use crate::util::Filesystem;
-use crate::util::Platform;
+use crate::util::{Filesystem, Platform};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

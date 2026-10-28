@@ -1,18 +1,13 @@
 //! ref: composer/src/Composer/Command/ReinstallCommand.php
 
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
-use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
+use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::console::input::{InputArgument, InputOption};
 use crate::dependency_resolver::Transaction;
-use crate::dependency_resolver::operation::AnyOperation;
-use crate::dependency_resolver::operation::UninstallOperation;
+use crate::dependency_resolver::operation::{AnyOperation, UninstallOperation};
 use crate::io::IOInterfaceImmutable;
 use crate::package::base_package;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
+use crate::plugin::{CommandEvent, PluginEvents};
 use crate::script::ScriptEvents;
 use crate::util::Platform;
 use shirabe_php_shim::{InvalidArgumentException, impl_php_class, preg_is_match};

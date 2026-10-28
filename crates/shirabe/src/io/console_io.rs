@@ -1,30 +1,22 @@
 //! ref: composer/src/Composer/IO/ConsoleIO.php
 
 use crate::config::Config;
-use crate::io::BaseIO;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::IOInterfaceMutable;
-use crate::io::io_interface;
+use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
 use crate::question::StrictConfirmationQuestion;
 use bstr::ByteSlice;
-use indexmap::IndexMap;
-use indexmap::indexmap;
+use indexmap::{IndexMap, indexmap};
 use shirabe_php_shim::{
     PhpMixed, array_search, in_array_strict, is_array, is_string, memory_get_usage, microtime,
     preg_replace, str_repeat, strip_tags, strlen,
 };
-use shirabe_symfony_console::helper::ProgressBar;
-use shirabe_symfony_console::helper::QuestionHelper;
-use shirabe_symfony_console::helper::QuestionHelperInterface;
-use shirabe_symfony_console::helper::Table;
+use shirabe_symfony_console::helper::{
+    ProgressBar, QuestionHelper, QuestionHelperInterface, Table,
+};
 use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::output::ConsoleOutput;
-use shirabe_symfony_console::output::ConsoleOutputInterface;
-use shirabe_symfony_console::output::{OutputInterface, output_interface};
-use shirabe_symfony_console::question::ChoiceQuestion;
-use shirabe_symfony_console::question::Question;
-use shirabe_symfony_console::question::QuestionInterface;
+use shirabe_symfony_console::output::{
+    ConsoleOutput, ConsoleOutputInterface, OutputInterface, output_interface,
+};
+use shirabe_symfony_console::question::{ChoiceQuestion, Question, QuestionInterface};
 
 /// The Input/Output helper.
 #[derive(Debug)]

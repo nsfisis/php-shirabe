@@ -1,16 +1,12 @@
 //! ref: composer/src/Composer/Package/Version/VersionGuesser.php
 
 use crate::config::Config;
-use crate::io::IOInterface;
-use crate::io::NullIO;
+use crate::io::{IOInterface, NullIO};
 use crate::package::version::VersionParser;
 use crate::repository::vcs::HgDriver;
-use crate::util::Git as GitUtil;
-use crate::util::HttpDownloader;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
-use crate::util::Svn as SvnUtil;
-use crate::util::sync_executor;
+use crate::util::{
+    Git as GitUtil, HttpDownloader, Platform, ProcessExecutor, Svn as SvnUtil, sync_executor,
+};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

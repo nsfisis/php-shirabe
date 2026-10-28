@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Util/Filesystem.php
 
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
+use crate::util::{Platform, ProcessExecutor};
 use shirabe_php_shim::{
     CHILD_FIRST, InvalidArgumentException, LogicException, PhpMixed, PregMatches, RuntimeException,
     SELF_FIRST, SKIP_DOTS, array_pop, basename, chdir, clearstatcache, clearstatcache2, copy,

@@ -1,10 +1,8 @@
 //! ref: composer/src/Composer/Console/Input/InputArgument.php
 
 use crate::console::input::SuggestedValues;
-use shirabe_symfony_console::completion::CompletionInput;
-use shirabe_symfony_console::completion::CompletionSuggestions;
-use shirabe_symfony_console::input::InputArgument as BaseInputArgument;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::completion::{CompletionInput, CompletionSuggestions};
+use shirabe_symfony_console::input::{InputArgument as BaseInputArgument, InputValue};
 
 #[derive(Debug)]
 pub struct InputArgument {

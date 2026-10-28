@@ -1,19 +1,11 @@
 //! ref: composer/src/Composer/Util/Git.php
 
 use crate::config::Config;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::util::Bitbucket;
-use crate::util::CommandLine;
-use crate::util::Filesystem;
-use crate::util::GitHub;
-use crate::util::GitLab;
-use crate::util::HttpDownloader;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
-use crate::util::Url;
-use crate::util::{AuthHelper, StoreAuth};
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::util::{
+    AuthHelper, Bitbucket, CommandLine, Filesystem, GitHub, GitLab, HttpDownloader, Platform,
+    ProcessExecutor, StoreAuth, Url,
+};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{

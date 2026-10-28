@@ -1,8 +1,6 @@
 //! ref: composer/src/Composer/Package/RootPackageInterface.php
 
-use crate::package::CompletePackageInterface;
-use crate::package::Link;
-use crate::package::PackageInterface;
+use crate::package::{CompletePackageInterface, Link, PackageInterface};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 

@@ -1,17 +1,14 @@
 //! ref: composer/src/Composer/Plugin/PluginManager.php
 
-use crate::composer::PartialComposerHandle;
-use crate::composer::{ComposerHandle, ComposerWeakHandle};
+use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialComposerHandle};
 use crate::event_dispatcher::{EventDispatcher, unwrap_php_result};
 use crate::factory::DisablePlugins;
 use crate::installer::InstallerInterface;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::package::LockerInterface;
-use crate::package::PackageInterfaceHandle;
-use crate::package::RootPackageInterfaceHandle;
-use crate::package::base_package::{self};
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::version::VersionParser;
+use crate::package::{
+    LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle, base_package,
+};
 use crate::plugin::PluginBlockedException;
 use crate::plugin::capability::Capability;
 use crate::plugin::php_plugin_proxy::{
@@ -19,10 +16,9 @@ use crate::plugin::php_plugin_proxy::{
     plugin_handle_value,
 };
 use crate::plugin::plugin_interface::{self, PluginInterface};
-use crate::repository::InstalledRepository;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::RepositoryUtils;
-use crate::repository::RootPackageRepository;
+use crate::repository::{
+    InstalledRepository, RepositoryInterfaceHandle, RepositoryUtils, RootPackageRepository,
+};
 use crate::util::PackageSorter;
 use bstr::ByteSlice;
 use indexmap::IndexMap;

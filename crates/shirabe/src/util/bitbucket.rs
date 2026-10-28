@@ -3,15 +3,11 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
-use crate::io::io_interface;
-use crate::util::HttpDownloader;
-use crate::util::ProcessExecutor;
+use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, json_encode};
-use shirabe_php_shim::{LogicException, PhpMixed, time};
+use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, json_encode, time};
 
 fn transport_error_code(err: &anyhow::Error) -> Option<i64> {
     err.catch::<TransportException>().map(|te| te.get_code())

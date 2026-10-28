@@ -1,16 +1,13 @@
 //! ref: composer/src/Composer/Command/SuggestsCommand.php
 
-use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
+use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
+use crate::console::input::{InputArgument, InputOption};
 use crate::installer::SuggestedPackagesReporter;
-use crate::repository::InstalledRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterface;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::RootPackageRepository;
+use crate::repository::{
+    InstalledRepository, PlatformRepository, RepositoryInterface, RepositoryInterfaceHandle,
+    RootPackageRepository,
+};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, impl_php_class, in_array_loose};
 use shirabe_symfony_console::command::Command;

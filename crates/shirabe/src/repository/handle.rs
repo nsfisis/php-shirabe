@@ -1,7 +1,6 @@
 //! Shared handle over `RepositoryInterface`.
 
-use crate::package::BasePackageHandle;
-use crate::package::PackageInterfaceHandle;
+use crate::package::{BasePackageHandle, PackageInterfaceHandle};
 use crate::repository::{
     FindPackageConstraint, InstalledRepositoryInterface, LoadPackagesResult, LockArrayRepository,
     PlatformRepository, ProviderInfo, RepositoryInterface, SearchResult,

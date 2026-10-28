@@ -3,9 +3,8 @@
 use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
 use shirabe_php_shim::{php_regex, preg_is_match, preg_replace};
-use shirabe_semver::Semver;
-use shirabe_semver::VersionParser as SemverVersionParser;
 use shirabe_semver::constraint::AnyConstraint;
+use shirabe_semver::{Semver, VersionParser as SemverVersionParser};
 use std::sync::{LazyLock, Mutex};
 
 static CONSTRAINTS: LazyLock<Mutex<IndexMap<String, AnyConstraint>>> =

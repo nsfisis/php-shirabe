@@ -7,10 +7,8 @@ use shirabe_php_shim::{
 };
 use shirabe_symfony_console::formatter::OutputFormatterInterface;
 use shirabe_symfony_console::helper::QuestionHelper;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::StringInput;
-use shirabe_symfony_console::output::OutputInterface;
-use shirabe_symfony_console::output::StreamOutput;
+use shirabe_symfony_console::input::{InputInterface, StringInput};
+use shirabe_symfony_console::output::{OutputInterface, StreamOutput};
 
 #[derive(Debug)]
 pub struct BufferIO {

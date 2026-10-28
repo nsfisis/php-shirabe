@@ -4,9 +4,8 @@ use crate::io_mock::{Expectation, IOMock, IOMockGuard, get_io_mock};
 use crate::test_case::get_package;
 use indexmap::IndexMap;
 use shirabe::installer::SuggestedPackagesReporter;
-use shirabe::io::IOInterface;
-use shirabe::io::io_interface;
 use shirabe::io::null_io::NullIO;
+use shirabe::io::{IOInterface, io_interface};
 use shirabe::repository::{InstalledRepository, LockArrayRepository, RepositoryInterfaceHandle};
 
 /// ref: SuggestedPackagesReporterTest::setUp.

@@ -1,14 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/SecurityAdvisoryPoolFilter.php
 
-use crate::advisory::AnySecurityAdvisory;
-use crate::advisory::AuditConfig;
-use crate::advisory::Auditor;
-use crate::dependency_resolver::Pool;
-use crate::dependency_resolver::Request;
+use crate::advisory::{AnySecurityAdvisory, AuditConfig, Auditor};
+use crate::dependency_resolver::{Pool, Request};
 use crate::package::BasePackageHandle;
-use crate::repository::PlatformRepository;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::RepositorySet;
+use crate::repository::{PlatformRepository, RepositoryInterfaceHandle, RepositorySet};
 use indexmap::IndexMap;
 use shirabe_semver::constraint::SimpleConstraint;
 

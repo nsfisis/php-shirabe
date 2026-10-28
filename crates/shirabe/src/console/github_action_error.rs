@@ -1,7 +1,6 @@
 //! ref: composer/src/Composer/Console/GithubActionError.php
 
-use crate::io::IOInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::Platform;
 
 #[derive(Debug)]

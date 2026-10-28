@@ -2,8 +2,7 @@
 
 use crate::downloader::TransportException;
 use crate::util::NoProxyPattern;
-use crate::util::http::ProxyItem;
-use crate::util::http::RequestProxy;
+use crate::util::http::{ProxyItem, RequestProxy};
 use shirabe_php_shim::PHP_SERVER;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};

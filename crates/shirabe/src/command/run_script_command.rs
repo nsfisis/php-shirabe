@@ -1,24 +1,18 @@
 //! ref: composer/src/Composer/Command/RunScriptCommand.php
 
-use crate::command::BaseCommand;
-use crate::command::BaseCommandData;
 use crate::command::base_command::base_command_initialize;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
+use crate::command::{BaseCommand, BaseCommandData};
+use crate::console::input::{InputArgument, InputOption};
 use crate::io::IOInterfaceImmutable;
-use crate::script::Event as ScriptEvent;
-use crate::script::ScriptEvents;
-use crate::util::Platform;
-use crate::util::ProcessExecutor;
+use crate::script::{Event as ScriptEvent, ScriptEvents};
+use crate::util::{Platform, ProcessExecutor};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
-use shirabe_php_shim::{InvalidArgumentException, RuntimeException};
-use shirabe_php_shim::{PhpMixed, impl_php_class};
+use shirabe_php_shim::{
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class,
+};
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::exception::CommandNotFoundException;
-use shirabe_symfony_console::exception::NamespaceNotFoundException;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::exception::{CommandNotFoundException, NamespaceNotFoundException};
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]

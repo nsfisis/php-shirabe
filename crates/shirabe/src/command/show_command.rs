@@ -1,39 +1,23 @@
 //! ref: composer/src/Composer/Command/ShowCommand.php
 
-use crate::command::CompletionTrait;
 use crate::command::base_command::base_command_initialize;
-use crate::command::{BaseCommand, BaseCommandData};
+use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::composer::PartialComposerHandle;
-use crate::console::input::InputArgument;
-use crate::console::input::InputOption;
-use crate::console::input::SuggestedValues;
-use crate::dependency_resolver::DefaultPolicy;
-use crate::dependency_resolver::PolicyInterface;
+use crate::console::input::{InputArgument, InputOption, SuggestedValues};
+use crate::dependency_resolver::{DefaultPolicy, PolicyInterface};
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
-use crate::package::CompletePackageInterfaceHandle;
-use crate::package::Link;
-use crate::package::PackageInterfaceHandle;
-use crate::package::base_package;
-use crate::package::version::VersionParser;
-use crate::package::version::VersionSelector;
 use crate::package::version::version_selector::ShowWarnings;
-use crate::plugin::CommandEvent;
-use crate::plugin::PluginEvents;
-use crate::repository::ComposerRepository;
-use crate::repository::CompositeRepository;
-use crate::repository::FilterRepository;
-use crate::repository::InstalledArrayRepository;
-use crate::repository::InstalledRepository;
-use crate::repository::PlatformRepository;
-use crate::repository::PlatformRepositoryHandle;
-use crate::repository::RepositoryFactory;
-use crate::repository::RepositoryInterface;
-use crate::repository::RepositoryInterfaceHandle;
-use crate::repository::RepositorySet;
-use crate::repository::RepositoryUtils;
-use crate::repository::RootPackageRepository;
+use crate::package::version::{VersionParser, VersionSelector};
+use crate::package::{CompletePackageInterfaceHandle, Link, PackageInterfaceHandle, base_package};
+use crate::plugin::{CommandEvent, PluginEvents};
+use crate::repository::{
+    ComposerRepository, CompositeRepository, FilterRepository, InstalledArrayRepository,
+    InstalledRepository, PlatformRepository, PlatformRepositoryHandle, RepositoryFactory,
+    RepositoryInterface, RepositoryInterfaceHandle, RepositorySet, RepositoryUtils,
+    RootPackageRepository,
+};
 use crate::util::PackageInfo;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
@@ -47,10 +31,8 @@ use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_spdx_licenses::SpdxLicenses;
 use shirabe_symfony_console::command::Command;
-use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::formatter::OutputFormatterStyle;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::formatter::{OutputFormatter, OutputFormatterStyle};
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]

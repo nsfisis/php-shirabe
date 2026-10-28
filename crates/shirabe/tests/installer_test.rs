@@ -9,7 +9,9 @@ mod test_case;
 
 use config_stub::ConfigStubBuilder;
 use serial_test::serial;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{
+    InputArgument, InputInterface, InputOption, InputValue, StringInput,
+};
 use test_case::{get_package, get_version_constraint};
 
 use indexmap::IndexMap;
@@ -49,14 +51,8 @@ use shirabe_php_shim::{
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
-use shirabe_symfony_console::command::Command as SymfonyCommand;
-use shirabe_symfony_console::command::CommandData;
-use shirabe_symfony_console::input::InputArgument;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputOption;
-use shirabe_symfony_console::input::StringInput;
-use shirabe_symfony_console::output::StreamOutput;
-use shirabe_symfony_console::output::{OutputInterface, VERBOSITY_NORMAL};
+use shirabe_symfony_console::command::{Command as SymfonyCommand, CommandData};
+use shirabe_symfony_console::output::{OutputInterface, StreamOutput, VERBOSITY_NORMAL};
 
 // removeDirectory of tempComposerHome (a path produced by the unported install pipeline) is not
 // ported; the cwd management (setUp's chdir(__DIR__) / tearDown's chdir($this->prevCwd)) and the

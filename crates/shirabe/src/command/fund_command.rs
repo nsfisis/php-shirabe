@@ -2,21 +2,17 @@
 
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
-use crate::console::input::InputOption;
-use crate::console::input::SuggestedValues;
+use crate::console::input::{InputOption, SuggestedValues};
 use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::base_package::{self};
-use crate::repository::CompositeRepository;
-use crate::repository::RepositoryInterface;
+use crate::repository::{CompositeRepository, RepositoryInterface};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, impl_php_class, php_regex, preg_match};
-use shirabe_semver::constraint::AnyConstraint;
-use shirabe_semver::constraint::MatchAllConstraint;
+use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
-use shirabe_symfony_console::input::InputInterface;
-use shirabe_symfony_console::input::InputValue;
+use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
 
 #[derive(Debug)]
