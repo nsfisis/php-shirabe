@@ -525,11 +525,11 @@ fn test_run_command_private_bitbucket_repository_not_initial_clone_interactive_w
 
 #[test]
 fn test_sync_mirror_sanitizes_url_after_initial_clone() {
-    let non_existent_dir = format!(
-        "{}/composer-test-nonexistent-{}",
-        std::env::temp_dir().display(),
-        rand_hex()
-    );
+    let non_existent_dir = std::env::temp_dir()
+        .join(format!("composer-test-nonexistent-{}", rand_hex()))
+        .to_str()
+        .unwrap()
+        .to_string();
 
     let config = mock_sync_mirror_config();
 

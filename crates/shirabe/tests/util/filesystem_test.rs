@@ -433,27 +433,31 @@ fn test_find_shortest_path() {
 #[test]
 fn test_remove_directory_php() {
     let working_dir = tempfile::TempDir::new().unwrap();
-    let working_dir = working_dir.path().to_str().unwrap().to_string();
+    let working_dir = working_dir.path().to_path_buf();
 
-    mkdir(format!("{working_dir}/level1/level2"), 0o777, true);
+    mkdir(working_dir.join("level1/level2"), 0o777, true);
     file_put_contents(
-        &format!("{working_dir}/level1/level2/hello.txt"),
+        working_dir
+            .join("level1/level2/hello.txt")
+            .to_str()
+            .unwrap(),
         b"hello world",
     );
 
     let mut fs = Filesystem::new(None);
-    assert!(fs.remove_directory_php(&working_dir).unwrap());
-    assert!(!file_exists(format!(
-        "{working_dir}/level1/level2/hello.txt"
-    )));
+    assert!(
+        fs.remove_directory_php(working_dir.to_str().unwrap())
+            .unwrap()
+    );
+    assert!(!file_exists(working_dir.join("level1/level2/hello.txt")));
 }
 
 #[test]
 fn test_file_size() {
     let unique_tmp = tempfile::TempDir::new().unwrap();
-    let test_file = format!("{}/composer_test_file", unique_tmp.path().to_str().unwrap());
+    let test_file = unique_tmp.path().join("composer_test_file");
 
-    file_put_contents(&test_file, b"Hello");
+    file_put_contents(test_file.to_str().unwrap(), b"Hello");
 
     let fs = Filesystem::new(None);
     assert!(fs.size(&test_file).unwrap() >= 5);
@@ -462,11 +466,11 @@ fn test_file_size() {
 #[test]
 fn test_directory_size() {
     let working_dir = tempfile::TempDir::new().unwrap();
-    let working_dir = working_dir.path().to_str().unwrap().to_string();
+    let working_dir = working_dir.path().to_path_buf();
 
     mkdir(&working_dir, 0o777, true);
-    file_put_contents(&format!("{working_dir}/file1.txt"), b"Hello");
-    file_put_contents(&format!("{working_dir}/file2.txt"), b"World");
+    file_put_contents(working_dir.join("file1.txt").to_str().unwrap(), b"Hello");
+    file_put_contents(working_dir.join("file2.txt").to_str().unwrap(), b"World");
 
     let fs = Filesystem::new(None);
     assert!(fs.size(&working_dir).unwrap() >= 10);
@@ -509,12 +513,12 @@ fn test_normalize_path() {
 #[test]
 fn test_unlink_symlinked_directory() {
     let working_dir = tempfile::TempDir::new().unwrap();
-    let basepath = working_dir.path().to_str().unwrap().to_string();
-    let symlinked = format!("{basepath}/linked");
-    mkdir(format!("{basepath}/real"), 0o777, true);
-    touch(format!("{basepath}/real/FILE"));
+    let basepath = working_dir.path().to_path_buf();
+    let symlinked = basepath.join("linked");
+    mkdir(basepath.join("real"), 0o777, true);
+    touch(basepath.join("real/FILE"));
 
-    let result = symlink(format!("{basepath}/real"), &symlinked).is_ok();
+    let result = symlink(basepath.join("real"), &symlinked).is_ok();
 
     if !result {
         // Symbolic links for directories not supported on this platform.
@@ -534,14 +538,14 @@ fn test_unlink_symlinked_directory() {
 #[test]
 fn test_remove_symlinked_directory_with_trailing_slash() {
     let working_dir = tempfile::TempDir::new().unwrap();
-    let working_dir = working_dir.path().to_str().unwrap().to_string();
+    let working_dir = working_dir.path().to_path_buf();
 
-    mkdir(format!("{working_dir}/real"), 0o777, true);
-    touch(format!("{working_dir}/real/FILE"));
-    let symlinked = format!("{working_dir}/linked");
-    let symlinked_trailing_slash = format!("{symlinked}/");
+    mkdir(working_dir.join("real"), 0o777, true);
+    touch(working_dir.join("real/FILE"));
+    let symlinked = working_dir.join("linked");
+    let symlinked_trailing_slash = symlinked.join("");
 
-    let result = symlink(format!("{working_dir}/real"), &symlinked).is_ok();
+    let result = symlink(working_dir.join("real"), &symlinked).is_ok();
 
     if !result {
         // Symbolic links for directories not supported on this platform.
@@ -567,20 +571,22 @@ fn test_remove_symlinked_directory_with_trailing_slash() {
 #[test]
 fn test_junctions() {
     let working_dir = tempfile::TempDir::new().unwrap();
-    let working_dir = working_dir.path().to_str().unwrap().to_string();
+    let working_dir = working_dir.path().to_path_buf();
 
-    mkdir(format!("{working_dir}/real/nesting/testing"), 0o777, true);
+    mkdir(working_dir.join("real/nesting/testing"), 0o777, true);
     let mut fs = Filesystem::new(None);
 
     // Non-Windows systems do not support this and will return false on all tests, and an exception
     // on creation.
     if !Platform::is_windows() {
-        assert!(!fs.is_junction(&working_dir));
-        assert!(!fs.remove_junction(&working_dir).unwrap());
+        assert!(!fs.is_junction(working_dir.to_str().unwrap()));
+        assert!(!fs.remove_junction(working_dir.to_str().unwrap()).unwrap());
 
-        let target = format!("{working_dir}/real/../real/nesting");
-        let junction = format!("{working_dir}/junction");
-        let err = fs.junction(&target, &junction).unwrap_err();
+        let target = working_dir.join("real/../real/nesting");
+        let junction = working_dir.join("junction");
+        let err = fs
+            .junction(target.to_str().unwrap(), junction.to_str().unwrap())
+            .unwrap_err();
         assert!(
             err.to_string()
                 .contains("not available on non-Windows platform")
@@ -588,33 +594,50 @@ fn test_junctions() {
         return;
     }
 
-    let target = format!("{working_dir}/real/../real/nesting");
-    let junction = format!("{working_dir}/junction");
+    let target = working_dir.join("real/../real/nesting");
+    let junction = working_dir.join("junction");
 
     // Create and detect junction
-    fs.junction(&target, &junction).unwrap();
-    assert!(fs.is_junction(&junction), "{junction}: is a junction");
-    assert!(!fs.is_junction(&target), "{target}: is not a junction");
+    fs.junction(target.to_str().unwrap(), junction.to_str().unwrap())
+        .unwrap();
     assert!(
-        fs.is_junction(&format!("{target}/../../junction")),
-        "{target}/../../junction: is a junction"
+        fs.is_junction(junction.to_str().unwrap()),
+        "{}: is a junction",
+        junction.display()
     );
     assert!(
-        !fs.is_junction(&format!("{junction}/../real")),
-        "{junction}/../real: is not a junction"
+        !fs.is_junction(target.to_str().unwrap()),
+        "{}: is not a junction",
+        target.display()
     );
     assert!(
-        fs.is_junction(&format!("{junction}/../junction")),
-        "{junction}/../junction: is a junction"
+        fs.is_junction(target.join("../../junction").to_str().unwrap()),
+        "{}/../../junction: is a junction",
+        target.display()
+    );
+    assert!(
+        !fs.is_junction(junction.join("../real").to_str().unwrap()),
+        "{}/../real: is not a junction",
+        junction.display()
+    );
+    assert!(
+        fs.is_junction(junction.join("../junction").to_str().unwrap()),
+        "{}/../junction: is a junction",
+        junction.display()
     );
 
     // Remove junction
-    assert!(is_dir(&junction), "{junction} is a directory");
+    assert!(is_dir(&junction), "{} is a directory", junction.display());
     assert!(
-        fs.remove_junction(&junction).unwrap(),
-        "{junction} has been removed"
+        fs.remove_junction(junction.to_str().unwrap()).unwrap(),
+        "{} has been removed",
+        junction.display()
     );
-    assert!(!is_dir(&junction), "{junction} is not a directory");
+    assert!(
+        !is_dir(&junction),
+        "{} is not a directory",
+        junction.display()
+    );
 }
 
 #[test]
@@ -625,145 +648,194 @@ fn test_override_junctions() {
     }
 
     let working_dir = tempfile::TempDir::new().unwrap();
-    let working_dir = working_dir.path().to_str().unwrap().to_string();
+    let working_dir = working_dir.path().to_path_buf();
 
-    mkdir(format!("{working_dir}/real/nesting/testing"), 0o777, true);
+    mkdir(working_dir.join("real/nesting/testing"), 0o777, true);
     let mut fs = Filesystem::new(None);
 
-    let old_target = format!("{working_dir}/real/nesting/testing");
-    let target = format!("{working_dir}/real/../real/nesting");
-    let junction = format!("{working_dir}/junction");
+    let old_target = working_dir.join("real/nesting/testing");
+    let target = working_dir.join("real/../real/nesting");
+    let junction = working_dir.join("junction");
 
     // Override non-broken junction
-    fs.junction(&old_target, &junction).unwrap();
-    fs.junction(&target, &junction).unwrap();
+    fs.junction(old_target.to_str().unwrap(), junction.to_str().unwrap())
+        .unwrap();
+    fs.junction(target.to_str().unwrap(), junction.to_str().unwrap())
+        .unwrap();
 
-    assert!(fs.is_junction(&junction), "{junction}: is a junction");
     assert!(
-        fs.is_junction(&format!("{target}/../../junction")),
-        "{target}/../../junction: is a junction"
+        fs.is_junction(junction.to_str().unwrap()),
+        "{}: is a junction",
+        junction.display()
+    );
+    assert!(
+        fs.is_junction(target.join("../../junction").to_str().unwrap()),
+        "{}/../../junction: is a junction",
+        target.display()
     );
 
     // Remove junction
     assert!(
-        fs.remove_junction(&junction).unwrap(),
-        "{junction} has been removed"
+        fs.remove_junction(junction.to_str().unwrap()).unwrap(),
+        "{} has been removed",
+        junction.display()
     );
 
     // Override broken junction
-    fs.junction(&old_target, &junction).unwrap();
+    fs.junction(old_target.to_str().unwrap(), junction.to_str().unwrap())
+        .unwrap();
     fs.remove_directory(&old_target).unwrap();
-    fs.junction(&target, &junction).unwrap();
+    fs.junction(target.to_str().unwrap(), junction.to_str().unwrap())
+        .unwrap();
 
-    assert!(fs.is_junction(&junction), "{junction}: is a junction");
     assert!(
-        fs.is_junction(&format!("{target}/../../junction")),
-        "{target}/../../junction: is a junction"
+        fs.is_junction(junction.to_str().unwrap()),
+        "{}: is a junction",
+        junction.display()
+    );
+    assert!(
+        fs.is_junction(target.join("../../junction").to_str().unwrap()),
+        "{}/../../junction: is a junction",
+        target.display()
     );
 }
 
 #[test]
 fn test_copy() {
     let working_dir = tempfile::TempDir::new().unwrap();
-    let working_dir = working_dir.path().to_str().unwrap().to_string();
+    let working_dir = working_dir.path().to_path_buf();
     let unique_tmp = tempfile::TempDir::new().unwrap();
-    let test_file = format!("{}/composer_test_file", unique_tmp.path().to_str().unwrap());
+    let test_file = unique_tmp.path().join("composer_test_file");
 
-    mkdir(format!("{working_dir}/foo/bar"), 0o777, true);
-    mkdir(format!("{working_dir}/foo/baz"), 0o777, true);
-    file_put_contents(&format!("{working_dir}/foo/foo.file"), b"foo");
-    file_put_contents(&format!("{working_dir}/foo/bar/foobar.file"), b"foobar");
-    file_put_contents(&format!("{working_dir}/foo/baz/foobaz.file"), b"foobaz");
-    file_put_contents(&test_file, b"testfile");
+    mkdir(working_dir.join("foo/bar"), 0o777, true);
+    mkdir(working_dir.join("foo/baz"), 0o777, true);
+    file_put_contents(working_dir.join("foo/foo.file").to_str().unwrap(), b"foo");
+    file_put_contents(
+        working_dir.join("foo/bar/foobar.file").to_str().unwrap(),
+        b"foobar",
+    );
+    file_put_contents(
+        working_dir.join("foo/baz/foobaz.file").to_str().unwrap(),
+        b"foobaz",
+    );
+    file_put_contents(test_file.to_str().unwrap(), b"testfile");
 
     let mut fs = Filesystem::new(None);
 
     let result1 = fs
         .copy(
-            &format!("{working_dir}/foo"),
-            &format!("{working_dir}/foop"),
+            working_dir.join("foo").to_str().unwrap(),
+            working_dir.join("foop").to_str().unwrap(),
         )
         .unwrap();
     assert!(result1, "Copying directory failed.");
     assert!(
-        is_dir(format!("{working_dir}/foop")),
-        "Not a directory: {working_dir}/foop"
+        is_dir(working_dir.join("foop")),
+        "Not a directory: {}/foop",
+        working_dir.display()
     );
     assert!(
-        is_dir(format!("{working_dir}/foop/bar")),
-        "Not a directory: {working_dir}/foop/bar"
+        is_dir(working_dir.join("foop/bar")),
+        "Not a directory: {}/foop/bar",
+        working_dir.display()
     );
     assert!(
-        is_dir(format!("{working_dir}/foop/baz")),
-        "Not a directory: {working_dir}/foop/baz"
+        is_dir(working_dir.join("foop/baz")),
+        "Not a directory: {}/foop/baz",
+        working_dir.display()
     );
     assert!(
-        file_exists(format!("{working_dir}/foop/foo.file")),
-        "Not a file: {working_dir}/foop/foo.file"
+        file_exists(working_dir.join("foop/foo.file")),
+        "Not a file: {}/foop/foo.file",
+        working_dir.display()
     );
     assert!(
-        file_exists(format!("{working_dir}/foop/bar/foobar.file")),
-        "Not a file: {working_dir}/foop/bar/foobar.file"
+        file_exists(working_dir.join("foop/bar/foobar.file")),
+        "Not a file: {}/foop/bar/foobar.file",
+        working_dir.display()
     );
     assert!(
-        file_exists(format!("{working_dir}/foop/baz/foobaz.file")),
-        "Not a file: {working_dir}/foop/baz/foobaz.file"
+        file_exists(working_dir.join("foop/baz/foobaz.file")),
+        "Not a file: {}/foop/baz/foobaz.file",
+        working_dir.display()
     );
 
     let result2 = fs
-        .copy(&test_file, &format!("{working_dir}/testfile.file"))
+        .copy(
+            test_file.to_str().unwrap(),
+            working_dir.join("testfile.file").to_str().unwrap(),
+        )
         .unwrap();
     assert!(result2);
-    assert!(file_exists(format!("{working_dir}/testfile.file")));
+    assert!(file_exists(working_dir.join("testfile.file")));
 }
 
 #[test]
 fn test_copy_then_remove() {
     let working_dir = tempfile::TempDir::new().unwrap();
-    let working_dir = working_dir.path().to_str().unwrap().to_string();
+    let working_dir = working_dir.path().to_path_buf();
     let unique_tmp = tempfile::TempDir::new().unwrap();
-    let test_file = format!("{}/composer_test_file", unique_tmp.path().to_str().unwrap());
+    let test_file = unique_tmp.path().join("composer_test_file");
 
-    mkdir(format!("{working_dir}/foo/bar"), 0o777, true);
-    mkdir(format!("{working_dir}/foo/baz"), 0o777, true);
-    file_put_contents(&format!("{working_dir}/foo/foo.file"), b"foo");
-    file_put_contents(&format!("{working_dir}/foo/bar/foobar.file"), b"foobar");
-    file_put_contents(&format!("{working_dir}/foo/baz/foobaz.file"), b"foobaz");
-    file_put_contents(&test_file, b"testfile");
+    mkdir(working_dir.join("foo/bar"), 0o777, true);
+    mkdir(working_dir.join("foo/baz"), 0o777, true);
+    file_put_contents(working_dir.join("foo/foo.file").to_str().unwrap(), b"foo");
+    file_put_contents(
+        working_dir.join("foo/bar/foobar.file").to_str().unwrap(),
+        b"foobar",
+    );
+    file_put_contents(
+        working_dir.join("foo/baz/foobaz.file").to_str().unwrap(),
+        b"foobaz",
+    );
+    file_put_contents(test_file.to_str().unwrap(), b"testfile");
 
     let mut fs = Filesystem::new(None);
 
-    fs.copy_then_remove(&test_file, &format!("{working_dir}/testfile.file"))
-        .unwrap();
-    assert!(!file_exists(&test_file), "Still a file: {test_file}");
-
     fs.copy_then_remove(
-        &format!("{working_dir}/foo"),
-        &format!("{working_dir}/foop"),
+        test_file.to_str().unwrap(),
+        working_dir.join("testfile.file").to_str().unwrap(),
     )
     .unwrap();
     assert!(
-        !file_exists(format!("{working_dir}/foo/baz/foobaz.file")),
-        "Still a file: {working_dir}/foo/baz/foobaz.file"
+        !file_exists(&test_file),
+        "Still a file: {}",
+        test_file.display()
+    );
+
+    fs.copy_then_remove(
+        working_dir.join("foo").to_str().unwrap(),
+        working_dir.join("foop").to_str().unwrap(),
+    )
+    .unwrap();
+    assert!(
+        !file_exists(working_dir.join("foo/baz/foobaz.file")),
+        "Still a file: {}/foo/baz/foobaz.file",
+        working_dir.display()
     );
     assert!(
-        !file_exists(format!("{working_dir}/foo/bar/foobar.file")),
-        "Still a file: {working_dir}/foo/bar/foobar.file"
+        !file_exists(working_dir.join("foo/bar/foobar.file")),
+        "Still a file: {}/foo/bar/foobar.file",
+        working_dir.display()
     );
     assert!(
-        !file_exists(format!("{working_dir}/foo/foo.file")),
-        "Still a file: {working_dir}/foo/foo.file"
+        !file_exists(working_dir.join("foo/foo.file")),
+        "Still a file: {}/foo/foo.file",
+        working_dir.display()
     );
     assert!(
-        !is_dir(format!("{working_dir}/foo/baz")),
-        "Still a directory: {working_dir}/foo/baz"
+        !is_dir(working_dir.join("foo/baz")),
+        "Still a directory: {}/foo/baz",
+        working_dir.display()
     );
     assert!(
-        !is_dir(format!("{working_dir}/foo/bar")),
-        "Still a directory: {working_dir}/foo/bar"
+        !is_dir(working_dir.join("foo/bar")),
+        "Still a directory: {}/foo/bar",
+        working_dir.display()
     );
     assert!(
-        !is_dir(format!("{working_dir}/foo")),
-        "Still a directory: {working_dir}/foo"
+        !is_dir(working_dir.join("foo")),
+        "Still a directory: {}/foo",
+        working_dir.display()
     );
 }

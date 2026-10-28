@@ -30,10 +30,11 @@ fn get_result_to_string(res: &GetResult) -> String {
 
 // Mirrors PHP's `__FILE__`: the path to this test source file.
 fn this_file() -> String {
-    format!(
-        "{}/tests/util/local_filesystem_test.rs",
-        env!("CARGO_MANIFEST_DIR")
-    )
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/util/local_filesystem_test.rs")
+        .to_str()
+        .unwrap()
+        .to_string()
 }
 
 #[test]

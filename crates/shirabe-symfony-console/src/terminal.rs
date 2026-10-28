@@ -27,9 +27,12 @@ impl Terminal {
     pub fn get_width(&self) -> i64 {
         let width = shirabe_php_shim::getenv("COLUMNS");
         if let Some(width) = width {
+            // TODO(bytes): PhpMixed::String carries the value as a String.
+            let width = width
+                .into_string()
+                .unwrap_or_else(|width| panic!("COLUMNS is not valid UTF-8: {width:?}"));
             return shirabe_php_shim::intval(&PhpMixed::String(shirabe_php_shim::trim(
-                &width.to_string_lossy(),
-                None,
+                &width, None,
             )));
         }
 
@@ -44,9 +47,12 @@ impl Terminal {
     pub fn get_height(&self) -> i64 {
         let height = shirabe_php_shim::getenv("LINES");
         if let Some(height) = height {
+            // TODO(bytes): PhpMixed::String carries the value as a String.
+            let height = height
+                .into_string()
+                .unwrap_or_else(|height| panic!("LINES is not valid UTF-8: {height:?}"));
             return shirabe_php_shim::intval(&PhpMixed::String(shirabe_php_shim::trim(
-                &height.to_string_lossy(),
-                None,
+                &height, None,
             )));
         }
 
@@ -73,11 +79,16 @@ impl Terminal {
 
     fn init_dimensions() {
         if cfg!(windows) {
-            let ansicon = shirabe_php_shim::getenv("ANSICON");
+            // TODO(bytes): preg_match matches over a &str.
+            let ansicon = shirabe_php_shim::getenv("ANSICON").map(|ansicon| {
+                ansicon
+                    .into_string()
+                    .unwrap_or_else(|ansicon| panic!("ANSICON is not valid UTF-8: {ansicon:?}"))
+            });
             if let Some(ansicon) = &ansicon
                 && let Some(matches) = preg_match(
                     php_regex!("/^(\\d+)x(\\d+)(?: \\((\\d+)x(\\d+)\\))?$/"),
-                    &shirabe_php_shim::trim(&ansicon.to_string_lossy(), None),
+                    &shirabe_php_shim::trim(ansicon, None),
                 )
             {
                 // extract [w, H] from "wxh (WxH)"

@@ -54,7 +54,7 @@ fn get_test_config(test_path: &std::path::Path) -> Config {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(test_path.to_string_lossy().into_owned()),
+        PhpMixed::String(test_path.to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&top, Config::SOURCE_UNKNOWN);

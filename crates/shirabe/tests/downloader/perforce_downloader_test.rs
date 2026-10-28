@@ -50,7 +50,7 @@ fn get_config(test_path: &std::path::Path) -> Config {
     let mut section: IndexMap<String, PhpMixed> = IndexMap::new();
     section.insert(
         "home".to_string(),
-        PhpMixed::String(test_path.to_string_lossy().into_owned()),
+        PhpMixed::String(test_path.to_str().unwrap().to_string()),
     );
     top.insert("config".to_string(), PhpMixed::Array(section));
     config.merge(&top, Config::SOURCE_UNKNOWN);
@@ -87,7 +87,7 @@ fn test_init_perforce_instantiates_a_new_perforce_object() {
 
     downloader.init_perforce(
         package,
-        test_path.path().to_string_lossy().into_owned(),
+        test_path.path().to_str().unwrap().to_string(),
         "SOURCE_REF".to_string(),
     );
 }
@@ -112,7 +112,7 @@ fn test_init_perforce_does_nothing_if_perforce_already_set() {
     let package = make_package(None);
     downloader.init_perforce(
         package,
-        test_path.path().to_string_lossy().into_owned(),
+        test_path.path().to_str().unwrap().to_string(),
         "SOURCE_REF".to_string(),
     );
 }
@@ -131,7 +131,7 @@ fn test_do_install_with_no_tag() {
 // against a mocked Perforce, asserting each step is invoked exactly once.
 fn do_install_workflow(source_ref: &'static str, expected_label: Option<String>) {
     let test_path = TempDir::new().unwrap();
-    let test_path_str = test_path.path().to_string_lossy().into_owned();
+    let test_path_str = test_path.path().to_str().unwrap().to_string();
 
     let (io_mock, _io_guard) = get_io_mock(NORMAL).unwrap();
     io_mock

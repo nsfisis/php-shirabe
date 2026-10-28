@@ -16,10 +16,11 @@ fn set_up() -> bool {
 }
 
 fn artifacts_dir() -> String {
-    format!(
-        "{}/../../composer/tests/Composer/Test/Repository/Fixtures/artifacts",
-        env!("CARGO_MANIFEST_DIR")
-    )
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../composer/tests/Composer/Test/Repository/Fixtures/artifacts")
+        .to_str()
+        .unwrap()
+        .to_string()
 }
 
 fn create_repo(url: &str) -> ArtifactRepository {

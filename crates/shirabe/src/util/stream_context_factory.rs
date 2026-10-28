@@ -301,7 +301,13 @@ impl StreamContextFactory {
         let has_capath = ssl.as_ref().and_then(|a| a.get("capath")).is_some();
         if !has_cafile && !has_capath {
             let result = CaBundle::get_system_ca_root_bundle_path(logger);
-            if shirabe_php_shim::is_dir(&result) {
+            let is_dir = shirabe_php_shim::is_dir(&result);
+            // TODO(bytes): PhpMixed::String carries the path as a String.
+            let result = result
+                .into_os_string()
+                .into_string()
+                .unwrap_or_else(|path| panic!("CA bundle path is not valid UTF-8: {path:?}"));
+            if is_dir {
                 if let Some(PhpMixed::Array(ssl)) = defaults.get_mut("ssl") {
                     ssl.insert("capath".to_string(), PhpMixed::String(result));
                 }

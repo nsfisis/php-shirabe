@@ -6,11 +6,12 @@ use shirabe::package::loader::validating_array_loader::ValidatingArrayLoader;
 use shirabe::util::config_validator::ConfigValidator;
 
 fn fixture(name: &str) -> String {
-    format!(
-        "{}/../../composer/tests/Composer/Test/Util/Fixtures/{}",
-        env!("CARGO_MANIFEST_DIR"),
-        name
-    )
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../composer/tests/Composer/Test/Util/Fixtures")
+        .join(name)
+        .to_str()
+        .unwrap()
+        .to_string()
 }
 
 fn validate(file: &str) -> Vec<String> {

@@ -23,7 +23,10 @@ impl PhpExecutableFinder {
     /// Finds The PHP executable.
     pub fn find(&self, _include_args: bool) -> Option<String> {
         if let Some(php) = shirabe_php_shim::getenv("PHP_BINARY").filter(|v| !v.is_empty()) {
-            let mut php = php.to_string_lossy().into_owned();
+            // TODO(bytes): the PHP executable path is returned as a String.
+            let mut php = php
+                .into_string()
+                .unwrap_or_else(|php| panic!("PHP_BINARY is not valid UTF-8: {php:?}"));
             if !shirabe_php_shim::is_executable(&php) {
                 match self.executable_finder.find(&php, None, &[]) {
                     Some(found) => php = found,
@@ -42,7 +45,10 @@ impl PhpExecutableFinder {
         // These constants cannot be obtained in Rust, the branch is skipped here.
 
         if let Some(php) = shirabe_php_shim::getenv("PHP_PATH").filter(|v| !v.is_empty()) {
-            let php = php.to_string_lossy().into_owned();
+            // TODO(bytes): the PHP executable path is returned as a String.
+            let php = php
+                .into_string()
+                .unwrap_or_else(|php| panic!("PHP_PATH is not valid UTF-8: {php:?}"));
             if !shirabe_php_shim::is_executable(&php) || shirabe_php_shim::is_dir(&php) {
                 return None;
             }
@@ -51,7 +57,10 @@ impl PhpExecutableFinder {
         }
 
         if let Some(php) = shirabe_php_shim::getenv("PHP_PEAR_PHP_BIN").filter(|v| !v.is_empty()) {
-            let php = php.to_string_lossy().into_owned();
+            // TODO(bytes): the PHP executable path is returned as a String.
+            let php = php
+                .into_string()
+                .unwrap_or_else(|php| panic!("PHP_PEAR_PHP_BIN is not valid UTF-8: {php:?}"));
             if shirabe_php_shim::is_executable(&php) && !shirabe_php_shim::is_dir(&php) {
                 return Some(php);
             }

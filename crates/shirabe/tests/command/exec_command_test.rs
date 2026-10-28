@@ -12,7 +12,7 @@ fn test_list_throws_if_no_binaries_exist() {
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, false);
     let composer_dir = tear_down.working_dir();
 
-    let composer_bin_dir = format!("{}/vendor/bin", composer_dir.display());
+    let composer_bin_dir = composer_dir.join("vendor/bin");
 
     let mut app_tester = get_application_tester();
     let err = app_tester
@@ -28,7 +28,7 @@ fn test_list_throws_if_no_binaries_exist() {
     assert!(
         err.to_string().contains(&format!(
             "No binaries found in composer.json or in bin-dir ({})",
-            composer_bin_dir
+            composer_bin_dir.display()
         )),
         "expected RuntimeException about no binaries, got: {:?}",
         err.to_string(),
@@ -53,11 +53,11 @@ fn test_list() {
     );
     let composer_dir = tear_down.working_dir();
 
-    let composer_bin_dir = format!("{}/vendor/bin", composer_dir.display());
+    let composer_bin_dir = composer_dir.join("vendor/bin");
     std::fs::create_dir_all(&composer_bin_dir).unwrap();
-    std::fs::write(format!("{}/b", composer_bin_dir), "").unwrap();
-    std::fs::write(format!("{}/b.bat", composer_bin_dir), "").unwrap();
-    std::fs::write(format!("{}/c", composer_bin_dir), "").unwrap();
+    std::fs::write(composer_bin_dir.join("b"), "").unwrap();
+    std::fs::write(composer_bin_dir.join("b.bat"), "").unwrap();
+    std::fs::write(composer_bin_dir.join("c"), "").unwrap();
 
     let mut app_tester = get_application_tester();
     app_tester

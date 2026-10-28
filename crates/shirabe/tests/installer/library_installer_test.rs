@@ -92,8 +92,8 @@ mockall::mock! {
 /// mock before constructing the installer.
 struct SetUp {
     root: TempDir,
-    vendor_dir: String,
-    bin_dir: String,
+    vendor_dir: std::path::PathBuf,
+    bin_dir: std::path::PathBuf,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     composer: PartialComposerWeakHandle,
     fs: Filesystem,
@@ -113,24 +113,24 @@ fn set_up() -> SetUp {
     let fs = Filesystem::new(None);
 
     let root = TempDir::new().unwrap();
-    let root_dir = fs::canonicalize(root.path())
-        .unwrap()
-        .to_string_lossy()
-        .into_owned();
+    let root_dir = fs::canonicalize(root.path()).unwrap();
 
-    let vendor_dir = format!("{}/vendor", root_dir);
+    let vendor_dir = root_dir.join("vendor");
     fs::create_dir_all(&vendor_dir).unwrap();
 
-    let bin_dir = format!("{}/bin", root_dir);
+    let bin_dir = root_dir.join("bin");
     fs::create_dir_all(&bin_dir).unwrap();
 
     let mut config = Config::new(false, None);
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(vendor_dir.clone()),
+        PhpMixed::String(vendor_dir.to_str().unwrap().to_string()),
     );
-    config_section.insert("bin-dir".to_string(), PhpMixed::String(bin_dir.clone()));
+    config_section.insert(
+        "bin-dir".to_string(),
+        PhpMixed::String(bin_dir.to_str().unwrap().to_string()),
+    );
     let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
     merged.insert("config".to_string(), PhpMixed::Array(config_section));
     config.merge(&merged, Config::SOURCE_UNKNOWN);
@@ -175,7 +175,7 @@ fn test_installer_creation_should_not_create_vendor_directory() {
     setup.fs.remove_directory(&setup.vendor_dir).unwrap();
 
     LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
-    assert!(!std::path::Path::new(&setup.vendor_dir).exists());
+    assert!(!setup.vendor_dir.exists());
 
     tear_down(&mut setup);
 }
@@ -186,7 +186,7 @@ fn test_installer_creation_should_not_create_bin_directory() {
     setup.fs.remove_directory(&setup.bin_dir).unwrap();
 
     LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
-    assert!(!std::path::Path::new(&setup.bin_dir).exists());
+    assert!(!setup.bin_dir.exists());
 
     tear_down(&mut setup);
 }
@@ -209,7 +209,7 @@ fn test_is_installed() {
     assert!(!library.is_installed(&repository, package.clone()).unwrap());
 
     // package being in repo and vendor/pkg/foo dir present means it is seen as installed
-    let pkg_dir = format!("{}/{}", setup.vendor_dir, package.get_pretty_name());
+    let pkg_dir = setup.vendor_dir.join(package.get_pretty_name());
     fs::create_dir_all(&pkg_dir).unwrap();
     assert!(library.is_installed(&repository, package.clone()).unwrap());
 
@@ -231,7 +231,12 @@ fn test_install() {
     // ($package, vendorDir/some/package).
     let mut dm = MockDownloadManager::new();
     let expected_package = package.clone();
-    let expected_path = format!("{}/some/package", setup.vendor_dir);
+    let expected_path = setup
+        .vendor_dir
+        .join("some/package")
+        .to_str()
+        .unwrap()
+        .to_string();
     dm.expect_install()
         .times(1)
         .withf_st(move |package, target_dir| {
@@ -251,14 +256,8 @@ fn test_install() {
     // PHP asserts repository->addPackage was called once with $package.
     assert!(repository.borrow_mut().has_package(package).unwrap());
 
-    assert!(
-        std::path::Path::new(&setup.vendor_dir).exists(),
-        "Vendor dir should be created"
-    );
-    assert!(
-        std::path::Path::new(&setup.bin_dir).exists(),
-        "Bin dir should be created"
-    );
+    assert!(setup.vendor_dir.exists(), "Vendor dir should be created");
+    assert!(setup.bin_dir.exists(), "Bin dir should be created");
 
     tear_down(&mut setup);
 }
@@ -276,8 +275,8 @@ fn test_update() {
     // PHP mocks Filesystem::rename; here a real Filesystem renames the actual oldtarget
     // dir, so it must exist first. The install path embeds the pretty-name twice because
     // the package is named vendor/package1 and lives under vendorDir.
-    let old_target_dir = format!("{}/vendor/package1/oldtarget", setup.vendor_dir);
-    let new_target_dir = format!("{}/vendor/package1/newtarget", setup.vendor_dir);
+    let old_target_dir = setup.vendor_dir.join("vendor/package1/oldtarget");
+    let new_target_dir = setup.vendor_dir.join("vendor/package1/newtarget");
     fs::create_dir_all(&old_target_dir).unwrap();
 
     // PHP asserts the DownloadManager mock's update() is called once with
@@ -285,7 +284,7 @@ fn test_update() {
     let mut dm = MockDownloadManager::new();
     let expected_initial = initial.clone();
     let expected_target = target.clone();
-    let expected_path = new_target_dir.clone();
+    let expected_path = new_target_dir.to_str().unwrap().to_string();
     dm.expect_update()
         .times(1)
         .withf_st(move |initial, target, target_dir| {
@@ -322,14 +321,8 @@ fn test_update() {
     );
     assert!(repository.borrow_mut().has_package(target.clone()).unwrap());
 
-    assert!(
-        std::path::Path::new(&setup.vendor_dir).exists(),
-        "Vendor dir should be created"
-    );
-    assert!(
-        std::path::Path::new(&setup.bin_dir).exists(),
-        "Bin dir should be created"
-    );
+    assert!(setup.vendor_dir.exists(), "Vendor dir should be created");
+    assert!(setup.bin_dir.exists(), "Bin dir should be created");
 
     // Updating again, with the initial package no longer installed, fails.
     assert!(run(library.update(&repository, initial, target)).is_err());
@@ -346,7 +339,12 @@ fn test_uninstall() {
     // ($package, vendorDir/vendor/pkg).
     let mut dm = MockDownloadManager::new();
     let expected_package = package.clone();
-    let expected_path = format!("{}/vendor/pkg", setup.vendor_dir);
+    let expected_path = setup
+        .vendor_dir
+        .join("vendor/pkg")
+        .to_str()
+        .unwrap()
+        .to_string();
     dm.expect_remove()
         .times(1)
         .withf_st(move |package, target_dir| {
@@ -390,7 +388,11 @@ fn test_get_install_path_without_target_dir() {
     let package = get_package("Vendor/Pkg", "1.0.0");
 
     assert_eq!(
-        format!("{}/{}", setup.vendor_dir, package.get_pretty_name()),
+        setup
+            .vendor_dir
+            .join(package.get_pretty_name())
+            .to_str()
+            .unwrap(),
         library.get_install_path(package).unwrap()
     );
 
@@ -405,11 +407,12 @@ fn test_get_install_path_with_target_dir() {
     package.__set_target_dir(Some("Some/Namespace".to_string()));
 
     assert_eq!(
-        format!(
-            "{}/{}/Some/Namespace",
-            setup.vendor_dir,
-            package.get_pretty_name()
-        ),
+        setup
+            .vendor_dir
+            .join(package.get_pretty_name())
+            .join("Some/Namespace")
+            .to_str()
+            .unwrap(),
         library.get_install_path(package).unwrap()
     );
 

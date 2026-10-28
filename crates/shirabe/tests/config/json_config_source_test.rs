@@ -37,11 +37,9 @@ impl Drop for TearDown {
 }
 
 fn fixture_path(name: &str) -> PathBuf {
-    PathBuf::from(format!(
-        "{}/../../composer/tests/Composer/Test/Config/Fixtures/{}",
-        env!("CARGO_MANIFEST_DIR"),
-        name
-    ))
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../composer/tests/Composer/Test/Config/Fixtures")
+        .join(name)
 }
 
 fn assert_file_equals(expected: &std::path::Path, actual: &std::path::Path) {
@@ -55,7 +53,7 @@ fn assert_file_equals(expected: &std::path::Path, actual: &std::path::Path) {
 }
 
 fn json_config_source(config: &std::path::Path) -> JsonConfigSource {
-    let json_file = JsonFile::new(config.to_string_lossy().to_string(), None, None).unwrap();
+    let json_file = JsonFile::new(config.to_str().unwrap().to_string(), None, None).unwrap();
     JsonConfigSource::new(std::rc::Rc::new(std::cell::RefCell::new(json_file)), false)
 }
 

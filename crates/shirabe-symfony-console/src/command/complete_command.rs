@@ -131,6 +131,7 @@ impl CompleteCommand {
             return;
         }
 
+        // TODO(bytes): basename takes the path as a &str.
         let command_name = shirabe_php_shim::basename(
             &shirabe_php_shim::PHP_SERVER
                 .lock()
@@ -138,14 +139,16 @@ impl CompleteCommand {
                 .argv()
                 .next()
                 .unwrap_or_default()
-                .to_string_lossy(),
+                .into_string()
+                .unwrap_or_else(|arg| panic!("argv[0] is not valid UTF-8: {arg:?}")),
         );
+        // TODO(bytes): file_put_contents3 takes the path as a &str.
+        let tmp_dir = shirabe_php_shim::sys_get_temp_dir()
+            .into_os_string()
+            .into_string()
+            .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
         shirabe_php_shim::file_put_contents3(
-            &format!(
-                "{}/sf_{}.log",
-                shirabe_php_shim::sys_get_temp_dir(),
-                command_name
-            ),
+            &format!("{}/sf_{}.log", tmp_dir, command_name),
             &(messages.join(shirabe_php_shim::PHP_EOL) + shirabe_php_shim::PHP_EOL),
             shirabe_php_shim::FILE_APPEND,
         );
@@ -229,10 +232,14 @@ impl Command for CompleteCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         let _ = (input, output);
+        // TODO(bytes): filter_var_boolean takes the value as a &str.
         self.is_debug.set(shirabe_php_shim::filter_var_boolean(
             &shirabe_php_shim::getenv("SYMFONY_COMPLETION_DEBUG")
                 .unwrap_or_default()
-                .to_string_lossy(),
+                .into_string()
+                .unwrap_or_else(|value| {
+                    panic!("SYMFONY_COMPLETION_DEBUG is not valid UTF-8: {value:?}")
+                }),
         ));
 
         Ok(())
@@ -296,7 +303,10 @@ impl Command for CompleteCommand {
                         .lock()
                         .unwrap()
                         .argv()
-                        .map(|a| a.to_string_lossy().into_owned())
+                        // TODO(bytes): the log messages are built as Strings.
+                        .map(|a| a
+                            .into_string()
+                            .unwrap_or_else(|a| panic!("argv is not valid UTF-8: {a:?}")))
                         .collect::<Vec<_>>()
                         .join(" ")
                 ),

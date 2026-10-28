@@ -89,8 +89,8 @@ fn test_install_for_package_without_source_reference() {
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());
     let downloader = get_downloader_mock(None, None, process, None);
 
-    let path = format!("{}/path", working_dir.path().to_string_lossy());
-    let result = run(downloader.install(package, &path));
+    let path = working_dir.path().join("path");
+    let result = run(downloader.install(package, path.to_str().unwrap()));
 
     let e = result.expect_err("missing source reference should throw");
     assert!(e.to_string().contains("missing reference information"));
@@ -101,7 +101,7 @@ fn test_install() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = working_dir.path().to_string_lossy().into_owned();
+    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
     let package = get_package(Some("trunk"), Some("http://fossil.kd2.org/kd2fw/"));
 
     let repo_file = format!("{}.fossil", working_dir_str);
@@ -162,11 +162,11 @@ fn test_update() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = working_dir.path().to_string_lossy().into_owned();
+    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
 
     // Ensure the .fslckout metadata file exists.
-    let fslckout = format!("{}/.fslckout", working_dir_str);
-    if !std::path::Path::new(&fslckout).exists() {
+    let fslckout = working_dir.path().join(".fslckout");
+    if !fslckout.exists() {
         std::fs::File::create(&fslckout).unwrap();
     }
 
@@ -208,10 +208,10 @@ fn test_update() {
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let working_dir_str = working_dir.path().to_string_lossy().into_owned();
+    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
 
     // Ensure file exists
-    let file = format!("{}/.fslckout", working_dir_str);
+    let file = working_dir.path().join(".fslckout");
     std::fs::File::create(&file).unwrap();
 
     let package = get_package(None, None);

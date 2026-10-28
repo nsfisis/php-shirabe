@@ -678,13 +678,14 @@ impl Command for CommandData {
             "%command.name%".to_string(),
             "%command.full_name%".to_string(),
         ];
+        // TODO(bytes): the help text is built as a String.
         let php_self = shirabe_php_shim::PHP_SERVER
             .lock()
             .unwrap()
             .php_self()
             .unwrap_or_default()
-            .to_string_lossy()
-            .into_owned();
+            .into_string()
+            .unwrap_or_else(|php_self| panic!("PHP_SELF is not valid UTF-8: {php_self:?}"));
         let replacements = [
             name.clone().unwrap_or_default(),
             if is_single_command {

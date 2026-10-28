@@ -99,7 +99,7 @@ fn test_download() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = working_dir.path().to_string_lossy().into_owned();
+    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
     let package = get_package(Some("ref"), Some("https://mercurial.dev/l3l0/composer"));
 
     let (process, _guard) = get_process_executor_mock(
@@ -159,10 +159,10 @@ fn test_update() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
 
-    let working_dir_str = working_dir.path().to_string_lossy().into_owned();
+    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(&format!("{}/.hg", working_dir_str))
+    fs.ensure_directory_exists(working_dir.path().join(".hg").to_str().unwrap())
         .unwrap();
 
     let package = get_package(Some("ref"), Some("https://github.com/l3l0/composer"));
@@ -203,10 +203,10 @@ fn test_update() {
 fn test_remove() {
     let working_dir = set_up();
     let _tear_down = TearDown::new(working_dir.path().to_path_buf());
-    let working_dir_str = working_dir.path().to_string_lossy().into_owned();
+    let working_dir_str = working_dir.path().to_str().unwrap().to_string();
 
     let mut fs = Filesystem::new(None);
-    fs.ensure_directory_exists(&format!("{}/.hg", working_dir_str))
+    fs.ensure_directory_exists(working_dir.path().join(".hg").to_str().unwrap())
         .unwrap();
 
     let package = get_package(None, None);

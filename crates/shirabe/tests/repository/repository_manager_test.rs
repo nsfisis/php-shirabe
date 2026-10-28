@@ -104,7 +104,7 @@ fn test_repo_creation() {
             "config",
             PhpMixed::Array(str_config(&[(
                 "cache-repo-dir",
-                PhpMixed::String(tmpdir.path().to_string_lossy().to_string()),
+                PhpMixed::String(tmpdir.path().to_str().unwrap().to_string()),
             )])),
         )]),
         "unknown",
@@ -188,7 +188,7 @@ fn test_invalid_repo_creation_throws() {
             "config",
             PhpMixed::Array(str_config(&[(
                 "cache-repo-dir",
-                PhpMixed::String(tmpdir.path().to_string_lossy().to_string()),
+                PhpMixed::String(tmpdir.path().to_str().unwrap().to_string()),
             )])),
         )]),
         "unknown",
@@ -227,7 +227,13 @@ fn test_filter_repo_wrapping() {
                 ("type", PhpMixed::String("path".to_string())),
                 (
                     "url",
-                    PhpMixed::String(format!("{}/tests/repository", env!("CARGO_MANIFEST_DIR"))),
+                    PhpMixed::String(
+                        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                            .join("tests/repository")
+                            .to_str()
+                            .unwrap()
+                            .to_string(),
+                    ),
                 ),
                 (
                     "only",

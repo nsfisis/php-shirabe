@@ -137,7 +137,11 @@ impl ProxyManager {
             if let Some(val) = PHP_SERVER.lock().unwrap().get(&name)
                 && !val.is_empty()
             {
-                return (Some(val.to_string_lossy().into_owned()), name);
+                // TODO(bytes): the proxy URL is returned as a String.
+                let val = val
+                    .into_string()
+                    .unwrap_or_else(|val| panic!("{name} is not valid UTF-8: {val:?}"));
+                return (Some(val), name);
             }
         }
         (None, String::new())

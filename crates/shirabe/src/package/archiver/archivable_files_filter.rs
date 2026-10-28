@@ -18,7 +18,12 @@ impl ArchivableFilesFilter {
 
     fn accept(&mut self, file: &Path) -> bool {
         if file.is_dir() {
-            self.dirs.push(file.to_string_lossy().into_owned());
+            // TODO(bytes): the directories are kept as Strings.
+            self.dirs.push(
+                file.to_str()
+                    .unwrap_or_else(|| panic!("path is not valid UTF-8: {}", file.display()))
+                    .to_string(),
+            );
             return false;
         }
         true

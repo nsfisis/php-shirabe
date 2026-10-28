@@ -134,7 +134,11 @@ impl Perforce {
     }
 
     pub fn generate_unique_perforce_client_name(&self) -> String {
-        format!("{}_{}", gethostname(), time())
+        // TODO(bytes): the client name is returned as a String.
+        let hostname = gethostname()
+            .into_string()
+            .unwrap_or_else(|hostname| panic!("hostname is not valid UTF-8: {hostname:?}"));
+        format!("{}_{}", hostname, time())
     }
 
     pub fn cleanup_client_spec(&mut self) {

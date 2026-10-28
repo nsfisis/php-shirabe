@@ -8,7 +8,13 @@ fn init_tracing() {
     let Some(directives) = shirabe_php_shim::getenv("SHIRABE_TRACING") else {
         return;
     };
-    let directives = directives.to_string_lossy();
+    let directives = match directives.into_string() {
+        Ok(directives) => directives,
+        Err(directives) => {
+            eprintln!("SHIRABE_TRACING: invalid filter directives {directives:?}: not valid UTF-8");
+            return;
+        }
+    };
     if directives.is_empty() {
         return;
     }

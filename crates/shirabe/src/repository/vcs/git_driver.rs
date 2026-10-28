@@ -414,6 +414,11 @@ impl GitDriver {
         );
         GitUtil::clean_env(&process);
 
+        // TODO(bytes): run_commands takes the cwd as a &str.
+        let tmp_dir = sys_get_temp_dir()
+            .into_os_string()
+            .into_string()
+            .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
         match git_util.run_commands(
             vec![vec![
                 "git".to_string(),
@@ -423,7 +428,7 @@ impl GitDriver {
                 "%url%".to_string(),
             ]],
             url,
-            Some(&sys_get_temp_dir()),
+            Some(&tmp_dir),
             false,
             (),
         ) {

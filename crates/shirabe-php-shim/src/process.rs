@@ -416,24 +416,24 @@ pub fn posix_geteuid() -> u32 {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct PasswdEntry {
     pub name: String,
-    pub passwd: String,
+    pub passwd: std::ffi::CString,
     pub uid: i64,
     pub gid: i64,
-    pub gecos: String,
-    pub dir: String,
-    pub shell: String,
+    pub gecos: std::ffi::CString,
+    pub dir: std::path::PathBuf,
+    pub shell: std::path::PathBuf,
 }
 
 pub fn posix_getpwuid(uid: u32) -> Option<PasswdEntry> {
     let user = nix::unistd::User::from_uid(nix::unistd::Uid::from_raw(uid)).ok()??;
     Some(PasswdEntry {
         name: user.name,
-        passwd: user.passwd.to_string_lossy().into_owned(),
+        passwd: user.passwd,
         uid: user.uid.as_raw() as i64,
         gid: user.gid.as_raw() as i64,
-        gecos: user.gecos.to_string_lossy().into_owned(),
-        dir: user.dir.to_string_lossy().into_owned(),
-        shell: user.shell.to_string_lossy().into_owned(),
+        gecos: user.gecos,
+        dir: user.dir,
+        shell: user.shell,
     })
 }
 

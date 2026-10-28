@@ -80,7 +80,15 @@ impl OutputFormatterStyleInterface for OutputFormatterStyle {
                     != Some(std::ffi::OsStr::new("JetBrains-JediTerm"))
                     && (shirabe_php_shim::getenv("KONSOLE_VERSION").is_none_or(|v| v.is_empty())
                         || shirabe_php_shim::getenv("KONSOLE_VERSION")
-                            .map(|v| v.to_string_lossy().parse::<i64>().unwrap_or(0))
+                            // TODO(bytes): the version is parsed as a &str.
+                            .map(|v| {
+                                v.into_string()
+                                    .unwrap_or_else(|v| {
+                                        panic!("KONSOLE_VERSION is not valid UTF-8: {v:?}")
+                                    })
+                                    .parse::<i64>()
+                                    .unwrap_or(0)
+                            })
                             .unwrap_or(0)
                             > 201100)
                     && shirabe_php_shim::PHP_SERVER

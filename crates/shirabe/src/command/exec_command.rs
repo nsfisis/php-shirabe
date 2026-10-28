@@ -217,11 +217,14 @@ impl Command for ExecCommand {
                 .get_initial_working_directory()
         });
         if let Some(ref iwd) = initial_working_directory
-            && getcwd().as_deref() != Some(iwd.as_str())
+            && getcwd().as_deref() != Some(iwd.as_path())
         {
             chdir(iwd).map_err(|e| {
                 RuntimeException::with_code_and_previous(
-                    format!("Could not switch back to working directory \"{}\"", iwd),
+                    format!(
+                        "Could not switch back to working directory \"{}\"",
+                        iwd.display()
+                    ),
                     0,
                     Some(std::sync::Arc::new(e)),
                 )

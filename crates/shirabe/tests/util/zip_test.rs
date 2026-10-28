@@ -3,12 +3,10 @@
 use shirabe::util::zip::Zip;
 
 /// Reuses the PHP fixtures under composer/tests/Composer/Test/Util/Fixtures/Zip.
-fn fixture(name: &str) -> String {
-    format!(
-        "{}/../../composer/tests/Composer/Test/Util/Fixtures/Zip/{}",
-        env!("CARGO_MANIFEST_DIR"),
-        name
-    )
+fn fixture(name: &str) -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../composer/tests/Composer/Test/Util/Fixtures/Zip")
+        .join(name)
 }
 
 // TODO(php-runtime): PHP runs this test only when the zip extension is NOT loaded (it is
@@ -18,7 +16,7 @@ fn fixture(name: &str) -> String {
 #[test]
 #[ignore = "requires a PHP runtime without the zip extension; the Rust port has unconditional zip support, so this precondition is impossible to reproduce"]
 fn test_throws_exception_if_zip_extension_is_not_loaded() {
-    assert!(Zip::get_composer_json("").is_err());
+    assert!(Zip::get_composer_json(std::path::Path::new("")).is_err());
 }
 
 #[test]

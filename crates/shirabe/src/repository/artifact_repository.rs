@@ -179,9 +179,9 @@ impl ArtifactRepository {
 
         let pathname = file.to_str().unwrap_or("");
         let get_result = if file_type == "tar" {
-            Tar::get_composer_json(pathname)
+            Tar::get_composer_json(file)
         } else {
-            Zip::get_composer_json(pathname)
+            Zip::get_composer_json(file)
         };
         match get_result {
             Ok(j) => json = j,

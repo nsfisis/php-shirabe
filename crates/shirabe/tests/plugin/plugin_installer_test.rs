@@ -40,24 +40,18 @@ use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 use tempfile::TempDir;
 
 /// `__DIR__ . '/Fixtures'` of the upstream test class.
-fn fixtures_dir() -> String {
+fn fixtures_dir() -> std::path::PathBuf {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../composer/tests/Composer/Test/Plugin/Fixtures");
     dir.canonicalize()
         .expect("the Composer checkout must provide the plugin fixtures")
-        .to_str()
-        .unwrap()
-        .to_string()
 }
 
 /// Shirabe-owned fixtures with no upstream counterpart (see `subscriber_test.rs`).
-fn shirabe_fixtures_dir() -> String {
+fn shirabe_fixtures_dir() -> std::path::PathBuf {
     let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/plugin/fixtures");
     dir.canonicalize()
         .expect("the Shirabe plugin fixtures directory must exist")
-        .to_str()
-        .unwrap()
-        .to_string()
 }
 
 // PHP mocks `Composer\Downloader\DownloadManager`; install/update/remove resolve to null and the
@@ -185,16 +179,18 @@ impl InstallationManagerInterface for MockInstallationManager {
     }
 
     fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
-        let upstream = format!("{}/{}", fixtures_dir(), package.get_pretty_name());
-        if std::path::Path::new(&upstream).exists() {
-            return Some(upstream);
+        let upstream = fixtures_dir().join(package.get_pretty_name());
+        if upstream.exists() {
+            return Some(upstream.to_str().unwrap().to_string());
         }
         // Shirabe-specific fixtures (subscriber_test) live next to this test binary.
-        Some(format!(
-            "{}/{}",
-            shirabe_fixtures_dir(),
-            package.get_pretty_name()
-        ))
+        Some(
+            shirabe_fixtures_dir()
+                .join(package.get_pretty_name())
+                .to_str()
+                .unwrap()
+                .to_string(),
+        )
     }
 
     fn set_output_progress(&mut self, _output_progress: bool) {}
@@ -241,16 +237,18 @@ pub(crate) fn set_up() -> SetUp {
     let loader = JsonLoader::new(Box::new(ArrayLoader::new(None, false)));
     let mut packages = vec![];
     let directory = TempDir::new().unwrap();
-    let directory_path = directory.path().to_str().unwrap().to_string();
+    let directory_path = directory.path();
     for i in 1..=8 {
-        std::fs::create_dir_all(format!("{}/Fixtures/plugin-v{}", directory_path, i)).unwrap();
+        std::fs::create_dir_all(directory_path.join(format!("Fixtures/plugin-v{}", i))).unwrap();
         packages.push(
             loader
-                .load(JsonLoaderInput::String(format!(
-                    "{}/plugin-v{}/composer.json",
-                    fixtures_dir(),
-                    i
-                )))
+                .load(JsonLoaderInput::String(
+                    fixtures_dir()
+                        .join(format!("plugin-v{}/composer.json", i))
+                        .to_str()
+                        .unwrap()
+                        .to_string(),
+                ))
                 .unwrap(),
         );
     }
@@ -296,15 +294,33 @@ pub(crate) fn set_up() -> SetUp {
     let mut config_section: IndexMap<String, PhpMixed> = IndexMap::new();
     config_section.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(format!("{}/Fixtures/", directory_path)),
+        PhpMixed::String(
+            directory_path
+                .join("Fixtures/")
+                .to_str()
+                .unwrap()
+                .to_string(),
+        ),
     );
     config_section.insert(
         "home".to_string(),
-        PhpMixed::String(format!("{}/Fixtures", directory_path)),
+        PhpMixed::String(
+            directory_path
+                .join("Fixtures")
+                .to_str()
+                .unwrap()
+                .to_string(),
+        ),
     );
     config_section.insert(
         "bin-dir".to_string(),
-        PhpMixed::String(format!("{}/Fixtures/bin", directory_path)),
+        PhpMixed::String(
+            directory_path
+                .join("Fixtures/bin")
+                .to_str()
+                .unwrap()
+                .to_string(),
+        ),
     );
     config_section.insert("allow-plugins".to_string(), PhpMixed::Bool(true));
     let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -430,7 +446,11 @@ fn test_install_plugin_with_root_package_having_files_autoload() {
     set_up.pm.borrow_mut().load_installed_plugins().unwrap();
 
     set_up.autoload_generator.borrow_mut().set_dev_mode(true);
-    let files_autoload = format!("{}/files_autoload_which_should_not_run.php", fixtures_dir());
+    let files_autoload = fixtures_dir()
+        .join("files_autoload_which_should_not_run.php")
+        .to_str()
+        .unwrap()
+        .to_string();
     let mut autoload: IndexMap<String, PhpMixed> = IndexMap::new();
     autoload.insert(
         "files".to_string(),

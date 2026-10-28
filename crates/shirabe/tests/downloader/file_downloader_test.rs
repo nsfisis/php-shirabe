@@ -100,7 +100,7 @@ fn test_download_to_existing_file() {
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().join("composer_test_file");
     std::fs::write(&path, b"").unwrap();
-    let path = path.to_string_lossy().into_owned();
+    let path = path.to_str().unwrap().to_string();
 
     let (downloader, _http_downloader, _guard) = get_downloader(None, None);
 
@@ -144,14 +144,14 @@ fn test_download_but_file_is_unsaved() {
     package.set_dist_url(Some("http://example.com/script.js".to_string()));
 
     let tmp_dir = TempDir::new().unwrap();
-    let path = tmp_dir.path().to_string_lossy().into_owned();
+    let path = tmp_dir.path().to_str().unwrap().to_string();
 
     // The PHP IOMock write callback unlinks the half-written script.js; the Rust mock never writes
     // the destination file in the first place, so a NullIO suffices to reproduce the unsaved-file path.
     let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(format!("{}/vendor", path)),
+        PhpMixed::String(tmp_dir.path().join("vendor").to_str().unwrap().to_string()),
     );
     let config = get_config(config_options);
 
@@ -266,11 +266,11 @@ fn test_download_file_with_invalid_checksum() {
     package.__set_dist_sha1_checksum(Some("invalid".to_string()));
 
     let tmp_dir = TempDir::new().unwrap();
-    let path = tmp_dir.path().to_string_lossy().into_owned();
+    let path = tmp_dir.path().to_str().unwrap().to_string();
     let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(format!("{}/vendor", path)),
+        PhpMixed::String(tmp_dir.path().join("vendor").to_str().unwrap().to_string()),
     );
     let config = get_config(config_options);
 
@@ -324,11 +324,11 @@ fn test_downgrade_shows_appropriate_message() {
         .unwrap();
 
     let tmp_dir = TempDir::new().unwrap();
-    let path = tmp_dir.path().to_string_lossy().into_owned();
+    let path = tmp_dir.path().to_str().unwrap().to_string();
     let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(format!("{}/vendor", path)),
+        PhpMixed::String(tmp_dir.path().join("vendor").to_str().unwrap().to_string()),
     );
     let config = get_config(config_options);
 

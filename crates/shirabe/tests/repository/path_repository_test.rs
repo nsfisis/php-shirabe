@@ -13,10 +13,11 @@ use shirabe_php_shim::{PhpMixed, file_get_contents, hash, realpath, serialize};
 use std::path::Path;
 
 fn fixtures_dir() -> String {
-    format!(
-        "{}/../../composer/tests/Composer/Test/Repository/Fixtures",
-        env!("CARGO_MANIFEST_DIR")
-    )
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../composer/tests/Composer/Test/Repository/Fixtures")
+        .to_str()
+        .unwrap()
+        .to_string()
 }
 
 /// ref: PathRepositoryTest::createPathRepo
@@ -294,7 +295,8 @@ fn test_reference_config() {
             Some(hash(
                 "sha1",
                 [
-                    file_get_contents(format!("{}/composer.json", dist_url)).unwrap_or_default(),
+                    file_get_contents(std::path::Path::new(&dist_url).join("composer.json"))
+                        .unwrap_or_default(),
                     serialize(&PhpMixed::Array(options.clone())).into_bytes(),
                 ]
                 .concat()

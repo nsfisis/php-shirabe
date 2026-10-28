@@ -26,7 +26,7 @@ fn default_authors() -> serde_json::Value {
 /// on arrays) while staying order-sensitive for lists.
 fn read_composer_json(dir: &std::path::Path) -> serde_json::Value {
     let file = JsonFile::new(
-        dir.join("composer.json").to_string_lossy().to_string(),
+        dir.join("composer.json").to_str().unwrap().to_string(),
         None,
         None,
     )
@@ -620,7 +620,7 @@ fn test_get_git_config() {
     )
     .unwrap();
     let original_home = Platform::get_env("HOME");
-    Platform::put_env("HOME", &home.path().to_string_lossy());
+    Platform::put_env("HOME", home.path().to_str().unwrap());
     let _restore_home = RestoreEnv::new("HOME", original_home);
 
     let command = InitCommand::new();

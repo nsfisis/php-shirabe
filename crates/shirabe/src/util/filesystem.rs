@@ -668,10 +668,11 @@ impl Filesystem {
     }
 
     /// Checks if the given path is absolute
-    pub fn is_absolute_path(&self, path: &str) -> bool {
-        strpos(path, "/") == Some(0)
-            || substr(path, 1, Some(1)) == ":"
-            || strpos(path, "\\\\") == Some(0)
+    pub fn is_absolute_path(&self, path: impl AsRef<Path>) -> bool {
+        // std::path::Path::is_absolute() is environment-dependent, while PHP's
+        // Filesystem::isAbsolutePath() returns the same result in any platforms.
+        let path = path.as_ref().as_os_str().as_encoded_bytes();
+        path.starts_with(b"/") || path.get(1) == Some(&b':') || path.starts_with(b"\\\\")
     }
 
     /// Returns size of a file or directory specified by path. If a directory is

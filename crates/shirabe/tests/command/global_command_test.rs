@@ -48,7 +48,7 @@ fn test_global() {
         true,
     );
     let composer_home: PathBuf = tear_down.working_dir();
-    let composer_home_str = composer_home.to_string_lossy().to_string();
+    let composer_home_str = composer_home.to_str().unwrap().to_string();
 
     Platform::put_env("COMPOSER_HOME", &composer_home_str);
     Platform::put_env("COMPOSER", fake_composer);
@@ -92,7 +92,7 @@ fn test_cannot_create_home() {
     let dir = TempDir::new().unwrap();
     let filename = dir.path().join("file");
     std::fs::write(&filename, "").unwrap();
-    let filename_str = filename.to_string_lossy().to_string();
+    let filename_str = filename.to_str().unwrap().to_string();
 
     Platform::put_env("COMPOSER_HOME", &filename_str);
 
@@ -147,7 +147,7 @@ fn test_global_show() {
         None,
         true,
     );
-    let composer_home_str = tear_down.working_dir().to_string_lossy().to_string();
+    let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
 
     let pkg = get_complete_package("vendor/global-tool", "1.0.0");
     pkg.set_description("A globally installed tool".to_string());
@@ -180,7 +180,7 @@ fn test_global_show_without_packages() {
     let _env_guard = EnvGuard;
 
     let tear_down = init_temp_composer(None, None, None, true);
-    let composer_home_str = tear_down.working_dir().to_string_lossy().to_string();
+    let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
 
     create_installed_json(&[], &[], true);
 
@@ -230,7 +230,7 @@ fn test_global_require() {
         None,
         true,
     );
-    let composer_home_str = tear_down.working_dir().to_string_lossy().to_string();
+    let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
 
     Platform::put_env("COMPOSER_HOME", &composer_home_str);
 
@@ -290,7 +290,7 @@ fn test_global_update() {
         None,
         true,
     );
-    let composer_home_str = tear_down.working_dir().to_string_lossy().to_string();
+    let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
 
     let pkg = get_package("vendor/pkg", "1.0.0");
     create_installed_json(std::slice::from_ref(&pkg), &[], true);
@@ -333,7 +333,7 @@ fn test_global_changes_directory() {
         None,
         true,
     );
-    let composer_home_str = tear_down.working_dir().to_string_lossy().to_string();
+    let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
 
     Platform::put_env("COMPOSER_HOME", &composer_home_str);
 
@@ -372,7 +372,7 @@ fn test_global_missing_command_name() {
     let _env_guard = EnvGuard;
 
     let tear_down = init_temp_composer(None, None, None, true);
-    let composer_home_str = tear_down.working_dir().to_string_lossy().to_string();
+    let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
 
     Platform::put_env("COMPOSER_HOME", &composer_home_str);
 

@@ -79,7 +79,7 @@ fn test_error_messages() {
     let mut config_options: IndexMap<String, PhpMixed> = IndexMap::new();
     config_options.insert(
         "vendor-dir".to_string(),
-        PhpMixed::String(test_dir.to_string_lossy().into_owned()),
+        PhpMixed::String(test_dir.to_str().unwrap().to_string()),
     );
     let config = std::rc::Rc::new(std::cell::RefCell::new(get_config(config_options, false)));
     let http_downloader = std::rc::Rc::new(std::cell::RefCell::new(HttpDownloader::new(
@@ -103,7 +103,7 @@ fn test_error_messages() {
     );
 
     let install_path = test_dir.join("install-path");
-    let install_path = install_path.to_string_lossy().into_owned();
+    let install_path = install_path.to_str().unwrap().to_string();
 
     let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {

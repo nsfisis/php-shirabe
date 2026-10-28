@@ -99,10 +99,11 @@ impl ConsoleOutput {
     fn is_running_os400() -> bool {
         let checks = [
             shirabe_php_shim::php_uname("s"),
+            // TODO(bytes): the checks are matched as Strings.
             shirabe_php_shim::getenv("OSTYPE")
                 .unwrap_or_default()
-                .to_string_lossy()
-                .into_owned(),
+                .into_string()
+                .unwrap_or_else(|ostype| panic!("OSTYPE is not valid UTF-8: {ostype:?}")),
             shirabe_php_shim::PHP_OS.to_string(),
         ];
 

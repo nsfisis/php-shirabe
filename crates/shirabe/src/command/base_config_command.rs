@@ -146,7 +146,11 @@ pub trait BaseConfigCommand: BaseCommand {
             let composer_config = self.get_composer_config_file(input, config)?;
             let parent = std::path::Path::new(&composer_config)
                 .parent()
-                .map(|p| p.to_string_lossy().to_string())
+                .map(|p| {
+                    p.to_str()
+                        .expect("the parent of a UTF-8 path is valid UTF-8")
+                        .to_string()
+                })
                 .unwrap_or_default();
             Ok(format!("{}/auth.json", parent))
         }

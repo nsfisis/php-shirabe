@@ -233,7 +233,12 @@ impl Process {
         // exists; its value merely reflects the NTS/ZTS build), so the disjunction is always true and
         // the cwd is defaulted to getcwd() whenever it was null.
         if this.cwd.is_none() {
-            this.cwd = shirabe_php_shim::getcwd();
+            // TODO(bytes): Process keeps the working directory as a String.
+            this.cwd = shirabe_php_shim::getcwd().map(|cwd| {
+                cwd.into_os_string()
+                    .into_string()
+                    .unwrap_or_else(|cwd| panic!("cwd is not valid UTF-8: {cwd:?}"))
+            });
         }
         if let Some(env) = env {
             this.set_env(
@@ -669,7 +674,14 @@ impl Process {
         if self.cwd.is_none() {
             // getcwd() will return false if any one of the parent directories does not have
             // the readable or search mode set, even if the current directory does
-            return shirabe_php_shim::getcwd().filter(|s| !s.is_empty());
+            // TODO(bytes): Process keeps the working directory as a String.
+            return shirabe_php_shim::getcwd()
+                .map(|cwd| {
+                    cwd.into_os_string()
+                        .into_string()
+                        .unwrap_or_else(|cwd| panic!("cwd is not valid UTF-8: {cwd:?}"))
+                })
+                .filter(|s| !s.is_empty());
         }
 
         self.cwd.clone()
@@ -1149,11 +1161,14 @@ impl Process {
     }
 
     fn get_default_env(&self) -> IndexMap<String, PhpMixed> {
+        // TODO(bytes): the environment is kept as Strings.
         let env: IndexMap<String, String> = shirabe_php_shim::getenv_all()
             .map(|(k, v)| {
                 (
-                    k.to_string_lossy().into_owned(),
-                    v.to_string_lossy().into_owned(),
+                    k.into_string()
+                        .unwrap_or_else(|k| panic!("env name is not valid UTF-8: {k:?}")),
+                    v.into_string()
+                        .unwrap_or_else(|v| panic!("env value is not valid UTF-8: {v:?}")),
                 )
             })
             .collect();
@@ -1179,10 +1194,15 @@ impl Process {
             .lock()
             .unwrap()
             .get_all()
+            // TODO(bytes): the environment is kept as Strings.
             .map(|(k, v)| {
                 (
-                    k.to_string_lossy().into_owned(),
-                    PhpMixed::String(v.to_string_lossy().into_owned()),
+                    k.into_string()
+                        .unwrap_or_else(|k| panic!("env name is not valid UTF-8: {k:?}")),
+                    PhpMixed::String(
+                        v.into_string()
+                            .unwrap_or_else(|v| panic!("env value is not valid UTF-8: {v:?}")),
+                    ),
                 )
             })
             .collect();

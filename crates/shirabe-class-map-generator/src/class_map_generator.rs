@@ -10,7 +10,7 @@ use shirabe_php_shim::{
     strpos, strrpos, strtr, substr,
 };
 use shirabe_symfony_finder::Finder;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct ClassMapGenerator {
@@ -116,7 +116,7 @@ impl ClassMapGenerator {
             )).into());
         };
 
-        let cwd = realpath(getcwd().unwrap_or_default()).unwrap_or_default();
+        let cwd = realpath(Self::get_cwd()?).unwrap_or_default();
 
         for file in files {
             let mut file_path = match file.to_str() {
@@ -290,11 +290,15 @@ impl ClassMapGenerator {
 
         // warn only if no valid classes, else silently skip invalid
         if valid_classes.is_empty() {
-            let cwd_str = Self::get_cwd()?;
-            let cwd = realpath(&cwd_str);
+            let cwd_path = Self::get_cwd()?;
+            let cwd = realpath(&cwd_path);
             let cwd = match cwd {
                 Some(c) => c,
-                None => cwd_str,
+                // TODO(bytes): the cwd is handled as a String.
+                None => cwd_path
+                    .into_os_string()
+                    .into_string()
+                    .unwrap_or_else(|cwd| panic!("cwd is not valid UTF-8: {cwd:?}")),
             };
             let cwd = Self::normalize_path(&cwd);
             let short_path = preg_replace(
@@ -326,10 +330,11 @@ impl ClassMapGenerator {
     }
 
     /// Checks if the given path is absolute
-    fn is_absolute_path(path: &str) -> bool {
-        strpos(path, "/") == Some(0)
-            || substr(path, 1, Some(1)) == ":"
-            || strpos(path, "\\\\") == Some(0)
+    fn is_absolute_path(path: impl AsRef<Path>) -> bool {
+        // std::path::Path::is_absolute() is environment-dependent, while PHP's
+        // ClassMapGenerator::isAbsolutePath() returns the same result in any platforms.
+        let path = path.as_ref().as_os_str().as_encoded_bytes();
+        path.starts_with(b"/") || path.get(1) == Some(&b':') || path.starts_with(b"\\\\")
     }
 
     /// Normalize a path. This replaces backslashes with slashes, removes ending
@@ -382,13 +387,10 @@ impl ClassMapGenerator {
         format!("{}{}{}", prefix, absolute, parts.join("/"))
     }
 
-    fn get_cwd() -> anyhow::Result<String> {
-        match getcwd() {
-            Some(cwd) => Ok(cwd),
-            None => Err(RuntimeException::new(
-                "Could not determine the current working directory".to_string(),
-            )
-            .into()),
-        }
+    fn get_cwd() -> anyhow::Result<PathBuf> {
+        getcwd().ok_or_else(|| {
+            RuntimeException::new("Could not determine the current working directory".to_string())
+                .into()
+        })
     }
 }
