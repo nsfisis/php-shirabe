@@ -12,8 +12,8 @@ use crate::output::OutputInterface;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, count, json_encode_ex, php_truthy,
-    preg_replace, str_repeat, str_replace, strip_tags, strlen, strtoupper,
+    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, count, json_encode_ex, legacy_lossy,
+    php_truthy, preg_replace, str_repeat, str_replace, strip_tags, strlen, strtoupper,
 };
 
 /// Text descriptor.
@@ -411,7 +411,7 @@ impl TextDescriptor {
     fn write_text(&self, content: &str, options: &IndexMap<BString, PhpMixed>) {
         let raw_text = matches!(options.get(B("raw_text")), Some(v) if php_truthy(v));
         let content = if raw_text {
-            strip_tags(content)
+            legacy_lossy(&strip_tags(content)).into_owned()
         } else {
             content.to_string()
         };

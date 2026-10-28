@@ -20,9 +20,6 @@
 8 crates/shirabe-php-shim/src/var.rs
 3 crates/shirabe-php-shim/src/xml.rs
 2 crates/shirabe-php-shim/src/zip.rs
-1 crates/shirabe-php-src/src/standard/exec.rs
-5 crates/shirabe-php-src/src/standard/string.rs
-1 crates/shirabe-php-src/src/standard/versioning.rs
 1 crates/shirabe-symfony-console/src/command/command.rs
 6 crates/shirabe-symfony-console/src/command/complete_command.rs
 4 crates/shirabe-symfony-console/src/command/dump_completion_command.rs

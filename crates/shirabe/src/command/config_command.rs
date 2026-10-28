@@ -15,8 +15,8 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
     array_values_mixed, chmod, escapeshellcmd, exec, explode, file_exists, impl_php_class, implode,
     in_array_loose, in_array_strict, intval, is_array, is_bool, is_dir, is_numeric, is_object,
-    is_string, json_encode, php_regex, php_to_string, preg_is_match, preg_match, preg_replace,
-    str_replace, strpos, strtolower, system, touch, trim, var_export,
+    is_string, json_encode, legacy_lossy, php_regex, php_to_string, preg_is_match, preg_match,
+    preg_replace, str_replace, strpos, strtolower, system, touch, trim, var_export,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
@@ -562,7 +562,7 @@ impl Command for ConfigCommand {
                     }
                 }
             } else {
-                editor = Some(escapeshellcmd(&editor.unwrap()));
+                editor = Some(legacy_lossy(&escapeshellcmd(editor.unwrap())).into_owned());
             }
 
             let file = if input.borrow().get_option("auth")?.as_bool() == Some(true) {

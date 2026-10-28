@@ -240,7 +240,7 @@ impl ZipDownloader {
                         None
                     ))
                 ));
-                if strlen(&package.get_dist_url().unwrap_or_default()) > 0 {
+                if strlen(package.get_dist_url().unwrap_or_default()) > 0 {
                     self.inner.io.borrow().write_error(&format!(
                         "Origin URL: {}",
                         self.inner.process_url(

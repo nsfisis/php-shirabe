@@ -128,7 +128,7 @@ impl ConsoleIO {
             } else {
                 self.last_message.borrow().clone()
             };
-            strlen(&strip_tags(&last))
+            strlen(strip_tags(&last))
         });
         // ...let's fill its length with backspaces
         self.do_write(
@@ -145,7 +145,7 @@ impl ConsoleIO {
         // In cmd.exe on Win8.1 (possibly 10?), the line can not be cleared, so we need to
         // track the length of previous output and fill it with spaces to make sure the line is cleared.
         // See https://github.com/composer/composer/pull/5836 for more details
-        let fill = size - strlen(&strip_tags(messages));
+        let fill = size - strlen(strip_tags(messages));
         if fill > 0 {
             // whitespace whatever has left
             self.do_write(

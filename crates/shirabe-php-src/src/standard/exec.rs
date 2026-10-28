@@ -1,10 +1,12 @@
+use bstr::BString;
+
 /// php-src: ext/standard/exec.c `php_escape_shell_cmd` (PHP 8.5.2)
 ///
 /// Unix branch only. Shell metacharacters are backslash-escaped; quote characters are escaped
 /// only when unpaired, paired quotes being left intact. The multibyte skip (`php_mblen`), the
 /// command length check and the Windows branch are not ported.
-pub fn escapeshellcmd(command: &str) -> String {
-    let bytes = command.as_bytes();
+pub fn escapeshellcmd(command: impl AsRef<[u8]>) -> BString {
+    let bytes = command.as_ref();
     let len = bytes.len();
     let mut out: Vec<u8> = Vec::with_capacity(len);
     // Byte index of the matching closing quote while inside a paired quote run.
@@ -36,5 +38,5 @@ pub fn escapeshellcmd(command: &str) -> String {
         }
         x += 1;
     }
-    String::from_utf8_lossy(&out).into_owned()
+    BString::from(out)
 }

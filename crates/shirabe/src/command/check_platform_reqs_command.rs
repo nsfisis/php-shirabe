@@ -10,7 +10,7 @@ use crate::repository::{
     InstalledRepository, PlatformRepository, RepositoryInterface, RootPackageRepository,
 };
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, array_merge_map, impl_php_class, strip_tags};
+use shirabe_php_shim::{PhpMixed, array_merge_map, impl_php_class, legacy_lossy, strip_tags};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -83,7 +83,7 @@ impl CheckPlatformReqsCommand {
                 .map(|result| PlatformRequirementJson {
                     name: result.platform_package.clone(),
                     version: result.version.clone(),
-                    status: strip_tags(&result.status),
+                    status: legacy_lossy(&strip_tags(&result.status)).into_owned(),
                     failed_requirement: result.link.as_ref().map(|link| FailedRequirementJson {
                         source: link.get_source().to_string(),
                         r#type: link.get_description().to_string(),
@@ -93,7 +93,7 @@ impl CheckPlatformReqsCommand {
                     provider: if result.provider.is_empty() {
                         None
                     } else {
-                        Some(strip_tags(&result.provider))
+                        Some(legacy_lossy(&strip_tags(&result.provider)).into_owned())
                     },
                 })
                 .collect();

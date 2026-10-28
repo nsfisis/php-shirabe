@@ -220,11 +220,11 @@ fn serialize_into(value: &PluginValue, out: &mut Vec<u8>) {
         }
         PluginValue::Float(f) => {
             out.extend_from_slice(b"d:");
-            let mut repr = String::new();
+            let mut repr = BString::default();
             shirabe_php_src::zend::zend_smart_str::smart_str_append_double(
                 &mut repr, *f, -1, false,
             );
-            out.extend_from_slice(repr.as_bytes());
+            out.extend_from_slice(&repr);
             out.push(b';');
         }
         PluginValue::String(bytes) => serialize_bytes(bytes, out),

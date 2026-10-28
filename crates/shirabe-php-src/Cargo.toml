@@ -10,5 +10,8 @@ license = "BSD-3-Clause AND Zlib"
 # php-src, not a binary entry point.
 autobins = false
 
+[dependencies]
+bstr.workspace = true
+
 [lints]
 workspace = true

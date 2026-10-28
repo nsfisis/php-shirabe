@@ -5,7 +5,7 @@ use crate::output::{
     OUTPUT_NORMAL, OUTPUT_PLAIN, OUTPUT_RAW, VERBOSITY_DEBUG, VERBOSITY_NORMAL, VERBOSITY_QUIET,
     VERBOSITY_VERBOSE, VERBOSITY_VERY_VERBOSE,
 };
-use shirabe_php_shim::strip_tags;
+use shirabe_php_shim::{legacy_lossy, strip_tags};
 
 /// Base class for output classes.
 ///
@@ -141,15 +141,15 @@ impl Output {
                     .unwrap()
                     .unwrap_or_default(),
                 OUTPUT_RAW => message.clone(),
-                OUTPUT_PLAIN => strip_tags(
-                    &self
-                        .formatter
+                OUTPUT_PLAIN => legacy_lossy(&strip_tags(
+                    self.formatter
                         .borrow()
                         .borrow_mut()
                         .format(Some(message))
                         .unwrap()
                         .unwrap_or_default(),
-                ),
+                ))
+                .into_owned(),
                 _ => message.clone(),
             };
 

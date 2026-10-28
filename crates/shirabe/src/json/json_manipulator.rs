@@ -8,9 +8,9 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
     array_reverse, empty, explode, implode, in_array_loose, is_array, is_int, is_numeric,
-    json_decode_assoc, json_decode_obj, php_regex, php_truthy, preg_is_match, preg_match,
-    preg_quote, preg_replace, preg_replace2, rtrim, str_repeat, str_replace, strlen, strnatcmp,
-    strpos, substr, trim, uksort,
+    json_decode_assoc, json_decode_obj, legacy_lossy, php_regex, php_truthy, preg_is_match,
+    preg_match, preg_quote, preg_replace, preg_replace2, rtrim, str_repeat, str_replace, strlen,
+    strnatcmp, strpos, substr, trim, uksort,
 };
 
 #[derive(Debug)]
@@ -120,8 +120,8 @@ impl JsonManipulator {
                 // link missing but non empty links
                 links = preg_replace(
                     format!("{{{}$}}", preg_quote(&groups_1, None)),
-                    &addcslashes(
-                        &format!(
+                    &legacy_lossy(&addcslashes(
+                        format!(
                             ",{}{}{}{}: {}{}",
                             self.newline,
                             self.indent,
@@ -131,7 +131,7 @@ impl JsonManipulator {
                             groups_1
                         ),
                         "\\$",
-                    ),
+                    )),
                     &links,
                 );
             } else {
@@ -770,8 +770,8 @@ impl JsonManipulator {
                     if append {
                         children = preg_replace(
                             format!("#{}}}$#", whitespace),
-                            &addcslashes(
-                                &format!(
+                            &legacy_lossy(&addcslashes(
+                                format!(
                                     ",{}{}{}{}: {}{}}}",
                                     self.newline,
                                     self.indent,
@@ -781,15 +781,15 @@ impl JsonManipulator {
                                     whitespace
                                 ),
                                 "\\$",
-                            ),
+                            )),
                             &children,
                         );
                     } else {
                         whitespace = leading_space;
                         children = preg_replace(
                             format!("#^{{{}#", whitespace),
-                            &addcslashes(
-                                &format!(
+                            &legacy_lossy(&addcslashes(
+                                format!(
                                     "{{{}{}: {},{}{}{}",
                                     whitespace,
                                     JsonFile::encode(&name_owned)?,
@@ -799,7 +799,7 @@ impl JsonManipulator {
                                     self.indent
                                 ),
                                 "\\$",
-                            ),
+                            )),
                             &children,
                         );
                     }
@@ -1079,30 +1079,30 @@ impl JsonManipulator {
                 if append {
                     children = preg_replace(
                         format!("#{}\\]$#", whitespace),
-                        &addcslashes(
-                            &format!(
+                        &legacy_lossy(&addcslashes(
+                            format!(
                                 ",{}{}{}]",
                                 leading_item_whitespace,
                                 self.format(&value, item_depth, false)?,
                                 trailing_item_whitespace
                             ),
                             "\\$",
-                        ),
+                        )),
                         &children,
                     );
                 } else {
                     whitespace = leading_whitespace;
                     children = preg_replace(
                         format!("#^\\[{}#", whitespace),
-                        &addcslashes(
-                            &format!(
+                        &legacy_lossy(&addcslashes(
+                            format!(
                                 "[{}{},{}",
                                 whitespace,
                                 self.format(&value, item_depth, false)?,
                                 leading_item_whitespace
                             ),
                             "\\$",
-                        ),
+                        )),
                         &children,
                     );
                 }
@@ -1344,8 +1344,8 @@ impl JsonManipulator {
             let tail_match_1 = tail_match.get(1).unwrap_or_default().to_string();
             self.contents = preg_replace(
                 format!("#{}\\}}$#", tail_match_1),
-                &addcslashes(
-                    &format!(
+                &legacy_lossy(&addcslashes(
+                    format!(
                         ",{}{}{}: {}{}}}",
                         self.newline,
                         self.indent,
@@ -1354,7 +1354,7 @@ impl JsonManipulator {
                         self.newline
                     ),
                     "\\$",
-                ),
+                )),
                 &self.contents,
             );
 
@@ -1364,8 +1364,8 @@ impl JsonManipulator {
         // append at the end of the file
         self.contents = preg_replace(
             php_regex!("#\\}$#"),
-            &addcslashes(
-                &format!(
+            &legacy_lossy(&addcslashes(
+                format!(
                     "{}{}: {}{}}}",
                     self.indent,
                     JsonFile::encode(key)?,
@@ -1373,7 +1373,7 @@ impl JsonManipulator {
                     self.newline
                 ),
                 "\\$",
-            ),
+            )),
             &self.contents,
         );
 

@@ -2460,6 +2460,9 @@ dependencies = [
 [[package]]
 name = "shirabe-php-src"
 version = "0.2.0-dev"
+dependencies = [
+ "bstr",
+]
 
 [[package]]
 name = "shirabe-seld-json-lint"

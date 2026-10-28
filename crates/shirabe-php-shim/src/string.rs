@@ -1,4 +1,4 @@
-use crate::PhpMixed;
+use crate::{PhpMixed, legacy_lossy};
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::string::{addcslashes, strip_tags, stripcslashes};
@@ -151,8 +151,8 @@ pub fn strtoupper(s: &str) -> String {
     s.to_ascii_uppercase()
 }
 
-pub fn strlen(s: &str) -> i64 {
-    s.len() as i64
+pub fn strlen(s: impl AsRef<[u8]>) -> i64 {
+    s.as_ref().len() as i64
 }
 
 pub fn strtr(str: &str, from: &str, to: &str) -> String {
@@ -1032,7 +1032,7 @@ pub fn wordwrap(s: &str, width: i64, break_str: &str, cut: bool) -> String {
         !(width == 0 && cut),
         "wordwrap(): Argument #4 ($cut) cannot be true when argument #2 ($width) is 0"
     );
-    php_wordwrap(s, width, break_str, cut)
+    legacy_lossy(&php_wordwrap(s, width, break_str, cut)).into_owned()
 }
 
 pub fn levenshtein(string1: &str, string2: &str) -> i64 {

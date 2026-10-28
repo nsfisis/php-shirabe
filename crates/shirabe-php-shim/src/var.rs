@@ -1,4 +1,4 @@
-use crate::PhpMixed;
+use crate::{PhpMixed, legacy_lossy};
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 
@@ -64,9 +64,9 @@ fn serialize_into(out: &mut String, value: &PhpMixed) {
 // (the default: the shortest round-trip representation). Any other serialize_precision selects
 // php_gcvt's fixed-precision mode, which is not reachable from here.
 fn serialize_float(f: f64) -> String {
-    let mut out = String::new();
+    let mut out = BString::default();
     shirabe_php_src::zend::zend_smart_str::smart_str_append_double(&mut out, f, -1, false);
-    out
+    legacy_lossy(&out).into_owned()
 }
 
 /// Returns the integer a PHP array key string normalizes to, or None if the key stays a string.
@@ -244,9 +244,9 @@ pub fn php_to_string(value: &PhpMixed) -> String {
 // TODO(php-runtime): the shim has no ini registry, so this hard-codes precision=14, the default
 // significant-digit count a float-to-string cast rounds to.
 fn float_to_string(f: f64) -> String {
-    let mut out = String::new();
+    let mut out = BString::default();
     shirabe_php_src::zend::zend_smart_str::smart_str_append_double(&mut out, f, 14, false);
-    out
+    legacy_lossy(&out).into_owned()
 }
 
 pub fn strval(value: &PhpMixed) -> String {
@@ -481,11 +481,11 @@ fn var_export_string(s: &str) -> String {
 // (the default: the shortest round-trip representation). Any other serialize_precision selects
 // php_gcvt's fixed-precision mode, which is not reachable from here.
 fn var_export_float(f: f64) -> String {
-    let mut out = String::new();
+    let mut out = BString::default();
     // var_export() renders a whole-valued float with a trailing ".0" so that it stays a float when
     // the exported code is evaluated.
     shirabe_php_src::zend::zend_smart_str::smart_str_append_double(&mut out, f, -1, true);
-    out
+    legacy_lossy(&out).into_owned()
 }
 
 #[cfg(test)]

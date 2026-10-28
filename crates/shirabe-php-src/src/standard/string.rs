@@ -1,3 +1,5 @@
+use bstr::BString;
+
 /// php-src: ext/standard/string.c `php_charmask` (PHP 8.5.2)
 ///
 /// Build the set of bytes to strip from a PHP trim `$characters` argument, expanding `a..b`
@@ -28,10 +30,11 @@ pub fn php_trim_mask(chars: &[u8]) -> [bool; 256] {
 ///
 /// Every byte that falls in the (range-expanded) charlist is backslash-escaped, with
 /// non-printable bytes rendered as the C escape or a three-digit octal.
-pub fn addcslashes(_string: &str, _charlist: &str) -> String {
-    let mask = php_trim_mask(_charlist.as_bytes());
+pub fn addcslashes(_string: impl AsRef<[u8]>, _charlist: impl AsRef<[u8]>) -> BString {
+    let _string = _string.as_ref();
+    let mask = php_trim_mask(_charlist.as_ref());
     let mut out: Vec<u8> = Vec::with_capacity(_string.len());
-    for &c in _string.as_bytes() {
+    for &c in _string {
         if mask[c as usize] {
             if !(32..=126).contains(&c) {
                 out.push(b'\\');
@@ -53,15 +56,15 @@ pub fn addcslashes(_string: &str, _charlist: &str) -> String {
             out.push(c);
         }
     }
-    String::from_utf8_lossy(&out).into_owned()
+    BString::from(out)
 }
 
 /// php-src: ext/standard/string.c `php_stripcslashes` (PHP 8.5.2)
 ///
 /// The inverse of `addcslashes`, decoding C escape sequences including octal (\ooo) and hex
 /// (\xHH).
-pub fn stripcslashes(_s: &str) -> String {
-    let bytes = _s.as_bytes();
+pub fn stripcslashes(_s: impl AsRef<[u8]>) -> BString {
+    let bytes = _s.as_ref();
     let n = bytes.len();
     let mut out: Vec<u8> = Vec::with_capacity(n);
     let mut i = 0;
@@ -137,7 +140,7 @@ pub fn stripcslashes(_s: &str) -> String {
             i += 1;
         }
     }
-    String::from_utf8_lossy(&out).into_owned()
+    BString::from(out)
 }
 
 fn hex_digit_value(b: u8) -> Option<u8> {
@@ -155,8 +158,8 @@ fn hex_digit_value(b: u8) -> Option<u8> {
 /// State: 0 = text, 1 = inside a tag, 2 = inside an HTML comment, 3 = inside `<? ... ?>` / `<!`.
 /// TODO(php-semantics): this omits allowed-tags handling and the tag-depth counter, so it can diverge
 /// from PHP on malformed markup (unterminated comments/quotes, nested `<`).
-pub fn strip_tags(_str: &str) -> String {
-    let bytes = _str.as_bytes();
+pub fn strip_tags(_str: impl AsRef<[u8]>) -> BString {
+    let bytes = _str.as_ref();
     let n = bytes.len();
     let mut out: Vec<u8> = Vec::with_capacity(n);
     let mut state: u8 = 0;
@@ -229,7 +232,7 @@ pub fn strip_tags(_str: &str) -> String {
         }
         i += 1;
     }
-    String::from_utf8_lossy(&out).into_owned()
+    BString::from(out)
 }
 
 /// php-src: ext/standard/string.c `PHP_FUNCTION(wordwrap)` (PHP 8.5.2)
@@ -237,14 +240,19 @@ pub fn strip_tags(_str: &str) -> String {
 /// Byte-based, matching PHP's single-byte/multi-byte break and cut handling. The original's
 /// output buffer pre-allocation and growth (`chk` / `alloced` / `newtextlen`) is replaced by
 /// pushing onto a `Vec`. Argument validation stays with the caller.
-pub fn php_wordwrap(text: &str, linelength: i64, breakchar: &str, docut: bool) -> String {
-    let text = text.as_bytes();
-    let breakchar = breakchar.as_bytes();
+pub fn php_wordwrap(
+    text: impl AsRef<[u8]>,
+    linelength: i64,
+    breakchar: impl AsRef<[u8]>,
+    docut: bool,
+) -> BString {
+    let text = text.as_ref();
+    let breakchar = breakchar.as_ref();
     let textlen = text.len() as i64;
     let breaklen = breakchar.len() as i64;
 
     if textlen == 0 {
-        return String::new();
+        return BString::default();
     }
 
     let mut laststart: i64 = 0;
@@ -271,7 +279,7 @@ pub fn php_wordwrap(text: &str, linelength: i64, breakchar: &str, docut: bool) -
             }
             current += 1;
         }
-        return String::from_utf8_lossy(&out).into_owned();
+        return BString::from(out);
     }
 
     // Multiple character line break or forced cut.
@@ -313,5 +321,5 @@ pub fn php_wordwrap(text: &str, linelength: i64, breakchar: &str, docut: bool) -
         out.extend_from_slice(&text[laststart as usize..current as usize]);
     }
 
-    String::from_utf8_lossy(&out).into_owned()
+    BString::from(out)
 }

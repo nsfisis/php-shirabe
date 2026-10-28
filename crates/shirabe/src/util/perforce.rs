@@ -242,11 +242,11 @@ impl Perforce {
 
     pub fn query_p4_user(&mut self) -> anyhow::Result<()> {
         let _ = self.get_user();
-        if strlen(&self.p4_user.clone().unwrap_or_default()) > 0 {
+        if strlen(self.p4_user.clone().unwrap_or_default()) > 0 {
             return Ok(());
         }
         self.p4_user = self.get_p4_variable("P4USER");
-        if strlen(&self.p4_user.clone().unwrap_or_default()) > 0 {
+        if strlen(self.p4_user.clone().unwrap_or_default()) > 0 {
             return Ok(());
         }
         self.p4_user = self
@@ -307,7 +307,7 @@ impl Perforce {
             return Ok(Some(p.clone()));
         }
         let mut password = self.get_p4_variable("P4PASSWD");
-        if strlen(&password.clone().unwrap_or_default()) <= 0 {
+        if strlen(password.clone().unwrap_or_default()) <= 0 {
             password = self.io.ask_and_hide_answer(format!(
                 "Enter password for Perforce user {}: ",
                 self.get_user().unwrap_or_default()

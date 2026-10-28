@@ -88,7 +88,7 @@ impl StringInput {
                 token = Some(format!(
                     "{}{}",
                     token.unwrap_or_default(),
-                    stripcslashes(&substr(m.get(0).unwrap_or(""), 1, Some(-1)))
+                    stripcslashes(substr(m.get(0).unwrap_or(""), 1, Some(-1)))
                 ));
                 cursor += strlen(m.get(0).unwrap_or(""));
             } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_UNQUOTED_STRING), rest)

@@ -190,7 +190,7 @@ pub trait QuestionHelperInterface {
             }
         }
 
-        ret = if strlen(&ret.to_string()) > 0 {
+        ret = if strlen(ret.to_string()) > 0 {
             ret
         } else {
             question.get_default()
@@ -508,7 +508,7 @@ impl QuestionHelper {
                         // Echo out remaining chars for current match
                         let remaining_characters = substr(
                             &ret,
-                            strlen(&trim(&self.most_recently_entered_value(&full_choice), None)),
+                            strlen(trim(&self.most_recently_entered_value(&full_choice), None)),
                             None,
                         );
                         output.borrow().write(
@@ -602,7 +602,7 @@ impl QuestionHelper {
                 cursor.save_position();
                 // Write highlighted text, complete the partially entered response
                 let characters_entered =
-                    strlen(&trim(&self.most_recently_entered_value(&full_choice), None));
+                    strlen(trim(&self.most_recently_entered_value(&full_choice), None));
                 output.borrow().write(
                     &[format!(
                         "<hl>{}</hl>",
