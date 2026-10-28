@@ -10,7 +10,7 @@ use shirabe_php_shim::{
     strpos, strrpos, strtr, substr,
 };
 use shirabe_symfony_finder::Finder;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct ClassMapGenerator {
@@ -330,10 +330,11 @@ impl ClassMapGenerator {
     }
 
     /// Checks if the given path is absolute
-    fn is_absolute_path(path: &str) -> bool {
-        strpos(path, "/") == Some(0)
-            || substr(path, 1, Some(1)) == ":"
-            || strpos(path, "\\\\") == Some(0)
+    fn is_absolute_path(path: impl AsRef<Path>) -> bool {
+        // std::path::Path::is_absolute() is environment-dependent, while PHP's
+        // ClassMapGenerator::isAbsolutePath() returns the same result in any platforms.
+        let path = path.as_ref().as_os_str().as_encoded_bytes();
+        path.starts_with(b"/") || path.get(1) == Some(&b':') || path.starts_with(b"\\\\")
     }
 
     /// Normalize a path. This replaces backslashes with slashes, removes ending
