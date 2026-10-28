@@ -63,14 +63,13 @@ Map PHP types to Rust types as follows:
 * `bool`: `bool`
 * `int`: `i64`
 * `float`: `f64`
-* `string`: `String`, `Vec<u8>`, `bstr::BString`, `PathBuf`, `OsString`, or their borrowed
-  counterparts:
+* `string`: `Vec<u8>`, `bstr::BString`, `PathBuf`, `OsString`, or their borrowed counterparts. See
+  [strings-porting.md](strings-porting.md).
     * `PathBuf`, `OsString`: for the same purposes as in Rust.
-    * `String`: avoid, as a rule.
     * `Vec<u8>`: for what is best described as binary data or a blob.
     * `BString`: for what is best described as a string.
-    * The existing code base leans heavily on `String`. When modifying an existing API, keep using
-      `String`; apply the criteria above only to new code.
+    * `String`: do not use for a PHP string. Some code still does; it converts at its boundary with
+      `legacy_lossy()`.
 * `array`: `Vec` or `indexmap::IndexMap`, depending on whether the array is used as a list or as a
   map.
     * PHP arrays preserve insertion order, and `IndexMap` emulates this. Use `IndexMap` even where
@@ -146,6 +145,10 @@ through `$this->`, a method that a child overrides, port it with the following p
 ## Regular expressions
 
 See [regex-porting.md](regex-porting.md).
+
+## Strings
+
+See [strings-porting.md](strings-porting.md).
 
 ## Environment variables
 

@@ -1,4 +1,5 @@
 mod array;
+mod bytes;
 mod compress;
 mod curl;
 mod datetime;
@@ -25,6 +26,7 @@ mod xml;
 mod zip;
 
 pub use array::*;
+pub use bytes::*;
 pub use compress::*;
 pub use curl::*;
 pub use datetime::*;

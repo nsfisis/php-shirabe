@@ -17,8 +17,8 @@ use Shirabe\Lint\Linters\NoModRs;
 use Shirabe\Lint\Linters\NoPhpDocTag;
 use Shirabe\Lint\Linters\NoQualifiedPhpShimPath;
 use Shirabe\Lint\Linters\NoStdCollectionsMaps;
-use Shirabe\Lint\Linters\NoToStringLossy;
 use Shirabe\Lint\Linters\NoUseAsAlias;
+use Shirabe\Lint\Linters\NoUtf8Gate;
 use Shirabe\Lint\Linters\OneUsePerModule;
 use Shirabe\Lint\Linters\PhpSrcDerivationBoundary;
 use Shirabe\Lint\Linters\SortedDependencies;
@@ -68,8 +68,8 @@ $runner = new Runner($rootDir, [
         'crates/shirabe-symfony-process/src/exception/runtime_exception.rs',
     ]],
     [new NoStdCollectionsMaps(), []],
-    [new NoToStringLossy(), []],
     [new NoUseAsAlias(), []],
+    [new NoUtf8Gate(), NoUtf8Gate::EXCLUDES],
     [new OneUsePerModule(), []],
     [new PhpSrcDerivationBoundary(), []],
     [new SortedDependencies(), []],
