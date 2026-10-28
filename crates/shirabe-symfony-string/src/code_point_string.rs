@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/string/CodePointString.php
 
-use shirabe_php_shim::{legacy_lossy, mb_convert_encoding, wordwrap};
+use bstr::BString;
+use shirabe_php_shim::{mb_convert_encoding, wordwrap};
 
 #[derive(Debug, Clone)]
 pub struct CodePointString {
@@ -78,14 +79,14 @@ impl CodePointString {
     }
 
     /// `to_encoding` is `""` for PHP's `null`.
-    pub fn to_byte_string(&self, to_encoding: &str) -> String {
+    pub fn to_byte_string(&self, to_encoding: &str) -> BString {
         // A CodePointString is an AbstractUnicodeString, so PHP's `$fromEncoding` is always
         // 'UTF-8' and the string is returned verbatim for a null/UTF-8 target.
         if matches!(to_encoding, "" | "utf8" | "utf-8" | "UTF8" | "UTF-8") {
-            return self.string.clone();
+            return BString::from(self.string.as_str());
         }
 
         // PHP falls back to iconv() only when mb_convert_encoding() rejects the target encoding.
-        legacy_lossy(&mb_convert_encoding(&self.string, to_encoding, "UTF-8")).into_owned()
+        mb_convert_encoding(&self.string, to_encoding, "UTF-8")
     }
 }

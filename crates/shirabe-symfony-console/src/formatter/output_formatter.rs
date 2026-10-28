@@ -229,10 +229,13 @@ impl OutputFormatter {
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| bstr::BString::from("UTF-8".to_string()));
 
-        b(text)
-            .to_code_point_string(&legacy_lossy(&encoding))
-            .wordwrap(width, "\n", true)
-            .to_byte_string(&legacy_lossy(&encoding))
+        legacy_lossy(
+            &b(text)
+                .to_code_point_string(&legacy_lossy(&encoding))
+                .wordwrap(width, "\n", true)
+                .to_byte_string(&legacy_lossy(&encoding)),
+        )
+        .into_owned()
     }
 }
 

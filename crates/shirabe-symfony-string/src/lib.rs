@@ -7,7 +7,7 @@ pub use code_point_string::*;
 pub use unicode_string::*;
 
 /// Mirror of Symfony's `b()` helper function.
-pub fn b(string: &str) -> ByteString {
+pub fn b(string: impl AsRef<[u8]>) -> ByteString {
     ByteString::new(string)
 }
 

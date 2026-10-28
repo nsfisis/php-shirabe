@@ -244,12 +244,13 @@ impl ProcessExecutor {
                     };
                     process.run(Some(Box::new(callback)), IndexMap::new())?;
                     if self.capture_output.get() {
-                        output.write_back(process.get_output()?);
+                        output.write_back(legacy_lossy(&process.get_output()?).into_owned());
                     }
                 }
             }
 
-            *self.error_output.borrow_mut() = process.get_error_output()?;
+            *self.error_output.borrow_mut() =
+                legacy_lossy(&process.get_error_output()?).into_owned();
             Ok(())
         })();
         if signals.is_triggered()

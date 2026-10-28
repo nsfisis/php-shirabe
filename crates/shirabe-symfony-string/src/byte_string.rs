@@ -1,27 +1,29 @@
 //! ref: composer/vendor/symfony/string/ByteString.php
 
 use crate::code_point_string::CodePointString;
-use shirabe_php_shim::{legacy_lossy, mb_convert_encoding, mb_detect_encoding};
+use bstr::BString;
+use shirabe_php_shim::{mb_convert_encoding, mb_detect_encoding, utf8_text};
 
 #[derive(Debug, Clone)]
 pub struct ByteString {
-    string: String,
+    string: BString,
 }
 
 impl ByteString {
-    pub fn new(string: &str) -> Self {
+    pub fn new(string: impl AsRef<[u8]>) -> Self {
         Self {
-            string: string.to_string(),
+            string: BString::from(string.as_ref()),
         }
     }
 
     /// `from_encoding` is `""` for PHP's `null`.
     pub fn to_code_point_string(&self, from_encoding: &str) -> CodePointString {
-        // The source `string` is always valid UTF-8 (Rust `String`/`&str` guarantee), so
-        // `preg_match('//u', ...)` always holds.
         if matches!(from_encoding, "" | "utf8" | "utf-8" | "UTF8" | "UTF-8") {
+            // PHP throws InvalidArgumentException. Callers detect `from_encoding` from this very
+            // string, so invalid UTF-8 here is a programming error.
+            let string = utf8_text(&self.string).expect("Invalid UTF-8 string.");
             return CodePointString {
-                string: self.string.clone(),
+                string: string.to_string(),
             };
         }
 
@@ -31,9 +33,11 @@ impl ByteString {
         // string, so a mismatch is a programming error.
         assert!(valid_encoding, "Invalid \"{}\" string.", from_encoding);
 
+        let converted = mb_convert_encoding(&self.string, "UTF-8", from_encoding);
         CodePointString {
-            string: legacy_lossy(&mb_convert_encoding(&self.string, "UTF-8", from_encoding))
-                .into_owned(),
+            string: utf8_text(&converted)
+                .expect("mb_convert_encoding() to UTF-8 yields valid UTF-8")
+                .to_string(),
         }
     }
 }

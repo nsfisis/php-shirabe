@@ -433,33 +433,29 @@ impl Process {
     }
 
     /// Returns the current output of the process (STDOUT).
-    pub fn get_output(&mut self) -> anyhow::Result<String> {
+    pub fn get_output(&mut self) -> anyhow::Result<BString> {
         if let Some(mock) = &self.mock {
-            return Ok(mock.stdout.clone());
+            return Ok(BString::from(mock.stdout.as_str()));
         }
 
         self.read_pipes_for_output("getOutput", false)?;
 
-        // TODO(bytes): the output is returned as a String.
-        Ok(String::from_utf8_lossy(
-            &stream_get_contents3(self.stdout.as_ref().unwrap(), -1, 0).unwrap_or_default(),
-        )
-        .into_owned())
+        Ok(BString::from(
+            stream_get_contents3(self.stdout.as_ref().unwrap(), -1, 0).unwrap_or_default(),
+        ))
     }
 
     /// Returns the current error output of the process (STDERR).
-    pub fn get_error_output(&mut self) -> anyhow::Result<String> {
+    pub fn get_error_output(&mut self) -> anyhow::Result<BString> {
         if let Some(mock) = &self.mock {
-            return Ok(mock.stderr.clone());
+            return Ok(BString::from(mock.stderr.as_str()));
         }
 
         self.read_pipes_for_output("getErrorOutput", false)?;
 
-        // TODO(bytes): the output is returned as a String.
-        Ok(String::from_utf8_lossy(
-            &stream_get_contents3(self.stderr.as_ref().unwrap(), -1, 0).unwrap_or_default(),
-        )
-        .into_owned())
+        Ok(BString::from(
+            stream_get_contents3(self.stderr.as_ref().unwrap(), -1, 0).unwrap_or_default(),
+        ))
     }
 
     /// Returns the exit code returned by the process.
@@ -595,7 +591,8 @@ impl Process {
     }
 
     /// Adds a line to the STDOUT stream.
-    pub fn add_output(&mut self, line: &str) {
+    pub fn add_output(&mut self, line: impl AsRef<[u8]>) {
+        let line = line.as_ref();
         let stdout = self.stdout.as_ref().unwrap();
         fseek(stdout, 0, SEEK_END);
         fwrite(stdout, line, Some(line.len() as i64));
@@ -603,7 +600,8 @@ impl Process {
     }
 
     /// Adds a line to the STDERR stream.
-    pub fn add_error_output(&mut self, line: &str) {
+    pub fn add_error_output(&mut self, line: impl AsRef<[u8]>) {
+        let line = line.as_ref();
         let stderr = self.stderr.as_ref().unwrap();
         fseek(stderr, 0, SEEK_END);
         fwrite(stderr, line, Some(line.len() as i64));

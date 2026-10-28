@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/SelfUpdateCommandTest.php
 
 use crate::test_case::{RunOptions, get_application_tester, init_temp_composer};
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe_php_shim::{PHP_BINARY, PhpMixed};
@@ -66,7 +67,7 @@ fn test_successful_update() {
         app_tester
             .get_output()
             .unwrap()
-            .contains("Upgrading to version")
+            .contains_str("Upgrading to version")
     );
 }
 
@@ -96,7 +97,7 @@ fn test_update_to_specific_version() {
         app_tester
             .get_output()
             .unwrap()
-            .contains("Upgrading to version 2.4.0")
+            .contains_str("Upgrading to version 2.4.0")
     );
 }
 
@@ -160,7 +161,7 @@ fn test_update_to_different_channel() {
         assert_eq!(0, status, "{}", app_tester.get_error_output().unwrap());
 
         let output = app_tester.get_output().unwrap();
-        assert!(output.contains("Upgrading to version"));
-        assert!(output.contains(expected_output));
+        assert!(output.contains_str("Upgrading to version"));
+        assert!(output.contains_str(expected_output));
     }
 }

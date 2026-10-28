@@ -37,7 +37,7 @@
 3 crates/shirabe-symfony-process/src/php_executable_finder.rs
 1 crates/shirabe-symfony-process/src/pipes/abstract_pipes.rs
 1 crates/shirabe-symfony-process/src/pipes/unix_pipes.rs
-9 crates/shirabe-symfony-process/src/process.rs
+7 crates/shirabe-symfony-process/src/process.rs
 1 crates/shirabe/build.rs
 5 crates/shirabe/src/advisory/audit_config.rs
 3 crates/shirabe/src/advisory/partial_security_advisory.rs
