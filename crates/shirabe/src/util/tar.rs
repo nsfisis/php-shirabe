@@ -6,7 +6,7 @@ use shirabe_php_shim::{PharData, RuntimeException};
 pub struct Tar;
 
 impl Tar {
-    pub fn get_composer_json(path_to_archive: &str) -> anyhow::Result<Option<String>> {
+    pub fn get_composer_json(path_to_archive: &std::path::Path) -> anyhow::Result<Option<String>> {
         let phar = PharData::new(path_to_archive)?;
 
         if !phar.valid() {

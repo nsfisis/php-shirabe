@@ -8,7 +8,7 @@ use shirabe_php_shim::{
 pub struct Zip;
 
 impl Zip {
-    pub fn get_composer_json(path_to_zip: &str) -> anyhow::Result<Option<String>> {
+    pub fn get_composer_json(path_to_zip: &std::path::Path) -> anyhow::Result<Option<String>> {
         if !extension_loaded("zip") {
             return Err(RuntimeException::new(
                 "The Zip Util requires PHP's zip extension".to_string(),
