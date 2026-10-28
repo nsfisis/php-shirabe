@@ -985,8 +985,11 @@ pub fn rename(
     std::fs::rename(old_name, new_name).is_ok()
 }
 
-pub fn copy(source: impl AsRef<std::path::Path>, dest: impl AsRef<std::path::Path>) -> bool {
-    std::fs::copy(source.as_ref(), dest.as_ref()).is_ok()
+pub fn copy(
+    source: impl AsRef<std::path::Path>,
+    dest: impl AsRef<std::path::Path>,
+) -> Result<(), std::io::Error> {
+    std::fs::copy(source.as_ref(), dest.as_ref()).map(|_| ())
 }
 
 pub fn ftruncate(stream: &PhpResource, size: i64) -> bool {

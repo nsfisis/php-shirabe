@@ -698,7 +698,7 @@ impl QuestionHelper {
                     .into_string()
                     .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
                 let tmp = format!("{}/hiddeninput.exe", tmp_dir);
-                shirabe_php_shim::copy(&exe, &tmp);
+                let _ = shirabe_php_shim::copy(&exe, &tmp);
                 exe = tmp.clone();
                 tmp_exe = Some(tmp);
             }

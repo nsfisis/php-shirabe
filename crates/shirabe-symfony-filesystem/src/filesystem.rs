@@ -56,7 +56,7 @@ impl Filesystem {
                 0o666 & !shirabe_php_shim::umask()
             };
 
-            if !shirabe_php_shim::copy(origin_file, target_file) {
+            if shirabe_php_shim::copy(origin_file, target_file).is_err() {
                 return Err(IOException::new(
                     format!("Failed to copy \"{}\" to \"{}\".", origin_file, target_file),
                     0,

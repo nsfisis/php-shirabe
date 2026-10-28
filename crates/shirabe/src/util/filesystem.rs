@@ -3,13 +3,13 @@
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use shirabe_php_shim::{
-    ErrorException, InvalidArgumentException, LogicException, PhpMixed, PregMatches,
-    RuntimeException, array_pop, basename, chdir, clearstatcache, clearstatcache2, copy, dirname,
-    explode, fclose, feof, file_exists, file_get_contents, file_put_contents, fileatime, filemtime,
-    filesize, fopen, fread, fwrite, implode, is_dir, is_file, is_link, is_readable, lstat, mkdir,
-    php_regex, preg_is_match, preg_match, preg_replace, preg_replace_callback, rename, rmdir,
-    rtrim, str_repeat, str_replace, strlen, strpos, strtoupper, strtr, substr, substr_count,
-    symlink, touch, unlink, usleep, var_export,
+    InvalidArgumentException, LogicException, PhpMixed, PregMatches, RuntimeException, array_pop,
+    basename, chdir, clearstatcache, clearstatcache2, copy, dirname, explode, fclose, feof,
+    file_exists, file_get_contents, file_put_contents, fileatime, filemtime, filesize, fopen,
+    fread, fwrite, implode, is_dir, is_file, is_link, is_readable, lstat, mkdir, php_regex,
+    preg_is_match, preg_match, preg_replace, preg_replace_callback, rename, rmdir, rtrim,
+    str_repeat, str_replace, strlen, strpos, strtoupper, strtr, substr, substr_count, symlink,
+    touch, unlink, usleep, var_export,
 };
 use shirabe_symfony_filesystem::exception::IOException;
 use shirabe_symfony_finder::Finder;
@@ -398,19 +398,14 @@ impl Filesystem {
         let target = self.normalize_path(target);
 
         if !is_dir(source) {
-            let result =
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| copy(source, &target)));
-            match result {
-                Ok(b) => return Ok(b),
-                Err(payload) => {
-                    let e: ErrorException = match payload.downcast::<ErrorException>() {
-                        Ok(boxed) => *boxed,
-                        Err(_) => return Err(anyhow::anyhow!("Copy panicked")),
-                    };
-
+            match copy(source, &target) {
+                Ok(()) => return Ok(true),
+                Err(e) => {
                     // if copy fails we attempt to copy it manually as this can help bypass issues with VirtualBox shared folders
                     // see https://github.com/composer/composer/issues/12057
-                    if e.get_message().contains("Bad address") {
+                    // PHP matches the strerror() text "Bad address", i.e. EFAULT (14 on Linux and macOS).
+                    // TODO(windows): raw_os_error() is a Win32 error code there, so 14 does not mean EFAULT.
+                    if cfg!(unix) && e.raw_os_error() == Some(14) {
                         let (source_handle, target_handle) =
                             match (fopen(source, "r"), fopen(&target, "w")) {
                                 (Ok(source_handle), Ok(target_handle)) => {
@@ -449,7 +444,10 @@ impl Filesystem {
             if file.is_dir() {
                 self.ensure_directory_exists(&target_path)?;
             } else {
-                result = result && copy(file.get_pathname(), &target_path);
+                result = result && {
+                    copy(file.get_pathname(), &target_path)?;
+                    true
+                };
             }
         }
 
