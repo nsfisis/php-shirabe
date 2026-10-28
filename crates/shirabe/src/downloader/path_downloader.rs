@@ -213,8 +213,8 @@ impl DownloaderInterface for PathDownloader {
         })?;
         let real_url = realpath(&url);
         if real_url.is_none()
-            || !file_exists(real_url.as_deref().unwrap_or(""))
-            || !is_dir(real_url.as_deref().unwrap_or(""))
+            || !file_exists(real_url.as_deref().unwrap_or_default())
+            || !is_dir(real_url.as_deref().unwrap_or_default())
         {
             return Err(RuntimeException::new(format!(
                 "Source path \"{}\" is not found for package {}",

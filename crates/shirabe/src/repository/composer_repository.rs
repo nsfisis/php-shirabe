@@ -29,9 +29,9 @@ use shirabe_metadata_minifier::{ExpandedVersion, ExpandedVersions, MetadataMinif
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpClass,
     PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash,
-    http_build_query_mixed, json_decode_assoc, legacy_lossy, parse_url, php_regex, preg_grep,
-    preg_is_match, preg_match, preg_replace, preg_split, realpath, strtolower, strtr, urlencode,
-    var_export,
+    http_build_query_mixed, implode, json_decode_assoc, legacy_lossy, parse_url, php_regex,
+    preg_grep, preg_is_match, preg_match, preg_replace, preg_split, realpath, rtrim2, strtolower,
+    strtr, urlencode, var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
@@ -322,13 +322,13 @@ impl ComposerRepository {
 
         let base_url_trimmed =
             preg_replace(php_regex!(r"{(?:/[^/\\]+\.json)?(?:[?#].*)?$}"), "", &url);
-        let base_url = base_url_trimmed.trim_end_matches('/').to_string();
+        let base_url = legacy_lossy(&rtrim2(&base_url_trimmed, "/")).into_owned();
         assert!(!base_url.is_empty());
 
         let cache_dir = format!(
             "{}/{}",
             config.get("cache-repo-dir").as_string().unwrap_or_default(),
-            preg_replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.clone())),
+            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.clone())),
         );
         let cache = Cache::new(io.clone(), &cache_dir, Some("a-z0-9.$~_"), None, false);
         let version_parser = VersionParser::new();
@@ -549,7 +549,7 @@ impl ComposerRepository {
 
         let mut uniques: IndexMap<String, bool> = IndexMap::new();
         for name in &names {
-            let vendor = name.split('/').next().unwrap_or("").to_string();
+            let vendor = name.split('/').next().unwrap_or_default().to_string();
             uniques.insert(vendor, true);
         }
 
@@ -775,7 +775,7 @@ impl ComposerRepository {
         {
             let url = search_url
                 .replace("%query%", &legacy_lossy(&urlencode(&query)))
-                .replace("%type%", r#type.as_deref().unwrap_or(""));
+                .replace("%type%", r#type.as_deref().unwrap_or_default());
 
             let search = self
                 .http_downloader
@@ -826,7 +826,7 @@ impl ComposerRepository {
         if mode == SEARCH_VENDOR {
             let mut results: Vec<IndexMap<BString, PhpMixed>> = Vec::new();
             let parts = preg_split(php_regex!(r"{\s+}"), &query);
-            let regex = format!("{{(?:{})}}i", parts.join("|"));
+            let regex = format!("{{(?:{})}}i", implode("|", &parts));
 
             let vendor_names = self.get_vendor_names()?;
             for name in preg_grep(&regex, vendor_names) {
@@ -881,7 +881,7 @@ impl ComposerRepository {
 
             let mut results: Vec<IndexMap<BString, PhpMixed>> = Vec::new();
             let parts = preg_split(php_regex!(r"{\s+}"), &query);
-            let regex = format!("{{(?:{})}}i", parts.join("|"));
+            let regex = format!("{{(?:{})}}i", implode("|", &parts));
 
             let package_names = self.get_package_names(None)?;
             for name in preg_grep(&regex, package_names) {
@@ -1777,7 +1777,8 @@ impl ComposerRepository {
             .into_iter()
             .filter_map(|(name, constraint)| {
                 let name = legacy_lossy(&strtolower(&name)).into_owned();
-                let real_name = preg_replace(php_regex!(r"{~dev$}"), "", &name);
+                let real_name =
+                    legacy_lossy(&preg_replace(php_regex!(r"{~dev$}"), "", &name)).into_owned();
                 // skip platform packages, root package and composer-plugin-api
                 if PlatformRepository::is_platform_package(&real_name) || real_name == "__root__" {
                     None
@@ -2777,7 +2778,7 @@ impl ComposerRepository {
                 }
 
                 let mut response = self.http_downloader.borrow_mut().get(&filename, options)?;
-                let mut json = response.get_body().unwrap_or("").to_string();
+                let mut json = response.get_body().unwrap_or_default().to_string();
                 if let Some(sha256_val) = sha256
                     && sha256_val != hash("sha256", &json)
                 {
@@ -2972,7 +2973,7 @@ impl ComposerRepository {
                 .http_downloader
                 .borrow_mut()
                 .get(&filename, options.clone())?;
-            let mut json = response.get_body().unwrap_or("").to_string();
+            let mut json = response.get_body().unwrap_or_default().to_string();
             if json.is_empty() && response.get_status_code() == 304 {
                 return Ok(FetchFileIfLastModifiedResult::NotModified);
             }
@@ -3147,7 +3148,7 @@ impl ComposerRepository {
             return Ok(PhpMixed::Array(empty.into_iter().collect()));
         }
 
-        let mut json = response.get_body().unwrap_or("").to_string();
+        let mut json = response.get_body().unwrap_or_default().to_string();
         if json.is_empty() && response.get_status_code() == 304 {
             self.fresh_metadata_urls
                 .borrow_mut()

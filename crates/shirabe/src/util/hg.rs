@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::{ProcessExecutor, Url};
-use shirabe_php_shim::{php_regex, preg_match, rawurlencode};
+use shirabe_php_shim::{legacy_lossy, php_regex, preg_match, rawurlencode};
 use std::sync::Mutex;
 
 static VERSION: Mutex<Option<Option<String>>> = Mutex::new(None);
@@ -63,9 +63,9 @@ impl Hg {
         if let Some(matches) = matched
             && self
                 .io
-                .has_authentication(matches.name("host").unwrap_or(""))
+                .has_authentication(&legacy_lossy(matches.name("host").unwrap_or_default()))
         {
-            let authenticated_url = if matches.name("proto") == Some("ssh") {
+            let authenticated_url = if matches.name("proto") == Some(bstr::BStr::new("ssh")) {
                 let user = if let Some(u) = matches.name("user") {
                     format!("{}@", rawurlencode(u))
                 } else {
@@ -73,30 +73,30 @@ impl Hg {
                 };
                 format!(
                     "{}://{}{}{}",
-                    matches.name("proto").unwrap_or(""),
+                    matches.name("proto").unwrap_or_default(),
                     user,
-                    matches.name("host").unwrap_or(""),
-                    matches.name("path").unwrap_or(""),
+                    matches.name("host").unwrap_or_default(),
+                    matches.name("path").unwrap_or_default(),
                 )
             } else {
                 let auth = self
                     .io
-                    .get_authentication(matches.name("host").unwrap_or(""));
+                    .get_authentication(&legacy_lossy(matches.name("host").unwrap_or_default()));
                 format!(
                     "{}://{}:{}@{}{}",
-                    matches.name("proto").unwrap_or(""),
+                    matches.name("proto").unwrap_or_default(),
                     rawurlencode(
                         auth.get("username")
                             .and_then(|s| s.as_deref())
-                            .unwrap_or("")
+                            .unwrap_or_default()
                     ),
                     rawurlencode(
                         auth.get("password")
                             .and_then(|s| s.as_deref())
-                            .unwrap_or("")
+                            .unwrap_or_default()
                     ),
-                    matches.name("host").unwrap_or(""),
-                    matches.name("path").unwrap_or(""),
+                    matches.name("host").unwrap_or_default(),
+                    matches.name("path").unwrap_or_default(),
                 )
             };
 
@@ -154,7 +154,7 @@ impl Hg {
                     &output,
                 )
             {
-                *version = Some(matches.get(1).map(str::to_string));
+                *version = Some(matches.get(1).map(|s| legacy_lossy(s).into_owned()));
             }
         }
 

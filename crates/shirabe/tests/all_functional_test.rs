@@ -8,7 +8,9 @@
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::util::filesystem::Filesystem;
-use shirabe_php_shim::{PhpMixed, intval, php_regex, preg_match, preg_split_delim_capture};
+use shirabe_php_shim::{
+    PhpMixed, intval, legacy_lossy, php_regex, preg_match, preg_split_delim_capture,
+};
 use std::path::{Path, PathBuf};
 
 /// ref: AllFunctionalTest's `$oldcwd` / `$testDir` instance state plus its `setUp`/`tearDown`.
@@ -76,7 +78,7 @@ fn parse_test_file(file: &Path) -> IndexMap<String, String> {
 
         // Handle section headers.
         if section.is_none() {
-            section = Some(token);
+            section = Some(legacy_lossy(&token).into_owned());
             continue;
         }
 
@@ -85,8 +87,10 @@ fn parse_test_file(file: &Path) -> IndexMap<String, String> {
         // Allow sections to validate, or modify their section data.
         let section_data = match sec.as_str() {
             "EXPECT-EXIT-CODE" => intval(&PhpMixed::from(token)).to_string(),
-            "RUN" | "EXPECT" | "EXPECT-REGEX" | "EXPECT-REGEXES" => token.trim().to_string(),
-            "TEST" => token,
+            "RUN" | "EXPECT" | "EXPECT-REGEX" | "EXPECT-REGEXES" => {
+                legacy_lossy(&token).trim().to_string()
+            }
+            "TEST" => legacy_lossy(&token).into_owned(),
             _ => panic!(
                 "Unknown section \"{}\". Allowed sections: \"RUN\", \"EXPECT\", \"EXPECT-EXIT-CODE\", \"EXPECT-REGEX\", \"EXPECT-REGEXES\". \
                  Section headers must be written as \"--HEADER_NAME--\".",
@@ -152,11 +156,11 @@ fn expect_matches(expected: &str, output: &str) {
             let Some(m) = preg_match(php_regex!("{%(.+?)%}"), &expected[i..]) else {
                 panic!("Failed to match %...% in {}", &expected[i..]);
             };
-            let regex = m.get(1).map(str::to_string).unwrap();
+            let regex = m.get(1).map(|s| legacy_lossy(s).into_owned()).unwrap();
 
             let pattern = format!("{{{}}}", regex);
             if let Some(m) = preg_match(&pattern, &output[j..]) {
-                let full = m.get(0).map(str::to_string).unwrap();
+                let full = m.get(0).map(|s| legacy_lossy(s).into_owned()).unwrap();
                 i += regex.len() + 2;
                 j += full.len();
                 continue;

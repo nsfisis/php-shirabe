@@ -79,7 +79,11 @@ impl ProxyManager {
             )));
         }
 
-        let scheme = request_url.split("://").next().unwrap_or("").to_string();
+        let scheme = request_url
+            .split("://")
+            .next()
+            .unwrap_or_default()
+            .to_string();
         let proxy = self.get_proxy_for_scheme(&scheme);
 
         if proxy.is_none() {

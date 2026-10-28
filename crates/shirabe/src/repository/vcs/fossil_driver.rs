@@ -11,7 +11,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, date_create, dirname, is_dir, is_file, is_writable,
-    php_regex, preg_is_match, preg_replace,
+    legacy_lossy, php_regex, preg_is_match, preg_replace, trim,
 };
 
 #[derive(Debug)]
@@ -250,7 +250,7 @@ impl FossilDriver {
             Some(&self.checkout_dir),
         )?;
         let parts: Vec<&str> = output.trim().splitn(3, ' ').collect();
-        let date = parts.get(1).copied().unwrap_or("");
+        let date = parts.get(1).copied().unwrap_or_default();
 
         let date: DateTime<Utc> = date_create(date)?;
         Ok(Some(date.fixed_offset()))
@@ -284,7 +284,7 @@ impl FossilDriver {
             )?;
             for branch in self.inner.process.borrow().split_lines(&output) {
                 let branch = preg_replace(php_regex!(r"/^\*/"), "", branch.trim());
-                let branch = branch.trim().to_string();
+                let branch = legacy_lossy(&trim(&branch)).into_owned();
                 branches.insert(branch.clone(), branch);
             }
             self.branches = Some(branches);

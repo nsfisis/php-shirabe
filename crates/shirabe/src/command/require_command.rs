@@ -531,7 +531,7 @@ impl RequireCommand {
             let requirement_str = requirements
                 .get(package_name)
                 .map(|s| s.as_str())
-                .unwrap_or("");
+                .unwrap_or_default();
             if requirement_str.starts_with("dev-")
                 && !matches!(
                     &requirement_str[4..],

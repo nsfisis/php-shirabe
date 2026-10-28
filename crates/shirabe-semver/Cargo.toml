@@ -10,6 +10,7 @@ license.workspace = true
 [dependencies]
 shirabe-php-shim.workspace = true
 anyhow.workspace = true
+bstr.workspace = true
 indexmap.workspace = true
 
 [lints]

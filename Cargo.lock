@@ -1983,15 +1983,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "regex-macro"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d306632607af6ec61c0b117971d57a96381b6317cf18ae419b5558048fe016e"
-dependencies = [
- "regex",
-]
-
-[[package]]
 name = "regex-syntax"
 version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2443,7 +2434,6 @@ dependencies = [
  "memchr",
  "nix",
  "regex",
- "regex-macro",
  "reqwest",
  "serde",
  "serde_json",
@@ -2478,6 +2468,7 @@ name = "shirabe-semver"
 version = "0.2.0-dev"
 dependencies = [
  "anyhow",
+ "bstr",
  "indexmap",
  "shirabe-php-shim",
 ]

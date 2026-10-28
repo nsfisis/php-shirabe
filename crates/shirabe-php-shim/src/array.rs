@@ -64,7 +64,7 @@ pub fn array_fill_keys(keys: PhpMixed, value: PhpMixed) -> PhpMixed {
     };
     let mut result: IndexMap<BString, PhpMixed> = IndexMap::new();
     for key in entries {
-        result.insert(php_to_string(key).into(), value.clone());
+        result.insert(php_to_string(key), value.clone());
     }
     PhpMixed::Array(result)
 }

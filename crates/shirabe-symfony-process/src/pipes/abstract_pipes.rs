@@ -93,7 +93,11 @@ impl AbstractPipes {
 
         if !self.input_buffer.is_empty() {
             let written = fwrite(&stdin, &self.input_buffer, None).unwrap_or(0) as usize;
-            self.input_buffer = self.input_buffer.get(written..).unwrap_or("").to_string();
+            self.input_buffer = self
+                .input_buffer
+                .get(written..)
+                .unwrap_or_default()
+                .to_string();
             if !self.input_buffer.is_empty() {
                 return Some(vec![stdin]);
             }

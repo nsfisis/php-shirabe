@@ -8,8 +8,8 @@ use bstr::BString;
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, LogicException, PhpMixed, PregMatches, php_regex, preg_is_match,
-    preg_replace, preg_replace_callback, strpos, trigger_error,
+    E_USER_DEPRECATED, LogicException, PhpMixed, PregMatches, legacy_lossy, ltrim2, php_regex,
+    preg_is_match, preg_replace, preg_replace_callback, strpos, trigger_error,
 };
 
 /// Mirror entry, e.g. `['url' => 'https://...', 'preferred' => true]`.
@@ -141,7 +141,7 @@ impl Package {
             "/",
             target_dir,
         );
-        Some(replaced.trim_start_matches('/').to_string())
+        Some(legacy_lossy(&ltrim2(&replaced, "/")).into_owned())
     }
 
     pub fn set_extra(&mut self, extra: IndexMap<BString, PhpMixed>) {
@@ -417,7 +417,7 @@ impl Package {
                 php_regex!(
                     "{^https?://(?:(?:www\\.)?bitbucket\\.org|(api\\.)?github\\.com|(?:www\\.)?gitlab\\.com)/}i"
                 ),
-                &self.get_dist_url().unwrap_or_default(),
+                self.get_dist_url().unwrap_or_default(),
             )
         {
             self.set_dist_reference(Some(reference.clone()));
@@ -429,15 +429,19 @@ impl Package {
             // SHAs sharing a single `/` between them would not both match; harmless here since a
             // dist URL never carries more than one SHA reference.
             self.set_dist_url(Some(
-                preg_replace_callback(
-                    php_regex!("{(/|sha=)[a-f0-9]{40}(/|$)}i"),
-                    |m: &PregMatches| -> anyhow::Result<String> {
-                        let get = |i: usize| -> String { m.get(i).unwrap_or_default().to_string() };
-                        Ok(format!("{}{}{}", get(1), reference, get(2)))
-                    },
-                    &self.get_dist_url().unwrap_or_default(),
+                legacy_lossy(
+                    &preg_replace_callback(
+                        php_regex!("{(/|sha=)[a-f0-9]{40}(/|$)}i"),
+                        |m: &PregMatches| -> anyhow::Result<String> {
+                            let get =
+                                |i: usize| -> String { m.get(i).unwrap_or_default().to_string() };
+                            Ok(format!("{}{}{}", get(1), reference, get(2)))
+                        },
+                        &self.get_dist_url().unwrap_or_default(),
+                    )
+                    .expect("the replacement callback cannot fail"),
                 )
-                .expect("the replacement callback cannot fail"),
+                .into_owned(),
             ));
         } else if self.get_dist_reference().is_some() {
             // update the dist reference if there was one, but if none was provided ignore it
@@ -500,7 +504,7 @@ impl Package {
                         &mirror.url,
                         &self.name,
                         &url,
-                        r#type.unwrap_or(""),
+                        r#type.unwrap_or_default(),
                     )
                 } else {
                     continue;

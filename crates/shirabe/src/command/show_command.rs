@@ -19,7 +19,7 @@ use crate::repository::{
     RootPackageRepository,
 };
 use crate::util::PackageInfo;
-use bstr::{BString, ByteSlice};
+use bstr::{BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
@@ -175,7 +175,7 @@ impl ShowCommand {
                 let mut description = description
                     .split(['\r', '\n'])
                     .next()
-                    .unwrap_or("")
+                    .unwrap_or_default()
                     .to_string();
 
                 // Compute remaining width available for the description.
@@ -887,7 +887,7 @@ impl ShowCommand {
             self.get_io()
                 .write_no_newline(&format!(" {}", package.version));
             if let Some(description) = &package.description {
-                let trimmed = description.split(['\r', '\n']).next().unwrap_or("");
+                let trimmed = description.split(['\r', '\n']).next().unwrap_or_default();
                 self.get_io().write(&format!(" {}", trimmed));
             } else {
                 // output newline
@@ -1201,14 +1201,14 @@ impl ShowCommand {
 
             if patch_only {
                 let trimmed_version =
-                    preg_replace(php_regex!(r"{(\.0)+$}D"), "", &package.get_version());
-                let parts_needed = if trimmed_version.starts_with('0') {
+                    preg_replace(php_regex!(r"{(\.0)+$}D"), "", package.get_version());
+                let parts_needed = if trimmed_version.starts_with(b"0") {
                     4
                 } else {
                     3
                 };
                 let mut trimmed_version = trimmed_version;
-                while trimmed_version.chars().filter(|&c| c == '.').count() + 1 < parts_needed {
+                while trimmed_version.iter().filter(|&&c| c == b'.').count() + 1 < parts_needed {
                     trimmed_version.push_str(".0");
                 }
                 target_version = Some(format!("~{}", trimmed_version));
@@ -1993,7 +1993,7 @@ impl Command for ShowCommand {
                 };
                 if let Some(path) = path {
                     let real = realpath(&path).unwrap_or_default();
-                    let trimmed = real.split(['\r', '\n']).next().unwrap_or("");
+                    let trimmed = real.split(['\r', '\n']).next().unwrap_or_default();
                     self.get_io().write(&format!(" {}", trimmed));
                 } else {
                     self.get_io().write(" null");
@@ -2131,7 +2131,7 @@ impl Command for ShowCommand {
                         }
                         let matches_filter = match &package_filter_regex {
                             None => true,
-                            Some(r) => preg_is_match(r, &p.get_name()),
+                            Some(r) => preg_is_match(r, p.get_name()),
                         };
                         if matches_filter {
                             let matches_list = match &package_list_filter {
@@ -2209,7 +2209,7 @@ impl Command for ShowCommand {
                 if show_latest && *show_version {
                     for package_or_name in type_packages.values() {
                         if let PackageOrName::Pkg(package) = package_or_name
-                            && !preg_is_match(&ignored_packages_regex, &package.get_pretty_name())
+                            && !preg_is_match(&ignored_packages_regex, package.get_pretty_name())
                         {
                             let latest = self.find_latest_package(
                                 package.clone(),
@@ -2280,7 +2280,7 @@ impl Command for ShowCommand {
                         package_is_up_to_date =
                             package_is_up_to_date || (latest_package.is_none() && show_major_only);
                         let package_is_ignored =
-                            preg_is_match(&ignored_packages_regex, &package.get_pretty_name());
+                            preg_is_match(&ignored_packages_regex, package.get_pretty_name());
                         if input.borrow().get_option("outdated")?.as_bool() == Some(true)
                             && (package_is_up_to_date || package_is_ignored)
                         {
@@ -2379,7 +2379,7 @@ impl Command for ShowCommand {
                                 .get_install_path(package.clone());
                             if let Some(p) = path {
                                 let r = realpath(&p).unwrap_or_default();
-                                let trimmed = r.split(['\r', '\n']).next().unwrap_or("");
+                                let trimmed = r.split(['\r', '\n']).next().unwrap_or_default();
                                 package_view_data.path = Some(Some(trimmed.to_string()));
                             } else {
                                 package_view_data.path = Some(None);

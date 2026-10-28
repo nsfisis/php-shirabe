@@ -124,7 +124,7 @@ impl ChoiceQuestion {
 
             let selected_choices: Vec<PhpMixed> = if multiselect {
                 // Check for a separated comma values
-                if !preg_is_match(php_regex!("/^[^,]+(?:,[^,]+)*$/"), &strval(&selected)) {
+                if !preg_is_match(php_regex!("/^[^,]+(?:,[^,]+)*$/"), strval(&selected)) {
                     return Err(InvalidArgumentException::new(
                         legacy_lossy(&sprintf(&error_message, std::slice::from_ref(&selected)))
                             .into_owned(),
@@ -164,7 +164,8 @@ impl ChoiceQuestion {
                 }
 
                 // array_search($value, $choices)
-                let result_key = array_search(&strval(value), &choices_as_str(&choices));
+                let result_key =
+                    array_search(&legacy_lossy(&strval(value)), &choices_as_str(&choices));
 
                 let mut result: PhpMixed;
                 if !is_assoc {
@@ -274,6 +275,11 @@ fn choices_as_str(choices: &IndexMap<BString, PhpMixed>) -> IndexMap<String, Str
     choices
         .iter()
         // TODO(bytes): the result is keyed by String, so non-UTF-8 bytes are replaced.
-        .map(|(k, v)| (k.to_str_lossy().into_owned(), strval(v)))
+        .map(|(k, v)| {
+            (
+                k.to_str_lossy().into_owned(),
+                legacy_lossy(&strval(v)).into_owned(),
+            )
+        })
         .collect()
 }

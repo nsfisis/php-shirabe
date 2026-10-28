@@ -613,7 +613,7 @@ impl Filesystem {
 
         // no commonality at all
         if Some(0) != strpos(&from, &common_path) || "." == common_path {
-            return Ok(var_export(&PhpMixed::string(to), true));
+            return Ok(legacy_lossy(&var_export(&PhpMixed::string(to), true)).into_owned());
         }
 
         common_path = format!("{}/", rtrim2(&common_path, "/"));
@@ -629,7 +629,7 @@ impl Filesystem {
 
         // allow top level /foo & /bar dirs to be addressed relatively as this is common in Docker setups
         if !prefer_relative && "/" == common_path && source_path_depth > 1 {
-            return Ok(var_export(&PhpMixed::string(to), true));
+            return Ok(legacy_lossy(&var_export(&PhpMixed::string(to), true)).into_owned());
         }
 
         let common_path_code = if static_code {
@@ -731,15 +731,18 @@ impl Filesystem {
         }
 
         // ensure c: is normalized to C:
-        prefix = preg_replace_callback(
-            php_regex!("{(^|://)[a-z]:$}i"),
-            |m: &PregMatches| -> anyhow::Result<String> {
-                let s = m.get(0).unwrap_or_default().to_string();
-                Ok(legacy_lossy(&strtoupper(&s)).into_owned())
-            },
-            &prefix,
+        prefix = legacy_lossy(
+            &preg_replace_callback(
+                php_regex!("{(^|://)[a-z]:$}i"),
+                |m: &PregMatches| -> anyhow::Result<String> {
+                    let s = m.get(0).unwrap_or_default().to_string();
+                    Ok(legacy_lossy(&strtoupper(&s)).into_owned())
+                },
+                &prefix,
+            )
+            .expect("the replacement callback cannot fail"),
         )
-        .expect("the replacement callback cannot fail");
+        .into_owned();
 
         format!("{}{}{}", prefix, absolute, implode("/", &parts))
     }
@@ -778,14 +781,15 @@ impl Filesystem {
     pub fn get_platform_path(path: &str) -> String {
         let mut path = path.to_string();
         if Platform::is_windows() {
-            path = preg_replace(
+            path = legacy_lossy(&preg_replace(
                 php_regex!("{^(?:file:///([a-z]):?/)}i"),
                 "file://$1:/",
                 &path,
-            );
+            ))
+            .into_owned();
         }
 
-        preg_replace(php_regex!("{^file://}i"), "", &path)
+        legacy_lossy(&preg_replace(php_regex!("{^file://}i"), "", &path)).into_owned()
     }
 
     /// Cross-platform safe version of is_readable()

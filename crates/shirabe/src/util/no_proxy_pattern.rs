@@ -35,6 +35,7 @@ impl NoProxyPattern {
         let host_names: Vec<String> = preg_split(php_regex!(r"{[\s,]+}"), pattern)
             .into_iter()
             .filter(|host_name| !host_name.is_empty())
+            .map(|s| legacy_lossy(&s).into_owned())
             .collect();
         let noproxy = host_names.is_empty() || host_names[0] == "*";
         Self {

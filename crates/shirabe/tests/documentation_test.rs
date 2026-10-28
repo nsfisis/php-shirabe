@@ -23,7 +23,7 @@ fn provide_command_cases() -> Vec<std::rc::Rc<std::cell::RefCell<dyn Command>>> 
     let mut commands = Vec::new();
     for command in description.get_commands().values() {
         if ["about", "completion", "list"]
-            .contains(&command.borrow().get_name().as_deref().unwrap_or(""))
+            .contains(&command.borrow().get_name().as_deref().unwrap_or_default())
         {
             continue;
         }

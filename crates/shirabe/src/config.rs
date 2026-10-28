@@ -634,7 +634,7 @@ impl Config {
                     .to_string()
                     .parse::<f64>()
                     .unwrap_or(0.0);
-                let unit = matches.get(2).map(str::to_string);
+                let unit = matches.get(2).map(|s| legacy_lossy(s).into_owned());
                 if let Some(unit) = unit {
                     match strtolower(&unit).as_slice() {
                         b"g" => {
@@ -933,7 +933,10 @@ impl Config {
             php_regex!(r"#\{\$(.+)\}#"),
             |m: &PregMatches| -> anyhow::Result<String> {
                 let key_match = m.get(1).unwrap_or_default().to_string();
-                Ok(php_to_string(&self.get_with_flags(&key_match, flags)?))
+                Ok(
+                    legacy_lossy(&php_to_string(&self.get_with_flags(&key_match, flags)?))
+                        .into_owned(),
+                )
             },
             &value_str,
         )?;
@@ -1031,7 +1034,7 @@ impl Config {
                             &format!(
                                 "<warning>Warning: Accessing {} over {} which is an insecure protocol.</warning>",
                                 hostname,
-                                scheme.as_deref().unwrap_or("")
+                                scheme.as_deref().unwrap_or_default()
                             ),
                             true,
                             io_interface::NORMAL,

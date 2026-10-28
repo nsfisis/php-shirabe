@@ -5,7 +5,7 @@ use crate::package::version::VersionParser;
 use bstr::{B, BString, ByteSlice};
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, date_create, php_regex, preg_replace};
+use shirabe_php_shim::{PhpMixed, date_create, legacy_lossy, php_regex, preg_replace};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 fn serialize_constraint<S: serde::Serializer>(
@@ -36,11 +36,12 @@ impl PartialSecurityAdvisory {
             match parser.parse_constraints(&affected_versions_str.to_str_lossy()) {
                 Ok(c) => c,
                 Err(_) => {
-                    let affected_version = preg_replace(
+                    let affected_version = legacy_lossy(&preg_replace(
                         php_regex!(r"{(^[>=<^~]*[\d.]+).*}"),
                         "$1",
-                        &affected_versions_str.to_str_lossy(),
-                    );
+                        affected_versions_str,
+                    ))
+                    .into_owned();
                     match parser.parse_constraints(&affected_version) {
                         Ok(c) => c,
                         Err(_) => SimpleConstraint::new(

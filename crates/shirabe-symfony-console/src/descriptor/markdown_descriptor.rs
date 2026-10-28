@@ -151,7 +151,8 @@ impl MarkdownDescriptor {
                     command.get_name().unwrap_or_default(),
                     str_repeat(
                         "-",
-                        (Helper::width(command.get_name().as_deref().unwrap_or("")) + 2) as usize
+                        (Helper::width(command.get_name().as_deref().unwrap_or_default()) + 2)
+                            as usize
                     ),
                     if !command.get_description().is_empty() {
                         format!("{}\n\n", command.get_description())
@@ -182,7 +183,7 @@ impl MarkdownDescriptor {
                 command.get_name().unwrap_or_default(),
                 str_repeat(
                     "-",
-                    (Helper::width(command.get_name().as_deref().unwrap_or("")) + 2) as usize
+                    (Helper::width(command.get_name().as_deref().unwrap_or_default()) + 2) as usize
                 ),
                 if !command.get_description().is_empty() {
                     format!("{}\n\n", command.get_description())

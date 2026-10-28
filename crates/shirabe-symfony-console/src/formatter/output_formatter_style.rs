@@ -20,11 +20,11 @@ impl OutputFormatterStyle {
     pub fn new(foreground: Option<&str>, background: Option<&str>, options: Vec<String>) -> Self {
         let foreground = foreground
             .filter(|s| !s.is_empty())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         let background = background
             .filter(|s| !s.is_empty())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         let color = Color::new(&foreground, &background, &options).unwrap();
         Self {
@@ -44,12 +44,18 @@ impl OutputFormatterStyle {
 
 impl OutputFormatterStyleInterface for OutputFormatterStyle {
     fn set_foreground(&mut self, color: Option<&str>) {
-        self.foreground = color.filter(|s| !s.is_empty()).unwrap_or("").to_string();
+        self.foreground = color
+            .filter(|s| !s.is_empty())
+            .unwrap_or_default()
+            .to_string();
         self.color = Color::new(&self.foreground, &self.background, &self.options.clone()).unwrap();
     }
 
     fn set_background(&mut self, color: Option<&str>) {
-        self.background = color.filter(|s| !s.is_empty()).unwrap_or("").to_string();
+        self.background = color
+            .filter(|s| !s.is_empty())
+            .unwrap_or_default()
+            .to_string();
         self.color = Color::new(&self.foreground, &self.background, &self.options.clone()).unwrap();
     }
 

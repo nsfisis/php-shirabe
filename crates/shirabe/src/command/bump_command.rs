@@ -170,6 +170,7 @@ impl BumpCommand {
             let packages_filter: Vec<String> = packages_filter
                 .iter()
                 .map(|constraint| preg_replace(php_regex!(r"{[:= ].+}"), "", constraint))
+                .map(|s| legacy_lossy(&s).into_owned())
                 .collect();
             let unique_lower: Vec<String> = packages_filter
                 .iter()

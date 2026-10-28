@@ -4,7 +4,7 @@ use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepository, RepositoryInterface};
 use indexmap::IndexMap;
-use shirabe_php_shim::{php_regex, preg_replace};
+use shirabe_php_shim::{legacy_lossy, php_regex, preg_replace};
 use shirabe_symfony_console::formatter::OutputFormatter;
 
 #[derive(Debug)]
@@ -204,6 +204,11 @@ impl SuggestedPackagesReporter {
     }
 
     fn remove_control_characters(&self, string: &str) -> String {
-        preg_replace(php_regex!("/[[:cntrl:]]/"), "", &string.replace('\n', " "))
+        legacy_lossy(&preg_replace(
+            php_regex!("/[[:cntrl:]]/"),
+            "",
+            string.replace('\n', " "),
+        ))
+        .into_owned()
     }
 }

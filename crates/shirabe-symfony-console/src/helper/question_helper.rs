@@ -826,7 +826,7 @@ impl QuestionHelper {
 
     /// Helper::substr proxy (inherited static helper).
     fn substr(string: Option<&str>, from: i64, length: Option<i64>) -> String {
-        Helper::substr(string.unwrap_or(""), from, length)
+        Helper::substr(string.unwrap_or_default(), from, length)
     }
 }
 

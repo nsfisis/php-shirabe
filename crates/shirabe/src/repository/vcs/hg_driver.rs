@@ -59,7 +59,7 @@ impl HgDriver {
             let sanitized = preg_replace(
                 php_regex!(r"{[^a-z0-9]}i"),
                 "-",
-                &Url::sanitize(self.inner.url.clone()),
+                Url::sanitize(self.inner.url.clone()),
             );
             self.repo_dir = format!("{}/{}/", cache_vcs_dir, sanitized);
 

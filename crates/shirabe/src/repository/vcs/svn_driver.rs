@@ -82,7 +82,7 @@ impl SvnDriver {
 
         if let Some(pos) = strrpos(
             &self.inner.url,
-            format!("/{}", self.trunk_path.as_deref().unwrap_or("")),
+            format!("/{}", self.trunk_path.as_deref().unwrap_or_default()),
         ) {
             self.base_url =
                 legacy_lossy(&substr(&self.inner.url, 0, Some(pos as i64))).into_owned();
@@ -98,7 +98,7 @@ impl SvnDriver {
                     .get("cache-repo-dir")
                     .as_string()
                     .unwrap_or_default(),
-                preg_replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(self.base_url.clone())),
+                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(self.base_url.clone())),
             ),
             None,
             None,
@@ -322,7 +322,10 @@ impl SvnDriver {
                             && let Some(m) =
                                 preg_match(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                         {
-                            let rev: i64 = m.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+                            let rev: i64 = m
+                                .get(1)
+                                .and_then(|s| legacy_lossy(s).parse().ok())
+                                .unwrap_or(0);
                             let path = m.get(2).unwrap_or_default().to_string();
                             if path == "./" {
                                 last_rev = rev;
@@ -364,7 +367,10 @@ impl SvnDriver {
                     if !line.is_empty()
                         && let Some(m) = preg_match(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                     {
-                        let rev: i64 = m.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+                        let rev: i64 = m
+                            .get(1)
+                            .and_then(|s| legacy_lossy(s).parse().ok())
+                            .unwrap_or(0);
                         let path = m.get(2).unwrap_or_default().to_string();
                         if path == "./" {
                             let identifier = self.build_identifier(
@@ -399,7 +405,10 @@ impl SvnDriver {
                             && let Some(m) =
                                 preg_match(php_regex!(r"{^\s*(\S+).*?(\S+)\s*$}"), &line)
                         {
-                            let rev: i64 = m.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+                            let rev: i64 = m
+                                .get(1)
+                                .and_then(|s| legacy_lossy(s).parse().ok())
+                                .unwrap_or(0);
                             let path = m.get(2).unwrap_or_default().to_string();
                             if path == "./" {
                                 last_rev = rev;

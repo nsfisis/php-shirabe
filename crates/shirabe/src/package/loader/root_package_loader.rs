@@ -317,7 +317,7 @@ impl RootPackageLoader {
 
             let or_split = preg_split(php_regex!(r"{\s*\|\|?\s*}"), req_version.trim());
             for or_constraint in &or_split {
-                let and_split = shirabe_semver::split_and_constraints(or_constraint);
+                let and_split = shirabe_semver::split_and_constraints(&legacy_lossy(or_constraint));
                 for and_constraint in and_split {
                     constraints.push(and_constraint);
                 }
@@ -350,7 +350,8 @@ impl RootPackageLoader {
                 let req_version_stripped =
                     preg_replace(php_regex!(r"{^([^,\s@]+) as .+$}"), "$1", constraint);
                 if preg_is_match(php_regex!(r"{^[^,\s@]+$}"), &req_version_stripped) {
-                    let stability_name = VersionParser::parse_stability(&req_version_stripped);
+                    let stability_name =
+                        VersionParser::parse_stability(&legacy_lossy(&req_version_stripped));
                     if stability_name != "stable" {
                         let name = legacy_lossy(&strtolower(req_name)).into_owned();
                         let stability = stabilities[stability_name.as_str()];
@@ -373,7 +374,12 @@ impl RootPackageLoader {
         mut references: IndexMap<String, String>,
     ) -> IndexMap<String, String> {
         for (req_name, req_version) in requires {
-            let req_version = preg_replace(php_regex!(r"{^([^,\s@]+) as .+$}"), "$1", req_version);
+            let req_version = legacy_lossy(&preg_replace(
+                php_regex!(r"{^([^,\s@]+) as .+$}"),
+                "$1",
+                req_version,
+            ))
+            .into_owned();
             if let Some(m) = preg_match(php_regex!(r"{^[^,\s@]+?#([a-f0-9]+)$}"), &req_version)
                 && VersionParser::parse_stability(&req_version) == "dev"
             {

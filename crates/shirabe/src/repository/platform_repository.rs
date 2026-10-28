@@ -217,8 +217,12 @@ impl PlatformRepository {
                 version = v;
             }
             Err(_) => {
-                pretty_version =
-                    preg_replace(php_regex!("#^([^~+-]+).*$#"), "$1", &php_version_str);
+                pretty_version = legacy_lossy(&preg_replace(
+                    php_regex!("#^([^~+-]+).*$#"),
+                    "$1",
+                    &php_version_str,
+                ))
+                .into_owned();
                 version = self
                     .version_parser
                     .as_ref()
@@ -621,7 +625,7 @@ impl PlatformRepository {
                     ) {
                         let version_id: i64 = libxpm_matches
                             .name("versionId")
-                            .and_then(|s| s.parse().ok())
+                            .and_then(|s| legacy_lossy(s).parse().ok())
                             .unwrap_or(0);
                         let converted = Version::convert_libxpm_version_id(version_id);
                         self.add_library(
@@ -798,7 +802,7 @@ impl PlatformRepository {
                     {
                         let version_id: i64 = matches
                             .name("versionId")
-                            .and_then(|s| s.parse().ok())
+                            .and_then(|s| legacy_lossy(s).parse().ok())
                             .unwrap_or(0);
                         let converted = Version::convert_openldap_version_id(version_id);
                         let vendor = vendor_matches
@@ -949,7 +953,12 @@ impl PlatformRepository {
                         PhpMixed::String(s) => s.to_str_lossy().into_owned(),
                         _ => "".to_string(),
                     };
-                    let stripped = preg_replace(php_regex!("{^(\\S+).*}"), "$1", &pcre_version_str);
+                    let stripped = legacy_lossy(&preg_replace(
+                        php_regex!("{^(\\S+).*}"),
+                        "$1",
+                        &pcre_version_str,
+                    ))
+                    .into_owned();
                     self.add_library(&mut libraries, name, Some(&stripped), None, &[], &[])?;
 
                     let info = platform_info.get_extension_info(name);
@@ -1307,8 +1316,12 @@ impl PlatformRepository {
                     version = v;
                 }
                 Err(_) => {
-                    pretty_version =
-                        preg_replace(php_regex!("#^([^~+-]+).*$#"), "$1", &hhvm_version);
+                    pretty_version = legacy_lossy(&preg_replace(
+                        php_regex!("#^([^~+-]+).*$#"),
+                        "$1",
+                        &hhvm_version,
+                    ))
+                    .into_owned();
                     version = self
                         .version_parser
                         .as_ref()
@@ -1531,15 +1544,16 @@ impl PlatformRepository {
         &mut self,
         libraries: &mut IndexMap<String, bool>,
         name: &str,
-        pretty_version: Option<&str>,
+        pretty_version: Option<impl AsRef<[u8]>>,
         description: Option<&str>,
         replaces: &[String],
         provides: &[String],
     ) -> anyhow::Result<()> {
-        let pretty_version = match pretty_version {
-            Some(v) => v,
+        let pretty_version = match &pretty_version {
+            Some(v) => legacy_lossy(v),
             None => return Ok(()),
         };
+        let pretty_version: &str = &pretty_version;
         let version = match self
             .version_parser
             .as_ref()

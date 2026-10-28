@@ -252,7 +252,7 @@ impl PluginManager {
             }
 
             if package.get_name() == "symfony/flex"
-                && preg_is_match(php_regex!("{^[0-9.]+$}"), &package.get_version())
+                && preg_is_match(php_regex!("{^[0-9.]+$}"), package.get_version())
                 && version_compare(&package.get_version(), "1.9.8", CmpOp::Lt)
             {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it is not compatible with Composer 2+. Make sure to update it to version 1.9.8 or greater.</warning>",
@@ -453,24 +453,27 @@ impl PluginManager {
                         "{{^((?:(?:final|readonly)\\s+)*(?:\\s*))class\\s+({})}}mi",
                         preg_quote(&class_name, None)
                     ),
-                    &format!("$1class $2_composer_tmp{}", class_counter),
+                    format!("$1class $2_composer_tmp{}", class_counter),
                     &code,
                     1,
                     None,
                 );
                 let mut replacements: IndexMap<String, String> = IndexMap::new();
-                replacements.insert("__FILE__".to_string(), var_export_str(&path, true));
-                replacements.insert("__DIR__".to_string(), var_export_str(&dirname(&path), true));
-                replacements.insert("__CLASS__".to_string(), var_export_str(&class, true));
+                replacements.insert(
+                    "__FILE__".to_string(),
+                    legacy_lossy(&var_export_str(&path, true)).into_owned(),
+                );
+                replacements.insert(
+                    "__DIR__".to_string(),
+                    legacy_lossy(&var_export_str(dirname(&path), true)).into_owned(),
+                );
+                replacements.insert(
+                    "__CLASS__".to_string(),
+                    legacy_lossy(&var_export_str(&class, true)).into_owned(),
+                );
                 let code = strtr_array(&code, &replacements);
-                let code = legacy_lossy(&preg_replace2(
-                    r"/^\s*<\?(php)?/i",
-                    "",
-                    &legacy_lossy(&code),
-                    1,
-                    None,
-                ))
-                .into_owned();
+                let code = legacy_lossy(&preg_replace2(r"/^\s*<\?(php)?/i", "", &code, 1, None))
+                    .into_owned();
                 self.php_runtime_eval(&code)?;
                 class = format!("{}_composer_tmp{}", class, class_counter);
                 CLASS_COUNTER.store(class_counter + 1, std::sync::atomic::Ordering::Relaxed);

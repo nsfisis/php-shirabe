@@ -123,14 +123,15 @@ impl LibraryInstaller {
         if let Some(target_dir) = target_dir
             && !target_dir.is_empty()
         {
-            let replaced = preg_replace(
+            let replaced = legacy_lossy(&preg_replace(
                 format!(
                     "{{/*{}/?$}}",
                     preg_quote(&target_dir, None).replace('/', "/+")
                 ),
                 "",
                 &install_path,
-            );
+            ))
+            .into_owned();
             return replaced;
         }
 

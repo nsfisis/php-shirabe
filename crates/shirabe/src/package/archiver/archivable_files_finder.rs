@@ -2,7 +2,7 @@
 
 use crate::package::archiver::{BaseExcludeFilter, ComposerExcludeFilter, GitExcludeFilter};
 use crate::util::Filesystem;
-use shirabe_php_shim::{RuntimeException, preg_quote, preg_replace, realpath};
+use shirabe_php_shim::{RuntimeException, legacy_lossy, preg_quote, preg_replace, realpath};
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
 
@@ -58,11 +58,12 @@ impl ArchivableFilesFinder {
                 .into_os_string()
                 .into_string()
                 .unwrap_or_else(|realpath| panic!("path is not valid UTF-8: {realpath:?}"));
-            let relative_path = preg_replace(
+            let relative_path = legacy_lossy(&preg_replace(
                 format!("#^{}#", preg_quote(&sources_clone, Some('#'))),
                 "",
-                &fs.normalize_path(&realpath),
-            );
+                fs.normalize_path(&realpath),
+            ))
+            .into_owned();
 
             let mut exclude = false;
             for f in &filters {

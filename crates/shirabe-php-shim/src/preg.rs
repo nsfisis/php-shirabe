@@ -11,34 +11,39 @@
 //! * Performance: pattern matching is performed in Composer's hot loops such as dependency
 //!   resolution. Allocating a PHP-compatible `$matches` array is expensive.
 //!
+//! Subjects are byte strings, as in PHP. A pattern without the `u` modifier matches bytes (`.` is
+//! any byte, `\w` and case folding are ASCII-only), and a pattern with it matches the UTF-8
+//! characters of a subject that must be valid UTF-8.
+//!
 //! See docs/dev/regex-porting.md for the regex porting rules.
 
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use std::sync::{Arc, LazyLock, Mutex};
 
-/// A single match's `$matches`: the `regex::Captures` the search produced, read by either the named
-/// or the numbered form of a capture group. `'h` is the lifetime of the searched subject, which the
-/// group values borrow from.
+/// A single match's `$matches`: the `regex::bytes::Captures` the search produced, read by either
+/// the named or the numbered form of a capture group. `'h` is the lifetime of the searched
+/// subject, which the group values borrow from.
 #[derive(Debug)]
 pub struct PregMatches<'h> {
-    caps: regex::Captures<'h>,
+    caps: regex::bytes::Captures<'h>,
 }
 
 impl<'h> PregMatches<'h> {
-    fn new(caps: regex::Captures<'h>) -> Self {
+    fn new(caps: regex::bytes::Captures<'h>) -> Self {
         Self { caps }
     }
 
     /// The value of the capture group at `index`, or `None` if that group did not participate in
     /// the match. A group the pattern does not have reads as `None` too, matching how PHP reports
     /// a `$matches` entry that is not there.
-    pub fn get(&self, index: usize) -> Option<&'h str> {
-        self.caps.get(index).map(|group| group.as_str())
+    pub fn get(&self, index: usize) -> Option<&'h BStr> {
+        self.caps.get(index).map(|group| group.as_bytes().as_bstr())
     }
 
     /// The value of the capture group called `name`, under the same rules as `get`.
-    pub fn name(&self, name: &str) -> Option<&'h str> {
-        self.caps.name(name).map(|group| group.as_str())
+    pub fn name(&self, name: &str) -> Option<&'h BStr> {
+        self.caps.name(name).map(|group| group.as_bytes().as_bstr())
     }
 
     /// The byte offset the capture group at `index` starts at, under the same rules as `get`.
@@ -53,7 +58,10 @@ impl<'h> PregMatches<'h> {
     }
 }
 
-pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
+/// Escapes `str` for a pattern. The result is a pattern fragment, which the `regex` crate takes as
+/// a `String`: a byte that is not part of a valid UTF-8 sequence is written as a `\xNN` escape,
+/// which matches that byte in a pattern without the `u` modifier.
+pub fn preg_quote(str: impl AsRef<[u8]>, delimiter: Option<char>) -> String {
     // Regex pattern compatibility:
     // PHP's preg_quote escapes `<` and `>` (PCRE treats `\<`/`\>` as literals), but the `regex`
     // crate reads `\<`/`\>` as start-of-word / end-of-word boundary assertions. `<` and `>` are
@@ -61,8 +69,13 @@ pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
     // literal match.
     const SPECIAL: &str = ".\\+*?[^]$(){}=!|:-#";
     let mut out = String::new();
-    for c in str.chars() {
-        if c == '\0' {
+    let bytes = str.as_ref();
+    for (start, end, c) in bytes.char_indices() {
+        if c == '\u{FFFD}' && &bytes[start..end] != "\u{FFFD}".as_bytes() {
+            for &b in &bytes[start..end] {
+                out.push_str(&format!("\\x{:02X}", b));
+            }
+        } else if c == '\0' {
             out.push_str("\\000");
         } else if SPECIAL.contains(c) || Some(c) == delimiter {
             out.push('\\');
@@ -74,97 +87,126 @@ pub fn preg_quote(str: &str, delimiter: Option<char>) -> String {
     out
 }
 
-// Whether the pattern matches, for the call sites that ignore the capture groups.
-pub fn preg_is_match(pattern: impl PregPattern, subject: &str) -> bool {
-    let __resolved = pattern.resolve();
-    let re = __resolved.regex();
+/// The subject a compiled pattern can search, or `None` when the pattern has the `u` modifier and
+/// `subject` is not valid UTF-8.
+// TODO(error-model): PCRE fails such a search with `PREG_BAD_UTF8_ERROR`, which
+// `Composer\Pcre\Preg` turns into a `PcreException`; here the search finds no match instead.
+fn searchable<'h>(pattern: &CompiledPattern, subject: &'h [u8]) -> Option<&'h [u8]> {
+    (!pattern.utf8 || subject.is_utf8()).then_some(subject)
+}
 
-    re.is_match(subject)
+// Whether the pattern matches, for the call sites that ignore the capture groups.
+pub fn preg_is_match(pattern: impl PregPattern, subject: impl AsRef<[u8]>) -> bool {
+    let resolved = pattern.resolve();
+    let pattern = resolved.pattern();
+    searchable(pattern, subject.as_ref()).is_some_and(|subject| pattern.regex.is_match(subject))
 }
 
 // Returns None if the pattern did not match; otherwise the match's capture groups.
-pub fn preg_match<'h>(pattern: impl PregPattern, subject: &'h str) -> Option<PregMatches<'h>> {
-    let __resolved = pattern.resolve();
-    let re = __resolved.regex();
-    let caps = re.captures(subject)?;
+pub fn preg_match<'h, S: AsRef<[u8]> + ?Sized>(
+    pattern: impl PregPattern,
+    subject: &'h S,
+) -> Option<PregMatches<'h>> {
+    let resolved = pattern.resolve();
+    let pattern = resolved.pattern();
+    let caps = pattern
+        .regex
+        .captures(searchable(pattern, subject.as_ref())?)?;
 
     Some(PregMatches::new(caps))
 }
 
 // Every occurrence of the pattern in `subject`, in match order. The search runs eagerly, as PHP's
 // does.
-pub fn preg_match_all<'h>(
+pub fn preg_match_all<'h, S: AsRef<[u8]> + ?Sized>(
     pattern: impl PregPattern,
-    subject: &'h str,
+    subject: &'h S,
 ) -> impl Iterator<Item = PregMatches<'h>> {
-    let __resolved = pattern.resolve();
-    let matches: Vec<PregMatches<'h>> = __resolved
-        .regex()
-        .captures_iter(subject)
-        .map(PregMatches::new)
-        .collect();
+    let resolved = pattern.resolve();
+    let pattern = resolved.pattern();
+    let matches: Vec<PregMatches<'h>> = match searchable(pattern, subject.as_ref()) {
+        Some(subject) => pattern
+            .regex
+            .captures_iter(subject)
+            .map(PregMatches::new)
+            .collect(),
+        None => Vec::new(),
+    };
 
     matches.into_iter()
 }
 
-pub fn preg_grep<T: AsRef<str>>(
+pub fn preg_grep<T: AsRef<[u8]>>(
     pattern: impl PregPattern,
     array: impl IntoIterator<Item = T>,
 ) -> impl Iterator<Item = T> {
-    let __resolved = pattern.resolve();
+    let resolved = pattern.resolve();
     array.into_iter().filter(move |s| {
-        let re = __resolved.regex();
-        re.is_match(s.as_ref())
+        let pattern = resolved.pattern();
+        searchable(pattern, s.as_ref()).is_some_and(|subject| pattern.regex.is_match(subject))
     })
 }
 
-pub fn preg_split(pattern: impl PregPattern, subject: &str) -> Vec<String> {
-    preg_split_impl(pattern, subject, false)
+pub fn preg_split(pattern: impl PregPattern, subject: impl AsRef<[u8]>) -> Vec<BString> {
+    preg_split_impl(pattern, subject.as_ref(), false)
 }
 
-pub fn preg_split_delim_capture(pattern: impl PregPattern, subject: &str) -> Vec<String> {
-    preg_split_impl(pattern, subject, true)
+pub fn preg_split_delim_capture(
+    pattern: impl PregPattern,
+    subject: impl AsRef<[u8]>,
+) -> Vec<BString> {
+    preg_split_impl(pattern, subject.as_ref(), true)
 }
 
-fn preg_split_impl(pattern: impl PregPattern, subject: &str, delim_capture: bool) -> Vec<String> {
-    let __resolved = pattern.resolve();
-    let re = __resolved.regex();
+fn preg_split_impl(pattern: impl PregPattern, subject: &[u8], delim_capture: bool) -> Vec<BString> {
+    let resolved = pattern.resolve();
+    let pattern = resolved.pattern();
+    let Some(subject) = searchable(pattern, subject) else {
+        return vec![BString::from(subject)];
+    };
 
-    let mut result: Vec<String> = Vec::new();
+    let mut result: Vec<BString> = Vec::new();
     let mut last = 0usize;
-    for caps in re.captures_iter(subject) {
+    for caps in pattern.regex.captures_iter(subject) {
         let m = caps.get(0).unwrap();
-        result.push(subject[last..m.start()].to_string());
+        result.push(BString::from(&subject[last..m.start()]));
         if delim_capture {
             // `preg_split` accepts no PREG_UNMATCHED_AS_NULL, so the split list
             // holds strings only: trailing unmatched groups are dropped,
             // interior ones are emitted as "".
             if let Some(last_g) = (1..caps.len()).rev().find(|&g| caps.get(g).is_some()) {
                 for g in 1..=last_g {
-                    result.push(caps.get(g).map(|x| x.as_str()).unwrap_or("").to_string());
+                    result.push(BString::from(
+                        caps.get(g).map(|x| x.as_bytes()).unwrap_or_default(),
+                    ));
                 }
             }
         }
         last = m.end();
     }
-    result.push(subject[last..].to_string());
+    result.push(BString::from(&subject[last..]));
 
     result
 }
 
-pub fn preg_replace(pattern: impl PregPattern, replacement: &str, subject: &str) -> String {
+pub fn preg_replace(
+    pattern: impl PregPattern,
+    replacement: impl AsRef<[u8]>,
+    subject: impl AsRef<[u8]>,
+) -> BString {
     preg_replace2(pattern, replacement, subject, -1, None)
 }
 
 pub fn preg_replace2(
     pattern: impl PregPattern,
-    replacement: &str,
-    subject: &str,
+    replacement: impl AsRef<[u8]>,
+    subject: impl AsRef<[u8]>,
     limit: i64,
     count: Option<&mut usize>,
-) -> String {
-    let __resolved = pattern.resolve();
-    let re = __resolved.regex();
+) -> BString {
+    let resolved = pattern.resolve();
+    let pattern = resolved.pattern();
+    let subject = subject.as_ref();
     let limit = if limit < 0 {
         usize::MAX
     } else {
@@ -174,60 +216,64 @@ pub fn preg_replace2(
     let mut out: Vec<u8> = Vec::new();
     let mut last = 0usize;
     let mut n = 0usize;
-    for caps in re.captures_iter(subject) {
-        if n >= limit {
-            break;
+    if let Some(subject) = searchable(pattern, subject) {
+        for caps in pattern.regex.captures_iter(subject) {
+            if n >= limit {
+                break;
+            }
+            let m = caps.get(0).unwrap();
+            out.extend_from_slice(&subject[last..m.start()]);
+            php_replacement_expand(replacement.as_ref(), &caps, &mut out);
+            last = m.end();
+            n += 1;
         }
-        let m = caps.get(0).unwrap();
-        out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
-        php_replacement_expand(replacement, &caps, &mut out);
-        last = m.end();
-        n += 1;
     }
-    out.extend_from_slice(&subject.as_bytes()[last..]);
+    out.extend_from_slice(&subject[last..]);
 
     if let Some(count) = count {
         *count = n;
     }
-    String::from_utf8_lossy(&out).into_owned()
+    BString::from(out)
 }
 
-pub fn preg_replace_callback<'h, F>(
+pub fn preg_replace_callback<'h, S, F, R>(
     pattern: impl PregPattern,
     mut callback: F,
-    subject: &'h str,
-) -> anyhow::Result<String>
+    subject: &'h S,
+) -> anyhow::Result<BString>
 where
-    F: FnMut(&PregMatches<'h>) -> anyhow::Result<String>,
+    S: AsRef<[u8]> + ?Sized,
+    F: FnMut(&PregMatches<'h>) -> anyhow::Result<R>,
+    R: AsRef<[u8]>,
 {
-    let __resolved = pattern.resolve();
-    let re = __resolved.regex();
+    let resolved = pattern.resolve();
+    let pattern = resolved.pattern();
+    let subject = subject.as_ref();
 
     let mut out: Vec<u8> = Vec::new();
     let mut last = 0usize;
-    for caps in re.captures_iter(subject) {
-        let m = caps.get(0).unwrap();
-        out.extend_from_slice(&subject.as_bytes()[last..m.start()]);
-        let matches = PregMatches::new(caps);
-        out.extend_from_slice(callback(&matches)?.as_bytes());
-        last = m.end();
+    if let Some(subject) = searchable(pattern, subject) {
+        for caps in pattern.regex.captures_iter(subject) {
+            let m = caps.get(0).unwrap();
+            out.extend_from_slice(&subject[last..m.start()]);
+            let matches = PregMatches::new(caps);
+            out.extend_from_slice(callback(&matches)?.as_ref());
+            last = m.end();
+        }
     }
-    out.extend_from_slice(&subject.as_bytes()[last..]);
+    out.extend_from_slice(&subject[last..]);
 
-    Ok(String::from_utf8_lossy(&out).into_owned())
+    Ok(BString::from(out))
 }
 
-// Translates a PHP PCRE pattern (delimiters + trailing modifiers) into a regex
-// the `regex` crate can compile. Only delimiter stripping and the i/x/s/m
-// modifiers are handled; PCRE-only constructs (possessive quantifiers,
-// lookaround, backreferences) are not supported by `regex` and must be avoided
-// in the caller's pattern.
-// PCRE treats `\<` and `\>` as escaped literal `<`/`>`, but the `regex` crate
-// reads them as start/end-of-word boundary assertions. Rewrite those escapes to
-// the literal characters so PCRE-sourced patterns (e.g. anything run through
-// `preg_quote`, which escapes `<` and `>`) keep their original meaning. A `\\`
-// escapes the following backslash, so `\\<` is left untouched.
-fn translate_pcre_literals(inner: &str) -> String {
+// Translates a PHP PCRE pattern body into `regex`-crate syntax. PCRE treats `\<` and `\>` as
+// escaped literal `<`/`>`, but the `regex` crate reads them as start/end-of-word boundary
+// assertions. Rewrite those escapes to the literal characters so PCRE-sourced patterns (e.g.
+// anything run through `preg_quote`, which escapes `<` and `>`) keep their original meaning. A `\\`
+// escapes the following backslash, so `\\<` is left untouched. Without the `u` modifier PCRE reads
+// the pattern as bytes, so a non-ASCII character is written as the `\xNN` escapes of its UTF-8
+// bytes, which also keeps it valid inside a character class.
+fn translate_pcre_literals(inner: &str, utf8: bool) -> String {
     let mut out = String::with_capacity(inner.len());
     let mut chars = inner.chars().peekable();
     while let Some(c) = chars.next() {
@@ -242,6 +288,11 @@ fn translate_pcre_literals(inner: &str) -> String {
                 }
                 _ => out.push('\\'),
             }
+        } else if !utf8 && !c.is_ascii() {
+            let mut buf = [0u8; 4];
+            for b in c.encode_utf8(&mut buf).bytes() {
+                out.push_str(&format!("\\x{:02X}", b));
+            }
         } else {
             out.push(c);
         }
@@ -249,24 +300,32 @@ fn translate_pcre_literals(inner: &str) -> String {
     out
 }
 
+/// A PHP pattern compiled for the `regex` crate.
+#[derive(Debug)]
+pub struct CompiledPattern {
+    regex: regex::bytes::Regex,
+    /// Whether the pattern has the `u` modifier.
+    utf8: bool,
+}
+
 // PHP's PCRE engine keeps a per-process cache of compiled patterns (pcre.cache_size, default 4096),
 // so repeated preg_* calls with the same pattern string are effectively free. The `regex` crate has
 // no such cache, and callers like the classmap generator re-issue the same pattern string for every
 // file (or even every scanned token), so compilation must be memoized here to match PHP's amortized
 // cost.
-// The cached value is `Arc`-wrapped so callers share a single `regex::Regex` instance:
-// `regex::Regex::clone()` does not share the underlying meta engine's search-cache pool, so
-// handing out fresh clones here would pay a ~10us per-clone cache warmup cost on every single
-// `preg_*` call (measured), defeating the point of this cache. `Arc::clone()` is a refcount bump.
-static PATTERN_CACHE: LazyLock<Mutex<IndexMap<String, Arc<regex::Regex>>>> =
+// The cached value is `Arc`-wrapped so callers share a single `regex::bytes::Regex` instance:
+// `Regex::clone()` does not share the underlying meta engine's search-cache pool, so handing out
+// fresh clones here would pay a ~10us per-clone cache warmup cost on every single `preg_*` call
+// (measured), defeating the point of this cache. `Arc::clone()` is a refcount bump.
+static PATTERN_CACHE: LazyLock<Mutex<IndexMap<String, Arc<CompiledPattern>>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
-fn compile_php_pattern(pattern: &str) -> anyhow::Result<Arc<regex::Regex>> {
+fn compile_php_pattern(pattern: &str) -> anyhow::Result<Arc<CompiledPattern>> {
     if let Some(cached) = PATTERN_CACHE.lock().unwrap().get(pattern) {
         return Ok(Arc::clone(cached));
     }
 
-    let compiled = Arc::new(regex::Regex::new(&translate_php_pattern(pattern)?)?);
+    let compiled = Arc::new(compile_php_pattern_uncached(pattern)?);
     PATTERN_CACHE
         .lock()
         .unwrap()
@@ -274,9 +333,19 @@ fn compile_php_pattern(pattern: &str) -> anyhow::Result<Arc<regex::Regex>> {
     Ok(compiled)
 }
 
+fn compile_php_pattern_uncached(pattern: &str) -> anyhow::Result<CompiledPattern> {
+    let (source, utf8) = translate_php_pattern(pattern)?;
+    let regex = regex::bytes::RegexBuilder::new(&source)
+        .unicode(utf8)
+        .octal(true)
+        .build()?;
+    Ok(CompiledPattern { regex, utf8 })
+}
+
 // Strips PHP-style delimiters and modifiers from `pattern` and translates the body into
-// `regex`-crate syntax, without compiling it.
-fn translate_php_pattern(pattern: &str) -> anyhow::Result<String> {
+// `regex`-crate syntax, without compiling it. Returns the translated source and whether the
+// pattern has the `u` modifier.
+fn translate_php_pattern(pattern: &str) -> anyhow::Result<(String, bool)> {
     let delimiter = pattern
         .chars()
         .next()
@@ -310,36 +379,38 @@ fn translate_php_pattern(pattern: &str) -> anyhow::Result<String> {
         anyhow::bail!("anchored (A) regex pattern is not supported: {pattern}");
     }
 
-    let inner = translate_pcre_literals(inner);
-    Ok(if flags.is_empty() {
+    let utf8 = modifiers.contains('u');
+    let inner = translate_pcre_literals(inner, utf8);
+    let source = if flags.is_empty() {
         inner
     } else {
         format!("(?{flags}){inner}")
-    })
+    };
+    Ok((source, utf8))
 }
 
 /// The result of resolving a `PregPattern`. Deliberately holds either a shared `Arc` (string
 /// patterns, via `PATTERN_CACHE`) or a `'static` reference (the `php_regex!` macro's per-call-site
-/// `LazyLock<Regex>`) rather than an owned `regex::Regex` — `regex::Regex::clone()` does not share
-/// the underlying meta engine's search-cache pool, so producing a fresh owned clone here would pay
-/// a ~10us per-call cache warmup cost regardless of which path produced it (measured).
+/// `LazyLock`) rather than an owned regex — `Regex::clone()` does not share the underlying meta
+/// engine's search-cache pool, so producing a fresh owned clone here would pay a ~10us per-call
+/// cache warmup cost regardless of which path produced it (measured).
 #[derive(Debug)]
 pub enum ResolvedPattern {
-    Cached(Arc<regex::Regex>),
-    Static(&'static regex::Regex),
+    Cached(Arc<CompiledPattern>),
+    Static(&'static CompiledPattern),
 }
 
 impl ResolvedPattern {
-    pub fn regex(&self) -> &regex::Regex {
+    fn pattern(&self) -> &CompiledPattern {
         match self {
             Self::Cached(arc) => arc,
-            Self::Static(re) => re,
+            Self::Static(pattern) => pattern,
         }
     }
 }
 
 /// Implemented by anything `preg_*` can accept as a pattern: a PHP-style pattern string (parsed
-/// and cached in `PATTERN_CACHE`) or an already-compiled `&'static regex::Regex`, as produced by
+/// and cached in `PATTERN_CACHE`) or an already-compiled `&'static CompiledPattern`, as produced by
 /// the `php_regex!` macro.
 pub trait PregPattern {
     fn resolve(self) -> ResolvedPattern;
@@ -365,44 +436,44 @@ impl PregPattern for String {
     }
 }
 
-impl PregPattern for &'static regex::Regex {
+impl PregPattern for &'static CompiledPattern {
     fn resolve(self) -> ResolvedPattern {
         ResolvedPattern::Static(self)
     }
 }
 
-// Used by the `php_regex!` macro to obtain the `regex`-crate-syntax source for a PHP pattern.
-pub fn php_regex_source(pattern: &str) -> String {
-    translate_php_pattern(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"))
+// Used by the `php_regex!` macro to compile a PHP pattern.
+#[doc(hidden)]
+pub fn __php_regex_compile(pattern: &str) -> CompiledPattern {
+    compile_php_pattern_uncached(pattern).unwrap_or_else(|e| panic!("invalid regex: {e}"))
 }
 
-/// Wraps `regex_macro::regex!` so a PHP-style `preg_*` pattern literal (delimiters + modifiers)
-/// compiles to a per-call-site cached `&'static regex::Regex`, instead of going through the
-/// runtime `PATTERN_CACHE` lookup by string key. Expands to a `&'static regex::Regex`, ready to
-/// pass straight into any `preg_*` function.
-// TODO(pcre): `$php_pattern` is still translated from PHP delimiter/modifier syntax at runtime (on
-// first use at each call site). Once call sites pass native `regex`-crate syntax directly, drop
-// this wrapper and call `regex_macro::regex!` directly.
+/// Compiles a PHP-style `preg_*` pattern literal (delimiters + modifiers) into a per-call-site
+/// cached `&'static CompiledPattern`, instead of going through the runtime `PATTERN_CACHE` lookup
+/// by string key. Expands to a `&'static CompiledPattern`, ready to pass straight into any `preg_*`
+/// function.
 #[macro_export]
 macro_rules! php_regex {
-    ($php_pattern:expr $(,)?) => {
-        &**$crate::regex!(&$crate::php_regex_source($php_pattern))
-    };
+    ($php_pattern:expr $(,)?) => {{
+        static RE: ::std::sync::LazyLock<$crate::CompiledPattern> =
+            ::std::sync::LazyLock::new(|| $crate::__php_regex_compile($php_pattern));
+        &*RE
+    }};
 }
 
 // Expands a PHP preg replacement template against `caps`, appending bytes to
 // `out`. Backreferences are written as `$1`, `${1}`, `\1` or `\\1`; a literal
 // `$` or `\` not forming a reference is emitted verbatim. Out-of-range or
 // non-participating groups expand to nothing.
-fn php_replacement_expand(template: &str, caps: &regex::Captures, out: &mut Vec<u8>) {
-    let bytes = template.as_bytes();
+fn php_replacement_expand(template: &[u8], caps: &regex::bytes::Captures, out: &mut Vec<u8>) {
+    let bytes = template;
     let mut i = 0;
     while i < bytes.len() {
         match bytes[i] {
             b'\\' if i + 1 < bytes.len() && bytes[i + 1].is_ascii_digit() => {
                 let (group, consumed) = php_replacement_group(&bytes[i + 1..]);
                 if let Some(m) = caps.get(group) {
-                    out.extend_from_slice(m.as_str().as_bytes());
+                    out.extend_from_slice(m.as_bytes());
                 }
                 i += 1 + consumed;
             }
@@ -420,10 +491,11 @@ fn php_replacement_expand(template: &str, caps: &regex::Captures, out: &mut Vec<
                 let rest = &bytes[i + 2..];
                 match rest.iter().position(|&b| b == b'}') {
                     Some(c) if c > 0 && rest[..c].iter().all(|b| b.is_ascii_digit()) => {
-                        let group: usize =
-                            std::str::from_utf8(&rest[..c]).unwrap().parse().unwrap();
+                        let group = rest[..c]
+                            .iter()
+                            .fold(0usize, |acc, &d| acc * 10 + usize::from(d - b'0'));
                         if let Some(m) = caps.get(group) {
-                            out.extend_from_slice(m.as_str().as_bytes());
+                            out.extend_from_slice(m.as_bytes());
                         }
                         i += 2 + c + 1;
                     }
@@ -436,7 +508,7 @@ fn php_replacement_expand(template: &str, caps: &regex::Captures, out: &mut Vec<
             b'$' if i + 1 < bytes.len() && bytes[i + 1].is_ascii_digit() => {
                 let (group, consumed) = php_replacement_group(&bytes[i + 1..]);
                 if let Some(m) = caps.get(group) {
-                    out.extend_from_slice(m.as_str().as_bytes());
+                    out.extend_from_slice(m.as_bytes());
                 }
                 i += 1 + consumed;
             }

@@ -261,17 +261,24 @@ impl ArrayLoader {
                 .into());
             }
             let source_map = source_map.unwrap();
-            package
-                .package_mut()
-                .set_source_type(source_map.get(B("type")).map(strval));
-            package
-                .package_mut()
-                .set_source_url(source_map.get(B("url")).map(strval));
+            package.package_mut().set_source_type(
+                source_map
+                    .get(B("type"))
+                    .map(strval)
+                    .map(|s| legacy_lossy(&s).into_owned()),
+            );
+            package.package_mut().set_source_url(
+                source_map
+                    .get(B("url"))
+                    .map(strval)
+                    .map(|s| legacy_lossy(&s).into_owned()),
+            );
             package.package_mut().set_source_reference(
                 source_map
                     .get(B("reference"))
                     .filter(|v| !v.is_null())
-                    .map(strval),
+                    .map(strval)
+                    .map(|s| legacy_lossy(&s).into_owned()),
             );
             if let Some(mirrors) = source_map.get(B("mirrors")) {
                 package
@@ -301,21 +308,31 @@ impl ArrayLoader {
                 .into());
             }
             let dist_map = dist_map.unwrap();
-            package
-                .package_mut()
-                .set_dist_type(dist_map.get(B("type")).map(strval));
-            package
-                .package_mut()
-                .set_dist_url(dist_map.get(B("url")).map(strval));
+            package.package_mut().set_dist_type(
+                dist_map
+                    .get(B("type"))
+                    .map(strval)
+                    .map(|s| legacy_lossy(&s).into_owned()),
+            );
+            package.package_mut().set_dist_url(
+                dist_map
+                    .get(B("url"))
+                    .map(strval)
+                    .map(|s| legacy_lossy(&s).into_owned()),
+            );
             package.package_mut().set_dist_reference(
                 dist_map
                     .get(B("reference"))
                     .filter(|v| !v.is_null())
-                    .map(strval),
+                    .map(strval)
+                    .map(|s| legacy_lossy(&s).into_owned()),
             );
-            package
-                .package_mut()
-                .set_dist_sha1_checksum(dist_map.get(B("shasum")).map(strval));
+            package.package_mut().set_dist_sha1_checksum(
+                dist_map
+                    .get(B("shasum"))
+                    .map(strval)
+                    .map(|s| legacy_lossy(&s).into_owned()),
+            );
             if let Some(mirrors) = dist_map.get(B("mirrors")) {
                 package
                     .package_mut()
@@ -337,7 +354,12 @@ impl ArrayLoader {
             let suggests: IndexMap<String, String> = suggest_map
                 .iter()
                 // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
-                .map(|(k, v)| (k.to_str_lossy().into_owned(), strval(v)))
+                .map(|(k, v)| {
+                    (
+                        k.to_str_lossy().into_owned(),
+                        legacy_lossy(&strval(v)).into_owned(),
+                    )
+                })
                 .collect();
             config.insert("suggest".into(), PhpMixed::Array(suggest_map));
             package.package_mut().set_suggests(suggests);
@@ -367,7 +389,7 @@ impl ArrayLoader {
             && !empty(time_value)
         {
             let time_str = time_value.as_string().unwrap_or_default();
-            let time = if preg_is_match(php_regex!(r"/^\d++$/D"), &time_str.to_str_lossy()) {
+            let time = if preg_is_match(php_regex!(r"/^\d++$/D"), time_str) {
                 format!("@{}", time_str)
             } else {
                 time_str.to_string()
@@ -383,7 +405,7 @@ impl ArrayLoader {
         {
             package
                 .package_mut()
-                .set_notification_url(strval(notification_url));
+                .set_notification_url(legacy_lossy(&strval(notification_url)).into_owned());
         }
 
         if let Some(archive) = config.get(B("archive")).cloned()
@@ -392,7 +414,9 @@ impl ArrayLoader {
             if let Some(name) = archive_map.get(B("name"))
                 && !empty(name)
             {
-                package.complete_mut().set_archive_name(strval(name));
+                package
+                    .complete_mut()
+                    .set_archive_name(legacy_lossy(&strval(name)).into_owned());
             }
             if let Some(exclude) = archive_map.get(B("exclude"))
                 && !empty(exclude)
@@ -457,8 +481,16 @@ impl ArrayLoader {
             && matches!(keywords, PhpMixed::Array(_) | PhpMixed::List(_))
         {
             let keywords_vec: Vec<String> = match keywords {
-                PhpMixed::List(list) => list.iter().map(strval).collect(),
-                PhpMixed::Array(map) => map.values().map(strval).collect(),
+                PhpMixed::List(list) => list
+                    .iter()
+                    .map(strval)
+                    .map(|s| legacy_lossy(&s).into_owned())
+                    .collect(),
+                PhpMixed::Array(map) => map
+                    .values()
+                    .map(strval)
+                    .map(|s| legacy_lossy(&s).into_owned())
+                    .collect(),
                 _ => vec![],
             };
             package.complete_mut().set_keywords(keywords_vec);
@@ -551,7 +583,12 @@ impl ArrayLoader {
         if let Some(alias_normalized) = alias_normalized
             && !alias_normalized.is_empty()
         {
-            let pretty_alias = preg_replace(php_regex!(r"{(\.9{7})+}"), ".x", &alias_normalized);
+            let pretty_alias = legacy_lossy(&preg_replace(
+                php_regex!(r"{(\.9{7})+}"),
+                ".x",
+                &alias_normalized,
+            ))
+            .into_owned();
 
             return Ok(match package {
                 CompleteOrRootPackage::Root(root) => RootAliasPackageHandle::new(
@@ -751,7 +788,8 @@ impl ArrayLoader {
 
         if let Some(branch_alias_map) = extra_branch_alias {
             for (source_branch, target_branch_value) in branch_alias_map {
-                let source_branch = strval(&PhpMixed::String(source_branch));
+                let source_branch =
+                    legacy_lossy(&strval(&PhpMixed::String(source_branch))).into_owned();
                 let target_branch = target_branch_value
                     .as_string()
                     .unwrap_or_default()
@@ -805,7 +843,11 @@ impl ArrayLoader {
             && default_branch_is_true
             && self
                 .version_parser
-                .parse_numeric_alias_prefix(&preg_replace(php_regex!(r"{^v}"), "", &version_str))
+                .parse_numeric_alias_prefix(&legacy_lossy(&preg_replace(
+                    php_regex!(r"{^v}"),
+                    "",
+                    &version_str,
+                )))
                 .is_none()
         {
             return Ok(Some(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()));
@@ -871,8 +913,16 @@ fn php_to_map(value: &PhpMixed) -> IndexMap<BString, PhpMixed> {
 
 fn php_to_string_vec(value: &PhpMixed) -> Vec<String> {
     match value {
-        PhpMixed::List(l) => l.iter().map(strval).collect(),
-        PhpMixed::Array(m) => m.values().map(strval).collect(),
+        PhpMixed::List(l) => l
+            .iter()
+            .map(strval)
+            .map(|s| legacy_lossy(&s).into_owned())
+            .collect(),
+        PhpMixed::Array(m) => m
+            .values()
+            .map(strval)
+            .map(|s| legacy_lossy(&s).into_owned())
+            .collect(),
         _ => Vec::new(),
     }
 }

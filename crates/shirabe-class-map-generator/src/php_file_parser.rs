@@ -3,7 +3,8 @@
 use crate::php_file_cleaner::PhpFileCleaner;
 use shirabe_php_shim::{
     PHP_EOL, RuntimeException, file_exists, file_get_contents, is_file, is_readable, legacy_lossy,
-    ltrim2, php_strip_whitespace, preg_match_all, str_replace_array, strrpos, substr, trim,
+    ltrim2, php_strip_whitespace, preg_match_all, str_replace_array, strrpos, strtolower, substr,
+    trim,
 };
 use std::sync::OnceLock;
 
@@ -51,7 +52,7 @@ impl PhpFileParser {
 
         // return early if there is no chance of matching anything in this file
         let pattern = format!("{{\\b(?:class|interface|trait{})\\s}}i", extra_types);
-        let max_matches = preg_match_all(&pattern, &legacy_lossy(&contents)).count();
+        let max_matches = preg_match_all(&pattern, &contents).count();
         if max_matches == 0 {
             return Ok(vec![]);
         }
@@ -85,7 +86,7 @@ impl PhpFileParser {
         for r#match in matches {
             let ns = r#match.name("ns");
             if ns.is_some_and(|ns| !ns.is_empty()) {
-                let nsname = r#match.name("nsname").unwrap_or("");
+                let nsname = r#match.name("nsname").unwrap_or_default();
                 let mut nsname = str_replace_array(&[" ", "\t", "\r", "\n"], &[""], nsname);
                 nsname.push(b'\\');
                 namespace = legacy_lossy(&nsname).into_owned();
@@ -101,7 +102,7 @@ impl PhpFileParser {
                     continue;
                 }
 
-                let name: String = if let Some(stripped) = name.strip_prefix(':') {
+                let name: String = if let Some(stripped) = name.strip_prefix(b":") {
                     // This is an XHP class, https://github.com/facebook/xhp
                     "xhp".to_string()
                         + &*legacy_lossy(&str_replace_array(
@@ -109,7 +110,7 @@ impl PhpFileParser {
                             &["_".to_string(), "__".to_string()],
                             stripped,
                         ))
-                } else if r#match.name("type").unwrap_or("").to_lowercase() == "enum" {
+                } else if strtolower(r#match.name("type").unwrap_or_default()) == "enum" {
                     // something like:
                     //   enum Foo: int { HERP = '123'; }
                     // The regex above captures the colon, which isn't part of

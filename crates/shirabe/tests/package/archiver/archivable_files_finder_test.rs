@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use shirabe::package::archiver::ArchivableFilesFinder;
 use shirabe::util::Filesystem;
 use shirabe_php_shim::{
-    PhpMixed, ZipArchive, dirname, file_put_contents, preg_quote, preg_replace,
+    PhpMixed, ZipArchive, dirname, file_put_contents, legacy_lossy, preg_quote, preg_replace,
 };
 use shirabe_symfony_process::Process;
 use tempfile::TempDir;
@@ -87,11 +87,14 @@ fn get_archivable_files(set_up: &SetUp, finder: ArchivableFilesFinder) -> Vec<St
     for file in finder {
         if !file.is_dir() {
             let real_path = file.canonicalize().unwrap();
-            files.push(preg_replace(
-                format!("#^{}#", preg_quote(&set_up.sources, Some('#'))),
-                "",
-                &set_up.fs.normalize_path(real_path.to_str().unwrap()),
-            ));
+            files.push(
+                legacy_lossy(&preg_replace(
+                    format!("#^{}#", preg_quote(&set_up.sources, Some('#'))),
+                    "",
+                    set_up.fs.normalize_path(real_path.to_str().unwrap()),
+                ))
+                .into_owned(),
+            );
         }
     }
 
@@ -198,11 +201,14 @@ fn get_archived_files(set_up: &SetUp, command: &str) -> Vec<String> {
             continue;
         }
         let virtual_path = format!("phar://{}/archive.zip/{}", set_up.sources, name);
-        files.push(preg_replace(
-            &prefix,
-            "",
-            &set_up.fs.normalize_path(&virtual_path),
-        ));
+        files.push(
+            legacy_lossy(&preg_replace(
+                &prefix,
+                "",
+                set_up.fs.normalize_path(&virtual_path),
+            ))
+            .into_owned(),
+        );
     }
 
     let _ = std::fs::remove_file(&zip_path);

@@ -9,7 +9,7 @@ use crate::package::base_package::{self};
 use crate::repository::{CompositeRepository, RepositoryInterface};
 use bstr::B;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, impl_php_class, php_regex, preg_match};
+use shirabe_php_shim::{PhpMixed, impl_php_class, legacy_lossy, php_regex, preg_match};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -62,7 +62,7 @@ impl FundCommand {
             if r#type == "github"
                 && let Some(matches) =
                     preg_match(php_regex!(r"{^https://github.com/([^/]+)$}"), &url)
-                && let Some(sponsor) = matches.get(1).map(str::to_string)
+                && let Some(sponsor) = matches.get(1).map(|s| legacy_lossy(s).into_owned())
             {
                 url = format!("https://github.com/sponsors/{}", sponsor);
             }

@@ -110,7 +110,7 @@ impl From<PhpMixed> for Cell {
     fn from(value: PhpMixed) -> Self {
         match value {
             PhpMixed::Null => Cell::Null,
-            other => Cell::Value(to_string(&other)),
+            other => Cell::Value(legacy_lossy(&to_string(&other)).into_owned()),
         }
     }
 }

@@ -194,7 +194,7 @@ pub trait CompletionTrait: BaseCommand {
             let mut show_vendors = false;
             if !input.get_completion_value().contains('/') {
                 results = repos.search(
-                    format!("^{}", preg_quote(&input.get_completion_value(), None)),
+                    format!("^{}", preg_quote(input.get_completion_value(), None)),
                     SEARCH_VENDOR,
                     None,
                 )?;
@@ -204,7 +204,7 @@ pub trait CompletionTrait: BaseCommand {
             // if we get a single vendor, we expand it into its contents already
             if results.len() <= 1 {
                 results = repos.search(
-                    format!("^{}", preg_quote(&input.get_completion_value(), None)),
+                    format!("^{}", preg_quote(input.get_completion_value(), None)),
                     SEARCH_NAME,
                     None,
                 )?;
@@ -255,7 +255,7 @@ pub trait CompletionTrait: BaseCommand {
         SuggestedValues::Closure(Box::new(|this, input, suggestions| {
             let matches = if preg_is_match(
                 php_regex!(r"{^(ext|lib|php)(-|$)|^com}"),
-                &input.get_completion_value(),
+                input.get_completion_value(),
             ) {
                 this.suggest_platform_package()
                     .call(this, input, suggestions)?

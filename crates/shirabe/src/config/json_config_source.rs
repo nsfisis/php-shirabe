@@ -525,8 +525,8 @@ impl ConfigSourceInterface for JsonConfigSource {
                 };
                 if Self::is_auth_config_key(name) {
                     let mut it = name.splitn(2, '.');
-                    let key = it.next().unwrap_or("");
-                    let host = it.next().unwrap_or("");
+                    let key = it.next().unwrap_or_default();
+                    let host = it.next().unwrap_or_default();
                     if auth_config {
                         Self::set_nested(root, &[key, host], value);
                     } else {
@@ -561,8 +561,8 @@ impl ConfigSourceInterface for JsonConfigSource {
                 };
                 if Self::is_auth_config_key(name) {
                     let mut it = name.splitn(2, '.');
-                    let key = it.next().unwrap_or("");
-                    let host = it.next().unwrap_or("");
+                    let key = it.next().unwrap_or_default();
+                    let host = it.next().unwrap_or_default();
                     if auth_config {
                         Self::unset_nested(root, &[key, host]);
                     } else {

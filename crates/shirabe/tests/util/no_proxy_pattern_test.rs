@@ -17,7 +17,7 @@ fn get_url(url: &str) -> String {
     let mut scheme = "http";
 
     if !url.starts_with('[') && url.rfind(':').is_some() {
-        let port = url.split(':').nth(1).unwrap_or("");
+        let port = url.split(':').nth(1).unwrap_or_default();
 
         if port == "443" {
             scheme = "https";

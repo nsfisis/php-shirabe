@@ -578,7 +578,7 @@ return array(
                 if let Some(matches) =
                     preg_match(php_regex!("{ComposerAutoloaderInit([^:\\s]+)::}"), &content)
                 {
-                    suffix = matches.get(1).map(str::to_string);
+                    suffix = matches.get(1).map(|s| legacy_lossy(s).into_owned());
                 }
             }
 
@@ -746,10 +746,7 @@ return array(
         // if $dir does not exist, it should anyway not find anything there so no trouble
         if file_exists(dir) {
             // transform $dir in the same way that exclude-from-classmap patterns are transformed so we can match them against each other
-            let dir_match = preg_quote(
-                &legacy_lossy(&strtr(realpath(dir).unwrap_or_default(), "\\", "/")),
-                None,
-            );
+            let dir_match = preg_quote(strtr(realpath(dir).unwrap_or_default(), "\\", "/"), None);
             // also match against the non-realpath version for symlinks
             let fs = Filesystem::new(None);
             let abs_dir = if fs.is_absolute_path(dir) {
@@ -761,22 +758,21 @@ return array(
                     dir
                 )
             };
-            let dir_match_normalized = preg_quote(
-                &legacy_lossy(&strtr(fs.normalize_path(&abs_dir), "\\", "/")),
-                None,
-            );
+            let dir_match_normalized =
+                preg_quote(strtr(fs.normalize_path(&abs_dir), "\\", "/"), None);
             let is_symlink = dir_match != dir_match_normalized;
 
             let mut new_excluded: Vec<String> = vec![];
             for pattern in &excluded {
                 // extract the constant string prefix of the pattern here, until we reach a non-escaped regex special character
-                let pattern_processed = preg_replace(
+                let pattern_processed = legacy_lossy(&preg_replace(
                     php_regex!(
                         "{^(([^.+*?\\[^\\]$(){}=!<>|:\\\\#-]+|\\\\[.+*?\\[^\\]$(){}=!<>|:#-])*).*}"
                     ),
                     "$1",
                     pattern,
-                );
+                ))
+                .into_owned();
                 // if the pattern is not a subset or superset of $dir, it is unrelated and we skip it
                 let unrelated = (!pattern_processed.starts_with(&dir_match)
                     && !dir_match.starts_with(&pattern_processed))
@@ -1191,7 +1187,7 @@ return array(
             );
             for (_k, link) in links.iter() {
                 if let Some(matches) = preg_match(php_regex!("{^ext-(.+)$}iD"), link.get_target())
-                    && let Some(ext) = matches.get(1).map(str::to_string)
+                    && let Some(ext) = matches.get(1).map(|s| legacy_lossy(s).into_owned())
                 {
                     extension_providers
                         .entry(ext)
@@ -1252,7 +1248,9 @@ return array(
                         ext_key.clone()
                     };
 
-                    let extension = var_export(&PhpMixed::string(ext_name.clone()), true);
+                    let extension =
+                        legacy_lossy(&var_export(&PhpMixed::string(ext_name.clone()), true))
+                            .into_owned();
                     if ext_name == "pcntl" || ext_name == "readline" {
                         required_extensions.insert(
                             extension.clone(),
@@ -1821,7 +1819,7 @@ class ComposerStaticInit{}
             let value = legacy_lossy(&ltrim(preg_replace(
                 php_regex!("/^ */m"),
                 "    $0$0",
-                &legacy_lossy(&value),
+                &value,
             )))
             .into_owned();
             let value = legacy_lossy(&preg_replace(php_regex!("/ +$/m"), "", &value)).into_owned();
@@ -1959,7 +1957,7 @@ class ComposerStaticInit{}
                                 preg_replace(
                                     format!("{{^{}}}", target_dir),
                                     "",
-                                    &legacy_lossy(&ltrim2(&path_str, "\\/")),
+                                    ltrim2(&path_str, "\\/"),
                                 ),
                                 "\\/",
                             ))
@@ -1979,10 +1977,7 @@ class ComposerStaticInit{}
                         let p = preg_replace(
                             php_regex!("{/+}"),
                             "/",
-                            &preg_quote(
-                                &legacy_lossy(&trim2(strtr(&path_str, "\\", "/"), "/")),
-                                None,
-                            ),
+                            preg_quote(trim2(strtr(&path_str, "\\", "/"), "/"), None),
                         );
 
                         // add support for wildcards * and **
@@ -2005,14 +2000,14 @@ class ComposerStaticInit{}
                                         legacy_lossy(&str_replace(
                                             "\\.",
                                             ".",
-                                            matches.get(1).unwrap_or(""),
+                                            matches.get(1).unwrap_or_default(),
                                         ))
                                         .into_owned(),
                                     );
 
                                     Ok(String::new())
                                 },
-                                &legacy_lossy(&p),
+                                &p,
                             )
                             .expect("the replacement callback cannot fail"),
                         )
@@ -2035,7 +2030,7 @@ class ComposerStaticInit{}
                         };
                         let entry = format!(
                             "{}/{}($|/)",
-                            preg_quote(&legacy_lossy(&strtr(&resolved_path, "\\", "/")), None),
+                            preg_quote(strtr(&resolved_path, "\\", "/"), None),
                             p
                         );
                         autoloads.insert(numeric_index.to_string().into(), PhpMixed::string(entry));
@@ -2408,7 +2403,7 @@ fn eval_php_dirname(term: &str, dir: &str, vendor_dir: &str, base_dir: &str) -> 
     let inner = term
         .strip_prefix("dirname(")
         .and_then(|s| s.strip_suffix(')'))
-        .unwrap_or("");
+        .unwrap_or_default();
     let resolved = eval_php_path_expr(inner, dir, vendor_dir, base_dir);
     let path = resolved.trim_end_matches('/');
     match path.rfind('/') {

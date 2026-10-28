@@ -57,7 +57,7 @@ impl RequestProxy {
         let mut options: IndexMap<i64, PhpMixed> = IndexMap::new();
         options.insert(
             CURLOPT_PROXY,
-            PhpMixed::string(self.url.as_deref().unwrap_or("").to_string()),
+            PhpMixed::string(self.url.as_deref().unwrap_or_default().to_string()),
         );
 
         if self.url.is_some() {
@@ -101,7 +101,10 @@ impl RequestProxy {
     }
 
     pub fn is_secure(&self) -> bool {
-        self.url.as_deref().unwrap_or("").starts_with("https://")
+        self.url
+            .as_deref()
+            .unwrap_or_default()
+            .starts_with("https://")
     }
 
     /// Whether a TLS connection to the proxy itself (an `https://` proxy URL) is supported.

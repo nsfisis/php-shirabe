@@ -230,11 +230,11 @@ impl StatusCommand {
                         let v = changes["current"]
                             .get("version")
                             .map(|s| s.as_str())
-                            .unwrap_or("");
+                            .unwrap_or_default();
                         let r = changes["current"]
                             .get("ref")
                             .map(|s| s.as_str())
-                            .unwrap_or("");
+                            .unwrap_or_default();
                         if v.is_empty() {
                             r.to_string()
                         } else {
@@ -245,11 +245,11 @@ impl StatusCommand {
                         let v = changes["previous"]
                             .get("version")
                             .map(|s| s.as_str())
-                            .unwrap_or("");
+                            .unwrap_or_default();
                         let r = changes["previous"]
                             .get("ref")
                             .map(|s| s.as_str())
-                            .unwrap_or("");
+                            .unwrap_or_default();
                         if v.is_empty() {
                             r.to_string()
                         } else {
@@ -261,11 +261,11 @@ impl StatusCommand {
                         let cur_ref = changes["current"]
                             .get("ref")
                             .map(|s| s.as_str())
-                            .unwrap_or("");
+                            .unwrap_or_default();
                         let prev_ref = changes["previous"]
                             .get("ref")
                             .map(|s| s.as_str())
-                            .unwrap_or("");
+                            .unwrap_or_default();
                         (
                             format!("{} ({})", current_version, cur_ref),
                             format!("{} ({})", previous_version, prev_ref),

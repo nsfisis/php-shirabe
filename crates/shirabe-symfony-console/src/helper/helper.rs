@@ -151,11 +151,12 @@ impl Helper {
         // remove already formatted characters
         let string = preg_replace(php_regex!("/\u{1b}\\[[^m]*m/"), "", &string);
         // remove terminal hyperlinks
-        let string = preg_replace(
+        let string = legacy_lossy(&preg_replace(
             php_regex!("/\u{1b}]8;[^;]*;[^\u{1b}]*\u{1b}\\\\/"),
             "",
             &string,
-        );
+        ))
+        .into_owned();
         formatter.set_decorated(is_decorated);
 
         string

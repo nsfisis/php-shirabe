@@ -341,7 +341,7 @@ fn test_bit_bucket_public_download() {
             std::rc::Rc::new(std::cell::RefCell::new(IOStub::new()));
         let rfs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false);
         let hostname = parse_url(url).and_then(|parsed| parsed.host);
-        let hostname = hostname.as_deref().unwrap_or("");
+        let hostname = hostname.as_deref().unwrap_or_default();
 
         let result = rfs
             .get_contents(hostname, url, false, IndexMap::new())

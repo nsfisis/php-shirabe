@@ -81,8 +81,14 @@ impl InputOption {
 
     fn normalize_shortcut(s: &str) -> anyhow::Result<Option<String>> {
         let stripped = ltrim2(s, "-");
-        let parts = preg_split(php_regex!(r"{(\|)-?}"), &legacy_lossy(&stripped));
-        let filtered: Vec<String> = array_filter(&parts, |s: &String| !s.is_empty());
+        let parts = preg_split(php_regex!(r"{(\|)-?}"), &stripped);
+        let filtered: Vec<String> = array_filter(
+            &parts
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<_>>(),
+            |s: &String| !s.is_empty(),
+        );
         let result = implode("|", &filtered);
         if result.is_empty() {
             return Err(InvalidArgumentException::new(

@@ -445,11 +445,9 @@ impl VcsRepository {
                     PhpMixed::string(preg_replace(
                         php_regex!(r"{[.-]?dev$}i"),
                         "",
-                        &data
-                            .get(B("version"))
+                        data.get(B("version"))
                             .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_str_lossy(),
+                            .unwrap_or_default(),
                     )),
                 );
                 data.insert(
@@ -457,11 +455,9 @@ impl VcsRepository {
                     PhpMixed::string(preg_replace(
                         php_regex!(r"{(^dev-|[.-]?dev$)}i"),
                         "",
-                        &data
-                            .get(B("version_normalized"))
+                        data.get(B("version_normalized"))
                             .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_str_lossy(),
+                            .unwrap_or_default(),
                     )),
                 );
 

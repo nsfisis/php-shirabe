@@ -3,7 +3,7 @@
 use crate::io::ConsoleIO;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, PhpResource, PregMatches, RuntimeException, SEEK_SET, fopen, fseek, fwrite,
-    php_regex, preg_replace_callback, rewind, stream_get_contents, strip_tags,
+    legacy_lossy, php_regex, preg_replace_callback, rewind, rtrim, stream_get_contents, strip_tags,
 };
 use shirabe_symfony_console::formatter::OutputFormatterInterface;
 use shirabe_symfony_console::helper::QuestionHelper;
@@ -77,9 +77,9 @@ impl BufferIO {
             let next = preg_replace_callback(
                 php_regex!(r"{(^|\n|\x08)(.+?)(\x08+)}"),
                 |matches: &PregMatches| -> anyhow::Result<String> {
-                    let g1 = matches.get(1).unwrap_or("");
-                    let g2 = matches.get(2).unwrap_or("");
-                    let g3 = matches.get(3).unwrap_or("");
+                    let g1 = matches.get(1).unwrap_or_default();
+                    let g2 = matches.get(2).unwrap_or_default();
+                    let g3 = matches.get(3).unwrap_or_default();
                     let pre = strip_tags(g2);
 
                     if pre.len() == g3.len() {
@@ -87,7 +87,7 @@ impl BufferIO {
                     }
 
                     // TODO reverse parse the string, skipping span tags and \033\[([0-9;]+)m(.*?)\033\[0m style blobs
-                    Ok(format!("{}{}\n", g1, g2.trim_end()))
+                    Ok(format!("{}{}\n", g1, rtrim(g2)))
                 },
                 &output,
             )
@@ -95,7 +95,7 @@ impl BufferIO {
             if next == output {
                 break;
             }
-            output = next;
+            output = legacy_lossy(&next).into_owned();
         }
         output
     }

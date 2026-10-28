@@ -13,7 +13,7 @@ use shirabe::package::version::version_parser::VersionParser;
 use shirabe::repository::handle::LockArrayRepositoryHandle;
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe_php_shim::{
-    PhpMixed, file_get_contents, php_regex, preg_is_match, preg_split_delim_capture,
+    PhpMixed, file_get_contents, legacy_lossy, php_regex, preg_is_match, preg_split_delim_capture,
 };
 use std::path::PathBuf;
 
@@ -75,18 +75,18 @@ fn read_test_file(file: &str, fixtures_dir: &str) -> IndexMap<String, String> {
         }
 
         if section.is_none() {
-            if !section_info.contains(&token.as_str()) {
+            if !section_info.contains(&&*legacy_lossy(&token)) {
                 panic!(
                     "The test file \"{}\" must not contain a section named \"{}\".",
                     file.replace(&format!("{}/", fixtures_dir), ""),
                     token
                 );
             }
-            section = Some(token);
+            section = Some(legacy_lossy(&token).into_owned());
             continue;
         }
 
-        let section_data = token;
+        let section_data = legacy_lossy(&token).into_owned();
         data.insert(section.take().unwrap(), section_data);
     }
 

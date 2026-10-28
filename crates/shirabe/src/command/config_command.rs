@@ -204,11 +204,11 @@ impl ConfigCommand {
                     || (key == "repositories" && k.is_none()))
             {
                 let mut new_k = k.clone().unwrap_or_default();
-                new_k.push_str(&preg_replace(
+                new_k.push_str(&legacy_lossy(&preg_replace(
                     php_regex!("{^config\\.}"),
                     "",
-                    &format!("{}.", key),
-                ));
+                    format!("{}.", key),
+                )));
                 k = Some(new_k);
                 self.list_configuration(
                     value_inner,
@@ -229,7 +229,7 @@ impl ConfigCommand {
                         if is_array(val) {
                             json_encode(val).unwrap_or_default()
                         } else {
-                            php_to_string(val)
+                            legacy_lossy(&php_to_string(val)).into_owned()
                         }
                     })
                     .collect();
@@ -267,7 +267,7 @@ impl ConfigCommand {
                     let id = preg_replace(
                         php_regex!("{[^a-z0-9]}i"),
                         "-",
-                        &legacy_lossy(&strtolower(trim2(&id, " \t\n\r\0\u{0B}"))),
+                        strtolower(trim2(&id, " \t\n\r\0\u{0B}")),
                     );
                     let id = preg_replace(php_regex!("{-+}"), "-", &id);
                     format!("https://getcomposer.org/doc/06-config.md#{}", id)
@@ -834,7 +834,7 @@ impl Command for ConfigCommand {
                     },
                 )?
             } else {
-                php_to_string(&value)
+                legacy_lossy(&php_to_string(&value)).into_owned()
             };
 
             let mut source_of_config_value = String::new();
@@ -1022,7 +1022,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_repository(matches.get(1).unwrap());
+                    .remove_repository(&legacy_lossy(matches.get(1).unwrap()));
 
                 return Ok(0);
             }
@@ -1036,7 +1036,7 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .add_repository(
-                        matches.get(1).unwrap(),
+                        &legacy_lossy(matches.get(1).unwrap()),
                         PhpMixed::Array(repo),
                         input.borrow().get_option("append")?.as_bool() == Some(true),
                     );
@@ -1056,7 +1056,7 @@ impl Command for ConfigCommand {
                             .as_mut()
                             .unwrap()
                             .add_repository(
-                                matches.get(1).unwrap(),
+                                &legacy_lossy(matches.get(1).unwrap()),
                                 PhpMixed::Bool(false),
                                 input.borrow().get_option("append")?.as_bool() == Some(true),
                             );
@@ -1070,7 +1070,7 @@ impl Command for ConfigCommand {
                         .as_mut()
                         .unwrap()
                         .add_repository(
-                            matches.get(1).unwrap(),
+                            &legacy_lossy(matches.get(1).unwrap()),
                             value,
                             input.borrow().get_option("append")?.as_bool() == Some(true),
                         );
@@ -1376,8 +1376,8 @@ impl Command for ConfigCommand {
                     .unwrap()
                     .add_config_setting(&key, PhpMixed::Array(obj));
             } else if matches!(
-                matches.get(1).unwrap(),
-                "github-oauth" | "gitlab-oauth" | "gitlab-token" | "bearer"
+                matches.get(1).unwrap().as_bytes(),
+                b"github-oauth" | b"gitlab-oauth" | b"gitlab-token" | b"bearer"
             ) {
                 if 1 != values.len() {
                     return Err(RuntimeException::new(
@@ -1712,7 +1712,7 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
             Box::new(|val| {
                 PhpMixed::Bool(preg_is_match(
                     php_regex!("/^\\s*([0-9.]+)\\s*(?:([kmg])(?:i?b)?)?\\s*$/i"),
-                    &val.as_string().unwrap_or_default().to_str_lossy(),
+                    val.as_string().unwrap_or_default(),
                 ))
             }),
             Box::new(|val| val.clone()),

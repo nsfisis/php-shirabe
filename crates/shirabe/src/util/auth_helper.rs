@@ -142,7 +142,7 @@ impl AuthHelper {
                 let sso_url = git_hub_util.get_sso_url(&headers);
                 message = format!(
                     "GitHub API token requires SSO authorization. Authorize this token at {}\n",
-                    sso_url.as_deref().unwrap_or(""),
+                    sso_url.as_deref().unwrap_or_default(),
                 );
                 self.io.write_error3(&message, true, io_interface::NORMAL);
                 if !self.io.is_interactive() {
@@ -261,7 +261,7 @@ impl AuthHelper {
             if !git_lab_util.authorize_oauth(origin)?
                 && (!self.io.is_interactive()
                     || !git_lab_util.authorize_oauth_interactively(
-                        scheme.as_deref().unwrap_or(""),
+                        scheme.as_deref().unwrap_or_default(),
                         origin,
                         Some(&message),
                     )?)
@@ -370,13 +370,13 @@ impl AuthHelper {
                     format!(
                         "The '{}' URL could not be accessed (HTTP 403): {}",
                         url,
-                        reason.unwrap_or(""),
+                        reason.unwrap_or_default(),
                     )
                 } else {
                     format!(
                         "Unknown error code '{}', reason: {}",
                         status_code,
-                        reason.unwrap_or(""),
+                        reason.unwrap_or_default(),
                     )
                 };
 
@@ -628,7 +628,7 @@ impl AuthHelper {
         let domain_str = parsed
             .as_ref()
             .and_then(|parsed| parsed.host.as_deref())
-            .unwrap_or("");
+            .unwrap_or_default();
         if strpos(domain_str, "bitbucket.org").is_none() {
             // Bitbucket downloads are hosted on amazonaws.
             // We do not need to authenticate there at all
@@ -638,7 +638,7 @@ impl AuthHelper {
         let path_str = parsed
             .as_ref()
             .and_then(|parsed| parsed.path.as_deref())
-            .unwrap_or("");
+            .unwrap_or_default();
 
         // Path for a public download follows this pattern /{user}/{repo}/downloads/{whatever}
         // {@link https://blog.bitbucket.org/2009/04/12/new-feature-downloads/}

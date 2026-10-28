@@ -11,7 +11,7 @@ use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, dirname, is_dir, is_writable,
-    php_regex, preg_is_match, preg_match, preg_replace, realpath, sys_get_temp_dir,
+    legacy_lossy, php_regex, preg_is_match, preg_match, preg_replace, realpath, sys_get_temp_dir,
 };
 
 #[derive(Debug)]
@@ -43,7 +43,12 @@ impl GitDriver {
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let cache_url;
         if Filesystem::is_local_path(&self.inner.url) {
-            self.inner.url = preg_replace(php_regex!(r"{[\\/]\.git/?$}"), "", &self.inner.url);
+            self.inner.url = legacy_lossy(&preg_replace(
+                php_regex!(r"{[\\/]\.git/?$}"),
+                "",
+                &self.inner.url,
+            ))
+            .into_owned();
             if !is_dir(&self.inner.url) {
                 return Err(RuntimeException::new(format!(
                     "Failed to read package information from {} as the path does not exist",
@@ -70,11 +75,7 @@ impl GitDriver {
             self.repo_dir = format!(
                 "{}/{}/",
                 cache_vcs_dir,
-                preg_replace(
-                    r"{[^a-z0-9.]}i",
-                    "-",
-                    &Url::sanitize(self.inner.url.clone())
-                )
+                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(self.inner.url.clone()))
             );
 
             GitUtil::clean_env(&self.inner.process);
@@ -138,7 +139,7 @@ impl GitDriver {
             &format!(
                 "{}/{}",
                 cache_repo_dir,
-                preg_replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(cache_url))
+                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(cache_url))
             ),
             None,
             None,
@@ -342,7 +343,7 @@ impl GitDriver {
                         &branch,
                     )
                     && let (Some(name), Some(hash)) = (caps.get(1), caps.get(2))
-                    && !name.starts_with('-')
+                    && !name.starts_with(b"-")
                 {
                     branches.insert(name.to_string(), hash.to_string());
                 }

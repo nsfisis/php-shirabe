@@ -69,36 +69,36 @@ impl StringInput {
                 if token.is_some() {
                     tokens.push(token.take().unwrap());
                 }
-                cursor += strlen(m.get(0).unwrap_or(""));
+                cursor += strlen(m.get(0).unwrap_or_default());
             } else if let Some(m) = preg_match(
                 format!(r#"/^([^="'\s]+?)(=?)({}+)/"#, Self::REGEX_QUOTED_STRING),
                 rest,
             ) {
-                let inner = substr(m.get(3).unwrap_or(""), 1, Some(-1));
+                let inner = substr(m.get(3).unwrap_or_default(), 1, Some(-1));
                 let replaced = str_replace_arr(&["\"'", "'\"", "''", "\"\""], "", &inner);
                 token = Some(format!(
                     "{}{}{}{}",
                     token.unwrap_or_default(),
-                    m.get(1).unwrap_or(""),
-                    m.get(2).unwrap_or(""),
+                    m.get(1).unwrap_or_default(),
+                    m.get(2).unwrap_or_default(),
                     stripcslashes(&replaced)
                 ));
-                cursor += strlen(m.get(0).unwrap_or(""));
+                cursor += strlen(m.get(0).unwrap_or_default());
             } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_QUOTED_STRING), rest) {
                 token = Some(format!(
                     "{}{}",
                     token.unwrap_or_default(),
-                    stripcslashes(substr(m.get(0).unwrap_or(""), 1, Some(-1)))
+                    stripcslashes(substr(m.get(0).unwrap_or_default(), 1, Some(-1)))
                 ));
-                cursor += strlen(m.get(0).unwrap_or(""));
+                cursor += strlen(m.get(0).unwrap_or_default());
             } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_UNQUOTED_STRING), rest)
             {
                 token = Some(format!(
                     "{}{}",
                     token.unwrap_or_default(),
-                    m.get(1).unwrap_or("")
+                    m.get(1).unwrap_or_default()
                 ));
-                cursor += strlen(m.get(0).unwrap_or(""));
+                cursor += strlen(m.get(0).unwrap_or_default());
             } else {
                 // should never happen
                 return Err(InvalidArgumentException::new(format!(

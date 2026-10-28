@@ -739,7 +739,7 @@ impl Application {
                     .filter(php_truthy)
                     .map(|n| {
                         shirabe_symfony_console::completion::StringOrSuggestion::String(
-                            php_to_string(&n),
+                            legacy_lossy(&php_to_string(&n)).into_owned(),
                         )
                     })
                     .collect();
@@ -908,7 +908,7 @@ impl Application {
         // implode('[^:]*:', array_map('preg_quote', explode(':', $namespace))).'[^:]*'
         let parts: Vec<String> = explode(":", namespace)
             .into_iter()
-            .map(|p| preg_quote(&legacy_lossy(&p), None))
+            .map(|p| preg_quote(&p, None))
             .collect();
         let expr = format!("{}{}", implode("[^:]*:", &parts), "[^:]*");
         let namespaces: Vec<String> =
@@ -1006,7 +1006,7 @@ impl Application {
 
         let parts: Vec<String> = explode(":", name)
             .into_iter()
-            .map(|p| preg_quote(&legacy_lossy(&p), None))
+            .map(|p| preg_quote(&p, None))
             .collect();
         let expr = format!("{}{}", implode("[^:]*:", &parts), "[^:]*");
         let mut commands: Vec<String> =
@@ -1123,6 +1123,7 @@ impl Application {
                         .iter()
                         .filter(|a| php_truthy(a))
                         .map(php_to_string)
+                        .map(|s| legacy_lossy(&s).into_owned())
                         .collect();
                     let suggestions = self.get_abbreviation_suggestions(&filtered);
 
@@ -1298,7 +1299,7 @@ impl Application {
                 Vec::new()
             };
             for line in split {
-                for line in self.split_string_by_width(&line, width - 4) {
+                for line in self.split_string_by_width(&legacy_lossy(&line), width - 4) {
                     // pre-format lines to get the right string length
                     let line_length = Helper::width(&line) + 4;
                     lines.push((line, line_length));
@@ -1718,14 +1719,11 @@ impl Application {
         let mut line = String::new();
 
         let mut offset = 0usize;
-        while let Some(m) = preg_match(
-            php_regex!(r"/.{1,10000}/u"),
-            &legacy_lossy(&utf8_string[offset..]),
-        ) {
-            let m0 = m.get(0).unwrap_or("");
+        while let Some(m) = preg_match(php_regex!(r"/.{1,10000}/u"), &utf8_string[offset..]) {
+            let m0 = m.get(0).unwrap_or_default();
             offset += strlen(m0) as usize;
 
-            let chunk = m0;
+            let chunk = legacy_lossy(m0);
             for char in chunk
                 .char_indices()
                 .map(|(i, c)| &chunk[i..i + c.len_utf8()])
@@ -1953,7 +1951,7 @@ impl ApplicationHandle {
             application.borrow().get_use_parent_dir_config_value();
         if new_work_dir.is_none()
             && !matches!(
-                command_name.as_deref().unwrap_or(""),
+                command_name.as_deref().unwrap_or_default(),
                 "" | "list"
                     | "init"
                     | "about"
@@ -2043,7 +2041,10 @@ impl ApplicationHandle {
             .borrow()
             .has_parameter_option(&["--version", "-V"], false)
             && (command_name.is_none()
-                || matches!(command_name.as_deref().unwrap_or(""), "" | "list" | "help")
+                || matches!(
+                    command_name.as_deref().unwrap_or_default(),
+                    "" | "list" | "help"
+                )
                 || (command_name.as_deref() == Some("_complete") && !is_non_allowed_root));
 
         let may_need_script_command = may_need_plugin_command
@@ -2633,7 +2634,7 @@ impl ApplicationHandle {
                 // $exitCode = $e->getCode();
                 // is_numeric($exitCode) ? max(1, (int) $exitCode) : 1
                 let exit_code = throwable_get_code(AnyThrowable::of(&e)) as i32;
-                if is_numeric_string(&exit_code.to_string()) {
+                if is_numeric_string(exit_code.to_string()) {
                     if exit_code <= 0 { 1 } else { exit_code }
                 } else {
                     1
@@ -2972,7 +2973,7 @@ pub(crate) fn run_worker_reverse_command(name: &str, input_line: &str) -> anyhow
     // the `command` argument, so the name is prepended when the first token is not this
     // command.
     let trimmed = input_line.trim();
-    let first_token = trimmed.split_whitespace().next().unwrap_or("");
+    let first_token = trimmed.split_whitespace().next().unwrap_or_default();
     let is_named = {
         let command = command.borrow();
         command.get_name().as_deref() == Some(first_token)

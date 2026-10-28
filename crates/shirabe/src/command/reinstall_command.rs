@@ -124,7 +124,7 @@ impl Command for ReinstallCommand {
                 let pattern_regexp = base_package::package_name_to_regexp(pattern);
                 let mut matched = false;
                 for package in local_repo.get_canonical_packages()? {
-                    if preg_is_match(&pattern_regexp, &package.get_name()) {
+                    if preg_is_match(&pattern_regexp, package.get_name()) {
                         matched = true;
                         package_names_to_reinstall.push(package.get_name());
                         packages_to_reinstall.push(package);

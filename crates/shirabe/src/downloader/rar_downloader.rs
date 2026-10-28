@@ -101,7 +101,7 @@ impl ArchiveDownloader for RarDownloader {
                 format!(
                     "Could not decompress the archive, enable the PHP rar extension or install unrar.\n{}\n{}",
                     ini_message,
-                    process_error.as_deref().unwrap_or(""),
+                    process_error.as_deref().unwrap_or_default(),
                 )
             };
             return Err(RuntimeException::new(error).into());

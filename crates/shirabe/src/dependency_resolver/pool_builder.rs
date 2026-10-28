@@ -798,7 +798,7 @@ impl PoolBuilder {
     fn is_update_allowed(&self, package: PackageInterfaceHandle) -> bool {
         for pattern in &self.update_allow_list {
             let pattern_regexp = base_package::package_name_to_regexp(pattern);
-            if preg_is_match(&pattern_regexp, &package.get_name()) {
+            if preg_is_match(&pattern_regexp, package.get_name()) {
                 return true;
             }
         }
@@ -825,7 +825,7 @@ impl PoolBuilder {
                 .borrow_mut()
                 .get_packages()?
             {
-                if preg_is_match(&pattern_regexp, &package.get_name()) {
+                if preg_is_match(&pattern_regexp, package.get_name()) {
                     continue 'outer;
                 }
             }

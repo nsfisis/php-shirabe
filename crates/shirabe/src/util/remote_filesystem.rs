@@ -12,7 +12,7 @@ use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, config_handle_value, 
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue};
-use shirabe_php_shim::{PhpMixed, RuntimeException, php_regex, preg_match};
+use shirabe_php_shim::{PhpMixed, RuntimeException, legacy_lossy, php_regex, preg_match};
 
 const CLASS: &str = "Composer\\Util\\RemoteFilesystem";
 
@@ -125,7 +125,10 @@ impl RemoteFilesystem {
         let mut value: Option<i64> = None;
         for header in headers {
             if let Some(m) = preg_match(php_regex!("{^HTTP/\\S+ (\\d+)}i"), header) {
-                value = m.get(1).and_then(|s| s.parse().ok()).or(Some(0));
+                value = m
+                    .get(1)
+                    .and_then(|s| legacy_lossy(s).parse().ok())
+                    .or(Some(0));
             }
         }
 

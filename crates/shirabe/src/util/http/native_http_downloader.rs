@@ -28,9 +28,9 @@ use crate::util::{AuthHelper, HttpDownloader, Platform, PromptAuthResult, StoreA
 use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, implode, in_array_loose, in_array_strict, json_decode_assoc, parse_url,
-    php_regex, preg_is_match, preg_quote, preg_replace, rename, stripos, strlen, strpos, substr,
-    unlink_silent,
+    PHP_EOL, PhpMixed, implode, in_array_loose, in_array_strict, json_decode_assoc, legacy_lossy,
+    parse_url, php_regex, preg_is_match, preg_quote, preg_replace, rename, stripos, strlen, strpos,
+    substr, unlink_silent,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -573,7 +573,7 @@ impl NativeHttpDownloader {
         // Header lines start with the status line so Response::get_status_message can find it.
         let mut headers_out: Vec<String> = vec![status_line];
         for (k, v) in resp.headers().iter() {
-            headers_out.push(format!("{}: {}", k, v.to_str().unwrap_or("")));
+            headers_out.push(format!("{}: {}", k, v.to_str().unwrap_or_default()));
         }
 
         let body = Self::read_body_with_limit(resp, max_file_size, filename)
@@ -689,22 +689,24 @@ impl NativeHttpDownloader {
             } else if location_header.starts_with('/') {
                 // Absolute path; e.g. /foo
                 let url_host = parse_url(url).and_then(|parsed| parsed.host);
-                let url_host_str = url_host.as_deref().unwrap_or("");
-                target_url = preg_replace(
+                let url_host_str = url_host.as_deref().unwrap_or_default();
+                target_url = legacy_lossy(&preg_replace(
                     format!(
                         r"{{^(.+(?://|@){}(?::\d+)?)(?:[/\?].*)?$}}",
                         preg_quote(url_host_str, None)
                     ),
-                    &format!("\\1{}", location_header),
+                    format!("\\1{}", location_header),
                     url,
-                );
+                ))
+                .into_owned();
             } else {
                 // Relative path; e.g. foo
-                target_url = preg_replace(
+                target_url = legacy_lossy(&preg_replace(
                     php_regex!(r"{^(.+/)[^/?]*(?:\?.*)?$}"),
-                    &format!("\\1{}", location_header),
+                    format!("\\1{}", location_header),
                     url,
-                );
+                ))
+                .into_owned();
             }
         }
 
@@ -783,10 +785,10 @@ impl NativeHttpDownloader {
             && !self.auth_helper.borrow().is_public_bit_bucket_download(url)
             && substr(url, -4, None) == ".zip"
             && (location_header.is_none()
-                || substr(location_header.as_deref().unwrap_or(""), -4, None) != ".zip")
+                || substr(location_header.as_deref().unwrap_or_default(), -4, None) != ".zip")
             && preg_is_match(
                 php_regex!(r"{^text/html\b}i"),
-                &response
+                response
                     .inner
                     .get_header("content-type")
                     .unwrap_or_default(),
@@ -867,7 +869,7 @@ impl NativeHttpDownloader {
                 .as_str(),
             "application/json" | "application/json; charset=utf-8"
         ) {
-            let body = response.inner.get_body().unwrap_or("");
+            let body = response.inner.get_body().unwrap_or_default();
             details = format!(
                 ":{}{}{}",
                 PHP_EOL,

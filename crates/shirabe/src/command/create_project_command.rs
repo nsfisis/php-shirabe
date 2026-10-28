@@ -437,7 +437,7 @@ impl CreateProjectCommand {
             requirements[0]
                 .get("name")
                 .map(|s| s.as_str())
-                .unwrap_or(""),
+                .unwrap_or_default(),
         ))
         .into_owned();
         if package_version.is_none() && requirements[0].contains_key("version") {
@@ -527,20 +527,21 @@ impl CreateProjectCommand {
                                 .collect::<Vec<_>>()
                         )
                     ),
-                    package_version.as_deref().unwrap_or(""),
+                    package_version.as_deref().unwrap_or_default(),
                 );
                 if let Some(matched) = matched {
                     stability = Some(matched.get(1).unwrap_or_default().to_string());
                 } else {
                     stability = Some(VersionParser::parse_stability(
-                        package_version.as_deref().unwrap_or(""),
+                        package_version.as_deref().unwrap_or_default(),
                     ));
                 }
             }
         }
 
-        let stability = VersionParser::normalize_stability(stability.as_deref().unwrap_or(""))
-            .unwrap_or_default();
+        let stability =
+            VersionParser::normalize_stability(stability.as_deref().unwrap_or_default())
+                .unwrap_or_default();
 
         if !STABILITIES.contains_key(stability.as_str()) {
             return Err(InvalidArgumentException::new(format!(

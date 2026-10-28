@@ -818,6 +818,6 @@ impl ProgressBar {
             })
         };
 
-        preg_replace_callback(regex, callback, &format)
+        Ok(legacy_lossy(&preg_replace_callback(regex, callback, &format)?).into_owned())
     }
 }

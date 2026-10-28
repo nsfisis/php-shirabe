@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileCleaner.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{PregMatches, preg_match};
+use shirabe_php_shim::{PregMatches, legacy_lossy, preg_match};
 use std::sync::Mutex;
 
 #[derive(Debug, Clone)]
@@ -114,7 +114,7 @@ impl PhpFileCleaner {
                                 r#match
                                     .get(*i)
                                     .filter(|s| !s.is_empty())
-                                    .map(str::to_string)
+                                    .map(|s| legacy_lossy(s).into_owned())
                             })
                             .unwrap_or_default();
                         self.index += matched_len;
@@ -148,7 +148,7 @@ impl PhpFileCleaner {
                             if let Some(r#match) =
                                 preg_match(&entry.pattern, &self.contents[offset..])
                             {
-                                return clean + r#match.get(0).unwrap_or("");
+                                return clean + &*legacy_lossy(r#match.get(0).unwrap_or_default());
                             }
                         }
                     }

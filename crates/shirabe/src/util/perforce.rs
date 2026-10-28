@@ -200,7 +200,7 @@ impl Perforce {
 
     pub fn is_stream(&self) -> bool {
         self.p4_depot_type.is_some()
-            && strcmp(self.p4_depot_type.as_deref().unwrap_or(""), "stream") == 0
+            && strcmp(self.p4_depot_type.as_deref().unwrap_or_default(), "stream") == 0
     }
 
     pub fn get_stream(&mut self) -> String {
@@ -208,11 +208,14 @@ impl Perforce {
             if self.is_stream() {
                 self.p4_stream = Some(format!(
                     "//{}/{}",
-                    self.p4_depot.as_deref().unwrap_or(""),
-                    self.p4_branch.as_deref().unwrap_or("")
+                    self.p4_depot.as_deref().unwrap_or_default(),
+                    self.p4_branch.as_deref().unwrap_or_default()
                 ));
             } else {
-                self.p4_stream = Some(format!("//{}", self.p4_depot.as_deref().unwrap_or("")));
+                self.p4_stream = Some(format!(
+                    "//{}",
+                    self.p4_depot.as_deref().unwrap_or_default()
+                ));
             }
         }
 
@@ -258,12 +261,12 @@ impl Perforce {
             format!(
                 "{} set P4USER={}",
                 Self::get_p4_executable(),
-                ProcessExecutor::escape(self.p4_user.as_deref().unwrap_or(""))
+                ProcessExecutor::escape(self.p4_user.as_deref().unwrap_or_default())
             )
         } else {
             format!(
                 "export P4USER={}",
-                ProcessExecutor::escape(self.p4_user.as_deref().unwrap_or(""))
+                ProcessExecutor::escape(self.p4_user.as_deref().unwrap_or_default())
             )
         };
         self.execute_command(CommandLine::Shell(command));
@@ -624,7 +627,7 @@ impl Perforce {
             let command = self.generate_p4_command(
                 vec![
                     "streams".to_string(),
-                    format!("//{}/...", self.p4_depot.as_deref().unwrap_or("")),
+                    format!("//{}/...", self.p4_depot.as_deref().unwrap_or_default()),
                 ],
                 true,
             );
@@ -634,11 +637,12 @@ impl Perforce {
             for line in &res_array {
                 let res_bits = explode(" ", line);
                 if res_bits.len() > 4 {
-                    let branch = preg_replace(
+                    let branch = legacy_lossy(&preg_replace(
                         php_regex!(r"/[^A-Za-z0-9 ]/"),
                         "",
-                        &legacy_lossy(&res_bits.get(4).cloned().unwrap_or_default()),
-                    );
+                        res_bits.get(4).cloned().unwrap_or_default(),
+                    ))
+                    .into_owned();
                     possible_branches.insert(
                         branch,
                         legacy_lossy(&res_bits.get(1).cloned().unwrap_or_default()).into_owned(),
@@ -664,7 +668,7 @@ impl Perforce {
             format!(
                 "{}@{}",
                 possible_branches
-                    .get(self.p4_branch.as_deref().unwrap_or(""))
+                    .get(self.p4_branch.as_deref().unwrap_or_default())
                     .cloned()
                     .unwrap_or_default(),
                 last_commit_num
@@ -700,7 +704,7 @@ impl Perforce {
             if strpos(line, "Depot").is_some() {
                 let fields = explode(" ", line);
                 if strcmp(
-                    self.p4_depot.as_deref().unwrap_or(""),
+                    self.p4_depot.as_deref().unwrap_or_default(),
                     &*legacy_lossy(fields.get(1).map(|s| s.as_slice()).unwrap_or_default()),
                 ) == 0
                 {

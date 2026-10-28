@@ -116,8 +116,8 @@ impl Problem {
             // '-'-joined literal ids (e.g. "-95"), which PHP's <=> compares numerically when both
             // sides are numeric strings rather than byte-by-byte.
             loosely_compare(
-                &self.get_sortable_string(pool, &rule1.borrow()),
-                &self.get_sortable_string(pool, &rule2.borrow()),
+                self.get_sortable_string(pool, &rule1.borrow()),
+                self.get_sortable_string(pool, &rule2.borrow()),
             )
         });
 
@@ -230,7 +230,9 @@ impl Problem {
                 let pkg_key = m.get(1).unwrap_or_default().to_string();
                 let m2 = m.get(2).unwrap_or_default().to_string();
                 message = legacy_lossy(&str_replace("%", "%%", &message)).into_owned();
-                let template = preg_replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &message);
+                let template =
+                    legacy_lossy(&preg_replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &message))
+                        .into_owned();
                 messages.push(template.clone());
                 let version_key = parser.normalize(&m2, Some("")).unwrap_or_default();
                 templates
@@ -558,13 +560,14 @@ impl Problem {
         if let Some(c) = constraint
             && c.is_constraint()
             && c.get_operator() == Some(CmpOp::Eq)
-            && preg_is_match(php_regex!(r"{^dev-.*#.*}"), &c.get_pretty_string())
+            && preg_is_match(php_regex!(r"{^dev-.*#.*}"), c.get_pretty_string())
         {
-            let new_constraint = preg_replace(
+            let new_constraint = legacy_lossy(&preg_replace(
                 php_regex!(r"{ +as +([^,\s|]+)$}"),
                 "",
-                &c.get_pretty_string(),
-            );
+                c.get_pretty_string(),
+            ))
+            .into_owned();
             let packages = repository_set.find_packages(
                 package_name,
                 Some(
@@ -1199,7 +1202,8 @@ impl Problem {
                     .or_default()
                     .push(pretty.clone());
             } else {
-                let key = preg_replace(php_regex!(r"{^(\d+)\..*}"), "$1", version);
+                let key = legacy_lossy(&preg_replace(php_regex!(r"{^(\d+)\..*}"), "$1", version))
+                    .into_owned();
                 by_major.entry(key).or_default().push(pretty.clone());
             }
         }
@@ -1377,7 +1381,7 @@ impl Problem {
             && c.get_operator() == Some(CmpOp::Eq)
             && !c.get_version().starts_with("dev-")
         {
-            if !preg_is_match(php_regex!(r"{^\d+(?:\.\d+)*$}"), &c.get_pretty_string()) {
+            if !preg_is_match(php_regex!(r"{^\d+(?:\.\d+)*$}"), c.get_pretty_string()) {
                 return format!(" {} (exact version match)", c.get_pretty_string());
             }
 

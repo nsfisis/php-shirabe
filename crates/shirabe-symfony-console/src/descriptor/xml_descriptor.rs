@@ -239,9 +239,9 @@ impl XmlDescriptor {
             PhpMixed::List(_) | PhpMixed::Array(_) => {
                 self.default_values_as_strings(&default_value)
             }
-            PhpMixed::Bool(_) => vec![var_export(&default_value, true)],
+            PhpMixed::Bool(_) => vec![legacy_lossy(&var_export(&default_value, true)).into_owned()],
             d if php_truthy(d) => {
-                vec![php_to_string(&default_value)]
+                vec![legacy_lossy(&php_to_string(&default_value)).into_owned()]
             }
             _ => vec![],
         };
@@ -258,7 +258,7 @@ impl XmlDescriptor {
 
         let object_xml = dom.append_child(dom.create_element("option"));
         object_xml.set_attribute("name", &format!("--{}", option.get_name()));
-        let pos = strpos(option.get_shortcut().unwrap_or(""), "|");
+        let pos = strpos(option.get_shortcut().unwrap_or_default(), "|");
         if let Some(pos) = pos {
             object_xml.set_attribute(
                 "shortcut",
@@ -301,9 +301,11 @@ impl XmlDescriptor {
                 PhpMixed::List(_) | PhpMixed::Array(_) => {
                     self.default_values_as_strings(&default_value)
                 }
-                PhpMixed::Bool(_) => vec![var_export(&default_value, true)],
+                PhpMixed::Bool(_) => {
+                    vec![legacy_lossy(&var_export(&default_value, true)).into_owned()]
+                }
                 d if php_truthy(d) => {
-                    vec![php_to_string(&default_value)]
+                    vec![legacy_lossy(&php_to_string(&default_value)).into_owned()]
                 }
                 _ => vec![],
             };
@@ -337,8 +339,16 @@ impl XmlDescriptor {
     /// getInputOptionDocument when the default is an array (returns it verbatim).
     fn default_values_as_strings(&self, default: &PhpMixed) -> Vec<String> {
         match default {
-            PhpMixed::List(list) => list.iter().map(php_to_string).collect(),
-            PhpMixed::Array(arr) => arr.values().map(php_to_string).collect(),
+            PhpMixed::List(list) => list
+                .iter()
+                .map(php_to_string)
+                .map(|s| legacy_lossy(&s).into_owned())
+                .collect(),
+            PhpMixed::Array(arr) => arr
+                .values()
+                .map(php_to_string)
+                .map(|s| legacy_lossy(&s).into_owned())
+                .collect(),
             _ => vec![],
         }
     }

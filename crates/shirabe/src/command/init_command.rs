@@ -85,7 +85,7 @@ impl InitCommand {
             php_regex!(r#"/^(?P<name>[- .,\p{L}\p{N}\p{Mn}\'’\"()]+)(?:\s+<(?P<email>.+?)>)?$/u"#),
             author,
         ) {
-            let email = m.name("email").map(str::to_string);
+            let email = m.name("email").map(|s| legacy_lossy(s).into_owned());
             if let Some(ref email) = email
                 && !self.is_valid_email(email)
             {
@@ -134,12 +134,8 @@ impl InitCommand {
 
         let namespace: Vec<BString> = array_map(
             |part: &BString| {
-                let part = legacy_lossy(&preg_replace(
-                    php_regex!(r"/[^a-z0-9]/i"),
-                    " ",
-                    &legacy_lossy(part),
-                ))
-                .into_owned();
+                let part = legacy_lossy(&preg_replace(php_regex!(r"/[^a-z0-9]/i"), " ", part))
+                    .into_owned();
                 let part = ucwords(&part);
                 str_replace(" ", "", &part)
             },
@@ -335,11 +331,11 @@ impl InitCommand {
         let name = legacy_lossy(&preg_replace(
             php_regex!(r"{^[_.-]+|[_.-]+$|[^a-z0-9_.-]}u"),
             "",
-            &legacy_lossy(&name),
+            &name,
         ))
         .into_owned();
 
-        preg_replace(php_regex!(r"{([_.-]){2,}}u"), "$1", &name)
+        legacy_lossy(&preg_replace(php_regex!(r"{([_.-]){2,}}u"), "$1", &name)).into_owned()
     }
 
     fn get_default_package_name(&self) -> anyhow::Result<String> {
@@ -523,11 +519,10 @@ impl Command for InitCommand {
         if options.contains_key(B("name"))
             && !preg_is_match(
                 php_regex!(r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"),
-                &options
+                options
                     .get(B("name"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_str_lossy(),
+                    .unwrap_or_default(),
             )
         {
             return Err(InvalidArgumentException::new(format!(
@@ -758,7 +753,7 @@ impl Command for InitCommand {
                 &format!(
                     "PSR-4 autoloading configured. Use \"<comment>namespace {};</comment>\" in {}",
                     namespace,
-                    autoload_path.as_deref().unwrap_or("")
+                    autoload_path.as_deref().unwrap_or_default()
                 ),
                 true,
                 io_interface::NORMAL,
@@ -928,7 +923,7 @@ impl Command for InitCommand {
                         php_regex!(
                             r"{^[a-z0-9]([_.-]?[a-z0-9]+)*\/[a-z0-9](([_.]|-{1,2})?[a-z0-9]+)*$}D"
                         ),
-                        &value.as_string().unwrap_or_default().to_str_lossy(),
+                        value.as_string().unwrap_or_default(),
                     ) {
                         return Err(InvalidArgumentException::new(format!(
                             "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",

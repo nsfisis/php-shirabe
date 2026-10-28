@@ -415,18 +415,21 @@ impl JsonFile {
         if options.pretty_print && options.indent != Self::INDENT_DEFAULT {
             // Pretty printing and not using default indentation
             let indent_owned = options.indent;
-            return Ok(preg_replace_callback(
-                php_regex!(r"#^ {4,}#m"),
-                move |m: &PregMatches| -> anyhow::Result<String> {
-                    let whole = m.get(0).unwrap_or("");
-                    Ok(
-                        legacy_lossy(&str_repeat(&indent_owned, (strlen(whole) / 4) as usize))
-                            .into_owned(),
-                    )
-                },
-                &json,
+            return Ok(legacy_lossy(
+                &preg_replace_callback(
+                    php_regex!(r"#^ {4,}#m"),
+                    move |m: &PregMatches| -> anyhow::Result<String> {
+                        let whole = m.get(0).unwrap_or_default();
+                        Ok(
+                            legacy_lossy(&str_repeat(&indent_owned, (strlen(whole) / 4) as usize))
+                                .into_owned(),
+                        )
+                    },
+                    &json,
+                )
+                .expect("the replacement callback cannot fail"),
             )
-            .expect("the replacement callback cannot fail"));
+            .into_owned());
         }
 
         Ok(json)
@@ -520,7 +523,7 @@ impl JsonFile {
     }
 
     pub fn detect_indenting(json: Option<&str>) -> String {
-        if let Some(m) = preg_match(php_regex!(r##"#^([ \t]+)"#m"##), json.unwrap_or("")) {
+        if let Some(m) = preg_match(php_regex!(r##"#^([ \t]+)"#m"##), json.unwrap_or_default()) {
             return m.get(1).unwrap_or_default().to_string();
         }
 

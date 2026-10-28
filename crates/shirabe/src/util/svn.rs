@@ -308,7 +308,7 @@ impl Svn {
         let auth_config = self.config.borrow_mut().get("http-basic");
 
         let host = parse_url(&self.url).and_then(|parsed| parsed.host);
-        let host_str = host.as_deref().unwrap_or("");
+        let host_str = host.as_deref().unwrap_or_default();
         let auth_for_host = auth_config
             .as_array()
             .and_then(|m| m.get(B(host_str)))

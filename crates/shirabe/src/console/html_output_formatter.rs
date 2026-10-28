@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Console/HtmlOutputFormatter.php
 
 use indexmap::IndexMap;
-use shirabe_php_shim::{PregMatches, preg_replace_callback};
+use shirabe_php_shim::{PregMatches, legacy_lossy, preg_replace_callback};
 use shirabe_symfony_console::formatter::{
     OutputFormatter, OutputFormatterInterface, OutputFormatterStyleInterface,
 };
@@ -66,18 +66,21 @@ impl HtmlOutputFormatter {
         );
 
         Ok(Some(
-            preg_replace_callback(
-                &pattern,
-                |matches| Ok(self.format_html(matches)),
-                &formatted,
+            legacy_lossy(
+                &preg_replace_callback(
+                    &pattern,
+                    |matches| Ok(self.format_html(matches)),
+                    &formatted,
+                )
+                .expect("the replacement callback cannot fail"),
             )
-            .expect("the replacement callback cannot fail"),
+            .into_owned(),
         ))
     }
 
     fn format_html(&self, matches: &PregMatches) -> String {
-        let codes_str = matches.get(1).unwrap_or("");
-        let content = matches.get(2).unwrap_or("");
+        let codes_str = legacy_lossy(matches.get(1).unwrap_or_default());
+        let content = matches.get(2).unwrap_or_default();
         let mut out = String::from("<span style=\"");
 
         for code_str in codes_str.split(';') {

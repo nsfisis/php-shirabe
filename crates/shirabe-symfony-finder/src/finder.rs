@@ -318,7 +318,7 @@ impl Finder {
 
         let dir = rtrim2(dir, "/");
 
-        if preg_is_match(php_regex!("#^(ssh2\\.)?s?ftp://#"), &legacy_lossy(&dir)) {
+        if preg_is_match(php_regex!("#^(ssh2\\.)?s?ftp://#"), &dir) {
             format!("{dir}/")
         } else {
             legacy_lossy(&dir).into_owned()
@@ -713,7 +713,7 @@ fn parse_date_comparator(test: &str) -> (String, i64) {
 
     let mut operator = matches
         .get(1)
-        .map(str::to_string)
+        .map(|s| legacy_lossy(s).into_owned())
         .unwrap_or_else(|| "==".to_string());
     if operator == "since" || operator == "after" {
         operator = ">".to_string();

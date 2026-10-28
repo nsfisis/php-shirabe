@@ -63,7 +63,7 @@ impl TextDescriptor {
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
                 preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
-                    &format!("\n{}", str_repeat(" ", (total_width + 4) as usize)),
+                    format!("\n{}", str_repeat(" ", (total_width + 4) as usize)),
                     argument.get_description(),
                 ),
                 default,
@@ -129,7 +129,7 @@ impl TextDescriptor {
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
                 preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
-                    &format!("\n{}", str_repeat(" ", (total_width + 4) as usize)),
+                    format!("\n{}", str_repeat(" ", (total_width + 4) as usize)),
                     option.get_description(),
                 ),
                 default,
@@ -180,7 +180,7 @@ impl TextDescriptor {
 
             self.write_text("<comment>Options:</comment>", &options);
             for option in definition.get_options().values() {
-                if strlen(option.get_shortcut().unwrap_or("")) > 1 {
+                if strlen(option.get_shortcut().unwrap_or_default()) > 1 {
                     later_options.push(option.as_ref());
                     continue;
                 }
@@ -480,7 +480,9 @@ impl TextDescriptor {
             match command {
                 CommandOrString::Command(command) => {
                     let command = command.borrow();
-                    widths.push(Helper::width(command.get_name().as_deref().unwrap_or("")));
+                    widths.push(Helper::width(
+                        command.get_name().as_deref().unwrap_or_default(),
+                    ));
                     for alias in command.get_aliases() {
                         widths.push(Helper::width(&alias));
                     }
@@ -503,7 +505,7 @@ impl TextDescriptor {
         for option in options {
             // "-" + shortcut + ", --" + name
             let mut name_length = 1
-                + Helper::width(option.get_shortcut().unwrap_or("")).max(1)
+                + Helper::width(option.get_shortcut().unwrap_or_default()).max(1)
                 + 4
                 + Helper::width(option.get_name());
             if option.is_negatable() {

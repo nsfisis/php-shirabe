@@ -147,7 +147,12 @@ impl ClassMapGenerator {
                 // optional leading group `(^|[^:])` that is re-emitted in the replacement. Slash runs
                 // are always separated by path-segment characters, so consuming the single preceding
                 // char never prevents an adjacent run from matching.
-                file_path = preg_replace(php_regex!(r"{(^|[^:])[\\/]{2,}}"), "${1}/", &file_path);
+                file_path = legacy_lossy(&preg_replace(
+                    php_regex!(r"{(^|[^:])[\\/]{2,}}"),
+                    "${1}/",
+                    &file_path,
+                ))
+                .into_owned();
             }
 
             if file_path.is_empty() {
@@ -183,11 +188,11 @@ impl ClassMapGenerator {
 
             // check the realpath of the file against the excluded paths as the path might be a symlink and the excluded path is realpath'd so symlink are resolved
             if let Some(ref excluded) = excluded {
-                if preg_is_match(excluded, &legacy_lossy(&strtr(&real_path, "\\", "/"))) {
+                if preg_is_match(excluded, strtr(&real_path, "\\", "/")) {
                     continue;
                 }
                 // check non-realpath of file for directories symlink in project dir
-                if preg_is_match(excluded, &legacy_lossy(&strtr(&file_path, "\\", "/"))) {
+                if preg_is_match(excluded, strtr(&file_path, "\\", "/")) {
                     continue;
                 }
             }
@@ -197,9 +202,9 @@ impl ClassMapGenerator {
                 let filtered = self.filter_by_namespace(
                     classes,
                     &file_path,
-                    namespace.as_deref().unwrap_or(""),
+                    namespace.as_deref().unwrap_or_default(),
                     autoload_type,
-                    base_path.as_deref().unwrap_or(""),
+                    base_path.as_deref().unwrap_or_default(),
                 )?;
 
                 // if no valid class was found in the file then we do not mark it as scanned as it might still be matched by another rule later
@@ -317,12 +322,12 @@ impl ClassMapGenerator {
             let short_path = preg_replace(
                 format!("{{^{}}}", preg_quote(&cwd, None)),
                 ".",
-                &Self::normalize_path(file_path),
+                Self::normalize_path(file_path),
             );
             let short_base_path = preg_replace(
                 format!("{{^{}}}", preg_quote(&cwd, None)),
                 ".",
-                &Self::normalize_path(base_path),
+                Self::normalize_path(base_path),
             );
 
             for class in rejected_classes {
@@ -367,7 +372,7 @@ impl ClassMapGenerator {
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
         if let Some(r#match) = preg_match(
             php_regex!(r"{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
-            &legacy_lossy(&path),
+            &path,
         ) {
             prefix = r#match.get(1).unwrap_or_default().to_string();
             path = substr(&path, strlen(&prefix), None);

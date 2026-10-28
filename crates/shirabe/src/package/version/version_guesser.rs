@@ -7,7 +7,7 @@ use crate::repository::vcs::HgDriver;
 use crate::util::{
     Git as GitUtil, HttpDownloader, Platform, ProcessExecutor, Svn as SvnUtil, sync_executor,
 };
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, implode, is_string,
@@ -140,17 +140,25 @@ impl VersionGuesser {
             version_data.feature_pretty_version = None;
         }
 
-        if "-dev" == substr(version_data.version.as_deref().unwrap_or(""), -4, None)
+        if "-dev"
+            == substr(
+                version_data.version.as_deref().unwrap_or_default(),
+                -4,
+                None,
+            )
             && preg_is_match(
                 php_regex!(r"{\.9{7}}"),
-                version_data.version.as_deref().unwrap_or(""),
+                version_data.version.as_deref().unwrap_or_default(),
             )
         {
-            version_data.pretty_version = Some(preg_replace(
-                php_regex!(r"{(\.9{7})+}"),
-                ".x",
-                version_data.version.as_deref().unwrap_or(""),
-            ));
+            version_data.pretty_version = Some(
+                legacy_lossy(&preg_replace(
+                    php_regex!(r"{(\.9{7})+}"),
+                    ".x",
+                    version_data.version.as_deref().unwrap_or_default(),
+                ))
+                .into_owned(),
+            );
         }
 
         let feature_non_empty = version_data
@@ -161,20 +169,23 @@ impl VersionGuesser {
         if feature_non_empty
             && "-dev"
                 == substr(
-                    version_data.feature_version.as_deref().unwrap_or(""),
+                    version_data.feature_version.as_deref().unwrap_or_default(),
                     -4,
                     None,
                 )
             && preg_is_match(
                 php_regex!(r"{\.9{7}}"),
-                version_data.feature_version.as_deref().unwrap_or(""),
+                version_data.feature_version.as_deref().unwrap_or_default(),
             )
         {
-            version_data.feature_pretty_version = Some(preg_replace(
-                php_regex!(r"{(\.9{7})+}"),
-                ".x",
-                version_data.feature_version.as_deref().unwrap_or(""),
-            ));
+            version_data.feature_pretty_version = Some(
+                legacy_lossy(&preg_replace(
+                    php_regex!(r"{(\.9{7})+}"),
+                    ".x",
+                    version_data.feature_version.as_deref().unwrap_or_default(),
+                ))
+                .into_owned(),
+            );
         }
 
         version_data
@@ -475,7 +486,7 @@ impl VersionGuesser {
             .and_then(|v| v.as_array())
             .and_then(|m| m.get(B("branch-alias")))
             .and_then(|v| v.as_array())
-            .map(|m| m.contains_key(B(version.as_deref().unwrap_or(""))))
+            .map(|m| m.contains_key(B(version.as_deref().unwrap_or_default())))
             .unwrap_or(false);
         let has_self_version = strpos(
             json_encode(&PhpMixed::Array(
@@ -489,7 +500,12 @@ impl VersionGuesser {
         )
         .is_some();
         if !has_branch_alias || has_self_version {
-            let branch = preg_replace(php_regex!(r"{^dev-}"), "", version.as_deref().unwrap_or(""));
+            let branch = legacy_lossy(&preg_replace(
+                php_regex!(r"{^dev-}"),
+                "",
+                version.as_deref().unwrap_or_default(),
+            ))
+            .into_owned();
             let mut length = i64::MAX;
 
             // return directly, if branch is configured to be non-feature branch
@@ -527,7 +543,10 @@ impl VersionGuesser {
 
                     // do not compare against itself or other feature branches
                     if candidate == &branch
-                        || self.is_feature_branch(package_config, Some(&candidate_version))
+                        || self.is_feature_branch(
+                            package_config,
+                            Some(&*legacy_lossy(&candidate_version)),
+                        )
                     {
                         continue;
                     }
@@ -558,7 +577,10 @@ impl VersionGuesser {
                     {
                         last_index = index;
                         length = strlen(&output);
-                        version = Some(self.version_parser.normalize_branch(&candidate_version)?);
+                        version = Some(
+                            self.version_parser
+                                .normalize_branch(&legacy_lossy(&candidate_version))?,
+                        );
                         pretty_version = Some(format!("dev-{}", candidate_version));
                         if length == 0 {
                             break;
@@ -602,7 +624,7 @@ impl VersionGuesser {
                 r"{{^({}|master|main|latest|next|current|support|tip|trunk|default|develop|\d+\..+)$}}",
                 non_feature_branches,
             ),
-            branch_name.unwrap_or(""),
+            branch_name.unwrap_or_default(),
         )
     }
 
@@ -671,17 +693,17 @@ impl VersionGuesser {
             let trunk_path = package_config
                 .get(B("trunk-path"))
                 .and_then(|v| v.as_string())
-                .map(|s| preg_quote(&s.to_str_lossy(), Some('#')))
+                .map(|s| preg_quote(s, Some('#')))
                 .unwrap_or_else(|| "trunk".to_string());
             let branches_path = package_config
                 .get(B("branches-path"))
                 .and_then(|v| v.as_string())
-                .map(|s| preg_quote(&s.to_str_lossy(), Some('#')))
+                .map(|s| preg_quote(s, Some('#')))
                 .unwrap_or_else(|| "branches".to_string());
             let tags_path = package_config
                 .get(B("tags-path"))
                 .and_then(|v| v.as_string())
-                .map(|s| preg_quote(&s.to_str_lossy(), Some('#')))
+                .map(|s| preg_quote(s, Some('#')))
                 .unwrap_or_else(|| "tags".to_string());
 
             let url_pattern = format!(
@@ -697,6 +719,7 @@ impl VersionGuesser {
                     && let Some(m3) = m3
                     && (branches_path == *m2 || tags_path == *m2)
                 {
+                    let m3: &str = &legacy_lossy(m3);
                     // we are in a branches path
                     let version = self.version_parser.normalize_branch(m3)?;
                     let pretty_version = format!("dev-{}", m3);

@@ -298,7 +298,7 @@ fn test_reference_config() {
                 [
                     file_get_contents(std::path::Path::new(&dist_url).join("composer.json"))
                         .unwrap_or_default(),
-                    serialize(&PhpMixed::Array(options.clone())).into_bytes(),
+                    Vec::from(serialize(&PhpMixed::Array(options.clone()))),
                 ]
                 .concat()
             ))

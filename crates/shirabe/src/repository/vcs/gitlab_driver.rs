@@ -79,7 +79,7 @@ impl GitLabDriver {
         let guessed_domain = match_
             .name("domain")
             .filter(|s| !s.is_empty())
-            .map(str::to_string)
+            .map(|s| legacy_lossy(s).into_owned())
             .unwrap_or_else(|| match_.name("domain2").unwrap_or_default().to_string());
         let configured_domains = self.inner.config.borrow_mut().get("gitlab-domains");
         let mut url_parts: Vec<String> = explode("/", match_.name("parts").unwrap_or_default())
@@ -101,7 +101,7 @@ impl GitLabDriver {
         } else {
             "https".to_string()
         };
-        let port = match_.name("port").map(str::to_string);
+        let port = match_.name("port").map(|s| legacy_lossy(s).into_owned());
         let origin =
             Self::determine_origin(&configured_domains, guessed_domain, &mut url_parts, port);
         let origin = match origin {
@@ -142,11 +142,12 @@ impl GitLabDriver {
         }
 
         self.namespace = legacy_lossy(&implode("/", &url_parts)).into_owned();
-        self.repository = preg_replace(
+        self.repository = legacy_lossy(&preg_replace(
             php_regex!(r"#(\.git)$#"),
             "",
             match_.name("repo").unwrap_or_default(),
-        );
+        ))
+        .into_owned();
 
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
@@ -575,7 +576,7 @@ impl GitLabDriver {
 
         let mut references: IndexMap<String, String> = IndexMap::new();
         loop {
-            let response = self.get_contents(resource.as_deref().unwrap_or(""), false)??;
+            let response = self.get_contents(resource.as_deref().unwrap_or_default(), false)??;
             let data = response.decode_json()?;
 
             if let PhpMixed::List(ref list) = data {
@@ -915,7 +916,7 @@ impl GitLabDriver {
         let guessed_domain = match_
             .name("domain")
             .filter(|s| !s.is_empty())
-            .map(str::to_string)
+            .map(|s| legacy_lossy(s).into_owned())
             .unwrap_or_else(|| match_.name("domain2").unwrap_or_default().to_string());
         let mut url_parts: Vec<String> = explode("/", match_.name("parts").unwrap_or_default())
             .iter()
@@ -926,7 +927,7 @@ impl GitLabDriver {
             &config.borrow().get("gitlab-domains"),
             guessed_domain,
             &mut url_parts,
-            match_.name("port").map(str::to_string),
+            match_.name("port").map(|s| legacy_lossy(s).into_owned()),
         )
         .is_none()
         {
@@ -961,9 +962,7 @@ impl GitLabDriver {
 
         let links = explode(",", &header);
         for link in links.iter() {
-            if let Some(match_) =
-                preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), &legacy_lossy(link))
-            {
+            if let Some(match_) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
                 return Some(match_.get(1).unwrap_or_default().to_string());
             }
         }
@@ -985,7 +984,7 @@ impl GitLabDriver {
                     format!(
                         "{}:{}",
                         guessed_domain,
-                        port_number.as_deref().unwrap_or("")
+                        port_number.as_deref().unwrap_or_default()
                     ),
                     configured_domains.values(),
                 ))

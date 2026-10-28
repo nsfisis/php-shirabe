@@ -394,7 +394,7 @@ impl ProcessExecutor {
             return Err(RuntimeException::new(format!(
                 "Received unexpected command {:?} in \"{}\"{}{}{}Received calls:{}{}",
                 command,
-                cwd.unwrap_or(""),
+                cwd.unwrap_or_default(),
                 PHP_EOL,
                 expected,
                 PHP_EOL,
@@ -685,6 +685,9 @@ impl ProcessExecutor {
             vec![]
         } else {
             preg_split(php_regex!(r"{\r?\n}"), &output)
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<_>>()
         }
     }
 
@@ -792,13 +795,14 @@ impl ProcessExecutor {
         let mut quote = strpbrk(&argument, " \t,").is_some();
         let mut dquotes: usize = 0;
         // PHP: Preg::replace('/(\\\\*)"/', '$1$1\\"', $argument, -1, $dquotes)
-        argument = preg_replace2(
+        argument = legacy_lossy(&preg_replace2(
             php_regex!(r#"/(\\*)"/"#),
             r#"$1$1\""#,
             &argument,
             -1,
             Some(&mut dquotes),
-        );
+        ))
+        .into_owned();
         let meta = dquotes > 0 || preg_is_match(php_regex!(r"/%[^%]+%|![^!]+!/"), &argument);
 
         if !meta && !quote {
@@ -810,8 +814,14 @@ impl ProcessExecutor {
         }
 
         if meta {
-            argument = preg_replace(php_regex!(r#"/(["^&|<>()%])/"#), "^$1", &argument);
-            argument = preg_replace(php_regex!(r"/(!)/"), "^^$1", &argument);
+            argument = legacy_lossy(&preg_replace(
+                php_regex!(r#"/(["^&|<>()%])/"#),
+                "^$1",
+                &argument,
+            ))
+            .into_owned();
+            argument =
+                legacy_lossy(&preg_replace(php_regex!(r"/(!)/"), "^^$1", &argument)).into_owned();
         }
 
         argument

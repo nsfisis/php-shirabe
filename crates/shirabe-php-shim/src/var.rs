@@ -1,5 +1,5 @@
-use crate::{PhpMixed, legacy_lossy};
-use bstr::{BString, ByteSlice};
+use crate::PhpMixed;
+use bstr::{BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 
 pub fn empty(value: &PhpMixed) -> bool {
@@ -15,43 +15,49 @@ pub fn empty(value: &PhpMixed) -> bool {
     }
 }
 
-pub fn serialize(value: &PhpMixed) -> String {
-    let mut out = String::new();
+pub fn serialize(value: &PhpMixed) -> BString {
+    let mut out = BString::default();
     serialize_into(&mut out, value);
     out
 }
 
-fn serialize_into(out: &mut String, value: &PhpMixed) {
+fn serialize_string(out: &mut BString, s: &[u8]) {
+    // PHP measures the string length in bytes.
+    out.push_str(format!("s:{}:\"", s.len()));
+    out.extend_from_slice(s);
+    out.push_str("\";");
+}
+
+fn serialize_into(out: &mut BString, value: &PhpMixed) {
     match value {
         PhpMixed::Null => out.push_str("N;"),
-        PhpMixed::Bool(b) => {
-            out.push_str("b:");
-            out.push(if *b { '1' } else { '0' });
-            out.push(';');
+        PhpMixed::Bool(b) => out.push_str(if *b { "b:1;" } else { "b:0;" }),
+        PhpMixed::Int(i) => out.push_str(format!("i:{};", i)),
+        PhpMixed::Float(f) => {
+            out.push_str("d:");
+            out.extend_from_slice(&serialize_float(*f));
+            out.push(b';');
         }
-        PhpMixed::Int(i) => out.push_str(&format!("i:{};", i)),
-        PhpMixed::Float(f) => out.push_str(&format!("d:{};", serialize_float(*f))),
-        // PHP measures the string length in bytes.
-        PhpMixed::String(s) => out.push_str(&format!("s:{}:\"{}\";", s.len(), s)),
+        PhpMixed::String(s) => serialize_string(out, s),
         PhpMixed::List(items) => {
-            out.push_str(&format!("a:{}:{{", items.len()));
+            out.push_str(format!("a:{}:{{", items.len()));
             for (i, item) in items.iter().enumerate() {
-                out.push_str(&format!("i:{};", i));
+                out.push_str(format!("i:{};", i));
                 serialize_into(out, item);
             }
-            out.push('}');
+            out.push(b'}');
         }
         PhpMixed::Array(entries) => {
-            out.push_str(&format!("a:{}:{{", entries.len()));
+            out.push_str(format!("a:{}:{{", entries.len()));
             for (k, v) in entries {
                 // PHP normalizes canonical integer string keys to integer keys.
                 match canonical_int_key(k) {
-                    Some(i) => out.push_str(&format!("i:{};", i)),
-                    None => out.push_str(&format!("s:{}:\"{}\";", k.len(), k)),
+                    Some(i) => out.push_str(format!("i:{};", i)),
+                    None => serialize_string(out, k),
                 }
                 serialize_into(out, v);
             }
-            out.push('}');
+            out.push(b'}');
         }
         // TODO(php-runtime): object serialization needs the PHP class name and the property
         // visibility name-mangling ("O:len:\"Class\":n:{...}"), which PhpMixed::Object does not
@@ -63,10 +69,10 @@ fn serialize_into(out: &mut String, value: &PhpMixed) {
 // TODO(php-runtime): the shim has no ini registry, so this hard-codes serialize_precision=-1
 // (the default: the shortest round-trip representation). Any other serialize_precision selects
 // php_gcvt's fixed-precision mode, which is not reachable from here.
-fn serialize_float(f: f64) -> String {
+fn serialize_float(f: f64) -> BString {
     let mut out = BString::default();
     shirabe_php_src::zend::zend_smart_str::smart_str_append_double(&mut out, f, -1, false);
-    legacy_lossy(&out).into_owned()
+    out
 }
 
 /// Returns the integer a PHP array key string normalizes to, or None if the key stays a string.
@@ -83,7 +89,14 @@ pub fn canonical_int_key(key: &[u8]) -> Option<i64> {
     if !digits.iter().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    key.to_str().ok()?.parse::<i64>().ok()
+    let magnitude = digits.iter().try_fold(0i64, |acc, &d| {
+        acc.checked_mul(10)?.checked_sub(i64::from(d - b'0'))
+    })?;
+    if key.starts_with(b"-") {
+        Some(magnitude)
+    } else {
+        magnitude.checked_neg()
+    }
 }
 
 pub fn is_bool(value: &PhpMixed) -> bool {
@@ -108,7 +121,7 @@ pub fn is_scalar(value: &PhpMixed) -> bool {
 pub fn is_numeric(value: &PhpMixed) -> bool {
     match value {
         PhpMixed::Int(_) | PhpMixed::Float(_) => true,
-        PhpMixed::String(s) => is_numeric_string(&s.to_str_lossy()),
+        PhpMixed::String(s) => is_numeric_string(s),
         _ => false,
     }
 }
@@ -149,9 +162,18 @@ pub fn is_iterable(value: &PhpMixed) -> bool {
     matches!(value, PhpMixed::List(_) | PhpMixed::Array(_))
 }
 
-pub fn is_numeric_string(s: &str) -> bool {
+/// The ASCII text of `s`, or `None` if `s` holds a byte that is not ASCII (which no numeric string
+/// does).
+fn ascii_text(s: &[u8]) -> Option<String> {
+    s.is_ascii().then(|| s.iter().map(|&b| b as char).collect())
+}
+
+pub fn is_numeric_string(s: impl AsRef<[u8]>) -> bool {
     // PHP is_numeric() on a string: optional leading whitespace, an integer or float literal
     // (decimal/scientific). PHP does not treat "inf"/"nan" as numeric.
+    let Some(s) = ascii_text(s.as_ref()) else {
+        return false;
+    };
     let trimmed = s.trim();
     if trimmed.is_empty() {
         return false;
@@ -168,8 +190,8 @@ pub fn is_numeric_to_int(value: &PhpMixed) -> i64 {
     match value {
         PhpMixed::Int(n) => *n,
         PhpMixed::Float(f) => *f as i64,
-        PhpMixed::String(s) if is_numeric_string(&s.to_str_lossy()) => {
-            let s = s.to_str_lossy();
+        PhpMixed::String(s) if is_numeric_string(s) => {
+            let s = ascii_text(s).expect("a numeric string is ASCII");
             let trimmed = s.trim();
             trimmed
                 .parse::<i64>()
@@ -185,8 +207,12 @@ pub fn is_numeric_to_int(value: &PhpMixed) -> i64 {
 /// TODO(php-semantics): this only covers the string/string case of PHP's loose comparison. PHP's `<=>` has many
 /// more special-cased rules across other operand type combinations (bool, array, null, object,
 /// numeric-string-vs-non-numeric-string, ...). Extend this if a new caller needs those.
-pub fn loosely_compare(a: &str, b: &str) -> std::cmp::Ordering {
+pub fn loosely_compare(a: impl AsRef<[u8]>, b: impl AsRef<[u8]>) -> std::cmp::Ordering {
+    let a = a.as_ref();
+    let b = b.as_ref();
     if is_numeric_string(a) && is_numeric_string(b) {
+        let a = ascii_text(a).expect("a numeric string is ASCII");
+        let b = ascii_text(b).expect("a numeric string is ASCII");
         match (a.trim().parse::<i64>(), b.trim().parse::<i64>()) {
             (Ok(na), Ok(nb)) => na.cmp(&nb),
             _ => {
@@ -200,41 +226,40 @@ pub fn loosely_compare(a: &str, b: &str) -> std::cmp::Ordering {
     }
 }
 
-pub fn get_class(_object: &PhpMixed) -> String {
+pub fn get_class(_object: &PhpMixed) -> BString {
     // TODO(php-runtime): PhpMixed::Object carries no class name; there is no runtime class to report.
     todo!()
 }
 
-pub fn get_debug_type(value: &PhpMixed) -> String {
+pub fn get_debug_type(value: &PhpMixed) -> BString {
     match value {
         PhpMixed::Null => "null".into(),
         PhpMixed::Bool(_) => "bool".into(),
         PhpMixed::Int(_) => "int".into(),
         PhpMixed::Float(_) => "float".into(),
         PhpMixed::String(_) => "string".into(),
-        PhpMixed::List(_) | PhpMixed::Array(_) => "array".to_string(),
+        PhpMixed::List(_) | PhpMixed::Array(_) => "array".into(),
         // TODO(php-runtime): PHP returns the object's class name; PhpMixed::Object carries none.
         PhpMixed::Object(_) => todo!(),
     }
 }
 
-pub fn get_debug_type_obj<T>(_value: &T) -> String {
+pub fn get_debug_type_obj<T>(_value: &T) -> BString {
     // PHP get_debug_type() returns the class name for an object. Rust has no runtime class names;
     // the static type name is the closest faithful diagnostic available here.
-    std::any::type_name::<T>().to_string()
+    std::any::type_name::<T>().into()
 }
 
-pub fn php_to_string(value: &PhpMixed) -> String {
+pub fn php_to_string(value: &PhpMixed) -> BString {
     match value {
-        PhpMixed::Null => String::new(),
+        PhpMixed::Null => BString::default(),
         PhpMixed::Bool(true) => "1".into(),
-        PhpMixed::Bool(false) => String::new(),
-        PhpMixed::Int(i) => i.to_string(),
+        PhpMixed::Bool(false) => BString::default(),
+        PhpMixed::Int(i) => i.to_string().into(),
         PhpMixed::Float(f) => float_to_string(*f),
-        // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
-        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
+        PhpMixed::String(s) => s.clone(),
         // PHP renders any array as the literal string "Array".
-        PhpMixed::List(_) | PhpMixed::Array(_) => "Array".to_string(),
+        PhpMixed::List(_) | PhpMixed::Array(_) => "Array".into(),
         // TODO(php-runtime): PHP casts an object to string via its __toString() method; PhpMixed::Object
         // carries no class/method information to dispatch to.
         PhpMixed::Object(_) => todo!(),
@@ -243,13 +268,13 @@ pub fn php_to_string(value: &PhpMixed) -> String {
 
 // TODO(php-runtime): the shim has no ini registry, so this hard-codes precision=14, the default
 // significant-digit count a float-to-string cast rounds to.
-fn float_to_string(f: f64) -> String {
+fn float_to_string(f: f64) -> BString {
     let mut out = BString::default();
     shirabe_php_src::zend::zend_smart_str::smart_str_append_double(&mut out, f, 14, false);
-    legacy_lossy(&out).into_owned()
+    out
 }
 
-pub fn strval(value: &PhpMixed) -> String {
+pub fn strval(value: &PhpMixed) -> BString {
     php_to_string(value)
 }
 
@@ -326,7 +351,7 @@ pub fn to_array(value: PhpMixed) -> IndexMap<BString, PhpMixed> {
     }
 }
 
-pub fn to_string(value: &PhpMixed) -> String {
+pub fn to_string(value: &PhpMixed) -> BString {
     php_to_string(value)
 }
 
@@ -353,76 +378,77 @@ pub fn boolval(value: &PhpMixed) -> bool {
     php_truthy(value)
 }
 
-pub fn var_export(value: &PhpMixed, r#return: bool) -> String {
-    let mut out = String::new();
+pub fn var_export(value: &PhpMixed, r#return: bool) -> BString {
+    let mut out = BString::default();
     var_export_into(&mut out, value, 0);
+    var_export_output(out, r#return)
+}
+
+pub fn var_export_str(value: impl AsRef<[u8]>, r#return: bool) -> BString {
+    let mut out = BString::default();
+    var_export_string(&mut out, value.as_ref());
+    var_export_output(out, r#return)
+}
+
+fn var_export_output(out: BString, r#return: bool) -> BString {
     if r#return {
         out
     } else {
         // PHP echoes the representation and returns null when $return is false.
-        print!("{}", out);
-        String::new()
+        use std::io::Write as _;
+        std::io::stdout()
+            .write_all(&out)
+            .expect("writing to stdout failed");
+        BString::default()
     }
 }
 
-pub fn var_export_str(value: &str, r#return: bool) -> String {
-    let out = var_export_string(value);
-    if r#return {
-        out
-    } else {
-        print!("{}", out);
-        String::new()
-    }
-}
-
-fn var_export_into(out: &mut String, value: &PhpMixed, level: usize) {
+fn var_export_into(out: &mut BString, value: &PhpMixed, level: usize) {
     match value {
         PhpMixed::Null => out.push_str("NULL"),
         PhpMixed::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
-        PhpMixed::Int(i) => out.push_str(&i.to_string()),
-        PhpMixed::Float(f) => out.push_str(&var_export_float(*f)),
-        // TODO(bytes): the output is a String, so non-UTF-8 bytes are replaced.
-        PhpMixed::String(s) => out.push_str(&var_export_string(&s.to_str_lossy())),
+        PhpMixed::Int(i) => out.push_str(i.to_string()),
+        PhpMixed::Float(f) => out.extend_from_slice(&var_export_float(*f)),
+        PhpMixed::String(s) => var_export_string(out, s),
         PhpMixed::List(items) => {
             out.push_str("array (\n");
             for (i, item) in items.iter().enumerate() {
                 var_export_indent(out, level + 1);
-                out.push_str(&format!("{} => ", i));
+                out.push_str(format!("{} => ", i));
                 if matches!(
                     item,
                     PhpMixed::List(_) | PhpMixed::Array(_) | PhpMixed::Object(_)
                 ) {
-                    out.push('\n');
+                    out.push(b'\n');
                     var_export_indent(out, level + 1);
                 }
                 var_export_into(out, item, level + 1);
                 out.push_str(",\n");
             }
             var_export_indent(out, level);
-            out.push(')');
+            out.push(b')');
         }
         PhpMixed::Array(entries) => {
             out.push_str("array (\n");
             for (k, v) in entries {
                 var_export_indent(out, level + 1);
                 match canonical_int_key(k) {
-                    Some(i) => out.push_str(&i.to_string()),
-                    // TODO(bytes): the output is a String, so non-UTF-8 bytes are replaced.
-                    None => out.push_str(&var_export_string(&k.to_str_lossy())),
+                    Some(i) => out.push_str(i.to_string()),
+                    None => var_export_string(out, k),
                 }
                 out.push_str(" => ");
                 if matches!(
                     v,
                     PhpMixed::List(_) | PhpMixed::Array(_) | PhpMixed::Object(_)
                 ) {
-                    out.push('\n');
+                    out.push(b'\n');
                     var_export_indent(out, level + 1);
                 }
                 var_export_into(out, v, level + 1);
                 out.push_str(",\n");
             }
             var_export_indent(out, level);
-            out.push(')');
+            out.push(b')');
         }
         // TODO(php-runtime): PhpMixed::Object carries no class name, so this renders the
         // stdClass shape "(object) array(...)" (PHP 8.5 oracle); any other class would render
@@ -432,60 +458,57 @@ fn var_export_into(out: &mut String, value: &PhpMixed, level: usize) {
             for (k, v) in entries {
                 var_export_indent(out, level + 1);
                 // Object property keys are always exported as quoted strings, never as ints.
-                out.push(' ');
-                // TODO(bytes): the output is a String, so non-UTF-8 bytes are replaced.
-                out.push_str(&var_export_string(&k.to_str_lossy()));
+                out.push(b' ');
+                var_export_string(out, k);
                 out.push_str(" => ");
                 if matches!(
                     v,
                     PhpMixed::List(_) | PhpMixed::Array(_) | PhpMixed::Object(_)
                 ) {
-                    out.push('\n');
+                    out.push(b'\n');
                     var_export_indent(out, level + 1);
                 }
                 var_export_into(out, v, level + 1);
                 out.push_str(",\n");
             }
             var_export_indent(out, level);
-            out.push(')');
+            out.push(b')');
         }
     }
 }
 
-fn var_export_indent(out: &mut String, level: usize) {
+fn var_export_indent(out: &mut BString, level: usize) {
     for _ in 0..level {
         out.push_str("  ");
     }
 }
 
 // PHP var_export() escapes only the backslash and single-quote inside the single-quoted literal.
-fn var_export_string(s: &str) -> String {
-    let mut out = String::with_capacity(s.len() + 2);
-    out.push('\'');
-    for c in s.chars() {
+fn var_export_string(out: &mut BString, s: &[u8]) {
+    out.push(b'\'');
+    for &c in s {
         // PHP var_export breaks NUL bytes out of the single-quoted literal as `' . "\0" . '`.
-        if c == '\0' {
+        if c == b'\0' {
             out.push_str("' . \"\\0\" . '");
             continue;
         }
-        if c == '\'' || c == '\\' {
-            out.push('\\');
+        if c == b'\'' || c == b'\\' {
+            out.push(b'\\');
         }
         out.push(c);
     }
-    out.push('\'');
-    out
+    out.push(b'\'');
 }
 
 // TODO(php-runtime): the shim has no ini registry, so this hard-codes serialize_precision=-1
 // (the default: the shortest round-trip representation). Any other serialize_precision selects
 // php_gcvt's fixed-precision mode, which is not reachable from here.
-fn var_export_float(f: f64) -> String {
+fn var_export_float(f: f64) -> BString {
     let mut out = BString::default();
     // var_export() renders a whole-valued float with a trailing ".0" so that it stays a float when
     // the exported code is evaluated.
     shirabe_php_src::zend::zend_smart_str::smart_str_append_double(&mut out, f, -1, true);
-    legacy_lossy(&out).into_owned()
+    out
 }
 
 #[cfg(test)]

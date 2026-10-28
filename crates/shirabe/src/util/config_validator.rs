@@ -9,7 +9,7 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use serde::de::Error as _;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, file_get_contents, php_regex, preg_is_match, preg_replace,
+    Catch as _, PhpMixed, file_get_contents, php_regex, preg_is_match, preg_replace, strtolower,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 
@@ -146,14 +146,14 @@ impl ConfigValidator {
 
         if let Some(PhpMixed::String(name)) = manifest.get(B("name"))
             && !name.is_empty()
-            && preg_is_match(php_regex!(r"{[A-Z]}"), &name.to_str_lossy())
+            && preg_is_match(php_regex!(r"{[A-Z]}"), name)
         {
             let suggest_name = preg_replace(
                 php_regex!(r"{(?:([a-z])([A-Z])|([A-Z])([A-Z][a-z]))}"),
                 r"\1\3-\2\4",
-                &name.to_str_lossy(),
+                name,
             );
-            let suggest_name = suggest_name.to_lowercase();
+            let suggest_name = strtolower(&suggest_name);
 
             publish_errors.push(format!(
                     "Name \"{}\" does not match the best practice (e.g. lower-cased/with-dashes). We suggest using \"{}\" instead. As such you will not be able to submit it to Packagist.",
@@ -223,7 +223,7 @@ impl ConfigValidator {
         packages.extend(require_dev);
         for (package, version) in &packages {
             if let PhpMixed::String(version_str) = version
-                && preg_is_match(php_regex!(r"{#}"), &version_str.to_str_lossy())
+                && preg_is_match(php_regex!(r"{#}"), version_str)
             {
                 warnings.push(format!(
                         "The package \"{}\" is pointing to a commit-ref, this is bad practice and can cause unforeseen issues.",

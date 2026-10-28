@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Package/Archiver/GitExcludeFilter.php
 
 use crate::package::archiver::{BaseExcludeFilter, BaseExcludeFilterBase};
-use shirabe_php_shim::{php_regex, preg_split};
+use shirabe_php_shim::{legacy_lossy, php_regex, preg_split};
 use std::path::Path;
 
 pub struct GitExcludeFilter {
@@ -37,7 +37,9 @@ impl GitExcludeFilter {
         let parts = preg_split(php_regex!(r"#\s+#"), line);
 
         if parts.len() == 2 && parts[1] == "export-ignore" {
-            return Some(BaseExcludeFilterBase::generate_pattern(&parts[0]));
+            return Some(BaseExcludeFilterBase::generate_pattern(&legacy_lossy(
+                &parts[0],
+            )));
         }
 
         if parts.len() == 2 && parts[1] == "-export-ignore" {

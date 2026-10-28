@@ -833,7 +833,7 @@ pub fn sprintf(format: impl AsRef<[u8]>, args: &[PhpMixed]) -> BString {
                 true,
             ),
             b's' => {
-                let mut s = BString::from(crate::php_to_string(&arg));
+                let mut s = crate::php_to_string(&arg);
                 if let Some(p) = precision.filter(|&p| p < s.len()) {
                     s.truncate(p);
                 }

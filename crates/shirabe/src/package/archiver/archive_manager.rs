@@ -54,7 +54,12 @@ impl ArchiveManager {
     ) -> anyhow::Result<IndexMap<String, String>> {
         let base_name = match package.get_archive_name() {
             Some(name) => name,
-            None => preg_replace(php_regex!("#[^a-z0-9-_]#i"), "-", &package.get_name()),
+            None => legacy_lossy(&preg_replace(
+                php_regex!("#[^a-z0-9-_]#i"),
+                "-",
+                package.get_name(),
+            ))
+            .into_owned(),
         };
 
         let mut parts: IndexMap<String, String> = IndexMap::new();
@@ -232,7 +237,7 @@ impl ArchiveManager {
             format
         );
         if let Some(parent) = std::path::Path::new(&target).parent() {
-            filesystem.ensure_directory_exists(parent.to_str().unwrap_or(""))?;
+            filesystem.ensure_directory_exists(parent.to_str().unwrap_or_default())?;
         }
 
         if !self.overwrite_files && file_exists(&target) {
@@ -251,7 +256,7 @@ impl ArchiveManager {
             format
         );
         if let Some(parent) = std::path::Path::new(&temp_target).parent() {
-            filesystem.ensure_directory_exists(parent.to_str().unwrap_or(""))?;
+            filesystem.ensure_directory_exists(parent.to_str().unwrap_or_default())?;
         }
 
         let mut all_excludes = exclude_patterns;

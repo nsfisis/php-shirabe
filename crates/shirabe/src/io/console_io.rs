@@ -229,7 +229,7 @@ impl ConsoleIO {
         };
         let messages = Self::ensure_valid_utf8(messages);
 
-        preg_replace(&pattern, replacement, &messages)
+        legacy_lossy(&preg_replace(&pattern, replacement, &messages)).into_owned()
     }
 
     /// Ensures a string is valid UTF-8, replacing invalid byte sequences with '?'

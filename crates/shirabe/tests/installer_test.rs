@@ -47,8 +47,8 @@ use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, php_fopen_resource, php_regex, preg_is_match, preg_match, preg_replace,
-    preg_split_delim_capture, rewind, stream_get_contents,
+    PHP_EOL, PhpMixed, legacy_lossy, php_fopen_resource, php_regex, preg_is_match, preg_match,
+    preg_replace, preg_split_delim_capture, rewind, stream_get_contents,
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
@@ -616,16 +616,16 @@ fn read_test_file(
         }
         if section.is_none() {
             assert!(
-                known.contains(token.as_str()),
+                known.contains(&*legacy_lossy(&token)),
                 "The test file \"{}\" must not contain a section named \"{}\".",
                 file.display(),
                 token
             );
-            section = Some(token);
+            section = Some(legacy_lossy(&token).into_owned());
             continue;
         }
         let sec = section.take().unwrap();
-        data.insert(sec, token);
+        data.insert(sec, legacy_lossy(&token).into_owned());
     }
 
     for (sec, required) in section_info {
@@ -1302,7 +1302,11 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
             "__inilist__\n",
             &output,
         );
-        assert_string_matches_format(expect_output.trim_end(), output.trim_end(), &output_string);
+        assert_string_matches_format(
+            legacy_lossy(&expect_output).trim_end(),
+            legacy_lossy(&output).trim_end(),
+            &output_string,
+        );
     }
 }
 

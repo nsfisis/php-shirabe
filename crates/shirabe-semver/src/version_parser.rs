@@ -1,9 +1,11 @@
 //! ref: composer/vendor/composer/semver/src/VersionParser.php
 
 use crate::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint};
+use bstr::{BStr, BString, ByteVec};
 use shirabe_php_shim::{
-    PregMatches, legacy_lossy, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
-    preg_split, strtolower, trim,
+    PhpMixed, PregMatches, bconcat, intval, legacy_lossy, ltrim2, php_regex, preg_is_match,
+    preg_match, preg_quote, preg_replace, preg_split, str_replace, str_replace_arr, strtolower,
+    trim,
 };
 
 // Regex to match pre-release data (sort of).
@@ -27,7 +29,7 @@ impl VersionParser {
     pub fn parse_stability(version: &str) -> String {
         let version = preg_replace(php_regex!("{#.+$}"), "", version);
 
-        if version.starts_with("dev-") || version.ends_with("-dev") {
+        if version.starts_with(b"dev-") || version.ends_with(b"-dev") {
             return "dev".to_string();
         }
 
@@ -45,7 +47,7 @@ impl VersionParser {
         }
 
         // match_[1] = the (stable|beta|b|RC|alpha|a|patch|pl|p) capture
-        let m1 = match_.as_ref().and_then(|m| m.get(1)).unwrap_or("");
+        let m1 = match_.as_ref().and_then(|m| m.get(1)).unwrap_or_default();
         if !m1.is_empty() {
             if m1 == "beta" || m1 == "b" {
                 return "beta".to_string();
@@ -131,13 +133,14 @@ impl VersionParser {
             let m2 = m.get(2).unwrap_or_default();
             let m3 = m.get(3).unwrap_or_default();
             let m4 = m.get(4).unwrap_or_default();
-            version = format!(
-                "{}{}{}{}",
+            let zero = BStr::new(".0");
+            version = legacy_lossy(&bconcat!(
                 m.get(1).unwrap_or_default(),
-                if m2.is_empty() { ".0" } else { m2 },
-                if m3.is_empty() { ".0" } else { m3 },
-                if m4.is_empty() { ".0" } else { m4 },
-            );
+                if m2.is_empty() { zero } else { m2 },
+                if m3.is_empty() { zero } else { m3 },
+                if m4.is_empty() { zero } else { m4 },
+            ))
+            .into_owned();
             index = Some(5);
             matches = Some(m);
         } else {
@@ -147,7 +150,12 @@ impl VersionParser {
                 MODIFIER_REGEX
             );
             if let Some(m) = preg_match(&datetime_pattern, &subject) {
-                version = preg_replace(php_regex!("{\\D}"), ".", m.get(1).unwrap_or_default());
+                version = legacy_lossy(&preg_replace(
+                    php_regex!("{\\D}"),
+                    ".",
+                    m.get(1).unwrap_or_default(),
+                ))
+                .into_owned();
                 index = Some(2);
                 matches = Some(m);
             }
@@ -162,16 +170,17 @@ impl VersionParser {
                     return Ok(version);
                 }
                 let mi1 = matches.get(idx + 1).unwrap_or_default();
-                version = format!(
-                    "{}-{}{}",
+                version = legacy_lossy(&bconcat!(
                     version,
-                    self.expand_stability(mi),
+                    "-",
+                    self.expand_stability(&legacy_lossy(mi)),
                     if !mi1.is_empty() {
-                        mi1.trim_start_matches(['.', '-'])
+                        ltrim2(mi1, ".-")
                     } else {
-                        ""
+                        BString::default()
                     }
-                );
+                ))
+                .into_owned();
             }
 
             if !matches.get(idx + 2).unwrap_or_default().is_empty() {
@@ -187,7 +196,7 @@ impl VersionParser {
             // a branch ending with -dev is only valid if it is numeric
             // if it gets prefixed with dev- it means the branch name should
             // have had a dev- prefix already when passed to normalize
-            if let Ok(normalized) = self.normalize_branch(branch_name)
+            if let Ok(normalized) = self.normalize_branch(&legacy_lossy(branch_name))
                 && !normalized.starts_with("dev-")
             {
                 return Ok(normalized);
@@ -253,16 +262,18 @@ impl VersionParser {
             php_regex!("{^v?(\\d++)(\\.(\\d++|[xX*]))?(\\.(\\d++|[xX*]))?(\\.(\\d++|[xX*]))?$}i"),
             &name,
         ) {
-            let mut version = String::new();
+            let mut version = BString::default();
             for i in [1usize, 2, 4, 6] {
                 if let Some(m) = matches.get(i) {
-                    version.push_str(&m.replace(['*', 'X'], "x"));
+                    version.extend_from_slice(&str_replace_arr(&["*", "X"], "x", m));
                 } else {
                     version.push_str(".x");
                 }
             }
 
-            return Ok(format!("{}-dev", version.replace('x', "9999999")));
+            return Ok(
+                legacy_lossy(&bconcat!(str_replace("x", "9999999", &version), "-dev")).into_owned(),
+            );
         }
 
         Ok(format!("dev-{}", name))
@@ -283,15 +294,12 @@ impl VersionParser {
     pub fn parse_constraints(&self, constraints: &str) -> anyhow::Result<AnyConstraint> {
         let pretty_constraint = constraints.to_string();
 
-        let or_constraints = preg_split(
-            php_regex!("{\\s*\\|\\|?\\s*}"),
-            &legacy_lossy(&trim(constraints)),
-        );
+        let or_constraints = preg_split(php_regex!("{\\s*\\|\\|?\\s*}"), trim(constraints));
 
         let mut or_groups: Vec<AnyConstraint> = Vec::new();
 
         for or_constraint in &or_constraints {
-            let and_constraints = split_and_constraints(or_constraint);
+            let and_constraints = split_and_constraints(&legacy_lossy(or_constraint));
 
             let constraint_objects: Vec<AnyConstraint> = if and_constraints.len() > 1 {
                 let mut objs: Vec<AnyConstraint> = Vec::new();
@@ -546,8 +554,8 @@ impl VersionParser {
                 ""
             };
 
-            let from_str = matches.get(1).unwrap_or_default(); // matches['from']
-            let low_version = self.normalize(from_str, None)?;
+            let from_str = legacy_lossy(&matches.get(1).unwrap_or_default()).into_owned(); // matches['from']
+            let low_version = self.normalize(&from_str, None)?;
             let lower_bound = SimpleConstraint::new(
                 ">=".to_string(),
                 format!("{}{}", low_version, low_stability_suffix),
@@ -555,7 +563,7 @@ impl VersionParser {
             );
 
             // PHP's empty() on "0" returns true, but here we only check for truly empty/missing
-            let empty = |x: Option<&str>| -> bool { x.is_none_or(|s| s.is_empty()) };
+            let empty = |x: Option<&BStr>| -> bool { x.is_none_or(|s| s.is_empty()) };
 
             // matches[12]=to minor, matches[13]=to patch, matches[15]=to stability,
             // matches[17]=to dev, matches[18]=to wildcard-dev
@@ -565,14 +573,14 @@ impl VersionParser {
                 || !matches.get(17).unwrap_or_default().is_empty()
                 || !matches.get(18).unwrap_or_default().is_empty()
             {
-                let to_str = matches.get(10).unwrap_or_default(); // matches['to']
-                let hv = self.normalize(to_str, None)?;
+                let to_str = legacy_lossy(&matches.get(10).unwrap_or_default()).into_owned(); // matches['to']
+                let hv = self.normalize(&to_str, None)?;
                 SimpleConstraint::new("<=".to_string(), hv, None)
             } else {
                 // matches[11]=to major, matches[12]=to minor, matches[13]=to patch,
                 // matches[14]=to fourth
                 let high_match = [
-                    Some(""),
+                    Some(BStr::new("")),
                     matches.get(11),
                     matches.get(12),
                     matches.get(13),
@@ -580,8 +588,8 @@ impl VersionParser {
                 ];
 
                 // validate to version
-                let to_str = matches.get(10).unwrap_or_default(); // matches['to']
-                self.normalize(to_str, None)?;
+                let to_str = legacy_lossy(&matches.get(10).unwrap_or_default()).into_owned(); // matches['to']
+                self.normalize(&to_str, None)?;
 
                 let position = if empty(matches.get(12)) { 1 } else { 2 };
                 let hv = format!(
@@ -636,7 +644,7 @@ impl VersionParser {
                 }
                 if op == "<" || op == ">=" {
                     let modifier_pattern = format!("{{-{}$}}", MODIFIER_REGEX);
-                    if !preg_is_match(&modifier_pattern, &legacy_lossy(&strtolower(&version_str)))
+                    if !preg_is_match(&modifier_pattern, strtolower(&version_str))
                         && !version_str.starts_with("dev-")
                     {
                         version = format!("{}-dev", version);
@@ -665,12 +673,13 @@ impl VersionParser {
 
     fn manipulate_version_string<'a>(
         &self,
-        matches: impl Fn(usize) -> Option<&'a str>,
+        matches: impl Fn(usize) -> Option<&'a BStr>,
         position: usize,
         increment: i64,
         pad: &str,
     ) -> Option<String> {
-        let part = |i: usize| -> i64 { matches(i).unwrap_or("0").parse().unwrap_or(0) };
+        let part =
+            |i: usize| -> i64 { intval(&PhpMixed::string(matches(i).unwrap_or(BStr::new("0")))) };
         let mut parts: [i64; 5] = [0, part(1), part(2), part(3), part(4)];
         let pad_val: i64 = pad.parse().unwrap_or(0);
         let mut position = position;

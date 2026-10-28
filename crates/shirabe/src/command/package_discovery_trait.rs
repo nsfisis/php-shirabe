@@ -139,14 +139,17 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 if requirement.contains_key("version")
                     && preg_is_match(
                         php_regex!(r"{^\d+(\.\d+)?$}"),
-                        requirement.get("version").map(|s| s.as_str()).unwrap_or(""),
+                        requirement
+                            .get("version")
+                            .map(|s| s.as_str())
+                            .unwrap_or_default(),
                     )
                 {
                     io.write_error3(
                         &format!(
                             "<warning>The \"{}\" constraint for \"{}\" appears too strict and will likely not match what you want. See https://getcomposer.org/constraints</warning>",
-                            requirement.get("version").map(|s| s.as_str()).unwrap_or(""),
-                            requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
+                            requirement.get("version").map(|s| s.as_str()).unwrap_or_default(),
+                            requirement.get("name").map(|s| s.as_str()).unwrap_or_default(),
                         ),
                         true,
                         io_interface::NORMAL,
@@ -159,7 +162,10 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         .find_best_version_and_name_for_package(
                             io.clone(),
                             input.clone(),
-                            requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
+                            requirement
+                                .get("name")
+                                .map(|s| s.as_str())
+                                .unwrap_or_default(),
                             platform_repo,
                             preferred_stability,
                             fixed,
@@ -186,8 +192,14 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                 result.push(format!(
                     "{} {}",
-                    requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
-                    requirement.get("version").map(|s| s.as_str()).unwrap_or(""),
+                    requirement
+                        .get("name")
+                        .map(|s| s.as_str())
+                        .unwrap_or_default(),
+                    requirement
+                        .get("version")
+                        .map(|s| s.as_str())
+                        .unwrap_or_default(),
                 ));
             }
 
@@ -328,7 +340,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                 php_regex!(r"{^\s*(?P<name>[\S/]+)(?:\s+(?P<version>\S+))?\s*$}"),
                                 &selection,
                             ) {
-                                if let Some(v) = m.name("version").map(str::to_string) {
+                                if let Some(v) =
+                                    m.name("version").map(|s| legacy_lossy(s).into_owned())
+                                {
                                     // parsing `acme/example ~2.3`
                                     // validate version constraint
                                     version_parser_clone.parse_constraints(&v)?;

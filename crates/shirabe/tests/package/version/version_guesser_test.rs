@@ -109,7 +109,13 @@ fn test_hg_guess_version_returns_data() {
         format!("dev-{}", branch),
         version_data.pretty_version.unwrap()
     );
-    assert!(version_data.commit.as_deref().unwrap_or("").is_empty());
+    assert!(
+        version_data
+            .commit
+            .as_deref()
+            .unwrap_or_default()
+            .is_empty()
+    );
 }
 
 #[test]

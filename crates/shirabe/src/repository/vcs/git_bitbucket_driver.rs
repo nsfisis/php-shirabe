@@ -711,14 +711,14 @@ impl GitBitbucketDriver {
             {
                 // Format: https://(user@)bitbucket.org/{user}/{repo}
                 // Strip username from URL (only present in clone URL's for private repositories)
-                self.clone_https_url = preg_replace(
+                self.clone_https_url = legacy_lossy(&preg_replace(
                     php_regex!(r"/https:\/\/([^@]+@)?/"),
                     "https://",
-                    &m.get(B("href"))
+                    m.get(B("href"))
                         .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_str_lossy(),
-                );
+                        .unwrap_or_default(),
+                ))
+                .into_owned();
             }
         }
     }

@@ -687,7 +687,7 @@ impl DownloaderInterface for FileDownloader {
             .get_pretty_name()
             .split('/')
             .next()
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         let dirs_to_clean_up: Vec<String> = vec![
             path.to_string(),

@@ -13,7 +13,7 @@ use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySetIn
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, UnexpectedValueException, legacy_lossy, php_regex, preg_is_match, preg_replace,
-    strtolower, version_compare,
+    str_replace, strtolower, version_compare,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
@@ -282,7 +282,8 @@ impl VersionSelector {
                 &extra,
             );
             if new_extra != extra {
-                let new_extra = new_extra.replace(".9999999", ".0");
+                let new_extra =
+                    legacy_lossy(&str_replace(".9999999", ".0", &new_extra)).into_owned();
                 return self.transform_version(&new_extra, &new_extra, "dev");
             }
         }

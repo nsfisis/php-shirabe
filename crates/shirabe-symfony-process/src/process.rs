@@ -13,9 +13,9 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Descriptor, PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, ProcStatus, SEEK_END,
-    SEEK_SET, exec, fopen, fseek, fwrite, getcwd, getenv_all, is_dir, microtime, php_regex,
-    preg_is_match, preg_replace, preg_replace_callback, proc_close, proc_get_status, proc_open,
-    proc_terminate, stream_get_contents3, strpbrk, uniqid, usleep,
+    SEEK_SET, exec, fopen, fseek, fwrite, getcwd, getenv_all, is_dir, legacy_lossy, microtime,
+    php_regex, preg_is_match, preg_replace, preg_replace_callback, proc_close, proc_get_status,
+    proc_open, proc_terminate, stream_get_contents3, strpbrk, uniqid, usleep,
 };
 use std::sync::OnceLock;
 
@@ -343,7 +343,7 @@ impl Process {
         if !self.cwd.as_deref().map(is_dir).unwrap_or(false) {
             return Err(RuntimeException::new(format!(
                 "The provided cwd \"{}\" does not exist.",
-                self.cwd.as_deref().unwrap_or("")
+                self.cwd.as_deref().unwrap_or_default()
             ))
             .into());
         }
@@ -995,7 +995,7 @@ impl Process {
             ),
             |m: &PregMatches| -> anyhow::Result<String> {
                 let m0 = m.get(0).unwrap_or_default().to_string();
-                let m1 = m.get(1).map(str::to_string);
+                let m1 = m.get(1).map(|s| legacy_lossy(s).into_owned());
                 if m1.is_none() {
                     return Ok(m0);
                 }
@@ -1034,6 +1034,7 @@ impl Process {
             },
             cmd,
         )?;
+        let cmd = legacy_lossy(&cmd).into_owned();
 
         static COM_SPEC: OnceLock<Option<String>> = OnceLock::new();
         let com_spec = COM_SPEC
@@ -1101,7 +1102,8 @@ impl Process {
         if !preg_is_match(php_regex!(r#"/[()%!^"<>&|\s\[\]=;*?'$]/"#), &argument) {
             return argument;
         }
-        argument = preg_replace(php_regex!(r"/(\\+)$/"), "$1$1", &argument);
+        argument =
+            legacy_lossy(&preg_replace(php_regex!(r"/(\\+)$/"), "$1$1", &argument)).into_owned();
 
         let mut result = argument;
         for (from, to) in [
@@ -1121,7 +1123,7 @@ impl Process {
         commandline: &str,
         env: &IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<String> {
-        preg_replace_callback(
+        let replaced = preg_replace_callback(
             php_regex!(r#"/"\$\{:([_a-zA-Z]+[_a-zA-Z0-9]*)\}"/"#),
             |matches: &PregMatches| -> anyhow::Result<String> {
                 let key = matches.get(1).unwrap_or_default().to_string();
@@ -1140,7 +1142,8 @@ impl Process {
                 }
             },
             commandline,
-        )
+        )?;
+        Ok(legacy_lossy(&replaced).into_owned())
     }
 
     fn get_default_env(&self) -> IndexMap<BString, PhpMixed> {

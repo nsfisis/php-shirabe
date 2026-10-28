@@ -218,7 +218,7 @@ impl PolicyInterface for DefaultPolicy {
                 .map(|l| l.to_string())
                 .collect::<Vec<_>>()
                 .join(","),
-            required_package.as_deref().unwrap_or("")
+            required_package.as_deref().unwrap_or_default()
         );
         let pool_id = pool as *const Pool as i64;
 
@@ -235,8 +235,12 @@ impl PolicyInterface for DefaultPolicy {
 
         for name_literals in packages.values_mut() {
             name_literals.sort_by(|&a, &b| {
-                let cache_key =
-                    format!("i{}.{}{}", a, b, required_package.as_deref().unwrap_or(""));
+                let cache_key = format!(
+                    "i{}.{}{}",
+                    a,
+                    b,
+                    required_package.as_deref().unwrap_or_default()
+                );
                 {
                     let cache = self.sorting_cache_per_pool.borrow();
                     if let Some(pool_cache) = cache.get(&pool_id)
@@ -269,7 +273,12 @@ impl PolicyInterface for DefaultPolicy {
         let mut selected: Vec<i64> = packages.into_values().flatten().collect();
 
         selected.sort_by(|&a, &b| {
-            let cache_key = format!("{}.{}{}", a, b, required_package.as_deref().unwrap_or(""));
+            let cache_key = format!(
+                "{}.{}{}",
+                a,
+                b,
+                required_package.as_deref().unwrap_or_default()
+            );
             {
                 let cache = self.sorting_cache_per_pool.borrow();
                 if let Some(pool_cache) = cache.get(&pool_id)

@@ -496,7 +496,7 @@ impl HttpDownloader {
     ) -> anyhow::Result<()> {
         let clean_message = |msg: &str| -> anyhow::Result<String> {
             if !io.is_decorated() {
-                return Ok(preg_replace("{\x1b\\[[;\\d]*m}u", "", msg));
+                return Ok(legacy_lossy(&preg_replace("{\x1b\\[[;\\d]*m}u", "", msg)).into_owned());
             }
 
             Ok(msg.to_string())

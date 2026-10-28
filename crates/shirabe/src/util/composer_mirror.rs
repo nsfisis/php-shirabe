@@ -30,8 +30,8 @@ impl ComposerMirror {
         let mut to: Vec<&str> = vec![
             package_name,
             &version,
-            reference.as_deref().unwrap_or(""),
-            r#type.unwrap_or(""),
+            reference.as_deref().unwrap_or_default(),
+            r#type.unwrap_or_default(),
         ];
         if let Some(pv) = pretty_version {
             from.push("%prettyVersion%");
@@ -73,12 +73,17 @@ impl ComposerMirror {
                 bb_matches.get(2).unwrap_or_default(),
             )
         } else {
-            preg_replace(php_regex!(r"{[^a-z0-9_.-]}i"), "-", url.trim_matches('/'))
+            legacy_lossy(&preg_replace(
+                php_regex!(r"{[^a-z0-9_.-]}i"),
+                "-",
+                url.trim_matches('/'),
+            ))
+            .into_owned()
         };
 
         ["%package%", "%normalizedUrl%", "%type%"]
             .iter()
-            .zip([package_name, &normalized_url, r#type.unwrap_or("")])
+            .zip([package_name, &normalized_url, r#type.unwrap_or_default()])
             .fold(mirror_url.to_string(), |acc, (f, t)| acc.replace(f, t))
     }
 

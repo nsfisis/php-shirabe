@@ -369,7 +369,9 @@ impl EventDispatcher {
             if let Callable::String(ref s) = callable
                 && s.contains("@no_additional_args")
             {
-                let replaced = preg_replace(php_regex!("{ ?@no_additional_args}"), "", s);
+                let replaced =
+                    legacy_lossy(&preg_replace(php_regex!("{ ?@no_additional_args}"), "", s))
+                        .into_owned();
                 callable = Callable::String(replaced);
                 additional_args = Vec::new();
             }
@@ -466,7 +468,7 @@ impl EventDispatcher {
                     let (class_name, method) = match &callable {
                         Callable::ArrayCallable(first, m) => {
                             let cls = if is_object(first.as_ref()) {
-                                get_class(first.as_ref())
+                                legacy_lossy(&get_class(first.as_ref())).into_owned()
                             } else if let PhpMixed::String(s) = first.as_ref() {
                                 s.to_str_lossy().into_owned()
                             } else {
@@ -485,7 +487,7 @@ impl EventDispatcher {
                 }
                 if let Callable::ArrayCallable(first, method_name) = &callable {
                     let prefix = if is_object(first.as_ref()) {
-                        get_class(first.as_ref())
+                        legacy_lossy(&get_class(first.as_ref())).into_owned()
                     } else if let PhpMixed::String(s) = first.as_ref() {
                         s.to_str_lossy().into_owned()
                     } else {
@@ -912,11 +914,12 @@ try {{
                                 ) {
                                     let caller =
                                         BinaryInstaller::determine_binary_caller(local_exec);
-                                    exec = preg_replace(
+                                    exec = legacy_lossy(&preg_replace(
                                         format!("{{^{}}}", preg_quote(&callable_str, None)),
-                                        &format!("{} {}", caller, local_exec),
+                                        format!("{} {}", caller, local_exec),
                                         &exec,
-                                    );
+                                    ))
+                                    .into_owned();
                                     break;
                                 }
                             }
@@ -939,15 +942,22 @@ try {{
                             let mut path_and_args =
                                 legacy_lossy(&substr(&exec, 5, None)).into_owned();
                             if Platform::is_windows() {
-                                path_and_args = preg_replace_callback(
-                                    php_regex!("{^\\S+}"),
-                                    |m| {
-                                        Ok(legacy_lossy(&str_replace("/", "\\", m.get(0).unwrap()))
+                                path_and_args = legacy_lossy(
+                                    &preg_replace_callback(
+                                        php_regex!("{^\\S+}"),
+                                        |m| {
+                                            Ok(legacy_lossy(&str_replace(
+                                                "/",
+                                                "\\",
+                                                m.get(0).unwrap(),
+                                            ))
                                             .into_owned())
-                                    },
-                                    &path_and_args,
+                                        },
+                                        &path_and_args,
+                                    )
+                                    .expect("the replacement callback cannot fail"),
                                 )
-                                .expect("the replacement callback cannot fail");
+                                .into_owned();
                             }
                             // match somename (not in quote, and not a qualified path) and if it is not a valid path from CWD then try to find it
                             // in $PATH. This allows support for `@php foo` where foo is a binary name found in PATH but not an actual relative path
@@ -960,11 +970,12 @@ try {{
                                     if let Some(path_to_exec) = finder.find(&m0, None, &[]) {
                                         let mut path_to_exec = path_to_exec;
                                         if Platform::is_windows() {
-                                            let exec_without_ext = preg_replace(
+                                            let exec_without_ext = legacy_lossy(&preg_replace(
                                                 php_regex!("{\\.(exe|bat|cmd|com)$}i"),
                                                 "",
                                                 &path_to_exec,
-                                            );
+                                            ))
+                                            .into_owned();
                                             // prefer non-extension file if it exists when executing with PHP
                                             if file_exists(&exec_without_ext) {
                                                 path_to_exec = exec_without_ext;
@@ -987,15 +998,22 @@ try {{
                             }
 
                             if Platform::is_windows() {
-                                exec = preg_replace_callback(
-                                    php_regex!("{^\\S+}"),
-                                    |m| {
-                                        Ok(legacy_lossy(&str_replace("/", "\\", m.get(0).unwrap()))
+                                exec = legacy_lossy(
+                                    &preg_replace_callback(
+                                        php_regex!("{^\\S+}"),
+                                        |m| {
+                                            Ok(legacy_lossy(&str_replace(
+                                                "/",
+                                                "\\",
+                                                m.get(0).unwrap(),
+                                            ))
                                             .into_owned())
-                                    },
-                                    &exec,
+                                        },
+                                        &exec,
+                                    )
+                                    .expect("the replacement callback cannot fail"),
                                 )
-                                .expect("the replacement callback cannot fail");
+                                .into_owned();
                             }
                         }
 

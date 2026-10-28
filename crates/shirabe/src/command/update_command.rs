@@ -105,7 +105,7 @@ impl UpdateCommand {
         let mut version_selector = self.create_version_selector(composer)?;
         for package in &installed_packages {
             if let Some(filter) = &filter
-                && !preg_is_match(filter, &package.get_name())
+                && !preg_is_match(filter, package.get_name())
             {
                 continue;
             }
@@ -366,7 +366,12 @@ impl Command for UpdateCommand {
 
             // replace the foo/bar:req by foo/bar in the allowlist
             for package in &allowlist_packages_with_requirements {
-                let package_name = preg_replace(php_regex!(r"{^([^ =:]+)[ =:].*$}"), "$1", package);
+                let package_name = legacy_lossy(&preg_replace(
+                    php_regex!(r"{^([^ =:]+)[ =:].*$}"),
+                    "$1",
+                    package,
+                ))
+                .into_owned();
                 if let Some(idx) = array_search_in_vec(package, &packages) {
                     packages[idx] = package_name;
                 }

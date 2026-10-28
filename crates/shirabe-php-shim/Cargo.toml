@@ -20,7 +20,6 @@ md5.workspace = true
 memchr.workspace = true
 nix.workspace = true
 regex.workspace = true
-regex-macro.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true

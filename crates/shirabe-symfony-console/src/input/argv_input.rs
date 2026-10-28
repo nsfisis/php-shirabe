@@ -544,8 +544,9 @@ impl std::fmt::Display for ArgvInput {
                 if let Some(r#match) = preg_match(php_regex!("{^(-[^=]+=)(.+)}"), token) {
                     return format!(
                         "{}{}",
-                        r#match.get(1).unwrap_or(""),
-                        self.inner.escape_token(r#match.get(2).unwrap_or(""))
+                        r#match.get(1).unwrap_or_default(),
+                        self.inner
+                            .escape_token(&legacy_lossy(r#match.get(2).unwrap_or_default()))
                     );
                 }
 

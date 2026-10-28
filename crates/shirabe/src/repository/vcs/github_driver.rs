@@ -81,7 +81,7 @@ impl GitHubDriver {
             match_
                 .get(1)
                 .filter(|s| !s.is_empty())
-                .map(str::to_string)
+                .map(|s| legacy_lossy(s).into_owned())
                 .unwrap_or_else(|| match_.get(2).unwrap_or_default().to_string()),
         ))
         .into_owned();
@@ -479,7 +479,7 @@ impl GitHubDriver {
                 if let Some(m2) = preg_match(php_regex!(r"{^\[(.*?)\](?:\s*#.*)?$}"), &g2) {
                     let inner = m2.get(1).unwrap_or_default().to_string();
                     for item in array_map(
-                        |s: &String| trim(s),
+                        |s: &BString| trim(s),
                         &preg_split(php_regex!(r#"{[\'\"]?\s*,\s*[\'\"]?}"#), &inner),
                     ) {
                         let mut entry = IndexMap::new();
@@ -787,7 +787,8 @@ impl GitHubDriver {
             ));
 
             loop {
-                let response = self.get_contents(resource.as_deref().unwrap_or(""), false)??;
+                let response =
+                    self.get_contents(resource.as_deref().unwrap_or_default(), false)??;
                 let tags_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = tags_data {
                     for tag in list {
@@ -835,7 +836,8 @@ impl GitHubDriver {
             ));
 
             loop {
-                let response = self.get_contents(resource.as_deref().unwrap_or(""), false)??;
+                let response =
+                    self.get_contents(resource.as_deref().unwrap_or_default(), false)??;
                 let branch_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = branch_data {
                     for branch in list {
@@ -889,7 +891,7 @@ impl GitHubDriver {
         let origin_url = matches
             .get(2)
             .filter(|s| !s.is_empty())
-            .map(str::to_string)
+            .map(|s| legacy_lossy(s).into_owned())
             .unwrap_or_else(|| matches.get(3).unwrap_or_default().to_string());
         if !in_array_loose(
             strtolower(preg_replace(php_regex!(r"{^www\.}i"), "", &origin_url)),
@@ -1230,9 +1232,7 @@ impl GitHubDriver {
 
         let links = explode(",", &header);
         for link in links.iter() {
-            if let Some(m) =
-                preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), &legacy_lossy(link))
-            {
+            if let Some(m) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
                 return Some(m.get(1).unwrap_or_default().to_string());
             }
         }

@@ -9,13 +9,13 @@ use crate::downloader::{
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Git as GitUtil, Platform, ProcessExecutor, Url};
-use bstr::B;
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, PhpMixed, RuntimeException, array_map, basename, dirname, impl_php_class, implode,
-    in_array_strict, is_dir, legacy_lossy, php_regex, preg_is_match, preg_match, preg_match_all,
-    preg_quote, preg_replace, preg_split, realpath, rtrim2, strlen, strpos, substr, trim,
-    version_compare,
+    CmpOp, PhpMixed, RuntimeException, array_map, basename, bconcat, dirname, impl_php_class,
+    implode, in_array_strict, is_dir, legacy_lossy, php_regex, preg_is_match, preg_match,
+    preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim2, strlen, strpos, substr,
+    trim, version_compare,
 };
 
 #[derive(Debug)]
@@ -182,7 +182,7 @@ impl GitDownloader {
                     let output = legacy_lossy(&trim(&output)).into_owned();
                     // keep the shortest diff from all remote branches we compare against
                     if unpushed_changes.is_none()
-                        || strlen(&output) < strlen(unpushed_changes.as_deref().unwrap_or(""))
+                        || strlen(&output) < strlen(unpushed_changes.as_deref().unwrap_or_default())
                     {
                         unpushed_changes = Some(output);
                     }
@@ -265,11 +265,12 @@ impl GitDownloader {
         // If the non-existent branch is actually the name of a file, the file
         // is checked out.
 
-        let mut branch = preg_replace(
+        let mut branch = legacy_lossy(&preg_replace(
             php_regex!(r"{(?:^dev-|(?:\.x)?-dev$)}i"),
             "",
             pretty_version,
-        );
+        ))
+        .into_owned();
 
         // Closure equivalent: $execute = function(array $command) use (&$output, $path) { ... };
         // Inlined below at each call site.
@@ -293,7 +294,7 @@ impl GitDownloader {
             && branches.is_some()
             && preg_is_match(
                 format!("{{^\\s+composer/{}$}}m", preg_quote(reference, None)),
-                branches.as_deref().unwrap_or(""),
+                branches.as_deref().unwrap_or_default(),
             )
         {
             let mut command1: Vec<String> = vec!["git".to_string(), "checkout".to_string()];
@@ -340,11 +341,11 @@ impl GitDownloader {
             if branches.is_some()
                 && !preg_is_match(
                     format!("{{^\\s+composer/{}$}}m", preg_quote(&branch, None)),
-                    branches.as_deref().unwrap_or(""),
+                    branches.as_deref().unwrap_or_default(),
                 )
                 && preg_is_match(
                     format!("{{^\\s+composer/v{}$}}m", preg_quote(&branch, None)),
-                    branches.as_deref().unwrap_or(""),
+                    branches.as_deref().unwrap_or_default(),
                 )
             {
                 branch = format!("v{}", branch);
@@ -760,13 +761,17 @@ impl VcsDownloader for GitDownloader {
                 .get("cache-vcs-dir")
                 .as_string()
                 .unwrap_or_default(),
-            preg_replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string())),
+            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.to_string())),
         );
         let git_version = GitUtil::get_version(&self.inner.process)?;
 
         // --dissociate option is only available since git 2.3.0-rc0
         if git_version.is_some()
-            && version_compare(git_version.as_deref().unwrap_or(""), "2.3.0-rc0", CmpOp::Ge)
+            && version_compare(
+                git_version.as_deref().unwrap_or_default(),
+                "2.3.0-rc0",
+                CmpOp::Ge,
+            )
             && Cache::is_usable(&cache_path)
         {
             self.inner.io.write_error3(
@@ -789,7 +794,7 @@ impl VcsDownloader for GitDownloader {
             if self.git_util.borrow_mut().fetch_ref_or_sync_mirror(
                 url,
                 &cache_path,
-                r#ref.as_deref().unwrap_or(""),
+                r#ref.as_deref().unwrap_or_default(),
                 Some(&pretty_version),
             )? && is_dir(&cache_path)
             {
@@ -797,7 +802,7 @@ impl VcsDownloader for GitDownloader {
                     .borrow_mut()
                     .entry(package.get_id())
                     .or_default()
-                    .insert(r#ref.as_deref().unwrap_or("").to_string(), true);
+                    .insert(r#ref.as_deref().unwrap_or_default().to_string(), true);
             }
         } else if git_version.is_none() {
             return Err(RuntimeException::new(
@@ -825,7 +830,7 @@ impl VcsDownloader for GitDownloader {
                 .get("cache-vcs-dir")
                 .as_string()
                 .unwrap_or_default(),
-            preg_replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string())),
+            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.to_string())),
         );
         let r#ref = package.get_source_reference().unwrap_or_default();
 
@@ -985,7 +990,7 @@ impl VcsDownloader for GitDownloader {
                 .get("cache-vcs-dir")
                 .as_string()
                 .unwrap_or_default(),
-            preg_replace(r"{[^a-z0-9.]}i", "-", &Url::sanitize(url.to_string())),
+            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.to_string())),
         );
         let r#ref = target.get_source_reference().unwrap_or_default();
 
@@ -1154,8 +1159,8 @@ impl VcsDownloader for GitDownloader {
             return Ok(None);
         }
 
-        let changes: Vec<String> = array_map(
-            |elem: &String| format!("    {}", elem),
+        let changes: Vec<BString> = array_map(
+            |elem: &BString| bconcat!("    ", elem),
             &preg_split(php_regex!(r"{\s*\r?\n\s*}"), &changes),
         );
         self.inner.io.write_error3(
@@ -1167,9 +1172,11 @@ impl VcsDownloader for GitDownloader {
             io_interface::NORMAL,
         );
         let slice_end = 10_usize.min(changes.len());
-        self.inner
-            .io
-            .write_error3(&changes[..slice_end].join("\n"), true, io_interface::NORMAL);
+        self.inner.io.write_error3(
+            &legacy_lossy(&implode("\n", &changes[..slice_end])),
+            true,
+            io_interface::NORMAL,
+        );
         if (changes.len() as i64) > 10 {
             self.inner.io.write_error3(
                 &format!(
@@ -1213,9 +1220,11 @@ impl VcsDownloader for GitDownloader {
                     return Err(RuntimeException::new("Update aborted".to_string()).into());
                 }
                 Some("v") => {
-                    self.inner
-                        .io
-                        .write_error3(&changes.join("\n"), true, io_interface::NORMAL);
+                    self.inner.io.write_error3(
+                        &legacy_lossy(&implode("\n", &changes)),
+                        true,
+                        io_interface::NORMAL,
+                    );
                 }
                 Some("d") => {
                     self.view_diff(&path)?;

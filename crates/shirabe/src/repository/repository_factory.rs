@@ -9,11 +9,11 @@ use crate::repository::{
     FilesystemRepository, RepositoryInterfaceHandle, RepositoryManager, RepositoryManagerInterface,
 };
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, get_debug_type, json_encode,
-    php_regex, php_to_string, preg_replace,
+    legacy_lossy, php_regex, php_to_string, preg_replace,
 };
 
 pub struct RepositoryFactory;
@@ -35,7 +35,7 @@ impl RepositoryFactory {
         let extension = std::path::Path::new(repository)
             .extension()
             .and_then(|e| e.to_str())
-            .unwrap_or("");
+            .unwrap_or_default();
 
         if extension == "json" {
             let json = JsonFile::new(
@@ -295,15 +295,18 @@ impl RepositoryFactory {
         repo: &IndexMap<BString, PhpMixed>,
         existing_repos: &IndexMap<K, T>,
     ) -> String {
-        let mut name = if matches!(index, PhpMixed::Int(_)) && repo.contains_key(B("url")) {
+        let mut name = legacy_lossy(&if matches!(index, PhpMixed::Int(_))
+            && repo.contains_key(B("url"))
+        {
             let url = repo
                 .get(B("url"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default();
-            preg_replace(php_regex!("{^https?://}i"), "", &url.to_str_lossy())
+            preg_replace(php_regex!("{^https?://}i"), "", url)
         } else {
             php_to_string(index)
-        };
+        })
+        .into_owned();
         while existing_repos
             .keys()
             .any(|key| key.as_ref() == name.as_bytes())
@@ -318,11 +321,14 @@ impl RepositoryFactory {
         repo: &IndexMap<BString, PhpMixed>,
         existing_repos: &IndexMap<String, RepositoryInterfaceHandle>,
     ) -> String {
-        let mut name = if let Some(url) = repo.get(B("url")).and_then(|v| v.as_string()) {
-            preg_replace(php_regex!("{^https?://}i"), "", &url.to_str_lossy())
+        let mut name = legacy_lossy(&if let Some(url) =
+            repo.get(B("url")).and_then(|v| v.as_string())
+        {
+            preg_replace(php_regex!("{^https?://}i"), "", url)
         } else {
-            index.to_string()
-        };
+            bstr::BString::from(index.to_string())
+        })
+        .into_owned();
         while existing_repos.contains_key(&name) {
             name.push('2');
         }

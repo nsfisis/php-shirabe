@@ -3,7 +3,9 @@
 use crate::dependency_resolver::{Decisions, Pool, Transaction};
 use crate::package::PackageInterfaceHandle;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PregMatches, php_regex, preg_is_match, preg_replace_callback};
+use shirabe_php_shim::{
+    PregMatches, legacy_lossy, php_regex, preg_is_match, preg_replace_callback,
+};
 
 #[derive(Debug)]
 pub struct LockTransaction {
@@ -160,7 +162,7 @@ impl LockTransaction {
                     php_regex!(
                         r"{^https?://(?:(?:www\.)?bitbucket\.org|(api\.)?github\.com|(?:www\.)?gitlab\.com)/}i"
                     ),
-                    &package.get_dist_url().unwrap(),
+                    package.get_dist_url().unwrap(),
                 )
             {
                 // Regex pattern compatibility:
@@ -171,15 +173,19 @@ impl LockTransaction {
                 // 40-hex SHAs sharing a single `/` between them would not both match; harmless
                 // here since a dist URL never carries more than one SHA reference.
                 let dist_reference = present_package.get_dist_reference().unwrap();
-                let new_dist_url = preg_replace_callback(
-                    php_regex!(r"{(/|sha=)[a-f0-9]{40}(/|$)}i"),
-                    |m: &PregMatches| -> anyhow::Result<String> {
-                        let get = |i: usize| -> String { m.get(i).unwrap_or_default().to_string() };
-                        Ok(format!("{}{}{}", get(1), dist_reference, get(2)))
-                    },
-                    &package.get_dist_url().unwrap(),
+                let new_dist_url = legacy_lossy(
+                    &preg_replace_callback(
+                        php_regex!(r"{(/|sha=)[a-f0-9]{40}(/|$)}i"),
+                        |m: &PregMatches| -> anyhow::Result<String> {
+                            let get =
+                                |i: usize| -> String { m.get(i).unwrap_or_default().to_string() };
+                            Ok(format!("{}{}{}", get(1), dist_reference, get(2)))
+                        },
+                        &package.get_dist_url().unwrap(),
+                    )
+                    .expect("the replacement callback cannot fail"),
                 )
-                .expect("the replacement callback cannot fail");
+                .into_owned();
                 present_package.set_dist_url(Some(new_dist_url));
             }
             present_package.set_dist_mirrors(package.get_dist_mirrors());
@@ -215,8 +221,8 @@ impl LockTransaction {
         }
 
         used_aliases.sort_by(|a, b| {
-            let a_pkg = a.get("package").map(|s| s.as_str()).unwrap_or("");
-            let b_pkg = b.get("package").map(|s| s.as_str()).unwrap_or("");
+            let a_pkg = a.get("package").map(|s| s.as_str()).unwrap_or_default();
+            let b_pkg = b.get("package").map(|s| s.as_str()).unwrap_or_default();
             a_pkg.cmp(b_pkg)
         });
 

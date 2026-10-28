@@ -848,7 +848,7 @@ impl DiagnoseCommand {
             errors.insert("iconv_mbstring".to_string(), None);
         }
 
-        if !filter_var_boolean(diagnostics.ini_get("allow_url_fopen").unwrap_or("")) {
+        if !filter_var_boolean(diagnostics.ini_get("allow_url_fopen").unwrap_or_default()) {
             errors.insert("allow_url_fopen".to_string(), None);
         }
 
@@ -877,7 +877,7 @@ impl DiagnoseCommand {
 
         if !diagnostics.has_hhvm_version
             && !diagnostics.extension_loaded("apcu")
-            && filter_var_boolean(diagnostics.ini_get("apc.enable_cli").unwrap_or(""))
+            && filter_var_boolean(diagnostics.ini_get("apc.enable_cli").unwrap_or_default())
         {
             warnings.insert("apc_cli".to_string(), None);
         }
@@ -902,7 +902,11 @@ impl DiagnoseCommand {
             }
         }
 
-        if filter_var_boolean(diagnostics.ini_get("xdebug.profiler_enabled").unwrap_or("")) {
+        if filter_var_boolean(
+            diagnostics
+                .ini_get("xdebug.profiler_enabled")
+                .unwrap_or_default(),
+        ) {
             warnings.insert("xdebug_profile".to_string(), None);
         } else if diagnostics.xdebug_active {
             warnings.insert("xdebug_loaded".to_string(), None);
@@ -920,8 +924,8 @@ impl DiagnoseCommand {
         }
 
         if diagnostics.extension_loaded("uopz")
-            && !(filter_var_boolean(diagnostics.ini_get("uopz.disable").unwrap_or(""))
-                || filter_var_boolean(diagnostics.ini_get("uopz.exit").unwrap_or("")))
+            && !(filter_var_boolean(diagnostics.ini_get("uopz.disable").unwrap_or_default())
+                || filter_var_boolean(diagnostics.ini_get("uopz.exit").unwrap_or_default()))
         {
             warnings.insert("uopz".to_string(), None);
         }

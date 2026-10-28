@@ -98,7 +98,12 @@ impl Git {
                 map.insert("%url%".to_string(), url.to_string());
                 map.insert(
                     "%sanitizedUrl%".to_string(),
-                    preg_replace(php_regex!(r"{://([^@]+?):(.+?)@}"), "://", url),
+                    legacy_lossy(&preg_replace(
+                        php_regex!(r"{://([^@]+?):(.+?)@}"),
+                        "://",
+                        url,
+                    ))
+                    .into_owned(),
                 );
 
                 CommandLine::Args(array_map(
@@ -262,7 +267,7 @@ impl Git {
                 messages.push(format!(
                     "- {}\n{}",
                     proto_url,
-                    preg_replace(r"#^#m", "  ", &self.process.borrow().get_error_output())
+                    preg_replace(r"#^#m", "  ", self.process.borrow().get_error_output())
                 ));
 
                 if initial_clone && let Some(ref orig) = orig_cwd {
@@ -948,12 +953,12 @@ impl Git {
                 if branches.is_some()
                     && !preg_is_match(
                         format!(r"{{^[\s*]*v?{}$}}m", preg_quote(&branch, None)),
-                        branches.as_deref().unwrap_or(""),
+                        branches.as_deref().unwrap_or_default(),
                     )
                     && tags.is_some()
                     && !preg_is_match(
                         format!(r"{{^[\s*]*{}$}}m", preg_quote(&branch, None)),
-                        tags.as_deref().unwrap_or(""),
+                        tags.as_deref().unwrap_or_default(),
                     )
                 {
                     self.sync_mirror(url, dir)?;
@@ -1036,11 +1041,12 @@ impl Git {
         }
 
         // Filter out "commit <hash>" lines for older git versions
-        Ok(preg_replace(
+        Ok(legacy_lossy(&preg_replace(
             php_regex!(r"{^commit [a-f0-9]{40}\n?}m"),
             "",
             output,
         ))
+        .into_owned())
     }
 
     fn check_ref_is_in_mirror(&mut self, dir: &str, r#ref: &str) -> anyhow::Result<bool> {
@@ -1287,7 +1293,7 @@ impl Git {
                 && let Some(matches) =
                     preg_match(php_regex!(r"/^git version (\d+(?:\.\d+)+)/m"), &output)
             {
-                *version = Some(matches.get(1).map(str::to_string));
+                *version = Some(matches.get(1).map(|s| legacy_lossy(s).into_owned()));
             }
         }
         Ok(version.clone().unwrap_or(None))

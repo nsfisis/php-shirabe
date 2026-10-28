@@ -7,8 +7,8 @@ use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, date_local, in_array_loose, php_regex, preg_is_match, preg_match,
-    rawurlencode, str_replace, stripos, strtolower,
+    Catch as _, PhpMixed, date_local, in_array_loose, legacy_lossy, php_regex, preg_is_match,
+    preg_match, rawurlencode, str_replace, stripos, strtolower,
 };
 
 #[derive(Debug)]
@@ -325,7 +325,7 @@ impl GitHub {
                 continue;
             }
             if let Some(caps) = preg_match(php_regex!(r"{\burl=(?P<url>[^\s;]+)}"), header) {
-                return caps.name("url").map(str::to_string);
+                return caps.name("url").map(|s| legacy_lossy(s).into_owned());
             }
         }
 

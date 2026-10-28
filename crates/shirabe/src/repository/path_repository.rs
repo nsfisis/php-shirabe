@@ -209,7 +209,7 @@ impl PathRepository {
                 );
                 let ref_hash = hash(
                     "sha1",
-                    [json.as_slice(), serialize(&options_mixed).as_bytes()].concat(),
+                    [json.as_slice(), serialize(&options_mixed).as_slice()].concat(),
                 );
                 if let Some(PhpMixed::Array(dist)) = package.get_mut(B("dist")) {
                     dist.insert("reference".into(), PhpMixed::string(ref_hash));

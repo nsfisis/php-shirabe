@@ -194,9 +194,9 @@ impl BinaryInstaller {
         // TODO(bytes): preg_match matches over a &str.
         if let Some(m) = preg_match(
             php_regex!(r"{^#!/(?:usr/bin/env )?(?:[^/]+/)*(.+)$}m"),
-            &String::from_utf8_lossy(&line),
+            &line,
         ) {
-            return legacy_lossy(&trim(m.get(1).unwrap_or(""))).into_owned();
+            return legacy_lossy(&trim(m.get(1).unwrap_or_default())).into_owned();
         }
 
         "php".to_string()
@@ -360,7 +360,7 @@ impl BinaryInstaller {
                 $data = str_replace('__FILE__', var_export($this->realpath, true), $data);"
                     .to_string();
             }
-            if trim(m.get(0).unwrap_or("")) != "<?php" {
+            if trim(m.get(0).unwrap_or_default()) != "<?php" {
                 stream_hint =
                     " using a stream wrapper to prevent the shebang from being output on PHP<8\n *"
                         .to_string();

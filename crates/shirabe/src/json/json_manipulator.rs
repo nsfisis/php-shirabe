@@ -118,9 +118,9 @@ impl JsonManipulator {
             {
                 let groups_1 = groups.get(1).unwrap_or_default().to_string();
                 // link missing but non empty links
-                links = preg_replace(
+                links = legacy_lossy(&preg_replace(
                     format!("{{{}$}}", preg_quote(&groups_1, None)),
-                    &legacy_lossy(&addcslashes(
+                    addcslashes(
                         format!(
                             ",{}{}{}{}: {}{}",
                             self.newline,
@@ -131,9 +131,10 @@ impl JsonManipulator {
                             groups_1
                         ),
                         "\\$",
-                    )),
+                    ),
                     &links,
-                );
+                ))
+                .into_owned();
             } else {
                 // links empty
                 links = format!(
@@ -168,7 +169,7 @@ impl JsonManipulator {
                 let replacements = ["0-$0", "1-$0", "2-$0", "3-$0", "4-$0"];
                 let mut result = requirement.to_string();
                 for (p, r) in patterns.iter().zip(replacements.iter()) {
-                    result = preg_replace(*p, r, &result);
+                    result = legacy_lossy(&preg_replace(*p, r, &result)).into_owned();
                 }
                 result
             } else {
@@ -778,9 +779,9 @@ impl JsonManipulator {
 
                     // child missing but non empty children
                     if append {
-                        children = preg_replace(
+                        children = legacy_lossy(&preg_replace(
                             format!("#{}}}$#", whitespace),
-                            &legacy_lossy(&addcslashes(
+                            addcslashes(
                                 format!(
                                     ",{}{}{}{}: {}{}}}",
                                     self.newline,
@@ -791,14 +792,15 @@ impl JsonManipulator {
                                     whitespace
                                 ),
                                 "\\$",
-                            )),
+                            ),
                             &children,
-                        );
+                        ))
+                        .into_owned();
                     } else {
                         whitespace = leading_space;
-                        children = preg_replace(
+                        children = legacy_lossy(&preg_replace(
                             format!("#^{{{}#", whitespace),
-                            &legacy_lossy(&addcslashes(
+                            addcslashes(
                                 format!(
                                     "{{{}{}: {},{}{}{}",
                                     whitespace,
@@ -809,9 +811,10 @@ impl JsonManipulator {
                                     self.indent
                                 ),
                                 "\\$",
-                            )),
+                            ),
                             &children,
-                        );
+                        ))
+                        .into_owned();
                     }
                 } else {
                     let mut value_local = value;
@@ -923,21 +926,23 @@ impl JsonManipulator {
                     }
                 }
                 let mut count_out: usize = 0;
-                let cleaned = preg_replace2(
+                let cleaned = legacy_lossy(&preg_replace2(
                     format!("{{,\\s*{}}}i", preg_quote(&best_match, None)),
                     "",
                     &children,
                     -1,
                     Some(&mut count_out),
-                );
+                ))
+                .into_owned();
                 if 1 != count_out {
-                    let cleaned2 = preg_replace2(
+                    let cleaned2 = legacy_lossy(&preg_replace2(
                         format!("{{{}\\s*,?\\s*}}i", preg_quote(&best_match, None)),
                         "",
                         &cleaned,
                         -1,
                         Some(&mut count_out),
-                    );
+                    ))
+                    .into_owned();
                     if 1 != count_out {
                         return Ok(false);
                     }
@@ -1087,9 +1092,9 @@ impl JsonManipulator {
             if leading_match.name("content").is_some() {
                 // child missing but non empty children
                 if append {
-                    children = preg_replace(
+                    children = legacy_lossy(&preg_replace(
                         format!("#{}\\]$#", whitespace),
-                        &legacy_lossy(&addcslashes(
+                        addcslashes(
                             format!(
                                 ",{}{}{}]",
                                 leading_item_whitespace,
@@ -1097,14 +1102,15 @@ impl JsonManipulator {
                                 trailing_item_whitespace
                             ),
                             "\\$",
-                        )),
+                        ),
                         &children,
-                    );
+                    ))
+                    .into_owned();
                 } else {
                     whitespace = leading_whitespace;
-                    children = preg_replace(
+                    children = legacy_lossy(&preg_replace(
                         format!("#^\\[{}#", whitespace),
-                        &legacy_lossy(&addcslashes(
+                        addcslashes(
                             format!(
                                 "[{}{},{}",
                                 whitespace,
@@ -1112,9 +1118,10 @@ impl JsonManipulator {
                                 leading_item_whitespace
                             ),
                             "\\$",
-                        )),
+                        ),
                         &children,
-                    );
+                    ))
+                    .into_owned();
                 }
             } else {
                 // children present but empty
@@ -1352,9 +1359,9 @@ impl JsonManipulator {
         // append at the end of the file and keep whitespace
         if let Some(tail_match) = preg_match(php_regex!("#[^{\\s](\\s*)\\}$#"), &self.contents) {
             let tail_match_1 = tail_match.get(1).unwrap_or_default().to_string();
-            self.contents = preg_replace(
+            self.contents = legacy_lossy(&preg_replace(
                 format!("#{}\\}}$#", tail_match_1),
-                &legacy_lossy(&addcslashes(
+                addcslashes(
                     format!(
                         ",{}{}{}: {}{}}}",
                         self.newline,
@@ -1364,17 +1371,18 @@ impl JsonManipulator {
                         self.newline
                     ),
                     "\\$",
-                )),
+                ),
                 &self.contents,
-            );
+            ))
+            .into_owned();
 
             return Ok(true);
         }
 
         // append at the end of the file
-        self.contents = preg_replace(
+        self.contents = legacy_lossy(&preg_replace(
             php_regex!("#\\}$#"),
-            &legacy_lossy(&addcslashes(
+            addcslashes(
                 format!(
                     "{}{}: {}{}}}",
                     self.indent,
@@ -1383,9 +1391,10 @@ impl JsonManipulator {
                     self.newline
                 ),
                 "\\$",
-            )),
+            ),
             &self.contents,
-        );
+        ))
+        .into_owned();
 
         Ok(true)
     }

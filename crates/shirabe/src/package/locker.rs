@@ -805,7 +805,7 @@ impl Locker {
                 .get_source_reference()
                 .or_else(|| package.get_dist_reference())
                 .unwrap_or_default();
-            match source_type.as_deref().unwrap_or("") {
+            match source_type.as_deref().unwrap_or_default() {
                 "git" => {
                     GitUtil::clean_env(&self.process)?;
 
@@ -847,7 +847,7 @@ impl Locker {
                         path.as_deref(),
                     )? && let Some(m) = preg_match(
                         php_regex!(r"{^\s*(\d+)\s*}"),
-                        &output.as_string().unwrap_or_default().to_str_lossy(),
+                        &output.as_string().unwrap_or_default(),
                     ) {
                         let ts = m
                             .get(1)

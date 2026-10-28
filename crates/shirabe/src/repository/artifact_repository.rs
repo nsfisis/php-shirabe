@@ -99,13 +99,13 @@ impl ArtifactRepository {
             if file_path.is_symlink() {
                 let resolved = std::fs::canonicalize(&file_path)?;
                 if resolved.is_dir() {
-                    self.scan_directory(resolved.to_str().unwrap_or(""))?;
+                    self.scan_directory(resolved.to_str().unwrap_or_default())?;
                     continue;
                 }
             }
 
             if file_path.is_dir() {
-                self.scan_directory(file_path.to_str().unwrap_or(""))?;
+                self.scan_directory(file_path.to_str().unwrap_or_default())?;
                 continue;
             }
 
@@ -116,14 +116,17 @@ impl ArtifactRepository {
             let ext = file_path
                 .extension()
                 .and_then(|e| e.to_str())
-                .unwrap_or("")
+                .unwrap_or_default()
                 .to_lowercase();
             if !matches!(ext.as_str(), "zip" | "tar" | "gz" | "tgz") {
                 continue;
             }
 
             let package = self.get_composer_information(&file_path)?;
-            let basename = file_path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            let basename = file_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or_default();
             match package {
                 None => {
                     self.io.write_error3(
@@ -157,7 +160,7 @@ impl ArtifactRepository {
         let file_extension = file
             .extension()
             .and_then(|e| e.to_str())
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_lowercase();
 
         let file_type: &str;
@@ -173,7 +176,7 @@ impl ArtifactRepository {
             .into());
         }
 
-        let pathname = file.to_str().unwrap_or("");
+        let pathname = file.to_str().unwrap_or_default();
         let get_result = if file_type == "tar" {
             Tar::get_composer_json(file)
         } else {

@@ -141,7 +141,12 @@ impl Cache {
         let was_enabled = self.enabled == Some(true);
 
         if self.is_enabled() && !self.read_only {
-            let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
+            let file = legacy_lossy(&preg_replace(
+                format!("{{[^{}]}}i", self.allowlist),
+                "-",
+                file,
+            ))
+            .into_owned();
 
             self.io.write_error3(
                 &format!("Writing {}{} into cache", self.root, file),

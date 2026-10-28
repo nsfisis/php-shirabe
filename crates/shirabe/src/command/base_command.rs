@@ -577,8 +577,14 @@ impl BaseCommand for BaseCommandData {
             if !requirement.contains_key("version") {
                 return Err(UnexpectedValueException::new(format!(
                     "Option {} is missing a version constraint, use e.g. {}:^1.0",
-                    requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
-                    requirement.get("name").map(|s| s.as_str()).unwrap_or(""),
+                    requirement
+                        .get("name")
+                        .map(|s| s.as_str())
+                        .unwrap_or_default(),
+                    requirement
+                        .get("name")
+                        .map(|s| s.as_str())
+                        .unwrap_or_default(),
                 ))
                 .into());
             }

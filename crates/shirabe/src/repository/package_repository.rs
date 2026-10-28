@@ -12,7 +12,7 @@ use crate::repository::{
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, json_encode, php_regex, preg_replace, var_export,
+    PhpMixed, RuntimeException, json_encode, legacy_lossy, php_regex, preg_replace, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -82,11 +82,12 @@ impl PackageRepository {
         // PHP: parent::getRepoName() counts through the late-bound $this->initialize(),
         // which resolves to PackageRepository::initialize (loading the config packages).
         self.ensure_initialized()?;
-        Ok(preg_replace(
+        Ok(legacy_lossy(&preg_replace(
             php_regex!(r"{^array }"),
             "package ",
             &self.inner.get_repo_name()?,
         ))
+        .into_owned())
     }
 
     // In PHP the inherited ArrayRepository methods lazily call the overridden initialize() to load

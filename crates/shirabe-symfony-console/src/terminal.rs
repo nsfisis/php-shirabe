@@ -1,9 +1,9 @@
 //! ref: composer/vendor/symfony/console/Terminal.php
 
 use shirabe_php_shim::{
-    Descriptor, PhpMixed, PhpResource, fclose, function_exists, getenv, intval, legacy_lossy,
-    php_fopen_resource, php_regex, preg_match, proc_close, proc_open, sapi_windows_cp_get,
-    sapi_windows_cp_set, sapi_windows_vt100_support, shell_exec, stream_get_contents, trim,
+    Descriptor, PhpMixed, PhpResource, fclose, function_exists, getenv, intval, php_fopen_resource,
+    php_regex, preg_match, proc_close, proc_open, sapi_windows_cp_get, sapi_windows_cp_set,
+    sapi_windows_vt100_support, shell_exec, stream_get_contents, trim,
 };
 use std::cell::Cell;
 
@@ -88,7 +88,7 @@ impl Terminal {
             if let Some(ansicon) = &ansicon
                 && let Some(matches) = preg_match(
                     php_regex!("/^(\\d+)x(\\d+)(?: \\((\\d+)x(\\d+)\\))?$/"),
-                    &legacy_lossy(&trim(ansicon)),
+                    &trim(ansicon),
                 )
             {
                 // extract [w, H] from "wxh (WxH)"

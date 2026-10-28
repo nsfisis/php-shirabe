@@ -37,7 +37,7 @@ impl ConfirmationQuestion {
                 return answer;
             }
 
-            let answer_is_true = preg_is_match(&regex, &strval(&answer));
+            let answer_is_true = preg_is_match(&regex, strval(&answer));
 
             // false === $default
             if matches!(default, PhpMixed::Bool(false)) {

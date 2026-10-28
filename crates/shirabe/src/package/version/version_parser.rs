@@ -2,7 +2,7 @@
 
 use crate::repository::PlatformRepository;
 use indexmap::IndexMap;
-use shirabe_php_shim::{php_regex, preg_is_match, preg_replace};
+use shirabe_php_shim::{legacy_lossy, php_regex, preg_is_match, preg_replace};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::{Semver, VersionParser as SemverVersionParser};
 use std::sync::{LazyLock, Mutex};
@@ -48,11 +48,12 @@ impl VersionParser {
         let count = pairs.len();
         let mut i = 0_usize;
         while i < count {
-            let mut pair = preg_replace(
+            let mut pair = legacy_lossy(&preg_replace(
                 php_regex!(r"{^([^=: ]+)[=: ](.*)$}"),
                 "$1 $2",
                 pairs[i].trim(),
-            );
+            ))
+            .into_owned();
             if !pair.contains(' ')
                 && i + 1 < count
                 && !pairs[i + 1].contains('/')

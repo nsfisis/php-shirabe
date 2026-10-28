@@ -10,7 +10,8 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, ProcessExecutor};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, impl_php_class, php_regex, preg_is_match, preg_split, realpath,
+    PhpMixed, RuntimeException, impl_php_class, legacy_lossy, php_regex, preg_is_match, preg_split,
+    realpath,
 };
 
 #[derive(Debug)]
@@ -222,6 +223,9 @@ impl VcsDownloader for FossilDownloader {
             vec![]
         } else {
             preg_split(php_regex!(r"{\r?\n}"), &trimmed)
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<_>>()
         };
 
         for line in lines {

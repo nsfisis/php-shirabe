@@ -27,7 +27,12 @@ pub struct OutputFormatter {
 impl OutputFormatter {
     /// Escapes "<" and ">" special chars in given text.
     pub fn escape(text: &str) -> anyhow::Result<String> {
-        let text = preg_replace(php_regex!("/([^\\\\]|^)([<>])/"), "$1\\\\$2", text);
+        let text = legacy_lossy(&preg_replace(
+            php_regex!("/([^\\\\]|^)([<>])/"),
+            "$1\\\\$2",
+            text,
+        ))
+        .into_owned();
 
         Ok(Self::escape_trailing_backslash(&text))
     }
@@ -130,17 +135,18 @@ impl OutputFormatter {
             } else if key == "bg" {
                 style.set_background(Some(&*legacy_lossy(&strtolower(value))));
             } else if key == "href" {
-                let url = preg_replace(php_regex!("{\\\\([<>])}"), "$1", value);
+                let url = legacy_lossy(&preg_replace(php_regex!("{\\\\([<>])}"), "$1", value))
+                    .into_owned();
                 style.set_href(&url);
             } else if key == "options" {
                 let value = legacy_lossy(&strtolower(value)).into_owned();
                 let options = preg_match_all(php_regex!("([^,;]+)"), &value);
                 for option in options {
-                    style.set_option(
+                    style.set_option(&legacy_lossy(
                         option
                             .get(0)
                             .expect("group 0 participates whenever the pattern matches"),
-                    );
+                    ));
                 }
             } else {
                 return Ok(None);
@@ -187,7 +193,7 @@ impl OutputFormatter {
 
         let trailing = preg_match(php_regex!("~(\\n)$~"), &text)
             .and_then(|matches| matches.get(1))
-            .unwrap_or("")
+            .unwrap_or_default()
             .to_string();
         text = format!("{}{}", prefix, self.add_line_breaks(&text, width));
         text = format!("{}{}", rtrim2(&text, "\n"), trailing);
@@ -298,9 +304,12 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
                 .get_offset(0)
                 .expect("group 0 participates whenever the pattern matches")
                 as i64;
-            let text = match_
-                .get(0)
-                .expect("group 0 participates whenever the pattern matches");
+            let text = legacy_lossy(
+                &match_
+                    .get(0)
+                    .expect("group 0 participates whenever the pattern matches"),
+            )
+            .into_owned();
 
             if pos != 0 && byte_at(message, (pos - 1) as usize) == b'\\' {
                 continue;
@@ -315,22 +324,23 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
                 &mut current_line_length,
             );
             output.push_str(&applied);
-            offset = pos + strlen(text);
+            offset = pos + strlen(&text);
 
             // opening tag?
-            let open = byte_at(text, 1) != b'/';
-            let tag = if open {
+            let open = byte_at(&text, 1) != b'/';
+            let tag = legacy_lossy(&if open {
                 match_
                     .get(1)
                     .expect("group 1 participates whenever the pattern matches")
             } else {
                 match_.get(3).unwrap_or_default()
-            };
+            })
+            .into_owned();
 
             if !open && tag.is_empty() {
                 // </>
                 self.style_stack.pop(None)?.ok();
-            } else if let Some(style) = self.create_style_from_string(tag)? {
+            } else if let Some(style) = self.create_style_from_string(&tag)? {
                 if open {
                     self.style_stack.push(style);
                 } else {
@@ -338,7 +348,7 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
                 }
             } else {
                 let applied =
-                    self.apply_current_style(text, &output, width, &mut current_line_length);
+                    self.apply_current_style(&text, &output, width, &mut current_line_length);
                 output.push_str(&applied);
             }
         }

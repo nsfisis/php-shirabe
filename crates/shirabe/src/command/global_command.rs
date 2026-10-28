@@ -7,7 +7,8 @@ use crate::console::input::InputArgument;
 use crate::factory::Factory;
 use crate::util::{Filesystem, Platform};
 use shirabe_php_shim::{
-    LogicException, RuntimeException, chdir, impl_php_class, php_regex, preg_replace2, preg_split,
+    LogicException, RuntimeException, chdir, impl_php_class, legacy_lossy, php_regex,
+    preg_replace2, preg_split,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::completion::{
@@ -104,13 +105,14 @@ impl GlobalCommand {
             ));
         }
 
-        let new_input_str = preg_replace2(
+        let new_input_str = legacy_lossy(&preg_replace2(
             php_regex!(r"{\bg(?:l(?:o(?:b(?:a(?:l)?)?)?)?)?\b}"),
             "",
             &Self::input_to_string(&*input.borrow())?,
             1,
             None,
-        );
+        ))
+        .into_owned();
         self.reset_composer()?;
 
         StringInput::new(&new_input_str)
@@ -230,8 +232,8 @@ impl Command for GlobalCommand {
         );
         let mut args: Vec<String> = vec![];
         for token in &tokens {
-            if !token.is_empty() && !token.starts_with('-') {
-                args.push(token.clone());
+            if !token.is_empty() && !token.starts_with(b"-") {
+                args.push(legacy_lossy(&token.clone()).into_owned());
                 if args.len() >= 2 {
                     break;
                 }
