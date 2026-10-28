@@ -164,8 +164,7 @@ impl ChoiceQuestion {
                 }
 
                 // array_search($value, $choices)
-                let result_key =
-                    array_search(&legacy_lossy(&strval(value)), &choices_as_str(&choices));
+                let result_key = array_search(strval(value), &choices_as_str(&choices));
 
                 let mut result: PhpMixed;
                 if !is_assoc {

@@ -5,9 +5,9 @@ use bstr::ByteSlice;
 use shirabe_php_shim::{
     PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, STDOUT, defined,
     file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get, is_readable,
-    legacy_lossy, mb_strlen, php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid,
-    preg_is_match, preg_replace_callback, putenv, putenv_clear, realpath, stream_isatty, stripos,
-    strlen, strtoupper, substr, usleep,
+    legacy_lossy, mb_strlen, path_to_bytes, php_os_family, php_regex, posix_geteuid,
+    posix_getpwuid, posix_getuid, preg_is_match, preg_replace_callback, putenv, putenv_clear,
+    realpath, stream_isatty, stripos, strlen, strtoupper, substr, usleep,
 };
 use std::sync::Mutex;
 
@@ -30,7 +30,7 @@ impl Platform {
 
         // fallback to realpath('') just in case this works but odds are it would break as well if we are in a case where getcwd fails
         if cwd.is_none() {
-            cwd = realpath("");
+            cwd = realpath("").map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
         }
 
         // crappy state, assume '' and hopefully relative paths allow things to continue
@@ -50,7 +50,7 @@ impl Platform {
 
     /// Infallible realpath version that falls back on the given $path if realpath is not working
     pub fn realpath(path: &str) -> String {
-        let real_path = realpath(path);
+        let real_path = realpath(path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
         if real_path.is_none() {
             return path.to_string();
         }

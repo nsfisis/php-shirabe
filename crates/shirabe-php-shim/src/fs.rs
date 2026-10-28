@@ -1,5 +1,8 @@
-use crate::{PhpResource, StreamBacking, StreamState, UnexpectedValueException};
-use bstr::BString;
+use crate::{
+    PhpResource, StreamBacking, StreamState, UnexpectedValueException, path_from_bytes,
+    path_to_bytes,
+};
+use bstr::{BString, ByteSlice};
 use std::io::{Read as _, Write as _};
 
 pub const PHP_EOL: &str = "\n";
@@ -854,12 +857,18 @@ pub fn unlink_silent(path: impl AsRef<std::path::Path>) -> bool {
     std::fs::remove_file(path.as_ref()).is_ok()
 }
 
-pub fn file_put_contents(path: &str, data: &[u8]) -> Option<i64> {
+pub fn file_put_contents(path: impl AsRef<std::path::Path>, data: impl AsRef<[u8]>) -> Option<i64> {
+    let data = data.as_ref();
     std::fs::write(path, data).ok().map(|_| data.len() as i64)
 }
 
 /// Only `FILE_APPEND` is honored; `LOCK_EX` and `FILE_USE_INCLUDE_PATH` have no effect.
-pub fn file_put_contents3(filename: &str, data: &str, flags: i64) -> Option<i64> {
+pub fn file_put_contents3(
+    filename: impl AsRef<std::path::Path>,
+    data: impl AsRef<[u8]>,
+    flags: i64,
+) -> Option<i64> {
+    let data = data.as_ref();
     let append = flags & FILE_APPEND != 0;
     let mut opts = std::fs::OpenOptions::new();
     opts.write(true).create(true);
@@ -869,17 +878,16 @@ pub fn file_put_contents3(filename: &str, data: &str, flags: i64) -> Option<i64>
         opts.truncate(true);
     }
     let mut file = opts.open(filename).ok()?;
-    file.write_all(data.as_bytes()).ok()?;
+    file.write_all(data).ok()?;
     Some(data.len() as i64)
 }
 
 pub fn file_get_contents(path: impl AsRef<std::path::Path>) -> std::io::Result<Vec<u8>> {
     let path = path.as_ref();
     // PHP supports the file:// stream wrapper; strip it to read the local file.
-    let path = path
-        .to_str()
-        .and_then(|s| s.strip_prefix("file://"))
-        .map_or(path, std::path::Path::new);
+    let path = path_to_bytes(path)
+        .strip_prefix(b"file://")
+        .map_or(path, path_from_bytes);
     std::fs::read(path)
 }
 
@@ -889,10 +897,9 @@ pub fn file_get_contents_with_max_length(
 ) -> std::io::Result<Vec<u8>> {
     let path = path.as_ref();
     // PHP supports the file:// stream wrapper; strip it to read the local file.
-    let path = path
-        .to_str()
-        .and_then(|s| s.strip_prefix("file://"))
-        .map_or(path, std::path::Path::new);
+    let path = path_to_bytes(path)
+        .strip_prefix(b"file://")
+        .map_or(path, path_from_bytes);
     let mut buf = Vec::new();
     std::fs::File::open(path)?
         .take(length as u64)
@@ -914,20 +921,19 @@ pub fn glob(pattern: &str) -> Vec<String> {
 
 pub const FILE_SKIP_EMPTY_LINES: i64 = 4;
 
-pub fn file(filename: &str, flags: i64) -> Option<Vec<String>> {
+pub fn file(filename: impl AsRef<std::path::Path>, flags: i64) -> Option<Vec<BString>> {
     let content = std::fs::read(filename).ok()?;
-    let s = String::from_utf8_lossy(&content);
     let ignore_newlines = flags & FILE_IGNORE_NEW_LINES != 0;
     let skip_empty = flags & FILE_SKIP_EMPTY_LINES != 0;
     let mut lines = Vec::new();
     // PHP keeps the trailing newline on each element unless FILE_IGNORE_NEW_LINES is set.
-    for line in s.split_inclusive('\n') {
-        let mut l = line.to_string();
+    for line in content.split_inclusive(|&b| b == b'\n') {
+        let mut l = BString::from(line);
         if ignore_newlines {
-            if l.ends_with('\n') {
+            if l.ends_with(b"\n") {
                 l.pop();
             }
-            if l.ends_with('\r') {
+            if l.ends_with(b"\r") {
                 l.pop();
             }
         }
@@ -1026,21 +1032,22 @@ pub fn sys_get_temp_dir() -> std::path::PathBuf {
     std::env::temp_dir()
 }
 
-pub fn pathinfo(path: &str, option: i64) -> String {
+pub fn pathinfo(path: impl AsRef<[u8]>, option: i64) -> BString {
+    let path = path.as_ref();
     match option {
         PATHINFO_DIRNAME => dirname(path),
         PATHINFO_BASENAME => basename(path),
         PATHINFO_EXTENSION => {
             let base = basename(path);
-            match base.rfind('.') {
-                Some(index) => base[index + 1..].to_string(),
-                None => String::new(),
+            match base.rfind_byte(b'.') {
+                Some(index) => BString::from(&base[index + 1..]),
+                None => BString::default(),
             }
         }
         PATHINFO_FILENAME => {
             let base = basename(path);
-            match base.rfind('.') {
-                Some(index) => base[..index].to_string(),
+            match base.rfind_byte(b'.') {
+                Some(index) => BString::from(&base[..index]),
                 None => base,
             }
         }
@@ -1048,42 +1055,45 @@ pub fn pathinfo(path: &str, option: i64) -> String {
     }
 }
 
-// TODO(type-model): returns Option<PathBuf>
-pub fn realpath(path: impl AsRef<std::path::Path>) -> Option<String> {
-    path.as_ref()
-        .canonicalize()
-        .ok()
-        .and_then(|p| p.to_str().map(ToOwned::to_owned))
+pub fn realpath(path: impl AsRef<std::path::Path>) -> Option<std::path::PathBuf> {
+    path.as_ref().canonicalize().ok()
 }
 
-pub fn dirname(path: &str) -> String {
+pub fn dirname(path: impl AsRef<[u8]>) -> BString {
+    let path = path.as_ref();
     if path.is_empty() {
-        return String::new();
+        return BString::default();
     }
-    match std::path::Path::new(path).parent() {
+    match path_from_bytes(path).parent() {
         // No parent: the root itself, or a path made up solely of slashes.
-        None => "/".to_string(),
+        None => BString::from("/"),
         // Path::parent yields an empty path where PHP's dirname returns ".".
-        Some(parent) if parent.as_os_str().is_empty() => ".".to_string(),
-        Some(parent) => parent.to_str().expect("input was valid UTF-8").to_string(),
+        Some(parent) if parent.as_os_str().is_empty() => BString::from("."),
+        Some(parent) => BString::from(path_to_bytes(parent)),
     }
 }
 
-pub fn basename(path: &str) -> String {
+pub fn basename(path: impl AsRef<[u8]>) -> BString {
     // PHP basename(): the trailing name component, after stripping trailing directory separators.
-    let trimmed = path.trim_end_matches(['/', '\\']);
-    match trimmed.rfind(['/', '\\']) {
-        Some(index) => trimmed[index + 1..].to_string(),
-        None => trimmed.to_string(),
+    let path = path.as_ref();
+    let end = path
+        .iter()
+        .rposition(|&b| b != b'/' && b != b'\\')
+        .map_or(0, |i| i + 1);
+    let trimmed = &path[..end];
+    match trimmed.iter().rposition(|&b| b == b'/' || b == b'\\') {
+        Some(index) => BString::from(&trimmed[index + 1..]),
+        None => BString::from(trimmed),
     }
 }
 
-pub fn basename_with_suffix(path: &str, suffix: &str) -> String {
+pub fn basename_with_suffix(path: impl AsRef<[u8]>, suffix: impl AsRef<[u8]>) -> BString {
+    let suffix = suffix.as_ref();
     let base = basename(path);
     // PHP strips the suffix only when it is a proper trailing part of the name,
     // never when it equals the whole basename.
     if base != suffix && base.ends_with(suffix) {
-        base[..base.len() - suffix.len()].to_string()
+        BString::from(&base[..base.len() - suffix.len()])
     } else {
         base
     }

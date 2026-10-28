@@ -21,9 +21,9 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed,
-    RuntimeException, UnexpectedValueException, array_search, chmod, dirname, extension_loaded,
-    file_exists, filesize, get_class, hash, hash_file, impl_php_class, is_dir, is_executable,
-    legacy_lossy, parse_url, pathinfo, realpath, rtrim2, spl_object_hash, strlen, strpos, strtr,
+    RuntimeException, UnexpectedValueException, chmod, dirname, extension_loaded, file_exists,
+    filesize, get_class, hash, hash_file, impl_php_class, is_dir, is_executable, legacy_lossy,
+    parse_url, path_to_bytes, pathinfo, realpath, rtrim2, spl_object_hash, strlen, strpos, strtr,
     trim, umask, usleep,
 };
 use std::sync::{LazyLock, Mutex};
@@ -224,8 +224,8 @@ impl FileDownloader {
     }
 
     fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> String {
-        pathinfo(
-            &parse_url(&legacy_lossy(&strtr(
+        legacy_lossy(&pathinfo(
+            parse_url(&legacy_lossy(&strtr(
                 package.get_dist_url().unwrap_or_default(),
                 "\\",
                 "/",
@@ -233,7 +233,8 @@ impl FileDownloader {
             .and_then(|url| url.path)
             .unwrap_or_default(),
             component,
-        )
+        ))
+        .into_owned()
     }
 
     pub(crate) fn clear_last_cache_write(&self, package: PackageInterfaceHandle) {
@@ -266,7 +267,6 @@ impl FileDownloader {
             if let Some(i) = idx {
                 paths.remove(i);
             }
-            let _ = array_search;
         }
     }
 
@@ -403,7 +403,7 @@ impl DownloaderInterface for FileDownloader {
 
         let file_name = self.get_file_name(package.clone(), path);
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
-        let dir_of_file = dirname(&file_name);
+        let dir_of_file = legacy_lossy(&dirname(&file_name)).into_owned();
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(&dir_of_file)?;
@@ -710,7 +710,10 @@ impl DownloaderInterface for FileDownloader {
         for dir in &dirs_to_clean_up {
             if is_dir(dir)
                 && self.filesystem.borrow_mut().is_dir_empty(dir)
-                && realpath(dir).as_deref() != Some(&Platform::get_cwd(false).unwrap_or_default())
+                && realpath(dir)
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .as_deref()
+                    != Some(&Platform::get_cwd(false).unwrap_or_default())
             {
                 self.filesystem.borrow_mut().remove_directory_php(dir)?;
             }

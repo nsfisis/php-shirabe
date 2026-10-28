@@ -13,12 +13,19 @@ pub fn legacy_lossy(bytes: &(impl AsRef<[u8]> + ?Sized)) -> Cow<'_, str> {
     String::from_utf8_lossy(bytes.as_ref())
 }
 
-/// The path PHP's filesystem functions open for the byte string `bytes`.
-pub fn path_from_bytes(bytes: &(impl AsRef<[u8]> + ?Sized)) -> &Path {
+/// `bytes` as UTF-8 text, or `None` if they are not valid UTF-8. Only for the shim of a PHP
+/// function that itself requires UTF-8, which reproduces how that function fails.
+pub fn utf8_text(bytes: &(impl AsRef<[u8]> + ?Sized)) -> Option<&str> {
+    std::str::from_utf8(bytes.as_ref()).ok()
+}
+
+/// The OS string PHP passes to the system (a path, a command line, an environment variable) for
+/// the byte string `bytes`.
+pub fn os_str_from_bytes(bytes: &(impl AsRef<[u8]> + ?Sized)) -> &OsStr {
     #[cfg(unix)]
     {
         use std::os::unix::ffi::OsStrExt;
-        Path::new(OsStr::from_bytes(bytes.as_ref()))
+        OsStr::from_bytes(bytes.as_ref())
     }
     #[cfg(windows)]
     {
@@ -26,6 +33,11 @@ pub fn path_from_bytes(bytes: &(impl AsRef<[u8]> + ?Sized)) -> &Path {
         // API.
         todo!()
     }
+}
+
+/// The path PHP's filesystem functions open for the byte string `bytes`.
+pub fn path_from_bytes(bytes: &(impl AsRef<[u8]> + ?Sized)) -> &Path {
+    Path::new(os_str_from_bytes(bytes))
 }
 
 /// The byte string PHP holds for `path`.

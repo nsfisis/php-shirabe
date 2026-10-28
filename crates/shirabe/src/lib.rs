@@ -1,4 +1,4 @@
-use shirabe_php_shim::realpath;
+use shirabe_php_shim::{legacy_lossy, path_to_bytes, realpath};
 pub mod advisory;
 pub mod autoload;
 pub mod cache;
@@ -44,7 +44,9 @@ pub async fn run(argv: Vec<String>) -> anyhow::Result<i32> {
     // somewhere else that communicates with the real PHP runtime.
     Platform::put_env(
         "COMPOSER_BINARY",
-        &realpath(argv.first().map(String::as_str).unwrap_or_default()).unwrap_or_default(),
+        &realpath(argv.first().map(String::as_str).unwrap_or_default())
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+            .unwrap_or_default(),
     );
 
     let application = ApplicationHandle::new("Shirabe".to_string(), String::new())?;

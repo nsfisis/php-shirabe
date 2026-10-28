@@ -2,7 +2,9 @@
 
 use crate::package::archiver::{BaseExcludeFilter, ComposerExcludeFilter, GitExcludeFilter};
 use crate::util::Filesystem;
-use shirabe_php_shim::{RuntimeException, legacy_lossy, preg_quote, preg_replace, realpath};
+use shirabe_php_shim::{
+    RuntimeException, legacy_lossy, path_to_bytes, preg_quote, preg_replace, realpath,
+};
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
 
@@ -23,7 +25,8 @@ impl ArchivableFilesFinder {
     pub fn new(sources: &str, excludes: Vec<String>, ignore_filters: bool) -> anyhow::Result<Self> {
         let fs = Filesystem::new(None);
 
-        let sources_real_path = realpath(sources);
+        let sources_real_path =
+            realpath(sources).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
         if sources_real_path.is_none() {
             return Err(RuntimeException::new(format!(
                 "Could not realpath() the source directory \"{}\"",

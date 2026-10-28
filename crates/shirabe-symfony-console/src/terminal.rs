@@ -68,7 +68,7 @@ impl Terminal {
             return stty;
         }
 
-        let result = shell_exec(&format!(
+        let result = shell_exec(format!(
             "stty 2> {}",
             if cfg!(windows) { "NUL" } else { "/dev/null" }
         ))

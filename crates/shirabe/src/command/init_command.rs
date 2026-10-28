@@ -17,9 +17,9 @@ use shirabe_php_shim::{
     Catch as _, FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_filter_map, array_flip_strings, array_intersect_key, array_map, basename, empty, explode,
     file, file_exists, file_get_contents, file_put_contents, filter_var_email, get_current_user,
-    impl_php_class, implode, is_dir, is_string, legacy_lossy, php_regex, preg_is_match, preg_match,
-    preg_match_all, preg_quote, preg_replace, realpath, str_replace, strpos, strtolower, trim,
-    ucwords, unlink,
+    impl_php_class, implode, is_dir, is_string, legacy_lossy, path_to_bytes, php_regex,
+    preg_is_match, preg_match, preg_match_all, preg_quote, preg_replace, realpath, str_replace,
+    strpos, strtolower, trim, ucwords, unlink,
 };
 use shirabe_spdx_licenses::SpdxLicenses;
 use shirabe_symfony_console::command::Command;
@@ -340,9 +340,12 @@ impl InitCommand {
 
     fn get_default_package_name(&self) -> anyhow::Result<String> {
         let git = self.get_git_config()?;
-        let cwd = realpath(".").unwrap_or_default();
+        let cwd = realpath(".")
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+            .unwrap_or_default();
         let name = basename(&cwd);
-        let name = self.sanitize_package_name_component(&name);
+        let name =
+            legacy_lossy(&self.sanitize_package_name_component(&legacy_lossy(&name))).into_owned();
 
         let mut vendor = name.clone();
         // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
@@ -715,10 +718,17 @@ impl Command for InitCommand {
         }
 
         if input.borrow().is_interactive() && is_dir(".git") {
-            let mut ignore_file = realpath(".gitignore").unwrap_or_default();
+            let mut ignore_file = realpath(".gitignore")
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or_default();
 
             if ignore_file.is_empty() {
-                ignore_file = format!("{}/.gitignore", realpath(".").unwrap_or_default());
+                ignore_file = format!(
+                    "{}/.gitignore",
+                    realpath(".")
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default()
+                );
             }
 
             if !self.has_vendor_ignore(&ignore_file, "vendor") {

@@ -8,8 +8,9 @@ use shirabe_php_shim::{
     Catch as _, Error, InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
     JSON_UNESCAPED_UNICODE, PhpMixed, PregMatches, RuntimeException, UnexpectedValueException,
     dirname, file_exists, file_get_contents, file_put_contents, is_dir, is_file, json_decode_assoc,
-    json_decode_obj, json_encode_ex, legacy_lossy, mkdir, php_regex, preg_is_match, preg_match,
-    preg_replace_callback, preg_replace2, realpath, str_repeat, strlen, strpos, usleep,
+    json_decode_obj, json_encode_ex, legacy_lossy, mkdir, path_from_bytes, path_to_bytes,
+    php_regex, preg_is_match, preg_match, preg_replace_callback, preg_replace2, realpath,
+    str_repeat, strlen, strpos, usleep,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
 
@@ -136,7 +137,8 @@ impl JsonFile {
                     && io.is_debug()
                 {
                     let mut realpath_info = String::new();
-                    if let Some(realpath) = realpath(&self.path)
+                    if let Some(realpath) =
+                        realpath(&self.path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                         && realpath != self.path
                     {
                         realpath_info = format!(" ({})", realpath);
@@ -210,15 +212,17 @@ impl JsonFile {
         }
 
         let dir = dirname(&self.path);
-        if !is_dir(&dir) {
-            if file_exists(&dir) {
+        if !is_dir(path_from_bytes(&dir)) {
+            if file_exists(path_from_bytes(&dir)) {
                 return Err(UnexpectedValueException::new(format!(
                     "{} exists and is not a directory.",
-                    realpath(&dir).unwrap_or_default(),
+                    realpath(path_from_bytes(&dir))
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default(),
                 ))
                 .into());
             }
-            if mkdir(&dir, 0o777, true).is_err() {
+            if mkdir(path_from_bytes(&dir), 0o777, true).is_err() {
                 return Err(UnexpectedValueException::new(format!(
                     "{} does not exist and could not be created.",
                     dir

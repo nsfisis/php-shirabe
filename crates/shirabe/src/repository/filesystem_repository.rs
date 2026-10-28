@@ -16,8 +16,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, LogicException, PhpClass as _, PhpMixed,
     UnexpectedValueException, array_flip, dirname, get_debug_type, in_array_strict, is_array,
-    is_null, is_string, ksort, legacy_lossy, realpath, str_repeat, strcmp, strnatcmp, usort,
-    var_export,
+    is_null, is_string, ksort, legacy_lossy, path_from_bytes, path_to_bytes, realpath, str_repeat,
+    strcmp, strnatcmp, usort, var_export,
 };
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -211,15 +211,16 @@ impl FilesystemRepository {
         // make sure the directory is created so we can realpath it
         // as realpath() does some additional normalizations with network paths that normalizePath does not
         // and we need to find shortest path correctly
-        let repo_dir = dirname(self.file.get_path());
+        let repo_dir = legacy_lossy(&dirname(self.file.get_path())).into_owned();
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(&repo_dir);
 
-        let repo_dir = self
-            .filesystem
-            .borrow()
-            .normalize_path(&realpath(&repo_dir).unwrap_or_default());
+        let repo_dir = self.filesystem.borrow().normalize_path(
+            &realpath(path_from_bytes(&repo_dir))
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or_default(),
+        );
         let mut install_paths: IndexMap<String, Option<String>> = IndexMap::new();
 
         for package in self.inner.get_canonical_packages() {
@@ -609,7 +610,9 @@ impl FilesystemRepository {
 
         let install_path = if package.as_root().is_some() {
             let to = self.filesystem.borrow_mut().normalize_path(
-                &realpath(Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default(),
+                &realpath(Platform::get_cwd(false).unwrap_or_default())
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .unwrap_or_default(),
             );
             Some(
                 self.filesystem

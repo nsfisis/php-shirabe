@@ -11,7 +11,8 @@ use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, dirname, is_dir, is_writable,
-    legacy_lossy, php_regex, preg_is_match, preg_match, preg_replace, realpath, sys_get_temp_dir,
+    legacy_lossy, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
+    preg_replace, realpath, sys_get_temp_dir,
 };
 
 #[derive(Debug)]
@@ -57,7 +58,9 @@ impl GitDriver {
                 .into());
             }
             self.repo_dir = self.inner.url.clone();
-            cache_url = realpath(&self.inner.url).unwrap_or_else(|| self.inner.url.clone());
+            cache_url = realpath(&self.inner.url)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or_else(|| self.inner.url.clone());
         } else {
             let cache_vcs_dir = self
                 .inner
@@ -81,9 +84,9 @@ impl GitDriver {
             GitUtil::clean_env(&self.inner.process);
 
             let mut fs = Filesystem::new(None);
-            fs.ensure_directory_exists(&dirname(&self.repo_dir))?;
+            fs.ensure_directory_exists(&legacy_lossy(&dirname(&self.repo_dir)))?;
 
-            if !is_writable(dirname(&self.repo_dir)) {
+            if !is_writable(path_from_bytes(&dirname(&self.repo_dir))) {
                 return Err(RuntimeException::new(format!(
                     "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
                     self.inner.url,

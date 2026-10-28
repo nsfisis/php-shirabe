@@ -9,7 +9,8 @@ use crate::util::{Filesystem, SyncHelper};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, RuntimeException, bin2hex, file_exists, hash, legacy_lossy,
-    php_regex, preg_is_match, preg_replace, random_bytes, realpath, sys_get_temp_dir,
+    path_to_bytes, php_regex, preg_is_match, preg_replace, random_bytes, realpath,
+    sys_get_temp_dir,
 };
 
 pub struct ArchiveManager {
@@ -148,7 +149,9 @@ impl ArchiveManager {
         let source_path: String;
 
         if is_root {
-            source_path = realpath(".").unwrap_or_else(|| ".".to_string());
+            source_path = realpath(".")
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or_else(|| ".".to_string());
         } else {
             // TODO(bytes): the source path is kept as a String.
             let tmp_dir = sys_get_temp_dir()
@@ -232,7 +235,9 @@ impl ArchiveManager {
         filesystem.ensure_directory_exists(&target_dir)?;
         let target = format!(
             "{}/{}.{}",
-            realpath(&target_dir).unwrap_or(target_dir.clone()),
+            realpath(&target_dir)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or(target_dir.clone()),
             package_name,
             format
         );

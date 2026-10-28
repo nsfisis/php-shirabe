@@ -91,7 +91,7 @@ impl ExecutableFinder {
         }
 
         let exec_result = exec(
-            &format!("command -v -- {}", escapeshellarg(name)),
+            format!("command -v -- {}", escapeshellarg(name)),
             None,
             None,
         )

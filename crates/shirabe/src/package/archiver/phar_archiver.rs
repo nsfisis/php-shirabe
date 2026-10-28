@@ -4,7 +4,8 @@ use crate::package::archiver::{ArchivableFilesFilter, ArchivableFilesFinder, Arc
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, FilesystemIterator, Phar, PharData, RuntimeException, UnexpectedValueException,
-    bzcompress, file_exists, file_put_contents, gzcompress, realpath, str_repeat, strrpos, unlink,
+    bzcompress, file_exists, file_put_contents, gzcompress, legacy_lossy, path_to_bytes, realpath,
+    str_repeat, strrpos, unlink,
 };
 
 fn formats() -> IndexMap<&'static str, i64> {
@@ -47,7 +48,9 @@ impl ArchiverInterface for PharArchiver {
         excludes: Vec<String>,
         ignore_filters: bool,
     ) -> anyhow::Result<String> {
-        let sources = realpath(&sources).unwrap_or(sources);
+        let sources = realpath(&sources)
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+            .unwrap_or(sources);
         let formats = formats();
         let compress_formats = compress_formats();
 
@@ -83,7 +86,7 @@ impl ArchiverInterface for PharArchiver {
 
                 if format == "tar" {
                     // create an empty tar file (=10240 null bytes) if the tar file is empty and PharData thus did not write it to disk
-                    file_put_contents(&target, &str_repeat("\0", 10240));
+                    file_put_contents(&target, str_repeat("\0", 10240));
                 } else if format == "zip" {
                     // create minimal valid ZIP file (Empty Central Directory + End of Central Directory record)
                     let mut eocd = Vec::with_capacity(22);

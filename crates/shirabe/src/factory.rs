@@ -33,8 +33,8 @@ use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
     PhpMixed, RuntimeException, UnexpectedValueException, array_replace_recursive, class_exists,
     dirname, extension_loaded, file_exists, file_get_contents, file_put_contents, implode, is_dir,
-    is_file, json_decode_assoc, json_decode_obj, legacy_lossy, mkdir, pathinfo, realpath, rename,
-    rtrim2, strpos, strtr, substr, trim2,
+    is_file, json_decode_assoc, json_decode_obj, legacy_lossy, mkdir, path_from_bytes,
+    path_to_bytes, pathinfo, realpath, rename, rtrim2, strpos, strtr, substr, trim2,
 };
 use shirabe_symfony_console::formatter::{
     OutputFormatter, OutputFormatterStyle, OutputFormatterStyleInterface,
@@ -397,7 +397,7 @@ impl Factory {
             && is_file(s)
             && cwd.is_none()
         {
-            cwd = Some(dirname(s));
+            cwd = Some(legacy_lossy(&dirname(s)).into_owned());
         }
 
         let cwd = match cwd {
@@ -469,7 +469,10 @@ impl Factory {
             Self::create_config(Some(io.clone()), Some(&cwd))?
         };
         let is_global = local_config_source != Config::SOURCE_UNKNOWN
-            && realpath(&config.get_str("home")?) == realpath(dirname(&local_config_source));
+            && realpath(&config.get_str("home")?)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                == realpath(path_from_bytes(&dirname(&local_config_source)))
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
         config.merge(&local_config_data, &local_config_source);
 
         if let Some(ref composer_file_path) = composer_file {
@@ -477,14 +480,18 @@ impl Factory {
                 &format!(
                     "Loading config file {} ({})",
                     composer_file_path,
-                    realpath(composer_file_path).unwrap_or_default()
+                    realpath(composer_file_path)
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default()
                 ),
                 true,
                 crate::io::DEBUG,
             );
             config.set_config_source(Box::new(JsonConfigSource::new(
                 std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
-                    realpath(composer_file_path).unwrap_or_default(),
+                    realpath(composer_file_path)
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default(),
                     None,
                     Some(io.clone()),
                 )?)),
@@ -494,7 +501,11 @@ impl Factory {
             let local_auth_file = JsonFile::new(
                 format!(
                     "{}/auth.json",
-                    dirname(&realpath(composer_file_path).unwrap_or_default())
+                    dirname(
+                        realpath(composer_file_path)
+                            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                            .unwrap_or_default()
+                    )
                 ),
                 None,
                 Some(io.clone()),

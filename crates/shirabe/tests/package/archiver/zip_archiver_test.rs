@@ -6,8 +6,8 @@ use shirabe::package::archiver::{ArchiverInterface, ZipArchiver};
 use shirabe::package::handle::CompletePackageHandle;
 use shirabe::util::Platform;
 use shirabe_php_shim::{
-    ZipArchive, class_exists, dirname, file_exists, file_put_contents, mkdir, realpath,
-    sys_get_temp_dir, unlink,
+    ZipArchive, class_exists, dirname, file_exists, file_put_contents, legacy_lossy, mkdir,
+    path_from_bytes, path_to_bytes, realpath, sys_get_temp_dir, unlink,
 };
 use tempfile::TempDir;
 
@@ -43,7 +43,11 @@ impl ArchiverTestCase {
             "master".to_string(),
             "master".to_string(),
         );
-        package.set_source_url(Some(realpath(&self.test_dir).unwrap_or_default()));
+        package.set_source_url(Some(
+            realpath(&self.test_dir)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or_default(),
+        ));
         package.set_source_reference(Some("master".to_string()));
         package.__set_source_type(Some("git".to_string()));
 
@@ -105,8 +109,8 @@ impl ArchiverTestCase {
     }
 
     fn write_file(&self, path: &str, content: String, current_work_dir: &str) {
-        if !file_exists(dirname(path)) {
-            mkdir(dirname(path), 0o777, true);
+        if !file_exists(path_from_bytes(&dirname(path))) {
+            mkdir(path_from_bytes(&dirname(path)), 0o777, true);
         }
 
         let result = file_put_contents(path, content.as_bytes());

@@ -5,7 +5,9 @@ use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::Application;
 use crate::console::input::{InputArgument, InputOption};
 use crate::io::IOInterfaceImmutable;
-use shirabe_php_shim::{PhpMixed, RuntimeException, basename, chdir, getcwd, glob, impl_php_class};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, basename, chdir, getcwd, glob, impl_php_class, legacy_lossy,
+};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
@@ -64,7 +66,7 @@ impl ExecCommand {
                 continue;
             }
             previous_bin = Some(bin.clone());
-            binaries.push(basename(bin));
+            binaries.push(legacy_lossy(&basename(bin)).into_owned());
         }
 
         Ok(binaries)

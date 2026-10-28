@@ -10,8 +10,8 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, ProcessExecutor};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, impl_php_class, legacy_lossy, php_regex, preg_is_match, preg_split,
-    realpath,
+    PhpMixed, RuntimeException, impl_php_class, legacy_lossy, path_to_bytes, php_regex,
+    preg_is_match, preg_split, realpath,
 };
 
 #[derive(Debug)]
@@ -101,7 +101,7 @@ impl VcsDownloader for FossilDownloader {
         )?;
 
         let repo_file = format!("{}.fossil", path);
-        let real_path = realpath(path);
+        let real_path = realpath(path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
 
         self.inner.io.write_error(&format!(
             "Cloning {}",
@@ -170,7 +170,7 @@ impl VcsDownloader for FossilDownloader {
             )).into());
         }
 
-        let real_path = realpath(path);
+        let real_path = realpath(path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
         let mut output = String::new();
         self.execute(
             vec!["fossil".to_string(), "pull".to_string()],
@@ -211,7 +211,7 @@ impl VcsDownloader for FossilDownloader {
                 "before".to_string(),
                 to_reference.to_string(),
             ],
-            realpath(path),
+            realpath(path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned()),
             &mut output,
         )?;
 
@@ -259,7 +259,9 @@ impl ChangeReportInterface for FossilDownloader {
         self.inner.process.borrow_mut().execute(
             &["fossil".to_string(), "changes".to_string()],
             &mut output,
-            realpath(path).as_deref(),
+            realpath(path)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .as_deref(),
         )?;
 
         let output = output.trim().to_string();

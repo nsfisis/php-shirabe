@@ -5,8 +5,8 @@ use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggesti
 use crate::input::{InputArgument, InputInterface, InputOption, InputValue};
 use crate::output::{OutputInterface, output_interface};
 use shirabe_php_shim::{
-    PHP_SERVER, PhpMixed, basename, file_exists, impl_php_class, legacy_lossy, realpath,
-    str_replace_arrays, sys_get_temp_dir, touch,
+    PHP_SERVER, PhpMixed, basename, file_exists, impl_php_class, legacy_lossy, path_to_bytes,
+    realpath, str_replace_arrays, sys_get_temp_dir, touch,
 };
 use shirabe_symfony_process::process::Process;
 use std::ops::{Deref, DerefMut};
@@ -85,15 +85,16 @@ impl DumpCompletionCommand {
 
     fn guess_shell() -> String {
         // TODO(bytes): basename takes the path as a &str.
-        basename(
-            &PHP_SERVER
+        legacy_lossy(&basename(
+            PHP_SERVER
                 .lock()
                 .unwrap()
                 .get("SHELL")
                 .unwrap_or_default()
                 .into_string()
                 .unwrap_or_else(|shell| panic!("SHELL is not valid UTF-8: {shell:?}")),
-        )
+        ))
+        .into_owned()
     }
 
     fn tail_debug_log(
@@ -155,7 +156,7 @@ impl Command for DumpCompletionCommand {
         let command_name = basename(&full_command);
         // @realpath($fullCommand) ?: $fullCommand
         let full_command = match realpath(&full_command) {
-            Some(p) if !p.is_empty() => p,
+            Some(p) if !p.as_os_str().is_empty() => legacy_lossy(path_to_bytes(&p)).into_owned(),
             _ => full_command,
         };
 
@@ -210,8 +211,8 @@ impl Command for DumpCompletionCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         // TODO(bytes): basename takes the path as a &str.
-        let command_name = basename(
-            &PHP_SERVER
+        let command_name = legacy_lossy(&basename(
+            PHP_SERVER
                 .lock()
                 .unwrap()
                 .argv()
@@ -219,7 +220,8 @@ impl Command for DumpCompletionCommand {
                 .unwrap_or_default()
                 .into_string()
                 .unwrap_or_else(|arg| panic!("argv[0] is not valid UTF-8: {arg:?}")),
-        );
+        ))
+        .into_owned();
 
         if input.borrow().get_option("debug")?.to_bool() {
             self.tail_debug_log(&command_name, output.clone())?;
@@ -278,7 +280,10 @@ impl Command for DumpCompletionCommand {
                     "{{ COMMAND_NAME }}".to_string(),
                     "{{ VERSION }}".to_string(),
                 ],
-                &[command_name, version],
+                &[
+                    command_name,
+                    legacy_lossy(&bstr::BString::from(version)).into_owned(),
+                ],
                 completion_file,
             ))
             .into_owned()],

@@ -16,8 +16,8 @@ use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined, dirname, file_exists,
-    file_get_contents, glob_with_flags, hash, is_dir, php_regex, preg_is_match, realpath,
-    serialize,
+    file_get_contents, glob_with_flags, hash, is_dir, legacy_lossy, path_to_bytes, php_regex,
+    preg_is_match, realpath, serialize,
 };
 
 #[derive(Debug)]
@@ -153,7 +153,7 @@ impl PathRepository {
             if preg_is_match(php_regex!(r"{[*{}]}"), &self.url) {
                 let mut url = self.url.clone();
                 while preg_is_match(php_regex!(r"{[*{}]}"), &url) {
-                    url = dirname(&url);
+                    url = legacy_lossy(&dirname(&url)).into_owned();
                 }
                 // the parent directory before any wildcard exists, so we assume it is correctly configured but simply empty
                 if is_dir(&url) {
@@ -169,7 +169,12 @@ impl PathRepository {
         }
 
         for url in url_matches {
-            let path = format!("{}/", realpath(&url).unwrap_or_default());
+            let path = format!(
+                "{}/",
+                realpath(&url)
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .unwrap_or_default()
+            );
             let composer_file_path = format!("{}composer.json", path);
 
             if !file_exists(&composer_file_path) {

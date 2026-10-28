@@ -16,8 +16,8 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, PhpClass as _, PhpMixed, RuntimeException, array_map,
-    array_shift, bconcat, explode, implode, legacy_lossy, rawurldecode, realpath, str_replace,
-    strlen, strpos, substr, trim,
+    array_shift, bconcat, explode, implode, legacy_lossy, path_to_bytes, rawurldecode, realpath,
+    str_replace, strlen, strpos, substr, trim,
 };
 
 #[derive(Debug)]
@@ -478,7 +478,9 @@ pub trait VcsDownloader:
                     url = legacy_lossy(&rawurldecode(&url)).into_owned();
                 }
 
-                *url_entry = realpath(&url).unwrap_or_default();
+                *url_entry = realpath(&url)
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .unwrap_or_default();
 
                 if is_file_protocol {
                     *url_entry = format!("{}{}", file_protocol, url_entry);

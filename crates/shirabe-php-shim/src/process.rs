@@ -1,4 +1,4 @@
-use crate::{ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState};
+use crate::{ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState, os_str_from_bytes};
 use bstr::BString;
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::exec::escapeshellcmd;
@@ -8,28 +8,37 @@ pub const SIGTERM: i64 = 15;
 pub const SIGUSR1: i64 = 10;
 pub const SIGUSR2: i64 = 12;
 
-pub fn exec(
-    command: &str,
-    output: Option<&mut Vec<String>>,
-    exit_code: Option<&mut i64>,
-) -> Option<String> {
-    let result = std::process::Command::new("/bin/sh")
+/// The lines of a command's output, as PHP's `exec()` and `system()` split it: without the line
+/// terminators, and without the single empty line a terminating newline leaves.
+fn output_lines(stdout: &[u8]) -> Vec<BString> {
+    let mut lines: Vec<BString> = stdout
+        .split(|&b| b == b'\n')
+        .map(|l| BString::from(l.strip_suffix(b"\r").unwrap_or(l)))
+        .collect();
+    if lines.last().is_some_and(|l| l.is_empty()) {
+        lines.pop();
+    }
+    lines
+}
+
+fn run_shell(command: &[u8]) -> Option<std::process::Output> {
+    std::process::Command::new("/bin/sh")
         .arg("-c")
-        .arg(command)
+        .arg(os_str_from_bytes(command))
         .output()
-        .ok()?;
+        .ok()
+}
+
+pub fn exec(
+    command: impl AsRef<[u8]>,
+    output: Option<&mut Vec<BString>>,
+    exit_code: Option<&mut i64>,
+) -> Option<BString> {
+    let result = run_shell(command.as_ref())?;
     if let Some(code) = exit_code {
         *code = result.status.code().unwrap_or(-1) as i64;
     }
-    let stdout = String::from_utf8_lossy(&result.stdout);
-    let mut lines: Vec<String> = stdout
-        .split('\n')
-        .map(|l| l.strip_suffix('\r').unwrap_or(l).to_string())
-        .collect();
-    // Drop the single trailing empty line produced by a terminating newline.
-    if lines.last().map(String::is_empty).unwrap_or(false) {
-        lines.pop();
-    }
+    let lines = output_lines(&result.stdout);
     let last = lines.last().cloned().unwrap_or_default();
     if let Some(out) = output {
         // PHP appends to the array rather than replacing it.
@@ -38,28 +47,19 @@ pub fn exec(
     Some(last)
 }
 
-pub fn shell_exec(command: &str) -> Option<String> {
-    let result = std::process::Command::new("/bin/sh")
-        .arg("-c")
-        .arg(command)
-        .output()
-        .ok()?;
-    let stdout = String::from_utf8_lossy(&result.stdout).into_owned();
+pub fn shell_exec(command: impl AsRef<[u8]>) -> Option<BString> {
+    let result = run_shell(command.as_ref())?;
     // PHP returns null when the command produces no output.
-    if stdout.is_empty() {
+    if result.stdout.is_empty() {
         None
     } else {
-        Some(stdout)
+        Some(BString::from(result.stdout))
     }
 }
 
-pub fn system(command: &str, result_code: Option<&mut i64>) -> Option<String> {
+pub fn system(command: impl AsRef<[u8]>, result_code: Option<&mut i64>) -> Option<BString> {
     use std::io::Write as _;
-    let result = std::process::Command::new("/bin/sh")
-        .arg("-c")
-        .arg(command)
-        .output()
-        .ok()?;
+    let result = run_shell(command.as_ref())?;
     if let Some(code) = result_code {
         *code = result.status.code().unwrap_or(-1) as i64;
     }
@@ -68,29 +68,22 @@ pub fn system(command: &str, result_code: Option<&mut i64>) -> Option<String> {
     // and emitted once the command finishes, which changes interleaving/streaming timing.
     let _ = std::io::stdout().write_all(&result.stdout);
     let _ = std::io::stdout().flush();
-    let stdout = String::from_utf8_lossy(&result.stdout);
-    let mut lines: Vec<String> = stdout
-        .split('\n')
-        .map(|l| l.strip_suffix('\r').unwrap_or(l).to_string())
-        .collect();
-    if lines.last().map(String::is_empty).unwrap_or(false) {
-        lines.pop();
-    }
-    Some(lines.last().cloned().unwrap_or_default())
+    Some(output_lines(&result.stdout).pop().unwrap_or_default())
 }
 
 // Unix branch of PHP's escapeshellarg: wrap in single quotes, escaping embedded single quotes.
-pub fn escapeshellarg(arg: &str) -> String {
-    let mut out = String::with_capacity(arg.len() + 2);
-    out.push('\'');
-    for c in arg.chars() {
-        if c == '\'' {
-            out.push_str("'\\''");
+pub fn escapeshellarg(arg: impl AsRef<[u8]>) -> BString {
+    let arg = arg.as_ref();
+    let mut out = BString::from(Vec::with_capacity(arg.len() + 2));
+    out.push(b'\'');
+    for &c in arg {
+        if c == b'\'' {
+            out.extend_from_slice(b"'\\''");
         } else {
             out.push(c);
         }
     }
-    out.push('\'');
+    out.push(b'\'');
     out
 }
 

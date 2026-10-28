@@ -13,9 +13,9 @@ use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, bconcat, dirname, impl_php_class,
-    implode, in_array_strict, is_dir, legacy_lossy, php_regex, preg_is_match, preg_match,
-    preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim2, strlen, strpos, substr,
-    trim, version_compare,
+    implode, in_array_strict, is_dir, legacy_lossy, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim2, strlen,
+    strpos, substr, trim, version_compare,
 };
 
 #[derive(Debug)]
@@ -606,10 +606,10 @@ impl GitDownloader {
             let mut removed: Vec<String> = vec![];
 
             while !is_dir(&base_path) && base_path != "\\" {
-                let mut new_removed = vec![basename(&base_path)];
+                let mut new_removed = vec![legacy_lossy(&basename(&base_path)).into_owned()];
                 new_removed.extend(removed);
                 removed = new_removed;
-                base_path = dirname(&base_path);
+                base_path = legacy_lossy(&dirname(&base_path)).into_owned();
             }
 
             if base_path == "\\" {
@@ -619,7 +619,9 @@ impl GitDownloader {
             path = legacy_lossy(&rtrim2(
                 format!(
                     "{}/{}",
-                    realpath(&base_path).unwrap_or_default(),
+                    realpath(&base_path)
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default(),
                     implode("/", &removed),
                 ),
                 "/",

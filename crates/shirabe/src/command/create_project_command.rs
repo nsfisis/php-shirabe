@@ -30,8 +30,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
     array_pop, chdir, explode_with_limit, file_exists, getcwd, impl_php_class, implode, is_dir,
-    is_file, legacy_lossy, mkdir, path_from_bytes, preg_match, realpath, rtrim2, strtolower,
-    unlink,
+    is_file, legacy_lossy, mkdir, path_from_bytes, path_to_bytes, preg_match, realpath, rtrim2,
+    strtolower, unlink,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -711,7 +711,7 @@ impl CreateProjectCommand {
 
         // handler Ctrl+C aborts gracefully
         let _ = mkdir(&directory, 0o777, true);
-        let real_dir = realpath(&directory);
+        let real_dir = realpath(&directory).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
         let signals = real_dir.as_ref().map(|_| SignalSubscription::new());
         let abort_on_signal = |signals: &SignalSubscription| {
             io.write_error3(

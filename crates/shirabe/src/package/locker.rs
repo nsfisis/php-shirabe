@@ -21,8 +21,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect,
     array_keys, array_map, array_merge, empty, file_get_contents, filemtime, hash, in_array_loose,
-    is_int, ksort, legacy_lossy, php_regex, preg_is_match, preg_match, realpath, strcmp,
-    strtolower, touch2, trim, usort,
+    is_int, ksort, legacy_lossy, path_to_bytes, php_regex, preg_is_match, preg_match, realpath,
+    strcmp, strtolower, touch2, trim, usort,
 };
 use shirabe_seld_json_lint::ParsingException;
 
@@ -788,7 +788,7 @@ impl Locker {
         if path.is_none() {
             return Ok(None);
         }
-        let path = realpath(path.unwrap());
+        let path = realpath(path.unwrap()).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
         let source_type = package.get_source_type();
         let mut datetime: Option<chrono::DateTime<chrono::Utc>> = None;
 

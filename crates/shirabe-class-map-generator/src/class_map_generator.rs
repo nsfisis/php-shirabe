@@ -6,9 +6,9 @@ use crate::php_file_parser::PhpFileParser;
 use bstr::BString;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, explode,
-    getcwd, implode, is_dir, is_file, legacy_lossy, pathinfo, php_regex, preg_is_match, preg_match,
-    preg_quote, preg_replace, preg_replace_callback, realpath, str_replace, stream_get_wrappers,
-    strlen, strpos, strrpos, strtr, substr,
+    getcwd, implode, is_dir, is_file, legacy_lossy, path_to_bytes, pathinfo, php_regex,
+    preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback, realpath,
+    str_replace, stream_get_wrappers, strlen, strpos, strrpos, strtr, substr,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
@@ -117,7 +117,10 @@ impl ClassMapGenerator {
             )).into());
         };
 
-        let cwd = realpath(Self::get_cwd()?).unwrap_or_default();
+        let cwd = legacy_lossy(path_to_bytes(
+            &realpath(Self::get_cwd()?).unwrap_or_default(),
+        ))
+        .into_owned();
 
         for file in files {
             let mut file_path = match file.to_str() {
@@ -130,7 +133,7 @@ impl ClassMapGenerator {
                     .into());
                 }
             };
-            let ext = pathinfo(&file_path, PATHINFO_EXTENSION);
+            let ext = legacy_lossy(&pathinfo(&file_path, PATHINFO_EXTENSION)).into_owned();
             if !self.extensions.contains(&ext) {
                 continue;
             }
@@ -166,7 +169,7 @@ impl ClassMapGenerator {
             let real_path = if is_stream_wrapper_path {
                 file_path.clone()
             } else {
-                match realpath(&file_path) {
+                legacy_lossy(path_to_bytes(&match realpath(&file_path) {
                     Some(p) => p,
                     None => {
                         return Err(RuntimeException::new(format!(
@@ -175,7 +178,8 @@ impl ClassMapGenerator {
                         ))
                         .into());
                     }
-                }
+                }))
+                .into_owned()
             };
 
             // if a list of scanned files is given, avoid scanning twice the same file to save cycles and avoid generating warnings
@@ -310,14 +314,7 @@ impl ClassMapGenerator {
         if valid_classes.is_empty() {
             let cwd_path = Self::get_cwd()?;
             let cwd = realpath(&cwd_path);
-            let cwd = match cwd {
-                Some(c) => c,
-                // TODO(bytes): the cwd is handled as a String.
-                None => cwd_path
-                    .into_os_string()
-                    .into_string()
-                    .unwrap_or_else(|cwd| panic!("cwd is not valid UTF-8: {cwd:?}")),
-            };
+            let cwd = legacy_lossy(path_to_bytes(&cwd.unwrap_or(cwd_path))).into_owned();
             let cwd = Self::normalize_path(&cwd);
             let short_path = preg_replace(
                 format!("{{^{}}}", preg_quote(&cwd, None)),

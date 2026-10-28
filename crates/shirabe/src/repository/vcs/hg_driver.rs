@@ -10,8 +10,8 @@ use bstr::BString;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, date_create, dirname, is_dir, is_writable, php_regex,
-    preg_is_match, preg_match, preg_replace,
+    Catch as _, PhpMixed, RuntimeException, date_create, dirname, is_dir, is_writable,
+    path_from_bytes, php_regex, preg_is_match, preg_match, preg_replace,
 };
 
 #[derive(Debug)]
@@ -66,7 +66,7 @@ impl HgDriver {
             let mut fs = Filesystem::new(None);
             fs.ensure_directory_exists(&cache_vcs_dir)?;
 
-            if !is_writable(dirname(&self.repo_dir)) {
+            if !is_writable(path_from_bytes(&dirname(&self.repo_dir))) {
                 return Err(RuntimeException::new(format!(
                     "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
                     self.inner.url, cache_vcs_dir

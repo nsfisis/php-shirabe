@@ -12,8 +12,8 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Filesystem, ProcessExecutor};
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, file_exists, file_put_contents, realpath,
-    sys_get_temp_dir, unlink,
+    Catch as _, PhpMixed, RuntimeException, file_exists, file_put_contents, legacy_lossy,
+    path_to_bytes, realpath, sys_get_temp_dir, unlink,
 };
 use shirabe_symfony_process::Process;
 use tempfile::TempDir;
@@ -84,7 +84,11 @@ impl TestCase {
             "master".to_string(),
             "master".to_string(),
         );
-        package.set_source_url(Some(realpath(&self.test_dir).unwrap_or_default()));
+        package.set_source_url(Some(
+            realpath(&self.test_dir)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or_default(),
+        ));
         package.set_source_reference(Some("master".to_string()));
         package.__set_source_type(Some("git".to_string()));
 

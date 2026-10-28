@@ -24,8 +24,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
     array_search, date_format_to_strftime, date_local, extension_loaded, get_class, impl_php_class,
-    in_array_loose, in_array_strict, legacy_lossy, php_regex, preg_is_match, preg_match,
-    preg_quote, preg_replace, realpath, strtolower, version_compare,
+    in_array_loose, in_array_strict, legacy_lossy, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_quote, preg_replace, realpath, strtolower, version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -462,7 +462,9 @@ impl ShowCommand {
             if let Some(p) = path {
                 self.get_io().write(&format!(
                     "<info>path</info>     : {}",
-                    realpath(&p).unwrap_or_default()
+                    realpath(&p)
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default()
                 ));
             } else {
                 self.get_io().write("<info>path</info>     : null");
@@ -702,7 +704,9 @@ impl ShowCommand {
                 .get_install_path(package.clone().into());
             match path {
                 Some(p) => {
-                    if let Some(r) = realpath(&p) {
+                    if let Some(r) =
+                        realpath(&p).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    {
                         json.path = Some(Some(r));
                     }
                 }
@@ -1992,7 +1996,9 @@ impl Command for ShowCommand {
                         .get_install_path(package.clone().into())
                 };
                 if let Some(path) = path {
-                    let real = realpath(&path).unwrap_or_default();
+                    let real = realpath(&path)
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default();
                     let trimmed = real.split(['\r', '\n']).next().unwrap_or_default();
                     self.get_io().write(&format!(" {}", trimmed));
                 } else {
@@ -2378,7 +2384,9 @@ impl Command for ShowCommand {
                                 .borrow_mut()
                                 .get_install_path(package.clone());
                             if let Some(p) = path {
-                                let r = realpath(&p).unwrap_or_default();
+                                let r = realpath(&p)
+                                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                                    .unwrap_or_default();
                                 let trimmed = r.split(['\r', '\n']).next().unwrap_or_default();
                                 package_view_data.path = Some(Some(trimmed.to_string()));
                             } else {

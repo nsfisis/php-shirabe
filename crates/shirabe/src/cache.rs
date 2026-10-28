@@ -6,8 +6,8 @@ use chrono::Utc;
 use shirabe_php_shim::{
     bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space, file_exists,
     file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable, legacy_lossy,
-    mkdir, php_regex, preg_is_match, preg_match, preg_replace, random_bytes, random_int, rename,
-    time, touch, touch3, unlink,
+    mkdir, path_from_bytes, php_regex, preg_is_match, preg_match, preg_replace, random_bytes,
+    random_int, rename, time, touch, touch3, unlink,
 };
 use shirabe_symfony_finder::Finder;
 use std::sync::Mutex;
@@ -190,9 +190,10 @@ impl Cache {
                         // Remove partial file.
                         unlink(&temp_file_name);
 
-                        let free_space = disk_free_space(dirname(&temp_file_name))
-                            .map(|space| space.to_string())
-                            .unwrap_or_default();
+                        let free_space =
+                            disk_free_space(path_from_bytes(&dirname(&temp_file_name)))
+                                .map(|space| space.to_string())
+                                .unwrap_or_default();
                         let message = format!(
                             "<warning>Writing {} into cache failed after {} of {} bytes written, only {} bytes of free space available</warning>",
                             temp_file_name,
@@ -221,7 +222,7 @@ impl Cache {
             let full_path = format!("{}{}", self.root, file);
             self.filesystem
                 .borrow_mut()
-                .ensure_directory_exists(&dirname(&full_path));
+                .ensure_directory_exists(&legacy_lossy(&dirname(&full_path)));
 
             if !file_exists(source) {
                 self.io.write_error(&format!(

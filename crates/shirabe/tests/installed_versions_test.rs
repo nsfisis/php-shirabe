@@ -14,7 +14,7 @@ use php_worker::{
     php_single_quote,
 };
 use shirabe_php_rpc::PluginValue;
-use shirabe_php_shim::{PhpMixed, realpath};
+use shirabe_php_shim::{PhpMixed, legacy_lossy, path_to_bytes, realpath};
 use tempfile::TempDir;
 
 const INSTALLED_VERSIONS: &str = "Composer\\InstalledVersions";
@@ -435,7 +435,10 @@ fn test_get_install_path() {
         "getInstallPath",
         vec![PluginValue::string("__root__")],
     ));
-    assert_eq!(realpath(set_up.root()), realpath(root_install_path));
+    assert_eq!(
+        realpath(set_up.root()).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned()),
+        realpath(root_install_path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+    );
     assert_eq!(
         PluginValue::string("/foo/bar/vendor/c/c"),
         call_static("getInstallPath", vec![PluginValue::string("c/c")])

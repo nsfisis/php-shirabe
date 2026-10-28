@@ -11,7 +11,7 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, date_create, dirname, is_dir, is_file, is_writable,
-    legacy_lossy, php_regex, preg_is_match, preg_replace, trim,
+    legacy_lossy, path_from_bytes, php_regex, preg_is_match, preg_replace, trim,
 };
 
 #[derive(Debug)]
@@ -115,7 +115,7 @@ impl FossilDriver {
         let mut fs = Filesystem::new(None);
         fs.ensure_directory_exists(&self.checkout_dir)?;
 
-        if !is_writable(dirname(&self.checkout_dir)) {
+        if !is_writable(path_from_bytes(&dirname(&self.checkout_dir))) {
             return Err(RuntimeException::new(format!(
                 "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
                 self.inner.url, self.checkout_dir

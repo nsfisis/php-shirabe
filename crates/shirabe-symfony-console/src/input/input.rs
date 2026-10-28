@@ -4,8 +4,8 @@ use crate::exception::{InvalidArgumentException, RuntimeException};
 use crate::input::{ArgumentName, InputDefinition, InputValue};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, array_filter, array_keys, array_merge_map, escapeshellarg, implode, php_regex,
-    preg_is_match,
+    PhpResource, array_filter, array_keys, array_merge_map, escapeshellarg, implode, legacy_lossy,
+    php_regex, preg_is_match,
 };
 
 /// Input is the base class for all concrete Input classes.
@@ -202,7 +202,7 @@ impl Input {
         if preg_is_match(php_regex!("{^[\\w-]+$}"), token) {
             token.to_string()
         } else {
-            escapeshellarg(token)
+            legacy_lossy(&escapeshellarg(token)).into_owned()
         }
     }
 

@@ -1,8 +1,9 @@
 //! ref: composer/vendor/symfony/finder/SplFileInfo.php
 
+use bstr::ByteSlice;
 use shirabe_php_shim::{
     RuntimeException, basename, basename_with_suffix, dirname, filesize, is_dir, is_file, is_link,
-    realpath,
+    legacy_lossy, path_to_bytes, realpath,
 };
 
 #[derive(Debug)]
@@ -33,25 +34,27 @@ impl SplFileInfo {
     }
 
     pub fn get_path(&self) -> String {
-        dirname(&self.pathname)
+        legacy_lossy(&dirname(&self.pathname)).into_owned()
     }
 
     pub fn get_filename(&self) -> String {
-        basename(&self.pathname)
+        legacy_lossy(&basename(&self.pathname)).into_owned()
     }
 
     pub fn get_basename(&self, suffix: Option<&str>) -> String {
         match suffix {
-            Some(suffix) => basename_with_suffix(&self.pathname, suffix),
-            None => basename(&self.pathname),
+            Some(suffix) => {
+                legacy_lossy(&basename_with_suffix(&self.pathname, suffix)).into_owned()
+            }
+            None => legacy_lossy(&basename(&self.pathname)).into_owned(),
         }
     }
 
     pub fn get_extension(&self) -> String {
         // \SplFileInfo::getExtension() returns the extension (without the dot), or "" if none.
         let base = basename(&self.pathname);
-        match base.rfind('.') {
-            Some(index) => base[index + 1..].to_string(),
+        match base.rfind_byte(b'.') {
+            Some(index) => legacy_lossy(&base[index + 1..]).into_owned(),
             None => String::new(),
         }
     }
@@ -78,7 +81,7 @@ impl SplFileInfo {
 
     pub fn get_real_path(&self) -> Option<String> {
         // \SplFileInfo::getRealPath() returns the canonicalized absolute path, or false on failure.
-        realpath(&self.pathname)
+        realpath(&self.pathname).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
     }
 
     pub fn get_size(&self) -> anyhow::Result<i64> {

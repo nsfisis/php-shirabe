@@ -4,8 +4,8 @@ use crate::exception::IOException;
 use shirabe_php_shim::{
     Catch as _, FilesystemIterator, PHP_MAXPATHLEN, base64_encode, chmod, copy, dirname,
     file_exists, filemtime, fileperms, filesize, filesystem_iterator, is_dir, is_file, is_link,
-    legacy_lossy, mkdir, parse_url, random_bytes, readlink, realpath, rename, rmdir, rtrim2,
-    stream_is_local, stripos, strrev, strtr, symlink, touch2, umask, unlink,
+    legacy_lossy, mkdir, parse_url, path_to_bytes, random_bytes, readlink, realpath, rename, rmdir,
+    rtrim2, stream_is_local, stripos, strrev, strtr, symlink, touch2, umask, unlink,
 };
 
 #[derive(Debug, Clone)]
@@ -40,7 +40,7 @@ impl Filesystem {
             .into());
         }
 
-        self.mkdir(&dirname(target_file), 0o777)?;
+        self.mkdir(&legacy_lossy(&dirname(target_file)), 0o777)?;
 
         let mut do_copy = true;
         // PHP: !$overwriteNewerFiles && !parse_url($originFile, PHP_URL_HOST) && is_file($targetFile)
@@ -178,7 +178,7 @@ impl Filesystem {
                 if !is_recursive {
                     let tmp_name = format!(
                         "{}/.!{}",
-                        dirname(&realpath(&file).unwrap_or_default()),
+                        dirname(path_to_bytes(&realpath(&file).unwrap_or_default())),
                         strrev(strtr(base64_encode(random_bytes(2)), "/=", "-!"))
                     );
 
@@ -251,7 +251,7 @@ impl Filesystem {
             target_dir = legacy_lossy(&strtr(&target_dir, "/", "\\")).into_owned();
         }
 
-        self.mkdir(&dirname(&target_dir), 0o777)?;
+        self.mkdir(&legacy_lossy(&dirname(&target_dir)), 0o777)?;
 
         if is_link(&target_dir) {
             // PHP compares the raw strings, so `Path`'s component-wise equality is not used.
@@ -308,7 +308,8 @@ impl Filesystem {
 
         for pathname in iterator {
             // SplFileInfo::getRealPath(), which returns false for a path that cannot be resolved.
-            let real_path = realpath(&pathname);
+            let real_path =
+                realpath(&pathname).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
             if pathname == target_dir
                 || real_path.as_deref() == Some(target_dir.as_str())
                 || real_path

@@ -6,10 +6,10 @@ use shirabe_php_shim::{
     SELF_FIRST, SKIP_DOTS, array_pop, basename, chdir, clearstatcache, clearstatcache2, copy,
     dirname, explode, fclose, feof, file_exists, file_get_contents, file_put_contents, fileatime,
     filemtime, filesize, fopen, fread, fwrite, implode, is_dir, is_file, is_link, is_readable,
-    legacy_lossy, lstat, mkdir, php_regex, preg_is_match, preg_match, preg_replace,
-    preg_replace_callback, recursive_directory_iterator, recursive_iterator_iterator, rename,
-    rmdir, rtrim2, str_repeat, str_replace, stream_copy_to_stream, strlen, strpos, strtoupper,
-    strtr, substr, substr_count, symlink, touch, unlink, usleep, var_export,
+    legacy_lossy, lstat, mkdir, path_from_bytes, php_regex, preg_is_match, preg_match,
+    preg_replace, preg_replace_callback, recursive_directory_iterator, recursive_iterator_iterator,
+    rename, rmdir, rtrim2, str_repeat, str_replace, stream_copy_to_stream, strlen, strpos,
+    strtoupper, strtr, substr, substr_count, symlink, touch, unlink, usleep, var_export,
 };
 use shirabe_symfony_filesystem::exception::IOException;
 use shirabe_symfony_finder::Finder;
@@ -861,7 +861,7 @@ impl Filesystem {
         let cwd = Platform::get_cwd(false).unwrap_or_default();
 
         let relative_path = self.find_shortest_path(link, target, false, false)?;
-        chdir(dirname(link));
+        chdir(path_from_bytes(&dirname(link)));
         let result = symlink(&relative_path, link).is_ok();
 
         chdir(&cwd);

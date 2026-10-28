@@ -27,10 +27,10 @@ use shirabe_php_rpc::{
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, file_exists, get_class, hash, implode, ini_get, is_array,
-    is_callable, is_dir, is_object, is_string, krsort, legacy_lossy, php_regex, preg_is_match,
-    preg_match, preg_quote, preg_replace, preg_replace_callback, realpath, spl_autoload_functions,
-    spl_autoload_register, spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos,
-    strtoupper, substr, trim2,
+    is_callable, is_dir, is_object, is_string, krsort, legacy_lossy, path_to_bytes, php_regex,
+    preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback, realpath,
+    spl_autoload_functions, spl_autoload_register, spl_autoload_unregister, spl_object_hash,
+    str_replace, strlen, strpos, strtoupper, substr, trim2,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
@@ -1458,7 +1458,9 @@ try {{
             .map(|s| s.to_string())
             .unwrap_or_default();
         if is_dir(&bin_dir) {
-            let bin_dir = realpath(&bin_dir).unwrap_or(bin_dir);
+            let bin_dir = realpath(&bin_dir)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or(bin_dir);
             let path_value = Platform::get_env(path_env).unwrap_or_default();
             if !std::env::split_paths(&path_value).any(|dir| dir == std::path::Path::new(&bin_dir))
             {

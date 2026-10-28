@@ -128,7 +128,7 @@ impl CompleteCommand {
 
         // TODO(bytes): basename takes the path as a &str.
         let command_name = basename(
-            &PHP_SERVER
+            PHP_SERVER
                 .lock()
                 .unwrap()
                 .argv()
@@ -143,7 +143,7 @@ impl CompleteCommand {
             .into_string()
             .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
         file_put_contents3(
-            &format!("{}/sf_{}.log", tmp_dir, command_name),
+            format!("{}/sf_{}.log", tmp_dir, command_name),
             &(messages.join(PHP_EOL) + PHP_EOL),
             FILE_APPEND,
         );

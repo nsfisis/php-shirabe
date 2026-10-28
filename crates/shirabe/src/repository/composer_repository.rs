@@ -29,9 +29,9 @@ use shirabe_metadata_minifier::{ExpandedVersion, ExpandedVersions, MetadataMinif
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpClass,
     PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash,
-    http_build_query_mixed, implode, json_decode_assoc, legacy_lossy, parse_url, php_regex,
-    preg_grep, preg_is_match, preg_match, preg_replace, preg_split, realpath, rtrim2, strtolower,
-    strtr, urlencode, var_export,
+    http_build_query_mixed, implode, json_decode_assoc, legacy_lossy, parse_url, path_to_bytes,
+    php_regex, preg_grep, preg_is_match, preg_match, preg_replace, preg_split, realpath, rtrim2,
+    strtolower, strtr, urlencode, var_export,
 };
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
@@ -226,7 +226,9 @@ impl ComposerRepository {
             .unwrap_or_default()
             .to_string();
         if !preg_is_match(php_regex!(r"{^[\w.]+\??://}"), &url_str) {
-            if let Some(local_file_path) = realpath(&url_str) {
+            if let Some(local_file_path) =
+                realpath(&url_str).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+            {
                 // it is a local path, add file scheme
                 repo_config.insert(
                     "url".into(),

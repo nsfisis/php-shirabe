@@ -11,7 +11,7 @@ use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, dirname, is_dir, is_link, legacy_lossy,
-    preg_quote, preg_replace, realpath, rmdir, rtrim2, strpos,
+    path_from_bytes, path_to_bytes, preg_quote, preg_replace, realpath, rmdir, rtrim2, strpos,
 };
 
 /// Package installation manager.
@@ -195,7 +195,9 @@ impl LibraryInstaller {
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(&self.vendor_dir.borrow());
-        let realpath = realpath(self.vendor_dir.borrow().as_str()).unwrap_or_default();
+        let realpath = realpath(self.vendor_dir.borrow().as_str())
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+            .unwrap_or_default();
         *self.vendor_dir.borrow_mut() = realpath;
     }
 
@@ -246,7 +248,10 @@ impl InstallerInterface for LibraryInstaller {
         }
 
         if is_link(&install_path) {
-            if realpath(&install_path).is_none() {
+            if realpath(&install_path)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .is_none()
+            {
                 return Ok(false);
             }
 
@@ -389,11 +394,11 @@ impl InstallerInterface for LibraryInstaller {
         repo.borrow_mut().remove_package(package.clone());
 
         if strpos(package.get_name(), "/").is_some_and(|pos| pos != 0) {
-            let package_vendor_dir = dirname(&download_path);
-            if is_dir(&package_vendor_dir)
+            let package_vendor_dir = legacy_lossy(&dirname(&download_path)).into_owned();
+            if is_dir(path_from_bytes(&package_vendor_dir))
                 && self.filesystem.borrow().is_dir_empty(&package_vendor_dir)
             {
-                let _ = rmdir(&package_vendor_dir);
+                let _ = rmdir(path_from_bytes(&package_vendor_dir));
             }
         }
 

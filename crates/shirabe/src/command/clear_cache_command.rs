@@ -7,7 +7,7 @@ use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
 use crate::io::IOInterfaceImmutable;
-use shirabe_php_shim::{impl_php_class, realpath};
+use shirabe_php_shim::{impl_php_class, legacy_lossy, path_to_bytes, realpath};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -124,15 +124,16 @@ impl Command for ClearCacheCommand {
                 continue;
             }
 
-            let cache_path = match realpath(&cache_path) {
-                Some(path) => path,
-                None => {
-                    io.write_error(&format!(
-                        "<info>Cache directory does not exist ({key}): {cache_path}</info>"
-                    ));
-                    continue;
-                }
-            };
+            let cache_path =
+                match realpath(&cache_path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned()) {
+                    Some(path) => path,
+                    None => {
+                        io.write_error(&format!(
+                            "<info>Cache directory does not exist ({key}): {cache_path}</info>"
+                        ));
+                        continue;
+                    }
+                };
             let mut cache = Cache::new(io.clone(), &cache_path, None, None, false);
             cache.set_read_only(config.get("cache-read-only").as_bool().unwrap_or(false));
             if !cache.is_enabled() {

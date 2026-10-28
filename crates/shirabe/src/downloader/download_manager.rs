@@ -151,7 +151,7 @@ impl DownloadManager {
         let target_dir = self.normalize_target_dir(target_dir);
         self.filesystem
             .borrow_mut()
-            .ensure_directory_exists(&dirname(&target_dir));
+            .ensure_directory_exists(&legacy_lossy(&dirname(&target_dir)));
 
         let mut sources = self.get_available_sources(package.clone(), prev_package.clone())?;
 

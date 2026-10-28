@@ -18,13 +18,16 @@ pub fn array_keys<K: Clone, V>(array: &IndexMap<K, V>) -> Vec<K> {
     array.keys().cloned().collect()
 }
 
-pub fn array_push(array: &mut Vec<String>, value: String) -> i64 {
+pub fn array_push<T>(array: &mut Vec<T>, value: T) -> i64 {
     array.push(value);
     array.len() as i64
 }
 
-pub fn array_search_in_vec(needle: &str, haystack: &[String]) -> Option<usize> {
-    haystack.iter().position(|s| s.as_str() == needle)
+pub fn array_search_in_vec(
+    needle: impl AsRef<[u8]>,
+    haystack: &[impl AsRef<[u8]>],
+) -> Option<usize> {
+    haystack.iter().position(|s| s.as_ref() == needle.as_ref())
 }
 
 pub fn array_map_str_fn<F: Fn(&str) -> String>(_callback: F, _array: &[String]) -> Vec<String> {
@@ -51,7 +54,7 @@ pub fn array_slice_mixed(value: &PhpMixed, offset: i64, length: Option<i64>) -> 
     }
 }
 
-pub fn array_slice_strs(value: &[String], offset: i64, length: Option<i64>) -> Vec<String> {
+pub fn array_slice_strs<T: Clone>(value: &[T], offset: i64, length: Option<i64>) -> Vec<T> {
     let (start, end) = php_slice_bounds(value.len() as i64, offset, length);
     value[start..end].to_vec()
 }
@@ -143,7 +146,7 @@ where
     result
 }
 
-pub fn array_diff(array1: &[String], array2: &[String]) -> Vec<String> {
+pub fn array_diff<T: Clone + PartialEq>(array1: &[T], array2: &[T]) -> Vec<T> {
     array1
         .iter()
         .filter(|&x| !array2.contains(x))
@@ -260,10 +263,13 @@ pub fn array_search_mixed(
     }
 }
 
-pub fn array_search(needle: &str, haystack: &IndexMap<String, String>) -> Option<String> {
+pub fn array_search<K: Clone, V: AsRef<[u8]>>(
+    needle: impl AsRef<[u8]>,
+    haystack: &IndexMap<K, V>,
+) -> Option<K> {
     haystack
         .iter()
-        .find(|(_, value)| value.as_str() == needle)
+        .find(|(_, value)| value.as_ref() == needle.as_ref())
         .map(|(key, _)| key.clone())
 }
 

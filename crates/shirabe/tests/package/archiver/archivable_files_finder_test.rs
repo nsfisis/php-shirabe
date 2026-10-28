@@ -70,7 +70,7 @@ fn set_up() -> SetUp {
 
     for relative_path in file_tree {
         let path = std::path::Path::new(&sources).join(relative_path);
-        fs.ensure_directory_exists(&dirname(path.to_str().unwrap()))
+        fs.ensure_directory_exists(&legacy_lossy(&dirname(path.to_str().unwrap())))
             .unwrap();
         file_put_contents(path.to_str().unwrap(), b"");
     }

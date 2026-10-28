@@ -459,7 +459,7 @@ impl QuestionHelper {
                     && c.as_deref() == Some(b"".as_slice())
                     && matches!(question.get_default(), PhpMixed::Null))
             {
-                shell_exec(&format!("stty {}", stty_mode));
+                shell_exec(format!("stty {}", stty_mode));
                 return Err(MissingInputException::new("Aborted.".to_string()));
             } else if c.as_deref() == Some(b"\x7f".as_slice()) {
                 // Backspace Character
@@ -620,7 +620,7 @@ impl QuestionHelper {
         }
 
         // Reset stty so it behaves normally again
-        shell_exec(&format!("stty {}", stty_mode));
+        shell_exec(format!("stty {}", stty_mode));
 
         Ok(full_choice)
     }
@@ -664,12 +664,8 @@ impl QuestionHelper {
                 tmp_exe = Some(tmp);
             }
 
-            let s_exec = shell_exec(&format!("\"{}\"", exe)).unwrap_or_default();
-            let value = if trimmable {
-                rtrim(&s_exec)
-            } else {
-                bstr::BString::from(s_exec)
-            };
+            let s_exec = shell_exec(format!("\"{}\"", exe)).unwrap_or_default();
+            let value = if trimmable { rtrim(&s_exec) } else { s_exec };
             output
                 .borrow()
                 .writeln(&["".to_string()], output_interface::OUTPUT_NORMAL);
@@ -683,7 +679,7 @@ impl QuestionHelper {
 
         let mut stty_mode = String::new();
         if STTY.load(std::sync::atomic::Ordering::SeqCst) && Terminal::has_stty_available() {
-            stty_mode = shell_exec("stty -g").unwrap_or_default();
+            stty_mode = legacy_lossy(&shell_exec("stty -g").unwrap_or_default()).into_owned();
             shell_exec("stty -echo");
         } else if self.is_interactive_input(input_stream) {
             return Ok(Err(RuntimeException::new(
@@ -694,7 +690,7 @@ impl QuestionHelper {
         let value = fgets(input_stream, Some(4096));
 
         if STTY.load(std::sync::atomic::Ordering::SeqCst) && Terminal::has_stty_available() {
-            shell_exec(&format!("stty {}", stty_mode));
+            shell_exec(format!("stty {}", stty_mode));
         }
 
         let mut value = match value {

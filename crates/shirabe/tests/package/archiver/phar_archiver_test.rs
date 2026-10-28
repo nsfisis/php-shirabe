@@ -4,7 +4,10 @@ use serial_test::serial;
 use shirabe::package::archiver::{ArchiverInterface, PharArchiver};
 use shirabe::package::handle::CompletePackageHandle;
 use shirabe::util::{Filesystem, Platform};
-use shirabe_php_shim::{dirname, file_exists, file_put_contents, mkdir, realpath};
+use shirabe_php_shim::{
+    dirname, file_exists, file_put_contents, legacy_lossy, mkdir, path_from_bytes, path_to_bytes,
+    realpath,
+};
 use tempfile::TempDir;
 
 // ref: ArchiverTestCase.
@@ -31,7 +34,11 @@ impl ArchiverTestCase {
             "master".to_string(),
             "master".to_string(),
         );
-        package.set_source_url(Some(realpath(&self.test_dir).unwrap_or_default()));
+        package.set_source_url(Some(
+            realpath(&self.test_dir)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or_default(),
+        ));
         package.set_source_reference(Some("master".to_string()));
         package.__set_source_type(Some("git".to_string()));
 
@@ -52,8 +59,8 @@ impl ArchiverTestCase {
     }
 
     fn write_file(&self, path: &str, content: &str, current_work_dir: &str) {
-        if !file_exists(dirname(path)) {
-            mkdir(dirname(path), 0o777, true);
+        if !file_exists(path_from_bytes(&dirname(path))) {
+            mkdir(path_from_bytes(&dirname(path)), 0o777, true);
         }
 
         let result = file_put_contents(path, content.as_bytes());
@@ -97,7 +104,7 @@ fn test_tar_archive() {
 
     test_case
         .filesystem
-        .remove_directory(dirname(&target))
+        .remove_directory(path_from_bytes(&dirname(&target)))
         .unwrap();
 }
 
@@ -130,6 +137,6 @@ fn test_zip_archive() {
 
     test_case
         .filesystem
-        .remove_directory(dirname(&target))
+        .remove_directory(path_from_bytes(&dirname(&target)))
         .unwrap();
 }

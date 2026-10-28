@@ -1,4 +1,4 @@
-2 crates/shirabe-class-map-generator/src/class_map_generator.rs
+1 crates/shirabe-class-map-generator/src/class_map_generator.rs
 4 crates/shirabe-php-rpc/build.rs
 3 crates/shirabe-php-rpc/src/composer_runtime.rs
 6 crates/shirabe-php-rpc/src/frame.rs
@@ -7,11 +7,10 @@
 1 crates/shirabe-php-rpc/tests/generated_stubs.rs
 6 crates/shirabe-php-rpc/tests/oracle.rs
 4 crates/shirabe-php-shim/src/array.rs
-7 crates/shirabe-php-shim/src/fs.rs
+2 crates/shirabe-php-shim/src/fs.rs
 1 crates/shirabe-php-shim/src/json.rs
-3 crates/shirabe-php-shim/src/lib.rs
 4 crates/shirabe-php-shim/src/phar.rs
-4 crates/shirabe-php-shim/src/process.rs
+1 crates/shirabe-php-shim/src/process.rs
 1 crates/shirabe-php-shim/src/runtime.rs
 2 crates/shirabe-php-shim/src/url.rs
 3 crates/shirabe-php-shim/src/xml.rs

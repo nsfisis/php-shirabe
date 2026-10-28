@@ -4,7 +4,8 @@ use crate::package::archiver::{ArchivableFilesFinder, ArchiverInterface};
 use crate::util::{Filesystem, Platform};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, ZipArchive, class_exists, fileperms, legacy_lossy, realpath, strtr,
+    RuntimeException, ZipArchive, class_exists, fileperms, legacy_lossy, path_to_bytes, realpath,
+    strtr,
 };
 
 #[derive(Debug)]
@@ -42,7 +43,8 @@ impl ArchiverInterface for ZipArchiver {
         ignore_filters: bool,
     ) -> anyhow::Result<String> {
         let fs = Filesystem::new(None);
-        let sources_realpath = realpath(&sources);
+        let sources_realpath =
+            realpath(&sources).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
         let sources = if let Some(p) = sources_realpath {
             p
         } else {

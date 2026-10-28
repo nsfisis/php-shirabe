@@ -552,7 +552,7 @@ impl Command for ConfigCommand {
                     editor = Some("notepad".to_string());
                 } else {
                     for candidate in &["editor", "vim", "vi", "nano", "pico", "ed"] {
-                        if !exec(&format!("which {}", candidate), None, None)
+                        if !exec(format!("which {}", candidate), None, None)
                             .unwrap_or_default()
                             .is_empty()
                         {
@@ -583,7 +583,7 @@ impl Command for ConfigCommand {
                     .to_string()
             };
             system(
-                &format!(
+                format!(
                     "{} {}{}",
                     editor.unwrap_or_default(),
                     file,

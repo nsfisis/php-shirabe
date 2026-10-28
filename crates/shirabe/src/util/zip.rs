@@ -2,7 +2,8 @@
 
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    RuntimeException, ZipArchive, dirname, extension_loaded, implode, stream_get_contents,
+    RuntimeException, ZipArchive, dirname, extension_loaded, implode, legacy_lossy,
+    stream_get_contents,
 };
 
 pub struct Zip;
@@ -53,7 +54,7 @@ impl Zip {
         let mut top_level_paths: IndexMap<String, bool> = IndexMap::new();
         for i in 0..zip.num_files {
             let name = zip.get_name_index(i);
-            let dir_name = dirname(&name);
+            let dir_name = legacy_lossy(&dirname(&name)).into_owned();
 
             // ignore OSX specific resource fork folder
             if name.contains("__MACOSX") {

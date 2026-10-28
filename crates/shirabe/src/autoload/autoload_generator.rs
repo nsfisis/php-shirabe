@@ -23,9 +23,10 @@ use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PHP_SERVER, PhpMixed, PregMatches, RuntimeException,
     array_keys, array_map, array_merge_map, array_merge_recursive, array_shift, array_slice_strs,
     array_unique, bin2hex, empty, explode, file_exists, file_get_contents, hash, implode, intval,
-    is_array, is_dir, ksort, legacy_lossy, ltrim, ltrim2, php_regex, preg_is_match, preg_match,
-    preg_quote, preg_replace, preg_replace_callback, random_bytes, realpath, rtrim2, str_replace,
-    strlen, strpos, strtr, strtr_array, substr, substr_count, trim2, unlink, var_export,
+    is_array, is_dir, ksort, legacy_lossy, ltrim, ltrim2, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_quote, preg_replace, preg_replace_callback, random_bytes, realpath, rtrim2,
+    str_replace, strlen, strpos, strtr, strtr_array, substr, substr_count, trim2, unlink,
+    var_export,
 };
 use shirabe_semver::constraint::Bound;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -189,6 +190,7 @@ impl AutoloadGenerator {
         // See https://bugs.php.net/bug.php?id=72738
         let base_path = filesystem.normalize_path(
             &realpath(realpath(Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default())
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                 .unwrap_or_default(),
         );
         let vendor_path = filesystem.normalize_path(
@@ -202,6 +204,7 @@ impl AutoloadGenerator {
                 )
                 .unwrap_or_default(),
             )
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
             .unwrap_or_default(),
         );
         let use_global_include_path = config.get("use-include-path").as_bool().unwrap_or(false);
@@ -214,7 +217,9 @@ impl AutoloadGenerator {
         filesystem.ensure_directory_exists(&target_dir)?;
 
         let vendor_path_code = filesystem.find_shortest_path_code(
-            &realpath(&target_dir).unwrap_or_default(),
+            &realpath(&target_dir)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or_default(),
             &vendor_path,
             true,
             false,
@@ -222,7 +227,9 @@ impl AutoloadGenerator {
         )?;
         let vendor_path_to_target_dir_code = filesystem.find_shortest_path_code(
             &vendor_path,
-            &realpath(&target_dir).unwrap_or_default(),
+            &realpath(&target_dir)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or_default(),
             true,
             false,
             false,
@@ -746,7 +753,16 @@ return array(
         // if $dir does not exist, it should anyway not find anything there so no trouble
         if file_exists(dir) {
             // transform $dir in the same way that exclude-from-classmap patterns are transformed so we can match them against each other
-            let dir_match = preg_quote(strtr(realpath(dir).unwrap_or_default(), "\\", "/"), None);
+            let dir_match = preg_quote(
+                strtr(
+                    realpath(dir)
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default(),
+                    "\\",
+                    "/",
+                ),
+                None,
+            );
             // also match against the non-realpath version for symlinks
             let fs = Filesystem::new(None);
             let abs_dir = if fs.is_absolute_path(dir) {
@@ -754,7 +770,9 @@ return array(
             } else {
                 format!(
                     "{}/{}",
-                    realpath(Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default(),
+                    realpath(Platform::get_cwd(false).unwrap_or_default())
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default(),
                     dir
                 )
             };
@@ -1686,7 +1704,9 @@ class ComposerStaticInit{}
         let vendor_path_code = format!(
             " => {} . '/",
             filesystem.find_shortest_path_code(
-                &realpath(target_dir).unwrap_or_default(),
+                &realpath(target_dir)
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .unwrap_or_default(),
                 vendor_path,
                 true,
                 true,
@@ -1696,7 +1716,9 @@ class ComposerStaticInit{}
         let vendor_phar_path_code = format!(
             " => 'phar://' . {} . '/",
             filesystem.find_shortest_path_code(
-                &realpath(target_dir).unwrap_or_default(),
+                &realpath(target_dir)
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .unwrap_or_default(),
                 vendor_path,
                 true,
                 true,
@@ -1706,7 +1728,9 @@ class ComposerStaticInit{}
         let app_base_dir_code = format!(
             " => {} . '/",
             filesystem.find_shortest_path_code(
-                &realpath(target_dir).unwrap_or_default(),
+                &realpath(target_dir)
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .unwrap_or_default(),
                 base_path,
                 true,
                 true,
@@ -1716,7 +1740,9 @@ class ComposerStaticInit{}
         let app_base_dir_phar_code = format!(
             " => 'phar://' . {} . '/",
             filesystem.find_shortest_path_code(
-                &realpath(target_dir).unwrap_or_default(),
+                &realpath(target_dir)
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .unwrap_or_default(),
                 base_path,
                 true,
                 true,
@@ -2023,7 +2049,8 @@ class ComposerStaticInit{}
                             "{}/{}",
                             install_path_for_resolve,
                             updir.clone().unwrap_or_default()
-                        ));
+                        ))
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
                         let resolved_path = match resolved_path {
                             Some(rp) => rp,
                             None => continue,

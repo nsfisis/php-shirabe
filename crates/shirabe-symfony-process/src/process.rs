@@ -13,9 +13,9 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Descriptor, PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, ProcStatus, SEEK_END,
-    SEEK_SET, exec, fopen, fseek, fwrite, getcwd, getenv_all, is_dir, legacy_lossy, microtime,
-    php_regex, preg_is_match, preg_replace, preg_replace_callback, proc_close, proc_get_status,
-    proc_open, proc_terminate, stream_get_contents3, strpbrk, uniqid, usleep,
+    SEEK_SET, exec, fopen, fseek, fwrite, getcwd, getenv_all, implode, is_dir, legacy_lossy,
+    microtime, php_regex, preg_is_match, preg_replace, preg_replace_callback, proc_close,
+    proc_get_status, proc_open, proc_terminate, stream_get_contents3, strpbrk, uniqid, usleep,
 };
 use std::sync::OnceLock;
 
@@ -937,10 +937,10 @@ impl Process {
         };
 
         if cfg!(windows) {
-            let mut output: Vec<String> = Vec::new();
+            let mut output: Vec<BString> = Vec::new();
             let mut exit_code: i64 = 0;
             exec(
-                &format!("taskkill /F /T /PID {} 2>&1", pid),
+                format!("taskkill /F /T /PID {} 2>&1", pid),
                 Some(&mut output),
                 Some(&mut exit_code),
             );
@@ -948,7 +948,7 @@ impl Process {
                 if throw_exception {
                     return Err(RuntimeException::new(format!(
                         "Unable to kill the process ({}).",
-                        output.join(" ")
+                        implode(" ", &output)
                     ))
                     .into());
                 }

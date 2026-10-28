@@ -7,7 +7,8 @@ use bstr::BString;
 use shirabe_php_shim::{
     basename, basename_with_suffix, chmod, dirname, fclose, fgets, file_exists,
     file_get_contents_with_max_length, file_put_contents, fopen, is_dir, is_file, is_link,
-    legacy_lossy, php_regex, preg_match, realpath, rmdir, substr, trim, trim2, umask,
+    legacy_lossy, path_to_bytes, php_regex, preg_match, realpath, rmdir, substr, trim, trim2,
+    umask,
 };
 
 /// Seam over the BinaryInstaller methods reached through LibraryInstaller, so tests can inject a
@@ -111,7 +112,9 @@ impl BinaryInstaller {
                 // $package, we can now safely turn it into a absolute path (as we
                 // already checked the binary's existence). The following helpers
                 // will require absolute paths to work properly.
-                bin_path = realpath(&bin_path).unwrap_or_default();
+                bin_path = realpath(&bin_path)
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .unwrap_or_default();
             }
             self.initialize_bin_dir();
             let link = format!("{}/{}", self.bin_dir, basename(bin));
@@ -130,7 +133,9 @@ impl BinaryInstaller {
                     }
                     continue;
                 }
-                if realpath(&link) == realpath(&bin_path) {
+                if realpath(&link).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    == realpath(&bin_path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                {
                     // It is a linked binary from a previous installation, which can be replaced with a proxy file
                     self.filesystem.borrow_mut().unlink(&link);
                 }
@@ -251,7 +256,9 @@ impl BinaryInstaller {
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(&self.bin_dir);
-        self.bin_dir = realpath(&self.bin_dir).unwrap_or_default();
+        self.bin_dir = realpath(&self.bin_dir)
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+            .unwrap_or_default();
     }
 
     fn generate_windows_proxy_code(&self, bin: &str, link: &str) -> anyhow::Result<String> {
@@ -272,7 +279,7 @@ impl BinaryInstaller {
                  SET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n\
                  {} \"%BIN_TARGET%\" %*\r\n",
                 trim2(
-                    ProcessExecutor::escape(&basename_with_suffix(link, ".bat")),
+                    ProcessExecutor::escape(&legacy_lossy(&basename_with_suffix(link, ".bat"))),
                     "\"'"
                 ),
                 caller,
@@ -296,7 +303,7 @@ impl BinaryInstaller {
             .borrow_mut()
             .find_shortest_path(link, bin, false, false)?;
 
-        let bin_dir = ProcessExecutor::escape(&dirname(&bin_path));
+        let bin_dir = ProcessExecutor::escape(&legacy_lossy(&dirname(&bin_path)));
         let bin_file = basename(&bin_path);
 
         // TODO(bytes): preg_match matches over a &str, and the shebang it captures is spliced
@@ -328,7 +335,9 @@ impl BinaryInstaller {
             // Don't expose autoload path when vendor dir was not set in custom installers
             if let Some(vendor_dir) = &self.vendor_dir {
                 // ensure comparisons work accurately if the CWD is a symlink, as $link is realpath'd already
-                let vendor_dir_real = realpath(vendor_dir).unwrap_or_else(|| vendor_dir.clone());
+                let vendor_dir_real = realpath(vendor_dir)
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .unwrap_or_else(|| vendor_dir.clone());
                 globals_code.push_str(&format!(
                     "$GLOBALS['_composer_autoload_path'] = {};\n",
                     self.filesystem.borrow_mut().find_shortest_path_code(

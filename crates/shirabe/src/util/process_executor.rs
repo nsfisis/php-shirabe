@@ -765,7 +765,7 @@ impl ProcessExecutor {
     fn escape_argument(argument: &str) -> String {
         let mut argument = argument.to_string();
         if argument.is_empty() {
-            return escapeshellarg(&argument);
+            return legacy_lossy(&escapeshellarg(&argument)).into_owned();
         }
 
         if !Platform::is_windows() {

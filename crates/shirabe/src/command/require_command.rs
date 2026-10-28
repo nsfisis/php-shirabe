@@ -706,7 +706,7 @@ impl RequireCommand {
                 extra
             );
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
-            file_put_contents(json.borrow().get_path(), &self.composer_backup.borrow());
+            file_put_contents(json.borrow().get_path(), &*self.composer_backup.borrow());
             if let Some(ref lock_backup) = *self.lock_backup.borrow() {
                 file_put_contents(&lock, lock_backup);
             }

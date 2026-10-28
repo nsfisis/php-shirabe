@@ -32,10 +32,11 @@ use shirabe_php_shim::{
     getmypid, glob, implode, ini_set, is_array, is_dir, is_file, is_numeric_string, is_string,
     json_decode_assoc, legacy_lossy, levenshtein, ltrim2, mb_convert_encoding,
     mb_convert_variables, mb_detect_encoding, mb_strwidth, memory_get_peak_usage, memory_get_usage,
-    microtime, php_regex, php_to_string, php_truthy, php_uname, posix_getuid, preg_grep,
-    preg_match, preg_quote, preg_split, putenv, random_bytes, realpath, restore_error_handler,
-    round, sort_natural_flag_case, str_pad, str_repeat, str_replace, str_split, strlen, strpos,
-    strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time, trim, unlink,
+    microtime, path_from_bytes, path_to_bytes, php_regex, php_to_string, php_truthy, php_uname,
+    posix_getuid, preg_grep, preg_match, preg_quote, preg_split, putenv, random_bytes, realpath,
+    restore_error_handler, round, sort_natural_flag_case, str_pad, str_repeat, str_replace,
+    str_split, strlen, strpos, strrpos, strtoupper, substr, substr_count, sys_get_temp_dir, time,
+    trim, unlink,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::application::Application as BaseApplication;
@@ -1317,7 +1318,7 @@ impl Application {
                 let file = exception
                     .map(|e| basename(e.get_file()))
                     .filter(|file| !file.is_empty())
-                    .unwrap_or_else(|| "n/a".to_string());
+                    .unwrap_or_else(|| bstr::BString::from("n/a".to_string()));
                 let line = exception
                     .map(AnyThrowable::get_line)
                     .filter(|line| *line != 0)
@@ -1970,11 +1971,13 @@ impl ApplicationHandle {
             && !input.borrow().has_parameter_option(&["--help"], true)
             && !input.borrow().has_parameter_option(&["-h"], true)
         {
-            let mut dir = dirname(&Platform::get_cwd(true).unwrap_or_default());
+            let mut dir = dirname(Platform::get_cwd(true).unwrap_or_default());
             let home_value = Platform::get_env("HOME")
                 .or_else(|| Platform::get_env("USERPROFILE"))
                 .unwrap_or_else(|| "/".to_string());
-            let home = realpath(&home_value).unwrap_or_default();
+            let home = realpath(&home_value)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or_default();
 
             // abort when we reach the home dir or top of the filesystem
             while dirname(&dir) != dir && dir != home {
@@ -1998,7 +2001,7 @@ impl ApplicationHandle {
                             io.write_error("<info>Always want to use the parent dir? Use \"shirabe config --global use-parent-dir true\" to change the default.</info>");
                         }
                         old_working_dir = Some(Platform::get_cwd(true).unwrap_or_default());
-                        chdir(&dir);
+                        chdir(path_from_bytes(&dir));
                     }
                     break;
                 }
@@ -2024,7 +2027,7 @@ impl ApplicationHandle {
                     // Silently clobber any sudo credentials on the invoking user to avoid privilege escalations later on
                     // ref. https://github.com/composer/composer/issues/5119
                     let _ = exec(
-                        &format!("sudo -u \\#{} sudo -K > /dev/null 2>&1", uid),
+                        format!("sudo -u \\#{} sudo -K > /dev/null 2>&1", uid),
                         None,
                         None,
                     );
@@ -2096,7 +2099,8 @@ impl ApplicationHandle {
                     } else if let Some(pe) = e.catch::<ParsingException>() {
                         let details = pe.get_details();
 
-                        let file = realpath(Factory::get_composer_file().unwrap_or_default());
+                        let file = realpath(Factory::get_composer_file().unwrap_or_default())
+                            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
 
                         let line = details.line;
 

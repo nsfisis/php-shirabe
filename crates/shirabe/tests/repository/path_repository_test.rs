@@ -10,7 +10,9 @@ use shirabe::repository::PathRepository;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Platform, ProcessExecutor};
-use shirabe_php_shim::{PhpMixed, file_get_contents, hash, legacy_lossy, realpath, serialize};
+use shirabe_php_shim::{
+    PhpMixed, file_get_contents, hash, legacy_lossy, path_to_bytes, realpath, serialize,
+};
 use std::path::Path;
 
 fn fixtures_dir() -> String {
@@ -215,6 +217,7 @@ fn test_url_remains_relative() {
     // PHP Bug https://bugs.php.net/bug.php?id=72642
     let repository_url = Path::new(
         &realpath(realpath(fixtures_dir().replace("/Fixtures", "")).unwrap_or_default())
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
             .unwrap_or_default(),
     )
     .join("Fixtures")
@@ -226,6 +229,7 @@ fn test_url_remains_relative() {
     // getcwd() not necessarily match __DIR__
     // PHP Bug https://bugs.php.net/bug.php?id=73797
     let cwd = realpath(realpath(Platform::get_cwd(false).unwrap()).unwrap_or_default())
+        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
         .unwrap_or_default();
     let relative_url = repository_url[cwd.len().min(repository_url.len())..]
         .trim_start_matches(std::path::MAIN_SEPARATOR)

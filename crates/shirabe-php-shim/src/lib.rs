@@ -71,6 +71,14 @@ pub enum PhpMixed {
     // things to this type.
 }
 
+/// A string as JSON holds it. PHP's `json_encode()` fails with `JSON_ERROR_UTF8` on a string that
+/// is not valid UTF-8.
+fn json_utf8<S: serde::Serializer>(s: &[u8]) -> Result<&str, S::Error> {
+    utf8_text(s).ok_or_else(|| {
+        serde::ser::Error::custom("Malformed UTF-8 characters, possibly incorrectly encoded")
+    })
+}
+
 impl serde::Serialize for PhpMixed {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -82,8 +90,7 @@ impl serde::Serialize for PhpMixed {
             PhpMixed::Bool(b) => serializer.serialize_bool(*b),
             PhpMixed::Int(i) => serializer.serialize_i64(*i),
             PhpMixed::Float(f) => serializer.serialize_f64(*f),
-            // TODO(bytes): serde serializes strings as UTF-8, so non-UTF-8 bytes are replaced.
-            PhpMixed::String(s) => serializer.serialize_str(&s.to_str_lossy()),
+            PhpMixed::String(s) => serializer.serialize_str(json_utf8::<S>(s)?),
             PhpMixed::List(items) => {
                 let mut seq = serializer.serialize_seq(Some(items.len()))?;
                 for item in items {
@@ -100,16 +107,14 @@ impl serde::Serialize for PhpMixed {
                 }
                 let mut map = serializer.serialize_map(Some(entries.len()))?;
                 for (k, v) in entries {
-                    // TODO(bytes): serde serializes keys as UTF-8, so non-UTF-8 bytes are replaced.
-                    map.serialize_entry(&k.to_str_lossy(), v)?;
+                    map.serialize_entry(json_utf8::<S>(k)?, v)?;
                 }
                 map.end()
             }
             PhpMixed::Object(entries) => {
                 let mut map = serializer.serialize_map(Some(entries.len()))?;
                 for (k, v) in entries {
-                    // TODO(bytes): serde serializes keys as UTF-8, so non-UTF-8 bytes are replaced.
-                    map.serialize_entry(&k.to_str_lossy(), v)?;
+                    map.serialize_entry(json_utf8::<S>(k)?, v)?;
                 }
                 map.end()
             }

@@ -13,7 +13,10 @@ use crate::package::version::{VersionGuesser, VersionParser};
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
 use bstr::{B, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, RuntimeException, file_exists, impl_php_class, is_dir, realpath};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, file_exists, impl_php_class, is_dir, legacy_lossy, path_to_bytes,
+    realpath,
+};
 use shirabe_symfony_filesystem::Filesystem as SymfonyFilesystem;
 
 #[derive(Debug)]
@@ -81,9 +84,14 @@ impl PathDownloader {
             ))
         })?;
         let real_url = realpath(&url)
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
             .ok_or_else(|| RuntimeException::new(format!("Failed to realpath {}", url)))?;
 
-        if realpath(path).as_deref() == Some(&real_url) {
+        if realpath(path)
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+            .as_deref()
+            == Some(&real_url)
+        {
             return Ok(": Source already present".to_string());
         }
 
@@ -211,7 +219,7 @@ impl DownloaderInterface for PathDownloader {
                 package.get_pretty_name()
             ))
         })?;
-        let real_url = realpath(&url);
+        let real_url = realpath(&url).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
         if real_url.is_none()
             || !file_exists(real_url.as_deref().unwrap_or_default())
             || !is_dir(real_url.as_deref().unwrap_or_default())
@@ -225,13 +233,19 @@ impl DownloaderInterface for PathDownloader {
         }
         let real_url = real_url.unwrap();
 
-        if realpath(&path).as_deref() == Some(&real_url) {
+        if realpath(&path)
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+            .as_deref()
+            == Some(&real_url)
+        {
             return Ok(None);
         }
 
         if format!(
             "{}{}",
-            realpath(&path).unwrap_or_default(),
+            realpath(&path)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .unwrap_or_default(),
             std::path::MAIN_SEPARATOR
         )
         .starts_with(&format!("{}{}", real_url, std::path::MAIN_SEPARATOR))
@@ -243,7 +257,9 @@ impl DownloaderInterface for PathDownloader {
             return Err(RuntimeException::new(format!(
                 "Package {} cannot install to \"{}\" inside its source at \"{}\"",
                 package.get_name(),
-                realpath(&path).unwrap_or_default(),
+                realpath(&path)
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .unwrap_or_default(),
                 real_url
             ))
             .into());
@@ -278,9 +294,14 @@ impl DownloaderInterface for PathDownloader {
             ))
         })?;
         let real_url = realpath(&url)
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
             .ok_or_else(|| RuntimeException::new(format!("Failed to realpath {}", url)))?;
 
-        if realpath(&path).as_deref() == Some(&real_url) {
+        if realpath(&path)
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+            .as_deref()
+            == Some(&real_url)
+        {
             if output {
                 let appendix = self.get_install_operation_appendix(package.clone(), &path)?;
                 self.inner.io.borrow().write_error3(

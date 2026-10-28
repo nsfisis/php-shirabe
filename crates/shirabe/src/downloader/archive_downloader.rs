@@ -7,7 +7,8 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Platform};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, bin2hex, file_exists, is_dir, random_bytes, realpath,
+    Catch as _, PhpMixed, RuntimeException, bin2hex, file_exists, is_dir, legacy_lossy,
+    path_to_bytes, random_bytes, realpath,
 };
 use shirabe_symfony_finder::Finder;
 use std::path::{Path, PathBuf};
@@ -107,7 +108,10 @@ pub trait ArchiveDownloader {
             .add_cleanup_path(package.clone(), &temporary_dir);
         // avoid cleaning up $path if installing in "." for eg create-project as we can not
         // delete the directory we are currently in on windows
-        if !is_dir(path) || realpath(path) != Some(Platform::get_cwd(false).unwrap_or_default()) {
+        if !is_dir(path)
+            || realpath(path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                != Some(Platform::get_cwd(false).unwrap_or_default())
+        {
             self.inner().add_cleanup_path(package.clone(), path);
         }
 
@@ -217,11 +221,14 @@ fn install_cleanup(
         .filesystem
         .borrow_mut()
         .remove_directory(temporary_dir)?;
-    if is_dir(path) && realpath(path) != Some(Platform::get_cwd(false).unwrap_or_default()) {
+    if is_dir(path)
+        && realpath(path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+            != Some(Platform::get_cwd(false).unwrap_or_default())
+    {
         inner.filesystem.borrow_mut().remove_directory(path)?;
     }
     inner.remove_cleanup_path(package.clone(), temporary_dir);
-    let realpath = realpath(path);
+    let realpath = realpath(path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
     if let Some(realpath) = realpath {
         inner.remove_cleanup_path(package, &realpath);
     }

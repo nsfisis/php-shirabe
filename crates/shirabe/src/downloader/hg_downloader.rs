@@ -9,7 +9,9 @@ use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Hg as HgUtils, ProcessExecutor};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class, realpath};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, impl_php_class, legacy_lossy, path_to_bytes, realpath,
+};
 
 #[derive(Debug)]
 pub struct HgDownloader {
@@ -103,7 +105,9 @@ impl VcsDownloader for HgDownloader {
         if self.inner.process.borrow_mut().execute(
             &command,
             &mut ignored_output,
-            realpath(path).as_deref(),
+            realpath(path)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .as_deref(),
         )? != 0
         {
             return Err(RuntimeException::new(format!(
@@ -181,7 +185,9 @@ impl VcsDownloader for HgDownloader {
         if self.inner.process.borrow_mut().execute(
             &command,
             &mut output,
-            realpath(path).as_deref(),
+            realpath(path)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .as_deref(),
         )? != 0
         {
             return Err(RuntimeException::new(format!(
@@ -215,7 +221,9 @@ impl ChangeReportInterface for HgDownloader {
         self.inner.process.borrow_mut().execute(
             &["hg".to_string(), "st".to_string()],
             &mut output,
-            realpath(path).as_deref(),
+            realpath(path)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                .as_deref(),
         )?;
 
         let output = output.trim().to_string();
