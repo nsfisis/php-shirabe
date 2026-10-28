@@ -12,7 +12,10 @@ use crate::input::InputOption;
 use crate::input::InputValue;
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match};
+use shirabe_php_shim::{
+    AsAny, PHP_SERVER, PhpClass, PhpMixed, is_numeric_to_int, php_regex, preg_is_match,
+    str_replace_array,
+};
 use std::cell::{Cell, Ref};
 
 /// The base-class state of the PHP `Command` class.
@@ -295,7 +298,7 @@ macro_rules! delegate_command_trait_impls_to_inner {
 /// The canonical behavior lives in `impl Command for CommandData`; subclasses forward
 /// the state methods there and override the behavior hooks (`configure`/`execute`/...).
 #[async_trait::async_trait(?Send)]
-pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim::PhpClass {
+pub trait Command: std::fmt::Debug + AsAny + PhpClass {
     /// Configures the current command.
     fn configure(&self) -> anyhow::Result<()> {
         Ok(())
@@ -419,7 +422,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim:
         };
 
         // is_numeric($statusCode) ? (int) $statusCode : 0
-        Ok(shirabe_php_shim::is_numeric_to_int(&status_code))
+        Ok(is_numeric_to_int(&status_code))
     }
 
     // --- state methods (canonical impl on `CommandData`; subclasses forward there) ---
@@ -490,7 +493,7 @@ pub trait Command: std::fmt::Debug + shirabe_php_shim::AsAny + shirabe_php_shim:
     fn get_ignore_validation_errors(&self) -> bool;
 }
 
-impl shirabe_php_shim::PhpClass for CommandData {
+impl PhpClass for CommandData {
     fn php_class_name(&self) -> String {
         panic!(
             "php_class_name called on the base command state; concrete commands supply their class name"
@@ -679,7 +682,7 @@ impl Command for CommandData {
             "%command.full_name%".to_string(),
         ];
         // TODO(bytes): the help text is built as a String.
-        let php_self = shirabe_php_shim::PHP_SERVER
+        let php_self = PHP_SERVER
             .lock()
             .unwrap()
             .php_self()
@@ -702,7 +705,7 @@ impl Command for CommandData {
             help
         };
 
-        shirabe_php_shim::str_replace_array(&placeholders, &replacements, &subject)
+        str_replace_array(&placeholders, &replacements, &subject)
     }
 
     fn set_aliases(&self, aliases: Vec<String>) -> anyhow::Result<()> {

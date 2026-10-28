@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/process/PhpExecutableFinder.php
 
 use super::executable_finder::ExecutableFinder;
+use shirabe_php_shim::{getenv, is_dir, is_executable};
 
 #[derive(Debug)]
 pub struct PhpExecutableFinder {
@@ -22,19 +23,19 @@ impl PhpExecutableFinder {
 
     /// Finds The PHP executable.
     pub fn find(&self, _include_args: bool) -> Option<String> {
-        if let Some(php) = shirabe_php_shim::getenv("PHP_BINARY").filter(|v| !v.is_empty()) {
+        if let Some(php) = getenv("PHP_BINARY").filter(|v| !v.is_empty()) {
             // TODO(bytes): the PHP executable path is returned as a String.
             let mut php = php
                 .into_string()
                 .unwrap_or_else(|php| panic!("PHP_BINARY is not valid UTF-8: {php:?}"));
-            if !shirabe_php_shim::is_executable(&php) {
+            if !is_executable(&php) {
                 match self.executable_finder.find(&php, None, &[]) {
                     Some(found) => php = found,
                     None => return None,
                 }
             }
 
-            if shirabe_php_shim::is_dir(&php) {
+            if is_dir(&php) {
                 return None;
             }
 
@@ -44,24 +45,24 @@ impl PhpExecutableFinder {
         // The original `\PHP_BINARY && \PHP_SAPI` branch describes the running PHP interpreter.
         // These constants cannot be obtained in Rust, the branch is skipped here.
 
-        if let Some(php) = shirabe_php_shim::getenv("PHP_PATH").filter(|v| !v.is_empty()) {
+        if let Some(php) = getenv("PHP_PATH").filter(|v| !v.is_empty()) {
             // TODO(bytes): the PHP executable path is returned as a String.
             let php = php
                 .into_string()
                 .unwrap_or_else(|php| panic!("PHP_PATH is not valid UTF-8: {php:?}"));
-            if !shirabe_php_shim::is_executable(&php) || shirabe_php_shim::is_dir(&php) {
+            if !is_executable(&php) || is_dir(&php) {
                 return None;
             }
 
             return Some(php);
         }
 
-        if let Some(php) = shirabe_php_shim::getenv("PHP_PEAR_PHP_BIN").filter(|v| !v.is_empty()) {
+        if let Some(php) = getenv("PHP_PEAR_PHP_BIN").filter(|v| !v.is_empty()) {
             // TODO(bytes): the PHP executable path is returned as a String.
             let php = php
                 .into_string()
                 .unwrap_or_else(|php| panic!("PHP_PEAR_PHP_BIN is not valid UTF-8: {php:?}"));
-            if shirabe_php_shim::is_executable(&php) && !shirabe_php_shim::is_dir(&php) {
+            if is_executable(&php) && !is_dir(&php) {
                 return Some(php);
             }
         }

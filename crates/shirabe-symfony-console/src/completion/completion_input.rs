@@ -4,7 +4,7 @@ use crate::input::ArgvInput;
 use crate::input::InputDefinition;
 use crate::input::InputOption;
 use crate::input::InputValue;
-use shirabe_php_shim::{php_regex, preg_match_all};
+use shirabe_php_shim::{explode_with_limit, ltrim, php_regex, preg_match_all, rtrim, substr, trim};
 
 /// An input specialized for shell completion.
 ///
@@ -76,7 +76,7 @@ impl CompletionInput {
         let relevant_token = self.get_relevant_token();
         if "-" == &relevant_token[0..1] {
             // the current token is an input option: complete either option name or option value
-            let parts = shirabe_php_shim::explode_with_limit("=", &relevant_token, 2);
+            let parts = explode_with_limit("=", &relevant_token, 2);
             let option_token = parts.first().cloned().unwrap_or_default();
             let option_value = parts.get(1).cloned().unwrap_or_default();
 
@@ -96,7 +96,7 @@ impl CompletionInput {
                 self.completion_value = if !option_value.is_empty() {
                     option_value
                 } else if !option_token.starts_with("--") {
-                    shirabe_php_shim::substr(&option_token, 2, None)
+                    substr(&option_token, 2, None)
                 } else {
                     String::new()
                 };
@@ -106,9 +106,7 @@ impl CompletionInput {
         }
 
         let previous_token = self.tokens[(self.current_index - 1) as usize].clone();
-        if "-" == &previous_token[0..1]
-            && !shirabe_php_shim::trim(&previous_token, Some("-")).is_empty()
-        {
+        if "-" == &previous_token[0..1] && !trim(&previous_token, Some("-")).is_empty() {
             // check if previous option accepted a value
             let previous_option = self.get_option_from_token(&previous_token);
             if let Some(previous_option) = &previous_option
@@ -229,7 +227,7 @@ impl CompletionInput {
     }
 
     fn get_option_from_token(&self, option_token: &str) -> Option<std::rc::Rc<InputOption>> {
-        let option_name = shirabe_php_shim::ltrim(option_token, Some("-"));
+        let option_name = ltrim(option_token, Some("-"));
         if option_name.is_empty() {
             return None;
         }
@@ -395,6 +393,6 @@ impl std::fmt::Display for CompletionInput {
             str += "|";
         }
 
-        write!(f, "{}", shirabe_php_shim::rtrim(&str, None))
+        write!(f, "{}", rtrim(&str, None))
     }
 }

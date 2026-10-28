@@ -1,6 +1,10 @@
 //! ref: composer/vendor/symfony/console/Terminal.php
 
-use shirabe_php_shim::{PhpMixed, php_regex, preg_match};
+use shirabe_php_shim::{
+    Descriptor, PhpMixed, PhpResource, fclose, function_exists, getenv, intval, php_fopen_resource,
+    php_regex, preg_match, proc_close, proc_open, sapi_windows_cp_get, sapi_windows_cp_set,
+    sapi_windows_vt100_support, shell_exec, stream_get_contents, trim,
+};
 use std::cell::Cell;
 
 thread_local! {
@@ -25,15 +29,13 @@ impl Terminal {
 
     /// Gets the terminal width.
     pub fn get_width(&self) -> i64 {
-        let width = shirabe_php_shim::getenv("COLUMNS");
+        let width = getenv("COLUMNS");
         if let Some(width) = width {
             // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
             let width = width
                 .into_string()
                 .unwrap_or_else(|width| panic!("COLUMNS is not valid UTF-8: {width:?}"));
-            return shirabe_php_shim::intval(&PhpMixed::string(shirabe_php_shim::trim(
-                &width, None,
-            )));
+            return intval(&PhpMixed::string(trim(&width, None)));
         }
 
         if WIDTH.with(|w| w.get()).is_none() {
@@ -45,15 +47,13 @@ impl Terminal {
 
     /// Gets the terminal height.
     pub fn get_height(&self) -> i64 {
-        let height = shirabe_php_shim::getenv("LINES");
+        let height = getenv("LINES");
         if let Some(height) = height {
             // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
             let height = height
                 .into_string()
                 .unwrap_or_else(|height| panic!("LINES is not valid UTF-8: {height:?}"));
-            return shirabe_php_shim::intval(&PhpMixed::string(shirabe_php_shim::trim(
-                &height, None,
-            )));
+            return intval(&PhpMixed::string(trim(&height, None)));
         }
 
         if HEIGHT.with(|h| h.get()).is_none() {
@@ -68,7 +68,7 @@ impl Terminal {
             return stty;
         }
 
-        let result = shirabe_php_shim::shell_exec(&format!(
+        let result = shell_exec(&format!(
             "stty 2> {}",
             if cfg!(windows) { "NUL" } else { "/dev/null" }
         ))
@@ -80,7 +80,7 @@ impl Terminal {
     fn init_dimensions() {
         if cfg!(windows) {
             // TODO(bytes): preg_match matches over a &str.
-            let ansicon = shirabe_php_shim::getenv("ANSICON").map(|ansicon| {
+            let ansicon = getenv("ANSICON").map(|ansicon| {
                 ansicon
                     .into_string()
                     .unwrap_or_else(|ansicon| panic!("ANSICON is not valid UTF-8: {ansicon:?}"))
@@ -88,23 +88,23 @@ impl Terminal {
             if let Some(ansicon) = &ansicon
                 && let Some(matches) = preg_match(
                     php_regex!("/^(\\d+)x(\\d+)(?: \\((\\d+)x(\\d+)\\))?$/"),
-                    &shirabe_php_shim::trim(ansicon, None),
+                    &trim(ansicon, None),
                 )
             {
                 // extract [w, H] from "wxh (WxH)"
                 // or [w, h] from "wxh"
                 WIDTH.with(|w| {
-                    w.set(Some(shirabe_php_shim::intval(&PhpMixed::string(
+                    w.set(Some(intval(&PhpMixed::string(
                         matches.get(1).unwrap_or_default().to_string(),
                     ))))
                 });
                 HEIGHT.with(|h| {
                     let value = if matches.get(4).is_some() {
-                        shirabe_php_shim::intval(&PhpMixed::string(
+                        intval(&PhpMixed::string(
                             matches.get(4).unwrap_or_default().to_string(),
                         ))
                     } else {
-                        shirabe_php_shim::intval(&PhpMixed::string(
+                        intval(&PhpMixed::string(
                             matches.get(2).unwrap_or_default().to_string(),
                         ))
                     };
@@ -129,9 +129,9 @@ impl Terminal {
 
     /// Returns whether STDOUT has vt100 support (some Windows 10+ configurations).
     fn has_vt100_support() -> bool {
-        shirabe_php_shim::function_exists("sapi_windows_vt100_support") && {
-            let stream = shirabe_php_shim::php_fopen_resource("php://stdout", "w");
-            shirabe_php_shim::sapi_windows_vt100_support(&stream)
+        function_exists("sapi_windows_vt100_support") && {
+            let stream = php_fopen_resource("php://stdout", "w");
+            sapi_windows_vt100_support(&stream)
         }
     }
 
@@ -146,12 +146,12 @@ impl Terminal {
             {
                 // extract [w, h] from "rows h; columns w;"
                 WIDTH.with(|w| {
-                    w.set(Some(shirabe_php_shim::intval(&PhpMixed::string(
+                    w.set(Some(intval(&PhpMixed::string(
                         matches.get(2).unwrap_or_default().to_string(),
                     ))))
                 });
                 HEIGHT.with(|h| {
-                    h.set(Some(shirabe_php_shim::intval(&PhpMixed::string(
+                    h.set(Some(intval(&PhpMixed::string(
                         matches.get(1).unwrap_or_default().to_string(),
                     ))))
                 });
@@ -160,12 +160,12 @@ impl Terminal {
             {
                 // extract [w, h] from "; h rows; w columns"
                 WIDTH.with(|w| {
-                    w.set(Some(shirabe_php_shim::intval(&PhpMixed::string(
+                    w.set(Some(intval(&PhpMixed::string(
                         matches.get(2).unwrap_or_default().to_string(),
                     ))))
                 });
                 HEIGHT.with(|h| {
-                    h.set(Some(shirabe_php_shim::intval(&PhpMixed::string(
+                    h.set(Some(intval(&PhpMixed::string(
                         matches.get(1).unwrap_or_default().to_string(),
                     ))))
                 });
@@ -186,10 +186,10 @@ impl Terminal {
         )?;
 
         Some(vec![
-            shirabe_php_shim::intval(&PhpMixed::string(
+            intval(&PhpMixed::string(
                 matches.get(2).unwrap_or_default().to_string(),
             )),
-            shirabe_php_shim::intval(&PhpMixed::string(
+            intval(&PhpMixed::string(
                 matches.get(1).unwrap_or_default().to_string(),
             )),
         ])
@@ -203,27 +203,19 @@ impl Terminal {
     fn read_from_process(command: &str) -> Option<String> {
         // Sparse PHP descriptorspec `[1 => ['pipe', 'w'], 2 => ['pipe', 'w']]`: fd 0 is inherited.
         let descriptorspec = [
-            shirabe_php_shim::Descriptor::Inherit,
-            shirabe_php_shim::Descriptor::Pipe("w".to_string()),
-            shirabe_php_shim::Descriptor::Pipe("w".to_string()),
+            Descriptor::Inherit,
+            Descriptor::Pipe("w".to_string()),
+            Descriptor::Pipe("w".to_string()),
         ];
 
-        let cp = if shirabe_php_shim::function_exists("sapi_windows_cp_set") {
-            shirabe_php_shim::sapi_windows_cp_get(None)
+        let cp = if function_exists("sapi_windows_cp_set") {
+            sapi_windows_cp_get(None)
         } else {
             0
         };
 
-        let mut pipes: indexmap::IndexMap<i64, shirabe_php_shim::PhpResource> =
-            indexmap::IndexMap::new();
-        let process = match shirabe_php_shim::proc_open(
-            command,
-            &descriptorspec,
-            &mut pipes,
-            None,
-            None,
-            None,
-        ) {
+        let mut pipes: indexmap::IndexMap<i64, PhpResource> = indexmap::IndexMap::new();
+        let process = match proc_open(command, &descriptorspec, &mut pipes, None, None, None) {
             Ok(process) => process,
             Err(_) => return None,
         };
@@ -231,18 +223,18 @@ impl Terminal {
         // TODO(bytes): the stty/mode output is returned as a String.
         let info = pipes
             .get(&1)
-            .and_then(shirabe_php_shim::stream_get_contents)
+            .and_then(stream_get_contents)
             .map(|info| String::from_utf8_lossy(&info).into_owned());
         if let Some(pipe) = pipes.get(&1) {
-            shirabe_php_shim::fclose(pipe);
+            fclose(pipe);
         }
         if let Some(pipe) = pipes.get(&2) {
-            shirabe_php_shim::fclose(pipe);
+            fclose(pipe);
         }
-        shirabe_php_shim::proc_close(&process);
+        proc_close(&process);
 
         if cp != 0 {
-            shirabe_php_shim::sapi_windows_cp_set(cp);
+            sapi_windows_cp_set(cp);
         }
 
         info

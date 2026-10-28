@@ -3,7 +3,7 @@
 use crate::util::ProcessExecutor;
 use bstr::ByteSlice;
 use shirabe_php_shim::{
-    PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, defined,
+    PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, RuntimeException, STDOUT, defined,
     file_exists, file_get_contents, function_exists, getcwd, getenv, ini_get, is_readable,
     mb_strlen, php_os_family, php_regex, posix_geteuid, posix_getpwuid, posix_getuid,
     preg_is_match, preg_replace_callback, putenv, putenv_clear, realpath, stream_isatty, stripos,
@@ -257,7 +257,7 @@ impl Platform {
     }
 
     pub fn is_tty(fd: Option<PhpResource>) -> bool {
-        let fd = fd.unwrap_or(shirabe_php_shim::STDOUT);
+        let fd = fd.unwrap_or(STDOUT);
 
         // detect msysgit/mingw and assume this is a tty because detection
         // does not work correctly, see https://github.com/composer/composer/issues/9690

@@ -19,9 +19,9 @@ use bstr::ByteSlice;
 use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AnyThrowable, E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, is_scalar, is_string,
-    json_encode, ltrim, php_regex, preg_is_match, preg_replace, stripos, strpos, strtolower,
-    strval, substr, trigger_error, trim,
+    AnyThrowable, E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, date_create, empty,
+    is_scalar, is_string, json_encode, ltrim, php_regex, preg_is_match, preg_replace, stripos,
+    strpos, strtolower, strval, substr, trigger_error, trim,
 };
 
 /// The fields of one package version, read without regard for how they are stored. A version
@@ -369,7 +369,7 @@ impl ArrayLoader {
         }
 
         if let Some(time_value) = config.get("time")
-            && !shirabe_php_shim::empty(time_value)
+            && !empty(time_value)
         {
             let time_str = time_value.as_string().unwrap_or_default();
             let time = if preg_is_match(php_regex!(r"/^\d++$/D"), &time_str.to_str_lossy()) {
@@ -378,13 +378,13 @@ impl ArrayLoader {
                 time_str.to_string()
             };
 
-            if let Ok(date) = shirabe_php_shim::date_create::<Utc>(&time) {
+            if let Ok(date) = date_create::<Utc>(&time) {
                 package.package_mut().set_release_date(Some(date));
             }
         }
 
         if let Some(notification_url) = config.get("notification-url")
-            && !shirabe_php_shim::empty(notification_url)
+            && !empty(notification_url)
         {
             package
                 .package_mut()
@@ -395,12 +395,12 @@ impl ArrayLoader {
             && let PhpMixed::Array(archive_map) = archive
         {
             if let Some(name) = archive_map.get("name")
-                && !shirabe_php_shim::empty(name)
+                && !empty(name)
             {
                 package.complete_mut().set_archive_name(strval(name));
             }
             if let Some(exclude) = archive_map.get("exclude")
-                && !shirabe_php_shim::empty(exclude)
+                && !empty(exclude)
             {
                 package
                     .complete_mut()
@@ -439,7 +439,7 @@ impl ArrayLoader {
         }
 
         if let Some(description) = config.get("description")
-            && !shirabe_php_shim::empty(description)
+            && !empty(description)
             && is_string(description)
         {
             package
@@ -448,7 +448,7 @@ impl ArrayLoader {
         }
 
         if let Some(homepage) = config.get("homepage")
-            && !shirabe_php_shim::empty(homepage)
+            && !empty(homepage)
             && is_string(homepage)
         {
             package
@@ -457,7 +457,7 @@ impl ArrayLoader {
         }
 
         if let Some(keywords) = config.get("keywords")
-            && !shirabe_php_shim::empty(keywords)
+            && !empty(keywords)
             && matches!(keywords, PhpMixed::Array(_) | PhpMixed::List(_))
         {
             let keywords_vec: Vec<String> = match keywords {
@@ -469,7 +469,7 @@ impl ArrayLoader {
         }
 
         if let Some(license) = config.get("license")
-            && !shirabe_php_shim::empty(license)
+            && !empty(license)
         {
             let license_vec: Vec<String> = match license {
                 PhpMixed::Array(map) => map
@@ -486,7 +486,7 @@ impl ArrayLoader {
         }
 
         if let Some(authors) = config.get("authors")
-            && !shirabe_php_shim::empty(authors)
+            && !empty(authors)
             && let PhpMixed::List(list) = authors
         {
             let authors_vec: Vec<IndexMap<String, String>> = list
@@ -516,7 +516,7 @@ impl ArrayLoader {
         }
 
         if let Some(funding) = config.get("funding")
-            && !shirabe_php_shim::empty(funding)
+            && !empty(funding)
             && let PhpMixed::List(list) = funding
         {
             let funding_vec: Vec<IndexMap<String, PhpMixed>> = list

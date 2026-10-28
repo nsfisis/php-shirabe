@@ -3,13 +3,14 @@
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PhpMixed, PregMatches, RuntimeException, array_pop,
-    basename, chdir, clearstatcache, clearstatcache2, copy, dirname, explode, fclose, feof,
-    file_exists, file_get_contents, file_put_contents, fileatime, filemtime, filesize, fopen,
-    fread, fwrite, implode, is_dir, is_file, is_link, is_readable, lstat, mkdir, php_regex,
-    preg_is_match, preg_match, preg_replace, preg_replace_callback, rename, rmdir, rtrim,
-    str_repeat, str_replace, strlen, strpos, strtoupper, strtr, substr, substr_count, symlink,
-    touch, unlink, usleep, var_export,
+    CHILD_FIRST, InvalidArgumentException, LogicException, PhpMixed, PregMatches, RuntimeException,
+    SELF_FIRST, SKIP_DOTS, array_pop, basename, chdir, clearstatcache, clearstatcache2, copy,
+    dirname, explode, fclose, feof, file_exists, file_get_contents, file_put_contents, fileatime,
+    filemtime, filesize, fopen, fread, fwrite, implode, is_dir, is_file, is_link, is_readable,
+    lstat, mkdir, php_regex, preg_is_match, preg_match, preg_replace, preg_replace_callback,
+    recursive_directory_iterator, recursive_iterator_iterator, rename, rmdir, rtrim, str_repeat,
+    str_replace, stream_copy_to_stream, strlen, strpos, strtoupper, strtr, substr, substr_count,
+    symlink, touch, unlink, usleep, var_export,
 };
 use shirabe_symfony_filesystem::exception::IOException;
 use shirabe_symfony_finder::Finder;
@@ -249,10 +250,7 @@ impl Filesystem {
             return Ok(r);
         }
 
-        let it = match shirabe_php_shim::recursive_directory_iterator(
-            directory,
-            shirabe_php_shim::SKIP_DOTS,
-        ) {
+        let it = match recursive_directory_iterator(directory, SKIP_DOTS) {
             Ok(it) => it,
             Err(_e) => {
                 // re-try once after clearing the stat cache if it failed as it
@@ -262,13 +260,10 @@ impl Filesystem {
                 if !is_dir(directory) {
                     return Ok(true);
                 }
-                shirabe_php_shim::recursive_directory_iterator(
-                    directory,
-                    shirabe_php_shim::SKIP_DOTS,
-                )?
+                recursive_directory_iterator(directory, SKIP_DOTS)?
             }
         };
-        let ri = shirabe_php_shim::recursive_iterator_iterator(it, shirabe_php_shim::CHILD_FIRST);
+        let ri = recursive_iterator_iterator(it, CHILD_FIRST);
 
         for file in &ri {
             if file.is_dir() {
@@ -429,9 +424,8 @@ impl Filesystem {
             }
         }
 
-        let it =
-            shirabe_php_shim::recursive_directory_iterator(source, shirabe_php_shim::SKIP_DOTS)?;
-        let ri = shirabe_php_shim::recursive_iterator_iterator(it, shirabe_php_shim::SELF_FIRST);
+        let it = recursive_directory_iterator(source, SKIP_DOTS)?;
+        let ri = recursive_iterator_iterator(it, SELF_FIRST);
         self.ensure_directory_exists(&target)?;
 
         let mut result = true;
@@ -814,9 +808,8 @@ impl Filesystem {
     }
 
     fn directory_size(&self, directory: &Path) -> anyhow::Result<i64> {
-        let it =
-            shirabe_php_shim::recursive_directory_iterator(directory, shirabe_php_shim::SKIP_DOTS)?;
-        let ri = shirabe_php_shim::recursive_iterator_iterator(it, shirabe_php_shim::CHILD_FIRST);
+        let it = recursive_directory_iterator(directory, SKIP_DOTS)?;
+        let ri = recursive_iterator_iterator(it, CHILD_FIRST);
 
         let mut size: i64 = 0;
         for file in &ri {
@@ -1044,7 +1037,7 @@ impl Filesystem {
                 }
             };
 
-            shirabe_php_shim::stream_copy_to_stream(&source_handle, &target_handle);
+            stream_copy_to_stream(&source_handle, &target_handle);
             fclose(&source_handle);
             fclose(&target_handle);
 

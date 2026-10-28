@@ -12,6 +12,7 @@ use crate::helper::HelperSet;
 use crate::output::OutputInterface;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
+use shirabe_php_shim::PhpMixed;
 
 /// This class adds helper method to describe objects in various formats.
 #[derive(Default)]
@@ -53,24 +54,18 @@ impl DescriptorHelper {
         &mut self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         object: DescribableObject,
-        options: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        options: IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let mut merged: IndexMap<String, shirabe_php_shim::PhpMixed> = IndexMap::new();
-        merged.insert(
-            "raw_text".to_string(),
-            shirabe_php_shim::PhpMixed::Bool(false),
-        );
-        merged.insert(
-            "format".to_string(),
-            shirabe_php_shim::PhpMixed::string("txt".to_string()),
-        );
+        let mut merged: IndexMap<String, PhpMixed> = IndexMap::new();
+        merged.insert("raw_text".to_string(), PhpMixed::Bool(false));
+        merged.insert("format".to_string(), PhpMixed::string("txt".to_string()));
         for (key, value) in options {
             merged.insert(key, value);
         }
         let options = merged;
 
         let format = match &options["format"] {
-            shirabe_php_shim::PhpMixed::String(format) => format.to_str_lossy().into_owned(),
+            PhpMixed::String(format) => format.to_str_lossy().into_owned(),
             _ => String::new(),
         };
 

@@ -1,3 +1,5 @@
 //! ref: composer/vendor/symfony/console/Exception/ExceptionInterface.php
 
-pub trait ExceptionInterface: shirabe_php_shim::Throwable {}
+use shirabe_php_shim::Throwable;
+
+pub trait ExceptionInterface: Throwable {}

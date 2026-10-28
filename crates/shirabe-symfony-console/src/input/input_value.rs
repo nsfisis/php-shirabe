@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/console/Input/InputInterface.php
 
 use bstr::ByteSlice;
+use shirabe_php_shim::PhpMixed;
 
 /// The value an option or an argument can hold.
 ///
@@ -19,7 +20,7 @@ impl InputValue {
     ///
     /// TODO(type-model): the question helpers and the plugin bridge still hand back a
     /// `PhpMixed`, so a value outside this domain can only be rejected here.
-    pub fn from_php_mixed(value: &shirabe_php_shim::PhpMixed) -> Self {
+    pub fn from_php_mixed(value: &PhpMixed) -> Self {
         use shirabe_php_shim::PhpMixed;
         match value {
             PhpMixed::Null => Self::Null,
@@ -82,7 +83,7 @@ impl InputValue {
     }
 
     /// The value as a PHP `mixed`, for the shim functions that take one.
-    pub fn to_php_mixed(&self) -> shirabe_php_shim::PhpMixed {
+    pub fn to_php_mixed(&self) -> PhpMixed {
         self.clone().into()
     }
 
@@ -103,7 +104,7 @@ impl InputValue {
     }
 }
 
-impl From<InputValue> for shirabe_php_shim::PhpMixed {
+impl From<InputValue> for PhpMixed {
     fn from(value: InputValue) -> Self {
         match value {
             InputValue::Null => Self::Null,

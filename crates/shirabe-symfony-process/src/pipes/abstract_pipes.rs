@@ -2,7 +2,9 @@
 
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, PhpResource};
+use shirabe_php_shim::{
+    PhpMixed, PhpResource, fclose, fwrite, php_truthy, stream_select, stream_set_blocking,
+};
 
 #[derive(Debug)]
 pub struct AbstractPipes {
@@ -41,7 +43,7 @@ impl AbstractPipes {
 
     pub fn close(&mut self) {
         for (_, pipe) in &self.pipes {
-            shirabe_php_shim::fclose(pipe);
+            fclose(pipe);
         }
         self.pipes = IndexMap::new();
     }
@@ -66,7 +68,7 @@ impl AbstractPipes {
         }
 
         for (_, pipe) in &self.pipes {
-            shirabe_php_shim::stream_set_blocking(pipe, false);
+            stream_set_blocking(pipe, false);
         }
         // The `is_resource($this->input)` branch does not apply: `input` is never a resource in this
         // port (is_resource on a PhpMixed is always false).
@@ -87,11 +89,10 @@ impl AbstractPipes {
         let mut w: Vec<PhpResource> = vec![stdin.clone()];
 
         // let's have a look if something changed in streams
-        shirabe_php_shim::stream_select(&mut r, &mut w, &mut e, 0, Some(0))?;
+        stream_select(&mut r, &mut w, &mut e, 0, Some(0))?;
 
         if !self.input_buffer.is_empty() {
-            let written =
-                shirabe_php_shim::fwrite(&stdin, &self.input_buffer, None).unwrap_or(0) as usize;
+            let written = fwrite(&stdin, &self.input_buffer, None).unwrap_or(0) as usize;
             self.input_buffer = self.input_buffer.get(written..).unwrap_or("").to_string();
             if !self.input_buffer.is_empty() {
                 return Some(vec![stdin]);
@@ -99,9 +100,9 @@ impl AbstractPipes {
         }
 
         // no input to read on resource, buffer is empty
-        if self.input_buffer.is_empty() && !shirabe_php_shim::php_truthy(&self.input) {
+        if self.input_buffer.is_empty() && !php_truthy(&self.input) {
             self.input = PhpMixed::Null;
-            shirabe_php_shim::fclose(&stdin);
+            fclose(&stdin);
             self.pipes.shift_remove(&0);
         }
 

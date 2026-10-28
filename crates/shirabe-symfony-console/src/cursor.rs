@@ -2,19 +2,20 @@
 
 use crate::output::OutputInterface;
 use crate::output::output_interface;
+use shirabe_php_shim::{PhpResource, STDIN};
 
 #[derive(Debug)]
 pub struct Cursor {
     output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-    input: shirabe_php_shim::PhpResource,
+    input: PhpResource,
 }
 
 impl Cursor {
     pub fn new(
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        input: Option<shirabe_php_shim::PhpResource>,
+        input: Option<PhpResource>,
     ) -> Self {
-        let input = input.unwrap_or(shirabe_php_shim::STDIN);
+        let input = input.unwrap_or(STDIN);
 
         Self { output, input }
     }

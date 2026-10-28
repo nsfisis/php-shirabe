@@ -2,6 +2,7 @@
 
 use crate::util::Platform;
 use indexmap::IndexMap;
+use shirabe_php_shim::{chdir, hash_file};
 use std::path::Path;
 
 #[derive(Debug)]
@@ -71,19 +72,19 @@ impl Comparer {
         let mut destination: IndexMap<String, IndexMap<String, Option<String>>> = IndexMap::new();
         self.changed = IndexMap::new();
         let current_directory = Platform::get_cwd(false).unwrap_or_default();
-        shirabe_php_shim::chdir(&self.source);
+        chdir(&self.source);
         if !Self::do_tree(".", &mut source) {
             return;
         }
-        shirabe_php_shim::chdir(&current_directory);
-        shirabe_php_shim::chdir(&self.update);
+        chdir(&current_directory);
+        chdir(&self.update);
         if !Self::do_tree(".", &mut destination) {
             // PHP calls `exit` here, but this is almost certainly a bug. The source branch above
             // handles the same failure with `return`, and there is no reason for the destination
             // branch to terminate the whole process. We treat it as `return`.
             return;
         }
-        shirabe_php_shim::chdir(&current_directory);
+        chdir(&current_directory);
         for (dir, value) in &source {
             for (file, hash) in value {
                 let dest_file_hash = destination.get(dir).and_then(|d| d.get(file));
@@ -144,7 +145,7 @@ impl Comparer {
                 } else if Path::new(&path).is_file() {
                     let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
                     if size > 0 {
-                        let hash = shirabe_php_shim::hash_file("xxh3", &path);
+                        let hash = hash_file("xxh3", &path);
                         array.entry(dir.to_string()).or_default().insert(file, hash);
                     }
                 }

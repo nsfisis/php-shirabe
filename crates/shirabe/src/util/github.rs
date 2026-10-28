@@ -8,7 +8,7 @@ use crate::io::io_interface;
 use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, rawurlencode};
 use shirabe_php_shim::{
     PhpMixed, date_local, in_array_loose, php_regex, preg_is_match, preg_match, stripos, strtolower,
 };
@@ -134,7 +134,7 @@ impl GitHub {
         self.io
             .write_error3(&lines.join("\n"), true, io_interface::NORMAL);
 
-        let encoded_note = shirabe_php_shim::rawurlencode(&note).replace("%20", "+");
+        let encoded_note = rawurlencode(&note).replace("%20", "+");
         let lines = [
             "1. When you don't use 'vcs'  type 'repositories'  in composer.json and do not need to clone source or download dist files".to_string(),
             "from private GitHub repositories over HTTPS, use a fine-grained token with read-only access to public information.".to_string(),

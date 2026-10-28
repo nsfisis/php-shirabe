@@ -17,7 +17,8 @@ use crate::repository::RepositoryInterface;
 use crate::repository::RepositorySetInterface;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, php_regex, preg_is_match, preg_replace, strtolower, version_compare,
+    CmpOp, UnexpectedValueException, php_regex, preg_is_match, preg_replace, strtolower,
+    version_compare,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
@@ -74,7 +75,7 @@ impl VersionSelector {
         show_warnings: ShowWarnings,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
         if !base_package::STABILITIES.contains_key(preferred_stability) {
-            return Err(shirabe_php_shim::UnexpectedValueException::new(format!(
+            return Err(UnexpectedValueException::new(format!(
                 "Expected a valid stability name as 3rd argument, got {}",
                 preferred_stability
             ))

@@ -1,5 +1,7 @@
 //! ref: composer/vendor/seld/jsonlint/src/Seld/JsonLint/ParsingException.php
 
+use shirabe_php_shim::Exception;
+
 #[derive(Debug, Clone, Default)]
 pub struct ParsingExceptionLoc {
     pub first_line: i64,
@@ -25,7 +27,7 @@ pub struct ParsingExceptionDetails {
 
 #[derive(Debug)]
 pub struct ParsingException {
-    inner: shirabe_php_shim::Exception,
+    inner: Exception,
     details: Box<ParsingExceptionDetails>,
 }
 
@@ -33,7 +35,7 @@ impl ParsingException {
     #[track_caller]
     pub fn new(message: String, details: ParsingExceptionDetails) -> Self {
         Self {
-            inner: shirabe_php_shim::Exception::new(message),
+            inner: Exception::new(message),
             details: Box::new(details),
         }
     }

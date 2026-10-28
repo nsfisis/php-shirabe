@@ -18,7 +18,7 @@ use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterface
 use shirabe::script::ScriptEvents;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_php_shim::{PhpMixed, dirname, preg_quote, realpath, strtr};
+use shirabe_php_shim::{PhpMixed, dirname, preg_quote, realpath, strtr, symlink};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 use shirabe_symfony_console::output::output_interface;
@@ -2582,7 +2582,7 @@ fn test_absolute_symlink_with_psr4_does_not_generate_warnings() {
     // Create an absolute symlink
     let target = s.working_dir.join("tools-real");
     let r#link = s.working_dir.join("tools");
-    assert!(shirabe_php_shim::symlink(&target, &r#link).is_ok());
+    assert!(symlink(&target, &r#link).is_ok());
 
     package.set_autoload(autoload(vec![
         ("psr-4", str_map(&[("MyTools\\", pstr("tools/"))])),
@@ -2621,7 +2621,7 @@ fn test_absolute_symlink_with_classmap_exclude_from_classmap() {
     // Create an absolute symlink
     let target = s.working_dir.join("tools-real");
     let r#link = s.working_dir.join("tools");
-    assert!(shirabe_php_shim::symlink(&target, &r#link).is_ok());
+    assert!(symlink(&target, &r#link).is_ok());
 
     package.set_autoload(autoload(vec![
         ("classmap", str_list(&["tools/"])),

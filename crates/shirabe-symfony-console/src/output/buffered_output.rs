@@ -3,6 +3,7 @@
 use crate::formatter::OutputFormatterInterface;
 use crate::output::OutputInterface;
 use crate::output::{DoWrite, Output};
+use shirabe_php_shim::PHP_EOL;
 
 #[derive(Debug)]
 pub struct BufferedOutput {
@@ -36,7 +37,7 @@ impl DoWrite for BufferedOutput {
         self.buffer.borrow_mut().push_str(message);
 
         if newline {
-            self.buffer.borrow_mut().push_str(shirabe_php_shim::PHP_EOL);
+            self.buffer.borrow_mut().push_str(PHP_EOL);
         }
     }
 }

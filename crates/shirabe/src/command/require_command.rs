@@ -856,9 +856,7 @@ impl Command for RequireCommand {
         // check for writability by writing to the file as is_writable can not be trusted on network-mounts
         // see https://github.com/composer/composer/issues/8231 and https://bugs.php.net/bug.php?id=68926
         let backup_contents = self.composer_backup.borrow().clone();
-        if !is_writable(&file)
-            && shirabe_php_shim::file_put_contents(&file, &backup_contents).is_none()
-        {
+        if !is_writable(&file) && file_put_contents(&file, &backup_contents).is_none() {
             let msg = format!("<error>{} is not writable.</error>", file);
             self.get_io().write_error3(&msg, true, io_interface::NORMAL);
 

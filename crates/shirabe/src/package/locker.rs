@@ -25,7 +25,7 @@ use crate::util::Git as GitUtil;
 use crate::util::ProcessExecutor;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, empty};
 use shirabe_php_shim::{
     DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect, array_keys,
     array_map, array_merge, file_get_contents, filemtime, hash, in_array_loose, is_int, ksort,
@@ -151,7 +151,7 @@ impl Locker {
 
         let content_hash = lock_map.get("content-hash");
         if let Some(content_hash) = content_hash
-            && !shirabe_php_shim::empty(content_hash)
+            && !empty(content_hash)
         {
             // There is a content hash key, use that instead of the file hash
             return Ok(self.content_hash == content_hash.as_string().unwrap_or_default());
@@ -160,7 +160,7 @@ impl Locker {
         // BC support for old lock files without content-hash
         let lock_hash = lock_map.get("hash");
         if let Some(lock_hash) = lock_hash
-            && !shirabe_php_shim::empty(lock_hash)
+            && !empty(lock_hash)
         {
             return Ok(self.hash == lock_hash.as_string().unwrap_or_default());
         }
@@ -191,7 +191,7 @@ impl Locker {
             }
         }
 
-        if shirabe_php_shim::empty(&locked_packages) {
+        if empty(&locked_packages) {
             return Ok(packages);
         }
 
@@ -295,7 +295,7 @@ impl Locker {
 
         let platform_value = lock_data.get("platform");
         if let Some(platform_value) = platform_value
-            && !shirabe_php_shim::empty(platform_value)
+            && !empty(platform_value)
         {
             requirements = self.loader.parse_links(
                 "__root__",
@@ -311,7 +311,7 @@ impl Locker {
         let platform_dev_value = lock_data.get("platform-dev");
         if with_dev_reqs
             && let Some(platform_dev_value) = platform_dev_value
-            && !shirabe_php_shim::empty(platform_dev_value)
+            && !empty(platform_dev_value)
         {
             let dev_requirements = self.loader.parse_links(
                 "__root__",

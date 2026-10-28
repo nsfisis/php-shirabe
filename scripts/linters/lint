@@ -15,6 +15,7 @@ use Shirabe\Lint\Linters\NoFormatTrailingComma;
 use Shirabe\Lint\Linters\NoHaltCompilerLiteral;
 use Shirabe\Lint\Linters\NoModRs;
 use Shirabe\Lint\Linters\NoPhpDocTag;
+use Shirabe\Lint\Linters\NoQualifiedPhpShimPath;
 use Shirabe\Lint\Linters\NoStdCollectionsMaps;
 use Shirabe\Lint\Linters\NoToStringLossy;
 use Shirabe\Lint\Linters\NoUseAsAlias;
@@ -55,6 +56,16 @@ $runner = new Runner($rootDir, [
     ]],
     [new NoModRs(), []],
     [new NoPhpDocTag(), []],
+    [new NoQualifiedPhpShimPath(), [
+        // Newtypes named after the shim exception they wrap; the shim type cannot be imported
+        // under its own name.
+        'crates/shirabe-symfony-console/src/exception/invalid_argument_exception.rs',
+        'crates/shirabe-symfony-console/src/exception/logic_exception.rs',
+        'crates/shirabe-symfony-console/src/exception/runtime_exception.rs',
+        'crates/shirabe-symfony-process/src/exception/invalid_argument_exception.rs',
+        'crates/shirabe-symfony-process/src/exception/logic_exception.rs',
+        'crates/shirabe-symfony-process/src/exception/runtime_exception.rs',
+    ]],
     [new NoStdCollectionsMaps(), []],
     [new NoToStringLossy(), []],
     [new NoUseAsAlias(), []],

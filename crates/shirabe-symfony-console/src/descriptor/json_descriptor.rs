@@ -11,7 +11,7 @@ use crate::input::InputOption;
 use crate::output::OutputInterface;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_replace};
+use shirabe_php_shim::{PhpMixed, json_encode_ex, php_regex, preg_replace, str_replace};
 
 /// JSON descriptor.
 #[derive(Debug, Default)]
@@ -135,7 +135,7 @@ impl JsonDescriptor {
         };
 
         self.write(
-            &shirabe_php_shim::json_encode_ex(&PhpMixed::Array(data.into_iter().collect()), flags)
+            &json_encode_ex(&PhpMixed::Array(data.into_iter().collect()), flags)
                 .unwrap_or_default(),
             false,
         );
@@ -198,7 +198,7 @@ impl JsonDescriptor {
             data.insert(
                 "shortcut".to_string(),
                 PhpMixed::string(if let Some(shortcut) = option.get_shortcut() {
-                    format!("-{}", shirabe_php_shim::str_replace("|", "|-", shortcut))
+                    format!("-{}", str_replace("|", "|-", shortcut))
                 } else {
                     String::new()
                 }),

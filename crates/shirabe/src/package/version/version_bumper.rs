@@ -5,7 +5,7 @@ use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::util::Platform;
-use shirabe_php_shim::{php_regex, preg_is_match, preg_match_all, preg_replace};
+use shirabe_php_shim::{php_regex, preg_is_match, preg_match_all, preg_replace, substr_replace};
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::AnyConstraint;
 
@@ -115,7 +115,7 @@ impl VersionBumper {
                         format!("{}{}", new_pretty_constraint, suffix)
                     };
                 modified = String::from_utf8(
-                    shirabe_php_shim::substr_replace(
+                    substr_replace(
                         &modified,
                         &replacement,
                         match_offset,

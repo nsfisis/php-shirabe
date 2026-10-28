@@ -11,7 +11,7 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, date_create};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, dirname, is_dir, is_file, is_writable, php_regex, preg_is_match,
     preg_replace,
@@ -29,7 +29,7 @@ pub struct FossilDriver {
 
 impl FossilDriver {
     pub fn new(
-        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        repo_config: IndexMap<String, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
@@ -255,7 +255,7 @@ impl FossilDriver {
         let parts: Vec<&str> = output.trim().splitn(3, ' ').collect();
         let date = parts.get(1).copied().unwrap_or("");
 
-        let date: DateTime<Utc> = shirabe_php_shim::date_create(date)?;
+        let date: DateTime<Utc> = date_create(date)?;
         Ok(Some(date.fixed_offset()))
     }
 

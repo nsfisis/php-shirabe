@@ -13,7 +13,7 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, impl_php_class, php_regex, preg_is_match, preg_split,
+    PhpMixed, RuntimeException, impl_php_class, php_regex, preg_is_match, preg_split, realpath,
 };
 
 #[derive(Debug)]
@@ -103,7 +103,7 @@ impl VcsDownloader for FossilDownloader {
         )?;
 
         let repo_file = format!("{}.fossil", path);
-        let real_path = shirabe_php_shim::realpath(path);
+        let real_path = realpath(path);
 
         self.inner.io.write_error(&format!(
             "Cloning {}",
@@ -172,7 +172,7 @@ impl VcsDownloader for FossilDownloader {
             )).into());
         }
 
-        let real_path = shirabe_php_shim::realpath(path);
+        let real_path = realpath(path);
         let mut output = String::new();
         self.execute(
             vec!["fossil".to_string(), "pull".to_string()],
@@ -213,7 +213,7 @@ impl VcsDownloader for FossilDownloader {
                 "before".to_string(),
                 to_reference.to_string(),
             ],
-            shirabe_php_shim::realpath(path),
+            realpath(path),
             &mut output,
         )?;
 
@@ -258,7 +258,7 @@ impl ChangeReportInterface for FossilDownloader {
         self.inner.process.borrow_mut().execute(
             &["fossil".to_string(), "changes".to_string()],
             &mut output,
-            shirabe_php_shim::realpath(path).as_deref(),
+            realpath(path).as_deref(),
         )?;
 
         let output = output.trim().to_string();

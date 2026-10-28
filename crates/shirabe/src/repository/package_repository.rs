@@ -15,7 +15,9 @@ use crate::repository::{
     RepositoryInterface, SearchResult, SecurityAdvisoryResult,
 };
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, RuntimeException, php_regex, preg_replace, var_export};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, json_encode, php_regex, preg_replace, var_export,
+};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -69,7 +71,7 @@ impl PackageRepository {
                     let msg = format!(
                         "A repository of type \"package\" contains an invalid package definition: {}\n\nInvalid package definition:\n{}",
                         e,
-                        shirabe_php_shim::json_encode(package).unwrap_or_default()
+                        json_encode(package).unwrap_or_default()
                     );
                     return Ok(Err(InvalidRepositoryException::new(msg)));
                 }

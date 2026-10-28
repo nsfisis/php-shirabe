@@ -6,6 +6,9 @@ use crate::output::DoWrite;
 use crate::output::OutputInterface;
 use crate::output::StreamOutput;
 use crate::terminal::Terminal;
+use shirabe_php_shim::{
+    PHP_EOL, PhpResource, array_reverse, array_splice, array_unshift, explode, str_replace,
+};
 
 type Sections =
     std::rc::Rc<std::cell::RefCell<Vec<std::rc::Rc<std::cell::RefCell<ConsoleSectionOutput>>>>>;
@@ -23,7 +26,7 @@ impl ConsoleSectionOutput {
     /// `$sections` is shared by reference (PHP `array &$sections`); the new instance
     /// is unshifted into it.
     pub fn new(
-        stream: shirabe_php_shim::PhpResource,
+        stream: PhpResource,
         sections: &Sections,
         verbosity: i64,
         decorated: bool,
@@ -41,7 +44,7 @@ impl ConsoleSectionOutput {
             terminal: Terminal::new(),
         }));
 
-        shirabe_php_shim::array_unshift(&mut sections.borrow_mut(), this.clone());
+        array_unshift(&mut sections.borrow_mut(), this.clone());
 
         this
     }
@@ -57,7 +60,7 @@ impl ConsoleSectionOutput {
 
         let lines = if let Some(lines) = lines.filter(|l| *l != 0) {
             // Multiply lines by 2 to cater for each new line added between content
-            shirabe_php_shim::array_splice(
+            array_splice(
                 &mut self.content.borrow_mut(),
                 -(lines * 2),
                 None,
@@ -87,16 +90,14 @@ impl ConsoleSectionOutput {
     }
 
     pub fn add_content(&self, input: &str) {
-        for line_content in shirabe_php_shim::explode(shirabe_php_shim::PHP_EOL, input) {
+        for line_content in explode(PHP_EOL, input) {
             let count = (self.get_display_length(&line_content) as f64
                 / self.terminal.get_width() as f64)
                 .ceil();
             self.lines
                 .set(self.lines.get() + if count != 0.0 { count as i64 } else { 1 });
             self.content.borrow_mut().push(line_content);
-            self.content
-                .borrow_mut()
-                .push(shirabe_php_shim::PHP_EOL.to_string());
+            self.content.borrow_mut().push(PHP_EOL.to_string());
         }
     }
 
@@ -131,13 +132,13 @@ impl ConsoleSectionOutput {
             self.inner.do_write("\x1b[0J", false);
         }
 
-        shirabe_php_shim::array_reverse(&erased_content, false).join("")
+        array_reverse(&erased_content, false).join("")
     }
 
     fn get_display_length(&self, text: &str) -> i64 {
         Helper::width(&Helper::remove_decoration(
             &mut *self.get_formatter().borrow_mut(),
-            &shirabe_php_shim::str_replace("\t", "        ", text),
+            &str_replace("\t", "        ", text),
         ))
     }
 }

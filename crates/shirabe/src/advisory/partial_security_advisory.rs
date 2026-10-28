@@ -6,7 +6,7 @@ use crate::package::version::VersionParser;
 use bstr::ByteSlice;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_replace};
+use shirabe_php_shim::{PhpMixed, date_create, php_regex, preg_replace};
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -60,7 +60,7 @@ impl PartialSecurityAdvisory {
             && data.contains_key("reportedAt");
 
         if has_full_data {
-            let reported_at: DateTime<Utc> = shirabe_php_shim::date_create(
+            let reported_at: DateTime<Utc> = date_create(
                 &data["reportedAt"]
                     .as_string()
                     .unwrap_or_default()

@@ -2,6 +2,7 @@
 
 use crate::exception::InvalidArgumentException;
 use indexmap::IndexMap;
+use shirabe_php_shim::{getenv, hexdec, implode, round, strlen, substr};
 
 const COLORS: [(&str, i64); 9] = [
     ("black", 0),
@@ -78,7 +79,7 @@ impl Color {
                 return Err(InvalidArgumentException::new(format!(
                     "Invalid option specified: \"{}\". Expected one of ({}).",
                     option.clone(),
-                    shirabe_php_shim::implode(
+                    implode(
                         ", ",
                         &AVAILABLE_OPTIONS
                             .iter()
@@ -113,7 +114,7 @@ impl Color {
             return String::new();
         }
 
-        format!("\u{1b}[{}m", shirabe_php_shim::implode(";", &set_codes))
+        format!("\u{1b}[{}m", implode(";", &set_codes))
     }
 
     pub fn unset(&self) -> String {
@@ -131,7 +132,7 @@ impl Color {
             return String::new();
         }
 
-        format!("\u{1b}[{}m", shirabe_php_shim::implode(";", &unset_codes))
+        format!("\u{1b}[{}m", implode(";", &unset_codes))
     }
 
     fn parse_color(color: &str, background: bool) -> Result<String, InvalidArgumentException> {
@@ -140,14 +141,14 @@ impl Color {
         }
 
         if &color[0..1] == "#" {
-            let mut color = shirabe_php_shim::substr(color, 1, None);
+            let mut color = substr(color, 1, None);
 
-            if shirabe_php_shim::strlen(&color) == 3 {
+            if strlen(&color) == 3 {
                 let c: Vec<char> = color.chars().collect();
                 color = format!("{}{}{}{}{}{}", c[0], c[0], c[1], c[1], c[2], c[2]);
             }
 
-            if shirabe_php_shim::strlen(&color) != 6 {
+            if strlen(&color) != 6 {
                 return Err(InvalidArgumentException::new(format!(
                     "Invalid \"{}\" color.",
                     color
@@ -157,7 +158,7 @@ impl Color {
             return Ok(format!(
                 "{}{}",
                 if background { "4" } else { "3" },
-                Self::convert_hex_color_to_ansi(shirabe_php_shim::hexdec(&color))
+                Self::convert_hex_color_to_ansi(hexdec(&color))
             ));
         }
 
@@ -174,7 +175,7 @@ impl Color {
         Err(InvalidArgumentException::new(format!(
             "Invalid \"{}\" color; expected one of ({}).",
             color,
-            shirabe_php_shim::implode(", ", &available),
+            implode(", ", &available),
         )))
     }
 
@@ -184,9 +185,7 @@ impl Color {
         let b = color & 255;
 
         // see https://github.com/termstandard/colors/ for more information about true color support
-        if shirabe_php_shim::getenv("COLORTERM").as_deref()
-            != Some(std::ffi::OsStr::new("truecolor"))
-        {
+        if getenv("COLORTERM").as_deref() != Some(std::ffi::OsStr::new("truecolor")) {
             return Self::degrade_hex_color_to_ansi(r, g, b).to_string();
         }
 
@@ -194,13 +193,13 @@ impl Color {
     }
 
     fn degrade_hex_color_to_ansi(r: i64, g: i64, b: i64) -> i64 {
-        if shirabe_php_shim::round(Self::get_saturation(r, g, b) as f64 / 50.0, 0) == 0.0 {
+        if round(Self::get_saturation(r, g, b) as f64 / 50.0, 0) == 0.0 {
             return 0;
         }
 
-        ((shirabe_php_shim::round(b as f64 / 255.0, 0) as i64) << 2)
-            | ((shirabe_php_shim::round(g as f64 / 255.0, 0) as i64) << 1)
-            | (shirabe_php_shim::round(r as f64 / 255.0, 0) as i64)
+        ((round(b as f64 / 255.0, 0) as i64) << 2)
+            | ((round(g as f64 / 255.0, 0) as i64) << 1)
+            | (round(r as f64 / 255.0, 0) as i64)
     }
 
     fn get_saturation(r: i64, g: i64, b: i64) -> i64 {

@@ -30,7 +30,7 @@ use shirabe::script::ScriptEvents;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, RuntimeException, getenv};
 use shirabe_php_shim::{PHP_EOL, PhpMixed};
 use shirabe_symfony_console::output::output_interface;
 
@@ -142,7 +142,7 @@ fn ensure_php_binary() -> bool {
     {
         return true;
     }
-    let path = shirabe_php_shim::getenv("PATH").unwrap_or_default();
+    let path = getenv("PATH").unwrap_or_default();
     for dir in std::env::split_paths(&path) {
         let candidate = dir.join("php");
         if candidate.is_file() {
@@ -346,7 +346,7 @@ fn test_dispatcher_detect_infinite_recursion() {
     let result = dispatcher.dispatch(Some("root"), Some(&mut event));
     let err = result.expect_err("infinite recursion must raise a RuntimeException");
     assert!(
-        err.is_instanceof::<shirabe_php_shim::RuntimeException>(),
+        err.is_instanceof::<RuntimeException>(),
         "expected RuntimeException, got: {err:?}"
     );
 }
@@ -447,10 +447,7 @@ fn test_listener_exceptions_are_caught() {
     );
 
     let e = result.expect_err("expected RuntimeException");
-    assert!(
-        e.is_instanceof::<shirabe_php_shim::RuntimeException>(),
-        "got: {e:?}"
-    );
+    assert!(e.is_instanceof::<RuntimeException>(), "got: {e:?}");
 }
 
 // PHP mocks `Composer\Autoload\AutoloadGenerator` with onlyMethods(['buildPackageMap',

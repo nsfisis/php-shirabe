@@ -32,7 +32,7 @@ pub struct GitDriver {
 
 impl GitDriver {
     pub fn new(
-        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        repo_config: IndexMap<String, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,

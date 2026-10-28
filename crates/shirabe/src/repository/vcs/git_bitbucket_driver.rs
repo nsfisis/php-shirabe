@@ -16,7 +16,7 @@ use crate::util::http::Response;
 use bstr::ByteSlice;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, date_create, empty};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_key_exists,
     array_search_mixed, extension_loaded, http_build_query, implode, is_array, php_regex,
@@ -44,7 +44,7 @@ pub struct GitBitbucketDriver {
 
 impl GitBitbucketDriver {
     pub fn new(
-        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        repo_config: IndexMap<String, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
@@ -150,7 +150,7 @@ impl GitBitbucketDriver {
             .cloned();
         self.parse_clone_urls(clone_links);
 
-        self.has_issues = !shirabe_php_shim::empty(
+        self.has_issues = !empty(
             repo_data
                 .get("has_issues")
                 .cloned()
@@ -450,7 +450,7 @@ impl GitBitbucketDriver {
             .get("date")
             .and_then(|v| v.as_string())
             .unwrap_or_default();
-        let date: DateTime<FixedOffset> = shirabe_php_shim::date_create(&date_str.to_str_lossy())?;
+        let date: DateTime<FixedOffset> = date_create(&date_str.to_str_lossy())?;
         Ok(Some(date))
     }
 
@@ -532,7 +532,7 @@ impl GitBitbucketDriver {
                         }
                     }
                 }
-                if shirabe_php_shim::empty(
+                if empty(
                     tags_data
                         .get("next")
                         .cloned()
@@ -598,7 +598,7 @@ impl GitBitbucketDriver {
                         }
                     }
                 }
-                if shirabe_php_shim::empty(
+                if empty(
                     branch_data
                         .get("next")
                         .cloned()

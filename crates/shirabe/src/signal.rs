@@ -130,6 +130,7 @@ impl Drop for SignalSubscription {
 #[cfg(test)]
 mod tests {
     use super::SignalSubscription;
+    use shirabe_php_shim::getenv;
 
     fn raise_sigint() {
         nix::sys::signal::raise(nix::sys::signal::Signal::SIGINT).unwrap();
@@ -172,7 +173,7 @@ mod tests {
 
     #[test]
     fn exit_with_last_signal_kills_by_the_signal() {
-        if shirabe_php_shim::getenv("SIGNAL_TEST_CHILD").is_some() {
+        if getenv("SIGNAL_TEST_CHILD").is_some() {
             let signals = SignalSubscription::new();
             raise_sigint();
             signals.exit_with_last_signal();
@@ -188,7 +189,7 @@ mod tests {
 
     #[test]
     fn the_default_disposition_returns_once_no_subscription_is_left() {
-        if shirabe_php_shim::getenv("SIGNAL_TEST_CHILD").is_some() {
+        if getenv("SIGNAL_TEST_CHILD").is_some() {
             drop(SignalSubscription::new());
             raise_sigint();
             unreachable!("SIGINT must terminate the process");

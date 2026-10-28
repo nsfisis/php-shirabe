@@ -18,7 +18,10 @@ use crate::question::QuestionInterface;
 use crate::style::output_style::OutputStyle;
 use crate::style::style_interface::StyleInterface;
 use crate::terminal::Terminal;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{
+    AsAny, PHP_EOL, PhpMixed, array_unshift, boolval, explode, str_repeat, str_replace, strlen,
+    substr, substr_count, wordwrap,
+};
 
 /// Output decorator helpers for the Symfony Style Guide.
 #[derive(Debug)]
@@ -136,12 +139,8 @@ impl SymfonyStyle {
     }
 
     fn auto_prepend_block(&mut self) {
-        let chars = shirabe_php_shim::substr(
-            &shirabe_php_shim::str_replace(
-                shirabe_php_shim::PHP_EOL,
-                "\n",
-                &self.buffered_output.fetch(),
-            ),
+        let chars = substr(
+            &str_replace(PHP_EOL, "\n", &self.buffered_output.fetch()),
             -2,
             None,
         );
@@ -152,7 +151,7 @@ impl SymfonyStyle {
             return;
         }
         // Prepend new line for each non LF chars (This means no blank line was output before)
-        self.new_line(2 - shirabe_php_shim::substr_count(&chars, "\n"));
+        self.new_line(2 - substr_count(&chars, "\n"));
     }
 
     fn write_buffer(&mut self, message: &str, new_line: bool, r#type: i64) {
@@ -181,8 +180,8 @@ impl SymfonyStyle {
         let mut line_indentation = String::new();
         if let Some(t) = &r#type {
             let formatted = format!("[{}] ", t.clone());
-            indent_length = shirabe_php_shim::strlen(&formatted);
-            line_indentation = shirabe_php_shim::str_repeat(" ", indent_length as usize);
+            indent_length = strlen(&formatted);
+            line_indentation = str_repeat(" ", indent_length as usize);
             r#type = Some(formatted);
         }
 
@@ -204,14 +203,9 @@ impl SymfonyStyle {
                 self.line_length - prefix_length - indent_length + decoration_length,
                 self.line_length,
             );
-            let message_lines = shirabe_php_shim::explode(
-                shirabe_php_shim::PHP_EOL,
-                &shirabe_php_shim::wordwrap(
-                    &message,
-                    message_line_length,
-                    shirabe_php_shim::PHP_EOL,
-                    true,
-                ),
+            let message_lines = explode(
+                PHP_EOL,
+                &wordwrap(&message, message_line_length, PHP_EOL, true),
             );
             for message_line in message_lines {
                 lines.push(message_line);
@@ -225,7 +219,7 @@ impl SymfonyStyle {
         let mut first_line_index: i64 = 0;
         if padding && self.inner.is_decorated() {
             first_line_index = 1;
-            shirabe_php_shim::array_unshift(&mut lines, String::new());
+            array_unshift(&mut lines, String::new());
             lines.push(String::new());
         }
 
@@ -240,7 +234,7 @@ impl SymfonyStyle {
             }
 
             *line = format!("{}{}", prefix, line);
-            line.push_str(&shirabe_php_shim::str_repeat(
+            line.push_str(&str_repeat(
                 " ",
                 (self.line_length
                     - Helper::width(&Helper::remove_decoration(
@@ -267,7 +261,7 @@ impl SymfonyStyle {
     ) -> bool {
         // ConsoleOutput is the only OutputInterface implementor that also implements
         // ConsoleOutputInterface, so `instanceof ConsoleOutputInterface` reduces to this downcast.
-        shirabe_php_shim::AsAny::as_any(&*output.borrow())
+        AsAny::as_any(&*output.borrow())
             .downcast_ref::<ConsoleOutput>()
             .is_some()
     }
@@ -319,15 +313,12 @@ impl StyleInterface for SymfonyStyle {
             "/^y/i".to_string(),
         ));
 
-        shirabe_php_shim::boolval(&answer)
+        boolval(&answer)
     }
 
     fn new_line(&mut self, count: i64) {
         self.inner.new_line(count);
-        self.buffered_output.write(
-            &[shirabe_php_shim::str_repeat("\n", count as usize)],
-            false,
-            OUTPUT_NORMAL,
-        );
+        self.buffered_output
+            .write(&[str_repeat("\n", count as usize)], false, OUTPUT_NORMAL);
     }
 }

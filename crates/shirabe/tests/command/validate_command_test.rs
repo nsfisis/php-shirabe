@@ -5,6 +5,7 @@ use crate::test_case::{
 };
 use serial_test::serial;
 use shirabe::util::platform::Platform;
+use shirabe_php_shim::{chmod, function_exists, posix_getuid};
 use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::input::ParameterName;
 
@@ -160,14 +161,14 @@ fn test_unaccessible_file() {
         // ref: $this->markTestSkipped('Does not run on windows');
         return;
     }
-    if shirabe_php_shim::function_exists("posix_getuid") && shirabe_php_shim::posix_getuid() == 0 {
+    if function_exists("posix_getuid") && posix_getuid() == 0 {
         // ref: $this->markTestSkipped('Cannot run as root');
         return;
     }
 
     let tear_down = init_temp_composer(Some(&minimal_valid_configuration()), None, None, true);
     let composer_json = tear_down.working_dir().join("composer.json");
-    shirabe_php_shim::chmod(&composer_json, 0o200);
+    chmod(&composer_json, 0o200);
 
     let mut app_tester = get_application_tester();
     app_tester
@@ -180,6 +181,6 @@ fn test_unaccessible_file() {
     );
     assert_eq!(3, app_tester.get_status_code());
 
-    shirabe_php_shim::chmod(&composer_json, 0o700);
+    chmod(&composer_json, 0o700);
     drop(tear_down);
 }

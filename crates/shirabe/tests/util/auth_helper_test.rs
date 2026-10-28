@@ -7,7 +7,7 @@ use shirabe::config::ConfigSourceInterface;
 use shirabe::io::IOInterface;
 use shirabe::io::io_interface;
 use shirabe::util::{AuthHelper, Bitbucket, StoreAuth};
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, time};
 use shirabe_php_shim::{PhpMixed, base64_encode, json_encode};
 
 // Mirrors AuthHelperTest::setUp: a DEBUG-verbosity IOMock plus a real Config, both
@@ -668,7 +668,7 @@ fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
     );
     token_entry.insert(
         "access-token-expiration".to_string(),
-        PhpMixed::Int(shirabe_php_shim::time() + 1800),
+        PhpMixed::Int(time() + 1800),
     );
     let mut bitbucket_oauth = IndexMap::new();
     bitbucket_oauth.insert("bitbucket.org".to_string(), PhpMixed::Array(token_entry));

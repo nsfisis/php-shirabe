@@ -5,7 +5,8 @@ use crate::constraint::MatchAllConstraint;
 use crate::constraint::MultiConstraint;
 use crate::constraint::SimpleConstraint;
 use shirabe_php_shim::{
-    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_split,
+    PregMatches, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_split,
+    strtolower, trim,
 };
 
 // Regex to match pre-release data (sort of).
@@ -34,7 +35,7 @@ impl VersionParser {
         }
 
         let pattern = format!("{{{}(?:\\+.*)?$}}i", MODIFIER_REGEX);
-        let lower = shirabe_php_shim::strtolower(&version);
+        let lower = strtolower(&version);
         let match_ = preg_match(&pattern, &lower);
 
         // match_[3] = the ([.-]?dev)? capture
@@ -64,7 +65,7 @@ impl VersionParser {
     }
 
     pub fn normalize_stability(stability: &str) -> anyhow::Result<String> {
-        let stability = shirabe_php_shim::strtolower(stability);
+        let stability = strtolower(stability);
 
         if !["stable", "rc", "beta", "alpha", "dev"].contains(&stability.as_str()) {
             anyhow::bail!(
@@ -81,7 +82,7 @@ impl VersionParser {
     }
 
     pub fn normalize(&self, version: &str, full_version: Option<&str>) -> anyhow::Result<String> {
-        let version = shirabe_php_shim::trim(version, None);
+        let version = trim(version, None);
         let orig_version = version.clone();
         let full_version = full_version.unwrap_or(&version).to_string();
         let mut version = version;
@@ -117,7 +118,7 @@ impl VersionParser {
 
         let mut index: Option<usize> = None;
         let subject = version.clone();
-        let mut matches: Option<shirabe_php_shim::PregMatches> = None;
+        let mut matches: Option<PregMatches> = None;
 
         // match classical versioning
         // Regex pattern compatibility:
@@ -246,7 +247,7 @@ impl VersionParser {
     }
 
     pub fn normalize_branch(&self, name: &str) -> anyhow::Result<String> {
-        let name = shirabe_php_shim::trim(name, None);
+        let name = trim(name, None);
 
         // Groups: 1=major, 2=".minor"(outer), 3=minor(inner), 4=".patch"(outer),
         // 5=patch(inner), 6=".fourth"(outer), 7=fourth(inner).
@@ -285,10 +286,7 @@ impl VersionParser {
     pub fn parse_constraints(&self, constraints: &str) -> anyhow::Result<AnyConstraint> {
         let pretty_constraint = constraints.to_string();
 
-        let or_constraints = preg_split(
-            php_regex!("{\\s*\\|\\|?\\s*}"),
-            &shirabe_php_shim::trim(constraints, None),
-        );
+        let or_constraints = preg_split(php_regex!("{\\s*\\|\\|?\\s*}"), &trim(constraints, None));
 
         let mut or_groups: Vec<AnyConstraint> = Vec::new();
 
@@ -638,10 +636,8 @@ impl VersionParser {
                 }
                 if op == "<" || op == ">=" {
                     let modifier_pattern = format!("{{-{}$}}", MODIFIER_REGEX);
-                    if !preg_is_match(
-                        &modifier_pattern,
-                        &shirabe_php_shim::strtolower(&version_str),
-                    ) && !version_str.starts_with("dev-")
+                    if !preg_is_match(&modifier_pattern, &strtolower(&version_str))
+                        && !version_str.starts_with("dev-")
                     {
                         version = format!("{}-dev", version);
                     }

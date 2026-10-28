@@ -14,7 +14,7 @@ use crate::util::Url;
 use bstr::ByteSlice;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, date_create};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, php_regex, preg_is_match, preg_match, preg_replace, stripos,
     strrpos, strtr, substr, trim,
@@ -39,7 +39,7 @@ pub struct SvnDriver {
 
 impl SvnDriver {
     pub fn new(
-        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        repo_config: IndexMap<String, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
@@ -299,7 +299,7 @@ impl SvnDriver {
                 && let Some(m) = preg_match(php_regex!(r"{^Last Changed Date: ([^(]+)}"), &line)
             {
                 let date_str = m.get(1).unwrap_or_default().to_string();
-                return Ok(shirabe_php_shim::date_create::<Utc>(date_str.trim())
+                return Ok(date_create::<Utc>(date_str.trim())
                     .ok()
                     .map(|d| d.fixed_offset()));
             }

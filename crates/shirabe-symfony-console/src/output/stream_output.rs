@@ -5,7 +5,10 @@ use crate::formatter::OutputFormatterInterface;
 use crate::output::OutputInterface;
 use crate::output::VERBOSITY_NORMAL;
 use crate::output::{DoWrite, Output};
-use shirabe_php_shim::{php_regex, preg_is_match};
+use shirabe_php_shim::{
+    PHP_EOL, PhpResource, fflush_resource, fwrite_resource, get_resource_type, getenv, php_regex,
+    preg_is_match, sapi_windows_vt100_support, stream_isatty_resource,
+};
 
 /// StreamOutput writes the output to a given stream.
 ///
@@ -23,20 +26,20 @@ use shirabe_php_shim::{php_regex, preg_is_match};
 #[derive(Debug)]
 pub struct StreamOutput {
     inner: Output,
-    stream: shirabe_php_shim::PhpResource,
+    stream: PhpResource,
 }
 
 impl StreamOutput {
     /// `$verbosity` defaults to `self::VERBOSITY_NORMAL`; pass `None` to use it.
     pub fn new(
-        stream: shirabe_php_shim::PhpResource,
+        stream: PhpResource,
         verbosity: Option<i64>,
         decorated: Option<bool>,
         formatter: Option<std::rc::Rc<std::cell::RefCell<dyn OutputFormatterInterface>>>,
     ) -> anyhow::Result<Result<Self, InvalidArgumentException>> {
         let verbosity = verbosity.unwrap_or(VERBOSITY_NORMAL);
 
-        if shirabe_php_shim::get_resource_type(&stream) != "stream" {
+        if get_resource_type(&stream) != "stream" {
             return Ok(Err(InvalidArgumentException::new(
                 "The StreamOutput class needs a stream as its first argument.".to_string(),
             )));
@@ -57,14 +60,14 @@ impl StreamOutput {
     }
 
     /// Gets the stream attached to this StreamOutput instance.
-    pub fn get_stream(&self) -> &shirabe_php_shim::PhpResource {
+    pub fn get_stream(&self) -> &PhpResource {
         &self.stream
     }
 
     /// For testing only. Overwrites the private `stream` field, mirroring what
     /// `Symfony\Component\Console\Tester\TesterTrait::initOutput` does via reflection on the
     /// `StreamOutput::$stream` property.
-    pub fn __set_stream(&mut self, stream: shirabe_php_shim::PhpResource) {
+    pub fn __set_stream(&mut self, stream: PhpResource) {
         self.stream = stream;
     }
 
@@ -77,7 +80,7 @@ impl StreamOutput {
     ///
     /// Reference: Composer\XdebugHandler\Process::supportsColor
     /// https://github.com/composer/xdebug-handler
-    fn has_color_support(stream: &shirabe_php_shim::PhpResource) -> bool {
+    fn has_color_support(stream: &PhpResource) -> bool {
         // Follow https://no-color.org/
         if no_color_first_char().is_some() {
             return false;
@@ -85,9 +88,9 @@ impl StreamOutput {
 
         // Detect msysgit/mingw and assume this is a tty because detection
         // does not work correctly, see https://github.com/composer/composer/issues/9690
-        if !shirabe_php_shim::stream_isatty_resource(stream)
+        if !stream_isatty_resource(stream)
             && ![b"MINGW32".as_slice(), b"MINGW64"].contains(
-                &shirabe_php_shim::getenv("MSYSTEM")
+                &getenv("MSYSTEM")
                     .unwrap_or_default()
                     .as_encoded_bytes()
                     .to_ascii_uppercase()
@@ -97,21 +100,20 @@ impl StreamOutput {
             return false;
         }
 
-        if cfg!(windows) && shirabe_php_shim::sapi_windows_vt100_support(stream) {
+        if cfg!(windows) && sapi_windows_vt100_support(stream) {
             return true;
         }
 
-        if shirabe_php_shim::getenv("TERM_PROGRAM").as_deref()
-            == Some(std::ffi::OsStr::new("Hyper"))
-            || shirabe_php_shim::getenv("COLORTERM").is_some()
-            || shirabe_php_shim::getenv("ANSICON").is_some()
-            || shirabe_php_shim::getenv("ConEmuANSI").as_deref() == Some(std::ffi::OsStr::new("ON"))
+        if getenv("TERM_PROGRAM").as_deref() == Some(std::ffi::OsStr::new("Hyper"))
+            || getenv("COLORTERM").is_some()
+            || getenv("ANSICON").is_some()
+            || getenv("ConEmuANSI").as_deref() == Some(std::ffi::OsStr::new("ON"))
         {
             return true;
         }
 
         // TODO(bytes): preg_match matches over a &str.
-        let term = shirabe_php_shim::getenv("TERM")
+        let term = getenv("TERM")
             .unwrap_or_default()
             .into_string()
             .unwrap_or_else(|term| panic!("TERM is not valid UTF-8: {term:?}"));
@@ -131,7 +133,7 @@ impl StreamOutput {
 
 /// PHP: `(($_SERVER['NO_COLOR'] ?? getenv('NO_COLOR'))[0] ?? '')`.
 fn no_color_first_char() -> Option<u8> {
-    shirabe_php_shim::getenv("NO_COLOR")
+    getenv("NO_COLOR")
         .unwrap_or_default()
         .as_encoded_bytes()
         .first()
@@ -142,12 +144,12 @@ impl DoWrite for StreamOutput {
     fn do_write(&self, message: &str, newline: bool) {
         let mut message = message.to_string();
         if newline {
-            message.push_str(shirabe_php_shim::PHP_EOL);
+            message.push_str(PHP_EOL);
         }
 
-        shirabe_php_shim::fwrite_resource(&self.stream, &message);
+        fwrite_resource(&self.stream, &message);
 
-        shirabe_php_shim::fflush_resource(&self.stream);
+        fflush_resource(&self.stream);
     }
 }
 

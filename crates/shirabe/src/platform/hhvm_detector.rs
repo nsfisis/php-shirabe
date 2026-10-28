@@ -2,6 +2,7 @@
 
 use crate::util::Platform;
 use crate::util::ProcessExecutor;
+use shirabe_php_shim::PhpMixed;
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
 
@@ -57,7 +58,7 @@ impl HhvmDetectorInterface for HhvmDetector {
                 let executor = self.process_executor.get_or_insert_with(|| {
                     std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(None)))
                 });
-                let mut version_output = shirabe_php_shim::PhpMixed::Null;
+                let mut version_output = PhpMixed::Null;
                 let cmd = [
                     hhvm_path.as_str(),
                     "--php",

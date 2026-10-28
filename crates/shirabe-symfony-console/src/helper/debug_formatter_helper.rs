@@ -4,6 +4,7 @@ use crate::helper::Helper;
 use crate::helper::HelperInterface;
 use crate::helper::HelperSet;
 use indexmap::IndexMap;
+use shirabe_php_shim::str_replace;
 
 const COLORS: [&str; 9] = [
     "black", "red", "green", "yellow", "blue", "magenta", "cyan", "white", "default",
@@ -84,7 +85,7 @@ impl DebugFormatterHelper {
                 self.started.get_mut(id).unwrap().err = true;
             }
 
-            message.push_str(&shirabe_php_shim::str_replace(
+            message.push_str(&str_replace(
                 "\n",
                 &format!(
                     "\n{}<bg=red;fg=white> {} </> ",
@@ -107,7 +108,7 @@ impl DebugFormatterHelper {
                 self.started.get_mut(id).unwrap().out = true;
             }
 
-            message.push_str(&shirabe_php_shim::str_replace(
+            message.push_str(&str_replace(
                 "\n",
                 &format!(
                     "\n{}<bg=green;fg=white> {} </> ",

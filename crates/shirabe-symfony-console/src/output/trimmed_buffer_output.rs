@@ -4,6 +4,7 @@ use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatterInterface;
 use crate::output::OutputInterface;
 use crate::output::{DoWrite, Output};
+use shirabe_php_shim::{PHP_EOL, substr};
 
 /// A BufferedOutput that keeps only the last N chars.
 #[derive(Debug)]
@@ -48,10 +49,10 @@ impl DoWrite for TrimmedBufferOutput {
         self.buffer.borrow_mut().push_str(message);
 
         if newline {
-            self.buffer.borrow_mut().push_str(shirabe_php_shim::PHP_EOL);
+            self.buffer.borrow_mut().push_str(PHP_EOL);
         }
 
-        let trimmed = shirabe_php_shim::substr(&self.buffer.borrow(), 0 - self.max_length, None);
+        let trimmed = substr(&self.buffer.borrow(), 0 - self.max_length, None);
         *self.buffer.borrow_mut() = trimmed;
     }
 }

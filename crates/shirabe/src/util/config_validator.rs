@@ -10,7 +10,7 @@ use crate::package::loader::ValidatingArrayLoader;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use serde::de::Error as _;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, file_get_contents};
 use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_replace};
 use shirabe_spdx_licenses::SpdxLicenses;
 
@@ -74,10 +74,8 @@ impl ConfigValidator {
 
         if manifest.is_some() {
             // TODO(bytes): detect_duplicate_keys scans the JSON as a &str.
-            let contents = String::from_utf8_lossy(
-                &shirabe_php_shim::file_get_contents(file).unwrap_or_default(),
-            )
-            .into_owned();
+            let contents =
+                String::from_utf8_lossy(&file_get_contents(file).unwrap_or_default()).into_owned();
             if let Some((key, line)) = detect_duplicate_keys(&contents) {
                 warnings.push(format!("Key {key} is a duplicate in {file} at line {line}"));
             }

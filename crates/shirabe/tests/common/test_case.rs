@@ -21,7 +21,10 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
-use shirabe_php_shim::PhpResource;
+use shirabe_php_shim::{
+    PHP_ENV, PHP_EOL, PHP_SERVER, PhpResource, function_exists, fwrite_resource, getenv,
+    php_fopen_resource, putenv, putenv_clear, rewind, stream_get_contents,
+};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::input::ArrayInput;
@@ -360,7 +363,7 @@ impl ApplicationTester {
         input: Vec<(ParameterName, InputValue)>,
         options: RunOptions,
     ) -> anyhow::Result<i32> {
-        let prev_shell_verbosity = shirabe_php_shim::getenv("SHELL_VERBOSITY");
+        let prev_shell_verbosity = getenv("SHELL_VERBOSITY");
 
         let result = (|| -> anyhow::Result<i32> {
             let mut array_input = ArrayInput::new(input, None)?;
@@ -392,27 +395,21 @@ impl ApplicationTester {
         // next `run()` call sharing this process.
         match &prev_shell_verbosity {
             None => {
-                if shirabe_php_shim::function_exists("putenv") {
-                    unsafe { shirabe_php_shim::putenv_clear("SHELL_VERBOSITY") };
+                if function_exists("putenv") {
+                    unsafe { putenv_clear("SHELL_VERBOSITY") };
                 }
-                shirabe_php_shim::PHP_ENV
-                    .lock()
-                    .unwrap()
-                    .clear("SHELL_VERBOSITY");
-                shirabe_php_shim::PHP_SERVER
-                    .lock()
-                    .unwrap()
-                    .clear("SHELL_VERBOSITY");
+                PHP_ENV.lock().unwrap().clear("SHELL_VERBOSITY");
+                PHP_SERVER.lock().unwrap().clear("SHELL_VERBOSITY");
             }
             Some(prev) => {
-                if shirabe_php_shim::function_exists("putenv") {
-                    unsafe { shirabe_php_shim::putenv("SHELL_VERBOSITY", prev) };
+                if function_exists("putenv") {
+                    unsafe { putenv("SHELL_VERBOSITY", prev) };
                 }
-                shirabe_php_shim::PHP_ENV
+                PHP_ENV
                     .lock()
                     .unwrap()
                     .put("SHELL_VERBOSITY".into(), prev.clone());
-                shirabe_php_shim::PHP_SERVER
+                PHP_SERVER
                     .lock()
                     .unwrap()
                     .put("SHELL_VERBOSITY".into(), prev.clone());
@@ -426,7 +423,7 @@ impl ApplicationTester {
         self.capture_streams_independently = options.capture_stderr_separately;
 
         if !self.capture_streams_independently {
-            let stream = shirabe_php_shim::php_fopen_resource("php://memory", "w");
+            let stream = php_fopen_resource("php://memory", "w");
             self.output_stream = Some(stream.clone());
             self.error_stream = None;
 
@@ -441,8 +438,8 @@ impl ApplicationTester {
             }
             self.output = Some(std::rc::Rc::new(std::cell::RefCell::new(output)));
         } else {
-            let stdout = shirabe_php_shim::php_fopen_resource("php://memory", "w");
-            let stderr = shirabe_php_shim::php_fopen_resource("php://memory", "w");
+            let stdout = php_fopen_resource("php://memory", "w");
+            let stderr = php_fopen_resource("php://memory", "w");
             self.output_stream = Some(stdout.clone());
             self.error_stream = Some(stderr.clone());
 
@@ -464,14 +461,11 @@ impl ApplicationTester {
     }
 
     fn create_stream(inputs: &[String]) -> PhpResource {
-        let stream = shirabe_php_shim::php_fopen_resource("php://memory", "r+");
+        let stream = php_fopen_resource("php://memory", "r+");
         for input in inputs {
-            shirabe_php_shim::fwrite_resource(
-                &stream,
-                &format!("{}{}", input, shirabe_php_shim::PHP_EOL),
-            );
+            fwrite_resource(&stream, &format!("{}{}", input, PHP_EOL));
         }
-        shirabe_php_shim::rewind(&stream);
+        rewind(&stream);
         stream
     }
 
@@ -485,10 +479,9 @@ impl ApplicationTester {
             .output_stream
             .as_ref()
             .expect("output not initialized; did you run() before requesting the display?");
-        shirabe_php_shim::rewind(stream);
+        rewind(stream);
         // TODO(bytes): the captured output is returned as a String.
-        String::from_utf8_lossy(&shirabe_php_shim::stream_get_contents(stream).unwrap_or_default())
-            .into_owned()
+        String::from_utf8_lossy(&stream_get_contents(stream).unwrap_or_default()).into_owned()
     }
 
     pub fn get_error_output(&self) -> String {
@@ -500,9 +493,8 @@ impl ApplicationTester {
             .error_stream
             .as_ref()
             .expect("error output not initialized; did you run() before requesting it?");
-        shirabe_php_shim::rewind(stream);
+        rewind(stream);
         // TODO(bytes): the captured output is returned as a String.
-        String::from_utf8_lossy(&shirabe_php_shim::stream_get_contents(stream).unwrap_or_default())
-            .into_owned()
+        String::from_utf8_lossy(&stream_get_contents(stream).unwrap_or_default()).into_owned()
     }
 }

@@ -7,6 +7,7 @@ use crate::test_case::{
 use serial_test::serial;
 use shirabe::json::JsonFile;
 use shirabe::package::handle::PackageInterfaceHandle;
+use shirabe_php_shim::{chmod, function_exists, posix_getuid};
 use shirabe_symfony_console::input::InputValue;
 use shirabe_symfony_console::input::ParameterName;
 
@@ -234,14 +235,14 @@ fn test_bump_fails_on_non_existing_composer_file() {
 #[test]
 #[serial]
 fn test_bump_fails_on_write_error_to_composer_file() {
-    if shirabe_php_shim::function_exists("posix_getuid") && shirabe_php_shim::posix_getuid() == 0 {
+    if function_exists("posix_getuid") && posix_getuid() == 0 {
         // ref: $this->markTestSkipped('Cannot run as root');
         return;
     }
 
     let tear_down = init_temp_composer(Some(&serde_json::json!({})), None, None, false);
     let composer_json_path = tear_down.working_dir().join("composer.json");
-    shirabe_php_shim::chmod(&composer_json_path, 0o444);
+    chmod(&composer_json_path, 0o444);
 
     let mut app_tester = get_application_tester();
     let status_code = app_tester

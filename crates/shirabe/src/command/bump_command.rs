@@ -16,8 +16,8 @@ use crate::package::version::VersionBumper;
 use crate::repository::PlatformRepository;
 use crate::util::Filesystem;
 use shirabe_php_shim::{
-    PhpMixed, file_get_contents, file_put_contents, impl_php_class, is_writable, php_regex,
-    preg_is_match, preg_replace, strtolower,
+    PhpMixed, RuntimeException, file_get_contents, file_put_contents, impl_php_class, is_writable,
+    php_regex, preg_is_match, preg_replace, strtolower,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -302,7 +302,7 @@ impl BumpCommand {
             // TODO(bytes): JsonManipulator takes the JSON as a String.
             Ok(c) => String::from_utf8_lossy(&c).into_owned(),
             Err(_) => {
-                return Err(shirabe_php_shim::RuntimeException::new(format!(
+                return Err(RuntimeException::new(format!(
                     "Unable to read {} contents.",
                     json.get_path()
                 ))
@@ -322,7 +322,7 @@ impl BumpCommand {
 
         match file_put_contents(json.get_path(), manipulator.get_contents().as_bytes()) {
             Some(_) => Ok(true),
-            None => Err(shirabe_php_shim::RuntimeException::new(format!(
+            None => Err(RuntimeException::new(format!(
                 "Unable to write new {} contents.",
                 json.get_path()
             ))

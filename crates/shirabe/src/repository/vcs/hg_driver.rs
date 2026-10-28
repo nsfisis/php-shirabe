@@ -11,7 +11,7 @@ use crate::util::Hg as HgUtils;
 use crate::util::Url;
 use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, date_create};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, dirname, is_dir, is_writable, php_regex, preg_is_match, preg_match,
     preg_replace,
@@ -28,7 +28,7 @@ pub struct HgDriver {
 
 impl HgDriver {
     pub fn new(
-        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        repo_config: IndexMap<String, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
@@ -220,7 +220,7 @@ impl HgDriver {
             Some(&self.repo_dir),
         )?;
 
-        let date: DateTime<Utc> = shirabe_php_shim::date_create(output.trim())?;
+        let date: DateTime<Utc> = date_create(output.trim())?;
         Ok(Some(date.fixed_offset()))
     }
 

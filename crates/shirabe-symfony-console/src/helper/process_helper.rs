@@ -6,6 +6,7 @@ use crate::helper::HelperInterface;
 use crate::helper::HelperSet;
 use crate::output::ConsoleOutputInterface;
 use crate::output::{OutputInterface, output_interface};
+use shirabe_php_shim::{AsAny, InvalidArgumentException, PhpMixed, spl_object_hash, str_replace};
 use shirabe_symfony_process::exception::ProcessFailedException;
 use shirabe_symfony_process::process::Process;
 
@@ -47,7 +48,7 @@ impl ProcessHelper {
         // implementor that also implements ConsoleOutputInterface, so the check
         // reduces to a downcast to the concrete type.
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = {
-            let redirected = shirabe_php_shim::AsAny::as_any(&*output.borrow())
+            let redirected = AsAny::as_any(&*output.borrow())
                 .downcast_ref::<crate::output::ConsoleOutput>()
                 .map(|console| console.get_error_output());
             redirected.unwrap_or(output)
@@ -80,13 +81,7 @@ impl ProcessHelper {
                         ProcessHelperCmdElement::Process(_) => unreachable!(),
                     })
                     .collect();
-                process = Process::new(
-                    command,
-                    None,
-                    None,
-                    shirabe_php_shim::PhpMixed::Null,
-                    Some(60.0),
-                )?;
+                process = Process::new(command, None, None, PhpMixed::Null, Some(60.0))?;
                 cmd = vec![];
             }
             Some(ProcessHelperCmdElement::Process(_)) => {
@@ -97,9 +92,9 @@ impl ProcessHelper {
                 };
             }
             None => {
-                anyhow::bail!(shirabe_php_shim::InvalidArgumentException::new(format!(
+                anyhow::bail!(InvalidArgumentException::new(format!(
                     "Invalid command provided to \"{}()\": the command should be an array whose first element is either the path to the binary to run or a \"Process\" object.",
-                    shirabe_php_shim::PhpMixed::string("ProcessHelper::run".to_string()),
+                    PhpMixed::string("ProcessHelper::run".to_string()),
                 )));
             }
         }
@@ -107,7 +102,7 @@ impl ProcessHelper {
         if verbosity <= output.borrow().get_verbosity() {
             let started = Self::formatter_start(
                 &formatter,
-                &shirabe_php_shim::spl_object_hash(&process),
+                &spl_object_hash(&process),
                 &self.escape_string(&process.get_command_line()),
             );
             output
@@ -122,12 +117,12 @@ impl ProcessHelper {
         };
 
         // PHP passes the remaining `$cmd` array as the `$env` argument to Process::run.
-        let env: indexmap::IndexMap<String, shirabe_php_shim::PhpMixed> = cmd
+        let env: indexmap::IndexMap<String, PhpMixed> = cmd
             .iter()
             .enumerate()
             .filter_map(|(i, element)| match element {
                 ProcessHelperCmdElement::String(s) => {
-                    Some((i.to_string(), shirabe_php_shim::PhpMixed::string(s.clone())))
+                    Some((i.to_string(), PhpMixed::string(s.clone())))
                 }
                 ProcessHelperCmdElement::Process(_) => None,
             })
@@ -148,14 +143,14 @@ impl ProcessHelper {
                 format!(
                     "{} Command did not run successfully",
                     match process.get_exit_code() {
-                        Some(code) => shirabe_php_shim::PhpMixed::Int(code),
-                        None => shirabe_php_shim::PhpMixed::Null,
+                        Some(code) => PhpMixed::Int(code),
+                        None => PhpMixed::Null,
                     },
                 )
             };
             let stopped = Self::formatter_stop(
                 &formatter,
-                &shirabe_php_shim::spl_object_hash(&process),
+                &spl_object_hash(&process),
                 &message,
                 process.is_successful(),
             );
@@ -214,7 +209,7 @@ impl ProcessHelper {
         // implementor that also implements ConsoleOutputInterface, so the check
         // reduces to a downcast to the concrete type.
         let output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> = {
-            let redirected = shirabe_php_shim::AsAny::as_any(&*output.borrow())
+            let redirected = AsAny::as_any(&*output.borrow())
                 .downcast_ref::<crate::output::ConsoleOutput>()
                 .map(|console| console.get_error_output());
             redirected.unwrap_or(output)
@@ -226,7 +221,7 @@ impl ProcessHelper {
             .borrow()
             .get_debug_formatter();
 
-        let object_hash = shirabe_php_shim::spl_object_hash(process);
+        let object_hash = spl_object_hash(process);
 
         Box::new(move |r#type: &str, buffer: &str| {
             let progressed = Self::formatter_progress(
@@ -246,11 +241,11 @@ impl ProcessHelper {
     }
 
     fn escape_string(&self, str: &str) -> String {
-        shirabe_php_shim::str_replace("<", "\\<", str)
+        str_replace("<", "\\<", str)
     }
 
     fn escape_string_static(str: &str) -> String {
-        shirabe_php_shim::str_replace("<", "\\<", str)
+        str_replace("<", "\\<", str)
     }
 
     fn formatter_start(

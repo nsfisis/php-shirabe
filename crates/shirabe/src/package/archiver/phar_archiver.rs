@@ -4,7 +4,7 @@ use crate::package::archiver::ArchivableFilesFilter;
 use crate::package::archiver::ArchivableFilesFinder;
 use crate::package::archiver::ArchiverInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, realpath};
 use shirabe_php_shim::{
     FilesystemIterator, Phar, PharData, RuntimeException, UnexpectedValueException, bzcompress,
     file_exists, file_put_contents, gzcompress, str_repeat, strrpos, unlink,
@@ -50,7 +50,7 @@ impl ArchiverInterface for PharArchiver {
         excludes: Vec<String>,
         ignore_filters: bool,
     ) -> anyhow::Result<String> {
-        let sources = shirabe_php_shim::realpath(&sources).unwrap_or(sources);
+        let sources = realpath(&sources).unwrap_or(sources);
         let formats = formats();
         let compress_formats = compress_formats();
 

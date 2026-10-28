@@ -19,14 +19,21 @@ use crate::question::ChoiceQuestion;
 use crate::question::QuestionInterface;
 use crate::terminal::Terminal;
 use bstr::BString;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{
+    Exception, PHP_EOL, PhpMixed, PhpResource, SEEK_SET, copy, dir, explode, feof, fgetc, fgets,
+    fopen, fread, fseek, ftell, function_exists, mb_detect_encoding, mb_strlen, ord,
+    php_fopen_resource, rewind, rtrim, sapi_windows_cp_conv, sapi_windows_cp_get,
+    sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat, stream_copy_to_stream,
+    stream_get_meta_data, stream_isatty_resource, stream_select, stream_set_blocking, strlen,
+    substr, sys_get_temp_dir, trim, unlink,
+};
 use shirabe_symfony_string::s;
 
 /// The QuestionHelper class provides helpers to interact with the user.
 #[derive(Debug, Default)]
 pub struct QuestionHelper {
     inner: Helper,
-    input_stream: Option<shirabe_php_shim::PhpResource>,
+    input_stream: Option<PhpResource>,
 }
 
 /// self::$stty
@@ -107,11 +114,7 @@ pub trait QuestionHelperInterface {
     ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
         self.write_prompt(std::rc::Rc::clone(&output), question);
 
-        let input_stream = self
-            .inner()
-            .input_stream
-            .clone()
-            .unwrap_or_else(shirabe_php_shim::stdin);
+        let input_stream = self.inner().input_stream.clone().unwrap_or_else(stdin);
         let autocomplete = question.get_autocompleter_callback();
 
         let ret: PhpMixed;
@@ -134,7 +137,7 @@ pub trait QuestionHelperInterface {
                 Err(exception) => return Ok(Err(exception)),
             };
             ret = PhpMixed::string(if question.is_trimmable() {
-                shirabe_php_shim::trim(&autocomplete, None)
+                trim(&autocomplete, None)
             } else {
                 autocomplete
             });
@@ -148,7 +151,7 @@ pub trait QuestionHelperInterface {
                 )? {
                     Ok(hidden_response) => {
                         r = PhpMixed::string(if question.is_trimmable() {
-                            shirabe_php_shim::trim(&hidden_response, None)
+                            trim(&hidden_response, None)
                         } else {
                             hidden_response
                         });
@@ -162,16 +165,16 @@ pub trait QuestionHelperInterface {
             }
 
             if matches!(r, PhpMixed::Bool(false)) {
-                let is_blocked = shirabe_php_shim::stream_get_meta_data(&input_stream).blocked;
+                let is_blocked = stream_get_meta_data(&input_stream).blocked;
 
                 if !is_blocked {
-                    shirabe_php_shim::stream_set_blocking(&input_stream, true);
+                    stream_set_blocking(&input_stream, true);
                 }
 
                 let read = self.inner().read_input(&input_stream, question);
 
                 if !is_blocked {
-                    shirabe_php_shim::stream_set_blocking(&input_stream, false);
+                    stream_set_blocking(&input_stream, false);
                 }
 
                 if matches!(read, PhpMixed::Bool(false)) {
@@ -179,7 +182,7 @@ pub trait QuestionHelperInterface {
                 }
                 r = read;
                 if question.is_trimmable() {
-                    r = PhpMixed::string(shirabe_php_shim::trim(&r.to_string(), None));
+                    r = PhpMixed::string(trim(&r.to_string(), None));
                 }
             }
             ret = r;
@@ -195,7 +198,7 @@ pub trait QuestionHelperInterface {
             }
         }
 
-        ret = if shirabe_php_shim::strlen(&ret.to_string()) > 0 {
+        ret = if strlen(&ret.to_string()) > 0 {
             ret
         } else {
             question.get_default()
@@ -215,7 +218,7 @@ pub trait QuestionHelperInterface {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
     ) -> anyhow::Result<Result<PhpMixed, MissingInputException>> {
-        let mut error: Option<shirabe_php_shim::Exception> = None;
+        let mut error: Option<Exception> = None;
         let mut attempts = question.get_max_attempts();
 
         loop {
@@ -242,7 +245,7 @@ pub trait QuestionHelperInterface {
                     // The validator return type is fixed to InvalidArgumentException here, so the
                     // RuntimeException rethrow branch is statically unreachable; record the error
                     // and retry.
-                    error = Some(shirabe_php_shim::Exception::with_code(
+                    error = Some(Exception::with_code(
                         e.get_message().to_string(),
                         e.get_code(),
                     ));
@@ -271,7 +274,7 @@ pub trait QuestionHelperInterface {
     fn write_error(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        error: &shirabe_php_shim::Exception,
+        error: &Exception,
     ) {
         self.inner().write_error(output, error);
     }
@@ -317,11 +320,11 @@ impl QuestionHelper {
                     .unwrap_or(default);
             }
 
-            let default_parts = shirabe_php_shim::explode(",", &default.to_string());
+            let default_parts = explode(",", &default.to_string());
             let mut resolved: indexmap::IndexMap<String, PhpMixed> = indexmap::IndexMap::new();
             for (k, v) in default_parts.iter().enumerate() {
                 let v = if question.is_trimmable() {
-                    shirabe_php_shim::trim(v, None)
+                    trim(v, None)
                 } else {
                     v.clone()
                 };
@@ -373,8 +376,7 @@ impl QuestionHelper {
             .unwrap_or(0);
 
         for (key, value) in choices {
-            let padding =
-                shirabe_php_shim::str_repeat(" ", (max_width - Helper::width(key)) as usize);
+            let padding = str_repeat(" ", (max_width - Helper::width(key)) as usize);
 
             messages.push(format!(
                 "  [<{tag}>{}{padding}</{tag}>] {}",
@@ -390,7 +392,7 @@ impl QuestionHelper {
     fn write_error(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        error: &shirabe_php_shim::Exception,
+        error: &Exception,
     ) {
         let message = if let Some(helper_set) = self.get_helper_set() {
             let formatter = helper_set.borrow().get_formatter();
@@ -414,7 +416,7 @@ impl QuestionHelper {
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
-        input_stream: &shirabe_php_shim::PhpResource,
+        input_stream: &PhpResource,
         autocomplete: &dyn Fn(&str) -> Vec<PhpMixed>,
     ) -> Result<String, MissingInputException> {
         let cursor = Cursor::new(std::rc::Rc::clone(&output), Some(input_stream.clone()));
@@ -427,16 +429,13 @@ impl QuestionHelper {
         let mut matches = autocomplete(&ret);
         let mut num_matches = matches.len() as i64;
 
-        let stty_mode = shirabe_php_shim::shell_exec("stty -g").unwrap_or_default();
-        let is_stdin = shirabe_php_shim::stream_get_meta_data(input_stream)
-            .uri
-            .as_deref()
-            == Some("php://stdin");
+        let stty_mode = shell_exec("stty -g").unwrap_or_default();
+        let is_stdin = stream_get_meta_data(input_stream).uri.as_deref() == Some("php://stdin");
         let mut r = vec![input_stream.clone()];
-        let w: Vec<shirabe_php_shim::PhpResource> = vec![];
+        let w: Vec<PhpResource> = vec![];
 
         // Disable icanon (so we can fread each keypress) and echo (we'll do echoing here instead)
-        shirabe_php_shim::shell_exec("stty -icanon -echo");
+        shell_exec("stty -icanon -echo");
 
         // Add highlighted text style
         output.borrow().get_formatter().borrow_mut().set_style(
@@ -449,21 +448,14 @@ impl QuestionHelper {
         );
 
         // Read a keypress
-        while !shirabe_php_shim::feof(input_stream) {
+        while !feof(input_stream) {
             while is_stdin
-                && Some(0)
-                    == shirabe_php_shim::stream_select(
-                        &mut r,
-                        &mut w.clone(),
-                        &mut w.clone(),
-                        0,
-                        Some(100),
-                    )
+                && Some(0) == stream_select(&mut r, &mut w.clone(), &mut w.clone(), 0, Some(100))
             {
                 // Give signal handlers a chance to run
                 r = vec![input_stream.clone()];
             }
-            let mut c = shirabe_php_shim::fread(input_stream, 1);
+            let mut c = fread(input_stream, 1);
 
             // as opposed to fgets(), fread() returns an empty string when the stream content is empty, not false.
             if c.is_none()
@@ -471,7 +463,7 @@ impl QuestionHelper {
                     && c.as_deref() == Some(b"".as_slice())
                     && matches!(question.get_default(), PhpMixed::Null))
             {
-                shirabe_php_shim::shell_exec(&format!("stty {}", stty_mode));
+                shell_exec(&format!("stty {}", stty_mode));
                 return Err(MissingInputException::new("Aborted.".to_string()));
             } else if c.as_deref() == Some(b"\x7f".as_slice()) {
                 // Backspace Character
@@ -494,7 +486,7 @@ impl QuestionHelper {
                 ret = QuestionHelper::substr(Some(&ret), 0, Some(i));
             } else if c.as_deref() == Some(b"\x1b".as_slice()) {
                 // Did we read an escape sequence?
-                let escape = shirabe_php_shim::fread(input_stream, 2).unwrap_or_default();
+                let escape = fread(input_stream, 2).unwrap_or_default();
                 let cc = [c.clone().unwrap_or_default(), escape].concat();
                 c = Some(cc.clone());
 
@@ -512,18 +504,15 @@ impl QuestionHelper {
                     ofs += if c2 == Some(b'A') { -1 } else { 1 };
                     ofs = (num_matches + ofs) % num_matches;
                 }
-            } else if shirabe_php_shim::ord(c.as_deref().unwrap_or_default()) < 32 {
+            } else if ord(c.as_deref().unwrap_or_default()) < 32 {
                 if c.as_deref() == Some(b"\t".as_slice()) || c.as_deref() == Some(b"\n".as_slice())
                 {
                     if num_matches > 0 && -1 != ofs {
                         ret = matches[ofs as usize].to_string();
                         // Echo out remaining chars for current match
-                        let remaining_characters = shirabe_php_shim::substr(
+                        let remaining_characters = substr(
                             &ret,
-                            shirabe_php_shim::strlen(&shirabe_php_shim::trim(
-                                &self.most_recently_entered_value(&full_choice),
-                                None,
-                            )),
+                            strlen(&trim(&self.most_recently_entered_value(&full_choice), None)),
                             None,
                         );
                         output.borrow().write(
@@ -532,9 +521,9 @@ impl QuestionHelper {
                             output_interface::OUTPUT_NORMAL,
                         );
                         full_choice.push_str(&remaining_characters);
-                        i = match shirabe_php_shim::mb_detect_encoding(&full_choice, None, true) {
-                            None => shirabe_php_shim::strlen(&full_choice),
-                            Some(encoding) => shirabe_php_shim::mb_strlen(&full_choice, &encoding),
+                        i = match mb_detect_encoding(&full_choice, None, true) {
+                            None => strlen(&full_choice),
+                            Some(encoding) => mb_strlen(&full_choice, &encoding),
                         };
 
                         let ret_for_filter = ret.clone();
@@ -564,14 +553,14 @@ impl QuestionHelper {
             } else {
                 let cur = c.clone().unwrap_or_default();
                 if b"\x80".as_slice() <= cur.as_slice() {
-                    let len = match shirabe_php_shim::str_bitand(&cur, b"\xf0").as_slice() {
+                    let len = match str_bitand(&cur, b"\xf0").as_slice() {
                         b"\xc0" => 1,
                         b"\xd0" => 1,
                         b"\xe0" => 2,
                         b"\xf0" => 3,
                         _ => 0,
                     };
-                    let extra = shirabe_php_shim::fread(input_stream, len).unwrap_or_default();
+                    let extra = fread(input_stream, len).unwrap_or_default();
                     c = Some([cur, extra].concat());
                 }
 
@@ -616,14 +605,12 @@ impl QuestionHelper {
             if num_matches > 0 && -1 != ofs {
                 cursor.save_position();
                 // Write highlighted text, complete the partially entered response
-                let characters_entered = shirabe_php_shim::strlen(&shirabe_php_shim::trim(
-                    &self.most_recently_entered_value(&full_choice),
-                    None,
-                ));
+                let characters_entered =
+                    strlen(&trim(&self.most_recently_entered_value(&full_choice), None));
                 output.borrow().write(
                     &[format!(
                         "<hl>{}</hl>",
-                        OutputFormatter::escape_trailing_backslash(&shirabe_php_shim::substr(
+                        OutputFormatter::escape_trailing_backslash(&substr(
                             &matches[ofs as usize].to_string(),
                             characters_entered,
                             None,
@@ -637,7 +624,7 @@ impl QuestionHelper {
         }
 
         // Reset stty so it behaves normally again
-        shirabe_php_shim::shell_exec(&format!("stty {}", stty_mode));
+        shell_exec(&format!("stty {}", stty_mode));
 
         Ok(full_choice)
     }
@@ -648,8 +635,8 @@ impl QuestionHelper {
             return entered.to_string();
         }
 
-        let choices = shirabe_php_shim::explode(",", entered);
-        let last_choice = shirabe_php_shim::trim(&choices[choices.len() - 1], None);
+        let choices = explode(",", entered);
+        let last_choice = trim(&choices[choices.len() - 1], None);
         if !last_choice.is_empty() {
             return last_choice;
         }
@@ -661,32 +648,29 @@ impl QuestionHelper {
     fn get_hidden_response(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        input_stream: &shirabe_php_shim::PhpResource,
+        input_stream: &PhpResource,
         trimmable: bool,
     ) -> anyhow::Result<Result<String, RuntimeException>> {
         if cfg!(windows) {
-            let mut exe = format!(
-                "{}/../Resources/bin/hiddeninput.exe",
-                shirabe_php_shim::dir()
-            );
+            let mut exe = format!("{}/../Resources/bin/hiddeninput.exe", dir());
 
             // handle code running from a phar
             let mut tmp_exe: Option<String> = None;
-            if shirabe_php_shim::substr(&magic_file(), 0, Some(5)) == "phar:" {
+            if substr(&magic_file(), 0, Some(5)) == "phar:" {
                 // TODO(bytes): the executable path is kept as a String.
-                let tmp_dir = shirabe_php_shim::sys_get_temp_dir()
+                let tmp_dir = sys_get_temp_dir()
                     .into_os_string()
                     .into_string()
                     .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
                 let tmp = format!("{}/hiddeninput.exe", tmp_dir);
-                let _ = shirabe_php_shim::copy(&exe, &tmp);
+                let _ = copy(&exe, &tmp);
                 exe = tmp.clone();
                 tmp_exe = Some(tmp);
             }
 
-            let s_exec = shirabe_php_shim::shell_exec(&format!("\"{}\"", exe)).unwrap_or_default();
+            let s_exec = shell_exec(&format!("\"{}\"", exe)).unwrap_or_default();
             let value = if trimmable {
-                shirabe_php_shim::rtrim(&s_exec, None)
+                rtrim(&s_exec, None)
             } else {
                 s_exec
             };
@@ -695,7 +679,7 @@ impl QuestionHelper {
                 .writeln(&["".to_string()], output_interface::OUTPUT_NORMAL);
 
             if let Some(tmp) = tmp_exe {
-                shirabe_php_shim::unlink(&tmp);
+                unlink(&tmp);
             }
 
             return Ok(Ok(value));
@@ -703,18 +687,18 @@ impl QuestionHelper {
 
         let mut stty_mode = String::new();
         if STTY.load(std::sync::atomic::Ordering::SeqCst) && Terminal::has_stty_available() {
-            stty_mode = shirabe_php_shim::shell_exec("stty -g").unwrap_or_default();
-            shirabe_php_shim::shell_exec("stty -echo");
+            stty_mode = shell_exec("stty -g").unwrap_or_default();
+            shell_exec("stty -echo");
         } else if self.is_interactive_input(input_stream) {
             return Ok(Err(RuntimeException::new(
                 "Unable to hide the response.".to_string(),
             )));
         }
 
-        let value = shirabe_php_shim::fgets(input_stream, Some(4096));
+        let value = fgets(input_stream, Some(4096));
 
         if STTY.load(std::sync::atomic::Ordering::SeqCst) && Terminal::has_stty_available() {
-            shirabe_php_shim::shell_exec(&format!("stty {}", stty_mode));
+            shell_exec(&format!("stty {}", stty_mode));
         }
 
         let mut value = match value {
@@ -725,7 +709,7 @@ impl QuestionHelper {
             }
         };
         if trimmable {
-            value = shirabe_php_shim::trim(&value, None);
+            value = trim(&value, None);
         }
         output
             .borrow()
@@ -734,8 +718,8 @@ impl QuestionHelper {
         Ok(Ok(value))
     }
 
-    fn is_interactive_input(&self, input_stream: &shirabe_php_shim::PhpResource) -> bool {
-        let uri = shirabe_php_shim::stream_get_meta_data(input_stream).uri;
+    fn is_interactive_input(&self, input_stream: &PhpResource) -> bool {
+        let uri = stream_get_meta_data(input_stream).uri;
         if uri.as_deref() != Some("php://stdin") {
             return false;
         }
@@ -745,9 +729,7 @@ impl QuestionHelper {
             return value;
         }
 
-        let value = shirabe_php_shim::stream_isatty_resource(
-            &shirabe_php_shim::php_fopen_resource("php://stdin", "r"),
-        );
+        let value = stream_isatty_resource(&php_fopen_resource("php://stdin", "r"));
         *stdin_is_interactive = Some(value);
         value
     }
@@ -755,12 +737,12 @@ impl QuestionHelper {
     /// Reads one or more lines of input and returns what is read.
     fn read_input(
         &self,
-        input_stream: &shirabe_php_shim::PhpResource,
+        input_stream: &PhpResource,
         question: &impl QuestionInterface,
     ) -> PhpMixed {
         if !question.is_multiline() {
             let cp = self.set_io_codepage();
-            let ret = shirabe_php_shim::fgets(input_stream, Some(4096));
+            let ret = fgets(input_stream, Some(4096));
 
             return self.reset_io_codepage(
                 cp,
@@ -777,12 +759,12 @@ impl QuestionHelper {
         let mut ret = BString::default();
         let cp = self.set_io_codepage();
         loop {
-            let char = shirabe_php_shim::fgetc(&multi_line_stream_reader);
+            let char = fgetc(&multi_line_stream_reader);
             let char = match char {
                 Some(char) => char,
                 None => break,
             };
-            if shirabe_php_shim::PHP_EOL.as_bytes() == [ret.as_slice(), char.as_slice()].concat() {
+            if PHP_EOL.as_bytes() == [ret.as_slice(), char.as_slice()].concat() {
                 break;
             }
             ret.extend_from_slice(&char);
@@ -793,11 +775,9 @@ impl QuestionHelper {
 
     /// Sets console I/O to the host code page.
     fn set_io_codepage(&self) -> i64 {
-        if shirabe_php_shim::function_exists("sapi_windows_cp_set") {
-            let cp = shirabe_php_shim::sapi_windows_cp_get(None);
-            shirabe_php_shim::sapi_windows_cp_set(shirabe_php_shim::sapi_windows_cp_get(Some(
-                "oem",
-            )));
+        if function_exists("sapi_windows_cp_set") {
+            let cp = sapi_windows_cp_get(None);
+            sapi_windows_cp_set(sapi_windows_cp_get(Some("oem")));
 
             return cp;
         }
@@ -809,11 +789,11 @@ impl QuestionHelper {
     fn reset_io_codepage(&self, cp: i64, input: PhpMixed) -> PhpMixed {
         let mut input = input;
         if 0 != cp {
-            shirabe_php_shim::sapi_windows_cp_set(cp);
+            sapi_windows_cp_set(cp);
 
             if !matches!(input, PhpMixed::Bool(false)) && input.to_string() != "" {
-                input = PhpMixed::string(shirabe_php_shim::sapi_windows_cp_conv(
-                    shirabe_php_shim::sapi_windows_cp_get(Some("oem")),
+                input = PhpMixed::string(sapi_windows_cp_conv(
+                    sapi_windows_cp_get(Some("oem")),
                     cp,
                     &input.to_string(),
                 ));
@@ -825,27 +805,24 @@ impl QuestionHelper {
 
     /// Clones an input stream in order to act on one instance of the same
     /// stream without affecting the other instance.
-    fn clone_input_stream(
-        &self,
-        input_stream: &shirabe_php_shim::PhpResource,
-    ) -> Option<shirabe_php_shim::PhpResource> {
-        let stream_meta_data = shirabe_php_shim::stream_get_meta_data(input_stream);
+    fn clone_input_stream(&self, input_stream: &PhpResource) -> Option<PhpResource> {
+        let stream_meta_data = stream_get_meta_data(input_stream);
         let seekable = stream_meta_data.seekable;
         let mode = stream_meta_data.mode;
         let uri = stream_meta_data.uri;
 
         let uri = uri?;
 
-        let clone_stream = shirabe_php_shim::fopen(&uri, &mode).ok()?;
+        let clone_stream = fopen(&uri, &mode).ok()?;
 
         // For seekable and writable streams, add all the same data to the
         // cloned stream and then seek to the same offset.
         if seekable && !["r", "rb", "rt"].contains(&mode.as_str()) {
-            let offset = shirabe_php_shim::ftell(input_stream).unwrap_or(0);
-            shirabe_php_shim::rewind(input_stream);
-            shirabe_php_shim::stream_copy_to_stream(input_stream, &clone_stream);
-            shirabe_php_shim::fseek(input_stream, offset, shirabe_php_shim::SEEK_SET);
-            shirabe_php_shim::fseek(&clone_stream, offset, shirabe_php_shim::SEEK_SET);
+            let offset = ftell(input_stream).unwrap_or(0);
+            rewind(input_stream);
+            stream_copy_to_stream(input_stream, &clone_stream);
+            fseek(input_stream, offset, SEEK_SET);
+            fseek(&clone_stream, offset, SEEK_SET);
         }
 
         Some(clone_stream)

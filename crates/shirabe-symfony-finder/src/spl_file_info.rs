@@ -1,5 +1,10 @@
 //! ref: composer/vendor/symfony/finder/SplFileInfo.php
 
+use shirabe_php_shim::{
+    RuntimeException, basename, basename_with_suffix, dirname, filesize, is_dir, is_file, is_link,
+    realpath,
+};
+
 #[derive(Debug)]
 pub struct SplFileInfo {
     // The path passed to the underlying \SplFileInfo constructor.
@@ -28,23 +33,23 @@ impl SplFileInfo {
     }
 
     pub fn get_path(&self) -> String {
-        shirabe_php_shim::dirname(&self.pathname)
+        dirname(&self.pathname)
     }
 
     pub fn get_filename(&self) -> String {
-        shirabe_php_shim::basename(&self.pathname)
+        basename(&self.pathname)
     }
 
     pub fn get_basename(&self, suffix: Option<&str>) -> String {
         match suffix {
-            Some(suffix) => shirabe_php_shim::basename_with_suffix(&self.pathname, suffix),
-            None => shirabe_php_shim::basename(&self.pathname),
+            Some(suffix) => basename_with_suffix(&self.pathname, suffix),
+            None => basename(&self.pathname),
         }
     }
 
     pub fn get_extension(&self) -> String {
         // \SplFileInfo::getExtension() returns the extension (without the dot), or "" if none.
-        let base = shirabe_php_shim::basename(&self.pathname);
+        let base = basename(&self.pathname);
         match base.rfind('.') {
             Some(index) => base[index + 1..].to_string(),
             None => String::new(),
@@ -60,27 +65,27 @@ impl SplFileInfo {
     }
 
     pub fn is_dir(&self) -> bool {
-        shirabe_php_shim::is_dir(&self.pathname)
+        is_dir(&self.pathname)
     }
 
     pub fn is_file(&self) -> bool {
-        shirabe_php_shim::is_file(&self.pathname)
+        is_file(&self.pathname)
     }
 
     pub fn is_link(&self) -> bool {
-        shirabe_php_shim::is_link(&self.pathname)
+        is_link(&self.pathname)
     }
 
     pub fn get_real_path(&self) -> Option<String> {
         // \SplFileInfo::getRealPath() returns the canonicalized absolute path, or false on failure.
-        shirabe_php_shim::realpath(&self.pathname)
+        realpath(&self.pathname)
     }
 
     pub fn get_size(&self) -> anyhow::Result<i64> {
         // Inherited from \SplFileInfo, whose failure message names the base class even for subclasses.
-        match shirabe_php_shim::filesize(&self.pathname) {
+        match filesize(&self.pathname) {
             Some(size) => Ok(size),
-            None => Err(shirabe_php_shim::RuntimeException::new(format!(
+            None => Err(RuntimeException::new(format!(
                 "SplFileInfo::getSize(): stat failed for {}",
                 self.pathname
             ))

@@ -6,7 +6,10 @@ use crate::input::ArgumentName;
 use crate::input::InputDefinition;
 use crate::input::InputValue;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpResource, php_regex, preg_is_match};
+use shirabe_php_shim::{
+    PhpResource, array_filter, array_keys, array_merge_map, escapeshellarg, implode, php_regex,
+    preg_is_match,
+};
 
 /// Input is the base class for all concrete Input classes.
 ///
@@ -70,8 +73,8 @@ impl Input {
         let definition = &self.definition;
         let given_arguments = &self.arguments;
 
-        let missing_arguments: Vec<String> = shirabe_php_shim::array_filter(
-            &shirabe_php_shim::array_keys(definition.get_arguments()),
+        let missing_arguments: Vec<String> = array_filter(
+            &array_keys(definition.get_arguments()),
             |argument: &String| {
                 !given_arguments.contains_key(argument)
                     && definition
@@ -84,7 +87,7 @@ impl Input {
         if !missing_arguments.is_empty() {
             return Err(RuntimeException::new(format!(
                 "Not enough arguments (missing: \"{}\").",
-                shirabe_php_shim::implode(", ", &missing_arguments),
+                implode(", ", &missing_arguments),
             ))
             .into());
         }
@@ -101,7 +104,7 @@ impl Input {
     }
 
     pub fn get_arguments(&self) -> IndexMap<String, InputValue> {
-        shirabe_php_shim::array_merge_map(
+        array_merge_map(
             self.definition.get_argument_defaults(),
             self.arguments.clone(),
         )
@@ -145,10 +148,7 @@ impl Input {
     }
 
     pub fn get_options(&self) -> IndexMap<String, InputValue> {
-        shirabe_php_shim::array_merge_map(
-            self.definition.get_option_defaults(),
-            self.options.clone(),
-        )
+        array_merge_map(self.definition.get_option_defaults(), self.options.clone())
     }
 
     pub fn get_option(&self, name: &str) -> anyhow::Result<InputValue> {
@@ -205,7 +205,7 @@ impl Input {
         if preg_is_match(php_regex!("{^[\\w-]+$}"), token) {
             token.to_string()
         } else {
-            shirabe_php_shim::escapeshellarg(token)
+            escapeshellarg(token)
         }
     }
 

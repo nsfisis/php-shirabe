@@ -34,8 +34,9 @@ use crate::util::http::Response;
 use crate::util::{AuthHelper, PromptAuthResult, StoreAuth};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, in_array_loose, in_array_strict, parse_url, php_regex, preg_is_match, preg_quote,
-    preg_replace, rename, strpos, substr, unlink_silent,
+    PHP_EOL, PhpMixed, implode, in_array_loose, in_array_strict, json_decode_assoc, parse_url,
+    php_regex, preg_is_match, preg_quote, preg_replace, rename, stripos, strlen, strpos, substr,
+    unlink_silent,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -193,11 +194,7 @@ impl NativeHttpDownloader {
         // send_once(), so the auth/stream-context merge happens once per attempt inside the loop.
 
         let header_strings = Self::header_list(&options);
-        let if_modified = if shirabe_php_shim::stripos(
-            &shirabe_php_shim::implode(",", &header_strings),
-            "if-modified-since:",
-        )
-        .is_some()
+        let if_modified = if stripos(&implode(",", &header_strings), "if-modified-since:").is_some()
         {
             " if modified"
         } else {
@@ -371,7 +368,7 @@ impl NativeHttpDownloader {
                 == Some("application/json")
             && let Some(body) = native_response.inner.get_body()
         {
-            let decoded = shirabe_php_shim::json_decode_assoc(body)?;
+            let decoded = json_decode_assoc(body)?;
             if let PhpMixed::Array(a) = decoded {
                 HttpDownloader::output_warnings(self.io.clone(), origin, &a)?;
             }
@@ -879,13 +876,9 @@ impl NativeHttpDownloader {
             let body = response.inner.get_body().unwrap_or("");
             details = format!(
                 ":{}{}{}",
-                shirabe_php_shim::PHP_EOL,
+                PHP_EOL,
                 substr(body, 0, Some(200)),
-                if shirabe_php_shim::strlen(body) > 200 {
-                    "..."
-                } else {
-                    ""
-                }
+                if strlen(body) > 200 { "..." } else { "" }
             );
         }
 

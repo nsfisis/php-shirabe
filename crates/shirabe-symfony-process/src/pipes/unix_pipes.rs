@@ -4,7 +4,7 @@ use crate::pipes::abstract_pipes::AbstractPipes;
 use crate::pipes::pipes_interface::{CHUNK_SIZE, PipesInterface};
 use crate::process::Process;
 use indexmap::IndexMap;
-use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource};
+use shirabe_php_shim::{Descriptor, PhpMixed, PhpResource, fclose, feof, fread, stream_select};
 
 /// UnixPipes implementation uses unix pipes as handles.
 #[derive(Debug)]
@@ -72,7 +72,7 @@ impl PipesInterface for UnixPipes {
 
         // let's have a look if something changed in streams
         if (!r_sel.is_empty() || w.is_some())
-            && shirabe_php_shim::stream_select(
+            && stream_select(
                 &mut r_sel,
                 &mut w_sel,
                 &mut e_sel,
@@ -97,7 +97,7 @@ impl PipesInterface for UnixPipes {
         for (fd, pipe) in &r {
             let mut data = Vec::new();
             loop {
-                let chunk = shirabe_php_shim::fread(pipe, CHUNK_SIZE).unwrap_or_default();
+                let chunk = fread(pipe, CHUNK_SIZE).unwrap_or_default();
                 let len = chunk.len() as i64;
                 data.extend_from_slice(&chunk);
                 if !(len > 0 && (close || len >= CHUNK_SIZE)) {
@@ -110,8 +110,8 @@ impl PipesInterface for UnixPipes {
                 read.insert(*fd, String::from_utf8_lossy(&data).into_owned());
             }
 
-            if close && shirabe_php_shim::feof(pipe) {
-                shirabe_php_shim::fclose(pipe);
+            if close && feof(pipe) {
+                fclose(pipe);
                 self.inner.pipes.shift_remove(fd);
             }
         }

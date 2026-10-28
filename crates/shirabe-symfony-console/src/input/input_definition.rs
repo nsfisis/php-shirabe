@@ -6,6 +6,7 @@ use crate::input::InputArgument;
 use crate::input::InputOption;
 use crate::input::InputValue;
 use indexmap::IndexMap;
+use shirabe_php_shim::{explode, implode, strtoupper};
 
 /// A InputDefinition represents a set of valid command line arguments and options.
 ///
@@ -256,7 +257,7 @@ impl InputDefinition {
         }
 
         if let Some(shortcut) = option.get_shortcut() {
-            for shortcut in shirabe_php_shim::explode("|", shortcut) {
+            for shortcut in explode("|", shortcut) {
                 if let Some(existing_name) = self.shortcuts.get(&shortcut)
                     && !option.equals(&self.options[existing_name])
                 {
@@ -272,7 +273,7 @@ impl InputDefinition {
         self.options
             .insert(option.get_name().to_string(), std::rc::Rc::clone(&option));
         if let Some(shortcut) = option.get_shortcut() {
-            for shortcut in shirabe_php_shim::explode("|", shortcut) {
+            for shortcut in explode("|", shortcut) {
                 self.shortcuts
                     .insert(shortcut, option.get_name().to_string());
             }
@@ -388,7 +389,7 @@ impl InputDefinition {
                         } else {
                             String::new()
                         },
-                        shirabe_php_shim::strtoupper(option.get_name()),
+                        strtoupper(option.get_name()),
                         if option.is_value_optional() {
                             "]".to_string()
                         } else {
@@ -437,7 +438,7 @@ impl InputDefinition {
             elements.push(element);
         }
 
-        format!("{}{}", shirabe_php_shim::implode(" ", &elements), tail)
+        format!("{}{}", implode(" ", &elements), tail)
     }
 }
 

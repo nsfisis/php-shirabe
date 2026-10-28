@@ -17,8 +17,8 @@ use crate::util::ProcessExecutor;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, php_regex, preg_is_match, preg_match,
-    preg_replace, preg_split, strtolower,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, php_regex,
+    preg_is_match, preg_match, preg_replace, preg_split, strtolower, trigger_error,
 };
 
 #[derive(Debug)]
@@ -65,9 +65,9 @@ impl RootPackageLoader {
         cwd: Option<&str>,
     ) -> anyhow::Result<crate::package::PackageInterfaceHandle> {
         if class != "Composer\\Package\\RootPackage" {
-            shirabe_php_shim::trigger_error(
+            trigger_error(
                 "The $class arg is deprecated, please reach out to Composer maintainers ASAP if you still need this.",
-                shirabe_php_shim::E_USER_DEPRECATED,
+                E_USER_DEPRECATED,
             );
         }
 

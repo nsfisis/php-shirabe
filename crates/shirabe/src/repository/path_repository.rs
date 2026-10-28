@@ -24,8 +24,9 @@ use crate::util::ProcessExecutor;
 use crate::util::Url;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined, file_exists,
-    file_get_contents, glob_with_flags, hash, php_regex, preg_is_match, realpath, serialize,
+    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined, dirname, file_exists,
+    file_get_contents, glob_with_flags, hash, is_dir, php_regex, preg_is_match, realpath,
+    serialize,
 };
 
 #[derive(Debug)]
@@ -161,10 +162,10 @@ impl PathRepository {
             if preg_is_match(php_regex!(r"{[*{}]}"), &self.url) {
                 let mut url = self.url.clone();
                 while preg_is_match(php_regex!(r"{[*{}]}"), &url) {
-                    url = shirabe_php_shim::dirname(&url);
+                    url = dirname(&url);
                 }
                 // the parent directory before any wildcard exists, so we assume it is correctly configured but simply empty
-                if shirabe_php_shim::is_dir(&url) {
+                if is_dir(&url) {
                     return Ok(());
                 }
             }
@@ -291,7 +292,7 @@ impl PathRepository {
                 args
             })?;
             if reference == "auto"
-                && shirabe_php_shim::is_dir(format!("{}/.git", path.trim_end_matches('/')))
+                && is_dir(format!("{}/.git", path.trim_end_matches('/')))
                 && self
                     .process
                     .borrow_mut()

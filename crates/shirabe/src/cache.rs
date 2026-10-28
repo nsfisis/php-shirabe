@@ -9,7 +9,7 @@ use shirabe_php_shim::{
     bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space, file_exists,
     file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable, mkdir,
     php_regex, preg_is_match, preg_match, preg_replace, random_bytes, random_int, rename, time,
-    unlink,
+    touch, touch3, unlink,
 };
 use shirabe_symfony_finder::Finder;
 use std::sync::Mutex;
@@ -246,11 +246,10 @@ impl Cache {
             let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
             let full_path = format!("{}{}", self.root, file);
             if file_exists(&full_path) {
-                if !shirabe_php_shim::touch3(&full_path, filemtime(&full_path).unwrap_or(0), time())
-                {
+                if !touch3(&full_path, filemtime(&full_path).unwrap_or(0), time()) {
                     // fallback in case the above failed due to incorrect ownership
                     // see https://github.com/composer/composer/issues/4070
-                    shirabe_php_shim::touch(&full_path);
+                    touch(&full_path);
                 }
 
                 self.io.write_error3(

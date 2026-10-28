@@ -12,7 +12,7 @@ use crate::input::InputOption;
 use crate::output::OutputInterface;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, preg_replace};
+use shirabe_php_shim::{PhpMixed, preg_replace, str_repeat, str_replace, var_export};
 
 /// Markdown descriptor.
 #[derive(Debug, Default)]
@@ -60,10 +60,10 @@ impl MarkdownDescriptor {
                 },
                 if argument.is_required() { "yes" } else { "no" },
                 if argument.is_array() { "yes" } else { "no" },
-                shirabe_php_shim::str_replace(
+                str_replace(
                     "\n",
                     "",
-                    &shirabe_php_shim::var_export(&argument.get_default().to_php_mixed(), true),
+                    &var_export(&argument.get_default().to_php_mixed(), true),
                 ),
             ),
             true,
@@ -81,7 +81,7 @@ impl MarkdownDescriptor {
             name += &format!("|--no-{}", option.get_name());
         }
         if let Some(shortcut) = option.get_shortcut() {
-            name += &format!("|-{}", shirabe_php_shim::str_replace("|", "|-", shortcut));
+            name += &format!("|-{}", str_replace("|", "|-", shortcut));
         }
 
         self.write(
@@ -100,10 +100,10 @@ impl MarkdownDescriptor {
                 if option.is_value_required() { "yes" } else { "no" },
                 if option.is_array() { "yes" } else { "no" },
                 if option.is_negatable() { "yes" } else { "no" },
-                shirabe_php_shim::str_replace(
+                str_replace(
                     "\n",
                     "",
-                    &shirabe_php_shim::var_export(&option.get_default().to_php_mixed(), true),
+                    &var_export(&option.get_default().to_php_mixed(), true),
                 ),
             ),
             true,
@@ -151,7 +151,7 @@ impl MarkdownDescriptor {
                 &format!(
                     "`{}`\n{}\n\n{}### Usage\n\n{}",
                     command.get_name().unwrap_or_default(),
-                    shirabe_php_shim::str_repeat(
+                    str_repeat(
                         "-",
                         (Helper::width(command.get_name().as_deref().unwrap_or("")) + 2) as usize
                     ),
@@ -182,7 +182,7 @@ impl MarkdownDescriptor {
             &format!(
                 "`{}`\n{}\n\n{}### Usage\n\n{}",
                 command.get_name().unwrap_or_default(),
-                shirabe_php_shim::str_repeat(
+                str_repeat(
                     "-",
                     (Helper::width(command.get_name().as_deref().unwrap_or("")) + 2) as usize
                 ),
@@ -229,7 +229,7 @@ impl MarkdownDescriptor {
             &format!(
                 "{}\n{}",
                 title,
-                shirabe_php_shim::str_repeat("=", Helper::width(&title) as usize)
+                str_repeat("=", Helper::width(&title) as usize)
             ),
             true,
         );
@@ -259,7 +259,7 @@ impl MarkdownDescriptor {
                         Ok(format!(
                             "* [`{}`](#{})",
                             command_name.clone(),
-                            shirabe_php_shim::str_replace(
+                            str_replace(
                                 ":",
                                 "",
                                 &description

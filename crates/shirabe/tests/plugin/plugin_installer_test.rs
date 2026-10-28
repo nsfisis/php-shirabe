@@ -34,8 +34,8 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_rpc::PluginValue;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{Catch as _, RuntimeException, UnexpectedValueException};
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
 use tempfile::TempDir;
@@ -953,7 +953,7 @@ fn test_querying_with_invalid_capability_class_name_throws() {
     for invalid_implementation_class_name in invalid_implementation_class_names() {
         assert_querying_with_invalid_capability_class_name_throws(
             &invalid_implementation_class_name,
-            |err| err.is_instanceof::<shirabe_php_shim::UnexpectedValueException>(),
+            |err| err.is_instanceof::<UnexpectedValueException>(),
             "UnexpectedValueException",
         );
     }
@@ -1052,7 +1052,7 @@ fn test_querying_with_non_existing_or_wrong_capability_class_types_throws() {
     for wrong_implementation_class_type in non_existing_or_invalid_implementation_class_types() {
         assert_querying_with_invalid_capability_class_name_throws(
             &PhpMixed::string(wrong_implementation_class_type.to_string()),
-            |err| err.is_instanceof::<shirabe_php_shim::RuntimeException>(),
+            |err| err.is_instanceof::<RuntimeException>(),
             "RuntimeException",
         );
     }

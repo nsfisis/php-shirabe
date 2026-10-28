@@ -6,6 +6,10 @@ use crate::output::ConsoleSectionOutput;
 use crate::output::OutputInterface;
 use crate::output::StreamOutput;
 use crate::output::VERBOSITY_NORMAL;
+use shirabe_php_shim::{
+    PHP_OS, PhpResource, getenv, implode, php_fopen_resource, php_stderr_resource,
+    php_stdout_resource, php_uname, stripos,
+};
 
 /// ConsoleOutput is the default class for all CLI output. It uses STDOUT and STDERR.
 ///
@@ -98,41 +102,41 @@ impl ConsoleOutput {
     /// doesn't properly convert character-encodings between ASCII to EBCDIC.
     fn is_running_os400() -> bool {
         let checks = [
-            shirabe_php_shim::php_uname("s"),
+            php_uname("s"),
             // TODO(bytes): the checks are matched as Strings.
-            shirabe_php_shim::getenv("OSTYPE")
+            getenv("OSTYPE")
                 .unwrap_or_default()
                 .into_string()
                 .unwrap_or_else(|ostype| panic!("OSTYPE is not valid UTF-8: {ostype:?}")),
-            shirabe_php_shim::PHP_OS.to_string(),
+            PHP_OS.to_string(),
         ];
 
-        shirabe_php_shim::stripos(&shirabe_php_shim::implode(";", &checks), "OS400").is_some()
+        stripos(&implode(";", &checks), "OS400").is_some()
     }
 
     /// For testing only. Overwrites the inner `StreamOutput`'s private `stream` field, mirroring
     /// what `Symfony\Component\Console\Tester\TesterTrait::initOutput` does via reflection on the
     /// parent `StreamOutput::$stream` property of a `ConsoleOutput`.
-    pub fn __set_stream(&mut self, stream: shirabe_php_shim::PhpResource) {
+    pub fn __set_stream(&mut self, stream: PhpResource) {
         self.inner.__set_stream(stream);
     }
 
-    fn open_output_stream() -> shirabe_php_shim::PhpResource {
+    fn open_output_stream() -> PhpResource {
         if !Self::has_stdout_support() {
-            return shirabe_php_shim::php_fopen_resource("php://output", "w");
+            return php_fopen_resource("php://output", "w");
         }
 
         // Use STDOUT when possible to prevent from opening too many file descriptors
-        shirabe_php_shim::php_stdout_resource()
+        php_stdout_resource()
     }
 
-    fn open_error_stream() -> shirabe_php_shim::PhpResource {
+    fn open_error_stream() -> PhpResource {
         if !Self::has_stderr_support() {
-            return shirabe_php_shim::php_fopen_resource("php://output", "w");
+            return php_fopen_resource("php://output", "w");
         }
 
         // Use STDERR when possible to prevent from opening too many file descriptors
-        shirabe_php_shim::php_stderr_resource()
+        php_stderr_resource()
     }
 }
 

@@ -39,7 +39,7 @@ use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_search, date_format_to_strftime, date_local, extension_loaded, impl_php_class,
+    array_search, date_format_to_strftime, date_local, extension_loaded, get_class, impl_php_class,
     in_array_loose, in_array_strict, php_regex, preg_is_match, preg_match, preg_quote,
     preg_replace, realpath, strtolower, version_compare,
 };
@@ -353,7 +353,7 @@ impl ShowCommand {
         {
             return Err(LogicException::new(format!(
                 "ShowCommand::getPackage can only work with CompletePackageInterface, but got {}",
-                shirabe_php_shim::get_class(&PhpMixed::Null)
+                get_class(&PhpMixed::Null)
             ))
             .into());
         }

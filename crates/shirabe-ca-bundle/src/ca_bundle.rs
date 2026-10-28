@@ -1,5 +1,7 @@
 //! ref: composer/vendor/composer/ca-bundle/src/CaBundle.php
 
+use shirabe_php_shim::{PHP_SERVER, getenv};
+
 #[derive(Debug)]
 pub struct CaBundle;
 
@@ -69,8 +71,8 @@ impl CaBundle {
     }
 
     fn get_env_variable(name: &str) -> Option<std::ffi::OsString> {
-        let value = shirabe_php_shim::PHP_SERVER.lock().unwrap().get(name);
-        value.or_else(|| shirabe_php_shim::getenv(name))
+        let value = PHP_SERVER.lock().unwrap().get(name);
+        value.or_else(|| getenv(name))
     }
 
     // TODO(http): Dummy stand-in until reqwest validates certificates itself.

@@ -7,7 +7,7 @@ use crate::io::io_interface;
 use crate::json::JsonValidationException;
 use crate::util::Filesystem;
 use crate::util::HttpDownloader;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, Error};
 use shirabe_php_shim::{
     InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE,
     PhpMixed, PregMatches, RuntimeException, UnexpectedValueException, dirname, file_exists,
@@ -166,7 +166,7 @@ impl JsonFile {
                     .into());
                 }
                 // `catch (\Exception)` leaves an \Error to propagate.
-                if e.is_instanceof::<shirabe_php_shim::Error>() {
+                if e.is_instanceof::<Error>() {
                     return Err(e);
                 }
                 return Err(RuntimeException::new(format!(

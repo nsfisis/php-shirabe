@@ -3,7 +3,7 @@
 use crate::exception::InvalidArgumentException;
 use crate::exception::LogicException;
 use crate::input::InputValue;
-use shirabe_php_shim::{php_regex, preg_split};
+use shirabe_php_shim::{array_filter, implode, ltrim, php_regex, preg_split};
 
 #[derive(Debug, Clone)]
 pub struct InputOption {
@@ -81,11 +81,10 @@ impl InputOption {
     }
 
     fn normalize_shortcut(s: &str) -> anyhow::Result<Option<String>> {
-        let stripped = shirabe_php_shim::ltrim(s, Some("-"));
+        let stripped = ltrim(s, Some("-"));
         let parts = preg_split(php_regex!(r"{(\|)-?}"), &stripped);
-        let filtered: Vec<String> =
-            shirabe_php_shim::array_filter(&parts, |s: &String| !s.is_empty());
-        let result = shirabe_php_shim::implode("|", &filtered);
+        let filtered: Vec<String> = array_filter(&parts, |s: &String| !s.is_empty());
+        let result = implode("|", &filtered);
         if result.is_empty() {
             return Err(InvalidArgumentException::new(
                 "An option shortcut cannot be empty.".to_string(),

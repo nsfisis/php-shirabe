@@ -33,7 +33,7 @@ use shirabe_php_rpc::{
     PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle, call_function,
     call_function_with_dispatcher, call_php_method, call_static_method,
 };
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, is_dir};
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, file_exists, get_class, hash, implode, ini_get, is_array,
@@ -1440,7 +1440,7 @@ try {{
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_default();
-        if shirabe_php_shim::is_dir(&bin_dir) {
+        if is_dir(&bin_dir) {
             let bin_dir = realpath(&bin_dir).unwrap_or(bin_dir);
             let path_value = Platform::get_env(path_env).unwrap_or_default();
             if !std::env::split_paths(&path_value).any(|dir| dir == std::path::Path::new(&bin_dir))

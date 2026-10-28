@@ -4,8 +4,8 @@ use crate::test_case;
 use indexmap::IndexMap;
 use shirabe::package::handle::PackageInterfaceHandle;
 use shirabe::package::loader::{InvalidPackageException, LoaderInterface, ValidatingArrayLoader};
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{Catch as _, PHP_EOL};
 
 fn s(v: &str) -> PhpMixed {
     PhpMixed::string(v.to_string())
@@ -936,7 +936,7 @@ fn warning_provider() -> Vec<(
             config(vec![("name", s("a/b")), ("license", s("XXXXX"))]),
             vec![format!(
                 "License \"XXXXX\" is not a valid SPDX license identifier, see https://spdx.org/licenses/ if you use an open license.{}If the software is closed-source, you may use \"proprietary\" as license.",
-                shirabe_php_shim::PHP_EOL
+                PHP_EOL
             )],
             true,
             Some(config(vec![

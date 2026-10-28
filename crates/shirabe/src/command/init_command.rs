@@ -19,7 +19,7 @@ use crate::util::Filesystem;
 use crate::util::ProcessExecutor;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, array_filter_map, filter_var_email, unlink};
 use shirabe_php_shim::{
     FILE_IGNORE_NEW_LINES, InvalidArgumentException, PHP_EOL, PHP_SERVER, PhpMixed,
     array_flip_strings, array_intersect_key, array_map, basename, empty, explode, file,
@@ -258,7 +258,7 @@ impl InitCommand {
     }
 
     fn is_valid_email(&self, email: &str) -> bool {
-        shirabe_php_shim::filter_var_email(email)
+        filter_var_email(email)
     }
 
     async fn update_dependencies(
@@ -514,7 +514,7 @@ impl Command for InitCommand {
             array_intersect_key(&options, &array_flip_strings(&allowlist))
                 .into_iter()
                 .collect();
-        let mut options = shirabe_php_shim::array_filter_map(&filtered_input, |val: &PhpMixed| {
+        let mut options = array_filter_map(&filtered_input, |val: &PhpMixed| {
             !matches!(val, PhpMixed::Null) && !matches!(val, PhpMixed::List(l) if l.is_empty())
         });
 
@@ -697,7 +697,7 @@ impl Command for InitCommand {
                     true,
                     io_interface::NORMAL,
                 );
-                let _ = shirabe_php_shim::unlink(file_obj.get_path());
+                let _ = unlink(file_obj.get_path());
 
                 return Ok(1);
             }

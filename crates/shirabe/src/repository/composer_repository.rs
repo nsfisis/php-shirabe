@@ -43,7 +43,7 @@ use shirabe_metadata_minifier::ExpandedVersion;
 use shirabe_metadata_minifier::ExpandedVersions;
 use shirabe_metadata_minifier::MetadataMinifier;
 use shirabe_php_shim::{
-    AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed,
+    AnyThrowable, CmpOp, InvalidArgumentException, LogicException, PHP_EOL, PhpClass, PhpMixed,
     RuntimeException, UnexpectedValueException, extension_loaded, hash, http_build_query_mixed,
     json_decode_assoc, parse_url, php_regex, preg_split, realpath, strtolower, strtr, urlencode,
     var_export,
@@ -2714,10 +2714,8 @@ impl ComposerRepository {
                     .as_ref()
                     .map(|s| format!(" from {}", s))
                     .unwrap_or_default(),
-                AnyThrowable::of(&e).map_or_else(
-                    || "Exception".to_string(),
-                    shirabe_php_shim::PhpClass::php_class_name,
-                ),
+                AnyThrowable::of(&e)
+                    .map_or_else(|| "Exception".to_string(), PhpClass::php_class_name),
                 e
             );
             RuntimeException::with_code_and_previous(message, 0, Some(std::sync::Arc::new(e)))

@@ -7,6 +7,7 @@ use shirabe::repository::{
     AdvisoryProviderInterface, ArrayRepository, FilterRepository, RepositoryInterface,
     RepositoryInterfaceHandle,
 };
+use shirabe_php_shim::PhpMixed;
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 
 fn set_up() -> RepositoryInterfaceHandle {
@@ -20,11 +21,7 @@ fn set_up() -> RepositoryInterfaceHandle {
     RepositoryInterfaceHandle::new(repo)
 }
 
-fn config(
-    only: Option<&[&str]>,
-    exclude: Option<&[&str]>,
-) -> IndexMap<String, shirabe_php_shim::PhpMixed> {
-    use shirabe_php_shim::PhpMixed;
+fn config(only: Option<&[&str]>, exclude: Option<&[&str]>) -> IndexMap<String, PhpMixed> {
     let mut c: IndexMap<String, PhpMixed> = IndexMap::new();
     if let Some(only) = only {
         c.insert(
@@ -64,7 +61,7 @@ fn stabilities() -> IndexMap<String, i64> {
 #[test]
 fn test_repo_matching() {
     let all = vec!["foo/aaa", "foo/bbb", "bar/xxx", "baz/yyy"];
-    let cases: Vec<(Vec<&str>, IndexMap<String, shirabe_php_shim::PhpMixed>)> = vec![
+    let cases: Vec<(Vec<&str>, IndexMap<String, PhpMixed>)> = vec![
         (vec!["foo/aaa", "foo/bbb"], config(Some(&["foo/*"]), None)),
         (
             vec!["foo/aaa", "baz/yyy"],
@@ -128,7 +125,6 @@ fn test_canonical_default_true() {
 
 #[test]
 fn test_non_canonical() {
-    use shirabe_php_shim::PhpMixed;
     let mut cfg: IndexMap<String, PhpMixed> = IndexMap::new();
     cfg.insert("canonical".to_string(), PhpMixed::Bool(false));
     let mut repo = FilterRepository::new(set_up(), cfg).unwrap();

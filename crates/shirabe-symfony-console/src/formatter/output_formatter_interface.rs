@@ -1,9 +1,10 @@
 //! ref: composer/vendor/symfony/console/Formatter/OutputFormatterInterface.php
 
 use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
+use shirabe_php_shim::AsAny;
 
 /// Formatter interface for console output.
-pub trait OutputFormatterInterface: shirabe_php_shim::AsAny {
+pub trait OutputFormatterInterface: AsAny {
     /// Sets the decorated flag.
     fn set_decorated(&mut self, decorated: bool);
 

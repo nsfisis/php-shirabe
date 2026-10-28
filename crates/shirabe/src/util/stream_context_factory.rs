@@ -10,8 +10,8 @@ use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
-    PhpMixed, array_replace_recursive, extension_loaded, php_uname, stream_context_create, stripos,
-    uasort,
+    PhpMixed, array_replace_recursive, extension_loaded, is_dir, php_uname, stream_context_create,
+    stripos, uasort,
 };
 
 pub struct StreamContextFactory;
@@ -303,7 +303,7 @@ impl StreamContextFactory {
         let has_capath = ssl.as_ref().and_then(|a| a.get("capath")).is_some();
         if !has_cafile && !has_capath {
             let result = CaBundle::get_system_ca_root_bundle_path(logger);
-            let is_dir = shirabe_php_shim::is_dir(&result);
+            let is_dir = is_dir(&result);
             // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
             let result = result
                 .into_os_string()
@@ -342,7 +342,7 @@ impl StreamContextFactory {
             .and_then(|v| v.as_string())
             .map(|s| s.to_string());
         if let Some(ref capath) = capath
-            && (!shirabe_php_shim::is_dir(capath) || !Filesystem::is_readable(capath))
+            && (!is_dir(capath) || !Filesystem::is_readable(capath))
         {
             return Err(Box::new(TransportException::new(
                 "The configured capath was not valid or could not be read.".to_string(),

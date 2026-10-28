@@ -44,7 +44,8 @@ use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_php_shim::{
-    PhpMixed, php_regex, preg_is_match, preg_match, preg_replace, preg_split_delim_capture,
+    PHP_EOL, PhpMixed, php_fopen_resource, php_regex, preg_is_match, preg_match, preg_replace,
+    preg_split_delim_capture, rewind, stream_get_contents,
 };
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
@@ -890,7 +891,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     // expected from the fixture can come from composer construction itself, not just the later
     // install/update run; check for that here since Rust has no equivalent ambient wrapper.
     if is_exception && let Err(e) = &composer_result {
-        let normalized = case.expect.replace('\n', shirabe_php_shim::PHP_EOL);
+        let normalized = case.expect.replace('\n', PHP_EOL);
         let normalized = normalized.trim_end();
         let err = format!("{}", e);
         assert!(
@@ -1158,7 +1159,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         "The run command only supports install and update"
     );
 
-    let app_output_stream = shirabe_php_shim::php_fopen_resource("php://memory", "w+");
+    let app_output_stream = php_fopen_resource("php://memory", "w+");
     let app_output = StreamOutput::new(app_output_stream.clone(), None, None, None)
         .unwrap()
         .expect("php://memory is a valid stream");
@@ -1179,7 +1180,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         let ExpectResult::Exception(_) = &case.expect_result else {
             unreachable!()
         };
-        let normalized = case.expect.replace('\n', shirabe_php_shim::PHP_EOL);
+        let normalized = case.expect.replace('\n', PHP_EOL);
         let normalized = normalized.trim_end();
         let err = match run_result.borrow().as_ref() {
             Some(Err(e)) => format!("{}", e),
@@ -1207,9 +1208,8 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     let ExpectResult::ExitCode(expect_result) = &case.expect_result else {
         unreachable!()
     };
-    shirabe_php_shim::rewind(&app_output_stream);
-    let app_output_contents =
-        shirabe_php_shim::stream_get_contents(&app_output_stream).unwrap_or_default();
+    rewind(&app_output_stream);
+    let app_output_contents = stream_get_contents(&app_output_stream).unwrap_or_default();
     assert_eq!(
         *expect_result,
         result,

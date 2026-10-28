@@ -27,7 +27,7 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::Url as UrlUtil;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, chmod, dirname, extension_loaded};
 use shirabe_php_shim::{
     InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed, RuntimeException,
     UnexpectedValueException, array_search, file_exists, filesize, get_class, hash, hash_file,
@@ -334,7 +334,7 @@ impl FileDownloader {
         package: PackageInterfaceHandle,
         url: &str,
     ) -> anyhow::Result<String> {
-        if !shirabe_php_shim::extension_loaded("openssl") && Some(0) == strpos(url, "https:") {
+        if !extension_loaded("openssl") && Some(0) == strpos(url, "https:") {
             return Err(RuntimeException::new(
                 "You must enable the openssl extension to download files via https".to_string(),
             )
@@ -410,7 +410,7 @@ impl DownloaderInterface for FileDownloader {
 
         let file_name = self.get_file_name(package.clone(), path);
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
-        let dir_of_file = shirabe_php_shim::dirname(&file_name);
+        let dir_of_file = dirname(&file_name);
         self.filesystem
             .borrow_mut()
             .ensure_directory_exists(&dir_of_file)?;
@@ -775,7 +775,7 @@ impl DownloaderInterface for FileDownloader {
         for bin in package.get_binaries() {
             let bin_path = format!("{}/{}", path, bin);
             if file_exists(&bin_path) && !is_executable(&bin_path) {
-                shirabe_php_shim::chmod(&bin_path, 0o777 & !umask());
+                chmod(&bin_path, 0o777 & !umask());
             }
         }
 

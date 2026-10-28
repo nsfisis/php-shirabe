@@ -13,7 +13,10 @@ use crate::input::InputOption;
 use crate::output::OutputInterface;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, preg_replace};
+use shirabe_php_shim::{
+    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, count, json_encode_ex, php_truthy,
+    preg_replace, str_repeat, str_replace, strip_tags, strlen, strtoupper,
+};
 
 /// Text descriptor.
 #[derive(Debug, Default)]
@@ -38,7 +41,7 @@ impl TextDescriptor {
         let default_value = argument.get_default().to_php_mixed();
         let default = if !default_value.is_null()
             && (!matches!(default_value, PhpMixed::List(_) | PhpMixed::Array(_))
-                || shirabe_php_shim::count(&default_value) != 0)
+                || count(&default_value) != 0)
         {
             format!(
                 "<comment> [default: {}]</comment>",
@@ -52,20 +55,17 @@ impl TextDescriptor {
             Some(PhpMixed::Int(w)) => *w,
             _ => Helper::width(argument.get_name()),
         };
-        let spacing_width = total_width - shirabe_php_shim::strlen(argument.get_name());
+        let spacing_width = total_width - strlen(argument.get_name());
 
         self.write_text(
             &format!(
                 "  <info>{}</info>  {}{}{}",
                 argument.get_name(),
-                shirabe_php_shim::str_repeat(" ", spacing_width as usize),
+                str_repeat(" ", spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
                 preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
-                    &format!(
-                        "\n{}",
-                        shirabe_php_shim::str_repeat(" ", (total_width + 4) as usize)
-                    ),
+                    &format!("\n{}", str_repeat(" ", (total_width + 4) as usize)),
                     argument.get_description(),
                 ),
                 default,
@@ -84,7 +84,7 @@ impl TextDescriptor {
         let default = if option.accept_value()
             && !default_value.is_null()
             && (!matches!(default_value, PhpMixed::List(_) | PhpMixed::Array(_))
-                || shirabe_php_shim::count(&default_value) != 0)
+                || count(&default_value) != 0)
         {
             format!(
                 "<comment> [default: {}]</comment>",
@@ -96,7 +96,7 @@ impl TextDescriptor {
 
         let mut value = String::new();
         if option.accept_value() {
-            value = format!("={}", shirabe_php_shim::strtoupper(option.get_name()));
+            value = format!("={}", strtoupper(option.get_name()));
 
             if option.is_value_optional() {
                 value = format!("[{}]", value);
@@ -127,14 +127,11 @@ impl TextDescriptor {
             &format!(
                 "  <info>{}</info>  {}{}{}{}",
                 synopsis,
-                shirabe_php_shim::str_repeat(" ", spacing_width as usize),
+                str_repeat(" ", spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
                 preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
-                    &format!(
-                        "\n{}",
-                        shirabe_php_shim::str_repeat(" ", (total_width + 4) as usize)
-                    ),
+                    &format!("\n{}", str_repeat(" ", (total_width + 4) as usize)),
                     option.get_description(),
                 ),
                 default,
@@ -185,7 +182,7 @@ impl TextDescriptor {
 
             self.write_text("<comment>Options:</comment>", &options);
             for option in definition.get_options().values() {
-                if shirabe_php_shim::strlen(option.get_shortcut().unwrap_or("")) > 1 {
+                if strlen(option.get_shortcut().unwrap_or("")) > 1 {
                     later_options.push(option.as_ref());
                     continue;
                 }
@@ -241,10 +238,7 @@ impl TextDescriptor {
             self.write_text("\n", &IndexMap::new());
             self.write_text("<comment>Help:</comment>", &options);
             self.write_text("\n", &IndexMap::new());
-            self.write_text(
-                &format!("  {}", shirabe_php_shim::str_replace("\n", "\n  ", &help)),
-                &options,
-            );
+            self.write_text(&format!("  {}", str_replace("\n", "\n  ", &help)), &options);
             self.write_text("\n", &IndexMap::new());
         }
         Ok(())
@@ -262,7 +256,7 @@ impl TextDescriptor {
         let mut description =
             ApplicationDescription::new(application.clone(), described_namespace.clone(), false);
 
-        if matches!(options.get("raw_text"), Some(v) if shirabe_php_shim::php_truthy(v)) {
+        if matches!(options.get("raw_text"), Some(v) if php_truthy(v)) {
             let width = self.get_column_width(
                 &description
                     .get_commands()
@@ -402,7 +396,7 @@ impl TextDescriptor {
                         &format!(
                             "  <info>{}</info>{}{}{}",
                             name.clone(),
-                            shirabe_php_shim::str_repeat(" ", spacing_width as usize),
+                            str_repeat(" ", spacing_width as usize),
                             command_aliases,
                             command.get_description(),
                         ),
@@ -417,15 +411,14 @@ impl TextDescriptor {
     }
 
     fn write_text(&self, content: &str, options: &IndexMap<String, PhpMixed>) {
-        let raw_text =
-            matches!(options.get("raw_text"), Some(v) if shirabe_php_shim::php_truthy(v));
+        let raw_text = matches!(options.get("raw_text"), Some(v) if php_truthy(v));
         let content = if raw_text {
-            shirabe_php_shim::strip_tags(content)
+            strip_tags(content)
         } else {
             content.to_string()
         };
         let decorated = match options.get("raw_output") {
-            Some(v) => !shirabe_php_shim::php_truthy(v),
+            Some(v) => !php_truthy(v),
             None => true,
         };
         self.write(&content, decorated);
@@ -472,14 +465,11 @@ impl TextDescriptor {
             other => other.clone(),
         };
 
-        Ok(shirabe_php_shim::str_replace(
+        Ok(str_replace(
             "\\\\",
             "\\",
-            &shirabe_php_shim::json_encode_ex(
-                &default,
-                shirabe_php_shim::JSON_UNESCAPED_SLASHES | shirabe_php_shim::JSON_UNESCAPED_UNICODE,
-            )
-            .unwrap_or_default(),
+            &json_encode_ex(&default, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+                .unwrap_or_default(),
         ))
     }
 

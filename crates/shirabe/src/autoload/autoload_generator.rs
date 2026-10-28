@@ -25,12 +25,12 @@ use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, PregMatches, RuntimeException, array_keys,
-    array_map, array_merge_map, array_merge_recursive, array_shift, array_slice_strs, array_unique,
-    bin2hex, empty, explode, file_exists, file_get_contents, hash, implode, is_array, ksort, ltrim,
-    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback,
-    random_bytes, realpath, str_replace, strlen, strpos, strtr, substr, substr_count, trim, unlink,
-    var_export,
+    Catch as _, InvalidArgumentException, PHP_SERVER, PhpMixed, PregMatches, RuntimeException,
+    array_keys, array_map, array_merge_map, array_merge_recursive, array_shift, array_slice_strs,
+    array_unique, bin2hex, empty, explode, file_exists, file_get_contents, hash, implode, intval,
+    is_array, is_dir, ksort, ltrim, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
+    preg_replace_callback, random_bytes, realpath, rtrim, str_replace, strlen, strpos, strtr,
+    strtr_array, substr, substr_count, trim, unlink, var_export,
 };
 use shirabe_semver::constraint::Bound;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -151,7 +151,7 @@ impl AutoloadGenerator {
 
         if self.run_scripts.get() {
             // set COMPOSER_DEV_MODE in case not set yet so it is available in the dump-autoload event listeners
-            if shirabe_php_shim::PHP_SERVER
+            if PHP_SERVER
                 .lock()
                 .unwrap()
                 .get("COMPOSER_DEV_MODE")
@@ -466,7 +466,7 @@ return array(
                             } else {
                                 &joined
                             });
-                        if !shirabe_php_shim::is_dir(&dir_str) {
+                        if !is_dir(&dir_str) {
                             continue;
                         }
 
@@ -1275,7 +1275,7 @@ return array(
             let version = str_replace("-", ".", bound.get_version());
             let chunks: Vec<i64> = explode(".", &version)
                 .into_iter()
-                .map(|s| shirabe_php_shim::intval(&PhpMixed::string(s)))
+                .map(|s| intval(&PhpMixed::string(s)))
                 .collect();
 
             chunks[0] * 10000 + chunks[1] * 100 + chunks[2]
@@ -1701,10 +1701,7 @@ class ComposerStaticInit{}
             " => {}",
             substr(
                 &var_export(
-                    &PhpMixed::string(format!(
-                        "{}/",
-                        shirabe_php_shim::rtrim(vendor_path, Some("\\/"))
-                    )),
+                    &PhpMixed::string(format!("{}/", rtrim(vendor_path, Some("\\/")))),
                     true
                 ),
                 0,
@@ -1717,7 +1714,7 @@ class ComposerStaticInit{}
                 &var_export(
                     &PhpMixed::string(format!(
                         "{}/",
-                        shirabe_php_shim::rtrim(&format!("phar://{}", vendor_path), Some("\\/"))
+                        rtrim(&format!("phar://{}", vendor_path), Some("\\/"))
                     )),
                     true
                 ),
@@ -1729,10 +1726,7 @@ class ComposerStaticInit{}
             " => {}",
             substr(
                 &var_export(
-                    &PhpMixed::string(format!(
-                        "{}/",
-                        shirabe_php_shim::rtrim(base_path, Some("\\/"))
-                    )),
+                    &PhpMixed::string(format!("{}/", rtrim(base_path, Some("\\/")))),
                     true
                 ),
                 0,
@@ -1745,7 +1739,7 @@ class ComposerStaticInit{}
                 &var_export(
                     &PhpMixed::string(format!(
                         "{}/",
-                        shirabe_php_shim::rtrim(&format!("phar://{}", base_path), Some("\\/"))
+                        rtrim(&format!("phar://{}", base_path), Some("\\/"))
                     )),
                     true
                 ),
@@ -1777,7 +1771,7 @@ class ComposerStaticInit{}
         }
 
         for (prop, value) in &maps {
-            let value = shirabe_php_shim::strtr_array(&var_export(value, true), &{
+            let value = strtr_array(&var_export(value, true), &{
                 let mut m: IndexMap<String, String> = IndexMap::new();
                 m.insert(absolute_vendor_path_code.clone(), vendor_path_code.clone());
                 m.insert(
@@ -1794,7 +1788,7 @@ class ComposerStaticInit{}
                 );
                 m
             });
-            let value = shirabe_php_shim::ltrim(
+            let value = ltrim(
                 &preg_replace(php_regex!("/^ */m"), "    $0$0", &value),
                 None,
             );
@@ -1949,7 +1943,7 @@ class ComposerStaticInit{}
                         );
 
                         // add support for wildcards * and **
-                        let p = shirabe_php_shim::strtr_array(&p, &{
+                        let p = strtr_array(&p, &{
                             let mut m: IndexMap<String, String> = IndexMap::new();
                             m.insert("\\*\\*".to_string(), ".+?".to_string());
                             m.insert("\\*".to_string(), "[^/]+?".to_string());

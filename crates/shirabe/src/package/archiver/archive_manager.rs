@@ -11,8 +11,8 @@ use crate::util::SyncHelper;
 use crate::util::r#loop::Loop;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, RuntimeException, bin2hex, file_exists, php_regex, preg_is_match,
-    preg_replace, random_bytes, realpath, sys_get_temp_dir,
+    InvalidArgumentException, RuntimeException, bin2hex, file_exists, hash, php_regex,
+    preg_is_match, preg_replace, random_bytes, realpath, sys_get_temp_dir,
 };
 
 pub struct ArchiveManager {
@@ -79,7 +79,7 @@ impl ArchiveManager {
         }
 
         if let Some(source_reference) = package.get_source_reference() {
-            let hash = shirabe_php_shim::hash("sha1", &source_reference);
+            let hash = hash("sha1", &source_reference);
             parts.insert("source_reference".to_string(), hash[..6].to_string());
         }
 

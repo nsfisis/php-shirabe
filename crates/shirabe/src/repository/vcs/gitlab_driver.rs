@@ -16,7 +16,7 @@ use crate::util::http::Response;
 use bstr::ByteSlice;
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, date_create};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_search_mixed,
     array_shift, ctype_alnum, empty, explode, extension_loaded, implode, in_array_loose, is_array,
@@ -47,7 +47,7 @@ impl GitLabDriver {
     pub const URL_REGEX: &'static str = r##"#^(?:(?P<scheme>https?)://(?P<domain>.+?)(?::(?P<port>[0-9]+))?/|git@(?P<domain2>[^:]+):)(?P<parts>.+)/(?P<repo>[^/]+?)(?:\.git|/)?$#"##;
 
     pub fn new(
-        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        repo_config: IndexMap<String, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
@@ -414,8 +414,7 @@ impl GitLabDriver {
                 .get("committed_date")
                 .and_then(|v| v.as_string())
                 .unwrap_or_default();
-            let date: DateTime<FixedOffset> =
-                shirabe_php_shim::date_create(&committed_date.to_str_lossy())?;
+            let date: DateTime<FixedOffset> = date_create(&committed_date.to_str_lossy())?;
             return Ok(Some(date));
         }
 

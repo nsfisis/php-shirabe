@@ -55,7 +55,6 @@ use crate::util::HttpDownloader;
 use crate::util::Platform;
 use crate::util::Silencer;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
 use shirabe_php_shim::{
     AnyThrowable, LogicException as ShimLogicException, PhpMixed, RuntimeException, bin2hex, chdir,
     defined, dirname, disk_free_space, extension_loaded, file_exists, file_get_contents,
@@ -63,6 +62,14 @@ use shirabe_php_shim::{
     is_string, json_decode_assoc, memory_get_peak_usage, memory_get_usage, microtime, php_regex,
     php_uname, posix_getuid, preg_grep, preg_match, preg_quote, preg_split, random_bytes, realpath,
     restore_error_handler, round, str_replace, strpos, strtoupper, sys_get_temp_dir, time, unlink,
+};
+use shirabe_php_shim::{
+    AsAny, Catch as _, Error, ExitException, InvalidArgumentException, PHP_ENV, PHP_SERVER,
+    PhpClass, STDIN, STR_PAD_RIGHT, basename, exec, explode, explode_limit, get_debug_type_obj,
+    getenv, implode, is_numeric_string, levenshtein, ltrim, mb_convert_encoding,
+    mb_convert_variables, mb_detect_encoding, mb_strwidth, php_to_string, php_truthy, putenv,
+    sort_natural_flag_case, str_pad, str_repeat, str_split, strlen, strrpos, substr, substr_count,
+    trim,
 };
 use shirabe_seld_json_lint::ParsingException;
 use shirabe_symfony_console::application::Application as BaseApplication;
@@ -230,8 +237,7 @@ impl Application {
         exception: &anyhow::Error,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
-        if (exception.is_class::<ShimLogicException>()
-            || exception.is_instanceof::<shirabe_php_shim::Error>())
+        if (exception.is_class::<ShimLogicException>() || exception.is_instanceof::<Error>())
             && output.borrow().get_verbosity() < output_interface::VERBOSITY_VERBOSE
         {
             output
@@ -393,14 +399,14 @@ impl Application {
             match Factory::create(io_for_factory, None, disable_plugins_enum, disable_scripts) {
                 Ok(c) => self.composer = Some(c.upcast()),
                 Err(e) => {
-                    if e.is_instanceof::<shirabe_php_shim::InvalidArgumentException>() {
+                    if e.is_instanceof::<InvalidArgumentException>() {
                         if required {
                             self.io.write_error(&e.to_string());
                             if self.are_exceptions_caught() {
                                 // PHP calls `exit(1)` here, terminating before parent::run() can
                                 // re-render the exception. Propagate it as an ExitException so the
                                 // top-level handler turns it into exit code 1 without re-rendering.
-                                return Err(shirabe_php_shim::ExitException { code: 1 }.into());
+                                return Err(ExitException { code: 1 }.into());
                             }
                             return Err(e);
                         }
@@ -775,10 +781,10 @@ impl Application {
             let filtered: Vec<shirabe_symfony_console::completion::StringOrSuggestion> =
                 command_names
                     .into_iter()
-                    .filter(shirabe_php_shim::php_truthy)
+                    .filter(php_truthy)
                     .map(|n| {
                         shirabe_symfony_console::completion::StringOrSuggestion::String(
-                            shirabe_php_shim::php_to_string(&n),
+                            php_to_string(&n),
                         )
                     })
                     .collect();
@@ -873,8 +879,7 @@ impl Application {
             self.want_helps = false;
 
             let help_command = self.get("help")?;
-            help_command
-                .borrow_mut()
+            (*help_command.borrow_mut())
                 .as_any_mut()
                 .downcast_mut::<HelpCommand>()
                 .expect("the help command is a HelpCommand instance")
@@ -946,11 +951,11 @@ impl Application {
     pub fn find_namespace(&mut self, namespace: &str) -> anyhow::Result<String> {
         let all_namespaces = self.get_namespaces()?;
         // implode('[^:]*:', array_map('preg_quote', explode(':', $namespace))).'[^:]*'
-        let parts: Vec<String> = shirabe_php_shim::explode(":", namespace)
+        let parts: Vec<String> = explode(":", namespace)
             .into_iter()
             .map(|p| preg_quote(&p, None))
             .collect();
-        let expr = format!("{}{}", shirabe_php_shim::implode("[^:]*:", &parts), "[^:]*");
+        let expr = format!("{}{}", implode("[^:]*:", &parts), "[^:]*");
         let namespaces: Vec<String> =
             preg_grep(format!("{{^{}}}", expr), all_namespaces.iter().cloned()).collect();
 
@@ -968,7 +973,7 @@ impl Application {
                     message.push_str("\n\nDid you mean one of these?\n    ");
                 }
 
-                message.push_str(&shirabe_php_shim::implode("\n    ", &alternatives));
+                message.push_str(&implode("\n    ", &alternatives));
             }
 
             return Err(NamespaceNotFoundException::new(message, alternatives, 0).into());
@@ -1044,11 +1049,11 @@ impl Application {
             None => self.commands.keys().cloned().collect(),
         };
 
-        let parts: Vec<String> = shirabe_php_shim::explode(":", name)
+        let parts: Vec<String> = explode(":", name)
             .into_iter()
             .map(|p| preg_quote(&p, None))
             .collect();
-        let expr = format!("{}{}", shirabe_php_shim::implode("[^:]*:", &parts), "[^:]*");
+        let expr = format!("{}{}", implode("[^:]*:", &parts), "[^:]*");
         let mut commands: Vec<String> =
             preg_grep(format!("{{^{}}}", expr), all_commands.iter().cloned()).collect();
 
@@ -1062,7 +1067,7 @@ impl Application {
                 .next()
                 .is_none()
         {
-            if let Some(pos) = shirabe_php_shim::strrpos(name, ":") {
+            if let Some(pos) = strrpos(name, ":") {
                 // check if a namespace exists and contains commands
                 self.find_namespace(&name[..pos])?;
             }
@@ -1088,7 +1093,7 @@ impl Application {
                 } else {
                     message.push_str("\n\nDid you mean one of these?\n    ");
                 }
-                message.push_str(&shirabe_php_shim::implode("\n    ", &alternatives));
+                message.push_str(&implode("\n    ", &alternatives));
             }
 
             return Err(CommandNotFoundException::new(message, alternatives, 0).into());
@@ -1144,12 +1149,7 @@ impl Application {
 
                     let abbrev = format!(
                         "{} {}",
-                        shirabe_php_shim::str_pad(
-                            &cmd,
-                            max_len as usize,
-                            " ",
-                            shirabe_php_shim::STR_PAD_RIGHT
-                        ),
+                        str_pad(&cmd, max_len as usize, " ", STR_PAD_RIGHT),
                         command_list[&cmd].borrow().get_description()
                     );
 
@@ -1166,8 +1166,8 @@ impl Application {
                 if commands.len() > 1 {
                     let filtered: Vec<String> = formatted_abbrevs
                         .iter()
-                        .filter(|a| shirabe_php_shim::php_truthy(a))
-                        .map(shirabe_php_shim::php_to_string)
+                        .filter(|a| php_truthy(a))
+                        .map(php_to_string)
                         .collect();
                     let suggestions = self.get_abbreviation_suggestions(&filtered);
 
@@ -1231,12 +1231,7 @@ impl Application {
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
         for (name, command) in entries {
-            if namespace
-                == self.extract_namespace(
-                    &name,
-                    Some(shirabe_php_shim::substr_count(namespace, ":") + 1),
-                )
-            {
+            if namespace == self.extract_namespace(&name, Some(substr_count(namespace, ":") + 1)) {
                 commands.insert(name, command);
             }
         }
@@ -1246,10 +1241,7 @@ impl Application {
             for name in names {
                 if !commands.contains_key(&name)
                     && namespace
-                        == self.extract_namespace(
-                            &name,
-                            Some(shirabe_php_shim::substr_count(namespace, ":") + 1),
-                        )
+                        == self.extract_namespace(&name, Some(substr_count(namespace, ":") + 1))
                     && self.has(&name)
                 {
                     commands.insert(name.clone(), self.get(&name)?);
@@ -1264,9 +1256,9 @@ impl Application {
     pub fn get_abbreviations(names: Vec<String>) -> IndexMap<String, Vec<String>> {
         let mut abbrevs: IndexMap<String, Vec<String>> = IndexMap::new();
         for name in names {
-            let mut len = shirabe_php_shim::strlen(&name);
+            let mut len = strlen(&name);
             while len > 0 {
-                let abbrev = shirabe_php_shim::substr(&name, 0, Some(len));
+                let abbrev = substr(&name, 0, Some(len));
                 abbrevs.entry(abbrev).or_default().push(name.clone());
                 len -= 1;
             }
@@ -1312,7 +1304,7 @@ impl Application {
         let mut current = Some(e);
         while let Some(e) = current {
             let exception = AnyThrowable::of(e);
-            let message = shirabe_php_shim::trim(&e.to_string(), None);
+            let message = trim(&e.to_string(), None);
             let verbosity = output.borrow().get_verbosity();
 
             let mut len;
@@ -1367,7 +1359,7 @@ impl Application {
                 // file rather than one of Composer's. An error that is no exception has no
                 // location, which PHP's 'n/a' fallback stands for.
                 let file = exception
-                    .map(|e| shirabe_php_shim::basename(e.get_file()))
+                    .map(|e| basename(e.get_file()))
                     .filter(|file| !file.is_empty())
                     .unwrap_or_else(|| "n/a".to_string());
                 let line = exception
@@ -1379,26 +1371,20 @@ impl Application {
                     OutputFormatter::escape(&format!("In {} line {}:", file, line)).unwrap()
                 ));
             }
-            let empty_line = format!(
-                "<error>{}</error>",
-                shirabe_php_shim::str_repeat(" ", len as usize)
-            );
+            let empty_line = format!("<error>{}</error>", str_repeat(" ", len as usize));
             messages.push(empty_line.clone());
             if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
                 messages.push(format!(
                     "<error>{}{}</error>",
                     title,
-                    shirabe_php_shim::str_repeat(
-                        " ",
-                        (len - Helper::width(&title)).max(0) as usize
-                    )
+                    str_repeat(" ", (len - Helper::width(&title)).max(0) as usize)
                 ));
             }
             for (line, line_length) in &lines {
                 messages.push(format!(
                     "<error>  {}  {}</error>",
                     OutputFormatter::escape(line).unwrap(),
-                    shirabe_php_shim::str_repeat(" ", (len - line_length) as usize)
+                    str_repeat(" ", (len - line_length) as usize)
                 ));
             }
             messages.push(empty_line);
@@ -1436,7 +1422,7 @@ impl Application {
         }
 
         // TODO(bytes): the verbosity is parsed as a &str.
-        let shell_verbosity = shirabe_php_shim::getenv("SHELL_VERBOSITY")
+        let shell_verbosity = getenv("SHELL_VERBOSITY")
             .unwrap_or_default()
             .into_string()
             .unwrap_or_else(|value| panic!("SHELL_VERBOSITY is not valid UTF-8: {value:?}"));
@@ -1512,12 +1498,12 @@ impl Application {
             input.borrow_mut().set_interactive(false);
         }
 
-        unsafe { shirabe_php_shim::putenv("SHELL_VERBOSITY", shell_verbosity.to_string()) };
-        shirabe_php_shim::PHP_ENV
+        unsafe { putenv("SHELL_VERBOSITY", shell_verbosity.to_string()) };
+        PHP_ENV
             .lock()
             .unwrap()
             .put("SHELL_VERBOSITY".into(), shell_verbosity.to_string().into());
-        shirabe_php_shim::PHP_SERVER
+        PHP_SERVER
             .lock()
             .unwrap()
             .put("SHELL_VERBOSITY".into(), shell_verbosity.to_string().into());
@@ -1647,7 +1633,7 @@ impl Application {
 
     /// Returns abbreviated suggestions in string format.
     fn get_abbreviation_suggestions(&self, abbrevs: &[String]) -> String {
-        format!("    {}", shirabe_php_shim::implode("\n    ", abbrevs))
+        format!("    {}", implode("\n    ", abbrevs))
     }
 
     /// Returns the namespace part of the command name.
@@ -1655,14 +1641,14 @@ impl Application {
     /// This method is not part of public API and should not be used directly.
     pub fn extract_namespace(&self, name: &str, limit: Option<i64>) -> String {
         // $parts = explode(':', $name, -1);
-        let parts = shirabe_php_shim::explode_limit(":", name, -1);
+        let parts = explode_limit(":", name, -1);
 
         // implode(':', null === $limit ? $parts : array_slice($parts, 0, $limit))
         match limit {
-            None => shirabe_php_shim::implode(":", &parts),
+            None => implode(":", &parts),
             Some(limit) => {
                 let sliced: Vec<String> = parts.into_iter().take(limit.max(0) as usize).collect();
-                shirabe_php_shim::implode(":", &sliced)
+                implode(":", &sliced)
             }
         }
     }
@@ -1675,10 +1661,10 @@ impl Application {
 
         let mut collection_parts: IndexMap<String, Vec<String>> = IndexMap::new();
         for item in collection {
-            collection_parts.insert(item.clone(), shirabe_php_shim::explode(":", item));
+            collection_parts.insert(item.clone(), explode(":", item));
         }
 
-        for (i, subname) in shirabe_php_shim::explode(":", name).into_iter().enumerate() {
+        for (i, subname) in explode(":", name).into_iter().enumerate() {
             for (collection_name, parts) in &collection_parts {
                 let exists = alternatives.contains_key(collection_name);
                 if parts.get(i).is_none() && exists {
@@ -1688,8 +1674,8 @@ impl Application {
                     continue;
                 }
 
-                let lev = shirabe_php_shim::levenshtein(&subname, &parts[i]) as f64;
-                if lev <= shirabe_php_shim::strlen(&subname) as f64 / 3.0
+                let lev = levenshtein(&subname, &parts[i]) as f64;
+                if lev <= strlen(&subname) as f64 / 3.0
                     || (!subname.is_empty() && parts[i].contains(&subname))
                 {
                     let v = if exists {
@@ -1705,8 +1691,8 @@ impl Application {
         }
 
         for item in collection {
-            let lev = shirabe_php_shim::levenshtein(name, item) as f64;
-            if lev <= shirabe_php_shim::strlen(name) as f64 / 3.0 || item.contains(name) {
+            let lev = levenshtein(name, item) as f64;
+            if lev <= strlen(name) as f64 / 3.0 || item.contains(name) {
                 let v = if alternatives.contains_key(item) {
                     alternatives[item] - lev
                 } else {
@@ -1720,7 +1706,7 @@ impl Application {
         alternatives.retain(|_, lev| *lev < 2.0 * threshold);
         // ksort($alternatives, SORT_NATURAL | SORT_FLAG_CASE)
         let mut keys: Vec<String> = alternatives.keys().cloned().collect();
-        shirabe_php_shim::sort_natural_flag_case(&mut keys);
+        sort_natural_flag_case(&mut keys);
 
         keys
     }
@@ -1732,8 +1718,8 @@ impl Application {
         is_single_command: bool,
     ) -> anyhow::Result<&mut Self> {
         // $this->defaultCommand = explode('|', ltrim($commandName, '|'))[0];
-        let trimmed = shirabe_php_shim::ltrim(command_name, Some("|"));
-        self.default_command = shirabe_php_shim::explode("|", &trimmed)
+        let trimmed = ltrim(command_name, Some("|"));
+        self.default_command = explode("|", &trimmed)
             .into_iter()
             .next()
             .unwrap_or_default();
@@ -1754,19 +1740,19 @@ impl Application {
 
     fn split_string_by_width(&self, string: &str, width: i64) -> Vec<String> {
         // str_split is not suitable for multi-byte characters, we should use preg_split to get char array properly.
-        let encoding = match shirabe_php_shim::mb_detect_encoding(string, None, true) {
-            None => return shirabe_php_shim::str_split(string, width),
+        let encoding = match mb_detect_encoding(string, None, true) {
+            None => return str_split(string, width),
             Some(encoding) => encoding,
         };
 
-        let utf8_string = shirabe_php_shim::mb_convert_encoding(string.into(), "utf8", &encoding);
+        let utf8_string = mb_convert_encoding(string.into(), "utf8", &encoding);
         let mut lines: Vec<String> = Vec::new();
         let mut line = String::new();
 
         let mut offset = 0usize;
         while let Some(m) = preg_match(php_regex!(r"/.{1,10000}/u"), &utf8_string[offset..]) {
             let m0 = m.get(0).unwrap_or("");
-            offset += shirabe_php_shim::strlen(m0) as usize;
+            offset += strlen(m0) as usize;
 
             let chunk = m0;
             for char in chunk
@@ -1774,30 +1760,23 @@ impl Application {
                 .map(|(i, c)| &chunk[i..i + c.len_utf8()])
             {
                 // test if $char could be appended to current line
-                if shirabe_php_shim::mb_strwidth(&format!("{}{}", line, char), Some("utf8"))
-                    <= width
-                {
+                if mb_strwidth(&format!("{}{}", line, char), Some("utf8")) <= width {
                     line.push_str(char);
                     continue;
                 }
                 // if not, push current line to array and make new line
-                lines.push(shirabe_php_shim::str_pad(
-                    &line,
-                    width as usize,
-                    " ",
-                    shirabe_php_shim::STR_PAD_RIGHT,
-                ));
+                lines.push(str_pad(&line, width as usize, " ", STR_PAD_RIGHT));
                 line = char.to_string();
             }
         }
 
         lines.push(if !lines.is_empty() {
-            shirabe_php_shim::str_pad(&line, width as usize, " ", shirabe_php_shim::STR_PAD_RIGHT)
+            str_pad(&line, width as usize, " ", STR_PAD_RIGHT)
         } else {
             line.clone()
         });
 
-        shirabe_php_shim::mb_convert_variables(&encoding, "utf8", &mut lines);
+        mb_convert_variables(&encoding, "utf8", &mut lines);
 
         lines
     }
@@ -1805,7 +1784,7 @@ impl Application {
     /// Returns all namespaces of the command name.
     fn extract_all_namespaces(&self, name: &str) -> Vec<String> {
         // -1 as third argument is needed to skip the command short name when exploding
-        let parts = shirabe_php_shim::explode_limit(":", name, -1);
+        let parts = explode_limit(":", name, -1);
         let mut namespaces: Vec<String> = Vec::new();
 
         for part in parts {
@@ -1872,7 +1851,7 @@ impl ApplicationHandle {
         if command.borrow().get_name().is_none() {
             return Err(ConsoleLogicException::new(format!(
                 "The command defined in \"{}\" cannot have an empty name.",
-                shirabe_php_shim::get_debug_type_obj(&command),
+                get_debug_type_obj(&command),
             ))
             .into());
         }
@@ -1925,7 +1904,7 @@ impl ApplicationHandle {
             .borrow()
             .has_parameter_option(&["--no-scripts"], false);
 
-        let stdin = shirabe_php_shim::STDIN;
+        let stdin = STDIN;
         if Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").as_deref() != Some("1")
             && (Platform::get_env("COMPOSER_NO_INTERACTION").is_some()
                 || !Platform::is_tty(Some(stdin)))
@@ -2071,7 +2050,7 @@ impl ApplicationHandle {
                 if uid != 0 {
                     // Silently clobber any sudo credentials on the invoking user to avoid privilege escalations later on
                     // ref. https://github.com/composer/composer/issues/5119
-                    let _ = shirabe_php_shim::exec(
+                    let _ = exec(
                         &format!("sudo -u \\#{} sudo -K > /dev/null 2>&1", uid),
                         None,
                         None,
@@ -2080,7 +2059,7 @@ impl ApplicationHandle {
             }
 
             // Silently clobber any remaining sudo leases on the current user as well to avoid privilege escalations
-            let _ = shirabe_php_shim::exec("sudo -K > /dev/null 2>&1", None, None);
+            let _ = exec("sudo -K > /dev/null 2>&1", None, None);
         }
 
         // avoid loading plugins/initializing the Composer instance earlier than necessary if no plugin command is needed
@@ -2217,7 +2196,7 @@ impl ApplicationHandle {
                 io.write_error(&format!(
                     "<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>",
                     std::path::Path::new(
-                        &shirabe_php_shim::PHP_SERVER
+                        &PHP_SERVER
                             .lock()
                             .unwrap()
                             .get("PHP_SELF")
@@ -2537,9 +2516,7 @@ impl ApplicationHandle {
             Err(mut e) => {
                 // PHP's `exit` bypasses parent::doRun()'s catch entirely; re-raise it untouched so
                 // the GitHub Actions annotation and error hints below are skipped.
-                if e.downcast_ref::<shirabe_php_shim::ExitException>()
-                    .is_some()
-                {
+                if e.downcast_ref::<ExitException>().is_some() {
                     return Err(e);
                 }
                 if let Some(see) = e.catch::<ScriptExecutionException>() {
@@ -2620,8 +2597,8 @@ impl ApplicationHandle {
             let app = application.borrow();
             (app.terminal.get_height(), app.terminal.get_width())
         };
-        unsafe { shirabe_php_shim::putenv("LINES", height.to_string()) };
-        unsafe { shirabe_php_shim::putenv("COLUMNS", width.to_string()) };
+        unsafe { putenv("LINES", height.to_string()) };
+        unsafe { putenv("COLUMNS", width.to_string()) };
 
         let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> = match input {
             None => std::rc::Rc::new(std::cell::RefCell::new(ArgvInput::new(None, None)?)),
@@ -2647,7 +2624,7 @@ impl ApplicationHandle {
                 // ConsoleOutput is the only OutputInterface implementor that also implements
                 // ConsoleOutputInterface, so `instanceof ConsoleOutputInterface` reduces to this
                 // downcast to the concrete type.
-                let error_output = shirabe_php_shim::AsAny::as_any(&*output.borrow())
+                let error_output = AsAny::as_any(&*output.borrow())
                     .downcast_ref::<ConsoleOutput>()
                     .map(|console_output| console_output.get_error_output());
                 match error_output {
@@ -2670,7 +2647,7 @@ impl ApplicationHandle {
             Err(e) => {
                 // PHP's `exit` bypasses Symfony's try/catch: it never renders and forces the exit
                 // code it carries. The message, if any, has already been written at the exit site.
-                if let Some(exit) = e.downcast_ref::<shirabe_php_shim::ExitException>() {
+                if let Some(exit) = e.downcast_ref::<ExitException>() {
                     return Ok(exit.code as i32);
                 }
 
@@ -2683,7 +2660,7 @@ impl ApplicationHandle {
                 // $exitCode = $e->getCode();
                 // is_numeric($exitCode) ? max(1, (int) $exitCode) : 1
                 let exit_code = throwable_get_code(AnyThrowable::of(&e)) as i32;
-                if shirabe_php_shim::is_numeric_string(&exit_code.to_string()) {
+                if is_numeric_string(&exit_code.to_string()) {
                     if exit_code <= 0 { 1 } else { exit_code }
                 } else {
                     1
@@ -2969,10 +2946,7 @@ fn throwable_get_code(e: Option<&AnyThrowable>) -> i64 {
 /// PHP's `get_debug_type($e)` for the title line, reached only when the message is empty or output
 /// is verbose.
 fn throwable_debug_type(e: Option<&AnyThrowable>) -> String {
-    e.map_or_else(
-        || "Exception".to_string(),
-        shirabe_php_shim::PhpClass::php_class_name,
-    )
+    e.map_or_else(|| "Exception".to_string(), PhpClass::php_class_name)
 }
 
 /// Borrows the shared input as a mutable `dyn InputInterface` for passing to
@@ -3014,7 +2988,7 @@ pub(crate) fn run_worker_reverse_command(name: &str, input_line: &str) -> anyhow
     let application = WORKER_REVERSE_APPLICATION
         .with(|slot| slot.borrow().as_ref().and_then(std::rc::Weak::upgrade))
         .ok_or_else(|| -> anyhow::Error {
-            shirabe_php_shim::RuntimeException::new(format!(
+            RuntimeException::new(format!(
                 "cannot run command {name}: no application is registered for worker callbacks"
             ))
             .into()

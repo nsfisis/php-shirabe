@@ -12,7 +12,9 @@ use shirabe::package::loader::{ArrayLoader, LoaderInterface};
 use shirabe::package::version::version_parser::VersionParser;
 use shirabe::repository::handle::LockArrayRepositoryHandle;
 use shirabe::repository::lock_array_repository::LockArrayRepository;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_split_delim_capture};
+use shirabe_php_shim::{
+    PhpMixed, file_get_contents, php_regex, preg_is_match, preg_split_delim_capture,
+};
 use std::path::PathBuf;
 
 fn load_package(package_data: &PhpMixed) -> BasePackageHandle {
@@ -60,8 +62,7 @@ fn reduce_packages_info_for_comparison(packages: &[BasePackageHandle]) -> Vec<St
 
 fn read_test_file(file: &str, fixtures_dir: &str) -> IndexMap<String, String> {
     // TODO(bytes)
-    let contents =
-        String::from_utf8_lossy(&shirabe_php_shim::file_get_contents(file).unwrap()).into_owned();
+    let contents = String::from_utf8_lossy(&file_get_contents(file).unwrap()).into_owned();
     let tokens = preg_split_delim_capture(php_regex!(r"#(?:^|\n*)--([A-Z-]+)--\n#"), &contents);
 
     let section_info: Vec<&str> = vec!["TEST", "REQUEST", "POOL-BEFORE", "POOL-AFTER"];

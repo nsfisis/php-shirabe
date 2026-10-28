@@ -10,7 +10,7 @@ use crate::util::HttpDownloader;
 use crate::util::ProcessExecutor;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, json_encode};
 use shirabe_php_shim::{LogicException, PhpMixed, time};
 
 fn transport_error_code(err: &anyhow::Error) -> Option<i64> {
@@ -171,7 +171,7 @@ impl Bitbucket {
             _ => {
                 return Err(LogicException::new(format!(
                     "Expected a token configured with expires_in and access_token present, got {}",
-                    shirabe_php_shim::json_encode(&token).unwrap_or_default()
+                    json_encode(&token).unwrap_or_default()
                 ))
                 .into());
             }
@@ -179,7 +179,7 @@ impl Bitbucket {
         if !token_map.contains_key("expires_in") || !token_map.contains_key("access_token") {
             return Err(LogicException::new(format!(
                 "Expected a token configured with expires_in and access_token present, got {}",
-                shirabe_php_shim::json_encode(&token).unwrap_or_default()
+                json_encode(&token).unwrap_or_default()
             ))
             .into());
         }
@@ -375,7 +375,7 @@ impl Bitbucket {
                     PhpMixed::Array(token.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
                 LogicException::new(format!(
                     "Expected a token configured with expires_in present, got {}",
-                    shirabe_php_shim::json_encode(&token_mixed).unwrap_or_default()
+                    json_encode(&token_mixed).unwrap_or_default()
                 ))
             })?;
 

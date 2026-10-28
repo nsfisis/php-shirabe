@@ -7,7 +7,9 @@ use crate::input::InputInterface;
 use crate::input::InputValue;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{php_regex, preg_match};
+use shirabe_php_shim::{
+    PhpResource, php_regex, preg_match, str_replace_arr, stripcslashes, strlen, substr,
+};
 
 /// StringInput represents an input provided as a string.
 ///
@@ -43,7 +45,7 @@ impl StringInput {
     fn tokenize(&self, input: &str) -> anyhow::Result<Vec<String>> {
         let bytes = input.as_bytes();
         let mut tokens: Vec<String> = vec![];
-        let length = shirabe_php_shim::strlen(input);
+        let length = strlen(input);
         let mut cursor: i64 = 0;
         let mut token: Option<String> = None;
         while cursor < length {
@@ -69,33 +71,28 @@ impl StringInput {
                 if token.is_some() {
                     tokens.push(token.take().unwrap());
                 }
-                cursor += shirabe_php_shim::strlen(m.get(0).unwrap_or(""));
+                cursor += strlen(m.get(0).unwrap_or(""));
             } else if let Some(m) = preg_match(
                 format!(r#"/^([^="'\s]+?)(=?)({}+)/"#, Self::REGEX_QUOTED_STRING),
                 rest,
             ) {
-                let inner = shirabe_php_shim::substr(m.get(3).unwrap_or(""), 1, Some(-1));
-                let replaced =
-                    shirabe_php_shim::str_replace_arr(&["\"'", "'\"", "''", "\"\""], "", &inner);
+                let inner = substr(m.get(3).unwrap_or(""), 1, Some(-1));
+                let replaced = str_replace_arr(&["\"'", "'\"", "''", "\"\""], "", &inner);
                 token = Some(format!(
                     "{}{}{}{}",
                     token.unwrap_or_default(),
                     m.get(1).unwrap_or(""),
                     m.get(2).unwrap_or(""),
-                    shirabe_php_shim::stripcslashes(&replaced)
+                    stripcslashes(&replaced)
                 ));
-                cursor += shirabe_php_shim::strlen(m.get(0).unwrap_or(""));
+                cursor += strlen(m.get(0).unwrap_or(""));
             } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_QUOTED_STRING), rest) {
                 token = Some(format!(
                     "{}{}",
                     token.unwrap_or_default(),
-                    shirabe_php_shim::stripcslashes(&shirabe_php_shim::substr(
-                        m.get(0).unwrap_or(""),
-                        1,
-                        Some(-1)
-                    ))
+                    stripcslashes(&substr(m.get(0).unwrap_or(""), 1, Some(-1)))
                 ));
-                cursor += shirabe_php_shim::strlen(m.get(0).unwrap_or(""));
+                cursor += strlen(m.get(0).unwrap_or(""));
             } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_UNQUOTED_STRING), rest)
             {
                 token = Some(format!(
@@ -103,12 +100,12 @@ impl StringInput {
                     token.unwrap_or_default(),
                     m.get(1).unwrap_or("")
                 ));
-                cursor += shirabe_php_shim::strlen(m.get(0).unwrap_or(""));
+                cursor += strlen(m.get(0).unwrap_or(""));
             } else {
                 // should never happen
                 return Err(InvalidArgumentException::new(format!(
                     "Unable to parse input near \"... {} ...\".",
-                    shirabe_php_shim::substr(input, cursor, Some(10)),
+                    substr(input, cursor, Some(10)),
                 ))
                 .into());
             }
@@ -212,11 +209,11 @@ impl InputInterface for StringInput {
 }
 
 impl StreamableInputInterface for StringInput {
-    fn set_stream(&mut self, stream: shirabe_php_shim::PhpResource) {
+    fn set_stream(&mut self, stream: PhpResource) {
         self.inner.set_stream(stream)
     }
 
-    fn get_stream(&self) -> Option<shirabe_php_shim::PhpResource> {
+    fn get_stream(&self) -> Option<PhpResource> {
         self.inner.get_stream()
     }
 }

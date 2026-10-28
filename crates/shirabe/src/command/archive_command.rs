@@ -26,7 +26,9 @@ use crate::util::Platform;
 use crate::util::ProcessExecutor;
 use crate::util::r#loop::Loop;
 use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, get_debug_type, impl_php_class, php_regex, preg_match};
+use shirabe_php_shim::{
+    LogicException, PhpMixed, get_debug_type, impl_php_class, php_regex, preg_match,
+};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -296,7 +298,7 @@ impl ArchiveCommand {
         let Some(complete) = package.as_complete() else {
             return Err(LogicException::new(format!(
                 "Expected a CompletePackageInterface instance but found {}",
-                get_debug_type(&shirabe_php_shim::PhpMixed::Null)
+                get_debug_type(&PhpMixed::Null)
             ))
             .into());
         };

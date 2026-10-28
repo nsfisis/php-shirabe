@@ -5,7 +5,7 @@ use crate::package::archiver::ArchiverInterface;
 use crate::util::Filesystem;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_php_shim::{RuntimeException, ZipArchive, class_exists, fileperms, realpath};
+use shirabe_php_shim::{RuntimeException, ZipArchive, class_exists, fileperms, realpath, strtr};
 
 #[derive(Debug)]
 pub struct ZipArchiver;
@@ -64,7 +64,7 @@ impl ArchiverInterface for ZipArchiver {
                     .to_string();
 
                 if Platform::is_windows() {
-                    relative_path = shirabe_php_shim::strtr(&relative_path, "\\", "/");
+                    relative_path = strtr(&relative_path, "\\", "/");
                 }
 
                 // Ensure to preserve the permission umasks for the filepath in the archive.

@@ -9,7 +9,10 @@ use crate::input::InputOption;
 use crate::input::InputValue;
 use crate::output::OutputInterface;
 use crate::output::output_interface;
-use shirabe_php_shim::{PhpMixed, impl_php_class};
+use shirabe_php_shim::{
+    PHP_SERVER, PhpMixed, basename, file_exists, impl_php_class, realpath, str_replace_arrays,
+    sys_get_temp_dir, touch,
+};
 use shirabe_symfony_process::process::Process;
 use std::ops::{Deref, DerefMut};
 
@@ -87,8 +90,8 @@ impl DumpCompletionCommand {
 
     fn guess_shell() -> String {
         // TODO(bytes): basename takes the path as a &str.
-        shirabe_php_shim::basename(
-            &shirabe_php_shim::PHP_SERVER
+        basename(
+            &PHP_SERVER
                 .lock()
                 .unwrap()
                 .get("SHELL")
@@ -104,13 +107,13 @@ impl DumpCompletionCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
         // TODO(bytes): Process takes the command line as Strings.
-        let tmp_dir = shirabe_php_shim::sys_get_temp_dir()
+        let tmp_dir = sys_get_temp_dir()
             .into_os_string()
             .into_string()
             .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
         let debug_file = format!("{}/sf_{}.log", tmp_dir, command_name);
-        if !shirabe_php_shim::file_exists(&debug_file) {
-            shirabe_php_shim::touch(&debug_file);
+        if !file_exists(&debug_file) {
+            touch(&debug_file);
         }
         // new Process(['tail', '-f', $debugFile], null, null, null, 0) — timeout 0 disables it;
         // like PHP, this tails forever until the user interrupts.
@@ -147,16 +150,16 @@ impl DumpCompletionCommand {
 impl Command for DumpCompletionCommand {
     fn configure(&self) -> anyhow::Result<()> {
         // TODO(bytes): basename and the help text work on Strings.
-        let full_command = shirabe_php_shim::PHP_SERVER
+        let full_command = PHP_SERVER
             .lock()
             .unwrap()
             .php_self()
             .unwrap_or_default()
             .into_string()
             .unwrap_or_else(|php_self| panic!("PHP_SELF is not valid UTF-8: {php_self:?}"));
-        let command_name = shirabe_php_shim::basename(&full_command);
+        let command_name = basename(&full_command);
         // @realpath($fullCommand) ?: $fullCommand
-        let full_command = match shirabe_php_shim::realpath(&full_command) {
+        let full_command = match realpath(&full_command) {
             Some(p) if !p.is_empty() => p,
             _ => full_command,
         };
@@ -212,8 +215,8 @@ impl Command for DumpCompletionCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         // TODO(bytes): basename takes the path as a &str.
-        let command_name = shirabe_php_shim::basename(
-            &shirabe_php_shim::PHP_SERVER
+        let command_name = basename(
+            &PHP_SERVER
                 .lock()
                 .unwrap()
                 .argv()
@@ -275,7 +278,7 @@ impl Command for DumpCompletionCommand {
         let application = self.get_application().unwrap();
         let version = application.borrow().get_version();
         output.borrow_mut().write(
-            &[shirabe_php_shim::str_replace_arrays(
+            &[str_replace_arrays(
                 &[
                     "{{ COMMAND_NAME }}".to_string(),
                     "{{ VERSION }}".to_string(),

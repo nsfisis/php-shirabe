@@ -17,7 +17,7 @@ use shirabe::util::Git as GitUtil;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, base64_encode};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -118,7 +118,7 @@ fn http_status(
 }
 
 fn b64(s: &str) -> String {
-    shirabe_php_shim::base64_encode(s)
+    base64_encode(s)
 }
 
 fn supports_provider() -> Vec<(bool, &'static str)> {

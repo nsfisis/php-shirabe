@@ -8,7 +8,11 @@ use crate::helper::{
 };
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match};
+use shirabe_php_shim::{
+    PhpMixed, array_splice, explode, get_debug_type, http_build_query_mixed, implode,
+    mb_detect_encoding, mb_str_split, mb_strwidth, php_regex, preg_is_match, sprintf, str_pad,
+    str_repeat, str_replace, strlen, strstr, substr_count, to_string,
+};
 
 /// A single cell within a table row.
 ///
@@ -106,7 +110,7 @@ impl From<PhpMixed> for Cell {
     fn from(value: PhpMixed) -> Self {
         match value {
             PhpMixed::Null => Cell::Null,
-            other => Cell::Value(shirabe_php_shim::to_string(&other)),
+            other => Cell::Value(to_string(&other)),
         }
     }
 }
@@ -343,7 +347,7 @@ impl Table {
             panic!(
                 "Setting a maximum column width is only supported when using a \"{}\" formatter, got \"{}\".",
                 "Symfony\\Component\\Console\\Formatter\\WrappableOutputFormatterInterface",
-                shirabe_php_shim::get_debug_type(&PhpMixed::from(()))
+                get_debug_type(&PhpMixed::from(()))
             );
         }
 
@@ -550,7 +554,7 @@ impl Table {
         let mut markup = left_char;
         let mut column = 0;
         while column < count {
-            markup.push_str(&shirabe_php_shim::str_repeat(
+            markup.push_str(&str_repeat(
                 &horizontal,
                 self.effective_column_widths[&column] as usize,
             ));
@@ -563,7 +567,7 @@ impl Table {
         }
 
         self.output.borrow().writeln(
-            &[shirabe_php_shim::sprintf(
+            &[sprintf(
                 &self.style.get_border_format(),
                 &[PhpMixed::from(markup)],
             )],
@@ -575,7 +579,7 @@ impl Table {
     fn render_column_separator(&self, r#type: i64) -> String {
         let borders = self.style.get_border_chars();
 
-        shirabe_php_shim::sprintf(
+        sprintf(
             &self.style.get_border_format(),
             &[PhpMixed::from(if BORDER_OUTSIDE == r#type {
                 borders[1].clone()
@@ -629,17 +633,16 @@ impl Table {
 
         // str_pad won't work properly with multi-byte strings, we need to fix the padding
         let cell_str = cell.to_php_string();
-        if let Some(encoding) = shirabe_php_shim::mb_detect_encoding(&cell_str, None, true) {
-            width += shirabe_php_shim::strlen(&cell_str)
-                - shirabe_php_shim::mb_strwidth(&cell_str, Some(&encoding));
+        if let Some(encoding) = mb_detect_encoding(&cell_str, None, true) {
+            width += strlen(&cell_str) - mb_strwidth(&cell_str, Some(&encoding));
         }
 
         let style = self.get_style();
 
         if cell.is_table_separator() {
-            return shirabe_php_shim::sprintf(
+            return sprintf(
                 &style.get_border_format(),
-                &[PhpMixed::from(shirabe_php_shim::str_repeat(
+                &[PhpMixed::from(str_repeat(
                     &style.get_border_chars()[2],
                     width as usize,
                 ))],
@@ -647,7 +650,7 @@ impl Table {
         }
 
         width += Helper::length(&cell_str) - Helper::length(&self.remove_decoration(&cell_str));
-        let mut content = shirabe_php_shim::sprintf(
+        let mut content = sprintf(
             &style.get_cell_row_content_format(),
             &[PhpMixed::from(cell_str.clone())],
         );
@@ -664,32 +667,27 @@ impl Table {
                 match cell_style.get_cell_format() {
                     Some(fmt) => cell_format = fmt,
                     None => {
-                        let tag = shirabe_php_shim::http_build_query_mixed(
-                            &cell_style.get_tag_options(),
-                            "",
-                            ";",
-                        );
+                        let tag = http_build_query_mixed(&cell_style.get_tag_options(), "", ";");
                         cell_format = format!("<{}>%s</>", tag);
                     }
                 }
 
-                if shirabe_php_shim::strstr(&content, "</>").is_some() {
-                    content = shirabe_php_shim::str_replace("</>", "", &content);
+                if strstr(&content, "</>").is_some() {
+                    content = str_replace("</>", "", &content);
                     width -= 3;
                 }
-                if shirabe_php_shim::strstr(&content, "<fg=default;bg=default>").is_some() {
-                    content =
-                        shirabe_php_shim::str_replace("<fg=default;bg=default>", "", &content);
-                    width -= shirabe_php_shim::strlen("<fg=default;bg=default>");
+                if strstr(&content, "<fg=default;bg=default>").is_some() {
+                    content = str_replace("<fg=default;bg=default>", "", &content);
+                    width -= strlen("<fg=default;bg=default>");
                 }
             }
 
             pad_type = cell.style().unwrap().get_pad_by_align();
         }
 
-        shirabe_php_shim::sprintf(
+        sprintf(
             &cell_format,
-            &[PhpMixed::from(shirabe_php_shim::str_pad(
+            &[PhpMixed::from(str_pad(
                 &content,
                 width as usize,
                 &style.get_padding_char(),
@@ -741,7 +739,7 @@ impl Table {
                     cell = Cell::Value(wrapped);
                 }
                 let cell_str = cell.to_php_string();
-                if shirabe_php_shim::strstr(&cell_str, "\n").is_none() {
+                if strstr(&cell_str, "\n").is_none() {
                     continue;
                 }
                 let eol = if cell_str.contains("\r\n") {
@@ -749,9 +747,9 @@ impl Table {
                 } else {
                     "\n"
                 };
-                let escaped = shirabe_php_shim::implode(
+                let escaped = implode(
                     eol,
-                    &shirabe_php_shim::explode(eol, &cell_str)
+                    &explode(eol, &cell_str)
                         .iter()
                         .map(|line| OutputFormatter::escape_trailing_backslash(line))
                         .collect::<Vec<_>>(),
@@ -764,9 +762,9 @@ impl Table {
                 } else {
                     Cell::Value(escaped.clone())
                 };
-                let lines = shirabe_php_shim::explode(
+                let lines = explode(
                     eol,
-                    &shirabe_php_shim::str_replace(
+                    &str_replace(
                         eol,
                         &format!("<fg=default;bg=default></>{}", eol),
                         &cell.to_php_string(),
@@ -844,15 +842,15 @@ impl Table {
                 let mut nb_lines = cell.rowspan() - 1;
                 let cell_str = cell.to_php_string();
                 let mut lines = vec![cell.clone()];
-                if shirabe_php_shim::strstr(&cell_str, "\n").is_some() {
+                if strstr(&cell_str, "\n").is_some() {
                     let eol = if cell_str.contains("\r\n") {
                         "\r\n"
                     } else {
                         "\n"
                     };
-                    let exploded = shirabe_php_shim::explode(
+                    let exploded = explode(
                         eol,
-                        &shirabe_php_shim::str_replace(
+                        &str_replace(
                             eol,
                             &format!("<fg=default;bg=default>{}</>", eol),
                             &cell_str,
@@ -860,7 +858,7 @@ impl Table {
                     );
                     lines = exploded.into_iter().map(Cell::Value).collect();
                     nb_lines = if (lines.len() as i64) > nb_lines {
-                        shirabe_php_shim::substr_count(&cell_str, eol)
+                        substr_count(&cell_str, eol)
                     } else {
                         nb_lines
                     };
@@ -918,7 +916,7 @@ impl Table {
                 let mut target = rows[unmerged_row_key as usize].cells();
                 for (cell_key, cell) in unmerged_row {
                     // insert cell into row at cellKey position
-                    shirabe_php_shim::array_splice(&mut target, cell_key, Some(0), vec![cell]);
+                    array_splice(&mut target, cell_key, Some(0), vec![cell]);
                 }
                 rows[unmerged_row_key as usize] = Row::Cells(target);
             } else {
@@ -928,12 +926,7 @@ impl Table {
                         set_cell(&mut row, *column, unmerged_row[column].clone());
                     }
                 }
-                shirabe_php_shim::array_splice(
-                    &mut rows,
-                    unmerged_row_key,
-                    Some(0),
-                    vec![Row::Cells(row)],
-                );
+                array_splice(&mut rows, unmerged_row_key, Some(0), vec![Row::Cells(row)]);
             }
         }
 
@@ -1022,7 +1015,7 @@ impl Table {
                             let text_content = self.remove_decoration(&cell.to_php_string());
                             let text_length = Helper::width(&text_content);
                             if text_length > 0 {
-                                let content_columns = shirabe_php_shim::mb_str_split(
+                                let content_columns = mb_str_split(
                                     &text_content,
                                     (text_length as f64 / cell.colspan() as f64).ceil() as i64,
                                 );
@@ -1052,7 +1045,7 @@ impl Table {
     }
 
     fn get_column_separator_width(&self) -> i64 {
-        Helper::width(&shirabe_php_shim::sprintf(
+        Helper::width(&sprintf(
             &self.style.get_border_format(),
             &[PhpMixed::from(self.style.get_border_chars()[3].clone())],
         ))

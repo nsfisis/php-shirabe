@@ -11,9 +11,9 @@ use crate::util::GitLab;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, base64_encode, explode, in_array_loose, in_array_strict, is_array,
-    is_string, json_decode_assoc, parse_url, php_regex, preg_is_match, str_replace, strpos,
-    strtolower, substr, trim,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, array_merge, base64_encode, explode,
+    in_array_loose, in_array_strict, is_array, is_string, json_decode_assoc, parse_url, php_regex,
+    preg_is_match, str_replace, strpos, strtolower, substr, trigger_error, trim,
 };
 
 #[derive(Debug)]
@@ -437,9 +437,9 @@ impl AuthHelper {
         origin: &str,
         url: &str,
     ) -> anyhow::Result<Vec<String>> {
-        shirabe_php_shim::trigger_error(
+        trigger_error(
             "AuthHelper::addAuthenticationHeader is deprecated since Composer 2.9 use addAuthenticationOptions instead.",
-            shirabe_php_shim::E_USER_DEPRECATED,
+            E_USER_DEPRECATED,
         );
 
         let mut http: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -582,10 +582,7 @@ impl AuthHelper {
                     .cloned()
                     .unwrap_or(PhpMixed::Array(IndexMap::new()));
                 let decoded = json_decode_assoc(&password)?;
-                options.insert(
-                    "ssl".to_string(),
-                    shirabe_php_shim::array_merge(existing_ssl, decoded),
-                );
+                options.insert("ssl".to_string(), array_merge(existing_ssl, decoded));
                 authentication_display_message = Some("Using SSL client certificate".to_string());
             } else {
                 let auth_str = base64_encode(format!("{}:{}", username, password));

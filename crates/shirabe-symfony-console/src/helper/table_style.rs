@@ -1,5 +1,7 @@
 //! ref: composer/vendor/symfony/console/Helper/TableStyle.php
 
+use shirabe_php_shim::STR_PAD_RIGHT;
+
 /// Defines the styles for a Table.
 #[derive(Debug, Clone)]
 pub struct TableStyle {
@@ -51,7 +53,7 @@ impl Default for TableStyle {
             cell_row_format: "%s".to_string(),
             cell_row_content_format: " %s ".to_string(),
             border_format: "%s".to_string(),
-            pad_type: shirabe_php_shim::STR_PAD_RIGHT,
+            pad_type: STR_PAD_RIGHT,
         }
     }
 }

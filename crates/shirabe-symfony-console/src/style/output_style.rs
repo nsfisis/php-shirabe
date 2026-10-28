@@ -5,6 +5,7 @@ use crate::helper::ProgressBar;
 use crate::output::ConsoleOutputInterface;
 use crate::output::OUTPUT_NORMAL;
 use crate::output::OutputInterface;
+use shirabe_php_shim::{AsAny, PHP_EOL, str_repeat};
 
 /// Decorates output to add console style guide helpers.
 #[derive(Debug)]
@@ -22,14 +23,9 @@ impl OutputStyle {
     }
 
     pub fn new_line(&self, count: i64) {
-        self.output.borrow().write(
-            &[shirabe_php_shim::str_repeat(
-                shirabe_php_shim::PHP_EOL,
-                count as usize,
-            )],
-            false,
-            OUTPUT_NORMAL,
-        );
+        self.output
+            .borrow()
+            .write(&[str_repeat(PHP_EOL, count as usize)], false, OUTPUT_NORMAL);
     }
 
     pub(crate) fn get_error_output(&self) -> std::rc::Rc<std::cell::RefCell<dyn OutputInterface>> {
@@ -49,7 +45,7 @@ impl OutputStyle {
     ) -> bool {
         // ConsoleOutput is the only OutputInterface implementor that also implements
         // ConsoleOutputInterface, so `instanceof ConsoleOutputInterface` reduces to this downcast.
-        shirabe_php_shim::AsAny::as_any(&*output.borrow())
+        AsAny::as_any(&*output.borrow())
             .downcast_ref::<crate::output::ConsoleOutput>()
             .is_some()
     }

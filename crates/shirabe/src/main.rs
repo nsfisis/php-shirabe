@@ -1,11 +1,11 @@
 //! ref: composer/bin/composer
 
-use shirabe_php_shim::{PHP_ENV, PHP_SERVER};
+use shirabe_php_shim::{PHP_ENV, PHP_SERVER, getenv};
 use std::io::IsTerminal as _;
 
 /// Initialize a tracing subscriber from the environment variable `$SHIRABE_TRACING`.
 fn init_tracing() {
-    let Some(directives) = shirabe_php_shim::getenv("SHIRABE_TRACING") else {
+    let Some(directives) = getenv("SHIRABE_TRACING") else {
         return;
     };
     let directives = match directives.into_string() {

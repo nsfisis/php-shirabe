@@ -7,7 +7,7 @@ use crate::output::output_interface;
 use crate::question::QuestionInterface;
 use crate::style::StyleInterface;
 use crate::style::SymfonyStyle;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{Exception, PhpMixed, boolval, explode, php_os_family, trim};
 use std::ops::{Deref, DerefMut};
 
 /// Symfony Style Guide compliant question helper.
@@ -22,7 +22,7 @@ impl SymfonyQuestionHelper {
     }
 
     fn get_eof_shortcut(&self) -> String {
-        if shirabe_php_shim::php_os_family() == "Windows" {
+        if php_os_family() == "Windows" {
             return "<comment>Ctrl+Z</comment> then <comment>Enter</comment>".to_string();
         }
 
@@ -58,21 +58,17 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
             text = format!(
                 " <info>{} (yes/no)</info> [<comment>{}</comment>]:",
                 text,
-                if shirabe_php_shim::boolval(&default) {
-                    "yes"
-                } else {
-                    "no"
-                },
+                if boolval(&default) { "yes" } else { "no" },
             );
         } else if let Some(choice_question) = question.as_choice().filter(|q| q.is_multiselect()) {
             let choices = choice_question.get_choices();
-            let default_parts = shirabe_php_shim::explode(",", &default.to_string());
+            let default_parts = explode(",", &default.to_string());
 
             let resolved: Vec<String> = default_parts
                 .iter()
                 .map(|value| {
                     choices
-                        .get(&shirabe_php_shim::trim(value, None))
+                        .get(&trim(value, None))
                         .map(|v| v.to_string())
                         .unwrap()
                 })
@@ -130,7 +126,7 @@ impl QuestionHelperInterface for SymfonyQuestionHelper {
     fn write_error(
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
-        error: &shirabe_php_shim::Exception,
+        error: &Exception,
     ) {
         {
             let mut borrowed = output.borrow_mut();

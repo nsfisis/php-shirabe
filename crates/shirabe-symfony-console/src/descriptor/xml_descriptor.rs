@@ -11,7 +11,10 @@ use crate::input::InputOption;
 use crate::output::OutputInterface;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::{DOMDocument, DOMNode, PhpMixed};
+use shirabe_php_shim::{
+    DOMDocument, DOMNode, PhpMixed, php_to_string, php_truthy, str_replace, strpos, substr,
+    var_export,
+};
 
 /// XML descriptor.
 #[derive(Debug, Default)]
@@ -51,7 +54,7 @@ impl XmlDescriptor {
         let usages_xml = command_xml.append_child(dom.create_element("usages"));
 
         let description_xml = command_xml.append_child(dom.create_element("description"));
-        description_xml.append_child(dom.create_text_node(&shirabe_php_shim::str_replace(
+        description_xml.append_child(dom.create_text_node(&str_replace(
             "\n",
             "\n ",
             &command.get_description(),
@@ -72,7 +75,7 @@ impl XmlDescriptor {
             }
 
             let help_xml = command_xml.append_child(dom.create_element("help"));
-            help_xml.append_child(dom.create_text_node(&shirabe_php_shim::str_replace(
+            help_xml.append_child(dom.create_text_node(&str_replace(
                 "\n",
                 "\n ",
                 &command.get_processed_help(),
@@ -238,9 +241,9 @@ impl XmlDescriptor {
             PhpMixed::List(_) | PhpMixed::Array(_) => {
                 self.default_values_as_strings(&default_value)
             }
-            PhpMixed::Bool(_) => vec![shirabe_php_shim::var_export(&default_value, true)],
-            d if shirabe_php_shim::php_truthy(d) => {
-                vec![shirabe_php_shim::php_to_string(&default_value)]
+            PhpMixed::Bool(_) => vec![var_export(&default_value, true)],
+            d if php_truthy(d) => {
+                vec![php_to_string(&default_value)]
             }
             _ => vec![],
         };
@@ -257,20 +260,20 @@ impl XmlDescriptor {
 
         let object_xml = dom.append_child(dom.create_element("option"));
         object_xml.set_attribute("name", &format!("--{}", option.get_name()));
-        let pos = shirabe_php_shim::strpos(option.get_shortcut().unwrap_or(""), "|");
+        let pos = strpos(option.get_shortcut().unwrap_or(""), "|");
         if let Some(pos) = pos {
             object_xml.set_attribute(
                 "shortcut",
                 &format!(
                     "-{}",
-                    shirabe_php_shim::substr(option.get_shortcut().unwrap(), 0, Some(pos as i64))
+                    substr(option.get_shortcut().unwrap(), 0, Some(pos as i64))
                 ),
             );
             object_xml.set_attribute(
                 "shortcuts",
                 &format!(
                     "-{}",
-                    shirabe_php_shim::str_replace("|", "|-", option.get_shortcut().unwrap())
+                    str_replace("|", "|-", option.get_shortcut().unwrap())
                 ),
             );
         } else {
@@ -300,9 +303,9 @@ impl XmlDescriptor {
                 PhpMixed::List(_) | PhpMixed::Array(_) => {
                     self.default_values_as_strings(&default_value)
                 }
-                PhpMixed::Bool(_) => vec![shirabe_php_shim::var_export(&default_value, true)],
-                d if shirabe_php_shim::php_truthy(d) => {
-                    vec![shirabe_php_shim::php_to_string(&default_value)]
+                PhpMixed::Bool(_) => vec![var_export(&default_value, true)],
+                d if php_truthy(d) => {
+                    vec![php_to_string(&default_value)]
                 }
                 _ => vec![],
             };
@@ -336,8 +339,8 @@ impl XmlDescriptor {
     /// getInputOptionDocument when the default is an array (returns it verbatim).
     fn default_values_as_strings(&self, default: &PhpMixed) -> Vec<String> {
         match default {
-            PhpMixed::List(list) => list.iter().map(shirabe_php_shim::php_to_string).collect(),
-            PhpMixed::Array(arr) => arr.values().map(shirabe_php_shim::php_to_string).collect(),
+            PhpMixed::List(list) => list.iter().map(php_to_string).collect(),
+            PhpMixed::Array(arr) => arr.values().map(php_to_string).collect(),
             _ => vec![],
         }
     }

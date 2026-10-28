@@ -9,6 +9,7 @@ use crate::input::InputInterface;
 use crate::input::InputValue;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
+use shirabe_php_shim::{PhpResource, implode, substr};
 
 /// ArrayInput represents an input provided as an array.
 ///
@@ -137,9 +138,9 @@ impl ArrayInput {
                 return Ok(());
             }
             if key_string.starts_with("--") {
-                self.add_long_option(&shirabe_php_shim::substr(&key_string, 2, None), value)?;
+                self.add_long_option(&substr(&key_string, 2, None), value)?;
             } else if key_string.starts_with("-") {
-                self.add_short_option(&shirabe_php_shim::substr(&key_string, 1, None), value)?;
+                self.add_short_option(&substr(&key_string, 1, None), value)?;
             } else {
                 self.add_argument(&key.to_argument_name(), value)?;
             }
@@ -265,13 +266,13 @@ impl std::fmt::Display for ArrayInput {
             } else if let InputValue::Array(list) = val {
                 let escaped: Vec<String> =
                     list.iter().map(|v| self.inner.escape_token(v)).collect();
-                params.push(shirabe_php_shim::implode(" ", &escaped));
+                params.push(implode(" ", &escaped));
             } else {
                 params.push(self.inner.escape_token(&val.to_php_string()));
             }
         }
 
-        write!(f, "{}", shirabe_php_shim::implode(" ", &params))
+        write!(f, "{}", implode(" ", &params))
     }
 }
 
@@ -355,11 +356,11 @@ impl InputInterface for ArrayInput {
 }
 
 impl StreamableInputInterface for ArrayInput {
-    fn set_stream(&mut self, stream: shirabe_php_shim::PhpResource) {
+    fn set_stream(&mut self, stream: PhpResource) {
         self.inner.set_stream(stream)
     }
 
-    fn get_stream(&self) -> Option<shirabe_php_shim::PhpResource> {
+    fn get_stream(&self) -> Option<PhpResource> {
         self.inner.get_stream()
     }
 }

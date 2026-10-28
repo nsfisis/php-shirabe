@@ -4,6 +4,7 @@ use crate::formatter::OutputFormatter;
 use crate::helper::Helper;
 use crate::helper::HelperInterface;
 use crate::helper::HelperSet;
+use shirabe_php_shim::str_repeat;
 
 /// The Formatter class provides helpers to format messages.
 #[derive(Debug, Default)]
@@ -37,7 +38,7 @@ impl FormatterHelper {
         }
 
         let mut messages: Vec<String> = if large {
-            vec![shirabe_php_shim::str_repeat(" ", len as usize)]
+            vec![str_repeat(" ", len as usize)]
         } else {
             vec![]
         };
@@ -46,12 +47,12 @@ impl FormatterHelper {
             messages.push(format!(
                 "{}{}",
                 lines[i],
-                shirabe_php_shim::str_repeat(" ", (len - Helper::width(&lines[i])) as usize)
+                str_repeat(" ", (len - Helper::width(&lines[i])) as usize)
             ));
             i += 1;
         }
         if large {
-            messages.push(shirabe_php_shim::str_repeat(" ", len as usize));
+            messages.push(str_repeat(" ", len as usize));
         }
 
         let mut i = 0;

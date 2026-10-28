@@ -1,10 +1,10 @@
 //! ref: composer/src/Composer/Downloader/DownloaderInterface.php
 
 use crate::package::PackageInterfaceHandle;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpClass, PhpMixed};
 
 #[async_trait::async_trait(?Send)]
-pub trait DownloaderInterface: std::fmt::Debug + shirabe_php_shim::PhpClass {
+pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
     fn get_installation_source(&self) -> String;
 
     async fn download(

@@ -11,7 +11,7 @@ use crate::repository::RepositoryInterfaceHandle;
 use crate::repository::RootPackageRepository;
 use crate::repository::repository_interface::{SEARCH_NAME, SEARCH_VENDOR, SearchResult};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_quote};
+use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_quote, substr};
 
 /// Adds completion to arguments and options.
 ///
@@ -112,10 +112,8 @@ pub trait CompletionTrait: BaseCommand {
                                         name.len() as i64 - 3,
                                         hint_prefix.len() as i64 + 1,
                                     );
-                                    platform_hint.push(format!(
-                                        "{}...",
-                                        shirabe_php_shim::substr(&name, 0, Some(end))
-                                    ));
+                                    platform_hint
+                                        .push(format!("{}...", substr(&name, 0, Some(end))));
                                 }
                                 continue 'pkgs;
                             }

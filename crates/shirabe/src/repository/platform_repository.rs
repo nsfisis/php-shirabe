@@ -20,8 +20,9 @@ use indexmap::IndexMap;
 use shirabe_php_rpc::PlatformInfo;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, array_map_str_fn,
-    array_slice_strs, explode, get_class, implode, is_string, php_regex, preg_is_match, preg_match,
-    preg_replace, str_replace, strpos, strtolower, var_export,
+    array_slice_mixed, array_slice_strs, explode, get_class, get_debug_type, implode, is_string,
+    php_regex, preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower,
+    var_export,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 use std::sync::{LazyLock, Mutex};
@@ -67,7 +68,7 @@ impl PlatformRepository {
                 return Err(UnexpectedValueException::new(format!(
                     "config.platform.{} should be a string or false, but got {} {}",
                     name,
-                    shirabe_php_shim::get_debug_type(&version),
+                    get_debug_type(&version),
                     var_export(&version, true)
                 ))
                 .into());
@@ -748,8 +749,7 @@ impl PlatformRepository {
 
                     if platform_info.has_class("IntlChar") {
                         let intl_char_versions = &platform_info.intl_char_unicode_version;
-                        let sliced =
-                            shirabe_php_shim::array_slice_mixed(intl_char_versions, 0, Some(3));
+                        let sliced = array_slice_mixed(intl_char_versions, 0, Some(3));
                         let joined = implode(".", &Self::php_array_to_string_vec(&sliced));
                         self.add_library(
                             &mut libraries,

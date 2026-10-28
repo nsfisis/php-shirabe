@@ -7,7 +7,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::io::io_interface;
 use crate::util::HttpDownloader;
 use bstr::ByteSlice;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, PhpMixed};
 
 #[derive(Debug)]
 pub struct Forgejo {
@@ -82,7 +82,7 @@ impl Forgejo {
 
         let username = self
             .io
-            .ask("Username: ".to_string(), shirabe_php_shim::PhpMixed::Null)?
+            .ask("Username: ".to_string(), PhpMixed::Null)?
             .as_string()
             .map(|s| s.to_str_lossy().trim().to_string())
             .unwrap_or_default();
@@ -149,7 +149,7 @@ impl Forgejo {
             cfg.get_config_source_mut()
                 .remove_config_setting(&setting_key)?;
         }
-        let value = shirabe_php_shim::PhpMixed::Array(indexmap::indexmap! {
+        let value = PhpMixed::Array(indexmap::indexmap! {
             "username".to_string() => username.into(),
             "token".to_string() => token.into(),
         });

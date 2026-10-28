@@ -1,9 +1,10 @@
 //! ref: composer/vendor/symfony/console/Helper/HelperInterface.php
 
 use crate::helper::HelperSet;
+use shirabe_php_shim::AsAny;
 
 /// HelperInterface is the interface all helpers must implement.
-pub trait HelperInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
+pub trait HelperInterface: std::fmt::Debug + AsAny {
     /// Sets the helper set associated with this helper.
     fn set_helper_set(&mut self, helper_set: Option<std::rc::Rc<std::cell::RefCell<HelperSet>>>);
 

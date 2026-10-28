@@ -9,7 +9,7 @@ use crate::repository::PlatformRepository;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values,
+    CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, date_create,
     filter_var_email, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar, is_string,
     json_encode, parse_url, php_regex, php_to_string, preg_is_match, preg_replace, str_replace,
     strcasecmp, strtolower, strtotime, substr, trigger_error, trim, var_export,
@@ -447,7 +447,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 .as_string()
                 .unwrap_or_default()
                 .to_string();
-            match shirabe_php_shim::date_create::<chrono::Utc>(&time_str) {
+            match date_create::<chrono::Utc>(&time_str) {
                 Ok(dt) => {
                     release_date = Some(dt);
                 }

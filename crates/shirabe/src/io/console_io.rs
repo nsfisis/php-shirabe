@@ -11,8 +11,8 @@ use bstr::ByteSlice;
 use indexmap::IndexMap;
 use indexmap::indexmap;
 use shirabe_php_shim::{
-    PhpMixed, array_search, in_array_strict, is_array, is_string, microtime, preg_replace,
-    str_repeat, strip_tags, strlen,
+    PhpMixed, array_search, in_array_strict, is_array, is_string, memory_get_usage, microtime,
+    preg_replace, str_repeat, strip_tags, strlen,
 };
 use shirabe_symfony_console::helper::ProgressBar;
 use shirabe_symfony_console::helper::QuestionHelper;
@@ -89,7 +89,7 @@ impl ConsoleIO {
         }
 
         let messages = if let Some(start_time) = self.start_time {
-            let memory_usage = (shirabe_php_shim::memory_get_usage() as f64) / 1024.0 / 1024.0;
+            let memory_usage = (memory_get_usage() as f64) / 1024.0 / 1024.0;
             let time_spent = microtime() - start_time;
             format!("[{:.1}MiB/{:.2}s] {}", memory_usage, time_spent, messages)
         } else {

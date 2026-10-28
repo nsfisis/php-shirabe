@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/console/Output/OutputInterface.php
 
 use crate::formatter::OutputFormatterInterface;
+use shirabe_php_shim::AsAny;
 
 pub const VERBOSITY_QUIET: i64 = 16;
 pub const VERBOSITY_NORMAL: i64 = 32;
@@ -13,7 +14,7 @@ pub const OUTPUT_RAW: i64 = 2;
 pub const OUTPUT_PLAIN: i64 = 4;
 
 /// OutputInterface is the interface implemented by all Output classes.
-pub trait OutputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
+pub trait OutputInterface: std::fmt::Debug + AsAny {
     /// Writes a message to the output.
     ///
     /// `$messages` is a single string or an iterable of strings.

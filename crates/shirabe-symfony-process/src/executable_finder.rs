@@ -1,5 +1,10 @@
 //! ref: composer/vendor/symfony/process/ExecutableFinder.php
 
+use shirabe_php_shim::{
+    PATHINFO_EXTENSION, PHP_EOL, basename, escapeshellarg, exec, getenv, is_dir, is_executable,
+    is_file, pathinfo, strcspn, strpos, strtolower, substr,
+};
+
 const CMD_BUILTINS: &[&str] = &[
     "assoc", "break", "call", "cd", "chdir", "cls", "color", "copy", "date", "del", "dir", "echo",
     "endlocal", "erase", "exit", "for", "ftype", "goto", "help", "if", "label", "md", "mkdir",
@@ -25,12 +30,12 @@ impl ExecutableFinder {
 
     pub fn find(&self, name: &str, default: Option<&str>, extra_dirs: &[String]) -> Option<String> {
         // windows built-in commands that are present in cmd.exe should not be resolved using PATH as they do not exist as exes
-        if cfg!(windows) && CMD_BUILTINS.contains(&shirabe_php_shim::strtolower(name).as_str()) {
+        if cfg!(windows) && CMD_BUILTINS.contains(&strtolower(name).as_str()) {
             return Some(name.to_string());
         }
 
-        let path = shirabe_php_shim::getenv("PATH")
-            .or_else(|| shirabe_php_shim::getenv("Path"))
+        let path = getenv("PATH")
+            .or_else(|| getenv("Path"))
             .unwrap_or_default();
         let mut dirs: Vec<String> = std::env::split_paths(&path)
             .map(|dir| dir.into_os_string().into_string().unwrap())
@@ -39,7 +44,7 @@ impl ExecutableFinder {
 
         let mut suffixes: Vec<String> = vec![];
         if cfg!(windows) {
-            let path_ext = shirabe_php_shim::getenv("PATHEXT");
+            let path_ext = getenv("PATHEXT");
             suffixes = self.suffixes.clone();
             let exts = match path_ext {
                 Some(ref ext) if !ext.is_empty() => std::env::split_paths(ext)
@@ -54,15 +59,14 @@ impl ExecutableFinder {
             };
             suffixes.extend(exts);
         }
-        suffixes =
-            if !shirabe_php_shim::pathinfo(name, shirabe_php_shim::PATHINFO_EXTENSION).is_empty() {
-                let mut s = vec![String::new()];
-                s.extend(suffixes);
-                s
-            } else {
-                suffixes.push(String::new());
-                suffixes
-            };
+        suffixes = if !pathinfo(name, PATHINFO_EXTENSION).is_empty() {
+            let mut s = vec![String::new()];
+            s.extend(suffixes);
+            s
+        } else {
+            suffixes.push(String::new());
+            suffixes
+        };
         for suffix in &suffixes {
             for dir in &dirs {
                 let dir = if dir.is_empty() { "." } else { dir.as_str() };
@@ -71,41 +75,35 @@ impl ExecutableFinder {
                     .into_os_string()
                     .into_string()
                     .unwrap();
-                if shirabe_php_shim::is_file(&file)
-                    && (cfg!(windows) || shirabe_php_shim::is_executable(&file))
-                {
+                if is_file(&file) && (cfg!(windows) || is_executable(&file)) {
                     return Some(file);
                 }
 
-                if !shirabe_php_shim::is_dir(dir)
-                    && shirabe_php_shim::basename(dir) == format!("{name}{suffix}")
-                    && shirabe_php_shim::is_executable(dir)
+                if !is_dir(dir) && basename(dir) == format!("{name}{suffix}") && is_executable(dir)
                 {
                     return Some(dir.to_string());
                 }
             }
         }
 
-        if cfg!(windows)
-            || name.len()
-                != shirabe_php_shim::strcspn(name, &format!("/{}", std::path::MAIN_SEPARATOR))
+        if cfg!(windows) || name.len() != strcspn(name, &format!("/{}", std::path::MAIN_SEPARATOR))
         {
             return default.map(ToString::to_string);
         }
 
-        let exec_result = shirabe_php_shim::exec(
-            &format!("command -v -- {}", shirabe_php_shim::escapeshellarg(name)),
+        let exec_result = exec(
+            &format!("command -v -- {}", escapeshellarg(name)),
             None,
             None,
         )
         .unwrap_or_default();
 
-        let executable_path = shirabe_php_shim::substr(
+        let executable_path = substr(
             &exec_result,
             0,
-            shirabe_php_shim::strpos(&exec_result, shirabe_php_shim::PHP_EOL).map(|i| i as i64),
+            strpos(&exec_result, PHP_EOL).map(|i| i as i64),
         );
-        if !executable_path.is_empty() && shirabe_php_shim::is_executable(&executable_path) {
+        if !executable_path.is_empty() && is_executable(&executable_path) {
             return Some(executable_path);
         }
 

@@ -4,6 +4,7 @@
 
 use crate::PluginValue;
 use crate::call_function;
+use shirabe_php_shim::{Phar, RuntimeException, getenv};
 
 const BUNDLE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/composer-runtime-bundle.phar"));
 
@@ -51,12 +52,12 @@ fn path_to_string(directory: std::path::PathBuf) -> anyhow::Result<String> {
 /// The checkout that stands in for the bundle, if `OVERRIDE_ENV` names one. Both the worker and
 /// the Rust side read the runtime from there instead.
 fn override_directory() -> anyhow::Result<Option<std::path::PathBuf>> {
-    let Some(directory) = shirabe_php_shim::getenv(OVERRIDE_ENV) else {
+    let Some(directory) = getenv(OVERRIDE_ENV) else {
         return Ok(None);
     };
     let directory = std::path::PathBuf::from(directory);
     if !directory.join("vendor/autoload.php").is_file() {
-        return Err(shirabe_php_shim::RuntimeException::new(format!(
+        return Err(RuntimeException::new(format!(
             "{OVERRIDE_ENV} points at {}, which has no vendor/autoload.php; install the \
              checkout's dependencies or unset it to use the runtime the executable carries",
             directory.display()
@@ -108,7 +109,7 @@ pub fn local_file(path: &str) -> anyhow::Result<LocalFile> {
     let archive = directory.path().join("bundle.phar");
     std::fs::write(&archive, BUNDLE)?;
     let unpacked = directory.path().join("unpacked");
-    shirabe_php_shim::Phar::new(&archive)?.extract_to(&unpacked, Some(&[path]), true)?;
+    Phar::new(&archive)?.extract_to(&unpacked, Some(&[path]), true)?;
     std::fs::remove_file(&archive)?;
 
     Ok(LocalFile {
@@ -144,7 +145,7 @@ fn extract_into(root: &std::path::Path) -> anyhow::Result<std::path::PathBuf> {
     let archive = staging.path().join("bundle.phar");
     std::fs::write(&archive, BUNDLE)?;
     let unpacked = staging.path().join("unpacked");
-    shirabe_php_shim::Phar::new(&archive)?.extract_to(&unpacked, None, true)?;
+    Phar::new(&archive)?.extract_to(&unpacked, None, true)?;
     std::fs::remove_file(&archive)?;
 
     if let Err(error) = std::fs::rename(&unpacked, &destination) {
@@ -172,7 +173,7 @@ mod tests {
     fn the_first_phar_in_this_executable_is_the_bundle() {
         let executable = std::env::current_exe().expect("no path for this executable");
         let unpacked = tempfile::tempdir().unwrap();
-        shirabe_php_shim::Phar::new(&executable)
+        Phar::new(&executable)
             .expect("this executable does not read back as a phar")
             .extract_to(unpacked.path(), None, true)
             .unwrap();

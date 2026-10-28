@@ -7,7 +7,8 @@ use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::util::{GetResult, RemoteFilesystem};
 use shirabe_php_shim::{
-    PhpMixed, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS, parse_url, strpos,
+    PhpMixed, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS, parse_url,
+    strpos,
 };
 
 // Mirrors RemoteFilesystemTest::getConfigMock: get('github-domains') and
@@ -231,7 +232,7 @@ fn test_callback_get_passes_through404() {
     let fs = RemoteFilesystem::new(io, config_mock(), IndexMap::new(), false);
 
     fs.__callback_get(
-        shirabe_php_shim::STREAM_NOTIFY_FAILURE,
+        STREAM_NOTIFY_FAILURE,
         0,
         Some("HTTP/1.1 404 Not Found".to_string()),
         404,

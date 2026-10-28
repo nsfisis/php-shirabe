@@ -10,7 +10,7 @@
 //! environment is not reflected back into the Rust-side storages.
 
 use crate::PluginValue;
-use shirabe_php_shim::EnvStorageKind;
+use shirabe_php_shim::{EnvStorageKind, env_mutations_since};
 use std::os::unix::ffi::OsStrExt as _;
 
 /// How many recorded mutations the worker has already been told about.
@@ -31,7 +31,7 @@ fn storage_name(storage: EnvStorageKind) -> &'static str {
 /// the session instead of recursing into another flush.
 pub(crate) fn flush() -> anyhow::Result<()> {
     let mut synced = SYNCED.lock().unwrap();
-    let (cursor, mutations) = shirabe_php_shim::env_mutations_since(*synced);
+    let (cursor, mutations) = env_mutations_since(*synced);
     if mutations.is_empty() {
         return Ok(());
     }

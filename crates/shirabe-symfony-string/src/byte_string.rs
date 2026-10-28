@@ -1,6 +1,7 @@
 //! ref: composer/vendor/symfony/string/ByteString.php
 
 use crate::code_point_string::CodePointString;
+use shirabe_php_shim::{mb_convert_encoding, mb_detect_encoding};
 
 #[derive(Debug, Clone)]
 pub struct ByteString {
@@ -24,22 +25,14 @@ impl ByteString {
             };
         }
 
-        let valid_encoding = shirabe_php_shim::mb_detect_encoding(
-            &self.string,
-            Some(vec![from_encoding.to_string()]),
-            true,
-        )
-        .is_some();
+        let valid_encoding =
+            mb_detect_encoding(&self.string, Some(vec![from_encoding.to_string()]), true).is_some();
         // PHP throws InvalidArgumentException. Callers detect `from_encoding` from this very
         // string, so a mismatch is a programming error.
         assert!(valid_encoding, "Invalid \"{}\" string.", from_encoding);
 
         CodePointString {
-            string: shirabe_php_shim::mb_convert_encoding(
-                self.string.clone().into(),
-                "UTF-8",
-                from_encoding,
-            ),
+            string: mb_convert_encoding(self.string.clone().into(), "UTF-8", from_encoding),
         }
     }
 }

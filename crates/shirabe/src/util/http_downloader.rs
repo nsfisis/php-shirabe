@@ -18,7 +18,7 @@ use crate::util::http::Response;
 use crate::util::sync_executor;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, PHP_EOL, empty};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, array_replace_recursive, extension_loaded,
     file_get_contents, implode, is_numeric, php_regex, preg_is_match, preg_match, preg_replace,
@@ -504,13 +504,13 @@ impl HttpDownloader {
         // legacy warning/info keys
         for r#type in ["warning", "info"].iter() {
             let entry = data.get(*r#type);
-            if entry.is_none() || shirabe_php_shim::empty(entry.unwrap()) {
+            if entry.is_none() || empty(entry.unwrap()) {
                 continue;
             }
 
             let versions_key = format!("{}-versions", r#type);
             if let Some(versions_value) = data.get(&versions_key)
-                && !shirabe_php_shim::empty(versions_value)
+                && !empty(versions_value)
             {
                 let version_parser: VersionParser = VersionParser::new();
                 let constraint = version_parser.parse_constraints(
@@ -549,7 +549,7 @@ impl HttpDownloader {
         // modern Composer 2.2+ format with support for multiple warning/info messages
         for key in ["warnings", "infos"].iter() {
             let entry = data.get(*key);
-            if entry.is_none() || shirabe_php_shim::empty(entry.unwrap()) {
+            if entry.is_none() || empty(entry.unwrap()) {
                 continue;
             }
 
@@ -647,7 +647,7 @@ impl HttpDownloader {
             _ => None,
         });
         if let Some(v) = allow_self_signed
-            && !shirabe_php_shim::empty(&v)
+            && !empty(&v)
         {
             return false;
         }
@@ -715,12 +715,12 @@ impl HttpDownloader {
             panic!(
                 "There are still {} expected HTTP requests which have not been consumed:{}{}{}{}Received calls:{}{}",
                 expectations.len(),
-                shirabe_php_shim::PHP_EOL,
-                urls.join(shirabe_php_shim::PHP_EOL),
-                shirabe_php_shim::PHP_EOL,
-                shirabe_php_shim::PHP_EOL,
-                shirabe_php_shim::PHP_EOL,
-                mock.log.join(shirabe_php_shim::PHP_EOL),
+                PHP_EOL,
+                urls.join(PHP_EOL),
+                PHP_EOL,
+                PHP_EOL,
+                PHP_EOL,
+                mock.log.join(PHP_EOL),
             );
         }
     }
@@ -780,7 +780,7 @@ impl HttpDownloader {
             })
             .unwrap_or_else(|| "Expected no more calls at this point.".to_string());
         let prior_calls = if mock.log.len() > 1 {
-            mock.log[..mock.log.len() - 1].join(shirabe_php_shim::PHP_EOL)
+            mock.log[..mock.log.len() - 1].join(PHP_EOL)
         } else {
             String::new()
         };
@@ -788,10 +788,10 @@ impl HttpDownloader {
             "Received unexpected request for \"{}\" with options \"{}\"{}{}{}Received calls:{}{}",
             file_url,
             serde_json::to_string(options).unwrap_or_default(),
-            shirabe_php_shim::PHP_EOL,
+            PHP_EOL,
             next_expected,
-            shirabe_php_shim::PHP_EOL,
-            shirabe_php_shim::PHP_EOL,
+            PHP_EOL,
+            PHP_EOL,
             prior_calls,
         );
     }

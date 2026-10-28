@@ -5,7 +5,9 @@ use crate::exception::LogicException;
 use crate::question::Question;
 use crate::question::QuestionInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match};
+use shirabe_php_shim::{
+    PhpMixed, array_search, explode, implode, php_regex, preg_is_match, sprintf, strval, trim,
+};
 
 /// Represents a choice question.
 #[derive(Debug)]
@@ -122,17 +124,14 @@ impl ChoiceQuestion {
 
             let selected_choices: Vec<PhpMixed> = if multiselect {
                 // Check for a separated comma values
-                if !preg_is_match(
-                    php_regex!("/^[^,]+(?:,[^,]+)*$/"),
-                    &shirabe_php_shim::strval(&selected),
-                ) {
-                    return Err(InvalidArgumentException::new(shirabe_php_shim::sprintf(
+                if !preg_is_match(php_regex!("/^[^,]+(?:,[^,]+)*$/"), &strval(&selected)) {
+                    return Err(InvalidArgumentException::new(sprintf(
                         &error_message,
                         std::slice::from_ref(&selected),
                     )));
                 }
 
-                shirabe_php_shim::explode(",", &shirabe_php_shim::strval(&selected))
+                explode(",", &strval(&selected))
                     .into_iter()
                     .map(PhpMixed::string)
                     .collect()
@@ -143,10 +142,7 @@ impl ChoiceQuestion {
             let mut selected_choices = selected_choices;
             if trimmable {
                 for v in selected_choices.iter_mut() {
-                    *v = PhpMixed::string(shirabe_php_shim::trim(
-                        &shirabe_php_shim::strval(v),
-                        None,
-                    ));
+                    *v = PhpMixed::string(trim(&strval(v), None));
                 }
             }
 
@@ -162,29 +158,26 @@ impl ChoiceQuestion {
                 if results.len() > 1 {
                     return Err(InvalidArgumentException::new(format!(
                         "The provided answer is ambiguous. Value should be one of \"{}\".",
-                        shirabe_php_shim::implode("\" or \"", &results),
+                        implode("\" or \"", &results),
                     )));
                 }
 
                 // array_search($value, $choices)
-                let result_key = shirabe_php_shim::array_search(
-                    &shirabe_php_shim::strval(value),
-                    &choices_as_str(&choices),
-                );
+                let result_key = array_search(&strval(value), &choices_as_str(&choices));
 
                 let mut result: PhpMixed;
                 if !is_assoc {
                     if let Some(found_key) = &result_key {
                         // $result = $choices[$result];
                         result = choices[found_key].clone();
-                    } else if let Some(found) = choices.get(&shirabe_php_shim::strval(value)) {
+                    } else if let Some(found) = choices.get(&strval(value)) {
                         // isset($choices[$value])
                         result = found.clone();
                     } else {
                         result = PhpMixed::Bool(false);
                     }
                 } else if result_key.is_none() {
-                    if let Some(_found) = choices.get(&shirabe_php_shim::strval(value)) {
+                    if let Some(_found) = choices.get(&strval(value)) {
                         // false === $result && isset($choices[$value])
                         result = value.clone();
                     } else {
@@ -197,7 +190,7 @@ impl ChoiceQuestion {
 
                 // false === $result
                 if matches!(result, PhpMixed::Bool(false)) {
-                    return Err(InvalidArgumentException::new(shirabe_php_shim::sprintf(
+                    return Err(InvalidArgumentException::new(sprintf(
                         &error_message,
                         std::slice::from_ref(value),
                     )));
@@ -205,7 +198,7 @@ impl ChoiceQuestion {
 
                 // For associative choices, consistently return the key as string:
                 if is_assoc {
-                    result = PhpMixed::string(shirabe_php_shim::strval(&result));
+                    result = PhpMixed::string(strval(&result));
                 }
                 multiselect_choices.push(result);
             }
@@ -279,6 +272,6 @@ impl QuestionInterface for ChoiceQuestion {
 fn choices_as_str(choices: &IndexMap<String, PhpMixed>) -> IndexMap<String, String> {
     choices
         .iter()
-        .map(|(k, v)| (k.clone(), shirabe_php_shim::strval(v)))
+        .map(|(k, v)| (k.clone(), strval(v)))
         .collect()
 }

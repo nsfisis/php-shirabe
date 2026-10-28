@@ -13,8 +13,10 @@ use crate::process_utils::ProcessUtils;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Descriptor, PhpMixed, PhpResource, PregMatches, php_regex, preg_is_match, preg_replace,
-    preg_replace_callback,
+    Descriptor, PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, ProcStatus, SEEK_END,
+    SEEK_SET, exec, fopen, fseek, fwrite, getcwd, getenv_all, is_dir, microtime, php_regex,
+    preg_is_match, preg_replace, preg_replace_callback, proc_close, proc_get_status, proc_open,
+    proc_terminate, stream_get_contents3, strpbrk, uniqid, usleep,
 };
 use std::sync::OnceLock;
 
@@ -64,7 +66,7 @@ pub struct Process {
     starttime: Option<f64>,
     timeout: Option<f64>,
     exitcode: Option<i64>,
-    process_information: Option<shirabe_php_shim::ProcStatus>,
+    process_information: Option<ProcStatus>,
     stdout: Option<PhpResource>,
     stderr: Option<PhpResource>,
     process: Option<PhpResource>,
@@ -235,7 +237,7 @@ impl Process {
         // the cwd is defaulted to getcwd() whenever it was null.
         if this.cwd.is_none() {
             // TODO(bytes): Process keeps the working directory as a String.
-            this.cwd = shirabe_php_shim::getcwd().map(|cwd| {
+            this.cwd = getcwd().map(|cwd| {
                 cwd.into_os_string()
                     .into_string()
                     .unwrap_or_else(|cwd| panic!("cwd is not valid UTF-8: {cwd:?}"))
@@ -291,7 +293,7 @@ impl Process {
         }
 
         self.reset_process_data();
-        self.starttime = Some(shirabe_php_shim::microtime());
+        self.starttime = Some(microtime());
         self.callback = Some(self.build_callback(callback));
         let descriptors = self.get_descriptors();
 
@@ -335,12 +337,7 @@ impl Process {
             }
         }
 
-        if !self
-            .cwd
-            .as_deref()
-            .map(shirabe_php_shim::is_dir)
-            .unwrap_or(false)
-        {
+        if !self.cwd.as_deref().map(is_dir).unwrap_or(false) {
             return Err(RuntimeException::new(format!(
                 "The provided cwd \"{}\" does not exist.",
                 self.cwd.as_deref().unwrap_or("")
@@ -352,7 +349,7 @@ impl Process {
         let options = self.options.clone();
         let process = {
             let pipes = self.process_pipes.as_mut().unwrap().pipes_mut();
-            shirabe_php_shim::proc_open(
+            proc_open(
                 &commandline,
                 &descriptors,
                 pipes,
@@ -406,7 +403,7 @@ impl Process {
         while self.is_running() {
             self.take_callback_error()?;
             self.check_timeout()?;
-            shirabe_php_shim::usleep(1000);
+            usleep(1000);
         }
         self.take_callback_error()?;
 
@@ -442,8 +439,7 @@ impl Process {
 
         // TODO(bytes): the output is returned as a String.
         Ok(String::from_utf8_lossy(
-            &shirabe_php_shim::stream_get_contents3(self.stdout.as_ref().unwrap(), -1, 0)
-                .unwrap_or_default(),
+            &stream_get_contents3(self.stdout.as_ref().unwrap(), -1, 0).unwrap_or_default(),
         )
         .into_owned())
     }
@@ -458,8 +454,7 @@ impl Process {
 
         // TODO(bytes): the output is returned as a String.
         Ok(String::from_utf8_lossy(
-            &shirabe_php_shim::stream_get_contents3(self.stderr.as_ref().unwrap(), -1, 0)
-                .unwrap_or_default(),
+            &stream_get_contents3(self.stderr.as_ref().unwrap(), -1, 0).unwrap_or_default(),
         )
         .into_owned())
     }
@@ -570,14 +565,14 @@ impl Process {
 
     /// Stops the process.
     pub fn stop(&mut self, timeout: f64, signal: Option<i64>) -> Option<i64> {
-        let timeout_micro = shirabe_php_shim::microtime() + timeout;
+        let timeout_micro = microtime() + timeout;
         if self.is_running() {
             // given SIGTERM may not be defined and that "proc_terminate" uses the constant value
             // and not the constant itself, we use the same here
             let _ = self.do_signal(15, false);
             loop {
-                shirabe_php_shim::usleep(1000);
-                if !(self.is_running() && shirabe_php_shim::microtime() < timeout_micro) {
+                usleep(1000);
+                if !(self.is_running() && microtime() < timeout_micro) {
                     break;
                 }
             }
@@ -599,25 +594,17 @@ impl Process {
     /// Adds a line to the STDOUT stream.
     pub fn add_output(&mut self, line: &str) {
         let stdout = self.stdout.as_ref().unwrap();
-        shirabe_php_shim::fseek(stdout, 0, shirabe_php_shim::SEEK_END);
-        shirabe_php_shim::fwrite(stdout, line, Some(line.len() as i64));
-        shirabe_php_shim::fseek(
-            stdout,
-            self.incremental_output_offset,
-            shirabe_php_shim::SEEK_SET,
-        );
+        fseek(stdout, 0, SEEK_END);
+        fwrite(stdout, line, Some(line.len() as i64));
+        fseek(stdout, self.incremental_output_offset, SEEK_SET);
     }
 
     /// Adds a line to the STDERR stream.
     pub fn add_error_output(&mut self, line: &str) {
         let stderr = self.stderr.as_ref().unwrap();
-        shirabe_php_shim::fseek(stderr, 0, shirabe_php_shim::SEEK_END);
-        shirabe_php_shim::fwrite(stderr, line, Some(line.len() as i64));
-        shirabe_php_shim::fseek(
-            stderr,
-            self.incremental_error_output_offset,
-            shirabe_php_shim::SEEK_SET,
-        );
+        fseek(stderr, 0, SEEK_END);
+        fwrite(stderr, line, Some(line.len() as i64));
+        fseek(stderr, self.incremental_error_output_offset, SEEK_SET);
     }
 
     /// Gets the command line to be executed.
@@ -676,7 +663,7 @@ impl Process {
             // getcwd() will return false if any one of the parent directories does not have
             // the readable or search mode set, even if the current directory does
             // TODO(bytes): Process keeps the working directory as a String.
-            return shirabe_php_shim::getcwd()
+            return getcwd()
                 .map(|cwd| {
                     cwd.into_os_string()
                         .into_string()
@@ -722,7 +709,7 @@ impl Process {
         }
 
         if let Some(timeout) = self.timeout
-            && timeout < shirabe_php_shim::microtime() - self.starttime.unwrap_or(0.0)
+            && timeout < microtime() - self.starttime.unwrap_or(0.0)
         {
             self.stop(0.0, None);
 
@@ -749,7 +736,7 @@ impl Process {
 
         *IS_TTY_SUPPORTED.get_or_init(|| {
             let mut pipes = IndexMap::new();
-            shirabe_php_shim::proc_open(
+            proc_open(
                 "echo 1 >/dev/null",
                 &[
                     descriptor(&["file", "/dev/tty", "r"]),
@@ -807,9 +794,7 @@ impl Process {
             return;
         }
 
-        self.process_information = Some(shirabe_php_shim::proc_get_status(
-            self.process.as_ref().unwrap(),
-        ));
+        self.process_information = Some(proc_get_status(self.process.as_ref().unwrap()));
         let running = self.process_information.as_ref().unwrap().running;
 
         self.read_pipes(running && blocking, !cfg!(windows) || !running);
@@ -887,7 +872,7 @@ impl Process {
             p.close();
         }
         if self.process.is_some() {
-            shirabe_php_shim::proc_close(self.process.as_ref().unwrap());
+            proc_close(self.process.as_ref().unwrap());
             self.process = None;
         }
         self.exitcode = self.process_information.as_ref().map(|i| i.exitcode);
@@ -923,14 +908,8 @@ impl Process {
         self.exitcode = None;
         self.process_information = None;
         // php://temp is an in-memory stream; fopen never fails for it.
-        self.stdout = Some(
-            shirabe_php_shim::fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+")
-                .unwrap(),
-        );
-        self.stderr = Some(
-            shirabe_php_shim::fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+")
-                .unwrap(),
-        );
+        self.stdout = Some(fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
+        self.stderr = Some(fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
         self.process = None;
         self.latest_signal = None;
         self.status = Self::STATUS_READY.to_string();
@@ -957,7 +936,7 @@ impl Process {
         if cfg!(windows) {
             let mut output: Vec<String> = Vec::new();
             let mut exit_code: i64 = 0;
-            shirabe_php_shim::exec(
+            exec(
                 &format!("taskkill /F /T /PID {} 2>&1", pid),
                 Some(&mut output),
                 Some(&mut exit_code),
@@ -974,7 +953,7 @@ impl Process {
                 return Ok(false);
             }
         } else {
-            let ok = shirabe_php_shim::proc_terminate(self.process.as_ref().unwrap(), signal);
+            let ok = proc_terminate(self.process.as_ref().unwrap(), signal);
             if !ok {
                 if throw_exception {
                     return Err(RuntimeException::new(format!(
@@ -998,7 +977,7 @@ impl Process {
         cmd: &str,
         env: &mut IndexMap<String, PhpMixed>,
     ) -> anyhow::Result<String> {
-        let uid = shirabe_php_shim::uniqid("", true);
+        let uid = uniqid("", true);
         let mut var_count = 0;
         let mut var_cache: IndexMap<String, String> = IndexMap::new();
         let cmd = preg_replace_callback(
@@ -1024,7 +1003,7 @@ impl Process {
                 if value.contains('\0') {
                     value = value.replace('\0', "?");
                 }
-                if shirabe_php_shim::strpbrk(&value, "\"%!\n").is_none() {
+                if strpbrk(&value, "\"%!\n").is_none() {
                     return Ok(format!("\"{}\"", value));
                 }
 
@@ -1163,7 +1142,7 @@ impl Process {
 
     fn get_default_env(&self) -> IndexMap<String, PhpMixed> {
         // TODO(bytes): the environment is kept as Strings.
-        let env: IndexMap<String, String> = shirabe_php_shim::getenv_all()
+        let env: IndexMap<String, String> = getenv_all()
             .map(|(k, v)| {
                 (
                     k.into_string()
@@ -1173,7 +1152,7 @@ impl Process {
                 )
             })
             .collect();
-        let server = shirabe_php_shim::PHP_SERVER.lock().unwrap();
+        let server = PHP_SERVER.lock().unwrap();
 
         // non-Windows: array_intersect_key($env, $_SERVER) ?: $env
         let mut intersect: IndexMap<String, PhpMixed> = IndexMap::new();
@@ -1191,7 +1170,7 @@ impl Process {
         };
 
         // $_ENV + env_map
-        let mut result: IndexMap<String, PhpMixed> = shirabe_php_shim::PHP_ENV
+        let mut result: IndexMap<String, PhpMixed> = PHP_ENV
             .lock()
             .unwrap()
             .get_all()

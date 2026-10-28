@@ -3,8 +3,9 @@
 use crate::input::InputDefinition;
 use crate::input::InputValue;
 use crate::input::StreamableInputInterface;
+use shirabe_php_shim::AsAny;
 
-pub trait InputInterface: std::fmt::Debug + shirabe_php_shim::AsAny {
+pub trait InputInterface: std::fmt::Debug + AsAny {
     /// Models PHP's `clone` operatior.
     fn dup(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>>;
 

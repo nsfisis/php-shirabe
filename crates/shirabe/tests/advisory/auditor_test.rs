@@ -24,7 +24,7 @@ use shirabe::repository::RepositoryInterfaceHandle;
 use shirabe::repository::RepositorySet;
 use shirabe::repository::SearchResult;
 use shirabe::repository::SecurityAdvisoryResult;
-use shirabe_php_shim::date_create;
+use shirabe_php_shim::{PhpMixed, date_create};
 use shirabe_semver::VersionParser;
 use shirabe_semver::constraint::AnyConstraint;
 use shirabe_semver::constraint::SimpleConstraint;
@@ -405,13 +405,13 @@ fn test_audit() {
 
     let abandoned_with_replacement = || {
         let p = get_complete_package("vendor/abandoned", "1.0.0");
-        p.set_abandoned(shirabe_php_shim::PhpMixed::string("foo/bar".to_string()));
+        p.set_abandoned(PhpMixed::string("foo/bar".to_string()));
         let handle: PackageInterfaceHandle = p.into();
         handle
     };
     let abandoned_no_replacement = || {
         let p = get_complete_package("vendor/abandoned2", "1.0.0");
-        p.set_abandoned(shirabe_php_shim::PhpMixed::Bool(true));
+        p.set_abandoned(PhpMixed::Bool(true));
         let handle: PackageInterfaceHandle = p.into();
         handle
     };

@@ -20,10 +20,10 @@ use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
-    array_values_mixed, escapeshellcmd, exec, explode, file_exists, impl_php_class, implode,
-    in_array_loose, in_array_strict, is_array, is_bool, is_dir, is_numeric, is_object, is_string,
-    json_encode, php_regex, php_to_string, preg_is_match, preg_match, preg_replace, str_replace,
-    strpos, strtolower, system, touch, var_export,
+    array_values_mixed, chmod, escapeshellcmd, exec, explode, file_exists, impl_php_class, implode,
+    in_array_loose, in_array_strict, intval, is_array, is_bool, is_dir, is_numeric, is_object,
+    is_string, json_encode, php_regex, php_to_string, preg_is_match, preg_match, preg_replace,
+    str_replace, strpos, strtolower, system, touch, trim, var_export,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
@@ -269,7 +269,7 @@ impl ConfigCommand {
                     let id = preg_replace(
                         php_regex!("{[^a-z0-9]}i"),
                         "-",
-                        &strtolower(&shirabe_php_shim::trim(&id, Some(" \t\n\r\0\u{0B}"))),
+                        &strtolower(&trim(&id, Some(" \t\n\r\0\u{0B}"))),
                     );
                     let id = preg_replace(php_regex!("{-+}"), "-", &id);
                     format!("https://getcomposer.org/doc/06-config.md#{}", id)
@@ -531,7 +531,7 @@ impl Command for ConfigCommand {
                 .borrow()
                 .write(PhpMixed::Array(empty_objs))?;
             let path_clone = auth_config_file.borrow().get_path().to_string();
-            shirabe_php_shim::chmod(&path_clone, 0o600);
+            chmod(&path_clone, 0o600);
         }
         Ok(())
     }
@@ -1571,11 +1571,7 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "process-timeout".to_string(),
         (
             Box::new(|val| PhpMixed::Bool(is_numeric(&val.as_string().unwrap_or_default().into()))),
-            Box::new(|val| {
-                PhpMixed::Int(shirabe_php_shim::intval(
-                    &val.as_string().unwrap_or("0".into()).into(),
-                ))
-            }),
+            Box::new(|val| PhpMixed::Int(intval(&val.as_string().unwrap_or("0".into()).into()))),
         ),
     );
     m.insert(
@@ -1700,22 +1696,14 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
         "cache-ttl".to_string(),
         (
             Box::new(|val| PhpMixed::Bool(is_numeric(&val.as_string().unwrap_or_default().into()))),
-            Box::new(|val| {
-                PhpMixed::Int(shirabe_php_shim::intval(
-                    &val.as_string().unwrap_or("0".into()).into(),
-                ))
-            }),
+            Box::new(|val| PhpMixed::Int(intval(&val.as_string().unwrap_or("0".into()).into()))),
         ),
     );
     m.insert(
         "cache-files-ttl".to_string(),
         (
             Box::new(|val| PhpMixed::Bool(is_numeric(&val.as_string().unwrap_or_default().into()))),
-            Box::new(|val| {
-                PhpMixed::Int(shirabe_php_shim::intval(
-                    &val.as_string().unwrap_or("0".into()).into(),
-                ))
-            }),
+            Box::new(|val| PhpMixed::Int(intval(&val.as_string().unwrap_or("0".into()).into()))),
         ),
     );
     m.insert(

@@ -12,7 +12,7 @@ use shirabe::util::Filesystem;
 use shirabe::util::ProcessExecutor;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, RuntimeException};
 use shirabe_php_shim::{
     PhpMixed, file_exists, file_put_contents, realpath, sys_get_temp_dir, unlink,
 };
@@ -164,7 +164,7 @@ fn test_unknown_format() {
     ));
 
     let err = result.expect_err("expected RuntimeException for unknown format");
-    assert!(err.is_instanceof::<shirabe_php_shim::RuntimeException>());
+    assert!(err.is_instanceof::<RuntimeException>());
 }
 
 // ref: ArchiveManagerTest::testArchiveTar / testArchiveCustomFileName.

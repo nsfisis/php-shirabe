@@ -13,7 +13,7 @@ use crate::util::Filesystem;
 use crate::util::Hg as HgUtils;
 use crate::util::ProcessExecutor;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class};
+use shirabe_php_shim::{PhpMixed, RuntimeException, impl_php_class, realpath};
 
 #[derive(Debug)]
 pub struct HgDownloader {
@@ -107,7 +107,7 @@ impl VcsDownloader for HgDownloader {
         if self.inner.process.borrow_mut().execute(
             &command,
             &mut ignored_output,
-            shirabe_php_shim::realpath(path).as_deref(),
+            realpath(path).as_deref(),
         )? != 0
         {
             return Err(RuntimeException::new(format!(
@@ -185,7 +185,7 @@ impl VcsDownloader for HgDownloader {
         if self.inner.process.borrow_mut().execute(
             &command,
             &mut output,
-            shirabe_php_shim::realpath(path).as_deref(),
+            realpath(path).as_deref(),
         )? != 0
         {
             return Err(RuntimeException::new(format!(
@@ -219,7 +219,7 @@ impl ChangeReportInterface for HgDownloader {
         self.inner.process.borrow_mut().execute(
             &["hg".to_string(), "st".to_string()],
             &mut output,
-            shirabe_php_shim::realpath(path).as_deref(),
+            realpath(path).as_deref(),
         )?;
 
         let output = output.trim().to_string();

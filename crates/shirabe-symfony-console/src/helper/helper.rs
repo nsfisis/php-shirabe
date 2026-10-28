@@ -2,7 +2,10 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::HelperSet;
-use shirabe_php_shim::{php_regex, preg_is_match, preg_replace};
+use shirabe_php_shim::{
+    mb_detect_encoding, mb_strlen, mb_strwidth, mb_substr, php_regex, preg_is_match, preg_replace,
+    strlen, substr, trigger_deprecation,
+};
 use shirabe_symfony_string::unicode_string::UnicodeString;
 
 /// Helper is the base class for all helper classes.
@@ -25,7 +28,7 @@ impl Helper {
 
     /// Returns the length of a string, using mb_strwidth if it is available.
     pub fn strlen(string: &str) -> i64 {
-        shirabe_php_shim::trigger_deprecation(
+        trigger_deprecation(
             "symfony/console",
             "5.3",
             "Method \"%s()\" is deprecated and will be removed in Symfony 6.0. Use Helper::width() or Helper::length() instead.",
@@ -42,13 +45,13 @@ impl Helper {
             return UnicodeString::new(string).width(false);
         }
 
-        let encoding = shirabe_php_shim::mb_detect_encoding(string, None, true);
+        let encoding = mb_detect_encoding(string, None, true);
         let encoding = match encoding {
             Some(encoding) => encoding,
-            None => return shirabe_php_shim::strlen(string),
+            None => return strlen(string),
         };
 
-        shirabe_php_shim::mb_strwidth(string, Some(&encoding))
+        mb_strwidth(string, Some(&encoding))
     }
 
     /// Returns the length of a string, using mb_strlen if it is available.
@@ -58,24 +61,24 @@ impl Helper {
             return UnicodeString::new(string).length();
         }
 
-        let encoding = shirabe_php_shim::mb_detect_encoding(string, None, true);
+        let encoding = mb_detect_encoding(string, None, true);
         let encoding = match encoding {
             Some(encoding) => encoding,
-            None => return shirabe_php_shim::strlen(string),
+            None => return strlen(string),
         };
 
-        shirabe_php_shim::mb_strlen(string, &encoding)
+        mb_strlen(string, &encoding)
     }
 
     /// Returns the subset of a string, using mb_substr if it is available.
     pub fn substr(string: &str, from: i64, length: Option<i64>) -> String {
-        let encoding = shirabe_php_shim::mb_detect_encoding(string, None, true);
+        let encoding = mb_detect_encoding(string, None, true);
         let encoding = match encoding {
             Some(encoding) => encoding,
-            None => return shirabe_php_shim::substr(string, from, length),
+            None => return substr(string, from, length),
         };
 
-        shirabe_php_shim::mb_substr(string, from, length, Some(&encoding))
+        mb_substr(string, from, length, Some(&encoding))
     }
 
     pub fn format_time(secs: f64) -> Option<String> {
@@ -129,7 +132,7 @@ impl Helper {
         formatter: &mut dyn OutputFormatterInterface,
         string: &str,
     ) -> i64 {
-        shirabe_php_shim::trigger_deprecation(
+        trigger_deprecation(
             "symfony/console",
             "5.3",
             "Method \"%s()\" is deprecated and will be removed in Symfony 6.0. Use Helper::removeDecoration() instead.",

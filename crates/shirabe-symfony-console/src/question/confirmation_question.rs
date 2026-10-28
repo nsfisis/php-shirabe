@@ -3,7 +3,7 @@
 use crate::exception::InvalidArgumentException;
 use crate::question::Question;
 use crate::question::QuestionInterface;
-use shirabe_php_shim::{PhpMixed, preg_is_match};
+use shirabe_php_shim::{PhpMixed, empty, preg_is_match, strval};
 
 /// Represents a yes/no question.
 #[derive(Debug)]
@@ -38,12 +38,12 @@ impl ConfirmationQuestion {
                 return answer;
             }
 
-            let answer_is_true = preg_is_match(&regex, &shirabe_php_shim::strval(&answer));
+            let answer_is_true = preg_is_match(&regex, &strval(&answer));
 
             // false === $default
             if matches!(default, PhpMixed::Bool(false)) {
                 // $answer && $answerIsTrue
-                return PhpMixed::Bool(!shirabe_php_shim::empty(&answer) && answer_is_true);
+                return PhpMixed::Bool(!empty(&answer) && answer_is_true);
             }
 
             // '' === $answer || $answerIsTrue

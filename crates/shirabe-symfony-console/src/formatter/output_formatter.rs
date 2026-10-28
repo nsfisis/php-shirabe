@@ -6,7 +6,11 @@ use crate::formatter::output_formatter_style::OutputFormatterStyle;
 use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
 use crate::formatter::output_formatter_style_stack::OutputFormatterStyleStack;
 use crate::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
-use shirabe_php_shim::{PregMatches, php_regex, preg_match, preg_match_all, preg_replace};
+use shirabe_php_shim::{
+    PhpMixed, PregMatches, byte_at, explode, implode, ltrim, mb_detect_encoding, php_regex,
+    preg_match, preg_match_all, preg_replace, rtrim, str_repeat, str_replace, strlen, strtolower,
+    strtr_array, substr,
+};
 use shirabe_symfony_string::b;
 
 /// Formatter class for console output.
@@ -32,13 +36,10 @@ impl OutputFormatter {
     pub fn escape_trailing_backslash(text: &str) -> String {
         let mut text = text.to_string();
         if text.ends_with('\\') {
-            let len = shirabe_php_shim::strlen(&text);
-            text = shirabe_php_shim::rtrim(&text, Some("\\"));
-            text = shirabe_php_shim::str_replace("\0", "", &text);
-            text.push_str(&shirabe_php_shim::str_repeat(
-                "\0",
-                (len - shirabe_php_shim::strlen(&text)) as usize,
-            ));
+            let len = strlen(&text);
+            text = rtrim(&text, Some("\\"));
+            text = str_replace("\0", "", &text);
+            text.push_str(&str_repeat("\0", (len - strlen(&text)) as usize));
         }
 
         text
@@ -112,7 +113,7 @@ impl OutputFormatter {
 
         let mut style = OutputFormatterStyle::new(None, None, vec![]);
         for r#match in &matches {
-            let key = shirabe_php_shim::strtolower(
+            let key = strtolower(
                 r#match
                     .get(1)
                     .expect("every group participates whenever the pattern matches"),
@@ -122,14 +123,14 @@ impl OutputFormatter {
                 .expect("every group participates whenever the pattern matches");
 
             if key == "fg" {
-                style.set_foreground(Some(&shirabe_php_shim::strtolower(value)));
+                style.set_foreground(Some(&strtolower(value)));
             } else if key == "bg" {
-                style.set_background(Some(&shirabe_php_shim::strtolower(value)));
+                style.set_background(Some(&strtolower(value)));
             } else if key == "href" {
                 let url = preg_replace(php_regex!("{\\\\([<>])}"), "$1", value);
                 style.set_href(&url);
             } else if key == "options" {
-                let value = shirabe_php_shim::strtolower(value);
+                let value = strtolower(value);
                 let options = preg_match_all(php_regex!("([^,;]+)"), &value);
                 for option in options {
                     style.set_option(
@@ -169,14 +170,14 @@ impl OutputFormatter {
         let mut text = text.to_string();
 
         if *current_line_length == 0 && !current.is_empty() {
-            text = shirabe_php_shim::ltrim(&text, None);
+            text = ltrim(&text, None);
         }
 
         let prefix;
         if *current_line_length != 0 {
             let i = width - *current_line_length;
-            prefix = format!("{}\n", shirabe_php_shim::substr(&text, 0, Some(i)));
-            text = shirabe_php_shim::substr(&text, i, None);
+            prefix = format!("{}\n", substr(&text, 0, Some(i)));
+            text = substr(&text, i, None);
         } else {
             prefix = String::new();
         }
@@ -186,19 +187,16 @@ impl OutputFormatter {
             .unwrap_or("")
             .to_string();
         text = format!("{}{}", prefix, self.add_line_breaks(&text, width));
-        text = format!("{}{}", shirabe_php_shim::rtrim(&text, Some("\n")), trailing);
+        text = format!("{}{}", rtrim(&text, Some("\n")), trailing);
 
-        if *current_line_length == 0
-            && !current.is_empty()
-            && shirabe_php_shim::substr(current, -1, None) != "\n"
-        {
+        if *current_line_length == 0 && !current.is_empty() && substr(current, -1, None) != "\n" {
             text = format!("\n{text}");
         }
 
-        let mut lines = shirabe_php_shim::explode("\n", &text);
+        let mut lines = explode("\n", &text);
 
         for line in &lines {
-            *current_line_length += shirabe_php_shim::strlen(line);
+            *current_line_length += strlen(line);
             if width <= *current_line_length {
                 *current_line_length = 0;
             }
@@ -210,11 +208,11 @@ impl OutputFormatter {
             }
         }
 
-        shirabe_php_shim::implode("\n", &lines)
+        implode("\n", &lines)
     }
 
     fn add_line_breaks(&self, text: &str, width: i64) -> String {
-        let encoding = shirabe_php_shim::mb_detect_encoding(text, None, true)
+        let encoding = mb_detect_encoding(text, None, true)
             .filter(|s| !s.is_empty())
             .unwrap_or_else(|| "UTF-8".to_string());
 
@@ -236,14 +234,13 @@ impl OutputFormatterInterface for OutputFormatter {
 
     fn set_style(&mut self, name: &str, style: Box<dyn OutputFormatterStyleInterface>) {
         self.styles.insert(
-            shirabe_php_shim::strtolower(name),
+            strtolower(name),
             std::rc::Rc::new(std::cell::RefCell::new(style)),
         );
     }
 
     fn has_style(&self, name: &str) -> bool {
-        self.styles
-            .contains_key(&shirabe_php_shim::strtolower(name))
+        self.styles.contains_key(&strtolower(name))
     }
 
     fn get_style(
@@ -254,14 +251,12 @@ impl OutputFormatterInterface for OutputFormatter {
         if !self.has_style(name) {
             return Err(InvalidArgumentException::new(format!(
                 "Undefined style: \"{}\".",
-                shirabe_php_shim::PhpMixed::string(name.to_string()),
+                PhpMixed::string(name.to_string()),
             ))
             .into());
         }
 
-        Ok(std::rc::Rc::clone(
-            &self.styles[&shirabe_php_shim::strtolower(name)],
-        ))
+        Ok(std::rc::Rc::clone(&self.styles[&strtolower(name)]))
     }
 
     fn format(&mut self, message: Option<&str>) -> anyhow::Result<Option<String>> {
@@ -298,19 +293,19 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
                 .get(0)
                 .expect("group 0 participates whenever the pattern matches");
 
-            if pos != 0 && shirabe_php_shim::byte_at(message, (pos - 1) as usize) == b'\\' {
+            if pos != 0 && byte_at(message, (pos - 1) as usize) == b'\\' {
                 continue;
             }
 
             // add the text up to the next tag
-            let segment = shirabe_php_shim::substr(message, offset, Some(pos - offset));
+            let segment = substr(message, offset, Some(pos - offset));
             let applied =
                 self.apply_current_style(&segment, &output, width, &mut current_line_length);
             output.push_str(&applied);
-            offset = pos + shirabe_php_shim::strlen(text);
+            offset = pos + strlen(text);
 
             // opening tag?
-            let open = shirabe_php_shim::byte_at(text, 1) != b'/';
+            let open = byte_at(text, 1) != b'/';
             let tag = if open {
                 match_
                     .get(1)
@@ -335,7 +330,7 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
             }
         }
 
-        let segment = shirabe_php_shim::substr(message, offset, None);
+        let segment = substr(message, offset, None);
         let applied = self.apply_current_style(&segment, &output, width, &mut current_line_length);
         output.push_str(&applied);
 
@@ -343,6 +338,6 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
         pairs.insert("\0".to_string(), "\\".to_string());
         pairs.insert("\\<".to_string(), "<".to_string());
         pairs.insert("\\>".to_string(), ">".to_string());
-        Ok(Some(shirabe_php_shim::strtr_array(&output, &pairs)))
+        Ok(Some(strtr_array(&output, &pairs)))
     }
 }

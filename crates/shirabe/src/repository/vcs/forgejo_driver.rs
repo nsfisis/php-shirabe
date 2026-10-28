@@ -16,7 +16,7 @@ use crate::util::ForgejoUrl;
 use crate::util::http::Response;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::Catch as _;
+use shirabe_php_shim::{Catch as _, date_create};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, base64_decode, explode, extension_loaded, php_regex, preg_match,
     urlencode,
@@ -34,7 +34,7 @@ pub struct ForgejoDriver {
 
 impl ForgejoDriver {
     pub fn new(
-        repo_config: IndexMap<String, shirabe_php_shim::PhpMixed>,
+        repo_config: IndexMap<String, PhpMixed>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
         http_downloader: std::rc::Rc<std::cell::RefCell<crate::util::HttpDownloader>>,
@@ -208,7 +208,7 @@ impl ForgejoDriver {
             RuntimeException::new(format!("Could not parse commit date for {}", identifier))
         })?;
 
-        let date: chrono::DateTime<chrono::FixedOffset> = shirabe_php_shim::date_create(&date_str)?;
+        let date: chrono::DateTime<chrono::FixedOffset> = date_create(&date_str)?;
         Ok(Some(date))
     }
 

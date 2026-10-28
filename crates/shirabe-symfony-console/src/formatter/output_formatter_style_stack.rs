@@ -3,6 +3,7 @@
 use crate::exception::InvalidArgumentException;
 use crate::formatter::output_formatter_style::OutputFormatterStyle;
 use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
+use shirabe_php_shim::array_pop;
 
 #[derive(Debug)]
 pub struct OutputFormatterStyleStack {
@@ -41,7 +42,7 @@ impl OutputFormatterStyleStack {
 
         let style = match style.as_mut() {
             None => {
-                return Ok(Ok(shirabe_php_shim::array_pop(&mut self.styles).unwrap()));
+                return Ok(Ok(array_pop(&mut self.styles).unwrap()));
             }
             Some(style) => style,
         };

@@ -6,11 +6,12 @@ use crate::completion::CompletionSuggestions;
 use crate::helper::HelperSet;
 use crate::input::InputDefinition;
 use indexmap::IndexMap;
+use shirabe_php_shim::AsAny;
 
 /// `Symfony\Component\Console\Application` is a concrete class in PHP, but it is ported here as a
 /// trait rather than a struct.
 /// Refer to shirabe::console::Application for the reason.
-pub trait Application: std::fmt::Debug + shirabe_php_shim::AsAny {
+pub trait Application: std::fmt::Debug + AsAny {
     fn get_name(&self) -> String;
 
     fn get_version(&self) -> String;

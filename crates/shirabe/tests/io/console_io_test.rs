@@ -16,7 +16,7 @@ use shirabe::io::ConsoleIO;
 use shirabe::io::IOInterfaceImmutable;
 use shirabe::io::IOInterfaceMutable;
 use shirabe::io::io_interface::NORMAL;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, PhpResource, fwrite_resource, php_fopen_resource, rewind};
 use shirabe_symfony_console::helper::QuestionHelper;
 use shirabe_symfony_console::input::ArrayInput;
 use shirabe_symfony_console::input::InputInterface;
@@ -41,10 +41,10 @@ fn make_console_io() -> ConsoleIO {
 
 /// Opens a `php://memory` stream pre-filled with `input`, mirroring
 /// StrictConfirmationQuestionTest::getInputStream.
-fn get_input_stream(input: &str) -> shirabe_php_shim::PhpResource {
-    let stream = shirabe_php_shim::php_fopen_resource("php://memory", "r+");
-    shirabe_php_shim::fwrite_resource(&stream, input);
-    shirabe_php_shim::rewind(&stream);
+fn get_input_stream(input: &str) -> PhpResource {
+    let stream = php_fopen_resource("php://memory", "r+");
+    fwrite_resource(&stream, input);
+    rewind(&stream);
     stream
 }
 

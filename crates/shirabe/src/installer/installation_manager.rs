@@ -23,7 +23,7 @@ use crate::util::r#loop::Loop;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_splice, array_unshift, http_build_query, json_encode,
-    str_replace, strpos, strtolower,
+    str_replace, strip_tags, strpos, strtolower, ucfirst,
 };
 
 /// Package operation manager.
@@ -238,7 +238,7 @@ impl InstallationManager {
             let _ = (dev_mode, run_scripts, download_only);
             let mut repo = repo.borrow_mut();
             for operation in operations {
-                let trace = shirabe_php_shim::strip_tags(&operation.to_string());
+                let trace = strip_tags(&operation.to_string());
                 match &*operation {
                     AnyOperation::Install(op) => {
                         let package = op.get_package();
@@ -658,7 +658,7 @@ impl InstallationManager {
                 if let Err(e) = chain_result {
                     self.io.write_error(&format!(
                         "    <error>{} of {} failed</error>",
-                        shirabe_php_shim::ucfirst(op_type),
+                        ucfirst(op_type),
                         package.get_pretty_name()
                     ));
                     return Err(e);

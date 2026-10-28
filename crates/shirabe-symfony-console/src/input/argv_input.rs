@@ -8,7 +8,10 @@ use crate::input::InputInterface;
 use crate::input::InputValue;
 use crate::input::StreamableInputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{php_regex, preg_match};
+use shirabe_php_shim::{
+    PhpResource, implode, mb_detect_encoding, mb_substr, php_regex, preg_match, strlen, strpos,
+    substr,
+};
 
 /// ArgvInput represents an input coming from the CLI arguments.
 ///
@@ -131,10 +134,10 @@ impl ArgvInput {
 
     /// Parses a short option.
     fn parse_short_option(&mut self, token: &str) -> anyhow::Result<()> {
-        let name = shirabe_php_shim::substr(token, 1, None);
+        let name = substr(token, 1, None);
 
-        if shirabe_php_shim::strlen(&name) > 1 {
-            let first = shirabe_php_shim::substr(&name, 0, Some(1));
+        if strlen(&name) > 1 {
+            let first = substr(&name, 0, Some(1));
             if self.inner.definition.has_shortcut(&first)
                 && self
                     .inner
@@ -143,10 +146,7 @@ impl ArgvInput {
                     .accept_value()
             {
                 // an option with a value (with no space)
-                self.add_short_option(
-                    &first,
-                    InputValue::String(shirabe_php_shim::substr(&name, 1, None)),
-                )?;
+                self.add_short_option(&first, InputValue::String(substr(&name, 1, None)))?;
             } else {
                 self.parse_short_option_set(&name)?;
             }
@@ -159,17 +159,15 @@ impl ArgvInput {
 
     /// Parses a short option set.
     fn parse_short_option_set(&mut self, name: &str) -> anyhow::Result<()> {
-        let len = shirabe_php_shim::strlen(name);
+        let len = strlen(name);
         let mut i = 0;
         while i < len {
-            let name_i = shirabe_php_shim::substr(name, i, Some(1));
+            let name_i = substr(name, i, Some(1));
             if !self.inner.definition.has_shortcut(&name_i) {
-                let encoding = shirabe_php_shim::mb_detect_encoding(name, None, true);
+                let encoding = mb_detect_encoding(name, None, true);
                 let bad = match encoding {
                     None => name_i,
-                    Some(encoding) => {
-                        shirabe_php_shim::mb_substr(name, i, Some(1), Some(&encoding))
-                    }
+                    Some(encoding) => mb_substr(name, i, Some(1), Some(&encoding)),
                 };
                 return Err(RuntimeException::new(format!(
                     "The \"-{}\" option does not exist.",
@@ -183,7 +181,7 @@ impl ArgvInput {
                 let value = if i == len - 1 {
                     InputValue::Null
                 } else {
-                    InputValue::String(shirabe_php_shim::substr(name, i + 1, None))
+                    InputValue::String(substr(name, i + 1, None))
                 };
                 self.add_long_option(option.get_name(), value)?;
 
@@ -199,19 +197,16 @@ impl ArgvInput {
 
     /// Parses a long option.
     fn parse_long_option(&mut self, token: &str) -> anyhow::Result<()> {
-        let name = shirabe_php_shim::substr(token, 2, None);
+        let name = substr(token, 2, None);
 
-        match shirabe_php_shim::strpos(&name, "=") {
+        match strpos(&name, "=") {
             Some(pos) => {
                 let pos = pos as i64;
-                let value = shirabe_php_shim::substr(&name, pos + 1, None);
+                let value = substr(&name, pos + 1, None);
                 if value.is_empty() {
                     self.parsed.insert(0, value.clone());
                 }
-                self.add_long_option(
-                    &shirabe_php_shim::substr(&name, 0, Some(pos)),
-                    InputValue::String(value),
-                )?;
+                self.add_long_option(&substr(&name, 0, Some(pos)), InputValue::String(value))?;
             }
             None => {
                 self.add_long_option(&name, InputValue::Null)?;
@@ -283,12 +278,12 @@ impl ArgvInput {
                         format!(
                             "Too many arguments to \"{}\" command, expected arguments \"{}\".",
                             symfony_command_name.to_php_string(),
-                            shirabe_php_shim::implode("\" \"", &names),
+                            implode("\" \"", &names),
                         )
                     }
                     _ => format!(
                         "Too many arguments, expected arguments \"{}\".",
-                        shirabe_php_shim::implode("\" \"", &names),
+                        implode("\" \"", &names),
                     ),
                 }
             } else if symfony_command_name
@@ -431,9 +426,9 @@ impl ArgvInput {
                 // If it's a long option, consider that everything after "--" is the option name.
                 // Otherwise, use the last char (if it's a short option set, only the last one can take a value with space separator)
                 let mut name = if token.as_bytes().get(1) == Some(&b'-') {
-                    shirabe_php_shim::substr(token, 2, None)
+                    substr(token, 2, None)
                 } else {
-                    shirabe_php_shim::substr(token, -1, None)
+                    substr(token, -1, None)
                 };
                 if !self.inner.options.contains_key(&name)
                     && !self.inner.definition.has_shortcut(&name)
@@ -519,11 +514,7 @@ impl ArgvInput {
                     value.to_string()
                 };
                 if !leading.is_empty() && token.starts_with(&leading) {
-                    return InputValue::String(shirabe_php_shim::substr(
-                        &token,
-                        shirabe_php_shim::strlen(&leading),
-                        None,
-                    ));
+                    return InputValue::String(substr(&token, strlen(&leading), None));
                 }
             }
         }
@@ -555,7 +546,7 @@ impl std::fmt::Display for ArgvInput {
             })
             .collect();
 
-        write!(f, "{}", shirabe_php_shim::implode(" ", &tokens))
+        write!(f, "{}", implode(" ", &tokens))
     }
 }
 
@@ -643,11 +634,11 @@ impl InputInterface for ArgvInput {
 }
 
 impl StreamableInputInterface for ArgvInput {
-    fn set_stream(&mut self, stream: shirabe_php_shim::PhpResource) {
+    fn set_stream(&mut self, stream: PhpResource) {
         self.inner.set_stream(stream)
     }
 
-    fn get_stream(&self) -> Option<shirabe_php_shim::PhpResource> {
+    fn get_stream(&self) -> Option<PhpResource> {
         self.inner.get_stream()
     }
 }

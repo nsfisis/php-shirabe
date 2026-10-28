@@ -13,6 +13,7 @@ use crate::filter::platform_requirement_filter::PlatformRequirementFilterFactory
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::package::PackageInterfaceHandle;
 use indexmap::IndexMap;
+use shirabe_php_shim::LogicException;
 use std::collections::VecDeque;
 
 #[derive(Debug)]
@@ -309,7 +310,7 @@ impl RuleSetGenerator {
                 }
 
                 // otherwise, looks like a bug
-                return Err(shirabe_php_shim::LogicException::new(format!(
+                return Err(LogicException::new(format!(
                     "Fixed package {} was not added to solver pool.",
                     package.get_pretty_string()
                 ))

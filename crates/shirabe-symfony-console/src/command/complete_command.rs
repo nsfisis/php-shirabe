@@ -10,7 +10,10 @@ use crate::input::InputOption;
 use crate::input::InputValue;
 use crate::output::OutputInterface;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, impl_php_class};
+use shirabe_php_shim::{
+    FILE_APPEND, PHP_EOL, PHP_SERVER, PhpMixed, RuntimeException, basename, ctype_digit, date_utc,
+    file_put_contents3, filter_var_boolean, getenv, impl_php_class, sys_get_temp_dir,
+};
 use std::ops::{Deref, DerefMut};
 
 /// Responsible for providing the values to the shell completion.
@@ -77,10 +80,8 @@ impl CompleteCommand {
         input: &dyn InputInterface,
     ) -> anyhow::Result<CompletionInput> {
         let current_index = input.get_option("current")?;
-        if !current_index.to_bool()
-            || !shirabe_php_shim::ctype_digit(current_index.as_string().unwrap_or_default())
-        {
-            anyhow::bail!(shirabe_php_shim::RuntimeException::new(
+        if !current_index.to_bool() || !ctype_digit(current_index.as_string().unwrap_or_default()) {
+            anyhow::bail!(RuntimeException::new(
                 "The \"--current\" option must be set and it must be an integer.".to_string()
             ));
         }
@@ -130,8 +131,8 @@ impl CompleteCommand {
         }
 
         // TODO(bytes): basename takes the path as a &str.
-        let command_name = shirabe_php_shim::basename(
-            &shirabe_php_shim::PHP_SERVER
+        let command_name = basename(
+            &PHP_SERVER
                 .lock()
                 .unwrap()
                 .argv()
@@ -141,14 +142,14 @@ impl CompleteCommand {
                 .unwrap_or_else(|arg| panic!("argv[0] is not valid UTF-8: {arg:?}")),
         );
         // TODO(bytes): file_put_contents3 takes the path as a &str.
-        let tmp_dir = shirabe_php_shim::sys_get_temp_dir()
+        let tmp_dir = sys_get_temp_dir()
             .into_os_string()
             .into_string()
             .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
-        shirabe_php_shim::file_put_contents3(
+        file_put_contents3(
             &format!("{}/sf_{}.log", tmp_dir, command_name),
-            &(messages.join(shirabe_php_shim::PHP_EOL) + shirabe_php_shim::PHP_EOL),
-            shirabe_php_shim::FILE_APPEND,
+            &(messages.join(PHP_EOL) + PHP_EOL),
+            FILE_APPEND,
         );
     }
 }
@@ -231,8 +232,8 @@ impl Command for CompleteCommand {
     ) -> anyhow::Result<()> {
         let _ = (input, output);
         // TODO(bytes): filter_var_boolean takes the value as a &str.
-        self.is_debug.set(shirabe_php_shim::filter_var_boolean(
-            &shirabe_php_shim::getenv("SYMFONY_COMPLETION_DEBUG")
+        self.is_debug.set(filter_var_boolean(
+            &getenv("SYMFONY_COMPLETION_DEBUG")
                 .unwrap_or_default()
                 .into_string()
                 .unwrap_or_else(|value| {
@@ -261,7 +262,7 @@ impl Command for CompleteCommand {
 
             let shell = input.borrow().get_option("shell")?;
             if !shell.to_bool() {
-                anyhow::bail!(shirabe_php_shim::RuntimeException::new(
+                anyhow::bail!(RuntimeException::new(
                     "The \"--shell\" option must be set.".to_string()
                 ));
             }
@@ -272,7 +273,7 @@ impl Command for CompleteCommand {
                 .cloned()
                 .unwrap_or(PhpMixed::Bool(false));
             if !completion_output.to_bool() {
-                anyhow::bail!(shirabe_php_shim::RuntimeException::new(format!(
+                anyhow::bail!(RuntimeException::new(format!(
                     "Shell completion is not supported for your shell: \"{}\" (supported: \"{}\").",
                     shell.as_string().unwrap_or_default(),
                     self.completion_outputs
@@ -288,16 +289,13 @@ impl Command for CompleteCommand {
 
             self.log_many(vec![
                 String::new(),
-                format!(
-                    "<comment>{}</>",
-                    shirabe_php_shim::date_utc("Y-m-d H:i:s", None)
-                ),
+                format!("<comment>{}</>", date_utc("Y-m-d H:i:s", None)),
                 "<info>Input:</> <comment>(\"|\" indicates the cursor position)</>".to_string(),
                 format!("  {}", completion_input.to_string()),
                 "<info>Command:</>".to_string(),
                 format!(
                     "  {}",
-                    shirabe_php_shim::PHP_SERVER
+                    PHP_SERVER
                         .lock()
                         .unwrap()
                         .argv()

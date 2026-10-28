@@ -6,7 +6,7 @@ use crate::dependency_resolver::Request;
 use crate::dependency_resolver::Rule;
 use crate::repository::RepositorySet;
 use crate::util::IniHelper;
-use shirabe_php_shim::RuntimeException;
+use shirabe_php_shim::{RuntimeException, array_unique};
 
 #[derive(Debug)]
 pub struct SolverProblemsException {
@@ -124,7 +124,7 @@ impl SolverProblemsException {
             paths.remove(0);
         }
 
-        let unique_extensions = shirabe_php_shim::array_unique(missing_extensions);
+        let unique_extensions = array_unique(missing_extensions);
         let ignore_extensions_arguments: String = unique_extensions
             .iter()
             .map(|ext| format!("--ignore-platform-req={}", ext))

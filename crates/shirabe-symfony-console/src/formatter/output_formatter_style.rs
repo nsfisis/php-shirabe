@@ -2,6 +2,7 @@
 
 use crate::color::Color;
 use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
+use shirabe_php_shim::{PHP_SERVER, array_search_in_vec, getenv};
 
 /// Formatter style class for defining styles.
 #[derive(Debug, Clone)]
@@ -58,7 +59,7 @@ impl OutputFormatterStyleInterface for OutputFormatterStyle {
     }
 
     fn unset_option(&mut self, option: &str) {
-        let pos = shirabe_php_shim::array_search_in_vec(option, &self.options);
+        let pos = array_search_in_vec(option, &self.options);
         if let Some(pos) = pos {
             self.options.remove(pos);
         }
@@ -76,10 +77,10 @@ impl OutputFormatterStyleInterface for OutputFormatterStyle {
 
         if self.handles_href_gracefully.is_none() {
             self.handles_href_gracefully = Some(
-                shirabe_php_shim::getenv("TERMINAL_EMULATOR").as_deref()
+                getenv("TERMINAL_EMULATOR").as_deref()
                     != Some(std::ffi::OsStr::new("JetBrains-JediTerm"))
-                    && (shirabe_php_shim::getenv("KONSOLE_VERSION").is_none_or(|v| v.is_empty())
-                        || shirabe_php_shim::getenv("KONSOLE_VERSION")
+                    && (getenv("KONSOLE_VERSION").is_none_or(|v| v.is_empty())
+                        || getenv("KONSOLE_VERSION")
                             // TODO(bytes): the version is parsed as a &str.
                             .map(|v| {
                                 v.into_string()
@@ -91,7 +92,7 @@ impl OutputFormatterStyleInterface for OutputFormatterStyle {
                             })
                             .unwrap_or(0)
                             > 201100)
-                    && shirabe_php_shim::PHP_SERVER
+                    && PHP_SERVER
                         .lock()
                         .unwrap()
                         .get("IDEA_INITIAL_DIRECTORY")
