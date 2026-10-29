@@ -1,11 +1,12 @@
 //! ref: composer/vendor/symfony/console/Style/StyleInterface.php
 
 use crate::helper::{Cell, Row};
+use bstr::BString;
 
 /// Output style helpers.
 pub trait StyleInterface {
     /// Formats an error result bar.
-    fn error(&mut self, message: &[String]);
+    fn error(&mut self, message: &[BString]);
 
     /// Formats a table.
     fn table(&mut self, headers: Vec<Cell>, rows: Vec<Row>);

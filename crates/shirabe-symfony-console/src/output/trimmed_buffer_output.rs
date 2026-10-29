@@ -3,14 +3,15 @@
 use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatterInterface;
 use crate::output::{DoWrite, Output, OutputInterface};
-use shirabe_php_shim::{PHP_EOL, legacy_lossy, substr};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{PHP_EOL, substr};
 
 /// A BufferedOutput that keeps only the last N chars.
 #[derive(Debug)]
 pub struct TrimmedBufferOutput {
     inner: Output,
     max_length: i64,
-    buffer: std::cell::RefCell<String>,
+    buffer: std::cell::RefCell<BString>,
 }
 
 impl TrimmedBufferOutput {
@@ -30,37 +31,39 @@ impl TrimmedBufferOutput {
         Ok(Self {
             inner: Output::new(verbosity, decorated, formatter),
             max_length,
-            buffer: std::cell::RefCell::new(String::new()),
+            buffer: std::cell::RefCell::new(BString::default()),
         })
     }
 
     /// Empties buffer and returns its content.
-    pub fn fetch(&self) -> String {
+    pub fn fetch(&self) -> BString {
         let content = self.buffer.borrow().clone();
-        *self.buffer.borrow_mut() = String::new();
+        *self.buffer.borrow_mut() = BString::default();
 
         content
     }
 }
 
 impl DoWrite for TrimmedBufferOutput {
-    fn do_write(&self, message: &str, newline: bool) {
-        self.buffer.borrow_mut().push_str(message);
+    fn do_write(&self, message: &BStr, newline: bool) {
+        self.buffer.borrow_mut().extend_from_slice(message);
 
         if newline {
-            self.buffer.borrow_mut().push_str(PHP_EOL);
+            self.buffer
+                .borrow_mut()
+                .extend_from_slice(PHP_EOL.as_bytes());
         }
 
         let trimmed = substr(&*self.buffer.borrow(), 0 - self.max_length, None);
-        *self.buffer.borrow_mut() = legacy_lossy(&trimmed).into_owned();
+        *self.buffer.borrow_mut() = trimmed;
     }
 }
 
 impl OutputInterface for TrimmedBufferOutput {
-    fn write(&self, messages: &[String], newline: bool, options: i64) {
+    fn write(&self, messages: &[BString], newline: bool, options: i64) {
         self.inner.write(self, messages, newline, options);
     }
-    fn writeln(&self, messages: &[String], options: i64) {
+    fn writeln(&self, messages: &[BString], options: i64) {
         self.inner.writeln(self, messages, options);
     }
     fn set_verbosity(&self, level: i64) {

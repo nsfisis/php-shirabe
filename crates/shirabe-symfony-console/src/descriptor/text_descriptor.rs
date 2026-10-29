@@ -441,12 +441,12 @@ impl TextDescriptor {
         }
 
         let default = match default {
-            PhpMixed::String(s) => PhpMixed::string(OutputFormatter::escape(&s.to_str_lossy())?),
+            PhpMixed::String(s) => PhpMixed::string(OutputFormatter::escape(s)?),
             PhpMixed::Array(arr) => {
                 let mut arr = arr.clone();
                 for (_key, value) in arr.iter_mut() {
                     if let PhpMixed::String(s) = &*value {
-                        *value = PhpMixed::string(OutputFormatter::escape(&s.to_str_lossy())?);
+                        *value = PhpMixed::string(OutputFormatter::escape(s)?);
                     }
                 }
                 PhpMixed::Array(arr)
@@ -455,7 +455,7 @@ impl TextDescriptor {
                 let mut list = list.clone();
                 for value in list.iter_mut() {
                     if let PhpMixed::String(s) = &*value {
-                        *value = PhpMixed::string(OutputFormatter::escape(&s.to_str_lossy())?);
+                        *value = PhpMixed::string(OutputFormatter::escape(s)?);
                     }
                 }
                 PhpMixed::List(list)

@@ -48,7 +48,7 @@ impl OutputFormatterStyleStack {
         };
 
         for index in (0..self.styles.len()).rev() {
-            if style.apply("") == self.styles[index].apply("") {
+            if style.apply(bstr::BStr::new("")) == self.styles[index].apply(bstr::BStr::new("")) {
                 // PHP: array_slice($this->styles, 0, $index) keeps elements before $index,
                 // dropping the matched element and everything after it.
                 let stacked_style = self.styles.remove(index);

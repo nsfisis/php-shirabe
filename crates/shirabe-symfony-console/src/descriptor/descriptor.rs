@@ -48,7 +48,7 @@ pub trait Descriptor: DescriptorInterface {
     /// Writes content to output.
     fn write(&self, content: &str, decorated: bool) {
         self.output().borrow().write(
-            &[content.to_string()],
+            &[bstr::BString::from(content.to_string())],
             false,
             if decorated {
                 crate::output::OUTPUT_NORMAL

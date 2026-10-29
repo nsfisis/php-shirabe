@@ -4,9 +4,9 @@ use crate::formatter::OutputFormatterInterface;
 use crate::helper::Helper;
 use crate::output::{DoWrite, OutputInterface, StreamOutput};
 use crate::terminal::Terminal;
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    PHP_EOL, PhpResource, array_reverse, array_splice, array_unshift, explode, legacy_lossy,
-    str_replace,
+    PHP_EOL, PhpResource, array_reverse, array_splice, array_unshift, explode, str_replace,
 };
 
 type Sections =
@@ -15,7 +15,7 @@ type Sections =
 #[derive(Debug)]
 pub struct ConsoleSectionOutput {
     inner: StreamOutput,
-    content: std::cell::RefCell<Vec<String>>,
+    content: std::cell::RefCell<Vec<BString>>,
     lines: std::cell::Cell<i64>,
     sections: Sections,
     terminal: Terminal,
@@ -75,30 +75,28 @@ impl ConsoleSectionOutput {
         self.lines.set(self.lines.get() - lines);
 
         let erased = self.pop_stream_content_until_current_section(lines);
-        self.inner.do_write(&erased, false);
+        self.inner.do_write(erased.as_bstr(), false);
     }
 
     /// Overwrites the previous output with a new message.
-    pub fn overwrite(&self, message: &[String]) {
+    pub fn overwrite(&self, message: &[BString]) {
         self.clear(None);
         self.writeln(message, crate::output::OUTPUT_NORMAL);
     }
 
-    pub fn get_content(&self) -> String {
-        self.content.borrow().join("")
+    pub fn get_content(&self) -> BString {
+        bstr::join("", &*self.content.borrow()).into()
     }
 
-    pub fn add_content(&self, input: &str) {
+    pub fn add_content(&self, input: &BStr) {
         for line_content in explode(PHP_EOL, input) {
-            let count = (self.get_display_length(&legacy_lossy(&line_content)) as f64
+            let count = (self.get_display_length(&line_content) as f64
                 / self.terminal.get_width() as f64)
                 .ceil();
             self.lines
                 .set(self.lines.get() + if count != 0.0 { count as i64 } else { 1 });
-            self.content
-                .borrow_mut()
-                .push(legacy_lossy(&line_content).into_owned());
-            self.content.borrow_mut().push(PHP_EOL.to_string());
+            self.content.borrow_mut().push(line_content);
+            self.content.borrow_mut().push(PHP_EOL.into());
         }
     }
 
@@ -109,9 +107,9 @@ impl ConsoleSectionOutput {
     fn pop_stream_content_until_current_section(
         &self,
         number_of_lines_to_clear_from_current_section: i64,
-    ) -> String {
+    ) -> BString {
         let mut number_of_lines_to_clear = number_of_lines_to_clear_from_current_section;
-        let mut erased_content: Vec<String> = Vec::new();
+        let mut erased_content: Vec<BString> = Vec::new();
 
         for section in self.sections.borrow().iter() {
             // PHP: `if ($section === $this) break;` — identity comparison against $this.
@@ -127,25 +125,29 @@ impl ConsoleSectionOutput {
 
         if number_of_lines_to_clear > 0 {
             // move cursor up n lines
-            self.inner
-                .do_write(&format!("\x1b[{}A", number_of_lines_to_clear), false);
+            self.inner.do_write(
+                format!("\x1b[{}A", number_of_lines_to_clear)
+                    .as_bytes()
+                    .as_bstr(),
+                false,
+            );
             // erase to end of screen
-            self.inner.do_write("\x1b[0J", false);
+            self.inner.do_write("\x1b[0J".into(), false);
         }
 
-        array_reverse(&erased_content, false).join("")
+        bstr::join("", array_reverse(&erased_content, false)).into()
     }
 
-    fn get_display_length(&self, text: &str) -> i64 {
-        Helper::width(&Helper::remove_decoration(
+    fn get_display_length(&self, text: &[u8]) -> i64 {
+        Helper::width(Helper::remove_decoration(
             &mut *self.get_formatter().borrow_mut(),
-            &legacy_lossy(&str_replace("\t", "        ", text)),
+            str_replace("\t", "        ", text),
         ))
     }
 }
 
 impl DoWrite for ConsoleSectionOutput {
-    fn do_write(&self, message: &str, newline: bool) {
+    fn do_write(&self, message: &BStr, newline: bool) {
         if !self.is_decorated() {
             self.inner.do_write(message, newline);
 
@@ -157,15 +159,15 @@ impl DoWrite for ConsoleSectionOutput {
         self.add_content(message);
 
         self.inner.do_write(message, true);
-        self.inner.do_write(&erased_content, false);
+        self.inner.do_write(erased_content.as_bstr(), false);
     }
 }
 
 impl OutputInterface for ConsoleSectionOutput {
-    fn write(&self, messages: &[String], newline: bool, options: i64) {
+    fn write(&self, messages: &[BString], newline: bool, options: i64) {
         self.inner.inner().write(self, messages, newline, options);
     }
-    fn writeln(&self, messages: &[String], options: i64) {
+    fn writeln(&self, messages: &[BString], options: i64) {
         self.inner.inner().writeln(self, messages, options);
     }
     fn set_verbosity(&self, level: i64) {

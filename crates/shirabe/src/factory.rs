@@ -350,17 +350,19 @@ impl Factory {
         }
     }
 
-    pub fn create_additional_styles() -> IndexMap<String, Box<dyn OutputFormatterStyleInterface>> {
-        let mut styles: IndexMap<String, Box<dyn OutputFormatterStyleInterface>> = IndexMap::new();
+    pub fn create_additional_styles()
+    -> IndexMap<bstr::BString, Box<dyn OutputFormatterStyleInterface>> {
+        let mut styles: IndexMap<bstr::BString, Box<dyn OutputFormatterStyleInterface>> =
+            IndexMap::new();
         styles.insert(
-            "highlight".to_string(),
-            Box::new(OutputFormatterStyle::new(Some("red"), None, vec![])),
+            "highlight".into(),
+            Box::new(OutputFormatterStyle::new(Some("red".into()), None, vec![])),
         );
         styles.insert(
-            "warning".to_string(),
+            "warning".into(),
             Box::new(OutputFormatterStyle::new(
-                Some("black"),
-                Some("yellow"),
+                Some("black".into()),
+                Some("yellow".into()),
                 vec![],
             )),
         );

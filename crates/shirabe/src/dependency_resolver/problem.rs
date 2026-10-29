@@ -801,7 +801,7 @@ impl Problem {
                             if advisory_id.starts_with("PKSA-") {
                                 return format!(
                                     "<href={}>{}</>",
-                                    OutputFormatter::escape(&format!(
+                                    OutputFormatter::escape(format!(
                                         "https://packagist.org/security-advisories/{}",
                                         advisory_id
                                     ))
@@ -823,7 +823,7 @@ impl Problem {
                             if advisory_id.starts_with("PKSA-") {
                                 return format!(
                                     "<href={}>{}</>",
-                                    OutputFormatter::escape(&format!(
+                                    OutputFormatter::escape(format!(
                                         "https://packagist.org/security-advisories/{}",
                                         advisory_id
                                     ))

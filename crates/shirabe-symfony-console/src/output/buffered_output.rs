@@ -2,12 +2,13 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::output::{DoWrite, Output, OutputInterface};
+use bstr::{BStr, BString};
 use shirabe_php_shim::PHP_EOL;
 
 #[derive(Debug)]
 pub struct BufferedOutput {
     inner: Output,
-    buffer: std::cell::RefCell<String>,
+    buffer: std::cell::RefCell<BString>,
 }
 
 impl BufferedOutput {
@@ -18,34 +19,36 @@ impl BufferedOutput {
     ) -> Self {
         Self {
             inner: Output::new(verbosity, decorated, formatter),
-            buffer: std::cell::RefCell::new(String::new()),
+            buffer: std::cell::RefCell::new(BString::default()),
         }
     }
 
     /// Empties buffer and returns its content.
-    pub fn fetch(&self) -> String {
+    pub fn fetch(&self) -> BString {
         let content = self.buffer.borrow().clone();
-        *self.buffer.borrow_mut() = String::new();
+        *self.buffer.borrow_mut() = BString::default();
 
         content
     }
 }
 
 impl DoWrite for BufferedOutput {
-    fn do_write(&self, message: &str, newline: bool) {
-        self.buffer.borrow_mut().push_str(message);
+    fn do_write(&self, message: &BStr, newline: bool) {
+        self.buffer.borrow_mut().extend_from_slice(message);
 
         if newline {
-            self.buffer.borrow_mut().push_str(PHP_EOL);
+            self.buffer
+                .borrow_mut()
+                .extend_from_slice(PHP_EOL.as_bytes());
         }
     }
 }
 
 impl OutputInterface for BufferedOutput {
-    fn write(&self, messages: &[String], newline: bool, options: i64) {
+    fn write(&self, messages: &[BString], newline: bool, options: i64) {
         self.inner.write(self, messages, newline, options);
     }
-    fn writeln(&self, messages: &[String], options: i64) {
+    fn writeln(&self, messages: &[BString], options: i64) {
         self.inner.writeln(self, messages, options);
     }
     fn set_verbosity(&self, level: i64) {

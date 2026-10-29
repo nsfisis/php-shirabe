@@ -1,9 +1,9 @@
 //! ref: composer/vendor/symfony/console/Color.php
 
 use crate::exception::InvalidArgumentException;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{getenv, hexdec, implode, round, strlen, substr};
+use shirabe_php_shim::{bconcat, getenv, hexdec, implode, round, strlen, substr};
 
 const COLORS: [(&str, i64); 9] = [
     ("black", 0),
@@ -36,21 +36,24 @@ const AVAILABLE_OPTIONS: [(&str, (i64, i64)); 5] = [
     ("conceal", (8, 28)),
 ];
 
-fn colors_get(name: &str) -> Option<i64> {
-    COLORS.iter().find(|(k, _)| *k == name).map(|(_, v)| *v)
-}
-
-fn bright_colors_get(name: &str) -> Option<i64> {
-    BRIGHT_COLORS
+fn colors_get(name: &[u8]) -> Option<i64> {
+    COLORS
         .iter()
-        .find(|(k, _)| *k == name)
+        .find(|(k, _)| k.as_bytes() == name)
         .map(|(_, v)| *v)
 }
 
-fn available_options_get(name: &str) -> Option<(i64, i64)> {
+fn bright_colors_get(name: &[u8]) -> Option<i64> {
+    BRIGHT_COLORS
+        .iter()
+        .find(|(k, _)| k.as_bytes() == name)
+        .map(|(_, v)| *v)
+}
+
+fn available_options_get(name: &[u8]) -> Option<(i64, i64)> {
     AVAILABLE_OPTIONS
         .iter()
-        .find(|(k, _)| *k == name)
+        .find(|(k, _)| k.as_bytes() == name)
         .map(|(_, v)| *v)
 }
 
@@ -59,14 +62,14 @@ pub struct Color {
     foreground: String,
     background: String,
     // option name => ['set' => i64, 'unset' => i64]
-    options: IndexMap<String, (i64, i64)>,
+    options: IndexMap<BString, (i64, i64)>,
 }
 
 impl Color {
     pub fn new(
-        foreground: &str,
-        background: &str,
-        options: &[String],
+        foreground: &BStr,
+        background: &BStr,
+        options: &[BString],
     ) -> Result<Self, InvalidArgumentException> {
         let mut this = Self {
             foreground: Self::parse_color(foreground, false)?,
@@ -96,8 +99,8 @@ impl Color {
         Ok(this)
     }
 
-    pub fn apply(&self, text: &str) -> String {
-        format!("{}{}{}", self.set(), text, self.unset())
+    pub fn apply(&self, text: &BStr) -> BString {
+        bconcat!(self.set(), text, self.unset())
     }
 
     pub fn set(&self) -> String {
@@ -136,12 +139,12 @@ impl Color {
         format!("\u{1b}[{}m", implode(";", &unset_codes))
     }
 
-    fn parse_color(color: &str, background: bool) -> Result<String, InvalidArgumentException> {
+    fn parse_color(color: &BStr, background: bool) -> Result<String, InvalidArgumentException> {
         if color.is_empty() {
             return Ok(String::new());
         }
 
-        if &color[0..1] == "#" {
+        if color[0] == b'#' {
             let mut color = substr(color, 1, None);
 
             if strlen(&color) == 3 {

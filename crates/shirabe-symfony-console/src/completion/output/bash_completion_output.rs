@@ -19,6 +19,6 @@ impl CompletionOutputInterface for BashCompletionOutput {
                 values.push(format!("--no-{}", option.get_name()));
             }
         }
-        output.writeln(&[values.join("\n")], 0);
+        output.writeln(&[bstr::BString::from(values.join("\n"))], 0);
     }
 }

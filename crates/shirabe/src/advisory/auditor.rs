@@ -517,9 +517,7 @@ impl Auditor {
                 error.push(format!("URL: {}", self.get_url(sa)));
                 error.push(format!(
                     "Affected versions: {}",
-                    OutputFormatter::escape(&legacy_lossy(
-                        &sa.affected_versions().get_pretty_string()
-                    ))?
+                    OutputFormatter::escape(sa.affected_versions().get_pretty_string())?
                 ));
                 error.push(format!("Reported at: {}", sa.reported_at.format(DATE_ATOM)));
                 if let Some(ignored) = advisory.as_ignored() {

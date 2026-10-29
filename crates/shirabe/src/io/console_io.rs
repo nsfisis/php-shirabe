@@ -98,17 +98,21 @@ impl ConsoleIO {
             None
         };
         if let Some(error_output) = error_output {
-            error_output
-                .borrow()
-                .write(std::slice::from_ref(&messages), newline, sf_verbosity);
+            error_output.borrow().write(
+                std::slice::from_ref(&bstr::BString::from(messages.clone())),
+                newline,
+                sf_verbosity,
+            );
             *self.last_message_err.borrow_mut() = messages;
 
             return;
         }
 
-        self.output
-            .borrow()
-            .write(std::slice::from_ref(&messages), newline, sf_verbosity);
+        self.output.borrow().write(
+            std::slice::from_ref(&bstr::BString::from(messages.clone())),
+            newline,
+            sf_verbosity,
+        );
         *self.last_message.borrow_mut() = messages;
     }
 

@@ -4,6 +4,7 @@ use crate::formatter::OutputFormatterInterface;
 use crate::output::{
     ConsoleOutputInterface, ConsoleSectionOutput, OutputInterface, StreamOutput, VERBOSITY_NORMAL,
 };
+use bstr::BString;
 use shirabe_php_shim::{
     PHP_OS, PhpResource, getenv, implode, php_fopen_resource, php_stderr_resource,
     php_stdout_resource, php_uname, stripos,
@@ -163,10 +164,10 @@ impl ConsoleOutputInterface for ConsoleOutput {
 }
 
 impl OutputInterface for ConsoleOutput {
-    fn write(&self, messages: &[String], newline: bool, options: i64) {
+    fn write(&self, messages: &[BString], newline: bool, options: i64) {
         self.inner.write(messages, newline, options);
     }
-    fn writeln(&self, messages: &[String], options: i64) {
+    fn writeln(&self, messages: &[BString], options: i64) {
         self.inner.writeln(messages, options);
     }
     fn set_verbosity(&self, level: i64) {

@@ -322,7 +322,7 @@ impl Descriptor for MarkdownDescriptor {
         // it still delegates to parent::write.
         let _ = decorated;
         self.output().borrow().write(
-            &[content.to_string()],
+            &[bstr::BString::from(content.to_string())],
             false,
             if decorated {
                 crate::output::OUTPUT_NORMAL

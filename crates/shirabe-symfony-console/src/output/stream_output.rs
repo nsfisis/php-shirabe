@@ -3,6 +3,7 @@
 use crate::exception::InvalidArgumentException;
 use crate::formatter::OutputFormatterInterface;
 use crate::output::{DoWrite, Output, OutputInterface, VERBOSITY_NORMAL};
+use bstr::{BStr, BString};
 use shirabe_php_shim::{
     PHP_EOL, PhpResource, fflush_resource, fwrite_resource, get_resource_type, getenv, php_regex,
     preg_is_match, sapi_windows_vt100_support, stream_isatty_resource,
@@ -139,10 +140,10 @@ fn no_color_first_char() -> Option<u8> {
 }
 
 impl DoWrite for StreamOutput {
-    fn do_write(&self, message: &str, newline: bool) {
-        let mut message = message.to_string();
+    fn do_write(&self, message: &BStr, newline: bool) {
+        let mut message = BString::from(message);
         if newline {
-            message.push_str(PHP_EOL);
+            message.extend_from_slice(PHP_EOL.as_bytes());
         }
 
         fwrite_resource(&self.stream, &message);
@@ -152,10 +153,10 @@ impl DoWrite for StreamOutput {
 }
 
 impl OutputInterface for StreamOutput {
-    fn write(&self, messages: &[String], newline: bool, options: i64) {
+    fn write(&self, messages: &[BString], newline: bool, options: i64) {
         self.inner.write(self, messages, newline, options);
     }
-    fn writeln(&self, messages: &[String], options: i64) {
+    fn writeln(&self, messages: &[BString], options: i64) {
         self.inner.writeln(self, messages, options);
     }
     fn set_verbosity(&self, level: i64) {

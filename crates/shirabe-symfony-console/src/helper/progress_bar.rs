@@ -425,7 +425,7 @@ impl ProgressBar {
         self.format = None;
         self.max = max.max(0);
         self.step_width = if self.max != 0 {
-            Helper::width(&self.max.to_string())
+            Helper::width(self.max.to_string())
         } else {
             4
         };
@@ -520,9 +520,9 @@ impl ProgressBar {
                     let mut line_count = message_lines.len() as i64;
                     for message_line in &message_lines {
                         let formatter = section.get_formatter();
-                        let message_line_length = Helper::width(&Helper::remove_decoration(
+                        let message_line_length = Helper::width(Helper::remove_decoration(
                             &mut *formatter.borrow_mut(),
-                            &legacy_lossy(message_line),
+                            message_line,
                         ));
                         if message_line_length > self.terminal.get_width() {
                             line_count += (message_line_length as f64
@@ -551,9 +551,11 @@ impl ProgressBar {
         self.previous_message = Some(original_message);
         self.last_write_time = microtime();
 
-        self.output
-            .borrow()
-            .write(&[message], false, output_interface::OUTPUT_NORMAL);
+        self.output.borrow().write(
+            &[bstr::BString::from(message)],
+            false,
+            output_interface::OUTPUT_NORMAL,
+        );
         self.write_count += 1;
     }
 
@@ -604,9 +606,9 @@ impl ProgressBar {
                     if complete_bars < bar.get_bar_width() as f64 {
                         let empty_bars = bar.get_bar_width() as f64
                             - complete_bars
-                            - Helper::length(&Helper::remove_decoration(
+                            - Helper::length(Helper::remove_decoration(
                                 &mut *output.borrow().get_formatter().borrow_mut(),
-                                &bar.get_progress_character(),
+                                bar.get_progress_character(),
                             )) as f64;
                         display.extend_from_slice(bar.get_progress_character().as_bytes());
                         display.extend_from_slice(&str_repeat(
@@ -761,9 +763,9 @@ impl ProgressBar {
         let lines_length: Vec<i64> = explode("\n", &line)
             .iter()
             .map(|sub_line| {
-                Helper::width(&Helper::remove_decoration(
+                Helper::width(Helper::remove_decoration(
                     &mut *self.output.borrow().get_formatter().borrow_mut(),
-                    &legacy_lossy(&rtrim2(sub_line, "\r")),
+                    rtrim2(sub_line, "\r"),
                 ))
             })
             .collect();

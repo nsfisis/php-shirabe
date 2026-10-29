@@ -10,14 +10,14 @@ use crate::output::{
 };
 use crate::question::{ChoiceQuestion, QuestionInterface};
 use crate::terminal::Terminal;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BString};
 use shirabe_php_shim::{
-    Exception, PHP_EOL, PhpMixed, PhpResource, SEEK_SET, copy, dir, explode, feof, fgetc, fgets,
-    fopen, fread, fseek, ftell, function_exists, legacy_lossy, mb_detect_encoding, mb_strlen, ord,
-    php_fopen_resource, rewind, rtrim, sapi_windows_cp_conv, sapi_windows_cp_get,
-    sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat, stream_copy_to_stream,
-    stream_get_meta_data, stream_isatty_resource, stream_select, stream_set_blocking, strlen,
-    substr, sys_get_temp_dir, trim, unlink,
+    Exception, PHP_EOL, PhpMixed, PhpResource, SEEK_SET, bconcat, copy, dir, explode, feof, fgetc,
+    fgets, fopen, fread, fseek, ftell, function_exists, legacy_lossy, mb_detect_encoding,
+    mb_strlen, ord, php_fopen_resource, php_to_string, rewind, rtrim, sapi_windows_cp_conv,
+    sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat,
+    stream_copy_to_stream, stream_get_meta_data, stream_isatty_resource, stream_select,
+    stream_set_blocking, strlen, substr, sys_get_temp_dir, trim, unlink,
 };
 use shirabe_symfony_string::s;
 
@@ -186,7 +186,7 @@ pub trait QuestionHelperInterface {
             if let Some(section_output) =
                 (*borrowed).as_any().downcast_ref::<ConsoleSectionOutput>()
             {
-                section_output.add_content(&ret.to_string());
+                section_output.add_content(bstr::BStr::new(&ret.to_string()));
             }
         }
 
@@ -336,16 +336,16 @@ impl QuestionHelper {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         question: &impl QuestionInterface,
     ) {
-        let mut message = question.get_question().to_string();
+        let mut message = BString::from(question.get_question());
 
         if let Some(choice_question) = question.as_choice() {
-            let mut lines = vec![question.get_question().to_string()];
+            let mut lines = vec![BString::from(question.get_question())];
             lines.extend(self.format_choice_question_choices(choice_question, "info"));
             output
                 .borrow()
                 .writeln(&lines, output_interface::OUTPUT_NORMAL);
 
-            message = choice_question.get_prompt().to_string();
+            message = BString::from(choice_question.get_prompt());
         }
 
         output
@@ -357,27 +357,30 @@ impl QuestionHelper {
         &self,
         question: &ChoiceQuestion,
         tag: &str,
-    ) -> Vec<String> {
-        let mut messages: Vec<String> = vec![];
+    ) -> Vec<BString> {
+        let mut messages: Vec<BString> = vec![];
 
         let choices = question.get_choices();
         let max_width = choices
             .keys()
             // TODO(bytes): widths are measured on UTF-8 text, so non-UTF-8 bytes are replaced.
-            .map(|key| Helper::width(&key.to_str_lossy()))
+            .map(Helper::width)
             .max()
             .unwrap_or(0);
 
         for (key, value) in choices {
-            let padding = str_repeat(
-                " ",
-                (max_width - Helper::width(&key.to_str_lossy())) as usize,
-            );
+            let padding = str_repeat(" ", (max_width - Helper::width(key)) as usize);
 
-            messages.push(format!(
-                "  [<{tag}>{}{padding}</{tag}>] {}",
-                key.clone(),
-                value.clone(),
+            messages.push(bconcat!(
+                "  [<",
+                tag,
+                ">",
+                key,
+                padding,
+                "</",
+                tag,
+                ">] ",
+                php_to_string(value),
             ));
         }
 
@@ -402,9 +405,10 @@ impl QuestionHelper {
             format!("<error>{}</error>", error.get_message())
         };
 
-        output
-            .borrow()
-            .writeln(&[message], output_interface::OUTPUT_NORMAL);
+        output.borrow().writeln(
+            &[bstr::BString::from(message)],
+            output_interface::OUTPUT_NORMAL,
+        );
     }
 
     /// Autocompletes a question.
@@ -435,10 +439,10 @@ impl QuestionHelper {
 
         // Add highlighted text style
         output.borrow().get_formatter().borrow_mut().set_style(
-            "hl",
+            bstr::BStr::new("hl"),
             Box::new(OutputFormatterStyle::new(
-                Some("black"),
-                Some("white"),
+                Some(bstr::BStr::new("black")),
+                Some(bstr::BStr::new("white")),
                 vec![],
             )),
         );
@@ -512,7 +516,9 @@ impl QuestionHelper {
                             None,
                         );
                         output.borrow().write(
-                            std::slice::from_ref(&legacy_lossy(&remaining_characters).into_owned()),
+                            std::slice::from_ref(&bstr::BString::from(
+                                legacy_lossy(&remaining_characters).into_owned().clone(),
+                            )),
                             false,
                             output_interface::OUTPUT_NORMAL,
                         );
@@ -535,7 +541,7 @@ impl QuestionHelper {
 
                     if c.as_deref() == Some(b"\n".as_slice()) {
                         output.borrow().write(
-                            &["\n".to_string()],
+                            &[bstr::BString::from("\n".to_string())],
                             false,
                             output_interface::OUTPUT_NORMAL,
                         );
@@ -564,7 +570,7 @@ impl QuestionHelper {
                 // Strings.
                 let cur = String::from_utf8_lossy(&c.clone().unwrap_or_default()).into_owned();
                 output.borrow().write(
-                    std::slice::from_ref(&cur),
+                    std::slice::from_ref(&bstr::BString::from(cur.clone())),
                     false,
                     output_interface::OUTPUT_NORMAL,
                 );
@@ -604,14 +610,14 @@ impl QuestionHelper {
                 let characters_entered =
                     strlen(trim(self.most_recently_entered_value(&full_choice)));
                 output.borrow().write(
-                    &[format!(
+                    &[bstr::BString::from(format!(
                         "<hl>{}</hl>",
-                        OutputFormatter::escape_trailing_backslash(&legacy_lossy(&substr(
+                        OutputFormatter::escape_trailing_backslash(substr(
                             matches[ofs as usize].to_string(),
                             characters_entered,
                             None,
-                        )))
-                    )],
+                        ))
+                    ))],
                     false,
                     output_interface::OUTPUT_NORMAL,
                 );
@@ -666,9 +672,10 @@ impl QuestionHelper {
 
             let s_exec = shell_exec(format!("\"{}\"", exe)).unwrap_or_default();
             let value = if trimmable { rtrim(&s_exec) } else { s_exec };
-            output
-                .borrow()
-                .writeln(&["".to_string()], output_interface::OUTPUT_NORMAL);
+            output.borrow().writeln(
+                &[bstr::BString::from("".to_string())],
+                output_interface::OUTPUT_NORMAL,
+            );
 
             if let Some(tmp) = tmp_exe {
                 unlink(&tmp);
@@ -703,9 +710,10 @@ impl QuestionHelper {
         if trimmable {
             value = legacy_lossy(&trim(&value)).into_owned();
         }
-        output
-            .borrow()
-            .writeln(&["".to_string()], output_interface::OUTPUT_NORMAL);
+        output.borrow().writeln(
+            &[bstr::BString::from("".to_string())],
+            output_interface::OUTPUT_NORMAL,
+        );
 
         Ok(Ok(value))
     }
@@ -822,7 +830,7 @@ impl QuestionHelper {
 
     /// Helper::substr proxy (inherited static helper).
     fn substr(string: Option<&str>, from: i64, length: Option<i64>) -> String {
-        Helper::substr(string.unwrap_or_default(), from, length)
+        legacy_lossy(&Helper::substr(string.unwrap_or_default(), from, length)).into_owned()
     }
 }
 

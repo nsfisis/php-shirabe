@@ -567,11 +567,13 @@ impl Table {
         }
 
         self.output.borrow().writeln(
-            &[legacy_lossy(&sprintf(
-                self.style.get_border_format(),
-                &[PhpMixed::from(markup)],
-            ))
-            .into_owned()],
+            &[bstr::BString::from(
+                legacy_lossy(&sprintf(
+                    self.style.get_border_format(),
+                    &[PhpMixed::from(markup)],
+                ))
+                .into_owned(),
+            )],
             crate::output::OUTPUT_NORMAL,
         );
     }
@@ -613,9 +615,10 @@ impl Table {
                 BORDER_INSIDE
             }));
         }
-        self.output
-            .borrow()
-            .writeln(&[row_content], crate::output::OUTPUT_NORMAL);
+        self.output.borrow().writeln(
+            &[bstr::BString::from(row_content)],
+            crate::output::OUTPUT_NORMAL,
+        );
     }
 
     /// Renders table cell with padding.
@@ -652,7 +655,7 @@ impl Table {
             .into_owned();
         }
 
-        width += Helper::length(&cell_str) - Helper::length(&self.remove_decoration(&cell_str));
+        width += Helper::length(&cell_str) - Helper::length(self.remove_decoration(&cell_str));
         let mut content = sprintf(
             style.get_cell_row_content_format(),
             &[PhpMixed::from(cell_str.clone())],
@@ -733,7 +736,7 @@ impl Table {
                 };
 
                 if self.column_max_widths.contains_key(&column)
-                    && Helper::width(&self.remove_decoration(&cell.to_php_string()))
+                    && Helper::width(self.remove_decoration(&cell.to_php_string()))
                         > self.column_max_widths[&column]
                 {
                     let wrapped = self.format_and_wrap(
@@ -755,7 +758,7 @@ impl Table {
                     eol,
                     &explode(eol, &cell_str)
                         .iter()
-                        .map(|line| OutputFormatter::escape_trailing_backslash(&legacy_lossy(line)))
+                        .map(OutputFormatter::escape_trailing_backslash)
                         .collect::<Vec<_>>(),
                 );
                 cell = if cell.is_table_cell() {
@@ -1040,7 +1043,7 @@ impl Table {
             self.effective_column_widths.insert(
                 column,
                 *lengths.iter().max().unwrap()
-                    + Helper::width(&self.style.get_cell_row_content_format())
+                    + Helper::width(self.style.get_cell_row_content_format())
                     - 2,
             );
             column += 1;
@@ -1048,17 +1051,17 @@ impl Table {
     }
 
     fn get_column_separator_width(&self) -> i64 {
-        Helper::width(&legacy_lossy(&sprintf(
+        Helper::width(sprintf(
             self.style.get_border_format(),
             &[PhpMixed::from(self.style.get_border_chars()[3].clone())],
-        )))
+        ))
     }
 
     fn get_cell_width(&self, row: &[Cell], column: i64) -> i64 {
         let mut cell_width = 0;
 
         if let Some(cell) = row.get(column as usize) {
-            cell_width = Helper::width(&self.remove_decoration(&cell.to_php_string()));
+            cell_width = Helper::width(self.remove_decoration(&cell.to_php_string()));
         }
 
         let column_width = *self.column_widths.get(&column).unwrap_or(&0);
@@ -1186,17 +1189,20 @@ impl Table {
             .as_any_mut()
             .downcast_mut::<OutputFormatter>()
             .expect("formatter must be a WrappableOutputFormatterInterface");
-        formatter
-            .format_and_wrap(Some(string), width)
-            .unwrap()
-            .unwrap_or_default()
+        legacy_lossy(
+            &formatter
+                .format_and_wrap(Some(bstr::BStr::new(string)), width)
+                .unwrap()
+                .unwrap_or_default(),
+        )
+        .into_owned()
     }
 
     /// PHP `Helper::removeDecoration($this->output->getFormatter(), $string)`.
     fn remove_decoration(&self, string: &str) -> String {
         let formatter = self.output.borrow().get_formatter();
         let mut formatter = formatter.borrow_mut();
-        Helper::remove_decoration(&mut *formatter, string)
+        legacy_lossy(&Helper::remove_decoration(&mut *formatter, string)).into_owned()
     }
 
     fn table_cell_options_colspan(colspan: i64) -> IndexMap<String, TableCellOption> {

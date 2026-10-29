@@ -97,7 +97,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 && (!root_pkg.get_requires().is_empty() || !root_pkg.get_dev_requires().is_empty())
             {
                 output.borrow().writeln(
-                    &["<warning>No dependencies installed. Try running shirabe install or update, or use --locked.</warning>".to_string()],
+                    &[bstr::BString::from("<warning>No dependencies installed. Try running shirabe install or update, or use --locked.</warning>".to_string())],
                     shirabe_symfony_console::output::OUTPUT_NORMAL,
                 );
 
@@ -402,12 +402,12 @@ pub trait BaseDependencyCommand: BaseCommand {
             "blue".to_string(),
         ]);
         for color in self.colors().iter() {
-            let style = OutputFormatterStyle::new(Some(color), None, vec![]);
+            let style = OutputFormatterStyle::new(Some(bstr::BStr::new(color)), None, vec![]);
             output
                 .borrow()
                 .get_formatter()
                 .borrow_mut()
-                .set_style(color, Box::new(style));
+                .set_style(bstr::BStr::new(color), Box::new(style));
         }
     }
 

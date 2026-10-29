@@ -10,9 +10,10 @@ use crate::question::{ConfirmationQuestion, QuestionInterface};
 use crate::style::output_style::OutputStyle;
 use crate::style::style_interface::StyleInterface;
 use crate::terminal::Terminal;
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    AsAny, PHP_EOL, PhpMixed, array_unshift, boolval, explode, legacy_lossy, str_repeat,
-    str_replace, strlen, substr, substr_count, wordwrap,
+    AsAny, PHP_EOL, PhpMixed, array_unshift, bconcat, boolval, explode, str_repeat, str_replace,
+    strlen, substr, substr_count, wordwrap,
 };
 
 /// Output decorator helpers for the Symfony Style Guide.
@@ -63,7 +64,7 @@ impl SymfonyStyle {
     /// Formats a message as a block of text.
     pub fn block(
         &mut self,
-        messages: &[String],
+        messages: &[BString],
         r#type: Option<&str>,
         style: Option<&str>,
         prefix: &str,
@@ -105,7 +106,7 @@ impl SymfonyStyle {
         if self.input.borrow().is_interactive() {
             self.new_line(1);
             self.buffered_output
-                .write(&["\n".to_string()], false, OUTPUT_NORMAL);
+                .write(&["\n".into()], false, OUTPUT_NORMAL);
         }
 
         answer
@@ -146,34 +147,34 @@ impl SymfonyStyle {
         self.new_line(2 - substr_count(&chars, "\n"));
     }
 
-    fn write_buffer(&mut self, message: &str, new_line: bool, r#type: i64) {
+    fn write_buffer(&mut self, message: &BStr, new_line: bool, r#type: i64) {
         // We need to know if the last chars are PHP_EOL
         self.buffered_output
-            .write(&[message.to_string()], new_line, r#type);
+            .write(&[BString::from(message)], new_line, r#type);
     }
 
     fn create_block(
         &mut self,
-        messages: &[String],
+        messages: &[BString],
         r#type: Option<&str>,
         style: Option<&str>,
         prefix: &str,
         padding: bool,
         escape: bool,
-    ) -> Vec<String> {
+    ) -> Vec<BString> {
         let mut indent_length: i64 = 0;
-        let prefix_length = Helper::width(&Helper::remove_decoration(
+        let prefix_length = Helper::width(Helper::remove_decoration(
             &mut *self.get_formatter().borrow_mut(),
             prefix,
         ));
-        let mut lines: Vec<String> = Vec::new();
+        let mut lines: Vec<BString> = Vec::new();
 
         let mut r#type = r#type.map(|t| t.to_string());
-        let mut line_indentation = String::new();
+        let mut line_indentation = BString::default();
         if let Some(t) = &r#type {
             let formatted = format!("[{}] ", t.clone());
             indent_length = strlen(&formatted);
-            line_indentation = legacy_lossy(&str_repeat(" ", indent_length as usize)).into_owned();
+            line_indentation = str_repeat(" ", indent_length as usize);
             r#type = Some(formatted);
         }
 
@@ -187,7 +188,7 @@ impl SymfonyStyle {
             }
 
             let decoration_length = Helper::width(&message)
-                - Helper::width(&Helper::remove_decoration(
+                - Helper::width(Helper::remove_decoration(
                     &mut *self.get_formatter().borrow_mut(),
                     &message,
                 ));
@@ -200,44 +201,45 @@ impl SymfonyStyle {
                 wordwrap(&message, message_line_length, PHP_EOL, true),
             );
             for message_line in message_lines {
-                lines.push(legacy_lossy(&message_line).into_owned());
+                lines.push(message_line);
             }
 
             if messages_count > 1 && key < messages_count - 1 {
-                lines.push(String::new());
+                lines.push(BString::default());
             }
         }
 
         let mut first_line_index: i64 = 0;
         if padding && self.inner.is_decorated() {
             first_line_index = 1;
-            array_unshift(&mut lines, String::new());
-            lines.push(String::new());
+            array_unshift(&mut lines, BString::default());
+            lines.push(BString::default());
         }
 
         for (i, line) in lines.iter_mut().enumerate() {
             let i = i as i64;
             if let Some(t) = &r#type {
                 *line = if first_line_index == i {
-                    format!("{}{}", t, line)
+                    bconcat!(t, &*line)
                 } else {
-                    format!("{}{}", line_indentation, line)
+                    bconcat!(line_indentation, &*line)
                 };
             }
 
-            *line = format!("{}{}", prefix, line);
-            line.push_str(&legacy_lossy(&str_repeat(
+            *line = bconcat!(prefix, &*line);
+            let padding = str_repeat(
                 " ",
                 (self.line_length
-                    - Helper::width(&Helper::remove_decoration(
+                    - Helper::width(Helper::remove_decoration(
                         &mut *self.output.borrow().get_formatter().borrow_mut(),
-                        line,
+                        &line,
                     )))
                 .max(0) as usize,
-            )));
+            );
+            line.extend_from_slice(&padding);
 
             if let Some(style) = style {
-                *line = format!("<{}>{}</>", style, line.clone());
+                *line = bconcat!("<", style, ">", &*line, "</>");
             }
         }
 
@@ -269,16 +271,16 @@ impl SymfonyStyle {
         .ok()
     }
 
-    pub fn writeln(&mut self, messages: &[String], r#type: i64) {
+    pub fn writeln(&mut self, messages: &[BString], r#type: i64) {
         for message in messages {
             self.inner.writeln(std::slice::from_ref(message), r#type);
-            self.write_buffer(message, true, r#type);
+            self.write_buffer(message.as_bstr(), true, r#type);
         }
     }
 }
 
 impl StyleInterface for SymfonyStyle {
-    fn error(&mut self, message: &[String]) {
+    fn error(&mut self, message: &[BString]) {
         self.block(
             message,
             Some("ERROR"),
@@ -310,10 +312,7 @@ impl StyleInterface for SymfonyStyle {
 
     fn new_line(&mut self, count: i64) {
         self.inner.new_line(count);
-        self.buffered_output.write(
-            &[legacy_lossy(&str_repeat("\n", count as usize)).into_owned()],
-            false,
-            OUTPUT_NORMAL,
-        );
+        self.buffered_output
+            .write(&[str_repeat("\n", count as usize)], false, OUTPUT_NORMAL);
     }
 }

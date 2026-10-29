@@ -1229,9 +1229,10 @@ impl Application {
         e: &anyhow::Error,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) {
-        output
-            .borrow()
-            .writeln(&["".to_string()], output_interface::VERBOSITY_QUIET);
+        output.borrow().writeln(
+            &[bstr::BString::from("".to_string())],
+            output_interface::VERBOSITY_QUIET,
+        );
 
         self.do_render_throwable(e, output.clone());
 
@@ -1241,15 +1242,16 @@ impl Application {
             // identity over the synopsis and the application-name argument is never substituted.
             let synopsis = running_command.borrow().get_synopsis(false);
             output.borrow().writeln(
-                &[format!(
+                &[bstr::BString::from(format!(
                     "<info>{}</info>",
                     OutputFormatter::escape(&synopsis).unwrap(),
-                )],
+                ))],
                 output_interface::VERBOSITY_QUIET,
             );
-            output
-                .borrow()
-                .writeln(&["".to_string()], output_interface::VERBOSITY_QUIET);
+            output.borrow().writeln(
+                &[bstr::BString::from("".to_string())],
+                output_interface::VERBOSITY_QUIET,
+            );
         }
     }
 
@@ -1325,7 +1327,7 @@ impl Application {
                     .map_or_else(|| "n/a".to_string(), |line| line.to_string());
                 messages.push(format!(
                     "<comment>{}</comment>",
-                    OutputFormatter::escape(&format!("In {} line {}:", file, line)).unwrap()
+                    OutputFormatter::escape(format!("In {} line {}:", file, line)).unwrap()
                 ));
             }
             let empty_line = format!("<error>{}</error>", str_repeat(" ", len as usize));
@@ -1347,9 +1349,13 @@ impl Application {
             messages.push(empty_line);
             messages.push(String::new());
 
-            output
-                .borrow()
-                .writeln(&messages, output_interface::VERBOSITY_QUIET);
+            output.borrow().writeln(
+                &messages
+                    .iter()
+                    .map(|s| bstr::BString::from(s.as_str()))
+                    .collect::<Vec<_>>(),
+                output_interface::VERBOSITY_QUIET,
+            );
 
             // PHP renders the `Exception trace:` block (getTrace()) at -v or higher. A PHP backtrace
             // has no faithful Rust equivalent, so this block is intentionally never ported; verbose
@@ -2663,9 +2669,10 @@ impl ApplicationHandle {
             .has_parameter_option(&["--version", "-V"], true)
         {
             let long_version = application.borrow().get_long_version();
-            output
-                .borrow()
-                .writeln(&[long_version], output_interface::OUTPUT_NORMAL);
+            output.borrow().writeln(
+                &[bstr::BString::from(long_version)],
+                output_interface::OUTPUT_NORMAL,
+            );
 
             return Ok(0);
         }
@@ -2766,9 +2773,10 @@ impl ApplicationHandle {
                 let alternative = single_alternative.unwrap();
 
                 let mut style = SymfonyStyle::new(input.clone(), output.clone());
-                output
-                    .borrow()
-                    .writeln(&["".to_string()], output_interface::OUTPUT_NORMAL);
+                output.borrow().writeln(
+                    &[bstr::BString::from("".to_string())],
+                    output_interface::OUTPUT_NORMAL,
+                );
                 let formatted_block = FormatterHelper::default().format_block(
                     FormatBlockMessages::String(format!(
                         "Command \"{}\" is not defined.",
@@ -2777,9 +2785,10 @@ impl ApplicationHandle {
                     "error",
                     true,
                 );
-                output
-                    .borrow()
-                    .writeln(&[formatted_block], output_interface::OUTPUT_NORMAL);
+                output.borrow().writeln(
+                    &[bstr::BString::from(formatted_block)],
+                    output_interface::OUTPUT_NORMAL,
+                );
                 if !style.confirm(
                     &format!("Do you want to run \"{}\" instead? ", alternative.clone()),
                     false,

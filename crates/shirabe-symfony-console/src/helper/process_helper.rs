@@ -104,9 +104,11 @@ impl ProcessHelper {
                 &spl_object_hash(&process),
                 &self.escape_string(&process.get_command_line()),
             );
-            output
-                .borrow()
-                .write(&[started], false, output_interface::OUTPUT_NORMAL);
+            output.borrow().write(
+                &[bstr::BString::from(started)],
+                false,
+                output_interface::OUTPUT_NORMAL,
+            );
         }
 
         let callback = if output.borrow().is_debug() {
@@ -153,16 +155,21 @@ impl ProcessHelper {
                 &message,
                 process.is_successful(),
             );
-            output
-                .borrow()
-                .write(&[stopped], false, output_interface::OUTPUT_NORMAL);
+            output.borrow().write(
+                &[bstr::BString::from(stopped)],
+                false,
+                output_interface::OUTPUT_NORMAL,
+            );
         }
 
         if !process.is_successful()
             && let Some(error) = error
         {
             output.borrow().writeln(
-                &[format!("<error>{}</error>", self.escape_string(error))],
+                &[bstr::BString::from(format!(
+                    "<error>{}</error>",
+                    self.escape_string(error)
+                ))],
                 output_interface::OUTPUT_NORMAL,
             );
         }
@@ -229,9 +236,11 @@ impl ProcessHelper {
                 &Self::escape_string_static(buffer),
                 Process::ERR == r#type,
             );
-            output
-                .borrow()
-                .write(&[progressed], false, output_interface::OUTPUT_NORMAL);
+            output.borrow().write(
+                &[bstr::BString::from(progressed)],
+                false,
+                output_interface::OUTPUT_NORMAL,
+            );
 
             if let Some(callback) = callback.as_mut() {
                 callback(r#type, buffer);

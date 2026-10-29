@@ -5,6 +5,7 @@ mod bootstrap;
 #[path = "common/test_case.rs"]
 mod test_case;
 
+use bstr::ByteSlice;
 use serial_test::serial;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue, ParameterName};
 use test_case::init_temp_composer;
@@ -68,7 +69,7 @@ fn test_dev_warning() {
         .display(),
         PHP_EOL
     );
-    assert!(output.borrow().fetch().contains(&expected_output));
+    assert!(output.borrow().fetch().contains_str(&expected_output));
 }
 
 #[ignore = "SelfUpdateCommand::execute is intentionally stubbed with a Shirabe-specific \"not available\" message instead of the original Composer wording this test expects"]
@@ -107,7 +108,7 @@ fn test_dev_warning_suppressed_for_self_update() {
     assert_eq!(
         "This instance of Composer does not have the self-update command.\n\
          This could be due to a number of reasons, such as Composer being installed as a system package on your OS, or Composer being installed as a package in the current project.\n",
-        output.borrow().fetch().as_str()
+        output.borrow().fetch().as_bstr()
     );
 }
 
@@ -260,7 +261,7 @@ fn test_script_command_takes_priority_over_abbreviated_builtin_command() {
 
     assert_eq!(0, exit_code, "Script command should have run successfully");
     assert!(
-        app_output.borrow().fetch().contains("hello"),
+        app_output.borrow().fetch().contains_str("hello"),
         "The \"check\" script should have been executed instead of the check-platform-reqs command"
     );
 }

@@ -874,12 +874,13 @@ impl ShowCommand {
         ];
 
         for color in self.colors.borrow().iter() {
-            let style = OutputFormatterStyle::new(Some(color.as_str()), None, vec![]);
+            let style =
+                OutputFormatterStyle::new(Some(bstr::BStr::new(color.as_str())), None, vec![]);
             output
                 .borrow()
                 .get_formatter()
                 .borrow_mut()
-                .set_style(color, Box::new(style));
+                .set_style(bstr::BStr::new(color), Box::new(style));
         }
     }
 

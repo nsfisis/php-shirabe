@@ -6,10 +6,11 @@ use crate::formatter::output_formatter_style::OutputFormatterStyle;
 use crate::formatter::output_formatter_style_interface::OutputFormatterStyleInterface;
 use crate::formatter::output_formatter_style_stack::OutputFormatterStyleStack;
 use crate::formatter::wrappable_output_formatter_interface::WrappableOutputFormatterInterface;
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    PhpMixed, PregMatches, byte_at, explode, implode, legacy_lossy, ltrim, mb_detect_encoding,
-    php_regex, preg_match, preg_match_all, preg_replace, rtrim2, str_repeat, str_replace, strlen,
-    strtolower, strtr_array, substr,
+    PregMatches, bconcat, byte_at, explode, implode, ltrim, mb_detect_encoding, php_regex,
+    preg_match, preg_match_all, preg_replace, rtrim2, str_repeat, str_replace, strlen, strtolower,
+    strtr_array, substr, utf8_text,
 };
 use shirabe_symfony_string::b;
 
@@ -18,7 +19,7 @@ use shirabe_symfony_string::b;
 pub struct OutputFormatter {
     decorated: bool,
     styles: indexmap::IndexMap<
-        String,
+        BString,
         std::rc::Rc<std::cell::RefCell<Box<dyn OutputFormatterStyleInterface>>>,
     >,
     style_stack: OutputFormatterStyleStack,
@@ -26,28 +27,21 @@ pub struct OutputFormatter {
 
 impl OutputFormatter {
     /// Escapes "<" and ">" special chars in given text.
-    pub fn escape(text: &str) -> anyhow::Result<String> {
-        let text = legacy_lossy(&preg_replace(
-            php_regex!("/([^\\\\]|^)([<>])/"),
-            "$1\\\\$2",
-            text,
-        ))
-        .into_owned();
+    pub fn escape(text: impl AsRef<[u8]>) -> anyhow::Result<BString> {
+        let text = preg_replace(php_regex!("/([^\\\\]|^)([<>])/"), "$1\\\\$2", text);
 
-        Ok(Self::escape_trailing_backslash(&text))
+        Ok(Self::escape_trailing_backslash(text))
     }
 
     /// Escapes trailing "\" in given text.
-    pub fn escape_trailing_backslash(text: &str) -> String {
-        let mut text = text.to_string();
-        if text.ends_with('\\') {
+    pub fn escape_trailing_backslash(text: impl AsRef<[u8]>) -> BString {
+        let mut text = BString::from(text.as_ref());
+        if text.ends_with(b"\\") {
             let len = strlen(&text);
-            text = legacy_lossy(&rtrim2(&text, "\\")).into_owned();
-            text = legacy_lossy(&str_replace("\0", "", &text)).into_owned();
-            text.push_str(&legacy_lossy(&str_repeat(
-                "\0",
-                (len - strlen(&text)) as usize,
-            )));
+            text = rtrim2(&text, "\\");
+            text = str_replace("\0", "", &text);
+            let padding = str_repeat("\0", (len - strlen(&text)) as usize);
+            text.extend_from_slice(&padding);
         }
 
         text
@@ -58,7 +52,7 @@ impl OutputFormatter {
     /// `styles` is an array of "name => FormatterStyle" instances.
     pub fn new(
         decorated: bool,
-        styles: indexmap::IndexMap<String, Box<dyn OutputFormatterStyleInterface>>,
+        styles: indexmap::IndexMap<BString, Box<dyn OutputFormatterStyleInterface>>,
     ) -> Self {
         let mut this = Self {
             decorated,
@@ -67,32 +61,40 @@ impl OutputFormatter {
         };
 
         this.set_style(
-            "error",
+            "error".into(),
             Box::new(OutputFormatterStyle::new(
-                Some("white"),
-                Some("red"),
+                Some("white".into()),
+                Some("red".into()),
                 vec![],
             )),
         );
         this.set_style(
-            "info",
-            Box::new(OutputFormatterStyle::new(Some("green"), None, vec![])),
-        );
-        this.set_style(
-            "comment",
-            Box::new(OutputFormatterStyle::new(Some("yellow"), None, vec![])),
-        );
-        this.set_style(
-            "question",
+            "info".into(),
             Box::new(OutputFormatterStyle::new(
-                Some("black"),
-                Some("cyan"),
+                Some("green".into()),
+                None,
+                vec![],
+            )),
+        );
+        this.set_style(
+            "comment".into(),
+            Box::new(OutputFormatterStyle::new(
+                Some("yellow".into()),
+                None,
+                vec![],
+            )),
+        );
+        this.set_style(
+            "question".into(),
+            Box::new(OutputFormatterStyle::new(
+                Some("black".into()),
+                Some("cyan".into()),
                 vec![],
             )),
         );
 
         for (name, style) in styles {
-            this.set_style(&name, style);
+            this.set_style(name.as_bstr(), style);
         }
 
         this.style_stack = OutputFormatterStyleStack::new(None);
@@ -107,7 +109,7 @@ impl OutputFormatter {
     /// Tries to create new style instance from string.
     fn create_style_from_string(
         &self,
-        string: &str,
+        string: &BStr,
     ) -> anyhow::Result<Option<Box<dyn OutputFormatterStyleInterface>>> {
         if let Some(style) = self.styles.get(string) {
             return Ok(Some(style.borrow().clone_box()));
@@ -131,22 +133,21 @@ impl OutputFormatter {
                 .expect("every group participates whenever the pattern matches");
 
             if key == "fg" {
-                style.set_foreground(Some(&*legacy_lossy(&strtolower(value))));
+                style.set_foreground(Some(strtolower(value).as_bstr()));
             } else if key == "bg" {
-                style.set_background(Some(&*legacy_lossy(&strtolower(value))));
+                style.set_background(Some(strtolower(value).as_bstr()));
             } else if key == "href" {
-                let url = legacy_lossy(&preg_replace(php_regex!("{\\\\([<>])}"), "$1", value))
-                    .into_owned();
-                style.set_href(&url);
+                let url = preg_replace(php_regex!("{\\\\([<>])}"), "$1", value);
+                style.set_href(url);
             } else if key == "options" {
-                let value = legacy_lossy(&strtolower(value)).into_owned();
+                let value = strtolower(value);
                 let options = preg_match_all(php_regex!("([^,;]+)"), &value);
                 for option in options {
-                    style.set_option(&legacy_lossy(
+                    style.set_option(
                         option
                             .get(0)
                             .expect("group 0 participates whenever the pattern matches"),
-                    ));
+                    );
                 }
             } else {
                 return Ok(None);
@@ -159,47 +160,48 @@ impl OutputFormatter {
     /// Applies current style from stack to text, if must be applied.
     fn apply_current_style(
         &mut self,
-        text: &str,
-        current: &str,
+        text: &BStr,
+        current: &BStr,
         width: i64,
         current_line_length: &mut i64,
-    ) -> String {
+    ) -> BString {
         if text.is_empty() {
-            return String::new();
+            return BString::default();
         }
 
         if width == 0 {
             return if self.is_decorated() {
                 self.style_stack.get_current_mut().apply(text)
             } else {
-                text.to_string()
+                BString::from(text)
             };
         }
 
-        let mut text = text.to_string();
+        let mut text = BString::from(text);
 
         if *current_line_length == 0 && !current.is_empty() {
-            text = legacy_lossy(&ltrim(&text)).into_owned();
+            text = ltrim(&text);
         }
 
         let prefix;
         if *current_line_length != 0 {
             let i = width - *current_line_length;
-            prefix = format!("{}\n", substr(&text, 0, Some(i)));
-            text = legacy_lossy(&substr(&text, i, None)).into_owned();
+            prefix = bconcat!(substr(&text, 0, Some(i)), "\n");
+            text = substr(&text, i, None);
         } else {
-            prefix = String::new();
+            prefix = BString::default();
         }
 
-        let trailing = preg_match(php_regex!("~(\\n)$~"), &text)
-            .and_then(|matches| matches.get(1))
-            .unwrap_or_default()
-            .to_string();
-        text = format!("{}{}", prefix, self.add_line_breaks(&text, width));
-        text = format!("{}{}", rtrim2(&text, "\n"), trailing);
+        let trailing = BString::from(
+            preg_match(php_regex!("~(\\n)$~"), &text)
+                .and_then(|matches| matches.get(1))
+                .unwrap_or_default(),
+        );
+        text = bconcat!(prefix, self.add_line_breaks(text.as_bstr(), width));
+        text = bconcat!(rtrim2(&text, "\n"), trailing);
 
         if *current_line_length == 0 && !current.is_empty() && substr(current, -1, None) != "\n" {
-            text = format!("\n{text}");
+            text = bconcat!("\n", text);
         }
 
         let mut lines = explode("\n", &text);
@@ -213,29 +215,24 @@ impl OutputFormatter {
 
         if self.is_decorated() {
             for line in lines.iter_mut() {
-                *line = bstr::BString::from(
-                    self.style_stack
-                        .get_current_mut()
-                        .apply(&legacy_lossy(line)),
-                );
+                *line = self.style_stack.get_current_mut().apply(line.as_bstr());
             }
         }
 
-        legacy_lossy(&implode("\n", &lines)).into_owned()
+        implode("\n", &lines)
     }
 
-    fn add_line_breaks(&self, text: &str, width: i64) -> String {
+    fn add_line_breaks(&self, text: &BStr, width: i64) -> BString {
         let encoding = mb_detect_encoding(text, None, true)
             .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| bstr::BString::from("UTF-8".to_string()));
+            .unwrap_or_else(|| BString::from("UTF-8"));
+        let encoding =
+            utf8_text(&encoding).expect("mb_detect_encoding() returns an ASCII encoding name");
 
-        legacy_lossy(
-            &b(text)
-                .to_code_point_string(&legacy_lossy(&encoding))
-                .wordwrap(width, "\n", true)
-                .to_byte_string(&legacy_lossy(&encoding)),
-        )
-        .into_owned()
+        b(text)
+            .to_code_point_string(encoding)
+            .wordwrap(width, "\n", true)
+            .to_byte_string(encoding)
     }
 }
 
@@ -248,36 +245,32 @@ impl OutputFormatterInterface for OutputFormatter {
         self.decorated
     }
 
-    fn set_style(&mut self, name: &str, style: Box<dyn OutputFormatterStyleInterface>) {
+    fn set_style(&mut self, name: &BStr, style: Box<dyn OutputFormatterStyleInterface>) {
         self.styles.insert(
-            legacy_lossy(&strtolower(name)).into_owned(),
+            strtolower(name),
             std::rc::Rc::new(std::cell::RefCell::new(style)),
         );
     }
 
-    fn has_style(&self, name: &str) -> bool {
-        self.styles.contains_key(&*legacy_lossy(&strtolower(name)))
+    fn has_style(&self, name: &BStr) -> bool {
+        self.styles.contains_key(strtolower(name).as_bstr())
     }
 
     fn get_style(
         &self,
-        name: &str,
+        name: &BStr,
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<Box<dyn OutputFormatterStyleInterface>>>>
     {
         if !self.has_style(name) {
-            return Err(InvalidArgumentException::new(format!(
-                "Undefined style: \"{}\".",
-                PhpMixed::string(name.to_string()),
-            ))
-            .into());
+            return Err(
+                InvalidArgumentException::new(format!("Undefined style: \"{}\".", name)).into(),
+            );
         }
 
-        Ok(std::rc::Rc::clone(
-            &self.styles[&*legacy_lossy(&strtolower(name))],
-        ))
+        Ok(std::rc::Rc::clone(&self.styles[strtolower(name).as_bstr()]))
     }
 
-    fn format(&mut self, message: Option<&str>) -> anyhow::Result<Option<String>> {
+    fn format(&mut self, message: Option<&BStr>) -> anyhow::Result<Option<BString>> {
         self.format_and_wrap(message, 0)
     }
 }
@@ -285,16 +278,16 @@ impl OutputFormatterInterface for OutputFormatter {
 impl WrappableOutputFormatterInterface for OutputFormatter {
     fn format_and_wrap(
         &mut self,
-        message: Option<&str>,
+        message: Option<&BStr>,
         width: i64,
-    ) -> anyhow::Result<Option<String>> {
+    ) -> anyhow::Result<Option<BString>> {
         let message = match message {
-            None => return Ok(Some(String::new())),
+            None => return Ok(Some(BString::default())),
             Some(message) => message,
         };
 
         let mut offset: i64 = 0;
-        let mut output = String::new();
+        let mut output = BString::default();
         let open_tag_regex = "[a-z](?:[^\\\\<>]* | \\\\.)*";
         let close_tag_regex = "[a-z][^<>]*";
         let mut current_line_length: i64 = 0;
@@ -307,12 +300,9 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
                 .get_offset(0)
                 .expect("group 0 participates whenever the pattern matches")
                 as i64;
-            let text = legacy_lossy(
-                &match_
-                    .get(0)
-                    .expect("group 0 participates whenever the pattern matches"),
-            )
-            .into_owned();
+            let text = match_
+                .get(0)
+                .expect("group 0 participates whenever the pattern matches");
 
             if pos != 0 && byte_at(message, (pos - 1) as usize) == b'\\' {
                 continue;
@@ -321,56 +311,57 @@ impl WrappableOutputFormatterInterface for OutputFormatter {
             // add the text up to the next tag
             let segment = substr(message, offset, Some(pos - offset));
             let applied = self.apply_current_style(
-                &legacy_lossy(&segment),
-                &output,
+                segment.as_bstr(),
+                output.as_bstr(),
                 width,
                 &mut current_line_length,
             );
-            output.push_str(&applied);
-            offset = pos + strlen(&text);
+            output.extend_from_slice(&applied);
+            offset = pos + strlen(text);
 
             // opening tag?
-            let open = byte_at(&text, 1) != b'/';
-            let tag = legacy_lossy(&if open {
+            let open = byte_at(text, 1) != b'/';
+            let tag = if open {
                 match_
                     .get(1)
                     .expect("group 1 participates whenever the pattern matches")
             } else {
                 match_.get(3).unwrap_or_default()
-            })
-            .into_owned();
+            };
 
             if !open && tag.is_empty() {
                 // </>
                 self.style_stack.pop(None)?.ok();
-            } else if let Some(style) = self.create_style_from_string(&tag)? {
+            } else if let Some(style) = self.create_style_from_string(tag)? {
                 if open {
                     self.style_stack.push(style);
                 } else {
                     self.style_stack.pop(Some(style))?.ok();
                 }
             } else {
-                let applied =
-                    self.apply_current_style(&text, &output, width, &mut current_line_length);
-                output.push_str(&applied);
+                let applied = self.apply_current_style(
+                    text,
+                    output.as_bstr(),
+                    width,
+                    &mut current_line_length,
+                );
+                output.extend_from_slice(&applied);
             }
         }
 
         let segment = substr(message, offset, None);
         let applied = self.apply_current_style(
-            &legacy_lossy(&segment),
-            &output,
+            segment.as_bstr(),
+            output.as_bstr(),
             width,
             &mut current_line_length,
         );
-        output.push_str(&applied);
+        output.extend_from_slice(&applied);
 
         let mut pairs = indexmap::IndexMap::new();
-        pairs.insert("\0".to_string(), "\\".to_string());
-        pairs.insert("\\<".to_string(), "<".to_string());
-        pairs.insert("\\>".to_string(), ">".to_string());
-        Ok(Some(
-            legacy_lossy(&strtr_array(&output, &pairs)).into_owned(),
-        ))
+        pairs.insert("\0", "\\");
+        pairs.insert("\\<", "<");
+        pairs.insert("\\>", ">");
+        Ok(Some(strtr_array(&output, &pairs)))
     }
 }

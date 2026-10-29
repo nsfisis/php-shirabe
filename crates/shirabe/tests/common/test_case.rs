@@ -461,7 +461,7 @@ impl ApplicationTester {
     fn create_stream(inputs: &[String]) -> PhpResource {
         let stream = php_fopen_resource("php://memory", "r+");
         for input in inputs {
-            fwrite_resource(&stream, &format!("{}{}", input, PHP_EOL));
+            fwrite_resource(&stream, format!("{}{}", input, PHP_EOL));
         }
         rewind(&stream);
         stream

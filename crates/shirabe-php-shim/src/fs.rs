@@ -733,7 +733,7 @@ pub fn fflush_resource(resource: &PhpResource) {
     fflush(resource);
 }
 
-pub fn fwrite_resource(resource: &PhpResource, data: &str) {
+pub fn fwrite_resource(resource: &PhpResource, data: impl AsRef<[u8]>) {
     fwrite(resource, data, None);
 }
 

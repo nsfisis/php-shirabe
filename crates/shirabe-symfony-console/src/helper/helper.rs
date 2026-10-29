@@ -2,10 +2,10 @@
 
 use crate::formatter::OutputFormatterInterface;
 use crate::helper::HelperSet;
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use shirabe_php_shim::{
-    legacy_lossy, mb_detect_encoding, mb_strlen, mb_strwidth, mb_substr, php_regex, preg_is_match,
-    preg_replace, strlen, substr, trigger_deprecation,
+    mb_detect_encoding, mb_strlen, mb_strwidth, mb_substr, php_regex, preg_is_match, preg_replace,
+    strlen, substr, trigger_deprecation, utf8_text,
 };
 use shirabe_symfony_string::unicode_string::UnicodeString;
 
@@ -28,7 +28,7 @@ impl Helper {
     }
 
     /// Returns the length of a string, using mb_strwidth if it is available.
-    pub fn strlen(string: &str) -> i64 {
+    pub fn strlen(string: impl AsRef<[u8]>) -> i64 {
         trigger_deprecation(
             "symfony/console",
             "5.3",
@@ -41,8 +41,10 @@ impl Helper {
 
     /// Returns the width of a string, using mb_strwidth if it is available.
     /// The width is how many characters positions the string will use.
-    pub fn width(string: &str) -> i64 {
+    pub fn width(string: impl AsRef<[u8]>) -> i64 {
+        let string = string.as_ref();
         if preg_is_match(php_regex!("//u"), string) {
+            let string = utf8_text(string).expect("a string matching //u is valid UTF-8");
             return UnicodeString::new(string).width(false);
         }
 
@@ -57,8 +59,10 @@ impl Helper {
 
     /// Returns the length of a string, using mb_strlen if it is available.
     /// The length is related to how many bytes the string will use.
-    pub fn length(string: &str) -> i64 {
+    pub fn length(string: impl AsRef<[u8]>) -> i64 {
+        let string = string.as_ref();
         if preg_is_match(php_regex!("//u"), string) {
+            let string = utf8_text(string).expect("a string matching //u is valid UTF-8");
             return UnicodeString::new(string).length();
         }
 
@@ -72,14 +76,15 @@ impl Helper {
     }
 
     /// Returns the subset of a string, using mb_substr if it is available.
-    pub fn substr(string: &str, from: i64, length: Option<i64>) -> String {
+    pub fn substr(string: impl AsRef<[u8]>, from: i64, length: Option<i64>) -> BString {
+        let string = string.as_ref();
         let encoding = mb_detect_encoding(string, None, true);
         let encoding = match encoding {
             Some(encoding) => encoding,
-            None => return legacy_lossy(&substr(string, from, length)).into_owned(),
+            None => return substr(string, from, length),
         };
 
-        legacy_lossy(&mb_substr(string, from, length, Some(encoding.as_bstr()))).into_owned()
+        mb_substr(string, from, length, Some(encoding.as_bstr()))
     }
 
     pub fn format_time(secs: f64) -> Option<String> {
@@ -131,7 +136,7 @@ impl Helper {
 
     pub fn strlen_without_decoration(
         formatter: &mut dyn OutputFormatterInterface,
-        string: &str,
+        string: impl AsRef<[u8]>,
     ) -> i64 {
         trigger_deprecation(
             "symfony/console",
@@ -140,23 +145,28 @@ impl Helper {
             "Helper::strlenWithoutDecoration",
         );
 
-        Self::width(&Self::remove_decoration(formatter, string))
+        Self::width(Self::remove_decoration(formatter, string))
     }
 
-    pub fn remove_decoration(formatter: &mut dyn OutputFormatterInterface, string: &str) -> String {
+    pub fn remove_decoration(
+        formatter: &mut dyn OutputFormatterInterface,
+        string: impl AsRef<[u8]>,
+    ) -> BString {
         let is_decorated = formatter.is_decorated();
         formatter.set_decorated(false);
         // remove <...> formatting
-        let string = formatter.format(Some(string)).unwrap().unwrap_or_default();
+        let string = formatter
+            .format(Some(string.as_ref().as_bstr()))
+            .unwrap()
+            .unwrap_or_default();
         // remove already formatted characters
         let string = preg_replace(php_regex!("/\u{1b}\\[[^m]*m/"), "", &string);
         // remove terminal hyperlinks
-        let string = legacy_lossy(&preg_replace(
+        let string = preg_replace(
             php_regex!("/\u{1b}]8;[^;]*;[^\u{1b}]*\u{1b}\\\\/"),
             "",
             &string,
-        ))
-        .into_owned();
+        );
         formatter.set_decorated(is_decorated);
 
         string

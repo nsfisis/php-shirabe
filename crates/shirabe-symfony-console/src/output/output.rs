@@ -5,7 +5,8 @@ use crate::output::{
     OUTPUT_NORMAL, OUTPUT_PLAIN, OUTPUT_RAW, VERBOSITY_DEBUG, VERBOSITY_NORMAL, VERBOSITY_QUIET,
     VERBOSITY_VERBOSE, VERBOSITY_VERY_VERBOSE,
 };
-use shirabe_php_shim::{legacy_lossy, strip_tags};
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::strip_tags;
 
 /// Base class for output classes.
 ///
@@ -33,7 +34,7 @@ impl std::fmt::Debug for Output {
 ///
 /// This mirrors the PHP `abstract protected function doWrite(string $message, bool $newline)`.
 pub trait DoWrite {
-    fn do_write(&self, message: &str, newline: bool);
+    fn do_write(&self, message: &BStr, newline: bool);
 }
 
 impl Output {
@@ -102,11 +103,17 @@ impl Output {
         VERBOSITY_DEBUG <= self.verbosity.get()
     }
 
-    pub fn writeln(&self, do_writer: &dyn DoWrite, messages: &[String], options: i64) {
+    pub fn writeln(&self, do_writer: &dyn DoWrite, messages: &[BString], options: i64) {
         self.write(do_writer, messages, true, options);
     }
 
-    pub fn write(&self, do_writer: &dyn DoWrite, messages: &[String], newline: bool, options: i64) {
+    pub fn write(
+        &self,
+        do_writer: &dyn DoWrite,
+        messages: &[BString],
+        newline: bool,
+        options: i64,
+    ) {
         let types = OUTPUT_NORMAL | OUTPUT_RAW | OUTPUT_PLAIN;
         let r#type = {
             let masked = types & options;
@@ -137,23 +144,22 @@ impl Output {
                     .formatter
                     .borrow()
                     .borrow_mut()
-                    .format(Some(message))
+                    .format(Some(message.as_bstr()))
                     .unwrap()
                     .unwrap_or_default(),
                 OUTPUT_RAW => message.clone(),
-                OUTPUT_PLAIN => legacy_lossy(&strip_tags(
+                OUTPUT_PLAIN => strip_tags(
                     self.formatter
                         .borrow()
                         .borrow_mut()
-                        .format(Some(message))
+                        .format(Some(message.as_bstr()))
                         .unwrap()
                         .unwrap_or_default(),
-                ))
-                .into_owned(),
+                ),
                 _ => message.clone(),
             };
 
-            do_writer.do_write(&message, newline);
+            do_writer.do_write(message.as_bstr(), newline);
         }
     }
 }

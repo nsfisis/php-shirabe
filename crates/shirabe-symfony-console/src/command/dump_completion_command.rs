@@ -123,7 +123,7 @@ impl DumpCompletionCommand {
         process.run(
             Some(Box::new(move |_type: &str, line: &str| {
                 output.borrow_mut().write(
-                    &[line.to_string()],
+                    &[bstr::BString::from(line.to_string())],
                     false,
                     output_interface::OUTPUT_NORMAL,
                 );
@@ -252,19 +252,19 @@ impl Command for DumpCompletionCommand {
             };
             if !shell.is_empty() {
                 output.borrow_mut().writeln(
-                    &[format!(
+                    &[bstr::BString::from(format!(
                         "<error>Detected shell \"{}\", which is not supported by Symfony shell completion (supported shells: \"{}\").</>",
                         shell,
                         supported_shells.join("\", \"")
-                    )],
+                    ))],
                     output_interface::OUTPUT_NORMAL,
                 );
             } else {
                 output.borrow_mut().writeln(
-                    &[format!(
+                    &[bstr::BString::from(format!(
                         "<error>Shell not detected, Symfony shell completion only supports \"{}\").</>",
                         supported_shells.join("\", \"")
-                    )],
+                    ))],
                     output_interface::OUTPUT_NORMAL,
                 );
             }
@@ -275,18 +275,20 @@ impl Command for DumpCompletionCommand {
         let application = self.get_application().unwrap();
         let version = application.borrow().get_version();
         output.borrow_mut().write(
-            &[legacy_lossy(&str_replace_arrays(
-                &[
-                    "{{ COMMAND_NAME }}".to_string(),
-                    "{{ VERSION }}".to_string(),
-                ],
-                &[
-                    command_name,
-                    legacy_lossy(&bstr::BString::from(version)).into_owned(),
-                ],
-                completion_file,
-            ))
-            .into_owned()],
+            &[bstr::BString::from(
+                legacy_lossy(&str_replace_arrays(
+                    &[
+                        "{{ COMMAND_NAME }}".to_string(),
+                        "{{ VERSION }}".to_string(),
+                    ],
+                    &[
+                        command_name,
+                        legacy_lossy(&bstr::BString::from(version)).into_owned(),
+                    ],
+                    completion_file,
+                ))
+                .into_owned(),
+            )],
             false,
             output_interface::OUTPUT_NORMAL,
         );
