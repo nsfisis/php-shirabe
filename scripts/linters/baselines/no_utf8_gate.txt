@@ -62,8 +62,8 @@
 9 crates/shirabe/src/io/base_io.rs
 1 crates/shirabe/src/io/buffer_io.rs
 6 crates/shirabe/src/io/console_io.rs
-4 crates/shirabe/src/json/json_file.rs
-5 crates/shirabe/src/json/json_manipulator.rs
+2 crates/shirabe/src/json/json_file.rs
+2 crates/shirabe/src/json/json_manipulator.rs
 1 crates/shirabe/src/main.rs
 1 crates/shirabe/src/package/archiver/archivable_files_filter.rs
 1 crates/shirabe/src/package/archiver/archivable_files_finder.rs

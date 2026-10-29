@@ -63,10 +63,7 @@ impl JsonConfigSource {
         // try to update cleanly
         let manipulator_result: bool = clean(&mut manipulator)?;
         if manipulator_result {
-            file_put_contents(
-                self.file.borrow().get_path(),
-                manipulator.get_contents().as_bytes(),
-            );
+            file_put_contents(self.file.borrow().get_path(), manipulator.get_contents());
         } else {
             // on failed clean update, call the fallback and rewrite the whole file
             let mut config = self.file.borrow_mut().read()?;
@@ -511,7 +508,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                     let parts = explode(".", name);
                     m.add_sub_node(
                         &legacy_lossy(parts.first().map(|p| p.as_slice()).unwrap_or(b"")),
-                        &legacy_lossy(parts.get(1).map(|p| p.as_slice()).unwrap_or(b"")),
+                        parts.get(1).map(|p| p.as_slice()).unwrap_or(b""),
                         value_cloned,
                         false,
                     )
@@ -549,7 +546,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                     let parts = explode(".", name);
                     m.remove_sub_node(
                         &legacy_lossy(parts.first().map(|p| p.as_slice()).unwrap_or(b"")),
-                        &legacy_lossy(parts.get(1).map(|p| p.as_slice()).unwrap_or(b"")),
+                        parts.get(1).map(|p| p.as_slice()).unwrap_or(b""),
                     )
                 } else {
                     m.remove_config_setting(name)

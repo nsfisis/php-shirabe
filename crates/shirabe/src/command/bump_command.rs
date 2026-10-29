@@ -317,7 +317,7 @@ impl BumpCommand {
             }
         }
 
-        match file_put_contents(json.get_path(), manipulator.get_contents().as_bytes()) {
+        match file_put_contents(json.get_path(), manipulator.get_contents()) {
             Some(_) => Ok(true),
             None => Err(RuntimeException::new(format!(
                 "Unable to write new {} contents.",

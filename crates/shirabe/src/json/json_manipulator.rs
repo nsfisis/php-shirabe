@@ -7,7 +7,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, addcslashes, array_key_exists, array_keys,
-    array_reverse, empty, explode, implode, in_array_loose, is_array, is_int, is_numeric,
+    array_reverse, bconcat, empty, explode, implode, in_array_loose, is_array, is_int, is_numeric,
     json_decode_assoc, json_decode_obj, legacy_lossy, php_regex, php_truthy, preg_is_match,
     preg_match, preg_quote, preg_replace, preg_replace2, rtrim2, str_repeat, str_replace, strlen,
     strnatcmp, strpos, substr, trim2, uksort,
@@ -15,9 +15,9 @@ use shirabe_php_shim::{
 
 #[derive(Debug)]
 pub struct JsonManipulator {
-    contents: String,
-    newline: String,
-    indent: String,
+    contents: BString,
+    newline: BString,
+    indent: BString,
 }
 
 impl JsonManipulator {
@@ -31,10 +31,10 @@ impl JsonManipulator {
        (?<json>      \\s*+ (?: (?&number) | (?&boolean) | (?&string) | (?&array) | (?&object) ) )
     )";
 
-    pub fn new(contents: String) -> anyhow::Result<Self> {
-        let mut contents = legacy_lossy(&trim2(&contents, " \t\n\r\0\u{0B}")).into_owned();
+    pub fn new(contents: impl AsRef<[u8]>) -> anyhow::Result<Self> {
+        let mut contents = trim2(contents, " \t\n\r\0\u{0B}");
         if contents.is_empty() {
-            contents = legacy_lossy(&bstr::BString::from("{}".to_string())).into_owned();
+            contents = BString::from("{}");
         }
         if !preg_is_match(php_regex!("#^\\{(.*)\\}$#s"), &contents) {
             return Err(InvalidArgumentException::new(
@@ -42,26 +42,26 @@ impl JsonManipulator {
             )
             .into());
         }
-        let newline = if strpos(&contents, "\r\n").is_some() {
-            "\r\n".to_string()
+        let newline = BString::from(if strpos(&contents, "\r\n").is_some() {
+            "\r\n"
         } else {
-            "\n".to_string()
-        };
+            "\n"
+        });
         let mut s = Self {
             contents: if contents == "{}" {
-                format!("{{{}}}", newline)
+                bconcat!("{", newline, "}")
             } else {
                 contents
             },
             newline,
-            indent: String::new(),
+            indent: BString::default(),
         };
         s.detect_indenting();
         Ok(s)
     }
 
-    pub fn get_contents(&self) -> String {
-        format!("{}{}", self.contents, self.newline)
+    pub fn get_contents(&self) -> BString {
+        bconcat!(self.contents, self.newline)
     }
 
     pub fn add_link(
@@ -91,25 +91,30 @@ impl JsonManipulator {
             Some(m) => m,
             None => return Ok(false),
         };
-        let start = self.contents[..m.key_pos].to_string();
-        let property = self.contents[m.key_pos..m.value_pos].to_string();
-        let end = self.contents[m.value_end..].to_string();
+        let start = BString::from(&self.contents[..m.key_pos]);
+        let property = BString::from(&self.contents[m.key_pos..m.value_pos]);
+        let end = BString::from(&self.contents[m.value_end..]);
 
-        let mut links = self.contents[m.value_pos..m.value_end].to_string();
+        let mut links = BString::from(&self.contents[m.value_pos..m.value_end]);
 
         // try to find existing link
         if let Some((key_start, key_end, value_start, value_end)) =
             find_package_link(&links, package)
         {
             // update existing link: re-encode the existing key, keep its separator, swap the value
-            let existing_package = links[key_start + 1..key_end - 1].to_string();
-            let separator = links[key_end..value_start].to_string();
-            links = format!(
-                "{}{}{}\"{}\"{}",
+            let existing_package = BString::from(&links[key_start + 1..key_end - 1]);
+            let separator = BString::from(&links[key_end..value_start]);
+            links = bconcat!(
                 &links[..key_start],
-                JsonFile::encode(&*legacy_lossy(&str_replace("\\/", "/", &existing_package)))?,
+                JsonFile::encode(&PhpMixed::string(str_replace(
+                    "\\/",
+                    "/",
+                    &existing_package
+                )))?,
                 separator,
+                "\"",
                 constraint,
+                "\"",
                 &links[value_end..]
             );
         } else {
@@ -118,7 +123,7 @@ impl JsonManipulator {
             {
                 let groups_1 = groups.get(1).unwrap_or_default().to_string();
                 // link missing but non empty links
-                links = legacy_lossy(&preg_replace(
+                links = preg_replace(
                     format!("{{{}$}}", preg_quote(&groups_1, None)),
                     addcslashes(
                         format!(
@@ -133,19 +138,20 @@ impl JsonManipulator {
                         "\\$",
                     ),
                     &links,
-                ))
-                .into_owned();
+                );
             } else {
                 // links empty
-                links = format!(
-                    "{{{}{}{}{}: {}{}{}}}",
+                links = bconcat!(
+                    "{",
                     self.newline,
                     self.indent,
                     self.indent,
                     JsonFile::encode(package)?,
+                    ": ",
                     JsonFile::encode(constraint)?,
                     self.newline,
-                    self.indent
+                    self.indent,
+                    "}"
                 );
             }
         }
@@ -153,35 +159,34 @@ impl JsonManipulator {
         if sort_packages {
             let mut requirements = json_decode_assoc(&links)?;
             Self::sort_packages(&mut requirements);
-            links = self.format(&requirements, 0, false)?;
+            links = bstr::BString::from(self.format(&requirements, 0, false)?);
         }
 
-        self.contents = format!("{}{}{}{}", start, property, links, end);
+        self.contents = bconcat!(start, property, links, end);
 
         Ok(true)
     }
 
     /// Sorts packages by importance (platform packages first, then PHP dependencies) and alphabetically.
     fn sort_packages(packages: &mut PhpMixed) {
-        let prefix = |requirement: &str| -> String {
-            if PlatformRepository::is_platform_package(requirement) {
+        let prefix = |requirement: &BStr| -> BString {
+            // TODO(bytes): is_platform_package matches the name as a &str.
+            if PlatformRepository::is_platform_package(&legacy_lossy(requirement)) {
                 let patterns = ["/^php/", "/^hhvm/", "/^ext/", "/^lib/", "/^\\D/"];
                 let replacements = ["0-$0", "1-$0", "2-$0", "3-$0", "4-$0"];
-                let mut result = requirement.to_string();
+                let mut result = BString::from(requirement);
                 for (p, r) in patterns.iter().zip(replacements.iter()) {
-                    result = legacy_lossy(&preg_replace(*p, r, &result)).into_owned();
+                    result = preg_replace(*p, r, &result);
                 }
                 result
             } else {
-                format!("5-{}", requirement)
+                bconcat!("5-", requirement)
             }
         };
 
         if let Some(arr) = packages.as_array_mut() {
-            // TODO(bytes): package names are compared as UTF-8 text, so non-UTF-8 bytes are
-            // replaced.
             uksort(arr, |a: &BStr, b: &BStr| -> i64 {
-                strnatcmp(prefix(&a.to_str_lossy()), prefix(&b.to_str_lossy()))
+                strnatcmp(prefix(a), prefix(b))
             });
         }
     }
@@ -247,7 +252,7 @@ impl JsonManipulator {
 
             for entry_key in &entries_to_revert {
                 // TODO(bytes): node names are Strings, so non-UTF-8 bytes are replaced.
-                if !self.remove_sub_node("repositories", &entry_key.to_str_lossy())? {
+                if !self.remove_sub_node("repositories", entry_key)? {
                     return Ok(false);
                 }
             }
@@ -379,7 +384,7 @@ impl JsonManipulator {
                     ValueKind::Object,
                 )
                 .and_then(|reps| {
-                    let obj = self.contents[reps.value_pos..reps.value_end].to_string();
+                    let obj = BString::from(&self.contents[reps.value_pos..reps.value_end]);
                     json_grammar::find_top_level_key(
                         obj.as_bytes(),
                         key.as_bytes(),
@@ -400,14 +405,14 @@ impl JsonManipulator {
             None => return Ok(false),
         };
 
-        let raw_repo = self.contents[repo_pos..repo_end].to_string();
+        let raw_repo = BString::from(&self.contents[repo_pos..repo_end]);
         // invalid match due to un-regexable content, abort
         if json_decode_obj(&raw_repo)?.as_bool() == Some(false) {
             return Ok(false);
         }
 
-        let start_outer = self.contents[..repo_pos].to_string();
-        let end_outer = self.contents[repo_end..].to_string();
+        let start_outer = BString::from(&self.contents[..repo_pos]);
+        let end_outer = BString::from(&self.contents[repo_end..]);
 
         // Replace the repository's "url" value, leaving the rest of the object untouched.
         let new_raw_repo = match json_grammar::find_top_level_key(
@@ -415,8 +420,7 @@ impl JsonManipulator {
             b"\"url\"",
             ValueKind::Json,
         ) {
-            Some(u) => format!(
-                "{}{}{}",
+            Some(u) => bconcat!(
                 &raw_repo[..u.value_pos],
                 JsonFile::encode(url)?,
                 &raw_repo[u.value_end..]
@@ -424,7 +428,7 @@ impl JsonManipulator {
             None => raw_repo,
         };
 
-        self.contents = format!("{}{}{}", start_outer, new_raw_repo, end_outer);
+        self.contents = bconcat!(start_outer, new_raw_repo, end_outer);
 
         Ok(true)
     }
@@ -610,25 +614,15 @@ impl JsonManipulator {
 
     pub fn add_property(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<bool> {
         if strpos(name, "suggest.") == Some(0) {
-            return self.add_sub_node(
-                "suggest",
-                &legacy_lossy(&substr(name, 8, None)),
-                value,
-                true,
-            );
+            return self.add_sub_node("suggest", substr(name, 8, None), value, true);
         }
 
         if strpos(name, "extra.") == Some(0) {
-            return self.add_sub_node("extra", &legacy_lossy(&substr(name, 6, None)), value, true);
+            return self.add_sub_node("extra", substr(name, 6, None), value, true);
         }
 
         if strpos(name, "scripts.") == Some(0) {
-            return self.add_sub_node(
-                "scripts",
-                &legacy_lossy(&substr(name, 8, None)),
-                value,
-                true,
-            );
+            return self.add_sub_node("scripts", substr(name, 8, None), value, true);
         }
 
         self.add_main_key(name, value)
@@ -636,23 +630,23 @@ impl JsonManipulator {
 
     pub fn remove_property(&mut self, name: &str) -> anyhow::Result<bool> {
         if strpos(name, "suggest.") == Some(0) {
-            return self.remove_sub_node("suggest", &legacy_lossy(&substr(name, 8, None)));
+            return self.remove_sub_node("suggest", substr(name, 8, None));
         }
 
         if strpos(name, "extra.") == Some(0) {
-            return self.remove_sub_node("extra", &legacy_lossy(&substr(name, 6, None)));
+            return self.remove_sub_node("extra", substr(name, 6, None));
         }
 
         if strpos(name, "scripts.") == Some(0) {
-            return self.remove_sub_node("scripts", &legacy_lossy(&substr(name, 8, None)));
+            return self.remove_sub_node("scripts", substr(name, 8, None));
         }
 
         if strpos(name, "autoload.") == Some(0) {
-            return self.remove_sub_node("autoload", &legacy_lossy(&substr(name, 9, None)));
+            return self.remove_sub_node("autoload", substr(name, 9, None));
         }
 
         if strpos(name, "autoload-dev.") == Some(0) {
-            return self.remove_sub_node("autoload-dev", &legacy_lossy(&substr(name, 13, None)));
+            return self.remove_sub_node("autoload-dev", substr(name, 13, None));
         }
 
         self.remove_main_key(name)
@@ -661,14 +655,15 @@ impl JsonManipulator {
     pub fn add_sub_node(
         &mut self,
         main_node: &str,
-        name: &str,
+        name: impl AsRef<[u8]>,
         value: PhpMixed,
         append: bool,
     ) -> anyhow::Result<bool> {
+        let name = name.as_ref();
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
-        let mut name_owned = name.to_string();
-        let mut sub_name: Option<String> = None;
+        let mut name_owned = BString::from(name);
+        let mut sub_name: Option<BString> = None;
         if in_array_loose(
             main_node.to_string(),
             &[
@@ -680,8 +675,8 @@ impl JsonManipulator {
         {
             let parts = explode(".", name);
             // PHP: explode('.', $name, 2)
-            let first = legacy_lossy(&parts[0].clone()).into_owned();
-            let rest = legacy_lossy(&implode(".", &parts[1..])).into_owned();
+            let first = parts[0].clone();
+            let rest = implode(".", &parts[1..]);
             name_owned = first;
             sub_name = Some(rest);
         }
@@ -694,13 +689,13 @@ impl JsonManipulator {
         {
             if let Some(ref sub) = sub_name {
                 let mut inner: IndexMap<BString, PhpMixed> = IndexMap::new();
-                inner.insert(sub.as_str().into(), value);
+                inner.insert(sub.clone(), value);
                 let mut outer: IndexMap<BString, PhpMixed> = IndexMap::new();
-                outer.insert(name_owned.into(), PhpMixed::Array(inner));
+                outer.insert(name_owned, PhpMixed::Array(inner));
                 self.add_main_key(main_node, PhpMixed::Array(outer))?;
             } else {
                 let mut outer: IndexMap<BString, PhpMixed> = IndexMap::new();
-                outer.insert(name_owned.into(), value);
+                outer.insert(name_owned, value);
                 self.add_main_key(main_node, PhpMixed::Array(outer))?;
             }
 
@@ -716,9 +711,9 @@ impl JsonManipulator {
             Some(node) => node,
             None => return Ok(false),
         };
-        let node_start = self.contents[..node.value_pos].to_string();
-        let node_end = self.contents[node.value_end..].to_string();
-        let mut children = self.contents[node.value_pos..node.value_end].to_string();
+        let node_start = BString::from(&self.contents[..node.value_pos]);
+        let node_end = BString::from(&self.contents[node.value_end..]);
+        let mut children = BString::from(&self.contents[node.value_pos..node.value_end]);
         // invalid match due to un-regexable content, abort
         if !php_truthy(&json_decode_obj(&children)?) {
             return Ok(false);
@@ -734,7 +729,7 @@ impl JsonManipulator {
             ValueKind::Json,
         );
         if let Some(cm) = child {
-            let content_str = children[cm.value_pos..cm.value_end].to_string();
+            let content_str = BString::from(&children[cm.value_pos..cm.value_end]);
             let mut value_local = value;
             if let Some(sub_name) = sub_name {
                 let mut cur_val = json_decode_assoc(&content_str).unwrap_or(PhpMixed::Null);
@@ -742,13 +737,12 @@ impl JsonManipulator {
                     cur_val = PhpMixed::Array(IndexMap::new());
                 }
                 if let Some(arr) = cur_val.as_array_mut() {
-                    arr.insert(sub_name.into(), value_local.clone());
+                    arr.insert(sub_name, value_local.clone());
                 }
                 value_local = cur_val;
             }
             let formatted = self.format(&value_local, 1, false)?;
-            children = format!(
-                "{}{}{}",
+            children = bconcat!(
                 &children[..cm.value_pos],
                 formatted,
                 &children[cm.value_end..]
@@ -773,13 +767,13 @@ impl JsonManipulator {
                     let mut value_local = value;
                     if let Some(ref sub) = sub_name {
                         let mut wrap: IndexMap<BString, PhpMixed> = IndexMap::new();
-                        wrap.insert(sub.as_str().into(), value_local.clone());
+                        wrap.insert(sub.clone(), value_local.clone());
                         value_local = PhpMixed::Array(wrap);
                     }
 
                     // child missing but non empty children
                     if append {
-                        children = legacy_lossy(&preg_replace(
+                        children = preg_replace(
                             format!("#{}}}$#", whitespace),
                             addcslashes(
                                 format!(
@@ -787,24 +781,23 @@ impl JsonManipulator {
                                     self.newline,
                                     self.indent,
                                     self.indent,
-                                    JsonFile::encode(&name_owned)?,
+                                    JsonFile::encode(&PhpMixed::String(name_owned.clone()))?,
                                     self.format(&value_local, 1, false)?,
                                     whitespace
                                 ),
                                 "\\$",
                             ),
                             &children,
-                        ))
-                        .into_owned();
+                        );
                     } else {
                         whitespace = leading_space;
-                        children = legacy_lossy(&preg_replace(
+                        children = preg_replace(
                             format!("#^{{{}#", whitespace),
                             addcslashes(
                                 format!(
                                     "{{{}{}: {},{}{}{}",
                                     whitespace,
-                                    JsonFile::encode(&name_owned)?,
+                                    JsonFile::encode(&PhpMixed::String(name_owned.clone()))?,
                                     self.format(&value_local, 1, false)?,
                                     self.newline,
                                     self.indent,
@@ -813,26 +806,27 @@ impl JsonManipulator {
                                 "\\$",
                             ),
                             &children,
-                        ))
-                        .into_owned();
+                        );
                     }
                 } else {
                     let mut value_local = value;
                     if let Some(ref sub) = sub_name {
                         let mut wrap: IndexMap<BString, PhpMixed> = IndexMap::new();
-                        wrap.insert(sub.as_str().into(), value_local.clone());
+                        wrap.insert(sub.clone(), value_local.clone());
                         value_local = PhpMixed::Array(wrap);
                     }
 
                     // children present but empty
-                    children = format!(
-                        "{{{}{}{}{}: {}{}}}",
+                    children = bconcat!(
+                        "{",
                         self.newline,
                         self.indent,
                         self.indent,
-                        JsonFile::encode(&name_owned)?,
+                        JsonFile::encode(&PhpMixed::String(name_owned.clone()))?,
+                        ": ",
                         self.format(&value_local, 1, false)?,
-                        whitespace
+                        whitespace,
+                        "}"
                     );
                 }
             } else {
@@ -844,12 +838,17 @@ impl JsonManipulator {
             }
         }
 
-        self.contents = format!("{}{}{}", node_start, children, node_end);
+        self.contents = bconcat!(node_start, children, node_end);
 
         Ok(true)
     }
 
-    pub fn remove_sub_node(&mut self, main_node: &str, name: &str) -> anyhow::Result<bool> {
+    pub fn remove_sub_node(
+        &mut self,
+        main_node: &str,
+        name: impl AsRef<[u8]>,
+    ) -> anyhow::Result<bool> {
+        let name = name.as_ref();
         let decoded = JsonFile::parse_json(Some(&self.contents), Some("composer.json"))?;
 
         // no node or empty node
@@ -867,17 +866,17 @@ impl JsonManipulator {
             Some(node) => node,
             None => return Ok(false),
         };
-        let node_start = self.contents[..node.value_pos].to_string();
-        let node_end = self.contents[node.value_end..].to_string();
-        let children = self.contents[node.value_pos..node.value_end].to_string();
+        let node_start = BString::from(&self.contents[..node.value_pos]);
+        let node_end = BString::from(&self.contents[node.value_end..]);
+        let children = BString::from(&self.contents[node.value_pos..node.value_end]);
 
         // invalid match due to un-regexable content, abort
         if !php_truthy(&json_decode_assoc(&children)?) {
             return Ok(false);
         }
 
-        let mut name_owned = name.to_string();
-        let mut sub_name: Option<String> = None;
+        let mut name_owned = BString::from(name);
+        let mut sub_name: Option<BString> = None;
         if in_array_loose(
             main_node.to_string(),
             &[
@@ -888,8 +887,8 @@ impl JsonManipulator {
         ) && strpos(name, ".").is_some()
         {
             let parts = explode(".", name);
-            let first = legacy_lossy(&parts[0].clone()).into_owned();
-            let rest = legacy_lossy(&implode(".", &parts[1..])).into_owned();
+            let first = parts[0].clone();
+            let rest = implode(".", &parts[1..]);
             name_owned = first;
             sub_name = Some(rest);
         }
@@ -912,37 +911,35 @@ impl JsonManipulator {
 
         // try and find a match for the subkey
         let key_regex = str_replace("/", "\\\\?/", preg_quote(&name_owned, None));
-        let mut children_clean: Option<String> = None;
+        let mut children_clean: Option<BString> = None;
         if preg_is_match(format!("{{\"{}\"\\s*:}}i", key_regex), &children) {
             // find best match for the value of "name". The PHP pattern `"name"\s*:\s*(?&json)` is
             // not anchored, so it can match the key at several nesting levels; collect every such
             // occurrence and keep the longest, reproducing PHP's behaviour.
             let key_value_matches = find_key_value_matches(&children, &name_owned);
             if !key_value_matches.is_empty() {
-                let mut best_match: String = String::new();
+                let mut best_match = BString::default();
                 for m in &key_value_matches {
                     if strlen(&best_match) < strlen(m) {
                         best_match = m.clone();
                     }
                 }
                 let mut count_out: usize = 0;
-                let cleaned = legacy_lossy(&preg_replace2(
+                let cleaned = preg_replace2(
                     format!("{{,\\s*{}}}i", preg_quote(&best_match, None)),
                     "",
                     &children,
                     -1,
                     Some(&mut count_out),
-                ))
-                .into_owned();
+                );
                 if 1 != count_out {
-                    let cleaned2 = legacy_lossy(&preg_replace2(
+                    let cleaned2 = preg_replace2(
                         format!("{{{}\\s*,?\\s*}}i", preg_quote(&best_match, None)),
                         "",
                         &cleaned,
                         -1,
                         Some(&mut count_out),
-                    ))
-                    .into_owned();
+                    );
                     if 1 != count_out {
                         return Ok(false);
                     }
@@ -963,10 +960,7 @@ impl JsonManipulator {
             &children_clean,
         ) && empty_match.name("content").is_none()
         {
-            self.contents = format!(
-                "{}{{{}{}}}{}",
-                node_start, self.newline, self.indent, node_end
-            );
+            self.contents = bconcat!(node_start, "{", self.newline, self.indent, "}", node_end);
 
             // we have a subname, so we restore the rest of $name
             if let Some(sub) = sub_name {
@@ -982,10 +976,7 @@ impl JsonManipulator {
                         .map(|a| a.is_empty())
                         .unwrap_or(false);
                     if now_empty {
-                        arr.insert(
-                            name_owned.as_str().into(),
-                            PhpMixed::Object(IndexMap::new()),
-                        );
+                        arr.insert(name_owned.clone(), PhpMixed::Object(IndexMap::new()));
                     }
                 }
                 let val = cur_val
@@ -1014,16 +1005,13 @@ impl JsonManipulator {
                     .map(|a| a.is_empty())
                     .unwrap_or(false);
                 if now_empty {
-                    arr.insert(
-                        name_owned.as_str().into(),
-                        PhpMixed::Object(IndexMap::new()),
-                    );
+                    arr.insert(name_owned.clone(), PhpMixed::Object(IndexMap::new()));
                 }
             }
-            children_final = self.format(&cur_val, 0, true)?;
+            children_final = bstr::BString::from(self.format(&cur_val, 0, true)?);
         }
 
-        self.contents = format!("{}{}{}", node_start, children_final, node_end);
+        self.contents = bconcat!(node_start, children_final, node_end);
 
         Ok(true)
     }
@@ -1055,9 +1043,9 @@ impl JsonManipulator {
             Some(node) => node,
             None => return Ok(false),
         };
-        let node_start = self.contents[..node.value_pos].to_string();
-        let node_end = self.contents[node.value_end..].to_string();
-        let mut children = self.contents[node.value_pos..node.value_end].to_string();
+        let node_start = BString::from(&self.contents[..node.value_pos]);
+        let node_end = BString::from(&self.contents[node.value_end..]);
+        let mut children = BString::from(&self.contents[node.value_pos..node.value_end]);
         // invalid match due to un-regexable content, abort
         if json_decode_obj(&children)?.as_bool() == Some(false) {
             return Ok(false);
@@ -1069,21 +1057,16 @@ impl JsonManipulator {
             ),
             &children,
         ) {
-            let leading_whitespace = leading_match
-                .name("leadingspace")
-                .unwrap_or_default()
-                .to_string();
-            let mut whitespace = leading_match
-                .name("trailingspace")
-                .unwrap_or_default()
-                .to_string();
-            let mut leading_item_whitespace =
-                format!("{}{}{}", self.newline, self.indent, self.indent);
+            let leading_whitespace =
+                BString::from(leading_match.name("leadingspace").unwrap_or_default());
+            let mut whitespace =
+                BString::from(leading_match.name("trailingspace").unwrap_or_default());
+            let mut leading_item_whitespace = bconcat!(self.newline, self.indent, self.indent);
             let mut trailing_item_whitespace = whitespace.clone();
             let mut item_depth: i64 = 1;
 
             // keep oneline lists as one line
-            if !whitespace.contains(&self.newline) {
+            if !whitespace.contains_str(&self.newline) {
                 leading_item_whitespace = leading_whitespace.clone();
                 trailing_item_whitespace = leading_whitespace.clone();
                 item_depth = 0;
@@ -1092,7 +1075,7 @@ impl JsonManipulator {
             if leading_match.name("content").is_some() {
                 // child missing but non empty children
                 if append {
-                    children = legacy_lossy(&preg_replace(
+                    children = preg_replace(
                         format!("#{}\\]$#", whitespace),
                         addcslashes(
                             format!(
@@ -1104,11 +1087,10 @@ impl JsonManipulator {
                             "\\$",
                         ),
                         &children,
-                    ))
-                    .into_owned();
+                    );
                 } else {
                     whitespace = leading_whitespace;
-                    children = legacy_lossy(&preg_replace(
+                    children = preg_replace(
                         format!("#^\\[{}#", whitespace),
                         addcslashes(
                             format!(
@@ -1120,16 +1102,16 @@ impl JsonManipulator {
                             "\\$",
                         ),
                         &children,
-                    ))
-                    .into_owned();
+                    );
                 }
             } else {
                 // children present but empty
-                children = format!(
-                    "[{}{}{}]",
+                children = bconcat!(
+                    "[",
                     leading_item_whitespace,
                     self.format(&value, item_depth, false)?,
-                    trailing_item_whitespace
+                    trailing_item_whitespace,
+                    "]"
                 );
             }
         } else {
@@ -1138,7 +1120,7 @@ impl JsonManipulator {
             );
         }
 
-        self.contents = format!("{}{}{}", node_start, children, node_end);
+        self.contents = bconcat!(node_start, children, node_end);
 
         Ok(true)
     }
@@ -1191,9 +1173,9 @@ impl JsonManipulator {
             Some(node) => node,
             None => return Ok(false),
         };
-        let node_start = self.contents[..node.value_pos].to_string();
-        let node_end = self.contents[node.value_end..].to_string();
-        let children = self.contents[node.value_pos..node.value_end].to_string();
+        let node_start = BString::from(&self.contents[..node.value_pos]);
+        let node_end = BString::from(&self.contents[node.value_end..]);
+        let children = BString::from(&self.contents[node.value_pos..node.value_end]);
         // invalid match due to un-regexable content, abort
         if json_decode_obj(&children)?.as_bool() == Some(false) {
             return Ok(false);
@@ -1217,17 +1199,17 @@ impl JsonManipulator {
             let sbi_end = json_grammar::skip_ws(cb, i);
             let space_before_item = &children[start_end..sbi_end];
             let formatted = self.format(&value, 1, false)?;
-            format!(
-                "{}{}{},{}{}",
+            bconcat!(
                 &children[..start_end],
                 space_before_item,
                 formatted,
+                ",",
                 space_before_item,
                 &children[sbi_end..]
             )
         };
 
-        self.contents = format!("{}{}{}", node_start, new_children, node_end);
+        self.contents = bconcat!(node_start, new_children, node_end);
 
         Ok(true)
     }
@@ -1255,9 +1237,9 @@ impl JsonManipulator {
             Some(node) => node,
             None => return Ok(false),
         };
-        let node_start = self.contents[..node.value_pos].to_string();
-        let node_end = self.contents[node.value_end..].to_string();
-        let children = self.contents[node.value_pos..node.value_end].to_string();
+        let node_start = BString::from(&self.contents[..node.value_pos]);
+        let node_end = BString::from(&self.contents[node.value_end..]);
+        let children = BString::from(&self.contents[node.value_pos..node.value_end]);
 
         // invalid match due to un-regexable content, abort
         if json_decode_assoc(&children)?.as_bool() == Some(false) {
@@ -1309,13 +1291,7 @@ impl JsonManipulator {
         })();
 
         if let Some((a, b)) = removal {
-            self.contents = format!(
-                "{}{}{}{}",
-                node_start,
-                &children[..a],
-                &children[b..],
-                node_end
-            );
+            self.contents = bconcat!(node_start, &children[..a], &children[b..], node_end);
 
             return Ok(true);
         }
@@ -1341,14 +1317,14 @@ impl JsonManipulator {
         if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
             let key_capture = &self.contents[m.key_pos..m.value_end];
-            if json_decode_obj(format!("{{{}}}", key_capture))?.is_null() {
+            if json_decode_obj(bconcat!("{", key_capture, "}"))?.is_null() {
                 return Ok(false);
             }
 
-            self.contents = format!(
-                "{}{}: {}{}",
+            self.contents = bconcat!(
                 &self.contents[..m.key_pos],
                 encoded_key,
+                ": ",
                 content,
                 &self.contents[m.value_end..]
             );
@@ -1359,7 +1335,7 @@ impl JsonManipulator {
         // append at the end of the file and keep whitespace
         if let Some(tail_match) = preg_match(php_regex!("#[^{\\s](\\s*)\\}$#"), &self.contents) {
             let tail_match_1 = tail_match.get(1).unwrap_or_default().to_string();
-            self.contents = legacy_lossy(&preg_replace(
+            self.contents = preg_replace(
                 format!("#{}\\}}$#", tail_match_1),
                 addcslashes(
                     format!(
@@ -1373,14 +1349,13 @@ impl JsonManipulator {
                     "\\$",
                 ),
                 &self.contents,
-            ))
-            .into_owned();
+            );
 
             return Ok(true);
         }
 
         // append at the end of the file
-        self.contents = legacy_lossy(&preg_replace(
+        self.contents = preg_replace(
             php_regex!("#\\}$#"),
             addcslashes(
                 format!(
@@ -1393,8 +1368,7 @@ impl JsonManipulator {
                 "\\$",
             ),
             &self.contents,
-        ))
-        .into_owned();
+        );
 
         Ok(true)
     }
@@ -1417,7 +1391,7 @@ impl JsonManipulator {
         if let Some(m) = key_match {
             // invalid match due to un-regexable content, abort
             let removal = &self.contents[m.key_pos..m.value_end];
-            if json_decode_obj(format!("{{{}}}", removal))?.is_null() {
+            if json_decode_obj(bconcat!("{", removal, "}"))?.is_null() {
                 return Ok(false);
             }
 
@@ -1430,21 +1404,20 @@ impl JsonManipulator {
             e = json_grammar::skip_ws(cb, e);
 
             // check that we are not leaving a dangling comma on the previous line if the last line was removed
-            let mut start = self.contents[..m.key_pos].to_string();
-            let end = self.contents[e..].to_string();
+            let mut start = BString::from(&self.contents[..m.key_pos]);
+            let end = BString::from(&self.contents[e..]);
             if preg_is_match(php_regex!("#,\\s*$#"), &start)
                 && preg_is_match(php_regex!("#^\\}$#"), &end)
             {
-                start = legacy_lossy(&rtrim2(
+                start = rtrim2(
                     preg_replace(php_regex!("#,(\\s*)$#"), "$1", &start),
                     &self.indent,
-                ))
-                .into_owned();
+                );
             }
 
-            self.contents = format!("{}{}", start, end);
+            self.contents = bconcat!(start, end);
             if preg_is_match(php_regex!("#^\\{\\s*\\}\\s*$#"), &self.contents) {
-                self.contents = "{\n}".to_string();
+                self.contents = bstr::BString::from("{\n}".to_string());
             }
 
             return Ok(true);
@@ -1475,10 +1448,11 @@ impl JsonManipulator {
             }
 
             let removal_space = &self.contents[m.value_pos + 1..m.value_end - 1];
-            self.contents = format!(
-                "{}[{}]{}",
+            self.contents = bconcat!(
                 &self.contents[..m.value_pos],
+                "[",
                 removal_space,
+                "]",
                 &self.contents[m.value_end..]
             );
 
@@ -1569,21 +1543,21 @@ impl JsonManipulator {
     }
 
     fn detect_indenting(&mut self) {
-        self.indent = JsonFile::detect_indenting(Some(&self.contents));
+        self.indent = BString::from(JsonFile::detect_indenting(Some(&self.contents)));
     }
 }
 
 // Reproduces the non-anchored PHP pattern `"name"\s*:\s*(?&json)` over `children`: returns every
 // substring where the raw key token `"name"` (allowing an escaped slash `\/` wherever the name has
 // `/`) is followed by `\s*:\s*` and a JSON value, in left-to-right, non-overlapping order.
-fn find_key_value_matches(children: &str, name: &str) -> Vec<String> {
-    let cb = children.as_bytes();
-    let name_bytes = name.as_bytes();
+fn find_key_value_matches(children: impl AsRef<[u8]>, name: impl AsRef<[u8]>) -> Vec<BString> {
+    let cb = children.as_ref();
+    let name_bytes = name.as_ref();
     let mut out = Vec::new();
     let mut i = 0;
     while i < cb.len() {
         if let Some(end) = match_key_value(cb, i, name_bytes) {
-            out.push(children[i..end].to_string());
+            out.push(BString::from(&cb[i..end]));
             i = end;
         } else {
             i += 1;
@@ -1628,9 +1602,12 @@ fn match_key_value(cb: &[u8], start: usize, name: &[u8]) -> Option<usize> {
 // optional escaped slash where the name has `/`) over the `links` object text. Returns the byte
 // offsets `(key_quote_start, key_end, value_start, value_end)` of the first match, where `key_end`
 // is just past the key's closing quote and the value is a JSON string.
-fn find_package_link(links: &str, package: &str) -> Option<(usize, usize, usize, usize)> {
-    let cb = links.as_bytes();
-    let name = package.as_bytes();
+fn find_package_link(
+    links: impl AsRef<[u8]>,
+    package: impl AsRef<[u8]>,
+) -> Option<(usize, usize, usize, usize)> {
+    let cb = links.as_ref();
+    let name = package.as_ref();
     for i in 0..cb.len() {
         if cb[i] != b'"' {
             continue;
@@ -1682,8 +1659,8 @@ fn match_pkg_name(b: &[u8], start: usize, name: &[u8]) -> Option<usize> {
 
 // Lightweight clone of JsonManipulator's formatting logic, used inside preg_replace_callback closures.
 struct ManipulatorFormatter {
-    newline: String,
-    indent: String,
+    newline: BString,
+    indent: BString,
 }
 
 impl ManipulatorFormatter {

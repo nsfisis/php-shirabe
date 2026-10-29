@@ -1276,7 +1276,7 @@ fn test_add_link() {
         ),
     ];
     for (json, r#type, package, constraint, expected) in cases {
-        let mut manipulator = JsonManipulator::new(json.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(json).unwrap();
         assert!(
             manipulator
                 .add_link(r#type, package, constraint, false)
@@ -1355,7 +1355,7 @@ fn test_add_link_and_sort_packages() {
         ),
     ];
     for (json, r#type, package, constraint, sort_packages, expected) in cases {
-        let mut manipulator = JsonManipulator::new(json.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(json).unwrap();
         assert!(
             manipulator
                 .add_link(r#type, package, constraint, sort_packages)
@@ -1672,7 +1672,7 @@ fn test_remove_sub_node() {
         ),
     ];
     for (json, name, expected, expected_content) in cases {
-        let mut manipulator = JsonManipulator::new(json.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(json).unwrap();
         assert_eq!(
             expected,
             manipulator.remove_sub_node("repositories", name).unwrap()
@@ -1924,7 +1924,7 @@ fn test_add_repository() {
         ),
     ];
     for (from, to, name, config, append) in cases {
-        let mut manipulator = JsonManipulator::new(from.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(from).unwrap();
         assert!(manipulator.add_repository(name, config, append).unwrap());
         assert_eq!(to, manipulator.get_contents());
     }
@@ -2181,7 +2181,7 @@ fn test_set_url_in_repository() {
         ),
     ];
     for (from, to, name, url) in cases {
-        let mut manipulator = JsonManipulator::new(from.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(from).unwrap();
         assert!(manipulator.set_repository_url(name, url).unwrap());
         assert_eq!(to, manipulator.get_contents());
     }
@@ -2492,7 +2492,7 @@ fn test_add_list_item() {
         ),
     ];
     for (from, to, main_node, value, append) in cases {
-        let mut manipulator = JsonManipulator::new(from.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(from).unwrap();
         assert!(manipulator.add_list_item(main_node, value, append).unwrap());
         assert_eq!(to, manipulator.get_contents());
     }
@@ -2602,7 +2602,7 @@ fn test_remove_list_item() {
         ),
     ];
     for (from, to, main_node, index_to_remove) in cases {
-        let mut manipulator = JsonManipulator::new(from.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(from).unwrap();
         assert!(
             manipulator
                 .remove_list_item(main_node, index_to_remove)
@@ -2739,7 +2739,7 @@ fn test_insert_list_item() {
         ),
     ];
     for (from, to, main_node, value, index_to_insert_at) in cases {
-        let mut manipulator = JsonManipulator::new(from.to_string()).unwrap();
+        let mut manipulator = JsonManipulator::new(from).unwrap();
         assert!(
             manipulator
                 .insert_list_item(main_node, value, index_to_insert_at)
@@ -2773,8 +2773,7 @@ fn test_remove_sub_node_from_require() {
     "require-dev": {
         "package/d": "*"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -2815,8 +2814,7 @@ fn test_remove_sub_node_preserves_object_type_when_empty() {
     let mut manipulator = JsonManipulator::new(
         r#"{
     "test": {"0": "foo"}
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -2838,8 +2836,7 @@ fn test_remove_sub_node_preserves_object_type_when_empty2() {
     "config": {
         "preferred-install": {"foo/*": "source"}
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -2883,8 +2880,7 @@ fn test_add_sub_node_in_require() {
     "require-dev": {
         "package/d": "*"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -2945,8 +2941,7 @@ fn test_add_extra_with_package() {
     "extra": {
         "auto-append-gitignore": true
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -2998,8 +2993,7 @@ fn test_add_config_with_package() {
             "php": "5.3.9"
         }
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3056,8 +3050,7 @@ fn test_add_suggest_with_package() {
     "suggest": {
         "package": "Description"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3095,8 +3088,7 @@ fn test_add_repository_can_initialize_empty_repositories() {
         r#"{
   "repositories": {
   }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3121,7 +3113,7 @@ fn test_add_repository_can_initialize_empty_repositories() {
 
 #[test]
 fn test_add_repository_can_initialize_from_scratch() {
-    let mut manipulator = JsonManipulator::new("{\n\t\"a\": \"b\"\n}".to_string()).unwrap();
+    let mut manipulator = JsonManipulator::new("{\n\t\"a\": \"b\"\n}").unwrap();
 
     assert!(
         manipulator
@@ -3145,8 +3137,7 @@ fn test_add_repository_can_append() {
             "url": "lala"
         }
     ]
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3185,8 +3176,7 @@ fn test_add_repository_can_prepend() {
             "url": "lala"
         }
     ]
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3224,8 +3214,7 @@ fn test_add_repository_can_override_deep_repos() {
             "package": {}
         }
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3263,8 +3252,7 @@ fn test_insert_repository_before_and_after_by_name() {
         },
         "packagist.org": false
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
     assert!(
@@ -3341,8 +3329,7 @@ fn test_remove_repository_removes_from_assoc_but_does_not_converts_from_assoc_to
         },
         "packagist.org": false
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3373,8 +3360,7 @@ fn test_remove_repository_removes_from_list() {
             "packagist.org": false
         }
     ]
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3403,8 +3389,7 @@ fn test_add_repository_converts_from_assoc_to_list() {
         },
         "packagist.org": false
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3442,8 +3427,7 @@ fn test_add_config_setting_escapes() {
         r#"{
     "config": {
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3469,8 +3453,7 @@ fn test_add_config_setting_escapes() {
 fn test_add_config_setting_works_from_scratch() {
     let mut manipulator = JsonManipulator::new(
         r#"{
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3495,8 +3478,7 @@ fn test_add_config_setting_can_add() {
     "config": {
         "foo": "bar"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3521,8 +3503,7 @@ fn test_add_config_setting_can_overwrite() {
         "foo": "bar",
         "bar": "baz"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3546,8 +3527,7 @@ fn test_add_config_setting_can_overwrite_numbers() {
     "config": {
         "foo": 500
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3577,8 +3557,7 @@ fn test_add_config_setting_can_overwrite_arrays() {
         },
         "github-protocols": ["https"]
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3632,8 +3611,7 @@ fn test_add_config_setting_can_add_sub_key_in_empty_config() {
         r#"{
     "config": {
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3664,8 +3642,7 @@ fn test_add_config_setting_can_add_sub_key_in_empty_val() {
         "github-oauth2": {
         }
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3712,8 +3689,7 @@ fn test_add_config_setting_can_add_sub_key_in_hash() {
             "github.com": "foo"
         }
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3743,8 +3719,7 @@ fn test_add_root_setting_does_not_break_dots() {
     "github-oauth": {
         "github.com": "foo"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3775,8 +3750,7 @@ fn test_remove_config_setting_can_remove_sub_key_in_hash() {
             "bar": "baz"
         }
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3809,8 +3783,7 @@ fn test_remove_config_setting_can_remove_sub_key_in_hash_with_siblings() {
             "bar": "baz"
         }
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3838,8 +3811,7 @@ fn test_add_main_key() {
     let mut manipulator = JsonManipulator::new(
         r#"{
     "foo": "bar"
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3859,8 +3831,7 @@ fn test_add_main_key_with_content_having_dollar_sign_followed_by_digit() {
     let mut manipulator = JsonManipulator::new(
         r#"{
     "foo": "bar"
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3877,7 +3848,7 @@ fn test_add_main_key_with_content_having_dollar_sign_followed_by_digit() {
 
 #[test]
 fn test_add_main_key_with_content_having_dollar_sign_followed_by_digit2() {
-    let mut manipulator = JsonManipulator::new("{}".to_string()).unwrap();
+    let mut manipulator = JsonManipulator::new("{}").unwrap();
 
     assert!(manipulator.add_main_key("foo", s("$1bar")).unwrap());
     assert_eq!(
@@ -3894,8 +3865,7 @@ fn test_update_main_key() {
     let mut manipulator = JsonManipulator::new(
         r#"{
     "foo": "bar"
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3919,8 +3889,7 @@ fn test_update_main_key2() {
     },
     "foo": "bar",
     "baz": "bar"
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3950,8 +3919,7 @@ fn test_update_main_key3() {
     "require-dev": {
         "foo": "bar"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -3979,8 +3947,7 @@ fn test_update_main_key_with_content_having_dollar_sign_followed_by_digit() {
     let mut manipulator = JsonManipulator::new(
         r#"{
     "foo": "bar"
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -4019,8 +3986,7 @@ fn test_remove_main_key() {
     "require-dev": {
         "package/d": "*"
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -4081,8 +4047,7 @@ fn test_remove_main_key_if_empty() {
     "foo": "bar",
     "require-dev": {
     }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -4125,7 +4090,7 @@ fn test_remove_main_key_if_empty() {
 
 #[test]
 fn test_remove_main_key_removes_key_where_value_is_null() {
-    let mut manipulator = JsonManipulator::new(r#"{"foo":9000,"bar":null}"#.to_string()).unwrap();
+    let mut manipulator = JsonManipulator::new(r#"{"foo":9000,"bar":null}"#).unwrap();
 
     manipulator.remove_main_key("bar").unwrap();
 
@@ -4140,8 +4105,7 @@ fn test_remove_main_key_removes_key_where_value_is_null() {
 #[test]
 fn test_indent_detection() {
     let mut manipulator =
-        JsonManipulator::new("{\n\n  \"require\": {\n    \"php\": \"5.*\"\n  }\n}".to_string())
-            .unwrap();
+        JsonManipulator::new("{\n\n  \"require\": {\n    \"php\": \"5.*\"\n  }\n}").unwrap();
 
     assert!(
         manipulator
@@ -4156,10 +4120,9 @@ fn test_indent_detection() {
 
 #[test]
 fn test_remove_main_key_at_end_of_file() {
-    let mut manipulator = JsonManipulator::new(
-        "{\n    \"require\": {\n        \"package/a\": \"*\"\n    }\n}\n".to_string(),
-    )
-    .unwrap();
+    let mut manipulator =
+        JsonManipulator::new("{\n    \"require\": {\n        \"package/a\": \"*\"\n    }\n}\n")
+            .unwrap();
     assert!(manipulator.add_main_key("homepage", s("http...")).unwrap());
     assert!(manipulator.add_main_key("license", s("mit")).unwrap());
     assert_eq!(
@@ -4195,8 +4158,7 @@ fn test_escaped_unicode_does_not_cause_backtrack_limit_error_github_issue8131() 
   "require": {
     "foo/bar": "^1.0"
   }
-}"#
-        .to_string(),
+}"#,
     )
     .unwrap();
 
@@ -4869,8 +4831,7 @@ fn test_large_file_does_not_cause_backtrack_limit_error_github_issue9595() {
     },
     "minimum-stability": "dev",
     "prefer-stable": true
-}"#
-            .to_string(),
+}"#,
     )
     .unwrap();
 

@@ -4,13 +4,14 @@ use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::json::JsonValidationException;
 use crate::util::{Filesystem, HttpDownloader};
+use bstr::ByteSlice;
 use shirabe_php_shim::{
     Catch as _, Error, InvalidArgumentException, JSON_PRETTY_PRINT, JSON_UNESCAPED_SLASHES,
     JSON_UNESCAPED_UNICODE, PhpMixed, PregMatches, RuntimeException, UnexpectedValueException,
     dirname, file_exists, file_get_contents, file_put_contents, is_dir, is_file, json_decode_assoc,
     json_decode_obj, json_encode_ex, legacy_lossy, mkdir, path_from_bytes, path_to_bytes,
     php_regex, preg_is_match, preg_match, preg_replace_callback, preg_replace2, realpath,
-    str_repeat, strlen, strpos, usleep,
+    str_repeat, strlen, strpos, usleep, utf8_text,
 };
 use shirabe_seld_json_lint::{ParsingException, ParsingExceptionDetails};
 
@@ -182,8 +183,7 @@ impl JsonFile {
             }
         };
 
-        // The indent is a run of spaces and tabs at a line start, which a lossy decode leaves intact.
-        *self.indent.borrow_mut() = Self::detect_indenting(Some(&String::from_utf8_lossy(&json)));
+        *self.indent.borrow_mut() = Self::detect_indenting(Some(&json));
 
         Self::parse_json(Some(&json), Some(&self.path))
     }
@@ -456,12 +456,9 @@ impl JsonFile {
         // `'null' !== $content` check.
         if matches!(data, PhpMixed::Null) && json != b"null" {
             // attempt resolving simple conflicts in lock files so that one can run `composer update --lock` and get a valid lock file
-            // TODO(bytes): preg_replace2 matches over a &str, so input that is not UTF-8 skips
-            // this; PHP still resolves a conflict whose marker lines hold the only invalid bytes.
             if let Some(file) = file
                 && file.ends_with(".lock")
-                && let Ok(json) = std::str::from_utf8(json)
-                && json.contains("\"content-hash\"")
+                && json.contains_str("\"content-hash\"")
             {
                 let mut count: usize = 0;
                 let replaced = preg_replace2(
@@ -526,9 +523,11 @@ impl JsonFile {
         .into())
     }
 
-    pub fn detect_indenting(json: Option<&str>) -> String {
+    pub fn detect_indenting(json: Option<&[u8]>) -> String {
         if let Some(m) = preg_match(php_regex!(r##"#^([ \t]+)"#m"##), json.unwrap_or_default()) {
-            return m.get(1).unwrap_or_default().to_string();
+            return utf8_text(m.get(1).unwrap_or_default())
+                .expect("the indent is a run of spaces and tabs")
+                .to_string();
         }
 
         Self::INDENT_DEFAULT.to_string()
