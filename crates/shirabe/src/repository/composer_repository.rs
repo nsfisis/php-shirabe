@@ -278,7 +278,7 @@ impl ComposerRepository {
                 .unwrap_or_default(),
         )
         .into_owned();
-        let url_bits = parse_url(&legacy_lossy(&strtr(&current_url, "\\", "/")));
+        let url_bits = parse_url(strtr(&current_url, "\\", "/"));
         let scheme_present = url_bits
             .as_ref()
             .and_then(|url_bits| url_bits.scheme.as_deref())
@@ -2183,11 +2183,11 @@ impl ComposerRepository {
     }
 
     pub fn get_packages_json_url(&self) -> String {
-        let json_url_parts = parse_url(&legacy_lossy(&strtr(&self.url, "\\", "/")));
+        let json_url_parts = parse_url(strtr(&self.url, "\\", "/"));
 
         let has_json = json_url_parts
             .and_then(|json_url_parts| json_url_parts.path)
-            .is_some_and(|path| path.contains(".json"));
+            .is_some_and(|path| path.contains_str(".json"));
         if has_json {
             return self.url.clone();
         }

@@ -269,7 +269,7 @@ impl HttpDownloader {
         options: IndexMap<BString, PhpMixed>,
     ) -> (IndexMap<BString, PhpMixed>, String) {
         let options = array_replace_recursive(self.options.clone(), options);
-        let origin = Url::get_origin(&self.config.borrow(), url);
+        let origin = legacy_lossy(&Url::get_origin(&self.config.borrow(), url)).into_owned();
 
         // capture username/password from URL if there is one
         if let Some(m) = preg_match(php_regex!(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i"), url) {

@@ -60,10 +60,10 @@ impl RepositoryCommand {
                     .get(B("url"))
                     .and_then(|v| v.as_string())
                     .map(|url| {
-                        parse_url(&url.to_str_lossy())
+                        parse_url(url)
                             .and_then(|parsed| parsed.host)
                             .unwrap_or_default()
-                            .ends_with("packagist.org")
+                            .ends_with(b"packagist.org")
                     })
                     .unwrap_or(false);
                 if has_type_and_url && is_composer_type && url_host_ends_with_packagist {

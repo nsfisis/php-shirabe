@@ -11,8 +11,8 @@ use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PATHINFO_FILENAME, PhpMixed, RuntimeException, extension_loaded, fclose, fopen, fwrite,
-    gzclose, gzopen, gzread, impl_php_class, implode, legacy_lossy, parse_url, path_from_bytes,
-    path_to_bytes, pathinfo, strtr,
+    gzclose, gzopen, gzread, impl_php_class, implode, parse_url, path_from_bytes, path_to_bytes,
+    pathinfo, strtr,
 };
 
 #[derive(Debug)]
@@ -79,13 +79,9 @@ impl ArchiveDownloader for GzipDownloader {
         path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let filename = pathinfo(
-            parse_url(&legacy_lossy(&strtr(
-                package.get_dist_url().unwrap_or_default(),
-                "\\",
-                "/",
-            )))
-            .and_then(|url| url.path)
-            .unwrap_or_default(),
+            parse_url(strtr(package.get_dist_url().unwrap_or_default(), "\\", "/"))
+                .and_then(|url| url.path)
+                .unwrap_or_default(),
             PATHINFO_FILENAME,
         );
         let target_filepath = path.join(path_from_bytes(&filename));

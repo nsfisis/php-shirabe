@@ -4,14 +4,20 @@ use crate::config::Config;
 use crate::util::GitHub;
 use bstr::BString;
 use shirabe_php_shim::{
-    PhpMixed, bconcat, in_array_strict, legacy_lossy, parse_url, php_regex, preg_is_match,
-    preg_match, preg_replace, preg_replace_callback,
+    PhpMixed, bconcat, in_array_strict, parse_url, php_regex, preg_is_match, preg_match,
+    preg_replace, preg_replace_callback,
 };
 
 pub struct Url;
 
 impl Url {
-    pub fn update_dist_reference(config: &Config, mut url: String, r#ref: &str) -> String {
+    pub fn update_dist_reference(
+        config: &Config,
+        url: impl AsRef<[u8]>,
+        r#ref: impl AsRef<[u8]>,
+    ) -> BString {
+        let mut url = BString::from(url.as_ref());
+        let r#ref = r#ref.as_ref();
         let host = parse_url(&url)
             .and_then(|parsed| parsed.host)
             .unwrap_or_default();
@@ -23,12 +29,15 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = format!(
-                    "https://api.github.com/repos/{}/{}/{}ball/{}",
-                    legacy_lossy(&m.get(1).unwrap_or_default()),
-                    legacy_lossy(&m.get(2).unwrap_or_default()),
-                    legacy_lossy(&m.get(3).unwrap_or_default()),
-                    r#ref
+                url = bconcat!(
+                    "https://api.github.com/repos/",
+                    m.get(1).unwrap_or_default(),
+                    "/",
+                    m.get(2).unwrap_or_default(),
+                    "/",
+                    m.get(3).unwrap_or_default(),
+                    "ball/",
+                    r#ref,
                 );
             } else if let Some(m) = preg_match(
                 php_regex!(
@@ -36,12 +45,15 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = format!(
-                    "https://api.github.com/repos/{}/{}/{}ball/{}",
-                    legacy_lossy(&m.get(1).unwrap_or_default()),
-                    legacy_lossy(&m.get(2).unwrap_or_default()),
-                    legacy_lossy(&m.get(3).unwrap_or_default()),
-                    r#ref
+                url = bconcat!(
+                    "https://api.github.com/repos/",
+                    m.get(1).unwrap_or_default(),
+                    "/",
+                    m.get(2).unwrap_or_default(),
+                    "/",
+                    m.get(3).unwrap_or_default(),
+                    "ball/",
+                    r#ref,
                 );
             } else if let Some(m) = preg_match(
                 php_regex!(
@@ -49,12 +61,15 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = format!(
-                    "https://api.github.com/repos/{}/{}/{}ball/{}",
-                    legacy_lossy(&m.get(1).unwrap_or_default()),
-                    legacy_lossy(&m.get(2).unwrap_or_default()),
-                    legacy_lossy(&m.get(3).unwrap_or_default()),
-                    r#ref
+                url = bconcat!(
+                    "https://api.github.com/repos/",
+                    m.get(1).unwrap_or_default(),
+                    "/",
+                    m.get(2).unwrap_or_default(),
+                    "/",
+                    m.get(3).unwrap_or_default(),
+                    "ball/",
+                    r#ref,
                 );
             }
         } else if host == "bitbucket.org" || host == "www.bitbucket.org" {
@@ -64,12 +79,15 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = format!(
-                    "https://bitbucket.org/{}/{}/get/{}.{}",
-                    legacy_lossy(&m.get(1).unwrap_or_default()),
-                    legacy_lossy(&m.get(2).unwrap_or_default()),
+                url = bconcat!(
+                    "https://bitbucket.org/",
+                    m.get(1).unwrap_or_default(),
+                    "/",
+                    m.get(2).unwrap_or_default(),
+                    "/get/",
                     r#ref,
-                    legacy_lossy(&m.get(4).unwrap_or_default())
+                    ".",
+                    m.get(4).unwrap_or_default(),
                 );
             }
         } else if host == "gitlab.com" || host == "www.gitlab.com" {
@@ -79,28 +97,35 @@ impl Url {
                 ),
                 &url,
             ) {
-                url = format!(
-                    "https://gitlab.com/api/v4/projects/{}/repository/archive.{}?sha={}",
-                    legacy_lossy(&m.get(1).unwrap_or_default()),
-                    legacy_lossy(&m.get(2).unwrap_or_default()),
-                    r#ref
+                url = bconcat!(
+                    "https://gitlab.com/api/v4/projects/",
+                    m.get(1).unwrap_or_default(),
+                    "/repository/archive.",
+                    m.get(2).unwrap_or_default(),
+                    "?sha=",
+                    r#ref,
                 );
             }
-        } else if in_array_strict(host.clone(), config.get("github-domains").values()) {
-            url = legacy_lossy(&preg_replace(
+        } else if in_array_strict(
+            PhpMixed::string(host.clone()),
+            config.get("github-domains").values(),
+        ) {
+            url = preg_replace(
                 php_regex!(r"{(/repos/[^/]+/[^/]+/(zip|tar)ball)(?:/.+)?$}i"),
-                format!("$1/{}", r#ref),
+                bconcat!("$1/", r#ref),
                 &url,
-            ))
-            .into_owned();
-        } else if in_array_strict(host, config.get("gitlab-domains").values()) {
-            url = legacy_lossy(&preg_replace(
+            );
+        } else if in_array_strict(
+            PhpMixed::string(host),
+            config.get("gitlab-domains").values(),
+        ) {
+            url = preg_replace(
                 php_regex!(
                     r"{(/api/v[34]/projects/[^/]+/repository/archive\.(?:zip|tar\.gz|tar\.bz2|tar)\?sha=).+$}i"
                 ),
-                format!("${{1}}{}", r#ref),
+                bconcat!("${1}", r#ref),
                 &url,
-            )).into_owned();
+            );
         }
 
         assert!(!url.is_empty());
@@ -108,9 +133,10 @@ impl Url {
         url
     }
 
-    pub fn get_origin(config: &Config, url: &str) -> String {
-        if url.starts_with("file://") {
-            return url.to_string();
+    pub fn get_origin(config: &Config, url: impl AsRef<[u8]>) -> BString {
+        let url = url.as_ref();
+        if url.starts_with(b"file://") {
+            return url.into();
         }
 
         let parsed = parse_url(url);
@@ -122,30 +148,33 @@ impl Url {
             .and_then(|parsed| parsed.port)
             .filter(|port| *port != 0)
         {
-            origin = format!("{}:{}", origin, port);
+            origin = bconcat!(origin, ":", port);
         }
 
-        if origin.ends_with(".github.com") && origin != "codeload.github.com" {
-            return "github.com".to_string();
+        if origin.ends_with(b".github.com") && origin != "codeload.github.com" {
+            return "github.com".into();
         }
 
         if origin == "repo.packagist.org" {
-            return "packagist.org".to_string();
+            return "packagist.org".into();
         }
 
         if origin.is_empty() {
-            origin = url.to_string();
+            origin = url.into();
         }
 
         // Gitlab can be installed in a non-root context (i.e. gitlab.com/foo). When downloading archives the originUrl
         // is the host without the path, so we look for the registered gitlab-domains matching the host here
-        if !origin.contains('/')
-            && !in_array_strict(origin.clone(), config.get("gitlab-domains").values())
+        if !origin.contains(&b'/')
+            && !in_array_strict(
+                PhpMixed::string(origin.clone()),
+                config.get("gitlab-domains").values(),
+            )
         {
-            let gitlab_domains: Vec<String> = match config.get("gitlab-domains") {
+            let gitlab_domains: Vec<BString> = match config.get("gitlab-domains") {
                 PhpMixed::List(list) => list
                     .iter()
-                    .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                    .filter_map(|v| v.as_string().map(BString::from))
                     .collect(),
                 _ => vec![],
             };

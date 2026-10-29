@@ -28,9 +28,9 @@ use crate::util::{AuthHelper, HttpDownloader, Platform, PromptAuthResult, StoreA
 use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PHP_EOL, PhpMixed, implode, in_array_loose, in_array_strict, json_decode_assoc, legacy_lossy,
-    parse_url, php_regex, preg_is_match, preg_quote, preg_replace, rename, stripos, strlen, strpos,
-    substr, unlink_silent,
+    PHP_EOL, PhpMixed, bconcat, implode, in_array_loose, in_array_strict, json_decode_assoc,
+    legacy_lossy, parse_url, php_regex, preg_is_match, preg_quote, preg_replace, rename, stripos,
+    strlen, strpos, substr, unlink_silent,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -253,7 +253,9 @@ impl NativeHttpDownloader {
                         tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
                     }
                     current_url = new_url;
-                    current_origin = Url::get_origin(&self.config.borrow(), &current_url);
+                    current_origin =
+                        legacy_lossy(&Url::get_origin(&self.config.borrow(), &current_url))
+                            .into_owned();
                     continue;
                 }
                 Decision::Done(response) => return Ok(Ok(response)),
@@ -669,28 +671,29 @@ impl NativeHttpDownloader {
             let location_parsed = parse_url(&location_header);
             if location_parsed
                 .as_ref()
-                .and_then(|parsed| parsed.scheme.as_deref())
+                .and_then(|parsed| parsed.scheme.as_ref())
                 .is_some_and(|scheme| !scheme.is_empty() && scheme != "0")
             {
                 // Absolute URL; e.g. https://example.com/composer
                 target_url = location_header;
             } else if location_parsed
                 .as_ref()
-                .and_then(|parsed| parsed.host.as_deref())
+                .and_then(|parsed| parsed.host.as_ref())
                 .is_some_and(|host| !host.is_empty() && host != "0")
             {
                 // Scheme relative; e.g. //example.com/foo
-                target_url = format!(
-                    "{}:{}",
+                target_url = legacy_lossy(&bconcat!(
                     parse_url(url)
                         .and_then(|parsed| parsed.scheme)
                         .unwrap_or_default(),
+                    ":",
                     location_header
-                );
+                ))
+                .into_owned();
             } else if location_header.starts_with('/') {
                 // Absolute path; e.g. /foo
                 let url_host = parse_url(url).and_then(|parsed| parsed.host);
-                let url_host_str = url_host.as_deref().unwrap_or_default();
+                let url_host_str = url_host.unwrap_or_default();
                 target_url = legacy_lossy(&preg_replace(
                     format!(
                         r"{{^(.+(?://|@){}(?::\d+)?)(?:[/\?].*)?$}}",

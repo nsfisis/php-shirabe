@@ -40,7 +40,7 @@
 9 crates/shirabe/src/command/init_command.rs
 2 crates/shirabe/src/command/package_discovery_trait.rs
 3 crates/shirabe/src/command/remove_command.rs
-3 crates/shirabe/src/command/repository_command.rs
+2 crates/shirabe/src/command/repository_command.rs
 2 crates/shirabe/src/command/require_command.rs
 1 crates/shirabe/src/command/show_command.rs
 6 crates/shirabe/src/config.rs

@@ -28,8 +28,9 @@ pub fn gethostbyname(hostname: &str) -> String {
     }
 }
 
-pub fn inet_pton(host: &str) -> Option<Vec<u8>> {
-    match host.parse::<IpAddr>() {
+pub fn inet_pton(host: impl AsRef<[u8]>) -> Option<Vec<u8>> {
+    // Every address PHP accepts is ASCII.
+    match crate::utf8_text(host.as_ref())?.parse::<IpAddr>() {
         Ok(IpAddr::V4(v4)) => Some(v4.octets().to_vec()),
         Ok(IpAddr::V6(v6)) => Some(v6.octets().to_vec()),
         Err(_) => None,

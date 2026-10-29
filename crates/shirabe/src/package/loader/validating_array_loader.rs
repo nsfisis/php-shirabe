@@ -320,7 +320,7 @@ impl ValidatingArrayLoader {
             return false;
         }
 
-        if !schemes.contains(&scheme.as_str()) {
+        if !schemes.iter().any(|allowed| scheme == *allowed) {
             return false;
         }
 

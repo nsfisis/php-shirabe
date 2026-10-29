@@ -30,8 +30,8 @@ pub struct Config {
     auth_config_source: Option<Box<dyn ConfigSourceInterface>>,
     local_auth_config_source: Option<Box<dyn ConfigSourceInterface>>,
     use_environment: bool,
-    warned_hosts: IndexMap<String, bool>,
-    ssl_verify_warned_hosts: IndexMap<String, bool>,
+    warned_hosts: IndexMap<BString, bool>,
+    ssl_verify_warned_hosts: IndexMap<BString, bool>,
     source_of_config_value: std::cell::RefCell<IndexMap<String, String>>,
 }
 
@@ -1001,12 +1001,15 @@ impl Config {
         }
 
         // Extract scheme and throw exception on known insecure protocols
-        let parsed = parse_url(&legacy_lossy(url));
+        let parsed = parse_url(url);
         let scheme = parsed.as_ref().and_then(|parsed| parsed.scheme.clone());
         let hostname = parsed.and_then(|parsed| parsed.host);
-        if matches!(scheme.as_deref(), Some("http" | "git" | "ftp" | "svn")) {
+        if matches!(
+            scheme.as_ref().map(|scheme| scheme.as_slice()),
+            Some(b"http" | b"git" | b"ftp" | b"svn")
+        ) {
             if self.get_with_flags("secure-http", 0)?.as_bool() == Some(true) {
-                if scheme.as_deref() == Some("svn") {
+                if scheme.as_ref().is_some_and(|scheme| scheme == "svn") {
                     if in_array_strict(
                         hostname.map(PhpMixed::string).unwrap_or(PhpMixed::Null),
                         self.get_with_flags("secure-svn-domains", 0)?.values(),
@@ -1040,8 +1043,8 @@ impl Config {
                     io.write_error3(
                             &format!(
                                 "<warning>Warning: Accessing {} over {} which is an insecure protocol.</warning>",
-                                hostname,
-                                scheme.as_deref().unwrap_or_default()
+                                hostname.display_lossy(),
+                                scheme.as_ref().map_or(B(""), |scheme| scheme.as_slice()).as_bstr().display_lossy()
                             ),
                             true,
                             io_interface::NORMAL,
@@ -1083,7 +1086,8 @@ impl Config {
                 io.write_error3(
                     &format!(
                         "<warning>Warning: Accessing {} with {} disabled.</warning>",
-                        hostname, w
+                        hostname.display_lossy(),
+                        w
                     ),
                     true,
                     io_interface::NORMAL,

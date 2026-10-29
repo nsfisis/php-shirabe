@@ -32,10 +32,10 @@ impl LocalFilesystem {
 
     /// Whether `url` names a local file: a `file://` URL, or a path with no scheme.
     pub fn handles(url: &str) -> bool {
-        let scheme = parse_url(&legacy_lossy(&strtr(url, "\\", "/")))
+        let scheme = parse_url(strtr(url, "\\", "/"))
             .and_then(|parsed| parsed.scheme)
             .unwrap_or_default();
-        if scheme.is_empty() || scheme.eq_ignore_ascii_case("file") {
+        if scheme.is_empty() || scheme.eq_ignore_ascii_case(b"file") {
             return true;
         }
 

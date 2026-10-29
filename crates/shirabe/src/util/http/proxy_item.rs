@@ -4,27 +4,29 @@ use crate::util::http::RequestProxy;
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, base64_encode, legacy_lossy, parse_url, rawurldecode, strpbrk,
+    PhpMixed, RuntimeException, base64_encode, bconcat, legacy_lossy, parse_url, rawurldecode,
+    str_replace, strpbrk, strtolower,
 };
 
 #[derive(Debug)]
 pub struct ProxyItem {
-    url: String,
-    safe_url: String,
-    curl_auth: Option<String>,
-    options_proxy: String,
-    options_auth: Option<String>,
+    url: BString,
+    safe_url: BString,
+    curl_auth: Option<BString>,
+    options_proxy: BString,
+    options_auth: Option<BString>,
 }
 
 impl ProxyItem {
-    pub fn new(proxy_url: String, env_name: String) -> Result<Self, RuntimeException> {
+    pub fn new(proxy_url: impl AsRef<[u8]>, env_name: String) -> Result<Self, RuntimeException> {
+        let proxy_url = proxy_url.as_ref();
         let syntax_error = format!("unsupported `{}` syntax", env_name);
 
-        if strpbrk(&proxy_url, "\r\n\t").is_some() {
+        if strpbrk(proxy_url, "\r\n\t").is_some() {
             return Err(RuntimeException::new(syntax_error));
         }
 
-        let Some(proxy) = parse_url(&proxy_url) else {
+        let Some(proxy) = parse_url(proxy_url) else {
             return Err(RuntimeException::new(syntax_error));
         };
 
@@ -36,34 +38,32 @@ impl ProxyItem {
         };
 
         let scheme = match &proxy.scheme {
-            Some(scheme) => format!("{}://", scheme.to_lowercase()),
-            None => "http://".to_string(),
+            Some(scheme) => bconcat!(strtolower(scheme), "://"),
+            None => BString::from("http://"),
         };
-        let mut safe = String::new();
+        let mut safe = BString::default();
 
-        let mut curl_auth: Option<String> = None;
-        let mut options_auth: Option<String> = None;
+        let mut curl_auth: Option<BString> = None;
+        let mut options_auth: Option<BString> = None;
 
         if let Some(user_raw) = &proxy.user {
-            safe = "***".to_string();
-            let auth_raw = legacy_lossy(&rawurldecode(user_raw)).into_owned();
-
+            safe = "***".into();
             let mut user = user_raw.clone();
-            let mut auth = auth_raw;
+            let mut auth = rawurldecode(user_raw);
 
             if let Some(pass_raw) = &proxy.pass {
-                safe += ":***";
-                user += &format!(":{}", pass_raw);
-                auth += &format!(":{}", legacy_lossy(&rawurldecode(pass_raw)));
+                safe.extend_from_slice(b":***");
+                user = bconcat!(user, ":", pass_raw);
+                auth = bconcat!(auth, ":", rawurldecode(pass_raw));
             }
 
-            safe += "@";
+            safe.extend_from_slice(b"@");
 
             if !user.is_empty() {
                 curl_auth = Some(user);
-                options_auth = Some(format!(
-                    "Proxy-Authorization: Basic {}",
-                    legacy_lossy(&base64_encode(&auth))
+                options_auth = Some(bconcat!(
+                    "Proxy-Authorization: Basic ",
+                    base64_encode(&auth)
                 ));
             }
         }
@@ -98,13 +98,15 @@ impl ProxyItem {
             Some(p) => p,
         };
 
-        let url = format!("{}{}:{}", scheme, host, port);
-        let safe_url = format!("{}{}{}:{}", scheme, safe, host, port);
+        let url = bconcat!(scheme, host, ":", port);
+        let safe_url = bconcat!(scheme, safe, host, ":", port);
 
-        let options_proxy_scheme = scheme
-            .replace("http://", "tcp://")
-            .replace("https://", "ssl://");
-        let options_proxy = format!("{}{}:{}", options_proxy_scheme, host, port);
+        let options_proxy_scheme = str_replace(
+            "https://",
+            "ssl://",
+            str_replace("http://", "tcp://", &scheme),
+        );
+        let options_proxy = bconcat!(options_proxy_scheme, host, ":", port);
 
         Ok(Self {
             url,
@@ -131,10 +133,12 @@ impl ProxyItem {
         options.insert("http".to_string(), http_options);
 
         RequestProxy::new(
-            Some(self.url.clone()),
-            self.curl_auth.clone(),
+            Some(legacy_lossy(&self.url).into_owned()),
+            self.curl_auth
+                .as_ref()
+                .map(|curl_auth| legacy_lossy(curl_auth).into_owned()),
             Some(options),
-            Some(self.safe_url.clone()),
+            Some(legacy_lossy(&self.safe_url).into_owned()),
         )
     }
 }

@@ -32,7 +32,7 @@ fn test_update_dist_reference() {
 
         assert_eq!(
             expected_url,
-            Url::update_dist_reference(&config, url.to_string(), r#ref)
+            Url::update_dist_reference(&config, url, r#ref)
         );
     }
 }

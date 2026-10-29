@@ -220,15 +220,10 @@ impl FileDownloader {
     }
 
     fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> BString {
-        // TODO(bytes): parse_url() takes a &str, so non-UTF-8 bytes in the URL are replaced.
         pathinfo(
-            parse_url(&legacy_lossy(&strtr(
-                package.get_dist_url().unwrap_or_default(),
-                "\\",
-                "/",
-            )))
-            .and_then(|url| url.path)
-            .unwrap_or_default(),
+            parse_url(strtr(package.get_dist_url().unwrap_or_default(), "\\", "/"))
+                .and_then(|url| url.path)
+                .unwrap_or_default(),
             component,
         )
     }
@@ -333,13 +328,14 @@ impl FileDownloader {
             .into());
         }
 
-        let mut url = legacy_lossy(&url.to_string()).into_owned();
-        if package.get_dist_reference().is_some() {
-            url = UrlUtil::update_dist_reference(
+        let mut url = url.to_string();
+        if let Some(dist_reference) = package.get_dist_reference() {
+            url = legacy_lossy(&UrlUtil::update_dist_reference(
                 &self.config.borrow(),
-                url,
-                &legacy_lossy(&package.get_dist_reference().unwrap()),
-            );
+                &url,
+                &dist_reference,
+            ))
+            .into_owned();
         }
 
         Ok(url)

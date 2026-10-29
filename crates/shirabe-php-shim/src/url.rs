@@ -1,40 +1,32 @@
 use crate::PhpMixed;
 use bstr::BString;
 use indexmap::IndexMap;
+use shirabe_php_src::standard::url::php_url_parse_ex2;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct UrlComponents {
-    pub scheme: Option<String>,
-    pub host: Option<String>,
+    pub scheme: Option<BString>,
+    pub host: Option<BString>,
     pub port: Option<i64>,
-    pub user: Option<String>,
-    pub pass: Option<String>,
-    pub path: Option<String>,
-    pub query: Option<String>,
-    pub fragment: Option<String>,
+    pub user: Option<BString>,
+    pub pass: Option<BString>,
+    pub path: Option<BString>,
+    pub query: Option<BString>,
+    pub fragment: Option<BString>,
 }
 
-/// PHP `parse_url()`. `None` for an invalid URL.
-pub fn parse_url(url: &str) -> Option<UrlComponents> {
-    // TODO(php-semantics): PHP's parse_url uses php_url_parse_ex, which accepts relative
-    // and partial URLs and leaves an absent component absent. reqwest::Url
-    // (WHATWG/RFC 3986) requires an absolute URL, lowercases the host of special
-    // schemes, and normalizes the path (e.g. "http://host" yields path "/"). This
-    // is therefore not a byte-for-byte compatible port of parse_url.
-    let parsed = reqwest::Url::parse(url).ok()?;
+/// PHP `parse_url()`. `None` for a seriously malformed URL.
+pub fn parse_url(url: impl AsRef<[u8]>) -> Option<UrlComponents> {
+    let parsed = php_url_parse_ex2(url.as_ref())?;
     Some(UrlComponents {
-        scheme: Some(parsed.scheme().to_string()),
-        host: parsed.host_str().map(str::to_string),
-        port: parsed.port().map(i64::from),
-        user: Some(parsed.username())
-            .filter(|user| !user.is_empty())
-            .map(str::to_string),
-        pass: parsed.password().map(str::to_string),
-        path: Some(parsed.path())
-            .filter(|path| !path.is_empty())
-            .map(str::to_string),
-        query: parsed.query().map(str::to_string),
-        fragment: parsed.fragment().map(str::to_string),
+        scheme: parsed.scheme,
+        host: parsed.host,
+        port: parsed.port.map(i64::from),
+        user: parsed.user,
+        pass: parsed.pass,
+        path: parsed.path,
+        query: parsed.query,
+        fragment: parsed.fragment,
     })
 }
 

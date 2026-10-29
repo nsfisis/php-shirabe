@@ -5,9 +5,8 @@ use bstr::BString;
 use shirabe_php_shim::{
     Catch as _, FilesystemIterator, PHP_MAXPATHLEN, base64_encode, bconcat, chmod, copy, dirname,
     file_exists, filemtime, fileperms, filesize, filesystem_iterator, is_dir, is_file, is_link,
-    legacy_lossy, mkdir, parse_url, path_from_bytes, path_to_bytes, random_bytes, readlink,
-    realpath, rename, rmdir, rtrim2, stream_is_local, stripos, strrev, strtr, symlink, touch2,
-    umask, unlink,
+    mkdir, parse_url, path_from_bytes, path_to_bytes, random_bytes, readlink, realpath, rename,
+    rmdir, rtrim2, stream_is_local, stripos, strrev, strtr, symlink, touch2, umask, unlink,
 };
 use std::path::{Path, PathBuf};
 
@@ -51,9 +50,7 @@ impl Filesystem {
 
         let mut do_copy = true;
         // PHP: !$overwriteNewerFiles && !parse_url($originFile, PHP_URL_HOST) && is_file($targetFile)
-        // TODO(bytes): parse_url takes the URL as a &str.
-        let origin_host =
-            parse_url(&legacy_lossy(path_to_bytes(origin_file))).and_then(|url| url.host);
+        let origin_host = parse_url(path_to_bytes(origin_file)).and_then(|url| url.host);
         if origin_host.is_none() && is_file(target_file) {
             do_copy = filemtime(origin_file).unwrap_or(0) > filemtime(target_file).unwrap_or(0);
         }

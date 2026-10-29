@@ -263,7 +263,7 @@ impl AuthHelper {
             if !git_lab_util.authorize_oauth(origin)?
                 && (!self.io.is_interactive()
                     || !git_lab_util.authorize_oauth_interactively(
-                        scheme.as_deref().unwrap_or_default(),
+                        &legacy_lossy(&scheme.unwrap_or_default()),
                         origin,
                         Some(&message),
                     )?)
@@ -629,9 +629,9 @@ impl AuthHelper {
         let parsed = parse_url(url_to_bit_bucket_file);
         let domain_str = parsed
             .as_ref()
-            .and_then(|parsed| parsed.host.as_deref())
+            .and_then(|parsed| parsed.host.clone())
             .unwrap_or_default();
-        if strpos(domain_str, "bitbucket.org").is_none() {
+        if strpos(&domain_str, "bitbucket.org").is_none() {
             // Bitbucket downloads are hosted on amazonaws.
             // We do not need to authenticate there at all
             return true;
@@ -639,12 +639,12 @@ impl AuthHelper {
 
         let path_str = parsed
             .as_ref()
-            .and_then(|parsed| parsed.path.as_deref())
+            .and_then(|parsed| parsed.path.clone())
             .unwrap_or_default();
 
         // Path for a public download follows this pattern /{user}/{repo}/downloads/{whatever}
         // {@link https://blog.bitbucket.org/2009/04/12/new-feature-downloads/}
-        let path_parts = explode("/", path_str);
+        let path_parts = explode("/", &path_str);
 
         path_parts.len() as i64 >= 4 && path_parts.get(3).is_some_and(|s| s == "downloads")
     }

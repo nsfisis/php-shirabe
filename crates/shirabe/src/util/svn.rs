@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::{Platform, ProcessExecutor};
-use bstr::{B, BStr, BString, ByteVec};
+use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
     LogicException, PhpMixed, RuntimeException, implode, legacy_lossy, parse_url, path_to_bytes,
     php_regex, preg_match, stripos, strpos, trim,
@@ -314,11 +314,12 @@ impl Svn {
 
         let auth_config = self.config.borrow_mut().get("http-basic");
 
-        let host = parse_url(&legacy_lossy(&self.url)).and_then(|parsed| parsed.host);
-        let host_str = host.as_deref().unwrap_or_default();
+        let host = parse_url(&self.url)
+            .and_then(|parsed| parsed.host)
+            .unwrap_or_default();
         let auth_for_host = auth_config
             .as_array()
-            .and_then(|m| m.get(B(host_str)))
+            .and_then(|m| m.get(host.as_bstr()))
             .cloned();
         if let Some(entry) = auth_for_host
             && let Some(entry_arr) = entry.as_array()
@@ -346,7 +347,7 @@ impl Svn {
 
     /// Create the auth params from the url
     fn create_auth_from_url(&mut self) -> bool {
-        let Some(uri) = parse_url(&legacy_lossy(&self.url)) else {
+        let Some(uri) = parse_url(&self.url) else {
             self.has_auth = Some(false);
             return false;
         };
@@ -356,12 +357,11 @@ impl Svn {
         };
 
         self.credentials = Some(SvnCredentials {
-            username: user.into(),
+            username: user,
             password: uri
                 .pass
                 .filter(|pass| !pass.is_empty() && pass != "0")
-                .unwrap_or_default()
-                .into(),
+                .unwrap_or_default(),
         });
 
         self.has_auth = Some(true);
