@@ -9,8 +9,8 @@ fn test_is_ignored() {
     for req in data_is_ignored() {
         let platform_requirement_filter = IgnoreNothingPlatformRequirementFilter;
 
-        assert!(!platform_requirement_filter.is_ignored(req));
-        assert!(!platform_requirement_filter.is_upper_bound_ignored(req));
+        assert!(!platform_requirement_filter.is_ignored(bstr::BStr::new(req)));
+        assert!(!platform_requirement_filter.is_upper_bound_ignored(bstr::BStr::new(req)));
     }
 }
 

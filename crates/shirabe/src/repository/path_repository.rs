@@ -314,7 +314,7 @@ impl PathRepository {
                 let version_data = self
                     .version_guesser
                     .borrow_mut()
-                    .guess_version(&package, &path)?;
+                    .guess_version(&package, std::path::Path::new(path.as_str()))?;
                 if let Some(version_data) = version_data {
                     if let Some(pretty_version) = version_data
                         .pretty_version

@@ -69,10 +69,9 @@ impl PathDownloader {
         let dumper = ArrayDumper::new();
 
         let package_config = dumper.dump(package);
-        let package_version =
-            guesser.guess_version(&package_config, &legacy_lossy(path_to_bytes(&path)));
+        let package_version = guesser.guess_version(&package_config, &path);
         if let Ok(Some(version)) = package_version {
-            return version.commit.map(BString::from);
+            return version.commit;
         }
 
         None

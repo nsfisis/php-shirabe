@@ -186,7 +186,7 @@ impl RuleSetGenerator {
 
             for link in package.get_requires().values() {
                 let mut constraint = link.get_constraint().clone();
-                if platform_requirement_filter.is_ignored(&legacy_lossy(link.get_target())) {
+                if platform_requirement_filter.is_ignored(link.get_target().as_bstr()) {
                     continue;
                 } else if let Some(ignore_list_filter) = platform_requirement_filter
                     .as_any()
@@ -194,7 +194,7 @@ impl RuleSetGenerator {
                 ) {
                     let fallback = constraint.clone();
                     constraint = ignore_list_filter
-                        .filter_constraint(&legacy_lossy(link.get_target()), constraint, true)
+                        .filter_constraint(link.get_target().as_bstr(), constraint, true)
                         .unwrap_or(fallback);
                 }
 
@@ -237,7 +237,7 @@ impl RuleSetGenerator {
                 }
 
                 let mut constraint = link.get_constraint().clone();
-                if platform_requirement_filter.is_ignored(&legacy_lossy(link.get_target())) {
+                if platform_requirement_filter.is_ignored(link.get_target().as_bstr()) {
                     continue;
                 } else if let Some(ignore_list_filter) = platform_requirement_filter
                     .as_any()
@@ -245,7 +245,7 @@ impl RuleSetGenerator {
                 ) {
                     let fallback = constraint.clone();
                     constraint = ignore_list_filter
-                        .filter_constraint(&legacy_lossy(link.get_target()), constraint, false)
+                        .filter_constraint(link.get_target().as_bstr(), constraint, false)
                         .unwrap_or(fallback);
                 }
 
@@ -335,7 +335,7 @@ impl RuleSetGenerator {
 
         for (package_name, constraint) in request.get_requires().iter() {
             let mut constraint = constraint.clone();
-            if platform_requirement_filter.is_ignored(&legacy_lossy(package_name)) {
+            if platform_requirement_filter.is_ignored(package_name.as_bstr()) {
                 continue;
             } else if let Some(ignore_list_filter) = platform_requirement_filter
                 .as_any()
@@ -343,7 +343,7 @@ impl RuleSetGenerator {
             ) {
                 let fallback = constraint.clone();
                 constraint = ignore_list_filter
-                    .filter_constraint(&legacy_lossy(package_name), constraint, true)
+                    .filter_constraint(package_name.as_bstr(), constraint, true)
                     .unwrap_or(fallback);
             }
 

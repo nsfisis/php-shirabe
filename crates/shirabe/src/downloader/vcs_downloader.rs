@@ -16,8 +16,8 @@ use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, PhpClass as _, PhpMixed, RuntimeException, array_map,
-    array_shift, bconcat, explode, implode, legacy_lossy, path_from_bytes, path_to_bytes,
-    rawurldecode, realpath, str_replace, strlen, strpos, substr, trim,
+    array_shift, bconcat, explode, implode, path_from_bytes, path_to_bytes, rawurldecode, realpath,
+    str_replace, strlen, strpos, substr, trim,
 };
 use std::path::Path;
 
@@ -66,10 +66,8 @@ impl VcsDownloaderBase {
         let dumper = ArrayDumper::new();
 
         let package_config = dumper.dump(package);
-        if let Ok(Some(package_version)) =
-            guesser.guess_version(&package_config, &legacy_lossy(path_to_bytes(path)))
-        {
-            return package_version.commit.map(BString::from);
+        if let Ok(Some(package_version)) = guesser.guess_version(&package_config, path) {
+            return package_version.commit;
         }
 
         None
@@ -445,10 +443,8 @@ pub trait VcsDownloader:
 
         let package_config = dumper.dump(package);
         let mut guesser = guesser;
-        if let Ok(Some(package_version)) =
-            guesser.guess_version(&package_config, &legacy_lossy(path_to_bytes(path)))
-        {
-            return package_version.commit.map(BString::from);
+        if let Ok(Some(package_version)) = guesser.guess_version(&package_config, path) {
+            return package_version.commit;
         }
 
         None

@@ -9,7 +9,6 @@ use crate::package::version::{VersionGuesser, VersionParser};
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::script::ScriptEvents;
 use crate::util::ProcessExecutor;
-use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{impl_php_class, legacy_lossy, path_to_bytes};
 use shirabe_symfony_console::command::Command;
@@ -131,12 +130,11 @@ impl StatusCommand {
                 };
 
                 let current_version =
-                    guesser.guess_version(&dumper.dump(package.clone()), &target_dir)?;
+                    guesser.guess_version(&dumper.dump(package.clone()), &target_path)?;
 
                 if let (Some(prev_ref), Some(cur_version)) = (&previous_ref, &current_version)
-                    && cur_version.commit.as_deref() != Some(&*legacy_lossy(prev_ref.as_bstr()))
-                    && cur_version.pretty_version.as_deref()
-                        != Some(&*legacy_lossy(prev_ref.as_bstr()))
+                    && cur_version.commit.as_ref() != Some(prev_ref)
+                    && cur_version.pretty_version.as_ref() != Some(prev_ref)
                 {
                     let mut previous = IndexMap::new();
                     previous.insert(
@@ -151,11 +149,12 @@ impl StatusCommand {
                     let mut current = IndexMap::new();
                     current.insert(
                         "version".to_string(),
-                        cur_version.pretty_version.clone().unwrap_or_default(),
+                        legacy_lossy(&cur_version.pretty_version.clone().unwrap_or_default())
+                            .into_owned(),
                     );
                     current.insert(
                         "ref".to_string(),
-                        cur_version.commit.clone().unwrap_or_default(),
+                        legacy_lossy(&cur_version.commit.clone().unwrap_or_default()).into_owned(),
                     );
 
                     let mut change = IndexMap::new();

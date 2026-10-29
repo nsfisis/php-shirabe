@@ -11,8 +11,8 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, legacy_lossy,
-    path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, preg_split, strtolower,
-    trigger_error, trim,
+    php_regex, preg_is_match, preg_match, preg_replace, preg_split, strtolower, trigger_error,
+    trim,
 };
 
 #[derive(Debug)]
@@ -78,17 +78,16 @@ impl RootPackageLoader {
 
         let mut auto_versioned = false;
         if !config.contains_key(B("version")) {
-            let mut commit: Option<String> = None;
+            let mut commit: Option<BString> = None;
 
             if Platform::get_env("COMPOSER_ROOT_VERSION").is_some() {
                 let version = self.version_guesser.get_root_version_from_env()?;
                 config.insert("version".into(), PhpMixed::string(version));
             } else {
-                let cwd_str = cwd.map(|s| s.to_string()).unwrap_or_else(|| {
-                    legacy_lossy(path_to_bytes(&Platform::get_cwd(true).unwrap_or_default()))
-                        .into_owned()
-                });
-                let version_data = self.version_guesser.guess_version(&config, &cwd_str)?;
+                let cwd = cwd
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|| Platform::get_cwd(true).unwrap_or_default());
+                let version_data = self.version_guesser.guess_version(&config, &cwd)?;
                 if let Some(data) = version_data {
                     config.insert(
                         "version".into(),

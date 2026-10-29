@@ -10,10 +10,10 @@ use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::package::{PackageInterfaceHandle, base_package};
 use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySetInterface};
-use bstr::ByteSlice;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, UnexpectedValueException, explode_with_limit, implode, legacy_lossy, php_regex,
+    CmpOp, UnexpectedValueException, bconcat, explode, explode_with_limit, implode, php_regex,
     preg_is_match, preg_replace, str_replace, strtolower, version_compare,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -28,7 +28,7 @@ pub enum ShowWarnings {
 #[derive(Debug)]
 pub struct VersionSelector {
     repository_set: std::rc::Rc<std::cell::RefCell<dyn RepositorySetInterface>>,
-    platform_constraints: IndexMap<String, Vec<AnyConstraint>>,
+    platform_constraints: IndexMap<BString, Vec<AnyConstraint>>,
     parser: Option<VersionParser>,
 }
 
@@ -37,16 +37,12 @@ impl VersionSelector {
         repository_set: std::rc::Rc<std::cell::RefCell<dyn RepositorySetInterface>>,
         platform_repo: Option<&mut crate::repository::PlatformRepository>,
     ) -> anyhow::Result<Self> {
-        let mut platform_constraints: IndexMap<String, Vec<AnyConstraint>> = IndexMap::new();
+        let mut platform_constraints: IndexMap<BString, Vec<AnyConstraint>> = IndexMap::new();
         if let Some(platform_repo) = platform_repo {
             for package in platform_repo.get_packages()? {
-                let constraint = SimpleConstraint::new(
-                    "==",
-                    legacy_lossy(&package.get_version()).into_owned(),
-                    None,
-                );
+                let constraint = SimpleConstraint::new("==", package.get_version(), None);
                 platform_constraints
-                    .entry(legacy_lossy(&package.get_name()).into_owned())
+                    .entry(package.get_name())
                     .or_default()
                     .push(constraint.into());
             }
@@ -127,8 +123,8 @@ impl VersionSelector {
 
         let package: Option<crate::package::PackageInterfaceHandle>;
         if !self.platform_constraints.is_empty() && !is_ignore_all {
-            let mut already_warned_names: IndexMap<String, bool> = IndexMap::new();
-            let mut already_seen_names: IndexMap<String, bool> = IndexMap::new();
+            let mut already_warned_names: IndexMap<BString, bool> = IndexMap::new();
+            let mut already_seen_names: IndexMap<BString, bool> = IndexMap::new();
             let mut found_package: Option<crate::package::PackageInterfaceHandle> = None;
 
             for pkg in candidates.iter() {
@@ -136,13 +132,13 @@ impl VersionSelector {
                 let mut skip = false;
                 'reqs: for (name, link) in reqs.iter() {
                     if !PlatformRepository::is_platform_package(name)
-                        || platform_requirement_filter.is_ignored(&legacy_lossy(name))
+                        || platform_requirement_filter.is_ignored(name.as_bstr())
                     {
                         continue;
                     }
                     let reason;
                     if let Some(provided_constraints) =
-                        self.platform_constraints.get(&*legacy_lossy(name))
+                        self.platform_constraints.get(name.as_bstr())
                     {
                         for provided_constraint in provided_constraints {
                             if link.get_constraint().matches(provided_constraint) {
@@ -154,10 +150,10 @@ impl VersionSelector {
                                 .downcast_ref::<IgnoreListPlatformRequirementFilter>(
                             );
                             if let Some(list_filter) = list_filter_opt
-                                && list_filter.is_upper_bound_ignored(&legacy_lossy(name))
+                                && list_filter.is_upper_bound_ignored(name.as_bstr())
                             {
                                 let filtered_constraint = list_filter.filter_constraint(
-                                    &legacy_lossy(name),
+                                    name.as_bstr(),
                                     link.get_constraint().clone(),
                                     false,
                                 )?;
@@ -172,19 +168,15 @@ impl VersionSelector {
                     }
 
                     let is_latest_version =
-                        !already_seen_names.contains_key(&*legacy_lossy(&pkg.get_name()));
-                    already_seen_names.insert(legacy_lossy(&pkg.get_name()).into_owned(), true);
+                        !already_seen_names.contains_key(pkg.get_name().as_bstr());
+                    already_seen_names.insert(pkg.get_name(), true);
                     if let Some(ref io) = io {
                         let should_warn = match &show_warnings {
                             ShowWarnings::Always => true,
                             ShowWarnings::Predicate(f) => f(pkg),
                         };
                         if should_warn {
-                            let warn_key = format!(
-                                "{}/{}",
-                                legacy_lossy(&pkg.get_name()),
-                                legacy_lossy(&link.get_target())
-                            );
+                            let warn_key = bconcat!(pkg.get_name(), "/", link.get_target());
                             let is_first_warning = !already_warned_names.contains_key(&warn_key);
                             already_warned_names.insert(warn_key, true);
                             let latest = if is_latest_version {
@@ -253,25 +245,24 @@ impl VersionSelector {
     pub fn find_recommended_require_version(
         &mut self,
         package: PackageInterfaceHandle,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<BString> {
         if package.get_name().starts_with(b"ext-") {
             let php = shirabe_php_rpc::get_php_version();
             let php_version = format!("{}.{}.{}", php.major, php.minor, php.release);
             let package_version = package.get_version();
             let ext_parts = explode_with_limit(".", package_version, 4);
-            let ext_version =
-                legacy_lossy(&implode(".", &ext_parts[..3.min(ext_parts.len())])).into_owned();
-            if php_version == ext_version {
-                return Ok("*".to_string());
+            let ext_version = implode(".", &ext_parts[..3.min(ext_parts.len())]);
+            if php_version.as_bytes() == ext_version.as_slice() {
+                return Ok("*".into());
             }
         }
 
-        let version = legacy_lossy(&package.get_version()).into_owned();
+        let version = package.get_version();
         if !package.is_dev() {
             return self.transform_version(
-                &version,
-                &legacy_lossy(&package.get_pretty_version()),
-                &legacy_lossy(&package.get_stability()),
+                version.as_bstr(),
+                package.get_pretty_version().as_bstr(),
+                package.get_stability().as_bstr(),
             );
         }
 
@@ -287,47 +278,45 @@ impl VersionSelector {
                 &extra,
             );
             if new_extra != extra {
-                let new_extra =
-                    legacy_lossy(&str_replace(".9999999", ".0", &new_extra)).into_owned();
-                return self.transform_version(&new_extra, &new_extra, "dev");
+                let new_extra = str_replace(".9999999", ".0", &new_extra);
+                return self.transform_version(
+                    new_extra.as_bstr(),
+                    new_extra.as_bstr(),
+                    BStr::new("dev"),
+                );
             }
         }
 
-        Ok(legacy_lossy(&package.get_pretty_version()).into_owned())
+        Ok(package.get_pretty_version())
     }
 
     fn transform_version(
         &self,
-        version: &str,
-        pretty_version: &str,
-        stability: &str,
-    ) -> anyhow::Result<String> {
-        let semantic_version_parts: Vec<&str> = version.split('.').collect();
+        version: &BStr,
+        pretty_version: &BStr,
+        stability: &BStr,
+    ) -> anyhow::Result<BString> {
+        let mut semantic_version_parts = explode(".", version);
 
         if semantic_version_parts.len() == 4
-            && preg_is_match(php_regex!(r"{^\d+\D?}"), semantic_version_parts[3])
+            && preg_is_match(php_regex!(r"{^\d+\D?}"), &semantic_version_parts[3])
         {
-            let mut parts: Vec<String> = semantic_version_parts
-                .iter()
-                .map(|s| s.to_string())
-                .collect();
-            let version = if parts[0] == "0" {
-                parts.truncate(3);
-                parts.join(".")
+            if semantic_version_parts[0] == "0" {
+                semantic_version_parts.truncate(3);
             } else {
-                parts.truncate(2);
-                parts.join(".")
-            };
+                semantic_version_parts.truncate(2);
+            }
+            let version = implode(".", &semantic_version_parts);
 
             let version = if stability != "stable" {
-                format!("{}@{}", version, stability)
+                bconcat!(version, "@", stability)
             } else {
                 version
             };
 
-            Ok(format!("^{}", version))
+            Ok(bconcat!("^", version))
         } else {
-            Ok(pretty_version.to_string())
+            Ok(pretty_version.into())
         }
     }
 

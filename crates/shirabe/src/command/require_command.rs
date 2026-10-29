@@ -520,7 +520,10 @@ impl RequireCommand {
             } else {
                 requirements.insert(
                     package_name.clone(),
-                    version_selector.find_recommended_require_version(package.clone())?,
+                    legacy_lossy(
+                        &version_selector.find_recommended_require_version(package.clone())?,
+                    )
+                    .into_owned(),
                 );
             }
             self.get_io().write_error3(

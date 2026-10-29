@@ -1387,10 +1387,7 @@ impl Installer {
         let mut root_requires: IndexMap<BString, AnyConstraint> = IndexMap::new();
         for (req, mut constraint) in requires {
             // skip platform requirements from the root package to avoid filtering out existing platform packages
-            if self
-                .platform_requirement_filter
-                .is_ignored(&legacy_lossy(&req))
-            {
+            if self.platform_requirement_filter.is_ignored(req.as_bstr()) {
                 continue;
             } else if let Some(filter) = self
                 .platform_requirement_filter
@@ -1398,7 +1395,7 @@ impl Installer {
                 .downcast_ref::<IgnoreListPlatformRequirementFilter>()
             {
                 constraint = filter
-                    .filter_constraint(&legacy_lossy(&req), constraint, false)
+                    .filter_constraint(req.as_bstr(), constraint, false)
                     .unwrap_or_else(|_| SimpleConstraint::new("=", String::new(), None).into());
             }
             root_requires.insert(req, constraint);

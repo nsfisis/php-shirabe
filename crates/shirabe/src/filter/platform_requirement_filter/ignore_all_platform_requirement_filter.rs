@@ -2,16 +2,17 @@
 
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::repository::PlatformRepository;
+use bstr::BStr;
 
 #[derive(Debug)]
 pub struct IgnoreAllPlatformRequirementFilter;
 
 impl PlatformRequirementFilterInterface for IgnoreAllPlatformRequirementFilter {
-    fn is_ignored(&self, req: &str) -> bool {
+    fn is_ignored(&self, req: &BStr) -> bool {
         PlatformRepository::is_platform_package(req)
     }
 
-    fn is_upper_bound_ignored(&self, req: &str) -> bool {
+    fn is_upper_bound_ignored(&self, req: &BStr) -> bool {
         self.is_ignored(req)
     }
 

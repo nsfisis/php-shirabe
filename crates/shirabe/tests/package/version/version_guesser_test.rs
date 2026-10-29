@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionGuesserTest.php
 
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::config::Config;
@@ -100,7 +100,7 @@ fn test_hg_guess_version_returns_data() {
     let config = make_config();
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
-        .guess_version(&IndexMap::new(), "dummy/path")
+        .guess_version(&IndexMap::new(), std::path::Path::new("dummy/path"))
         .unwrap()
         .expect("expected version data");
 
@@ -112,9 +112,8 @@ fn test_hg_guess_version_returns_data() {
     assert!(
         version_data
             .commit
-            .as_deref()
-            .unwrap_or_default()
-            .is_empty()
+            .as_ref()
+            .is_none_or(|commit| commit.is_empty())
     );
 }
 
@@ -143,7 +142,7 @@ fn test_guess_version_returns_data() {
     let config = make_config();
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
-        .guess_version(&IndexMap::new(), "dummy/path")
+        .guess_version(&IndexMap::new(), std::path::Path::new("dummy/path"))
         .unwrap()
         .expect("expected version data");
 
@@ -182,7 +181,7 @@ fn test_guess_version_does_not_see_custom_default_branch_as_non_feature_branch()
     let version_data = guesser
         .guess_version(
             &package_config(&[("version", PhpMixed::string("self.version".to_string()))]),
-            "dummy/path",
+            std::path::Path::new("dummy/path"),
         )
         .unwrap()
         .expect("expected version data");
@@ -227,7 +226,7 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
                 ("version", PhpMixed::string("self.version".to_string())),
                 ("non-feature-branches", string_list(&["arbitrary"])),
             ]),
-            "dummy/path",
+            std::path::Path::new("dummy/path"),
         )
         .unwrap()
         .expect("expected version data");
@@ -236,11 +235,15 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
     assert_eq!(another_commit_hash, version_data.commit.unwrap());
     assert_eq!(
         "dev-feature",
-        version_data.feature_version.as_deref().unwrap()
+        version_data.feature_version.as_ref().unwrap().as_bstr()
     );
     assert_eq!(
         "dev-feature",
-        version_data.feature_pretty_version.as_deref().unwrap()
+        version_data
+            .feature_pretty_version
+            .as_ref()
+            .unwrap()
+            .as_bstr()
     );
 }
 
@@ -281,7 +284,7 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
                 ("version", PhpMixed::string("self.version".to_string())),
                 ("non-feature-branches", string_list(&["latest-.*"])),
             ]),
-            "dummy/path",
+            std::path::Path::new("dummy/path"),
         )
         .unwrap()
         .expect("expected version data");
@@ -290,11 +293,15 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
     assert_eq!(another_commit_hash, version_data.commit.unwrap());
     assert_eq!(
         "dev-feature",
-        version_data.feature_version.as_deref().unwrap()
+        version_data.feature_version.as_ref().unwrap().as_bstr()
     );
     assert_eq!(
         "dev-feature",
-        version_data.feature_pretty_version.as_deref().unwrap()
+        version_data
+            .feature_pretty_version
+            .as_ref()
+            .unwrap()
+            .as_bstr()
     );
 }
 
@@ -329,7 +336,7 @@ fn test_guess_version_reads_and_respects_non_feature_branches_configuration_for_
                 ("version", PhpMixed::string("self.version".to_string())),
                 ("non-feature-branches", string_list(&["latest-.*"])),
             ]),
-            "dummy/path",
+            std::path::Path::new("dummy/path"),
         )
         .unwrap()
         .expect("expected version data");
@@ -362,7 +369,7 @@ fn test_detached_head_becomes_dev_hash() {
     let config = make_config();
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
-        .guess_version(&IndexMap::new(), "dummy/path")
+        .guess_version(&IndexMap::new(), std::path::Path::new("dummy/path"))
         .unwrap()
         .expect("expected version data");
 
@@ -397,7 +404,7 @@ fn test_detached_fetch_head_becomes_dev_hash_git2() {
     let config = make_config();
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
-        .guess_version(&IndexMap::new(), "dummy/path")
+        .guess_version(&IndexMap::new(), std::path::Path::new("dummy/path"))
         .unwrap()
         .expect("expected version data");
 
@@ -432,7 +439,7 @@ fn test_detached_commit_head_becomes_dev_hash_git2() {
     let config = make_config();
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
-        .guess_version(&IndexMap::new(), "dummy/path")
+        .guess_version(&IndexMap::new(), std::path::Path::new("dummy/path"))
         .unwrap()
         .expect("expected version data");
 
@@ -468,7 +475,7 @@ fn test_tag_becomes_version() {
     let config = make_config();
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
-        .guess_version(&IndexMap::new(), "dummy/path")
+        .guess_version(&IndexMap::new(), std::path::Path::new("dummy/path"))
         .unwrap()
         .expect("expected version data");
 
@@ -501,7 +508,7 @@ fn test_tag_becomes_pretty_version() {
     let config = make_config();
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
-        .guess_version(&IndexMap::new(), "dummy/path")
+        .guess_version(&IndexMap::new(), std::path::Path::new("dummy/path"))
         .unwrap()
         .expect("expected version data");
 
@@ -529,7 +536,7 @@ fn test_invalid_tag_becomes_version() {
     let config = make_config();
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
-        .guess_version(&IndexMap::new(), "dummy/path")
+        .guess_version(&IndexMap::new(), std::path::Path::new("dummy/path"))
         .unwrap()
         .expect("expected version data");
 
@@ -556,7 +563,7 @@ fn test_numeric_branches_show_nicely() {
     let config = make_config();
     let mut guesser = make_guesser(config, process);
     let version_data = guesser
-        .guess_version(&IndexMap::new(), "dummy/path")
+        .guess_version(&IndexMap::new(), std::path::Path::new("dummy/path"))
         .unwrap()
         .expect("expected version data");
 
@@ -593,7 +600,7 @@ fn test_remote_branches_are_selected() {
     let version_data = guesser
         .guess_version(
             &package_config(&[("version", PhpMixed::string("self.version".to_string()))]),
-            "dummy/path",
+            std::path::Path::new("dummy/path"),
         )
         .unwrap()
         .expect("expected version data");

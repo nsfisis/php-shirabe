@@ -3,7 +3,8 @@
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::package::base_package::{self};
 use crate::repository::PlatformRepository;
-use shirabe_php_shim::{legacy_lossy, preg_is_match};
+use bstr::{BStr, BString};
+use shirabe_php_shim::preg_is_match;
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -16,12 +17,12 @@ pub struct IgnoreListPlatformRequirementFilter {
 }
 
 impl IgnoreListPlatformRequirementFilter {
-    pub fn new(req_list: Vec<String>) -> anyhow::Result<Self> {
-        let mut ignore_all: Vec<String> = Vec::new();
-        let mut ignore_upper_bound: Vec<String> = Vec::new();
+    pub fn new(req_list: Vec<BString>) -> anyhow::Result<Self> {
+        let mut ignore_all: Vec<BString> = Vec::new();
+        let mut ignore_upper_bound: Vec<BString> = Vec::new();
         for req in req_list {
-            if req.ends_with('+') {
-                ignore_upper_bound.push(req[..req.len() - 1].to_string());
+            if req.ends_with(b"+") {
+                ignore_upper_bound.push(req[..req.len() - 1].into());
             } else {
                 ignore_all.push(req);
             }
@@ -37,7 +38,7 @@ impl IgnoreListPlatformRequirementFilter {
 
     pub fn filter_constraint(
         &self,
-        req: &str,
+        req: &BStr,
         constraint: AnyConstraint,
         allow_upper_bound_override: bool,
     ) -> anyhow::Result<AnyConstraint> {
@@ -63,7 +64,7 @@ impl IgnoreListPlatformRequirementFilter {
                     constraint,
                     AnyConstraint::Simple(SimpleConstraint::new(
                         ">=",
-                        legacy_lossy(last.get_end().get_version()).into_owned(),
+                        last.get_end().get_version(),
                         None,
                     )),
                 ],
@@ -79,14 +80,14 @@ impl IgnoreListPlatformRequirementFilter {
 }
 
 impl PlatformRequirementFilterInterface for IgnoreListPlatformRequirementFilter {
-    fn is_ignored(&self, req: &str) -> bool {
+    fn is_ignored(&self, req: &BStr) -> bool {
         if !PlatformRepository::is_platform_package(req) {
             return false;
         }
         preg_is_match(&self.ignore_regex, req)
     }
 
-    fn is_upper_bound_ignored(&self, req: &str) -> bool {
+    fn is_upper_bound_ignored(&self, req: &BStr) -> bool {
         if !PlatformRepository::is_platform_package(req) {
             return false;
         }

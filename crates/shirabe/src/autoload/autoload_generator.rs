@@ -1195,7 +1195,7 @@ impl AutoloadGenerator {
                 if self
                     .platform_requirement_filter
                     .borrow()
-                    .is_ignored(&legacy_lossy(link.get_target()))
+                    .is_ignored(link.get_target().as_bstr())
                 {
                     continue;
                 }

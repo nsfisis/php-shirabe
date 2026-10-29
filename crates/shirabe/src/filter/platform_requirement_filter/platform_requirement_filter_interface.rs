@@ -1,9 +1,11 @@
 //! ref: composer/src/Composer/Filter/PlatformRequirementFilter/PlatformRequirementFilterInterface.php
 
-pub trait PlatformRequirementFilterInterface: std::fmt::Debug {
-    fn is_ignored(&self, req: &str) -> bool;
+use bstr::BStr;
 
-    fn is_upper_bound_ignored(&self, req: &str) -> bool;
+pub trait PlatformRequirementFilterInterface: std::fmt::Debug {
+    fn is_ignored(&self, req: &BStr) -> bool;
+
+    fn is_upper_bound_ignored(&self, req: &BStr) -> bool;
 
     fn as_any(&self) -> &dyn std::any::Any;
 }

@@ -173,14 +173,14 @@ impl Solver {
         for (package_name, constraint) in request.get_requires().iter() {
             let mut filtered: Option<AnyConstraint> = None;
             let constraint_ref: &AnyConstraint = constraint;
-            if platform_requirement_filter.is_ignored(&legacy_lossy(package_name)) {
+            if platform_requirement_filter.is_ignored(package_name.as_bstr()) {
                 continue;
             } else if let Some(ignore_filter) = platform_requirement_filter
                 .as_any()
                 .downcast_ref::<IgnoreListPlatformRequirementFilter>(
             ) {
                 filtered = Some(ignore_filter.filter_constraint(
-                    &legacy_lossy(package_name),
+                    package_name.as_bstr(),
                     constraint.clone(),
                     true,
                 )?);

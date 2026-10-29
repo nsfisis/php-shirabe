@@ -484,7 +484,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         if package.is_none() {
             // platform packages can not be found in the pool in versions other than the local platform's has
             // so if platform reqs are ignored we just take the user's word for it
-            if platform_requirement_filter.is_ignored(name) {
+            if platform_requirement_filter.is_ignored(name.as_bytes().as_bstr()) {
                 return Ok((name.to_string(), "*".to_string()));
             }
 
@@ -715,7 +715,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             if fixed {
                 legacy_lossy(&package.get_pretty_version()).into_owned()
             } else {
-                version_selector.find_recommended_require_version(package)?
+                legacy_lossy(&version_selector.find_recommended_require_version(package)?)
+                    .into_owned()
             },
         ))
     }

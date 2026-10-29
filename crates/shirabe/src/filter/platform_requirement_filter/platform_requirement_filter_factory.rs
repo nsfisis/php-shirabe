@@ -6,7 +6,8 @@ use crate::filter::platform_requirement_filter::{
     ignore_nothing_platform_requirement_filter::IgnoreNothingPlatformRequirementFilter,
     platform_requirement_filter_interface::PlatformRequirementFilterInterface,
 };
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, get_debug_type, legacy_lossy};
+use bstr::BString;
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, get_debug_type};
 
 pub struct PlatformRequirementFilterFactory;
 
@@ -23,14 +24,14 @@ impl PlatformRequirementFilterFactory {
                 }
             }
             list_or_array @ (PhpMixed::List(_) | PhpMixed::Array(_)) => {
-                let list: Vec<String> = match list_or_array {
+                let list: Vec<BString> = match list_or_array {
                     PhpMixed::List(items) => items
                         .into_iter()
-                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                        .filter_map(|v| v.as_string().map(BString::from))
                         .collect(),
                     PhpMixed::Array(map) => map
                         .into_iter()
-                        .filter_map(|(_, v)| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                        .filter_map(|(_, v)| v.as_string().map(BString::from))
                         .collect(),
                     _ => unreachable!(),
                 };

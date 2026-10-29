@@ -81,10 +81,10 @@ mockall::mock! {
         fn guess_version(
             &mut self,
             package_config: &IndexMap<BString, PhpMixed>,
-            path: &str,
+            path: &std::path::Path,
         ) -> anyhow::Result<Option<VersionData>>;
 
-        fn get_root_version_from_env(&self) -> anyhow::Result<String>;
+        fn get_root_version_from_env(&self) -> anyhow::Result<BString>;
     }
 }
 
@@ -232,9 +232,9 @@ fn test_pretty_version_for_root_package_in_version_branch() {
         .times(1..)
         .returning(|_, _| {
             Ok(Some(VersionData {
-                version: Some("3.0.9999999.9999999-dev".to_string()),
-                commit: Some("aabbccddee".to_string()),
-                pretty_version: Some("3.0-dev".to_string()),
+                version: Some("3.0.9999999.9999999-dev".into()),
+                commit: Some("aabbccddee".into()),
+                pretty_version: Some("3.0-dev".into()),
                 feature_version: None,
                 feature_pretty_version: None,
             }))

@@ -8,11 +8,14 @@ use shirabe::filter::platform_requirement_filter::{
 fn test_is_ignored() {
     for (req_list, req, expect_ignored) in data_is_ignored() {
         let platform_requirement_filter = IgnoreListPlatformRequirementFilter::new(
-            req_list.iter().map(|s| s.to_string()).collect(),
+            req_list.iter().map(|s| (*s).into()).collect(),
         )
         .unwrap();
 
-        assert_eq!(expect_ignored, platform_requirement_filter.is_ignored(req));
+        assert_eq!(
+            expect_ignored,
+            platform_requirement_filter.is_ignored(bstr::BStr::new(req))
+        );
     }
 }
 
@@ -51,13 +54,13 @@ fn data_is_ignored() -> Vec<(Vec<&'static str>, &'static str, bool)> {
 fn test_is_upper_bound_ignored() {
     for (req_list, req, expect_ignored) in data_is_upper_bound_ignored() {
         let platform_requirement_filter = IgnoreListPlatformRequirementFilter::new(
-            req_list.iter().map(|s| s.to_string()).collect(),
+            req_list.iter().map(|s| (*s).into()).collect(),
         )
         .unwrap();
 
         assert_eq!(
             expect_ignored,
-            platform_requirement_filter.is_upper_bound_ignored(req)
+            platform_requirement_filter.is_upper_bound_ignored(bstr::BStr::new(req))
         );
     }
 }
