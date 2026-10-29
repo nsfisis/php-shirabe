@@ -104,7 +104,11 @@ impl ZipDownloader {
                 .inner
                 .process
                 .borrow_mut()
-                .execute(&[command_spec[1].as_str()], &mut output, None::<&str>)
+                .execute(
+                    &[command_spec[1].as_str()],
+                    &mut output,
+                    None::<&str>.map(std::path::Path::new),
+                )
                 .unwrap_or(1)
                 == 0
                 && let Some(m) =

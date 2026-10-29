@@ -26,7 +26,10 @@ impl ProcessFailedException {
                 .map(|c| c.to_string())
                 .unwrap_or_default(),
             process.get_exit_code_text().unwrap_or_default(),
-            process.get_working_directory().unwrap_or_default(),
+            process
+                .get_working_directory()
+                .unwrap_or_default()
+                .display(),
         );
 
         error += &format!(

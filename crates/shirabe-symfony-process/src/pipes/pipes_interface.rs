@@ -14,7 +14,7 @@ pub trait PipesInterface: std::fmt::Debug {
     fn get_files(&self) -> IndexMap<i64, String>;
 
     /// Reads data in file handles and pipes.
-    fn read_and_write(&mut self, blocking: bool, close: bool) -> IndexMap<i64, String>;
+    fn read_and_write(&mut self, blocking: bool, close: bool) -> IndexMap<i64, bstr::BString>;
 
     /// Returns if the current state has open file handles or pipes.
     fn are_open(&self) -> bool;

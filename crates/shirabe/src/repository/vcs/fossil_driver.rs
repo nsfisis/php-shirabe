@@ -131,13 +131,13 @@ impl FossilDriver {
             && self.inner.process.borrow_mut().execute(
                 ["fossil", "info"].map(|s| s.to_string()).as_ref(),
                 &mut String::new(),
-                Some(&self.checkout_dir),
+                Some(std::path::Path::new(&self.checkout_dir)),
             )? == 0
         {
             if self.inner.process.borrow_mut().execute(
                 ["fossil", "pull"].map(|s| s.to_string()).as_ref(),
                 &mut String::new(),
-                Some(&self.checkout_dir),
+                Some(std::path::Path::new(&self.checkout_dir)),
             )? != 0
             {
                 self.inner.io.write_error3(&format!(
@@ -174,7 +174,7 @@ impl FossilDriver {
                     .map(|s| s.to_string())
                     .as_ref(),
                 &mut output,
-                Some(&self.checkout_dir),
+                Some(std::path::Path::new(&self.checkout_dir)),
             )? != 0
             {
                 let output = self.inner.process.borrow().get_error_output().to_string();
@@ -227,7 +227,7 @@ impl FossilDriver {
                 .map(|s| s.to_string())
                 .as_ref(),
             &mut content,
-            Some(&self.checkout_dir),
+            Some(std::path::Path::new(&self.checkout_dir)),
         )?;
 
         if content.trim().is_empty() {
@@ -247,7 +247,7 @@ impl FossilDriver {
                 .map(|s| s.to_string())
                 .as_ref(),
             &mut output,
-            Some(&self.checkout_dir),
+            Some(std::path::Path::new(&self.checkout_dir)),
         )?;
         let parts: Vec<&str> = output.trim().splitn(3, ' ').collect();
         let date = parts.get(1).copied().unwrap_or_default();
@@ -263,10 +263,13 @@ impl FossilDriver {
             self.inner.process.borrow_mut().execute(
                 ["fossil", "tag", "list"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(&self.checkout_dir),
+                Some(std::path::Path::new(&self.checkout_dir)),
             )?;
             for tag in self.inner.process.borrow().split_lines(&output) {
-                tags.insert(tag.clone(), tag);
+                tags.insert(
+                    legacy_lossy(&tag.clone()).into_owned(),
+                    legacy_lossy(&tag).into_owned(),
+                );
             }
             self.tags = Some(tags);
         }
@@ -280,10 +283,10 @@ impl FossilDriver {
             self.inner.process.borrow_mut().execute(
                 ["fossil", "branch", "list"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(&self.checkout_dir),
+                Some(std::path::Path::new(&self.checkout_dir)),
             )?;
             for branch in self.inner.process.borrow().split_lines(&output) {
-                let branch = preg_replace(php_regex!(r"/^\*/"), "", branch.trim());
+                let branch = preg_replace(php_regex!(r"/^\*/"), "", branch.trim_ascii());
                 let branch = legacy_lossy(&trim(&branch)).into_owned();
                 branches.insert(branch.clone(), branch);
             }
@@ -321,7 +324,7 @@ impl FossilDriver {
             if process.execute(
                 ["fossil", "info"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(&*legacy_lossy(path_to_bytes(&url))),
+                Some(std::path::Path::new(&*legacy_lossy(path_to_bytes(&url)))),
             )? == 0
             {
                 return Ok(true);

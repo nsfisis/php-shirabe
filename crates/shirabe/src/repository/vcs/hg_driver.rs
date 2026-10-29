@@ -90,13 +90,13 @@ impl HgDriver {
                 && self.inner.process.borrow_mut().execute(
                     ["hg", "summary"].map(|s| s.to_string()).as_ref(),
                     &mut String::new(),
-                    Some(&self.repo_dir),
+                    Some(std::path::Path::new(&self.repo_dir)),
                 )? == 0
             {
                 if self.inner.process.borrow_mut().execute(
                     ["hg", "pull"].map(|s| s.to_string()).as_ref(),
                     &mut String::new(),
-                    Some(&self.repo_dir),
+                    Some(std::path::Path::new(&self.repo_dir)),
                 )? != 0
                 {
                     self.inner.io.write_error3(&format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.borrow().get_error_output()), true, crate::io::NORMAL);
@@ -135,10 +135,13 @@ impl HgDriver {
                     .map(|s| s.to_string())
                     .as_ref(),
                 &mut output,
-                Some(&self.repo_dir),
+                Some(std::path::Path::new(&self.repo_dir)),
             )?;
             let lines = self.inner.process.borrow().split_lines(&output);
-            self.root_identifier = lines.into_iter().next();
+            self.root_identifier = lines
+                .into_iter()
+                .next()
+                .map(|s| legacy_lossy(&s).into_owned());
         }
 
         Ok(self.root_identifier.clone().unwrap_or_default())
@@ -178,10 +181,11 @@ impl HgDriver {
             file.to_string(),
         ];
         let mut content = String::new();
-        self.inner
-            .process
-            .borrow_mut()
-            .execute(&resource, &mut content, Some(&self.repo_dir))?;
+        self.inner.process.borrow_mut().execute(
+            &resource,
+            &mut content,
+            Some(std::path::Path::new(&self.repo_dir)),
+        )?;
 
         if content.trim().is_empty() {
             return Ok(None);
@@ -215,7 +219,7 @@ impl HgDriver {
             .map(|s| s.to_string())
             .as_ref(),
             &mut output,
-            Some(&self.repo_dir),
+            Some(std::path::Path::new(&self.repo_dir)),
         )?;
 
         let date: DateTime<Utc> = date_create(output.trim())?;
@@ -229,7 +233,7 @@ impl HgDriver {
             self.inner.process.borrow_mut().execute(
                 ["hg", "tags"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(&self.repo_dir),
+                Some(std::path::Path::new(&self.repo_dir)),
             )?;
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty()
@@ -258,7 +262,7 @@ impl HgDriver {
             self.inner.process.borrow_mut().execute(
                 ["hg", "branches"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(&self.repo_dir),
+                Some(std::path::Path::new(&self.repo_dir)),
             )?;
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
@@ -276,7 +280,7 @@ impl HgDriver {
             self.inner.process.borrow_mut().execute(
                 ["hg", "bookmarks"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(&self.repo_dir),
+                Some(std::path::Path::new(&self.repo_dir)),
             )?;
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
@@ -324,7 +328,7 @@ impl HgDriver {
             if process.execute(
                 ["hg", "summary"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(&*legacy_lossy(path_to_bytes(&url))),
+                Some(std::path::Path::new(&*legacy_lossy(path_to_bytes(&url)))),
             )? == 0
             {
                 return Ok(true);

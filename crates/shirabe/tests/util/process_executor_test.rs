@@ -4,6 +4,7 @@
 // password hiding, line splitting and argument escaping. A few data points remain unportable —
 // see the individual `// TODO(async)` comments below.
 
+use bstr::ByteSlice;
 use shirabe::io::buffer_io::BufferIO;
 use shirabe::io::{ConsoleIO, IOInterface};
 use shirabe::util::process_executor::ProcessExecutor;
@@ -55,7 +56,7 @@ fn test_execute_captures_stderr() {
     assert!(
         process
             .get_error_output()
-            .contains("foo: No such file or directory")
+            .contains_str("foo: No such file or directory")
     );
 }
 

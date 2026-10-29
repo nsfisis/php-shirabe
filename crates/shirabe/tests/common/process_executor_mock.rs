@@ -33,31 +33,35 @@ pub trait IntoMockCmd {
 
 impl IntoMockCmd for &str {
     fn into_mock_cmd(self) -> CommandLine {
-        CommandLine::Shell(self.to_string())
+        CommandLine::Shell(bstr::BString::from(self.to_string()))
     }
 }
 
 impl IntoMockCmd for String {
     fn into_mock_cmd(self) -> CommandLine {
-        CommandLine::Shell(self)
+        CommandLine::Shell(bstr::BString::from(self))
     }
 }
 
 impl IntoMockCmd for Vec<&str> {
     fn into_mock_cmd(self) -> CommandLine {
-        CommandLine::Args(self.into_iter().map(|s| s.to_string()).collect())
+        CommandLine::Args(self.into_iter().map(bstr::BString::from).collect())
     }
 }
 
 impl IntoMockCmd for Vec<String> {
     fn into_mock_cmd(self) -> CommandLine {
-        CommandLine::Args(self)
+        CommandLine::Args(
+            self.into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
 impl<const N: usize> IntoMockCmd for [&str; N] {
     fn into_mock_cmd(self) -> CommandLine {
-        CommandLine::Args(self.iter().map(|s| s.to_string()).collect())
+        CommandLine::Args(self.iter().map(|&s| bstr::BString::from(s)).collect())
     }
 }
 

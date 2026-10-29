@@ -107,7 +107,8 @@ impl VcsDownloader for HgDownloader {
             &mut ignored_output,
             realpath(path)
                 .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                .as_deref(),
+                .as_deref()
+                .map(std::path::Path::new),
         )? != 0
         {
             return Err(RuntimeException::new(format!(
@@ -187,7 +188,8 @@ impl VcsDownloader for HgDownloader {
             &mut output,
             realpath(path)
                 .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                .as_deref(),
+                .as_deref()
+                .map(std::path::Path::new),
         )? != 0
         {
             return Err(RuntimeException::new(format!(
@@ -223,7 +225,8 @@ impl ChangeReportInterface for HgDownloader {
             &mut output,
             realpath(path)
                 .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                .as_deref(),
+                .as_deref()
+                .map(std::path::Path::new),
         )?;
 
         let output = output.trim().to_string();

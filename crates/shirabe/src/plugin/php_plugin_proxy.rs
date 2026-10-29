@@ -37,7 +37,7 @@ use crate::repository::{
     InstalledArrayRepository, InstalledFilesystemRepository, InstalledRepositoryInterfaceHandle,
     LockArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_rpc::{
     PhpObjHandle, PhpThrow, PluginValue, RustMethodDispatcher, RustObjHandle,
@@ -1626,15 +1626,15 @@ fn dispatch_process_executor_method(
                     .execute(
                         command,
                         crate::util::ProcessExecutor::FORWARD_OUTPUT,
-                        cwd.as_deref(),
+                        cwd.as_deref().map(std::path::Path::new),
                     )
                     .map(|code| code.to_plugin_value())
                     .map_err(failed);
             };
             if is_php_callable(output).map_err(failed)? {
                 let callable = output.clone();
-                let callback: Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>> =
-                    Box::new(move |r#type: &str, buffer: &str| {
+                let callback: Box<dyn FnMut(&str, &BStr) -> anyhow::Result<bool>> =
+                    Box::new(move |r#type: &str, buffer: &BStr| {
                         call_php_callable(
                             &callable,
                             vec![PluginValue::string(r#type), PluginValue::string(buffer)],
@@ -1643,14 +1643,18 @@ fn dispatch_process_executor_method(
                     });
                 return process
                     .borrow()
-                    .execute(command, callback, cwd.as_deref())
+                    .execute(command, callback, cwd.as_deref().map(std::path::Path::new))
                     .map(|code| code.to_plugin_value())
                     .map_err(failed);
             }
-            let mut captured: Option<String> = None;
+            let mut captured: Option<BString> = None;
             let code = process
                 .borrow()
-                .execute(command, &mut captured, cwd.as_deref())
+                .execute(
+                    command,
+                    &mut captured,
+                    cwd.as_deref().map(std::path::Path::new),
+                )
                 .map_err(failed)?;
             // PHP leaves `$output` alone when the child was signaled before the assignment, which
             // is what an absent out-param position reproduces.
@@ -1663,7 +1667,7 @@ fn dispatch_process_executor_method(
             .borrow()
             .execute_tty(
                 exec_command_arg(method_name, args, 0)?,
-                cwd_arg(1)?.as_deref(),
+                cwd_arg(1)?.as_deref().map(std::path::Path::new),
             )
             .map_err(failed)?
             .to_plugin_value()),
@@ -1704,10 +1708,11 @@ fn dispatch_process_executor_method(
             let command = exec_command_arg(method_name, args, 0)?;
             let cwd = cwd_arg(1)?;
             let started = std::rc::Rc::new(std::cell::Cell::new(false));
-            let mut future =
-                process
-                    .borrow()
-                    .execute_async_job(command, cwd.as_deref(), Some(started.clone()));
+            let mut future = process.borrow().execute_async_job(
+                command,
+                cwd.as_deref().map(std::path::Path::new),
+                Some(started.clone()),
+            );
             let resolve = |child: shirabe_symfony_process::Process| {
                 rust_handle_value(
                     register_entity(RustEntity::Process(std::rc::Rc::new(
@@ -1867,7 +1872,7 @@ fn exec_command_arg(
     match args.get(position) {
         // TODO(bytes): lossy UTF-8; every PHP string crossing the boundary is bytes.
         Some(PluginValue::String(bytes)) => Ok(crate::util::process_executor::CommandLine::Shell(
-            String::from_utf8_lossy(bytes).into_owned(),
+            bstr::BString::from(String::from_utf8_lossy(bytes).into_owned()),
         )),
         Some(PluginValue::List(items)) => {
             let mut parts = Vec::with_capacity(items.len());
@@ -1884,7 +1889,12 @@ fn exec_command_arg(
                     }
                 }
             }
-            Ok(crate::util::process_executor::CommandLine::Args(parts))
+            Ok(crate::util::process_executor::CommandLine::Args(
+                parts
+                    .into_iter()
+                    .map(bstr::BString::from)
+                    .collect::<Vec<_>>(),
+            ))
         }
         other => Err(arg_throw(
             method,

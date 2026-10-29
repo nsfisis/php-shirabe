@@ -189,10 +189,10 @@ impl GitDriver {
                     "--no-color".to_string(),
                 ],
                 &mut output,
-                Some(&self.repo_dir),
+                Some(std::path::Path::new(&self.repo_dir)),
             )?;
             let branches = self.inner.process.borrow().split_lines(&output);
-            if !branches.contains(&"* master".to_string()) {
+            if !branches.contains(&bstr::BString::from("* master".to_string().clone())) {
                 for branch in &branches {
                     if !branch.is_empty()
                         && let Some(caps) = preg_match(php_regex!(r"{^\* +(\S+)}"), branch)
@@ -245,7 +245,7 @@ impl GitDriver {
                 format!("{}:{}", identifier, file),
             ],
             &mut content,
-            Some(&self.repo_dir),
+            Some(std::path::Path::new(&self.repo_dir)),
         )?;
 
         if content.trim().is_empty() {
@@ -276,10 +276,11 @@ impl GitDriver {
             ],
         )?;
         let mut output = String::new();
-        self.inner
-            .process
-            .borrow_mut()
-            .execute(&command, &mut output, Some(&self.repo_dir))?;
+        self.inner.process.borrow_mut().execute(
+            &command,
+            &mut output,
+            Some(std::path::Path::new(&self.repo_dir)),
+        )?;
 
         let timestamp_str = GitUtil::parse_rev_list_output(&output, &self.inner.process)?;
         let timestamp: i64 = timestamp_str.trim().parse().unwrap_or(0);
@@ -301,7 +302,7 @@ impl GitDriver {
                     "--dereference".to_string(),
                 ],
                 &mut output,
-                Some(&self.repo_dir),
+                Some(std::path::Path::new(&self.repo_dir)),
             )?;
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty()
@@ -336,7 +337,7 @@ impl GitDriver {
                     "-v".to_string(),
                 ],
                 &mut output,
-                Some(&self.repo_dir),
+                Some(std::path::Path::new(&self.repo_dir)),
             )?;
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
@@ -384,13 +385,13 @@ impl GitDriver {
             if process.borrow_mut().execute(
                 &["git".to_string(), "tag".to_string()],
                 &mut output,
-                Some(&*legacy_lossy(path_to_bytes(&url))),
+                Some(std::path::Path::new(&*legacy_lossy(path_to_bytes(&url)))),
             )? == 0
             {
                 return Ok(true);
             }
             GitUtil::check_for_repo_ownership_error(
-                &process.borrow().get_error_output(),
+                &legacy_lossy(&process.borrow().get_error_output()),
                 &legacy_lossy(path_to_bytes(&url)),
                 Some(io.clone()),
             )?;

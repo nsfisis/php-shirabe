@@ -11,7 +11,7 @@
 3 crates/shirabe-php-shim/src/xml.rs
 1 crates/shirabe-symfony-console/src/command/command.rs
 6 crates/shirabe-symfony-console/src/command/complete_command.rs
-4 crates/shirabe-symfony-console/src/command/dump_completion_command.rs
+3 crates/shirabe-symfony-console/src/command/dump_completion_command.rs
 1 crates/shirabe-symfony-console/src/descriptor/json_descriptor.rs
 2 crates/shirabe-symfony-console/src/descriptor/markdown_descriptor.rs
 5 crates/shirabe-symfony-console/src/descriptor/text_descriptor.rs
@@ -32,8 +32,6 @@
 3 crates/shirabe-symfony-process/src/executable_finder.rs
 3 crates/shirabe-symfony-process/src/php_executable_finder.rs
 1 crates/shirabe-symfony-process/src/pipes/abstract_pipes.rs
-1 crates/shirabe-symfony-process/src/pipes/unix_pipes.rs
-7 crates/shirabe-symfony-process/src/process.rs
 1 crates/shirabe/build.rs
 5 crates/shirabe/src/advisory/audit_config.rs
 3 crates/shirabe/src/advisory/partial_security_advisory.rs
@@ -100,7 +98,6 @@
 3 crates/shirabe/src/util/config_validator.rs
 1 crates/shirabe/src/util/forgejo.rs
 1 crates/shirabe/src/util/forgejo_repository_data.rs
-1 crates/shirabe/src/util/git.rs
 1 crates/shirabe/src/util/gitlab.rs
 2 crates/shirabe/src/util/http/native_http_downloader.rs
 1 crates/shirabe/src/util/http/proxy_manager.rs
@@ -109,7 +106,6 @@
 5 crates/shirabe/src/util/no_proxy_pattern.rs
 1 crates/shirabe/src/util/perforce.rs
 2 crates/shirabe/src/util/platform.rs
-1 crates/shirabe/src/util/process_executor.rs
 3 crates/shirabe/src/util/remote_filesystem.rs
 3 crates/shirabe/src/util/stream_context_factory.rs
 1 crates/shirabe/src/util/tar.rs

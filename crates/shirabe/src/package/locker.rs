@@ -819,7 +819,7 @@ impl Locker {
                     if 0 == self.process.borrow_mut().execute(
                         command,
                         &mut output,
-                        path.as_deref(),
+                        path.as_deref().map(std::path::Path::new),
                     )? {
                         let output_str = legacy_lossy(&trim(&GitUtil::parse_rev_list_output(
                             &output.as_string().unwrap_or_default().to_str_lossy(),
@@ -844,7 +844,7 @@ impl Locker {
                             source_ref,
                         ],
                         &mut output,
-                        path.as_deref(),
+                        path.as_deref().map(std::path::Path::new),
                     )? && let Some(m) = preg_match(
                         php_regex!(r"{^\s*(\d+)\s*}"),
                         &output.as_string().unwrap_or_default(),

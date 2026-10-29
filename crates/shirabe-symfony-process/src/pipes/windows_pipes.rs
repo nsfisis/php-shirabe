@@ -37,7 +37,7 @@ impl PipesInterface for WindowsPipes {
         self.files.clone()
     }
 
-    fn read_and_write(&mut self, _blocking: bool, _close: bool) -> IndexMap<i64, String> {
+    fn read_and_write(&mut self, _blocking: bool, _close: bool) -> IndexMap<i64, bstr::BString> {
         todo!()
     }
 

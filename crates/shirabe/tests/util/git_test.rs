@@ -115,7 +115,7 @@ fn test_run_command_public_git_hub_repository_not_initial_clone_ssh() {
     let expected_url = "git@github.com:acme/repo";
     let command_callable: Box<dyn Fn(&str) -> CommandLine> = Box::new(move |url: &str| {
         assert_eq!(expected_url, url);
-        CommandLine::Shell("git command".to_string())
+        CommandLine::Shell(bstr::BString::from("git command".to_string()))
     });
 
     let config = mock_config("ssh");
@@ -141,7 +141,7 @@ fn test_run_command_public_git_hub_repository_not_initial_clone_https() {
     let expected_url = "https://github.com/acme/repo";
     let command_callable: Box<dyn Fn(&str) -> CommandLine> = Box::new(move |url: &str| {
         assert_eq!(expected_url, url);
-        CommandLine::Shell("git command".to_string())
+        CommandLine::Shell(bstr::BString::from("git command".to_string()))
     });
 
     let config = mock_config("https");
@@ -166,7 +166,7 @@ fn test_run_command_private_git_hub_repository_not_initial_clone_not_interactive
  {
     let command_callable: Box<dyn Fn(&str) -> CommandLine> = Box::new(|url: &str| {
         assert_eq!("https://github.com/acme/repo", url);
-        CommandLine::Shell("git command".to_string())
+        CommandLine::Shell(bstr::BString::from("git command".to_string()))
     });
 
     let config = mock_config("https");
@@ -205,9 +205,9 @@ fn run_command_private_github_with_authentication(
     let expected_url_owned = expected_url.to_string();
     let command_callable: Box<dyn Fn(&str) -> CommandLine> = Box::new(move |url: &str| {
         if url != expected_url_owned {
-            return CommandLine::Shell("git command failing".to_string());
+            return CommandLine::Shell(bstr::BString::from("git command failing".to_string()));
         }
-        CommandLine::Shell("git command ok".to_string())
+        CommandLine::Shell(bstr::BString::from("git command ok".to_string()))
     });
 
     let config = mock_config(protocol);
@@ -270,9 +270,9 @@ fn run_command_private_bitbucket_with_authentication(
     let expected_url_owned = expected_url.to_string();
     let command_callable: Box<dyn Fn(&str) -> CommandLine> = Box::new(move |url: &str| {
         if url != expected_url_owned {
-            return CommandLine::Shell("git command failing".to_string());
+            return CommandLine::Shell(bstr::BString::from("git command failing".to_string()));
         }
-        CommandLine::Shell("git command ok".to_string())
+        CommandLine::Shell(bstr::BString::from("git command ok".to_string()))
     });
 
     let config = ConfigStubBuilder::new()
@@ -413,9 +413,9 @@ fn run_command_private_bitbucket_interactive_with_oauth(
     let expected_url_owned = expected_url.to_string();
     let command_callable: Box<dyn Fn(&str) -> CommandLine> = Box::new(move |url: &str| {
         if url != expected_url_owned {
-            return CommandLine::Shell("git command failing".to_string());
+            return CommandLine::Shell(bstr::BString::from("git command failing".to_string()));
         }
-        CommandLine::Shell("git command ok".to_string())
+        CommandLine::Shell(bstr::BString::from("git command ok".to_string()))
     });
 
     let mut config = ConfigStubBuilder::new()

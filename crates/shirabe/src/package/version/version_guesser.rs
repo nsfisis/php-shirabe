@@ -216,7 +216,7 @@ impl VersionGuesser {
                 "-v".to_string(),
             ],
             &mut output,
-            Some(path),
+            Some(std::path::Path::new(path)),
         )? {
             let mut branches: Vec<String> = vec![];
             let mut is_feature_branch = false;
@@ -284,7 +284,7 @@ impl VersionGuesser {
             }
         }
         GitUtil::check_for_repo_ownership_error(
-            &self.process.borrow().get_error_output(),
+            &legacy_lossy(&self.process.borrow().get_error_output()),
             path,
             self.io.clone(),
         );
@@ -324,11 +324,11 @@ impl VersionGuesser {
                 .unwrap_or_default(),
             )?;
             let mut command_output = String::new();
-            if 0 == self
-                .process
-                .borrow_mut()
-                .execute(&command, &mut command_output, Some(path))?
-            {
+            if 0 == self.process.borrow_mut().execute(
+                &command,
+                &mut command_output,
+                Some(std::path::Path::new(path)),
+            )? {
                 let parsed = legacy_lossy(&trim(&GitUtil::parse_rev_list_output(
                     &command_output,
                     &self.process,
@@ -362,7 +362,7 @@ impl VersionGuesser {
                 "--tags".to_string(),
             ],
             &mut output,
-            Some(path),
+            Some(std::path::Path::new(path)),
         )? {
             match self
                 .version_parser
@@ -388,7 +388,7 @@ impl VersionGuesser {
         if 0 == self.process.borrow_mut().execute(
             &["hg".to_string(), "branch".to_string()],
             &mut output,
-            Some(path),
+            Some(std::path::Path::new(path)),
         )? {
             let branch = legacy_lossy(&trim(&output)).into_owned();
             let version = self.version_parser.normalize_branch(&branch)?;
@@ -563,7 +563,7 @@ impl VersionGuesser {
                     let process_future = self
                         .process
                         .borrow_mut()
-                        .execute_async(&cmd_line, Some(path));
+                        .execute_async(&cmd_line, Some(std::path::Path::new(path)));
                     let mut process = sync_executor::block_on(process_future)?;
                     if !process.is_successful() {
                         continue;
@@ -641,7 +641,7 @@ impl VersionGuesser {
                 "list".to_string(),
             ],
             &mut output,
-            Some(path),
+            Some(std::path::Path::new(path)),
         )? {
             let branch = legacy_lossy(&trim(&output)).into_owned();
             version = Some(self.version_parser.normalize_branch(&branch)?);
@@ -653,7 +653,7 @@ impl VersionGuesser {
         if 0 == self.process.borrow_mut().execute(
             &["fossil".to_string(), "tag".to_string(), "list".to_string()],
             &mut output,
-            Some(path),
+            Some(std::path::Path::new(path)),
         )? {
             match self
                 .version_parser
@@ -688,7 +688,7 @@ impl VersionGuesser {
         if 0 == self.process.borrow_mut().execute(
             &["svn".to_string(), "info".to_string(), "--xml".to_string()],
             &mut output,
-            Some(path),
+            Some(std::path::Path::new(path)),
         )? {
             let trunk_path = package_config
                 .get(B("trunk-path"))

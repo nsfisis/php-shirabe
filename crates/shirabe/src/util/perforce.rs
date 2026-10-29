@@ -87,7 +87,7 @@ impl Perforce {
                 "-s".to_string(),
             ],
             &mut ignored_output,
-            Option::<&str>::None,
+            Option::<&str>::None.map(std::path::Path::new),
         )? == 0)
     }
 
@@ -141,7 +141,12 @@ impl Perforce {
         let task = vec!["client".to_string(), "-d".to_string(), client];
         let use_p4_client = false;
         let command = self.generate_p4_command(task, use_p4_client);
-        self.execute_command(CommandLine::Args(command));
+        self.execute_command(CommandLine::Args(
+            command
+                .into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+        ));
         let client_spec = self.get_p4_client_spec();
         let file_system = self.get_filesystem();
         file_system.borrow_mut().remove(&client_spec);
@@ -269,7 +274,7 @@ impl Perforce {
                 ProcessExecutor::escape(self.p4_user.as_deref().unwrap_or_default())
             )
         };
-        self.execute_command(CommandLine::Shell(command));
+        self.execute_command(CommandLine::Shell(bstr::BString::from(command)));
 
         Ok(())
     }
@@ -277,7 +282,7 @@ impl Perforce {
     fn get_p4_variable(&mut self, name: &str) -> Option<String> {
         if self.windows_flag {
             let command = format!("{} set", Self::get_p4_executable());
-            self.execute_command(CommandLine::Shell(command));
+            self.execute_command(CommandLine::Shell(bstr::BString::from(command)));
             let result = trim(&self.command_result);
             let res_array = explode(PHP_EOL, &result);
             for line in &res_array {
@@ -303,7 +308,7 @@ impl Perforce {
         }
 
         let command = format!("echo ${}", name);
-        self.execute_command(CommandLine::Shell(command));
+        self.execute_command(CommandLine::Shell(bstr::BString::from(command)));
         let result = legacy_lossy(&trim(&self.command_result)).into_owned();
 
         Some(result)
@@ -345,7 +350,12 @@ impl Perforce {
 
     pub fn is_logged_in(&mut self) -> anyhow::Result<bool> {
         let command = self.generate_p4_command(vec!["login".to_string(), "-s".to_string()], false);
-        let exit_code = self.execute_command(CommandLine::Args(command));
+        let exit_code = self.execute_command(CommandLine::Args(
+            command
+                .into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+        ));
         if exit_code != 0 {
             let error_output = self.process.borrow().get_error_output().to_string();
             let user = self.get_user().unwrap_or_default();
@@ -392,7 +402,12 @@ impl Perforce {
         if let Some(source_reference) = source_reference {
             p4_sync_command.push(format!("@{}", source_reference));
         }
-        self.execute_command(CommandLine::Args(p4_sync_command));
+        self.execute_command(CommandLine::Args(
+            p4_sync_command
+                .into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+        ));
         chdir(&prev_dir);
 
         Ok(())
@@ -571,7 +586,12 @@ impl Perforce {
         let path = self.get_file_path(file, identifier)?;
 
         let command = self.generate_p4_command(vec!["print".to_string(), path], true);
-        self.execute_command(CommandLine::Args(command));
+        self.execute_command(CommandLine::Args(
+            command
+                .into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+        ));
         let result = self.command_result.clone();
 
         if trim(&result).is_empty() {
@@ -595,7 +615,12 @@ impl Perforce {
             substr(identifier, idx, None)
         );
         let command = self.generate_p4_command(vec!["files".to_string(), path], false);
-        self.execute_command(CommandLine::Args(command));
+        self.execute_command(CommandLine::Args(
+            command
+                .into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+        ));
         let result = self.command_result.clone();
         let index2 = strpos(&result, "no such file(s).");
         if index2.is_none() {
@@ -631,7 +656,12 @@ impl Perforce {
                 ],
                 true,
             );
-            self.execute_command(CommandLine::Args(command));
+            self.execute_command(CommandLine::Args(
+                command
+                    .into_iter()
+                    .map(bstr::BString::from)
+                    .collect::<Vec<_>>(),
+            ));
             let result = self.command_result.clone();
             let res_array = explode(PHP_EOL, &result);
             for line in &res_array {
@@ -655,7 +685,12 @@ impl Perforce {
             vec!["changes".to_string(), format!("{}/...", stream)],
             false,
         );
-        self.execute_command(CommandLine::Args(command));
+        self.execute_command(CommandLine::Args(
+            command
+                .into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+        ));
         let result = self.command_result.clone();
         let res_array = explode(PHP_EOL, &result);
         let last_commit = res_array.first().cloned().unwrap_or_default();
@@ -679,7 +714,12 @@ impl Perforce {
 
     pub fn get_tags(&mut self) -> IndexMap<String, String> {
         let command = self.generate_p4_command(vec!["labels".to_string()], true);
-        self.execute_command(CommandLine::Args(command));
+        self.execute_command(CommandLine::Args(
+            command
+                .into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+        ));
         let result = self.command_result.clone();
         let res_array = explode(PHP_EOL, &result);
         let mut tags: IndexMap<String, String> = IndexMap::new();
@@ -697,7 +737,12 @@ impl Perforce {
 
     pub fn check_stream(&mut self) -> bool {
         let command = self.generate_p4_command(vec!["depots".to_string()], false);
-        self.execute_command(CommandLine::Args(command));
+        self.execute_command(CommandLine::Args(
+            command
+                .into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+        ));
         let result = self.command_result.clone();
         let res_array = explode(PHP_EOL, &result);
         for line in &res_array {
@@ -725,7 +770,12 @@ impl Perforce {
         let label = legacy_lossy(&substr(reference, index as i64, None)).into_owned();
         let command =
             self.generate_p4_command(vec!["changes".to_string(), "-m1".to_string(), label], true);
-        self.execute_command(CommandLine::Args(command));
+        self.execute_command(CommandLine::Args(
+            command
+                .into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+        ));
         let changes = self.command_result.clone();
         if strpos(&changes, "Change") != Some(0) {
             return None;
@@ -747,7 +797,12 @@ impl Perforce {
             ],
             true,
         );
-        self.execute_command(CommandLine::Args(command));
+        self.execute_command(CommandLine::Args(
+            command
+                .into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+        ));
 
         Some(self.command_result.clone())
     }

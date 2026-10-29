@@ -394,12 +394,7 @@ impl SvnDriver {
                 )?;
                 if !output.is_empty() {
                     let mut last_rev: i64 = 0;
-                    for line in self
-                        .inner
-                        .process
-                        .borrow()
-                        .split_lines(&legacy_lossy(&trim(&output)))
-                    {
+                    for line in self.inner.process.borrow().split_lines(trim(&output)) {
                         let line = legacy_lossy(&trim(&line)).into_owned();
                         if !line.is_empty()
                             && let Some(m) =

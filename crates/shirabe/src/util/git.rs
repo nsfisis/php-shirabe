@@ -6,7 +6,6 @@ use crate::util::{
     AuthHelper, Bitbucket, CommandLine, Filesystem, GitHub, GitLab, HttpDownloader, Platform,
     ProcessExecutor, StoreAuth, Url,
 };
-use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
@@ -106,10 +105,15 @@ impl Git {
                     .into_owned(),
                 );
 
-                CommandLine::Args(array_map(
-                    |value: &String| map.get(value).cloned().unwrap_or_else(|| value.clone()),
-                    &cmd_clone,
-                ))
+                CommandLine::Args(
+                    array_map(
+                        |value: &String| map.get(value).cloned().unwrap_or_else(|| value.clone()),
+                        &cmd_clone,
+                    )
+                    .into_iter()
+                    .map(bstr::BString::from)
+                    .collect::<Vec<_>>(),
+                )
             }));
         }
 
@@ -138,7 +142,7 @@ impl Git {
         mut command_output: impl RunCommandOutput,
     ) -> anyhow::Result<()> {
         let command_callables = command_callable;
-        let mut last_command = CommandLine::Shell(String::new());
+        let mut last_command = CommandLine::Shell(bstr::BString::from(String::new()));
 
         // Ensure we are allowed to use this URL by config
         self.config.borrow_mut().prohibit_url_by_config(
@@ -176,12 +180,20 @@ impl Git {
                 if collect_outputs {
                     let mut local_output = String::new();
                     status = this_process
-                        .execute(cmd, &mut local_output, exec_cwd.as_deref())
+                        .execute(
+                            cmd,
+                            &mut local_output,
+                            exec_cwd.as_deref().map(std::path::Path::new),
+                        )
                         .unwrap_or(1);
                     outputs.push(local_output);
                 } else {
                     status = this_process
-                        .execute(cmd, output.make_handler().unwrap(), exec_cwd.as_deref())
+                        .execute(
+                            cmd,
+                            output.make_handler().unwrap(),
+                            exec_cwd.as_deref().map(std::path::Path::new),
+                        )
                         .unwrap_or(1);
                 }
                 if status != 0 {
@@ -210,7 +222,7 @@ impl Git {
             self.process.borrow_mut().execute(
                 &["git".to_string(), "remote".to_string(), "-v".to_string()][..],
                 &mut output,
-                cwd,
+                cwd.map(std::path::Path::new),
             )?;
             if let Some(m) = preg_match(
                 php_regex!(r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im"),
@@ -754,7 +766,7 @@ impl Git {
 
             let mut last_command_str = legacy_lossy(&match &last_command {
                 CommandLine::Args(args) => implode(" ", args),
-                CommandLine::Shell(command) => bstr::BString::from(command.clone()),
+                CommandLine::Shell(command) => command.clone(),
             })
             .into_owned();
             if (credentials.len() as i64) > 0 {
@@ -803,7 +815,7 @@ impl Git {
                     "--git-dir".to_string(),
                 ],
                 &mut output,
-                Some(dir),
+                Some(std::path::Path::new(dir)),
             )? == 0
             && trim(&output) == "."
         {
@@ -871,7 +883,11 @@ impl Git {
 
             return Ok(true);
         }
-        Self::check_for_repo_ownership_error(&self.process.borrow().get_error_output(), dir, None)?;
+        Self::check_for_repo_ownership_error(
+            &legacy_lossy(&self.process.borrow().get_error_output()),
+            dir,
+            None,
+        )?;
 
         // clean up directory and do a fresh clone into it
         self.filesystem.borrow_mut().remove_directory(dir);
@@ -931,7 +947,7 @@ impl Git {
                 if self.process.borrow_mut().execute(
                     &["git".to_string(), "branch".to_string()],
                     &mut output,
-                    Some(dir),
+                    Some(std::path::Path::new(dir)),
                 )? == 0
                 {
                     branches = Some(output);
@@ -940,7 +956,7 @@ impl Git {
                 if self.process.borrow_mut().execute(
                     &["git".to_string(), "tag".to_string()],
                     &mut output,
-                    Some(dir),
+                    Some(std::path::Path::new(dir)),
                 )? == 0
                 {
                     tags = Some(output);
@@ -1059,7 +1075,7 @@ impl Git {
                     "--git-dir".to_string(),
                 ],
                 &mut output,
-                Some(dir),
+                Some(std::path::Path::new(dir)),
             )? == 0
             && trim(&output) == "."
         {
@@ -1073,13 +1089,17 @@ impl Git {
                     format!("{}^{{commit}}", r#ref),
                 ],
                 &mut ignored_output,
-                Some(dir),
+                Some(std::path::Path::new(dir)),
             )?;
             if exit_code == 0 {
                 return Ok(true);
             }
         }
-        Self::check_for_repo_ownership_error(&self.process.borrow().get_error_output(), dir, None)?;
+        Self::check_for_repo_ownership_error(
+            &legacy_lossy(&self.process.borrow().get_error_output()),
+            dir,
+            None,
+        )?;
 
         Ok(false)
     }
@@ -1130,7 +1150,7 @@ impl Git {
                         "origin".to_string(),
                     ],
                     &mut output,
-                    Some(dir),
+                    Some(std::path::Path::new(dir)),
                 )?;
                 output_mixed = PhpMixed::string(output);
             } else {
@@ -1165,7 +1185,7 @@ impl Git {
             let lines = self
                 .process
                 .borrow()
-                .split_lines(&output_mixed.as_string().unwrap_or_default().to_str_lossy());
+                .split_lines(output_mixed.as_string().unwrap_or_default());
             for line in lines {
                 if let Some(matches) =
                     preg_match(php_regex!(r"{^\s*HEAD branch:\s(.+)\s*$}m"), &line)
@@ -1262,7 +1282,7 @@ impl Git {
         if self.process.borrow_mut().execute(
             &["git".to_string(), "--version".to_string()],
             &mut ignored_output,
-            Option::<&str>::None,
+            Option::<&str>::None.map(std::path::Path::new),
         )? != 0
         {
             return Err(RuntimeException::new(Url::sanitize(format!(
@@ -1287,7 +1307,7 @@ impl Git {
             let exit_code: i64 = process.borrow_mut().execute(
                 &["git".to_string(), "--version".to_string()],
                 &mut output,
-                Option::<&str>::None,
+                Option::<&str>::None.map(std::path::Path::new),
             )?;
             if exit_code == 0
                 && let Some(matches) =
@@ -1363,7 +1383,7 @@ pub trait RunCommandOutput {
 
     /// In callable mode, builds the per-command output handler passed to
     /// `ProcessExecutor::execute`. `None` in the accumulate/discard modes.
-    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>>;
+    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &bstr::BStr) -> anyhow::Result<bool>>>;
 
     /// PHP: `$commandOutput = implode('', $outputs);` — only meaningful in the accumulate-and-assign
     /// mode; a no-op for the discard and callable variants.
@@ -1377,7 +1397,7 @@ impl RunCommandOutput for () {
         true
     }
 
-    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>> {
+    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &bstr::BStr) -> anyhow::Result<bool>>> {
         None
     }
 
@@ -1391,7 +1411,7 @@ impl RunCommandOutput for &mut PhpMixed {
         true
     }
 
-    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>> {
+    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &bstr::BStr) -> anyhow::Result<bool>>> {
         None
     }
 
@@ -1404,7 +1424,7 @@ impl RunCommandOutput for &mut PhpMixed {
 /// PHP passes the same `$commandOutput` callable to each `process->execute` call, so the handler
 /// state is shared across all commands and protocol/auth retries.
 pub struct GitRunCommandOutputHandler {
-    handler: std::rc::Rc<std::cell::RefCell<dyn FnMut(&str, &str) -> anyhow::Result<bool>>>,
+    handler: std::rc::Rc<std::cell::RefCell<dyn FnMut(&str, &bstr::BStr) -> anyhow::Result<bool>>>,
 }
 
 impl std::fmt::Debug for GitRunCommandOutputHandler {
@@ -1414,7 +1434,7 @@ impl std::fmt::Debug for GitRunCommandOutputHandler {
 }
 
 impl GitRunCommandOutputHandler {
-    pub fn new(handler: impl FnMut(&str, &str) -> anyhow::Result<bool> + 'static) -> Self {
+    pub fn new(handler: impl FnMut(&str, &bstr::BStr) -> anyhow::Result<bool> + 'static) -> Self {
         Self {
             handler: std::rc::Rc::new(std::cell::RefCell::new(handler)),
         }
@@ -1426,9 +1446,9 @@ impl RunCommandOutput for GitRunCommandOutputHandler {
         false
     }
 
-    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>> {
+    fn make_handler(&self) -> Option<Box<dyn FnMut(&str, &bstr::BStr) -> anyhow::Result<bool>>> {
         let handler = self.handler.clone();
-        Some(Box::new(move |r#type: &str, buffer: &str| {
+        Some(Box::new(move |r#type: &str, buffer: &bstr::BStr| {
             (handler.borrow_mut())(r#type, buffer)
         }))
     }

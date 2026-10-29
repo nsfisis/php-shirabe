@@ -9,29 +9,29 @@ use crate::pipes::pipes_interface::PipesInterface;
 use crate::pipes::unix_pipes::UnixPipes;
 use crate::pipes::windows_pipes::WindowsPipes;
 use crate::process_utils::ProcessUtils;
-use bstr::{B, BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Descriptor, PHP_ENV, PHP_SERVER, PhpMixed, PhpResource, PregMatches, ProcStatus, SEEK_END,
-    SEEK_SET, exec, fopen, fseek, fwrite, getcwd, getenv_all, implode, is_dir, legacy_lossy,
-    microtime, php_regex, preg_is_match, preg_replace, preg_replace_callback, proc_close,
+    SEEK_SET, bconcat, exec, fopen, fseek, fwrite, getcwd, getenv_all, implode, is_dir, microtime,
+    os_str_from_bytes, php_regex, preg_is_match, preg_replace, preg_replace_callback, proc_close,
     proc_get_status, proc_open, proc_terminate, stream_get_contents3, strpbrk, uniqid, usleep,
 };
 use std::sync::OnceLock;
 
 /// A user-supplied callback invoked with the output type ("out"/"err") and a chunk of output. An
 /// error it returns is the exception PHP lets unwind out of `readPipes()`.
-pub type UserCallback = Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>;
+pub type UserCallback = Box<dyn FnMut(&str, &BStr) -> anyhow::Result<bool>>;
 
 /// The callback built by `build_callback`. It receives the owning Process so it can append output
 /// to the internal buffers, mirroring the `$this`-capturing closure produced in PHP.
-type ProcessCallback = Box<dyn FnMut(&mut Process, &str, &str) -> anyhow::Result<bool>>;
+type ProcessCallback = Box<dyn FnMut(&mut Process, &str, &BStr) -> anyhow::Result<bool>>;
 
 /// PHP `$this->commandline` is `array|string`.
 #[derive(Debug, Clone)]
 enum CommandLine {
-    Array(Vec<String>),
-    String(String),
+    Array(Vec<BString>),
+    String(BString),
 }
 
 /// Test-only behaviour for a Process fabricated via [`Process::__mock`]: `getOutput`/
@@ -59,7 +59,7 @@ pub struct Process {
     /// output read instead.
     callback_error: Option<anyhow::Error>,
     commandline: CommandLine,
-    cwd: Option<String>,
+    cwd: Option<std::path::PathBuf>,
     env: IndexMap<BString, PhpMixed>,
     input: PhpMixed,
     starttime: Option<f64>,
@@ -100,19 +100,19 @@ fn descriptor(items: &[&str]) -> Descriptor {
 }
 
 /// PHP `(string)` cast for an environment value or stream payload.
-fn to_php_string(value: &PhpMixed) -> String {
+fn to_php_string(value: &PhpMixed) -> BString {
     match value {
-        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
-        PhpMixed::Int(i) => i.to_string(),
-        PhpMixed::Float(f) => f.to_string(),
+        PhpMixed::String(s) => s.clone(),
+        PhpMixed::Int(i) => i.to_string().into(),
+        PhpMixed::Float(f) => f.to_string().into(),
         PhpMixed::Bool(b) => {
             if *b {
-                "1".to_string()
+                "1".into()
             } else {
-                String::new()
+                BString::default()
             }
         }
-        _ => String::new(),
+        _ => BString::default(),
     }
 }
 
@@ -219,14 +219,14 @@ impl Process {
     }
 
     pub fn new(
-        command: Vec<String>,
-        cwd: Option<String>,
+        command: impl IntoIterator<Item = impl Into<BString>>,
+        cwd: Option<std::path::PathBuf>,
         env: Option<IndexMap<String, String>>,
         input: PhpMixed,
         timeout: Option<f64>,
     ) -> anyhow::Result<Self> {
         let mut this = Self::empty();
-        this.commandline = CommandLine::Array(command);
+        this.commandline = CommandLine::Array(command.into_iter().map(Into::into).collect());
         this.cwd = cwd;
 
         // on Windows, if the cwd changed via chdir(), proc_open defaults to the dir where PHP was started
@@ -235,12 +235,7 @@ impl Process {
         // exists; its value merely reflects the NTS/ZTS build), so the disjunction is always true and
         // the cwd is defaulted to getcwd() whenever it was null.
         if this.cwd.is_none() {
-            // TODO(bytes): Process keeps the working directory as a String.
-            this.cwd = getcwd().map(|cwd| {
-                cwd.into_os_string()
-                    .into_string()
-                    .unwrap_or_else(|cwd| panic!("cwd is not valid UTF-8: {cwd:?}"))
-            });
+            this.cwd = getcwd();
         }
         if let Some(env) = env {
             this.set_env(
@@ -258,14 +253,20 @@ impl Process {
 
     /// Creates a Process instance as a command-line to be run in a shell wrapper.
     pub fn from_shell_commandline(
-        command: &str,
-        cwd: Option<&str>,
+        command: impl AsRef<[u8]>,
+        cwd: Option<&std::path::Path>,
         env: Option<IndexMap<String, String>>,
         input: PhpMixed,
         timeout: Option<f64>,
     ) -> anyhow::Result<Self> {
-        let mut process = Self::new(Vec::new(), cwd.map(String::from), env, input, timeout)?;
-        process.commandline = CommandLine::String(command.to_string());
+        let mut process = Self::new(
+            Vec::<BString>::new(),
+            cwd.map(std::path::Path::to_path_buf),
+            env,
+            input,
+            timeout,
+        )?;
+        process.commandline = CommandLine::String(BString::from(command.as_ref()));
 
         Ok(process)
     }
@@ -309,15 +310,17 @@ impl Process {
 
         let mut commandline = match &self.commandline {
             CommandLine::Array(args) => {
-                let mut cmd = args
-                    .iter()
-                    .map(|a| self.escape_argument(Some(a)))
-                    .collect::<Vec<_>>()
-                    .join(" ");
+                let mut cmd = implode(
+                    " ",
+                    &args
+                        .iter()
+                        .map(|a| self.escape_argument(Some(a)))
+                        .collect::<Vec<_>>(),
+                );
 
                 if !cfg!(windows) {
                     // exec is mandatory to deal with sending a signal to the process
-                    cmd = format!("exec {}", cmd);
+                    cmd = bconcat!("exec ", cmd);
                 }
                 cmd
             }
@@ -328,7 +331,7 @@ impl Process {
             commandline = self.prepare_windows_command_line(&commandline, &mut env)?;
         }
 
-        let mut env_pairs: Vec<String> = Vec::new();
+        let mut env_pairs: Vec<BString> = Vec::new();
         for (k, v) in &env {
             let is_false = matches!(v, PhpMixed::Bool(false));
             if !is_false
@@ -336,14 +339,17 @@ impl Process {
                     .iter()
                     .any(|name| k == name)
             {
-                env_pairs.push(format!("{}={}", k, to_php_string(v)));
+                env_pairs.push(bconcat!(k, "=", to_php_string(v)));
             }
         }
 
         if !self.cwd.as_deref().map(is_dir).unwrap_or(false) {
             return Err(RuntimeException::new(format!(
                 "The provided cwd \"{}\" does not exist.",
-                self.cwd.as_deref().unwrap_or_default()
+                self.cwd
+                    .as_deref()
+                    .unwrap_or(std::path::Path::new(""))
+                    .display()
             ))
             .into());
         }
@@ -356,7 +362,7 @@ impl Process {
                 &commandline,
                 &descriptors,
                 pipes,
-                cwd.as_deref().map(std::path::Path::new),
+                cwd.as_deref(),
                 Some(&env_pairs),
                 Some(&options),
             )
@@ -609,13 +615,15 @@ impl Process {
     }
 
     /// Gets the command line to be executed.
-    pub fn get_command_line(&self) -> String {
+    pub fn get_command_line(&self) -> BString {
         match &self.commandline {
-            CommandLine::Array(args) => args
-                .iter()
-                .map(|a| self.escape_argument(Some(a)))
-                .collect::<Vec<_>>()
-                .join(" "),
+            CommandLine::Array(args) => implode(
+                " ",
+                &args
+                    .iter()
+                    .map(|a| self.escape_argument(Some(a)))
+                    .collect::<Vec<_>>(),
+            ),
             CommandLine::String(s) => s.clone(),
         }
     }
@@ -659,18 +667,11 @@ impl Process {
     }
 
     /// Gets the working directory.
-    pub fn get_working_directory(&self) -> Option<String> {
+    pub fn get_working_directory(&self) -> Option<std::path::PathBuf> {
         if self.cwd.is_none() {
             // getcwd() will return false if any one of the parent directories does not have
             // the readable or search mode set, even if the current directory does
-            // TODO(bytes): Process keeps the working directory as a String.
-            return getcwd()
-                .map(|cwd| {
-                    cwd.into_os_string()
-                        .into_string()
-                        .unwrap_or_else(|cwd| panic!("cwd is not valid UTF-8: {cwd:?}"))
-                })
-                .filter(|s| !s.is_empty());
+            return getcwd().filter(|cwd| !cwd.as_os_str().is_empty());
         }
 
         self.cwd.clone()
@@ -774,7 +775,7 @@ impl Process {
         let out = Self::OUT;
 
         Box::new(
-            move |this: &mut Process, r#type: &str, data: &str| -> anyhow::Result<bool> {
+            move |this: &mut Process, r#type: &str, data: &BStr| -> anyhow::Result<bool> {
                 if out == r#type {
                     this.add_output(data);
                 } else {
@@ -858,7 +859,7 @@ impl Process {
                     } else {
                         Self::ERR
                     },
-                    &data,
+                    data.as_bstr(),
                 )
             {
                 self.callback_error = Some(error);
@@ -975,12 +976,12 @@ impl Process {
 
     fn prepare_windows_command_line(
         &mut self,
-        cmd: &str,
+        cmd: &[u8],
         env: &mut IndexMap<BString, PhpMixed>,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<BString> {
         let uid = uniqid("", true);
         let mut var_count = 0;
-        let mut var_cache: IndexMap<String, String> = IndexMap::new();
+        let mut var_cache: IndexMap<BString, BString> = IndexMap::new();
         let cmd = preg_replace_callback(
             php_regex!(
                 r#"/"(?:(
@@ -991,9 +992,9 @@ impl Process {
                 )++
             ) | [^"]*+ )"/x"#
             ),
-            |m: &PregMatches| -> anyhow::Result<String> {
-                let m0 = m.get(0).unwrap_or_default().to_string();
-                let m1 = m.get(1).map(|s| legacy_lossy(s).into_owned());
+            |m: &PregMatches| -> anyhow::Result<BString> {
+                let m0 = BString::from(m.get(0).unwrap_or_default());
+                let m1 = m.get(1).map(BString::from);
                 if m1.is_none() {
                     return Ok(m0);
                 }
@@ -1001,11 +1002,11 @@ impl Process {
                     return Ok(cached.clone());
                 }
                 let mut value = m1.unwrap();
-                if value.contains('\0') {
-                    value = value.replace('\0', "?");
+                if value.contains(&b'\0') {
+                    value = value.replace("\0", "?").into();
                 }
                 if strpbrk(&value, "\"%!\n").is_none() {
-                    return Ok(format!("\"{}\"", value));
+                    return Ok(bconcat!("\"", value, "\""));
                 }
 
                 for (from, to) in [
@@ -1015,46 +1016,48 @@ impl Process {
                     ("\"^^\"", "^"),
                     ("\"\"", "\""),
                 ] {
-                    value = value.replace(from, to);
+                    value = value.replace(from, to).into();
                 }
-                value = format!(
-                    "\"{}\"",
-                    preg_replace(php_regex!(r#"/(\\*)"/"#), "$1$1\\\"", &value)
+                value = bconcat!(
+                    "\"",
+                    preg_replace(php_regex!(r#"/(\\*)"/"#), "$1$1\\\"", &value),
+                    "\""
                 );
                 var_count += 1;
                 let var = format!("{}{}", uid, var_count);
 
                 env.insert(var.as_str().into(), PhpMixed::string(value));
 
-                let replacement = format!("!{}!", var);
+                let replacement = BString::from(format!("!{}!", var));
                 var_cache.insert(m0, replacement.clone());
                 Ok(replacement)
             },
             cmd,
         )?;
-        let cmd = legacy_lossy(&cmd).into_owned();
 
-        static COM_SPEC: OnceLock<Option<String>> = OnceLock::new();
+        static COM_SPEC: OnceLock<Option<BString>> = OnceLock::new();
         let com_spec = COM_SPEC
             .get_or_init(|| {
                 ExecutableFinder::new()
                     .find("cmd.exe", None, &[])
                     .map(|spec| {
-                        format!(
-                            "\"{}\"",
-                            preg_replace(php_regex!(r#"{(\\*+)"}"#), "$1$1\\\"", &spec)
+                        bconcat!(
+                            "\"",
+                            preg_replace(php_regex!(r#"{(\\*+)"}"#), "$1$1\\\"", &spec),
+                            "\""
                         )
                     })
             })
             .clone();
 
-        let mut cmd = format!(
-            "{} /V:ON /E:ON /D /C ({})",
-            com_spec.unwrap_or_else(|| "cmd".to_string()),
-            cmd.replace('\n', " ")
+        let mut cmd = bconcat!(
+            com_spec.unwrap_or_else(|| "cmd".into()),
+            " /V:ON /E:ON /D /C (",
+            cmd.replace("\n", " "),
+            ")"
         );
         for (offset, filename) in self.process_pipes.as_ref().unwrap().get_files() {
-            cmd.push_str(&format!(" {}>\"{}\"", offset, filename));
+            cmd.extend_from_slice(format!(" {}>\"{}\"", offset, filename).as_bytes());
         }
 
         Ok(cmd)
@@ -1085,23 +1088,22 @@ impl Process {
     }
 
     /// Escapes a string to be used as a shell argument.
-    fn escape_argument(&self, argument: Option<&str>) -> String {
+    fn escape_argument(&self, argument: Option<&[u8]>) -> BString {
         let argument = match argument {
-            None | Some("") => return "\"\"".to_string(),
+            None | Some(b"") => return "\"\"".into(),
             Some(a) => a,
         };
         if !cfg!(windows) {
-            return format!("'{}'", argument.replace('\'', "'\\''"));
+            return bconcat!("'", argument.replace("'", "'\\''"), "'");
         }
-        let mut argument = argument.to_string();
-        if argument.contains('\0') {
-            argument = argument.replace('\0', "?");
+        let mut argument = BString::from(argument);
+        if argument.contains(&b'\0') {
+            argument = argument.replace("\0", "?").into();
         }
         if !preg_is_match(php_regex!(r#"/[()%!^"<>&|\s\[\]=;*?'$]/"#), &argument) {
             return argument;
         }
-        argument =
-            legacy_lossy(&preg_replace(php_regex!(r"/(\\+)$/"), "$1$1", &argument)).into_owned();
+        argument = preg_replace(php_regex!(r"/(\\+)$/"), "$1$1", &argument);
 
         let mut result = argument;
         for (from, to) in [
@@ -1111,63 +1113,56 @@ impl Process {
             ("!", "\"^!\""),
             ("\n", "!LF!"),
         ] {
-            result = result.replace(from, to);
+            result = result.replace(from, to).into();
         }
-        format!("\"{}\"", result)
+        bconcat!("\"", result, "\"")
     }
 
     fn replace_placeholders(
         &self,
-        commandline: &str,
+        commandline: &[u8],
         env: &IndexMap<BString, PhpMixed>,
-    ) -> anyhow::Result<String> {
-        let replaced = preg_replace_callback(
+    ) -> anyhow::Result<BString> {
+        preg_replace_callback(
             php_regex!(r#"/"\$\{:([_a-zA-Z]+[_a-zA-Z0-9]*)\}"/"#),
-            |matches: &PregMatches| -> anyhow::Result<String> {
-                let key = matches.get(1).unwrap_or_default().to_string();
-                match env.get(B(&key)) {
+            |matches: &PregMatches| -> anyhow::Result<BString> {
+                let key = matches.get(1).unwrap_or_default();
+                match env.get(key) {
                     None => Err(InvalidArgumentException::new(format!(
                         "Command line is missing a value for parameter \"{}\": {}",
-                        key, commandline
+                        key,
+                        commandline.as_bstr()
                     ))
                     .into()),
                     Some(PhpMixed::Bool(false)) => Err(InvalidArgumentException::new(format!(
                         "Command line is missing a value for parameter \"{}\": {}",
-                        key, commandline
+                        key,
+                        commandline.as_bstr()
                     ))
                     .into()),
                     Some(v) => Ok(self.escape_argument(Some(&to_php_string(v)))),
                 }
             },
             commandline,
-        )?;
-        Ok(legacy_lossy(&replaced).into_owned())
+        )
     }
 
     fn get_default_env(&self) -> IndexMap<BString, PhpMixed> {
-        // TODO(bytes): the environment is kept as Strings.
-        let env: IndexMap<String, String> = getenv_all()
-            .map(|(k, v)| {
-                (
-                    k.into_string()
-                        .unwrap_or_else(|k| panic!("env name is not valid UTF-8: {k:?}")),
-                    v.into_string()
-                        .unwrap_or_else(|v| panic!("env value is not valid UTF-8: {v:?}")),
-                )
-            })
+        let env: IndexMap<BString, BString> = getenv_all()
+            .map(|(k, v)| (k.into_encoded_bytes().into(), v.into_encoded_bytes().into()))
             .collect();
         let server = PHP_SERVER.lock().unwrap();
 
         // non-Windows: array_intersect_key($env, $_SERVER) ?: $env
         let mut intersect: IndexMap<BString, PhpMixed> = IndexMap::new();
         for (k, v) in &env {
-            if server.get(k).is_some() {
-                intersect.insert(k.as_str().into(), PhpMixed::string(v.clone()));
+            if server.get(os_str_from_bytes(k)).is_some() {
+                intersect.insert(k.clone(), PhpMixed::string(v.clone()));
             }
         }
         let env_map: IndexMap<BString, PhpMixed> = if intersect.is_empty() {
             env.into_iter()
-                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                .map(|(k, v)| (k, PhpMixed::string(v)))
                 .collect()
         } else {
             intersect
@@ -1178,16 +1173,10 @@ impl Process {
             .lock()
             .unwrap()
             .get_all()
-            // TODO(bytes): the environment is kept as Strings.
             .map(|(k, v)| {
                 (
-                    k.into_string()
-                        .unwrap_or_else(|k| panic!("env name is not valid UTF-8: {k:?}"))
-                        .into(),
-                    PhpMixed::string(
-                        v.into_string()
-                            .unwrap_or_else(|v| panic!("env value is not valid UTF-8: {v:?}")),
-                    ),
+                    BString::from(k.into_encoded_bytes()),
+                    PhpMixed::string(v.into_encoded_bytes()),
                 )
             })
             .collect();

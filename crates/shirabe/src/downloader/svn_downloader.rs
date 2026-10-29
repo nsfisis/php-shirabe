@@ -68,7 +68,7 @@ impl SvnDownloader {
         if self.inner.process.borrow_mut().execute(
             ["svn", "revert", "-R", "."].map(|s| s.to_string()).as_ref(),
             &mut output,
-            Some(path),
+            Some(std::path::Path::new(path)),
         )? != 0
         {
             return Err(RuntimeException::new(format!(
@@ -364,12 +364,11 @@ impl VcsDownloader for SvnDownloader {
                 path.to_string(),
             ];
             let mut output = String::new();
-            if self
-                .inner
-                .process
-                .borrow_mut()
-                .execute(&command, &mut output, Some(path))?
-                != 0
+            if self.inner.process.borrow_mut().execute(
+                &command,
+                &mut output,
+                Some(std::path::Path::new(path)),
+            )? != 0
             {
                 return Err(RuntimeException::new(format!(
                     "Failed to execute {}\n\n{}",
@@ -448,7 +447,7 @@ impl ChangeReportInterface for SvnDownloader {
                 .map(|s| s.to_string())
                 .as_ref(),
             &mut output,
-            Some(path),
+            Some(std::path::Path::new(path)),
         )?;
 
         Ok(if preg_is_match(php_regex!("{^ *[^X ] +}m"), &output) {

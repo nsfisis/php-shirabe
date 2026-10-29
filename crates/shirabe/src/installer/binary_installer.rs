@@ -279,7 +279,7 @@ impl BinaryInstaller {
                  SET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n\
                  {} \"%BIN_TARGET%\" %*\r\n",
                 trim2(
-                    ProcessExecutor::escape(&legacy_lossy(&basename_with_suffix(link, ".bat"))),
+                    ProcessExecutor::escape(basename_with_suffix(link, ".bat")),
                     "\"'"
                 ),
                 caller,
@@ -292,10 +292,7 @@ impl BinaryInstaller {
              SET BIN_TARGET=%~dp0/{}\r\n\
              SET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n\
              {} \"%BIN_TARGET%\" %*\r\n",
-            trim2(
-                ProcessExecutor::escape(&legacy_lossy(path_to_bytes(&bin_path))),
-                "\"'"
-            ),
+            trim2(ProcessExecutor::escape(path_to_bytes(&bin_path)), "\"'"),
             caller,
         ))
     }
@@ -306,7 +303,7 @@ impl BinaryInstaller {
             .borrow_mut()
             .find_shortest_path(link, bin, false, false)?;
 
-        let bin_dir = ProcessExecutor::escape(&legacy_lossy(&dirname(path_to_bytes(&bin_path))));
+        let bin_dir = ProcessExecutor::escape(dirname(path_to_bytes(&bin_path)));
         let bin_file = basename(path_to_bytes(&bin_path));
 
         // TODO(bytes): preg_match matches over a &str, and the shebang it captures is spliced

@@ -4,6 +4,7 @@ use crate::command::{Command, CommandData};
 use crate::completion::{CompletionInput, CompletionSuggestions, StringOrSuggestion};
 use crate::input::{InputArgument, InputInterface, InputOption, InputValue};
 use crate::output::{OutputInterface, output_interface};
+use bstr::{BStr, BString};
 use shirabe_php_shim::{
     PHP_SERVER, PhpMixed, basename, file_exists, impl_php_class, legacy_lossy, path_to_bytes,
     realpath, str_replace_arrays, sys_get_temp_dir, touch,
@@ -102,28 +103,27 @@ impl DumpCompletionCommand {
         command_name: &str,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<()> {
-        // TODO(bytes): Process takes the command line as Strings.
-        let tmp_dir = sys_get_temp_dir()
-            .into_os_string()
-            .into_string()
-            .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
-        let debug_file = format!("{}/sf_{}.log", tmp_dir, command_name);
+        let debug_file = sys_get_temp_dir().join(format!("sf_{}.log", command_name));
         if !file_exists(&debug_file) {
             touch(&debug_file);
         }
         // new Process(['tail', '-f', $debugFile], null, null, null, 0) — timeout 0 disables it;
         // like PHP, this tails forever until the user interrupts.
         let mut process = Process::new(
-            vec!["tail".to_string(), "-f".to_string(), debug_file],
+            vec![
+                BString::from("tail"),
+                BString::from("-f"),
+                BString::from(path_to_bytes(&debug_file)),
+            ],
             None,
             None,
             PhpMixed::Null,
             Some(0.0),
         )?;
         process.run(
-            Some(Box::new(move |_type: &str, line: &str| {
+            Some(Box::new(move |_type: &str, line: &BStr| {
                 output.borrow_mut().write(
-                    &[bstr::BString::from(line.to_string())],
+                    &[BString::from(line)],
                     false,
                     output_interface::OUTPUT_NORMAL,
                 );

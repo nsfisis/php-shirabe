@@ -39,12 +39,11 @@ impl FossilDownloader {
         cwd: Option<String>,
         output: &mut String,
     ) -> anyhow::Result<()> {
-        if self
-            .inner
-            .process
-            .borrow_mut()
-            .execute(&command, output, cwd.as_deref())?
-            != 0
+        if self.inner.process.borrow_mut().execute(
+            &command,
+            output,
+            cwd.as_deref().map(std::path::Path::new),
+        )? != 0
         {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",
@@ -261,7 +260,8 @@ impl ChangeReportInterface for FossilDownloader {
             &mut output,
             realpath(path)
                 .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                .as_deref(),
+                .as_deref()
+                .map(std::path::Path::new),
         )?;
 
         let output = output.trim().to_string();

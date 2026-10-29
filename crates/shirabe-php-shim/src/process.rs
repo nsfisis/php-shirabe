@@ -1,5 +1,5 @@
 use crate::{ChildPipe, PhpMixed, PhpResource, StreamBacking, StreamState, os_str_from_bytes};
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 pub use shirabe_php_src::standard::exec::escapeshellcmd;
 
@@ -93,7 +93,7 @@ pub struct ProcessState {
     /// The spawned child. Taken by `proc_close`/`wait`; once taken the handle is closed.
     child: Option<std::process::Child>,
     /// The command line passed to `proc_open`, reported back by `proc_get_status`.
-    command: String,
+    command: BString,
 }
 
 /// One entry of the `descriptorspec` array passed to `proc_open`. Unlike PHP's array this is a
@@ -135,18 +135,19 @@ fn resource_to_file(resource: &PhpResource) -> std::io::Result<std::fs::File> {
 /// PHP `proc_open`. Returns the process resource on success; the PHP `false` return is modeled as
 /// `Err`. The `pipes` out-parameter is filled with the parent-side pipe streams keyed by fd index.
 pub fn proc_open(
-    command: &str,
+    command: impl AsRef<[u8]>,
     descriptorspec: &[Descriptor],
     pipes: &mut IndexMap<i64, PhpResource>,
     cwd: Option<&std::path::Path>,
-    env: Option<&[String]>,
+    env: Option<&[BString]>,
     options: Option<&IndexMap<BString, PhpMixed>>,
 ) -> std::io::Result<PhpResource> {
     // Windows-oriented options (bypass_shell, create_process_group, ...) have no effect here.
     let _ = options;
 
     let mut cmd = std::process::Command::new("/bin/sh");
-    cmd.arg("-c").arg(command);
+    cmd.arg("-c")
+        .arg(crate::os_str_from_bytes(command.as_ref()));
 
     if let Some(cwd) = cwd {
         cmd.current_dir(cwd);
@@ -156,9 +157,9 @@ pub fn proc_open(
         // A provided environment replaces the inherited one, matching proc_open.
         cmd.env_clear();
         for pair in env {
-            match pair.split_once('=') {
-                Some((k, v)) => cmd.env(k, v),
-                None => cmd.env(pair, ""),
+            match pair.split_once_str("=") {
+                Some((k, v)) => cmd.env(crate::os_str_from_bytes(k), crate::os_str_from_bytes(v)),
+                None => cmd.env(crate::os_str_from_bytes(pair), ""),
             };
         }
     }
@@ -298,7 +299,7 @@ pub fn proc_open(
     Ok(PhpResource::Process(std::rc::Rc::new(
         std::cell::RefCell::new(ProcessState {
             child: Some(child),
-            command: command.to_string(),
+            command: BString::from(command.as_ref()),
         }),
     )))
 }
@@ -320,7 +321,7 @@ pub fn proc_close(process: &PhpResource) -> i64 {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProcStatus {
-    pub command: String,
+    pub command: BString,
     pub pid: i64,
     pub running: bool,
     pub signaled: bool,

@@ -123,7 +123,7 @@ impl TestCase {
              git config user.name \"Your Name\" && \
              git add composer.json && \
              git commit -m \"commit composer.json\" -q",
-            Some(self.test_dir.to_str().unwrap()),
+            Some(std::path::Path::new(self.test_dir.to_str().unwrap())),
             None,
             PhpMixed::Bool(false),
             Some(60.0),

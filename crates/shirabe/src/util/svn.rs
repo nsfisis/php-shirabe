@@ -111,8 +111,8 @@ impl Svn {
             std::rc::Rc::new(std::cell::RefCell::new(None));
         let io = self.io.clone();
         let output_for_handler = output.clone();
-        let handler: Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>> =
-            Box::new(move |r#type: &str, buffer: &str| {
+        let handler: Box<dyn FnMut(&str, &bstr::BStr) -> anyhow::Result<bool>> =
+            Box::new(move |r#type: &str, buffer: &bstr::BStr| {
                 if r#type != "out" {
                     return Ok(false);
                 }
@@ -122,16 +122,17 @@ impl Svn {
                 output_for_handler
                     .borrow_mut()
                     .get_or_insert_with(String::new)
-                    .push_str(buffer);
+                    .push_str(&legacy_lossy(buffer));
                 if verbose {
-                    io.borrow().write_error2(buffer, false);
+                    io.borrow().write_error2(&legacy_lossy(buffer), false);
                 }
                 Ok(false)
             });
-        let status = self
-            .process
-            .borrow_mut()
-            .execute(command.as_slice(), handler, cwd)?;
+        let status = self.process.borrow_mut().execute(
+            command.as_slice(),
+            handler,
+            cwd.map(std::path::Path::new),
+        )?;
         let output = output.borrow().clone();
         if 0 == status {
             return Ok(output);

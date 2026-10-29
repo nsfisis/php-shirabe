@@ -51,11 +51,11 @@ impl PipesInterface for UnixPipes {
         IndexMap::new()
     }
 
-    fn read_and_write(&mut self, blocking: bool, close: bool) -> IndexMap<i64, String> {
+    fn read_and_write(&mut self, blocking: bool, close: bool) -> IndexMap<i64, bstr::BString> {
         self.inner.unblock();
         let w = self.inner.write();
 
-        let mut read: IndexMap<i64, String> = IndexMap::new();
+        let mut read: IndexMap<i64, bstr::BString> = IndexMap::new();
         // $r = $this->pipes; unset($r[0]);
         let r: Vec<(i64, PhpResource)> = self
             .inner
@@ -106,8 +106,7 @@ impl PipesInterface for UnixPipes {
             }
 
             if !data.is_empty() {
-                // TODO(bytes): PipesInterface hands the process output back as a String.
-                read.insert(*fd, String::from_utf8_lossy(&data).into_owned());
+                read.insert(*fd, data.into());
             }
 
             if close && feof(pipe) {

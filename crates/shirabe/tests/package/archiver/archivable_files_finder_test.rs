@@ -179,7 +179,7 @@ fn test_manual_excludes() {
 fn get_archived_files(set_up: &SetUp, command: &str) -> Vec<String> {
     let mut process = Process::from_shell_commandline(
         command,
-        Some(&set_up.sources),
+        Some(std::path::Path::new(&set_up.sources)),
         None,
         PhpMixed::Bool(false),
         Some(60.0),

@@ -2,7 +2,7 @@
 
 use crate::helper::{DebugFormatterHelper, Helper, HelperInterface, HelperSet};
 use crate::output::{ConsoleOutputInterface, OutputInterface, output_interface};
-use bstr::BString;
+use bstr::{BStr, BString};
 use shirabe_php_shim::{
     AsAny, InvalidArgumentException, PhpMixed, legacy_lossy, spl_object_hash, str_replace,
 };
@@ -36,7 +36,7 @@ impl ProcessHelper {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         cmd: ProcessHelperCmd,
         error: Option<&str>,
-        callback: Option<Box<dyn FnMut(&str, &str)>>,
+        callback: Option<Box<dyn FnMut(&str, &BStr)>>,
         verbosity: i64,
     ) -> anyhow::Result<Process> {
         // `class_exists(Process::class)` guards against the optional symfony/process
@@ -102,7 +102,7 @@ impl ProcessHelper {
             let started = Self::formatter_start(
                 &formatter,
                 &spl_object_hash(&process),
-                &self.escape_string(&process.get_command_line()),
+                &legacy_lossy(&Self::escape_string(process.get_command_line())),
             );
             output.borrow().write(
                 &[bstr::BString::from(started)],
@@ -128,12 +128,12 @@ impl ProcessHelper {
                 ProcessHelperCmdElement::Process(_) => None,
             })
             .collect();
-        let callback: Option<Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>> =
+        let callback: Option<Box<dyn FnMut(&str, &BStr) -> anyhow::Result<bool>>> =
             callback.map(|mut cb| {
-                Box::new(move |r#type: &str, buffer: &str| -> anyhow::Result<bool> {
+                Box::new(move |r#type: &str, buffer: &BStr| -> anyhow::Result<bool> {
                     cb(r#type, buffer);
                     Ok(false)
-                }) as Box<dyn FnMut(&str, &str) -> anyhow::Result<bool>>
+                }) as Box<dyn FnMut(&str, &BStr) -> anyhow::Result<bool>>
             });
         process.run(callback, env)?;
 
@@ -168,7 +168,7 @@ impl ProcessHelper {
             output.borrow().writeln(
                 &[bstr::BString::from(format!(
                     "<error>{}</error>",
-                    self.escape_string(error)
+                    Self::escape_string(error)
                 ))],
                 output_interface::OUTPUT_NORMAL,
             );
@@ -186,7 +186,7 @@ impl ProcessHelper {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         cmd: ProcessHelperCmd,
         error: Option<&str>,
-        callback: Option<Box<dyn FnMut(&str, &str)>>,
+        callback: Option<Box<dyn FnMut(&str, &BStr)>>,
     ) -> anyhow::Result<Process> {
         let mut process = self.run(
             output,
@@ -208,8 +208,8 @@ impl ProcessHelper {
         &self,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         process: &Process,
-        mut callback: Option<Box<dyn FnMut(&str, &str)>>,
-    ) -> Box<dyn FnMut(&str, &str)> {
+        mut callback: Option<Box<dyn FnMut(&str, &BStr)>>,
+    ) -> Box<dyn FnMut(&str, &BStr)> {
         // PHP: `if ($output instanceof ConsoleOutputInterface) { $output =
         // $output->getErrorOutput(); }`. ConsoleOutput is the only OutputInterface
         // implementor that also implements ConsoleOutputInterface, so the check
@@ -229,11 +229,11 @@ impl ProcessHelper {
 
         let object_hash = spl_object_hash(process);
 
-        Box::new(move |r#type: &str, buffer: &str| {
+        Box::new(move |r#type: &str, buffer: &BStr| {
             let progressed = Self::formatter_progress(
                 &formatter,
                 &object_hash,
-                &Self::escape_string_static(buffer),
+                &legacy_lossy(&Self::escape_string(buffer)),
                 Process::ERR == r#type,
             );
             output.borrow().write(
@@ -248,12 +248,8 @@ impl ProcessHelper {
         })
     }
 
-    fn escape_string(&self, str: &str) -> String {
-        legacy_lossy(&str_replace("<", "\\<", str)).into_owned()
-    }
-
-    fn escape_string_static(str: &str) -> String {
-        legacy_lossy(&str_replace("<", "\\<", str)).into_owned()
+    fn escape_string(str: impl AsRef<[u8]>) -> BString {
+        str_replace("<", "\\<", str)
     }
 
     fn formatter_start(

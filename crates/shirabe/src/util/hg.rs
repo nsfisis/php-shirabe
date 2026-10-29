@@ -43,11 +43,11 @@ impl Hg {
         // Try as is
         let command = command_callable(url.clone());
         let mut ignored_output = String::new();
-        if self
-            .process
-            .borrow_mut()
-            .execute(&command, &mut ignored_output, cwd.as_deref())?
-            == 0
+        if self.process.borrow_mut().execute(
+            &command,
+            &mut ignored_output,
+            cwd.as_deref().map(std::path::Path::new),
+        )? == 0
         {
             return Ok(());
         }
@@ -102,11 +102,11 @@ impl Hg {
 
             let command = command_callable(authenticated_url);
             let mut ignored_output = String::new();
-            if self
-                .process
-                .borrow_mut()
-                .execute(&command, &mut ignored_output, cwd.as_deref())?
-                == 0
+            if self.process.borrow_mut().execute(
+                &command,
+                &mut ignored_output,
+                cwd.as_deref().map(std::path::Path::new),
+            )? == 0
             {
                 return Ok(());
             }

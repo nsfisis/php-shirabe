@@ -70,12 +70,11 @@ impl GitDownloader {
             "-d".to_string(),
         ];
         let mut output = String::new();
-        if self
-            .inner
-            .process
-            .borrow_mut()
-            .execute(&command, &mut output, Some(&path))?
-            != 0
+        if self.inner.process.borrow_mut().execute(
+            &command,
+            &mut output,
+            Some(std::path::Path::new(&path)),
+        )? != 0
         {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",
@@ -168,7 +167,7 @@ impl GitDownloader {
                     if self.inner.process.borrow_mut().execute(
                         &command,
                         &mut output,
-                        Some(&path),
+                        Some(std::path::Path::new(&path)),
                     )? != 0
                     {
                         return Err(RuntimeException::new(format!(
@@ -196,7 +195,7 @@ impl GitDownloader {
                 self.inner.process.borrow_mut().execute(
                     &["git".to_string(), "fetch".to_string(), "--all".to_string()],
                     &mut output,
-                    Some(&path),
+                    Some(std::path::Path::new(&path)),
                 )?;
 
                 // update list of refs after fetching
@@ -207,12 +206,11 @@ impl GitDownloader {
                     "-d".to_string(),
                 ];
                 let mut output = String::new();
-                if self
-                    .inner
-                    .process
-                    .borrow_mut()
-                    .execute(&command, &mut output, Some(&path))?
-                    != 0
+                if self.inner.process.borrow_mut().execute(
+                    &command,
+                    &mut output,
+                    Some(std::path::Path::new(&path)),
+                )? != 0
                 {
                     return Err(RuntimeException::new(format!(
                         "Failed to execute {}\n\n{}",
@@ -281,7 +279,7 @@ impl GitDownloader {
             if self.inner.process.borrow_mut().execute(
                 &["git".to_string(), "branch".to_string(), "-r".to_string()],
                 &mut output,
-                Some(path),
+                Some(std::path::Path::new(path)),
             )? == 0
             {
                 branches = Some(output);
@@ -314,19 +312,18 @@ impl GitDownloader {
             ];
 
             let mut output = String::new();
-            let ok1 =
-                self.inner
-                    .process
-                    .borrow_mut()
-                    .execute(&command1, &mut output, Some(path))?
-                    == 0;
+            let ok1 = self.inner.process.borrow_mut().execute(
+                &command1,
+                &mut output,
+                Some(std::path::Path::new(path)),
+            )? == 0;
             let ok2 = if ok1 {
                 let mut output = String::new();
-                self.inner
-                    .process
-                    .borrow_mut()
-                    .execute(&command2, &mut output, Some(path))?
-                    == 0
+                self.inner.process.borrow_mut().execute(
+                    &command2,
+                    &mut output,
+                    Some(std::path::Path::new(path)),
+                )? == 0
             } else {
                 false
             };
@@ -374,29 +371,28 @@ impl GitDownloader {
             ];
 
             let mut output = String::new();
-            let ok_command =
-                self.inner
-                    .process
-                    .borrow_mut()
-                    .execute(&command, &mut output, Some(path))?
-                    == 0;
+            let ok_command = self.inner.process.borrow_mut().execute(
+                &command,
+                &mut output,
+                Some(std::path::Path::new(path)),
+            )? == 0;
             let ok_fallback = if !ok_command {
                 let mut output = String::new();
                 self.inner.process.borrow_mut().execute(
                     &fallback_command,
                     &mut output,
-                    Some(path),
+                    Some(std::path::Path::new(path)),
                 )? == 0
             } else {
                 false
             };
             let ok_reset = if ok_command || ok_fallback {
                 let mut output = String::new();
-                self.inner
-                    .process
-                    .borrow_mut()
-                    .execute(&reset_command, &mut output, Some(path))?
-                    == 0
+                self.inner.process.borrow_mut().execute(
+                    &reset_command,
+                    &mut output,
+                    Some(std::path::Path::new(path)),
+                )? == 0
             } else {
                 false
             };
@@ -417,19 +413,18 @@ impl GitDownloader {
         ];
         {
             let mut output = String::new();
-            let ok1 =
-                self.inner
-                    .process
-                    .borrow_mut()
-                    .execute(&command1, &mut output, Some(path))?
-                    == 0;
+            let ok1 = self.inner.process.borrow_mut().execute(
+                &command1,
+                &mut output,
+                Some(std::path::Path::new(path)),
+            )? == 0;
             let ok2 = if ok1 {
                 let mut output = String::new();
-                self.inner
-                    .process
-                    .borrow_mut()
-                    .execute(&command2, &mut output, Some(path))?
-                    == 0
+                self.inner.process.borrow_mut().execute(
+                    &command2,
+                    &mut output,
+                    Some(std::path::Path::new(path)),
+                )? == 0
             } else {
                 false
             };
@@ -484,7 +479,7 @@ impl GitDownloader {
                 url.to_string(),
             ],
             &mut output,
-            Some(path),
+            Some(std::path::Path::new(path)),
         )?;
         self.set_push_url(path, url)
     }
@@ -516,10 +511,11 @@ impl GitDownloader {
                 push_url,
             ];
             let mut ignored_output = String::new();
-            self.inner
-                .process
-                .borrow_mut()
-                .execute(&cmd, &mut ignored_output, Some(path))?;
+            self.inner.process.borrow_mut().execute(
+                &cmd,
+                &mut ignored_output,
+                Some(std::path::Path::new(path)),
+            )?;
         }
 
         Ok(())
@@ -531,7 +527,7 @@ impl GitDownloader {
         if self.inner.process.borrow_mut().execute(
             &["git".to_string(), "clean".to_string(), "-df".to_string()],
             &mut output,
-            Some(&path),
+            Some(std::path::Path::new(&path)),
         )? != 0
         {
             return Err(
@@ -542,7 +538,7 @@ impl GitDownloader {
         if self.inner.process.borrow_mut().execute(
             &["git".to_string(), "reset".to_string(), "--hard".to_string()],
             &mut output,
-            Some(&path),
+            Some(std::path::Path::new(&path)),
         )? != 0
         {
             return Err(
@@ -565,7 +561,7 @@ impl GitDownloader {
                 "--include-untracked".to_string(),
             ],
             &mut output,
-            Some(&path),
+            Some(std::path::Path::new(&path)),
         )? != 0
         {
             return Err(
@@ -584,7 +580,7 @@ impl GitDownloader {
         if self.inner.process.borrow_mut().execute(
             &["git".to_string(), "diff".to_string(), "HEAD".to_string()],
             &mut output,
-            Some(&path),
+            Some(std::path::Path::new(&path)),
         )? != 0
         {
             return Err(
@@ -689,12 +685,11 @@ impl ChangeReportInterface for GitDownloader {
             "--untracked-files=no".to_string(),
         ];
         let mut output = String::new();
-        if self
-            .inner
-            .process
-            .borrow_mut()
-            .execute(&command, &mut output, Some(path))?
-            != 0
+        if self.inner.process.borrow_mut().execute(
+            &command,
+            &mut output,
+            Some(std::path::Path::new(path)),
+        )? != 0
         {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",
@@ -1032,7 +1027,7 @@ impl VcsDownloader for GitDownloader {
                 format!("{}^{{commit}}", r#ref),
             ],
             &mut output,
-            Some(&path),
+            Some(std::path::Path::new(&path)),
         )? != 0
         {
             let commands = vec![
@@ -1089,7 +1084,7 @@ impl VcsDownloader for GitDownloader {
         if self.inner.process.borrow_mut().execute(
             &["git".to_string(), "remote".to_string(), "-v".to_string()],
             &mut output,
-            Some(&path),
+            Some(std::path::Path::new(&path)),
         )? == 0
             && let Some(origin_match) =
                 preg_match(php_regex!(r"{^origin\s+(?P<url>\S+)}m"), &output)
@@ -1291,7 +1286,7 @@ impl VcsDownloader for GitDownloader {
             if self.inner.process.borrow_mut().execute(
                 &["git".to_string(), "stash".to_string(), "pop".to_string()],
                 &mut output,
-                Some(&path),
+                Some(std::path::Path::new(&path)),
             )? != 0
             {
                 return Err(RuntimeException::new(format!(
@@ -1321,12 +1316,11 @@ impl VcsDownloader for GitDownloader {
         let command = GitUtil::build_rev_list_command(&self.inner.process, args)?;
 
         let mut output = String::new();
-        if self
-            .inner
-            .process
-            .borrow_mut()
-            .execute(&command, &mut output, Some(&path))?
-            != 0
+        if self.inner.process.borrow_mut().execute(
+            &command,
+            &mut output,
+            Some(std::path::Path::new(&path)),
+        )? != 0
         {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",

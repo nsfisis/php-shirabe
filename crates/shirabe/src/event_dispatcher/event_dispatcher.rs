@@ -544,7 +544,7 @@ impl EventDispatcher {
                         if flags.contains_key(B("script-alias-input")) {
                             let args_string = script
                                 .iter()
-                                .map(|arg| ProcessExecutor::escape(arg))
+                                .map(|arg| legacy_lossy(&ProcessExecutor::escape(arg)).into_owned())
                                 .collect::<Vec<_>>()
                                 .join(" ");
                             let existing = flags
@@ -563,7 +563,7 @@ impl EventDispatcher {
                             let exec = format!(
                                 "{} {}",
                                 ProcessExecutor::escape(
-                                    &Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
+                                    Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
                                 ),
                                 args.join(" ")
                             );
@@ -756,7 +756,7 @@ impl EventDispatcher {
                         // writing the buffer back once the run has returned is not a substitute.
                         let args = additional_args
                             .iter()
-                            .map(|arg| ProcessExecutor::escape(arg))
+                            .map(|arg| legacy_lossy(&ProcessExecutor::escape(arg)).into_owned())
                             .collect::<Vec<_>>()
                             .join(" ");
                         let string_input = event
@@ -863,7 +863,7 @@ try {{
                     Callable::String(callable_str) => {
                         let args = additional_args
                             .iter()
-                            .map(|arg| ProcessExecutor::escape(arg))
+                            .map(|arg| legacy_lossy(&ProcessExecutor::escape(arg)).into_owned())
                             .collect::<Vec<_>>()
                             .join(" ");
 
@@ -1026,7 +1026,7 @@ try {{
                             exec = format!(
                                 "{}{}",
                                 ProcessExecutor::escape(
-                                    &Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
+                                    Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
                                 ),
                                 substr(&exec, 8, None)
                             );
@@ -1108,15 +1108,15 @@ try {{
         };
         let allow_url_fopen_flag = format!(
             " -d allow_url_fopen={}",
-            ProcessExecutor::escape(&ini_get("allow_url_fopen").unwrap_or_default())
+            ProcessExecutor::escape(ini_get("allow_url_fopen").unwrap_or_default())
         );
         let disable_functions_flag = format!(
             " -d disable_functions={}",
-            ProcessExecutor::escape(&ini_get("disable_functions").unwrap_or_default())
+            ProcessExecutor::escape(ini_get("disable_functions").unwrap_or_default())
         );
         let memory_limit_flag = format!(
             " -d memory_limit={}",
-            ProcessExecutor::escape(&ini_get("memory_limit").unwrap_or_default())
+            ProcessExecutor::escape(ini_get("memory_limit").unwrap_or_default())
         );
 
         Ok(format!(

@@ -260,7 +260,7 @@ impl PathRepository {
                 let code1 = self
                     .process
                     .borrow_mut()
-                    .execute(&cmd, &mut ref1, Some(path.as_str()))
+                    .execute(&cmd, &mut ref1, Some(std::path::Path::new(path.as_str())))
                     .unwrap_or(1);
                 let code2 = self
                     .process
@@ -292,7 +292,11 @@ impl PathRepository {
                 && self
                     .process
                     .borrow_mut()
-                    .execute(command, &mut output, Some(path.as_str()))
+                    .execute(
+                        command,
+                        &mut output,
+                        Some(std::path::Path::new(path.as_str())),
+                    )
                     .unwrap_or(1)
                     == 0
             {
