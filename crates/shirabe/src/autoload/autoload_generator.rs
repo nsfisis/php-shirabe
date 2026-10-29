@@ -416,7 +416,7 @@ return array(
         for dir in &classmap_list {
             let dir_str = dir.as_string().unwrap_or_default();
             class_map_generator.scan_paths(
-                &dir_str.to_str_lossy(),
+                dir_str,
                 self.build_exclusion_regex(&dir_str.to_str_lossy(), excluded.clone()),
                 "classmap",
                 None,
@@ -488,7 +488,7 @@ return array(
                             &dir_str,
                             exclusion_regex,
                             &group_type,
-                            Some(namespace.clone()),
+                            Some(bstr::BString::from(namespace.clone())),
                             vec![],
                         )?;
                     }
@@ -554,7 +554,7 @@ return array(
         for (class_name, path) in class_map.get_map() {
             let path_code = format!(
                 "{},\n",
-                self.get_path_code(&filesystem, &base_path, &vendor_path, path)?
+                self.get_path_code(&filesystem, &base_path, &vendor_path, &legacy_lossy(path))?
             );
             classmap_file.push_str(&format!(
                 "    {} => {}",
@@ -984,7 +984,7 @@ return array(
             for dir in classmap.values() {
                 let dir = dir.as_string().unwrap_or_default();
                 if let Err(e) = class_map_generator.scan_paths(
-                    &dir.to_str_lossy(),
+                    dir,
                     self.build_exclusion_regex(&dir.to_str_lossy(), excluded.clone()),
                     "classmap",
                     None,
@@ -1000,7 +1000,19 @@ return array(
                 }
             }
 
-            loader.add_class_map(class_map_generator.get_class_map().get_map().clone());
+            loader.add_class_map(
+                class_map_generator
+                    .get_class_map()
+                    .get_map()
+                    .iter()
+                    .map(|(class, path)| {
+                        (
+                            legacy_lossy(class).into_owned(),
+                            legacy_lossy(path).into_owned(),
+                        )
+                    })
+                    .collect(),
+            );
         }
 
         Ok(loader)

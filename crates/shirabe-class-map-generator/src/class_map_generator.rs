@@ -3,15 +3,15 @@
 use crate::class_map::ClassMap;
 use crate::file_list::FileList;
 use crate::php_file_parser::PhpFileParser;
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
-    InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, explode,
-    getcwd, implode, is_dir, is_file, legacy_lossy, path_to_bytes, pathinfo, php_regex,
+    InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, bconcat,
+    explode, getcwd, implode, is_dir, is_file, path_from_bytes, path_to_bytes, pathinfo, php_regex,
     preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback, realpath,
     str_replace, stream_get_wrappers, strlen, strpos, strrpos, strtr, substr,
 };
 use shirabe_symfony_finder::Finder;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct ClassMapGenerator {
@@ -48,7 +48,9 @@ impl ClassMapGenerator {
     }
 
     /// Iterate over all files in the given directory searching for classes
-    pub fn create_map(path: &str) -> anyhow::Result<indexmap::IndexMap<String, String>> {
+    pub fn create_map(
+        path: impl AsRef<[u8]>,
+    ) -> anyhow::Result<indexmap::IndexMap<BString, BString>> {
         let mut generator = Self::new_default();
         generator.scan_paths(path, None, "classmap", None, vec![])?;
         Ok(generator.get_class_map().get_map().clone())
@@ -66,12 +68,14 @@ impl ClassMapGenerator {
     /// Iterate over all files in the given directory searching for classes
     pub fn scan_paths(
         &mut self,
-        path: &str,
+        path: impl AsRef<[u8]>,
         excluded: Option<String>,
         autoload_type: &str,
-        namespace: Option<String>,
+        namespace: Option<BString>,
         excluded_dirs: Vec<String>,
     ) -> anyhow::Result<()> {
+        let path = path.as_ref().as_bstr();
+        let fs_path = path_from_bytes(path);
         if !matches!(autoload_type, "psr-0" | "psr-4" | "classmap") {
             return Err(InvalidArgumentException::new(
                 "$autoloadType must be one of: \"psr-0\", \"psr-4\" or \"classmap\"".to_string(),
@@ -79,18 +83,18 @@ impl ClassMapGenerator {
             .into());
         }
 
-        let base_path: Option<String> = if autoload_type != "classmap" {
+        let base_path: Option<BString> = if autoload_type != "classmap" {
             if namespace.is_none() {
                 return Err(InvalidArgumentException::new("$namespace must be given (even if it is an empty string if you do not want to filter) when specifying a psr-0 or psr-4 autoload type".to_string()).into());
             }
-            Some(path.to_owned())
+            Some(BString::from(path))
         } else {
             None
         };
 
-        let files: Vec<PathBuf> = if is_file(path) {
-            vec![PathBuf::from(path)]
-        } else if is_dir(path) || strpos(path, "*").is_some() {
+        let files: Vec<BString> = if is_file(fs_path) {
+            vec![BString::from(path)]
+        } else if is_dir(fs_path) || strpos(path, "*").is_some() {
             let ext_pattern = format!(
                 "/\\.(?:{})$/",
                 implode(
@@ -106,9 +110,10 @@ impl ClassMapGenerator {
                 .files()
                 .follow_links()
                 .name(&ext_pattern)
-                .r#in(path)
+                .r#in(fs_path)
                 .exclude(&excluded_dirs)
                 .iter()
+                .map(|file| BString::from(path_to_bytes(&file)))
                 .collect()
         } else {
             return Err(RuntimeException::new(format!(
@@ -117,30 +122,24 @@ impl ClassMapGenerator {
             )).into());
         };
 
-        let cwd = legacy_lossy(path_to_bytes(
+        let cwd = BString::from(path_to_bytes(
             &realpath(Self::get_cwd()?).unwrap_or_default(),
-        ))
-        .into_owned();
+        ));
 
         for file in files {
-            let mut file_path = match file.to_str() {
-                Some(s) => s.to_string(),
-                None => {
-                    return Err(RuntimeException::new(format!(
-                        "Path contains invalid UTF-8: {}",
-                        file.display()
-                    ))
-                    .into());
-                }
-            };
-            let ext = legacy_lossy(&pathinfo(&file_path, PATHINFO_EXTENSION)).into_owned();
-            if !self.extensions.contains(&ext) {
+            let mut file_path = file.clone();
+            let ext = pathinfo(&file_path, PATHINFO_EXTENSION);
+            if !self
+                .extensions
+                .iter()
+                .any(|e| e.as_bytes() == ext.as_slice())
+            {
                 continue;
             }
 
             let is_stream_wrapper_path = preg_is_match(&self.stream_wrappers_regex, &file_path);
             if !Self::is_absolute_path(&file_path) && !is_stream_wrapper_path {
-                file_path = format!("{}/{}", cwd, file_path);
+                file_path = bconcat!(cwd, "/", file_path);
                 file_path = Self::normalize_path(&file_path);
             } else {
                 // Regex pattern compatibility:
@@ -150,27 +149,20 @@ impl ClassMapGenerator {
                 // optional leading group `(^|[^:])` that is re-emitted in the replacement. Slash runs
                 // are always separated by path-segment characters, so consuming the single preceding
                 // char never prevents an adjacent run from matching.
-                file_path = legacy_lossy(&preg_replace(
-                    php_regex!(r"{(^|[^:])[\\/]{2,}}"),
-                    "${1}/",
-                    &file_path,
-                ))
-                .into_owned();
+                file_path = preg_replace(php_regex!(r"{(^|[^:])[\\/]{2,}}"), "${1}/", &file_path);
             }
 
             if file_path.is_empty() {
-                return Err(LogicException::new(format!(
-                    "Got an empty $filePath for {}",
-                    file.display()
-                ))
-                .into());
+                return Err(
+                    LogicException::new(format!("Got an empty $filePath for {}", file)).into(),
+                );
             }
 
             let real_path = if is_stream_wrapper_path {
                 file_path.clone()
             } else {
-                legacy_lossy(path_to_bytes(&match realpath(&file_path) {
-                    Some(p) => p,
+                match realpath(path_from_bytes(&file_path)) {
+                    Some(p) => BString::from(path_to_bytes(&p)),
                     None => {
                         return Err(RuntimeException::new(format!(
                             "realpath of {} failed to resolve, got false",
@@ -178,8 +170,7 @@ impl ClassMapGenerator {
                         ))
                         .into());
                     }
-                }))
-                .into_owned()
+                }
             };
 
             // if a list of scanned files is given, avoid scanning twice the same file to save cycles and avoid generating warnings
@@ -201,14 +192,14 @@ impl ClassMapGenerator {
                 }
             }
 
-            let classes = PhpFileParser::find_classes(&file_path)?;
+            let classes = PhpFileParser::find_classes(file_path.as_bstr())?;
             let effective_classes = if autoload_type != "classmap" && namespace.is_some() {
                 let filtered = self.filter_by_namespace(
                     classes,
-                    &file_path,
-                    namespace.as_deref().unwrap_or_default(),
+                    file_path.as_bstr(),
+                    namespace.as_ref().map_or(BStr::new(""), |n| n.as_bstr()),
                     autoload_type,
-                    base_path.as_deref().unwrap_or_default(),
+                    base_path.as_ref().map_or(BStr::new(""), |p| p.as_bstr()),
                 )?;
 
                 // if no valid class was found in the file then we do not mark it as scanned as it might still be matched by another rule later
@@ -230,7 +221,7 @@ impl ClassMapGenerator {
             for class in effective_classes {
                 if !self.class_map.has_class(&class) {
                     self.class_map.add_class(class.clone(), file_path.clone());
-                } else if file_path != self.class_map.get_class_path(&class)? {
+                } else if file_path != *self.class_map.get_class_path(&class)? {
                     self.class_map.add_ambiguous_class(class, file_path.clone());
                 }
             }
@@ -242,12 +233,12 @@ impl ClassMapGenerator {
     /// Remove classes which could not have been loaded by namespace autoloaders
     fn filter_by_namespace(
         &mut self,
-        classes: Vec<String>,
-        file_path: &str,
-        base_namespace: &str,
+        classes: Vec<BString>,
+        file_path: &BStr,
+        base_namespace: &BStr,
         namespace_type: &str,
-        base_path: &str,
-    ) -> anyhow::Result<Vec<String>> {
+        base_path: &BStr,
+    ) -> anyhow::Result<Vec<BString>> {
         let mut valid_classes = vec![];
         let mut rejected_classes = vec![];
 
@@ -260,7 +251,7 @@ impl ClassMapGenerator {
         );
 
         for class in classes {
-            let sub_path: String;
+            let sub_path: BString;
 
             if namespace_type == "psr-0" {
                 if !base_namespace.is_empty() && !class.starts_with(base_namespace) {
@@ -278,24 +269,17 @@ impl ClassMapGenerator {
                         std::path::MAIN_SEPARATOR_STR,
                         &class_name,
                     ));
-                    sub_path = legacy_lossy(&path).into_owned();
+                    sub_path = path;
                 } else {
-                    sub_path =
-                        legacy_lossy(&str_replace("_", std::path::MAIN_SEPARATOR_STR, &class))
-                            .into_owned();
+                    sub_path = str_replace("_", std::path::MAIN_SEPARATOR_STR, &class);
                 }
             } else if namespace_type == "psr-4" {
                 let sub_namespace = if !base_namespace.is_empty() {
                     substr(&class, strlen(base_namespace), None)
                 } else {
-                    BString::from(class.as_str())
+                    class.clone()
                 };
-                sub_path = legacy_lossy(&str_replace(
-                    "\\",
-                    std::path::MAIN_SEPARATOR_STR,
-                    &sub_namespace,
-                ))
-                .into_owned();
+                sub_path = str_replace("\\", std::path::MAIN_SEPARATOR_STR, &sub_namespace);
             } else {
                 return Err(InvalidArgumentException::new(
                     "$namespaceType must be \"psr-0\" or \"psr-4\"".to_string(),
@@ -314,8 +298,7 @@ impl ClassMapGenerator {
         if valid_classes.is_empty() {
             let cwd_path = Self::get_cwd()?;
             let cwd = realpath(&cwd_path);
-            let cwd = legacy_lossy(path_to_bytes(&cwd.unwrap_or(cwd_path))).into_owned();
-            let cwd = Self::normalize_path(&cwd);
+            let cwd = Self::normalize_path(path_to_bytes(&cwd.unwrap_or(cwd_path)));
             let short_path = preg_replace(
                 format!("{{^{}}}", preg_quote(&cwd, None)),
                 ".",
@@ -334,7 +317,7 @@ impl ClassMapGenerator {
                         class, short_path, namespace_type, base_namespace, short_base_path
                     ),
                     class.clone(),
-                    file_path.to_string(),
+                    file_path,
                 );
             }
 
@@ -345,24 +328,23 @@ impl ClassMapGenerator {
     }
 
     /// Checks if the given path is absolute
-    fn is_absolute_path(path: impl AsRef<Path>) -> bool {
+    fn is_absolute_path(path: &[u8]) -> bool {
         // std::path::Path::is_absolute() is environment-dependent, while PHP's
         // ClassMapGenerator::isAbsolutePath() returns the same result in any platforms.
-        let path = path.as_ref().as_os_str().as_encoded_bytes();
         path.starts_with(b"/") || path.get(1) == Some(&b':') || path.starts_with(b"\\\\")
     }
 
     /// Normalize a path. This replaces backslashes with slashes, removes ending
     /// slash and collapses redundant separators and up-level references.
-    fn normalize_path(path: &str) -> String {
-        let mut parts: Vec<String> = vec![];
+    fn normalize_path(path: impl AsRef<[u8]>) -> BString {
+        let mut parts: Vec<BString> = vec![];
         let mut path = strtr(path, "\\", "/");
-        let mut prefix = String::new();
-        let mut absolute = String::new();
+        let mut prefix = BString::default();
+        let mut absolute = "";
 
         // extract windows UNC paths e.g. \\foo\bar
         if strpos(&path, "//") == Some(0) && strlen(&path) > 2 {
-            absolute = "//".to_string();
+            absolute = "//";
             path = substr(&path, 2, None);
         }
 
@@ -371,12 +353,12 @@ impl ClassMapGenerator {
             php_regex!(r"{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
             &path,
         ) {
-            prefix = r#match.get(1).unwrap_or_default().to_string();
+            prefix = BString::from(r#match.get(1).unwrap_or_default());
             path = substr(&path, strlen(&prefix), None);
         }
 
         if strpos(&path, "/") == Some(0) {
-            absolute = "/".to_string();
+            absolute = "/";
             path = substr(&path, 1, None);
         }
 
@@ -384,9 +366,9 @@ impl ClassMapGenerator {
         for chunk in explode("/", &path) {
             if chunk == ".." && (!absolute.is_empty() || up) {
                 parts.pop();
-                up = !(parts.is_empty() || parts.last().map(|s| s.as_str()) == Some(".."));
+                up = !(parts.is_empty() || parts.last().is_some_and(|s| s == ".."));
             } else if chunk != "." && !chunk.is_empty() {
-                parts.push(legacy_lossy(&chunk.clone()).into_owned());
+                parts.push(chunk.clone());
                 up = chunk != "..";
             }
         }
@@ -394,12 +376,12 @@ impl ClassMapGenerator {
         // ensure c: is normalized to C:
         let prefix = preg_replace_callback(
             php_regex!(r"{(?:^|://)[a-z]:$}i"),
-            |m| Ok(m.get(0).unwrap_or_default().to_string().to_uppercase()),
+            |m| Ok(m.get(0).unwrap_or_default().to_ascii_uppercase()),
             &prefix,
         )
         .expect("the replacement callback cannot fail");
 
-        format!("{}{}{}", prefix, absolute, parts.join("/"))
+        bconcat!(prefix, absolute, bstr::join("/", &parts))
     }
 
     fn get_cwd() -> anyhow::Result<PathBuf> {

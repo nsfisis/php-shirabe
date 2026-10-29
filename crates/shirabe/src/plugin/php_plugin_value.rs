@@ -257,7 +257,7 @@ pub(crate) fn class_map_to_wire(class_map: &ClassMap) -> PluginValue {
         "ambiguousClasses",
         ambiguous_classes.to_plugin_value(),
     );
-    let psr_violations: indexmap::IndexMap<String, PluginValue> = class_map
+    let psr_violations: indexmap::IndexMap<bstr::BString, PluginValue> = class_map
         .get_raw_psr_violations()
         .iter()
         .map(|(path, violations)| {
@@ -271,7 +271,7 @@ pub(crate) fn class_map_to_wire(class_map: &ClassMap) -> PluginValue {
                         ),
                         (
                             "className".into(),
-                            PluginValue::string(violation.class_name.as_str()),
+                            PluginValue::string(violation.class_name.clone()),
                         ),
                     ]))
                 })

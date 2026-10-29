@@ -826,18 +826,24 @@ fn test_non_dev_autoload_should_include_replaced_packages() {
     let vendor = s.vendor_dir.clone();
     let class_map = dump(&mut s, package.into(), true, "_5").unwrap();
 
-    let mut expected: IndexMap<String, String> = IndexMap::new();
+    let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
-        "B\\C\\C".to_string(),
-        vendor.join("b/b/src/C/C.php").to_str().unwrap().to_string(),
+        "B\\C\\C".to_string().into(),
+        vendor
+            .join("b/b/src/C/C.php")
+            .to_str()
+            .unwrap()
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "Composer\\InstalledVersions".to_string(),
+        "Composer\\InstalledVersions".to_string().into(),
         vendor
             .join("composer/InstalledVersions.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     assert_eq!(&expected, class_map.get_map());
 }
@@ -1007,14 +1013,15 @@ fn test_psr_to_class_map_ignores_non_existing_dir() {
     let class_map = dump(&mut s, package.into(), true, "_8").unwrap();
     assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 
-    let mut expected: IndexMap<String, String> = IndexMap::new();
+    let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
-        "Composer\\InstalledVersions".to_string(),
+        "Composer\\InstalledVersions".to_string().into(),
         vendor
             .join("composer/InstalledVersions.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     assert_eq!(&expected, class_map.get_map());
 }
@@ -1096,26 +1103,42 @@ fn test_vendors_class_map_autoloading() {
     let composer_out = vendor.join("composer");
     let class_map = dump(&mut s, package.into(), false, "_6").unwrap();
 
-    let mut expected: IndexMap<String, String> = IndexMap::new();
+    let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
-        "ClassMapBar".to_string(),
-        vendor.join("b/b/src/b.php").to_str().unwrap().to_string(),
+        "ClassMapBar".to_string().into(),
+        vendor
+            .join("b/b/src/b.php")
+            .to_str()
+            .unwrap()
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "ClassMapBaz".to_string(),
-        vendor.join("b/b/lib/c.php").to_str().unwrap().to_string(),
+        "ClassMapBaz".to_string().into(),
+        vendor
+            .join("b/b/lib/c.php")
+            .to_str()
+            .unwrap()
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "ClassMapFoo".to_string(),
-        vendor.join("a/a/src/a.php").to_str().unwrap().to_string(),
+        "ClassMapFoo".to_string().into(),
+        vendor
+            .join("a/a/src/a.php")
+            .to_str()
+            .unwrap()
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "Composer\\InstalledVersions".to_string(),
+        "Composer\\InstalledVersions".to_string().into(),
         vendor
             .join("composer/InstalledVersions.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     assert_eq!(&expected, class_map.get_map());
     assert_autoload_files("classmap4", &composer_out, "classmap");
@@ -1164,34 +1187,42 @@ fn test_vendors_class_map_autoloading_with_target_dir() {
     let class_map = dump(&mut s, package.into(), false, "_6").unwrap();
     assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 
-    let mut expected: IndexMap<String, String> = IndexMap::new();
+    let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
-        "ClassMapBar".to_string(),
+        "ClassMapBar".to_string().into(),
         vendor
             .join("a/a/target/lib/b.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "ClassMapBaz".to_string(),
-        vendor.join("b/b/src/c.php").to_str().unwrap().to_string(),
+        "ClassMapBaz".to_string().into(),
+        vendor
+            .join("b/b/src/c.php")
+            .to_str()
+            .unwrap()
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "ClassMapFoo".to_string(),
+        "ClassMapFoo".to_string().into(),
         vendor
             .join("a/a/target/src/a.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "Composer\\InstalledVersions".to_string(),
+        "Composer\\InstalledVersions".to_string().into(),
         vendor
             .join("composer/InstalledVersions.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     assert_eq!(&expected, class_map.get_map());
 }
@@ -1239,30 +1270,42 @@ fn test_class_map_autoloading_empty_dir_and_exact_file() {
     let class_map = dump(&mut s, package.into(), false, "_7").unwrap();
     assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 
-    let mut expected: IndexMap<String, String> = IndexMap::new();
+    let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
-        "ClassMapBar".to_string(),
-        vendor.join("b/b/test.php").to_str().unwrap().to_string(),
+        "ClassMapBar".to_string().into(),
+        vendor
+            .join("b/b/test.php")
+            .to_str()
+            .unwrap()
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "ClassMapBaz".to_string(),
+        "ClassMapBaz".to_string().into(),
         vendor
             .join("c/c/foo/test.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "ClassMapFoo".to_string(),
-        vendor.join("a/a/src/a.php").to_str().unwrap().to_string(),
+        "ClassMapFoo".to_string().into(),
+        vendor
+            .join("a/a/src/a.php")
+            .to_str()
+            .unwrap()
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "Composer\\InstalledVersions".to_string(),
+        "Composer\\InstalledVersions".to_string().into(),
         vendor
             .join("composer/InstalledVersions.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     assert_eq!(&expected, class_map.get_map());
     assert_autoload_files("classmap5", &composer_out, "classmap");
@@ -1316,38 +1359,42 @@ fn test_class_map_autoloading_authoritative_and_apcu() {
     let class_map = dump(&mut s, package.into(), false, "_7").unwrap();
     assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 
-    let mut expected: IndexMap<String, String> = IndexMap::new();
+    let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
-        "ClassMapBar".to_string(),
+        "ClassMapBar".to_string().into(),
         vendor
             .join("b/b/ClassMapBar.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "ClassMapBaz".to_string(),
+        "ClassMapBaz".to_string().into(),
         vendor
             .join("c/c/foo/ClassMapBaz.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "ClassMapFoo".to_string(),
+        "ClassMapFoo".to_string().into(),
         vendor
             .join("a/a/src/ClassMapFoo.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "Composer\\InstalledVersions".to_string(),
+        "Composer\\InstalledVersions".to_string().into(),
         vendor
             .join("composer/InstalledVersions.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     assert_eq!(&expected, class_map.get_map());
     assert_autoload_files("classmap8", &composer_out, "classmap");
@@ -1402,38 +1449,42 @@ fn test_class_map_autoloading_authoritative_and_apcu_prefix() {
     let class_map = dump(&mut s, package.into(), false, "_7").unwrap();
     assert!(std::path::Path::new(&composer_out.join("autoload_classmap.php")).exists());
 
-    let mut expected: IndexMap<String, String> = IndexMap::new();
+    let mut expected: IndexMap<BString, BString> = IndexMap::new();
     expected.insert(
-        "ClassMapBar".to_string(),
+        "ClassMapBar".to_string().into(),
         vendor
             .join("b/b/ClassMapBar.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "ClassMapBaz".to_string(),
+        "ClassMapBaz".to_string().into(),
         vendor
             .join("c/c/foo/ClassMapBaz.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "ClassMapFoo".to_string(),
+        "ClassMapFoo".to_string().into(),
         vendor
             .join("a/a/src/ClassMapFoo.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     expected.insert(
-        "Composer\\InstalledVersions".to_string(),
+        "Composer\\InstalledVersions".to_string().into(),
         vendor
             .join("composer/InstalledVersions.php")
             .to_str()
             .unwrap()
-            .to_string(),
+            .to_string()
+            .into(),
     );
     assert_eq!(&expected, class_map.get_map());
     assert_autoload_files("classmap8", &composer_out, "classmap");
@@ -2639,10 +2690,10 @@ fn test_absolute_symlink_with_classmap_exclude_from_classmap() {
     let class_map = dump(&mut s, package.into(), false, "_9").unwrap();
 
     // Check that MyClass is included but vendor files are excluded
-    assert!(class_map.get_map().contains_key("MyClass"));
+    assert!(class_map.get_map().contains_key(B("MyClass")));
     assert!(
         !class_map
             .get_map()
-            .contains_key("PHPUnit\\Framework\\Exception")
+            .contains_key(B("PHPUnit\\Framework\\Exception"))
     );
 }

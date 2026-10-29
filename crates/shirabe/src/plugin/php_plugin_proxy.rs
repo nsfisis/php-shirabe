@@ -2697,6 +2697,12 @@ impl ToPluginValue for String {
     }
 }
 
+impl ToPluginValue for BString {
+    fn to_plugin_value(self) -> PluginValue {
+        PluginValue::String(self)
+    }
+}
+
 impl ToPluginValue for &str {
     fn to_plugin_value(self) -> PluginValue {
         PluginValue::string(self)

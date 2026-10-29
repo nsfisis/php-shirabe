@@ -1,4 +1,3 @@
-1 crates/shirabe-class-map-generator/src/class_map_generator.rs
 4 crates/shirabe-php-rpc/build.rs
 1 crates/shirabe-php-rpc/src/frame.rs
 2 crates/shirabe-php-rpc/src/value.rs
@@ -39,7 +38,7 @@
 1 crates/shirabe/build.rs
 5 crates/shirabe/src/advisory/audit_config.rs
 3 crates/shirabe/src/advisory/partial_security_advisory.rs
-19 crates/shirabe/src/autoload/autoload_generator.rs
+17 crates/shirabe/src/autoload/autoload_generator.rs
 4 crates/shirabe/src/autoload/class_loader.rs
 1 crates/shirabe/src/cache.rs
 1 crates/shirabe/src/command/base_command.rs

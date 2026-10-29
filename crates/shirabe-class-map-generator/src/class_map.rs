@@ -1,19 +1,20 @@
 //! ref: composer/vendor/composer/class-map-generator/src/ClassMap.php
 
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{OutOfBoundsException, legacy_lossy, preg_is_match, rtrim2, strpos, strtr};
+use shirabe_php_shim::{OutOfBoundsException, bconcat, preg_is_match, rtrim2, strpos, strtr};
 
 #[derive(Debug, Clone)]
 pub struct PsrViolationEntry {
     pub warning: String,
-    pub class_name: String,
+    pub class_name: BString,
 }
 
 #[derive(Debug)]
 pub struct ClassMap {
-    pub map: IndexMap<String, String>,
-    ambiguous_classes: IndexMap<String, Vec<String>>,
-    psr_violations: IndexMap<String, Vec<PsrViolationEntry>>,
+    pub map: IndexMap<BString, BString>,
+    ambiguous_classes: IndexMap<BString, Vec<BString>>,
+    psr_violations: IndexMap<BString, Vec<PsrViolationEntry>>,
 }
 
 impl Default for ClassMap {
@@ -32,7 +33,7 @@ impl ClassMap {
     }
 
     /// Returns the class map, which is a list of paths indexed by class name
-    pub fn get_map(&self) -> &IndexMap<String, String> {
+    pub fn get_map(&self) -> &IndexMap<BString, BString> {
         &self.map
     }
 
@@ -56,15 +57,15 @@ impl ClassMap {
     pub fn get_ambiguous_classes(
         &self,
         duplicates_filter: Option<&str>,
-    ) -> anyhow::Result<IndexMap<String, Vec<String>>> {
+    ) -> anyhow::Result<IndexMap<BString, Vec<BString>>> {
         let duplicates_filter = match duplicates_filter {
             None => return Ok(self.ambiguous_classes.clone()),
             Some(pattern) => pattern,
         };
 
-        let mut ambiguous_classes: IndexMap<String, Vec<String>> = IndexMap::new();
+        let mut ambiguous_classes: IndexMap<BString, Vec<BString>> = IndexMap::new();
         for (class, paths) in &self.ambiguous_classes {
-            let paths: Vec<String> = paths
+            let paths: Vec<BString> = paths
                 .iter()
                 .filter(|path| !preg_is_match(duplicates_filter, strtr(path, "\\", "/")))
                 .cloned()
@@ -82,16 +83,18 @@ impl ClassMap {
         self.map.sort_keys();
     }
 
-    pub fn add_class(&mut self, class_name: String, path: String) {
+    pub fn add_class(&mut self, class_name: impl Into<BString>, path: impl Into<BString>) {
+        let path = path.into();
         self.psr_violations
-            .shift_remove(&*legacy_lossy(&strtr(&path, "\\", "/")));
+            .shift_remove(strtr(&path, "\\", "/").as_bstr());
 
-        self.map.insert(class_name, path);
+        self.map.insert(class_name.into(), path);
     }
 
-    pub fn get_class_path(&self, class_name: &str) -> anyhow::Result<&str> {
+    pub fn get_class_path(&self, class_name: impl AsRef<[u8]>) -> anyhow::Result<&BStr> {
+        let class_name = class_name.as_ref().as_bstr();
         match self.map.get(class_name) {
-            Some(path) => Ok(path.as_str()),
+            Some(path) => Ok(path.as_bstr()),
             None => Err(OutOfBoundsException::new(format!(
                 "Class {} is not present in the map",
                 class_name
@@ -100,39 +103,48 @@ impl ClassMap {
         }
     }
 
-    pub fn has_class(&self, class_name: &str) -> bool {
-        self.map.contains_key(class_name)
+    pub fn has_class(&self, class_name: impl AsRef<[u8]>) -> bool {
+        self.map.contains_key(class_name.as_ref().as_bstr())
     }
 
-    pub fn add_psr_violation(&mut self, warning: String, class_name: String, path: String) {
-        let path = rtrim2(strtr(&path, "\\", "/"), "/");
+    pub fn add_psr_violation(
+        &mut self,
+        warning: String,
+        class_name: impl Into<BString>,
+        path: impl AsRef<[u8]>,
+    ) {
+        let path = rtrim2(strtr(path, "\\", "/"), "/");
 
         self.psr_violations
-            .entry(legacy_lossy(&path).into_owned())
+            .entry(path)
             .or_default()
             .push(PsrViolationEntry {
                 warning,
-                class_name,
+                class_name: class_name.into(),
             });
     }
 
-    pub fn clear_psr_violations_by_path(&mut self, path_prefix: &str) {
+    pub fn clear_psr_violations_by_path(&mut self, path_prefix: impl AsRef<[u8]>) {
         let path_prefix = rtrim2(strtr(path_prefix, "\\", "/"), "/");
 
         self.psr_violations.retain(|path, _| {
-            path != &path_prefix && strpos(path, format!("{}/", path_prefix)) != Some(0)
+            path != &path_prefix && strpos(path, bconcat!(path_prefix, "/")) != Some(0)
         });
     }
 
-    pub fn add_ambiguous_class(&mut self, class_name: String, path: String) {
+    pub fn add_ambiguous_class(
+        &mut self,
+        class_name: impl Into<BString>,
+        path: impl Into<BString>,
+    ) {
         self.ambiguous_classes
-            .entry(class_name)
+            .entry(class_name.into())
             .or_default()
-            .push(path);
+            .push(path.into());
     }
 
     /// Get the raw psr violations
-    pub fn get_raw_psr_violations(&self) -> &IndexMap<String, Vec<PsrViolationEntry>> {
+    pub fn get_raw_psr_violations(&self) -> &IndexMap<BString, Vec<PsrViolationEntry>> {
         &self.psr_violations
     }
 }

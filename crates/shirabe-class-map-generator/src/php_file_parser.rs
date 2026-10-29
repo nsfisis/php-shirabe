@@ -1,35 +1,37 @@
 //! ref: composer/vendor/composer/class-map-generator/src/PhpFileParser.php
 
 use crate::php_file_cleaner::PhpFileCleaner;
+use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    PHP_EOL, RuntimeException, file_exists, file_get_contents, is_file, is_readable, legacy_lossy,
-    ltrim2, php_strip_whitespace, preg_match_all, str_replace_array, strrpos, strtolower, substr,
-    trim,
+    PHP_EOL, RuntimeException, bconcat, file_exists, file_get_contents, is_file, is_readable,
+    ltrim2, path_from_bytes, php_strip_whitespace, preg_match_all, str_replace_array, strrpos,
+    strtolower, substr, trim,
 };
 use std::sync::OnceLock;
 
 pub struct PhpFileParser;
 
 impl PhpFileParser {
-    pub fn find_classes(path: &str) -> anyhow::Result<Vec<String>> {
+    pub fn find_classes(path: &BStr) -> anyhow::Result<Vec<BString>> {
         let extra_types = Self::get_extra_types();
+        let fs_path = path_from_bytes(path);
 
         // Use @ here instead of Silencer to actively suppress 'unhelpful' output
-        let contents = match php_strip_whitespace(path) {
+        let contents = match php_strip_whitespace(fs_path) {
             Ok(contents) if !contents.is_empty() => contents,
             stripped => {
                 let mut message: String;
-                if !file_exists(path) {
+                if !file_exists(fs_path) {
                     message = format!(
                         "File at \"{}\" does not exist, check your classmap definitions",
                         path
                     );
-                } else if !Self::is_readable(path) {
+                } else if !Self::is_readable(fs_path) {
                     message = format!(
                         "File at \"{}\" is not readable, check its permissions",
                         path
                     );
-                } else if trim(file_get_contents(path).unwrap_or_default()).is_empty() {
+                } else if trim(file_get_contents(fs_path).unwrap_or_default()).is_empty() {
                     // The input file was really empty and thus contains no classes
                     return Ok(vec![]);
                 } else {
@@ -57,7 +59,7 @@ impl PhpFileParser {
             return Ok(vec![]);
         }
 
-        let mut p = PhpFileCleaner::new(legacy_lossy(&contents).into_owned(), max_matches);
+        let mut p = PhpFileCleaner::new(contents, max_matches);
         let contents = p.clean();
         drop(p);
 
@@ -81,7 +83,7 @@ impl PhpFileParser {
         let matches = preg_match_all(&pattern2, &contents);
 
         let mut classes = vec![];
-        let mut namespace = String::new();
+        let mut namespace = BString::default();
 
         for r#match in matches {
             let ns = r#match.name("ns");
@@ -89,7 +91,7 @@ impl PhpFileParser {
                 let nsname = r#match.name("nsname").unwrap_or_default();
                 let mut nsname = str_replace_array(&[" ", "\t", "\r", "\n"], &[""], nsname);
                 nsname.push(b'\\');
-                namespace = legacy_lossy(&nsname).into_owned();
+                namespace = nsname;
             } else {
                 let name = r#match
                     .name("name")
@@ -102,14 +104,12 @@ impl PhpFileParser {
                     continue;
                 }
 
-                let name: String = if let Some(stripped) = name.strip_prefix(b":") {
+                let name: BString = if let Some(stripped) = name.strip_prefix(b":") {
                     // This is an XHP class, https://github.com/facebook/xhp
-                    "xhp".to_string()
-                        + &*legacy_lossy(&str_replace_array(
-                            &["-".to_string(), ":".to_string()],
-                            &["_".to_string(), "__".to_string()],
-                            stripped,
-                        ))
+                    bconcat!(
+                        "xhp",
+                        str_replace_array(&["-", ":"], &["_", "__"], stripped)
+                    )
                 } else if strtolower(r#match.name("type").unwrap_or_default()) == "enum" {
                     // something like:
                     //   enum Foo: int { HERP = '123'; }
@@ -120,23 +120,20 @@ impl PhpFileParser {
                     // The regex above captures the colon and type, which isn't part of
                     // the class name.
                     if let Some(colon_pos) = strrpos(name, ":") {
-                        legacy_lossy(&substr(name, 0, Some(colon_pos as i64))).into_owned()
+                        substr(name, 0, Some(colon_pos as i64))
                     } else {
-                        name.to_string()
+                        BString::from(name)
                     }
                 } else {
-                    name.to_string()
+                    BString::from(name)
                 };
 
-                let class_name = ltrim2(format!("{}{}", namespace, name), "\\");
+                let class_name = ltrim2(bconcat!(namespace, name), "\\");
                 classes.push(class_name);
             }
         }
 
-        Ok(classes
-            .iter()
-            .map(|s| legacy_lossy(s).into_owned())
-            .collect::<Vec<_>>())
+        Ok(classes)
     }
 
     fn get_extra_types() -> &'static str {
@@ -167,7 +164,7 @@ impl PhpFileParser {
     ///
     /// This will also check for readability by reading the file as is_readable can not be trusted on network-mounts
     /// and \\wsl$ paths. See https://github.com/composer/composer/issues/8231 and https://bugs.php.net/bug.php?id=68926
-    fn is_readable(path: &str) -> bool {
+    fn is_readable(path: &std::path::Path) -> bool {
         if is_readable(path) {
             return true;
         }
