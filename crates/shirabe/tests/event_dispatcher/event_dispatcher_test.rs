@@ -489,17 +489,17 @@ mockall::mock! {
             installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
             root_package: RootPackageInterfaceHandle,
             packages: Vec<PackageInterfaceHandle>,
-        ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>>;
+        ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>>;
         fn parse_autoloads(
             &self,
-            package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
+            package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
             root_package: RootPackageInterfaceHandle,
             filtered_dev_packages: PhpMixed,
         ) -> IndexMap<BString, PhpMixed>;
         fn create_loader<'a>(
             &self,
             autoloads: &IndexMap<BString, PhpMixed>,
-            vendor_dir: Option<String>,
+            vendor_dir: Option<bstr::BString>,
         ) -> anyhow::Result<ClassLoader>;
     }
 }

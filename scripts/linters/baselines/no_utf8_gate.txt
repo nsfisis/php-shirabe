@@ -31,8 +31,6 @@
 3 crates/shirabe-symfony-process/src/executable_finder.rs
 3 crates/shirabe-symfony-process/src/php_executable_finder.rs
 1 crates/shirabe/build.rs
-16 crates/shirabe/src/autoload/autoload_generator.rs
-4 crates/shirabe/src/autoload/class_loader.rs
 1 crates/shirabe/src/command/base_command.rs
 1 crates/shirabe/src/command/base_config_command.rs
 1 crates/shirabe/src/command/bump_command.rs
@@ -66,7 +64,7 @@
 1 crates/shirabe/src/package/version/version_bumper.rs
 16 crates/shirabe/src/plugin/php_plugin_proxy.rs
 6 crates/shirabe/src/plugin/php_plugin_value.rs
-4 crates/shirabe/src/plugin/plugin_manager.rs
+2 crates/shirabe/src/plugin/plugin_manager.rs
 2 crates/shirabe/src/plugin/throwable_bridge.rs
 7 crates/shirabe/src/repository/artifact_repository.rs
 9 crates/shirabe/src/repository/composer_repository.rs

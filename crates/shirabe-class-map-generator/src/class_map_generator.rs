@@ -69,7 +69,7 @@ impl ClassMapGenerator {
     pub fn scan_paths(
         &mut self,
         path: impl AsRef<[u8]>,
-        excluded: Option<String>,
+        excluded: Option<bstr::BString>,
         autoload_type: &str,
         namespace: Option<BString>,
         excluded_dirs: Vec<String>,

@@ -31,14 +31,18 @@ fn test_find_file() {
 
     for (class, file) in get_find_file_tests() {
         let mut loader = ClassLoader::new(None);
-        loader.add("Namespaced\\", vec![fixtures.clone()], false);
-        loader.add("Pearlike_", vec![fixtures.clone()], false);
+        loader.add("Namespaced\\", vec![fixtures.clone().into()], false);
+        loader.add("Pearlike_", vec![fixtures.clone().into()], false);
         loader
-            .add_psr4("ShinyVendor\\ShinyPackage\\", vec![fixtures.clone()], false)
+            .add_psr4(
+                "ShinyVendor\\ShinyPackage\\",
+                vec![fixtures.clone().into()],
+                false,
+            )
             .unwrap();
         assert_eq!(
             loader.find_file(class),
-            Some(format!("{}/{}", fixtures, file)),
+            Some(bstr::BString::from(format!("{}/{}", fixtures, file))),
             "->findFile() finds '{}'",
             class
         );

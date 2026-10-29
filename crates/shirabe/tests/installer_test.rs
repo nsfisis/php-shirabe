@@ -238,12 +238,12 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
         >,
         _root_package: RootPackageInterfaceHandle,
         _packages: Vec<PackageInterfaceHandle>,
-    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>> {
+    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>> {
         Ok(vec![])
     }
     fn parse_autoloads(
         &self,
-        _package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
+        _package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
         _root_package: RootPackageInterfaceHandle,
         _filtered_dev_packages: PhpMixed,
     ) -> IndexMap<BString, PhpMixed> {
@@ -252,7 +252,7 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
     fn create_loader(
         &self,
         _autoloads: &IndexMap<BString, PhpMixed>,
-        _vendor_dir: Option<String>,
+        _vendor_dir: Option<bstr::BString>,
     ) -> anyhow::Result<ClassLoader> {
         unimplemented!("create_loader is not reached by the installer test path")
     }

@@ -1629,7 +1629,7 @@ try {{
             .borrow()
             .get("vendor-dir")
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(|s| s.to_owned());
         let loader = generator.borrow().create_loader(&map, vendor_dir)?;
         loader.register(false);
         self.loader = Some(loader);

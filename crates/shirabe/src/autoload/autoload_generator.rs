@@ -15,21 +15,22 @@ use crate::json::JsonFile;
 use crate::package::{LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::script::ScriptEvents;
 use crate::util::{Filesystem, PackageSorter, Platform};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_class_map_generator::class_map::ClassMap;
 use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PHP_SERVER, PhpMixed, PregMatches, RuntimeException,
     array_keys, array_map, array_merge_map, array_merge_recursive, array_shift, array_slice_strs,
-    array_unique, bconcat, bin2hex, empty, explode, file_exists, file_get_contents, hash, implode,
-    intval, is_array, is_dir, ksort, legacy_lossy, ltrim, ltrim2, path_from_bytes, path_to_bytes,
-    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback,
-    random_bytes, realpath, rtrim2, str_replace, strlen, strpos, strtr, strtr_array, substr,
-    substr_count, trim2, unlink, var_export,
+    array_unique, bconcat, bin2hex, dirname, empty, explode, file_exists, file_get_contents, hash,
+    implode, intval, is_array, is_dir, ksort, legacy_lossy, ltrim, ltrim2, path_from_bytes,
+    path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
+    preg_replace_callback, random_bytes, realpath, rtrim2, str_replace, strlen, strpos, strtr,
+    strtr_array, substr, substr_count, trim, trim2, unlink, var_export,
 };
 use shirabe_semver::constraint::Bound;
 use shirabe_symfony_console::formatter::OutputFormatter;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct AutoloadGenerator {
@@ -127,11 +128,13 @@ impl AutoloadGenerator {
             // we assume no-dev mode if no vendor dir is present or it is too old to contain dev information
             self.dev_mode.set(Some(false));
 
+            // TODO(bytes): JsonFile holds its path as a String.
             let installed_json = JsonFile::new(
-                format!(
-                    "{}/composer/installed.json",
-                    legacy_lossy(&config.get("vendor-dir").as_string().unwrap_or_default())
-                ),
+                legacy_lossy(&bconcat!(
+                    config.get("vendor-dir").as_string().unwrap_or_default(),
+                    "/composer/installed.json"
+                ))
+                .into_owned(),
                 None,
                 None,
             )?;
@@ -178,30 +181,22 @@ impl AutoloadGenerator {
         class_map_generator.avoid_duplicate_scans(None);
 
         let mut filesystem = Filesystem::new(None);
-        filesystem.ensure_directory_exists(path_from_bytes(
-            config.get("vendor-dir").as_string().unwrap_or_default(),
-        ))?;
+        let vendor_dir = config
+            .get("vendor-dir")
+            .as_string()
+            .unwrap_or_default()
+            .to_owned();
+        filesystem.ensure_directory_exists(path_from_bytes(&vendor_dir))?;
         // Do not remove double realpath() calls.
         // Fixes failing Windows realpath() implementation.
         // See https://bugs.php.net/bug.php?id=72738
         let base_path = filesystem.normalize_path(
             realpath(realpath(Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default())
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                 .unwrap_or_default(),
         );
         let vendor_path = filesystem.normalize_path(
-            realpath(
-                realpath(
-                    &*config
-                        .get("vendor-dir")
-                        .as_string()
-                        .unwrap_or_default()
-                        .to_str_lossy(),
-                )
+            realpath(realpath(path_from_bytes(&vendor_dir)).unwrap_or_default())
                 .unwrap_or_default(),
-            )
-            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            .unwrap_or_default(),
         );
         let use_global_include_path = config.get("use-include-path").as_bool().unwrap_or(false);
         let prepend_autoloader = if config.get("prepend-autoloader").as_bool() == Some(false) {
@@ -209,63 +204,42 @@ impl AutoloadGenerator {
         } else {
             "true"
         };
-        let target_dir = format!("{}/{}", vendor_path.display(), target_dir);
+        let target_dir = PathBuf::from(path_from_bytes(&bconcat!(vendor_path, "/", target_dir)));
         filesystem.ensure_directory_exists(&target_dir)?;
 
-        let vendor_path_code = legacy_lossy(
-            &filesystem.find_shortest_path_code(
-                realpath(&target_dir)
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                    .unwrap_or_default(),
-                &vendor_path,
-                true,
-                false,
-                false,
-            )?,
-        )
-        .into_owned();
-        let vendor_path_to_target_dir_code = legacy_lossy(
-            &filesystem.find_shortest_path_code(
-                &vendor_path,
-                realpath(&target_dir)
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                    .unwrap_or_default(),
-                true,
-                false,
-                false,
-            )?,
-        )
-        .into_owned();
+        let vendor_path_code = filesystem.find_shortest_path_code(
+            realpath(&target_dir).unwrap_or_default(),
+            &vendor_path,
+            true,
+            false,
+            false,
+        )?;
+        let vendor_path_to_target_dir_code = filesystem.find_shortest_path_code(
+            &vendor_path,
+            realpath(&target_dir).unwrap_or_default(),
+            true,
+            false,
+            false,
+        )?;
 
         let app_base_dir_code =
             filesystem.find_shortest_path_code(&vendor_path, &base_path, true, false, false)?;
-        let app_base_dir_code =
-            legacy_lossy(&str_replace("__DIR__", "$vendorDir", &app_base_dir_code)).into_owned();
+        let app_base_dir_code = str_replace("__DIR__", "$vendorDir", &app_base_dir_code);
 
-        let mut namespaces_file = format!(
-            r#"<?php
-
-// autoload_namespaces.php @generated by Composer
-
-$vendorDir = {};
-$baseDir = {};
-
-return array(
-"#,
-            vendor_path_code, app_base_dir_code
+        let mut namespaces_file = bconcat!(
+            "<?php\n\n// autoload_namespaces.php @generated by Composer\n\n$vendorDir = ",
+            vendor_path_code,
+            ";\n$baseDir = ",
+            app_base_dir_code,
+            ";\n\nreturn array(\n",
         );
 
-        let mut psr4_file = format!(
-            r#"<?php
-
-// autoload_psr4.php @generated by Composer
-
-$vendorDir = {};
-$baseDir = {};
-
-return array(
-"#,
-            vendor_path_code, app_base_dir_code
+        let mut psr4_file = bconcat!(
+            "<?php\n\n// autoload_psr4.php @generated by Composer\n\n$vendorDir = ",
+            vendor_path_code,
+            ";\n$baseDir = ",
+            app_base_dir_code,
+            ";\n\nreturn array(\n",
         );
 
         // Collect information from all packages.
@@ -306,25 +280,26 @@ return array(
             .and_then(|v| v.as_array().cloned())
             .unwrap_or_default();
         for (namespace, paths) in &psr0_map {
-            let mut exported_paths: Vec<String> = vec![];
+            let mut exported_paths: Vec<BString> = vec![];
             if let Some(p_list) = paths.as_list() {
                 for path in p_list {
                     exported_paths.push(self.get_path_code(
                         &filesystem,
-                        &legacy_lossy(path_to_bytes(&base_path)),
-                        &legacy_lossy(path_to_bytes(&vendor_path)),
-                        &path.as_string().unwrap_or_default().to_str_lossy(),
+                        &base_path,
+                        &vendor_path,
+                        path.as_string().unwrap_or_default(),
                     )?);
                 }
             }
             let exported_prefix = var_export(&PhpMixed::String(namespace.clone()), true);
-            namespaces_file.push_str(&format!("    {} => ", legacy_lossy(&exported_prefix)));
-            namespaces_file.push_str(&format!(
-                "array({}),\n",
-                legacy_lossy(&implode(", ", &exported_paths))
+            namespaces_file.extend_from_slice(&bconcat!("    ", exported_prefix, " => "));
+            namespaces_file.extend_from_slice(&bconcat!(
+                "array(",
+                implode(", ", &exported_paths),
+                "),\n"
             ));
         }
-        namespaces_file.push_str(");\n");
+        namespaces_file.extend_from_slice(b");\n");
 
         // Process the 'psr-4' base directories.
         let psr4_map = autoloads
@@ -332,28 +307,29 @@ return array(
             .and_then(|v| v.as_array().cloned())
             .unwrap_or_default();
         for (namespace, paths) in &psr4_map {
-            let mut exported_paths: Vec<String> = vec![];
+            let mut exported_paths: Vec<BString> = vec![];
             if let Some(p_list) = paths.as_list() {
                 for path in p_list {
                     exported_paths.push(self.get_path_code(
                         &filesystem,
-                        &legacy_lossy(path_to_bytes(&base_path)),
-                        &legacy_lossy(path_to_bytes(&vendor_path)),
-                        &path.as_string().unwrap_or_default().to_str_lossy(),
+                        &base_path,
+                        &vendor_path,
+                        path.as_string().unwrap_or_default(),
                     )?);
                 }
             }
             let exported_prefix = var_export(&PhpMixed::String(namespace.clone()), true);
-            psr4_file.push_str(&format!("    {} => ", legacy_lossy(&exported_prefix)));
-            psr4_file.push_str(&format!(
-                "array({}),\n",
-                legacy_lossy(&implode(", ", &exported_paths))
+            psr4_file.extend_from_slice(&bconcat!("    ", exported_prefix, " => "));
+            psr4_file.extend_from_slice(&bconcat!(
+                "array(",
+                implode(", ", &exported_paths),
+                "),\n"
             ));
         }
-        psr4_file.push_str(");\n");
+        psr4_file.extend_from_slice(b");\n");
 
         // add custom psr-0 autoloading if the root package has a target dir
-        let mut target_dir_loader: Option<String> = None;
+        let mut target_dir_loader: Option<BString> = None;
         let main_autoload = root_package.get_autoload();
         if root_package.get_target_dir().is_some()
             && main_autoload
@@ -382,33 +358,36 @@ return array(
             let base_dir_from_target_dir_code =
                 filesystem.find_shortest_path_code(&target_dir, &base_path, true, false, false)?;
 
-            target_dir_loader = Some(format!(
+            target_dir_loader = Some(bconcat!(
                 r#"
     public static function autoload($class)
-    {{
-        $dir = {} . '/';
-        $prefixes = array({});
-        foreach ($prefixes as $prefix) {{
-            if (0 !== strpos($class, $prefix)) {{
+    {
+        $dir = "#,
+                base_dir_from_target_dir_code,
+                r#" . '/';
+        $prefixes = array("#,
+                prefixes,
+                r#");
+        foreach ($prefixes as $prefix) {
+            if (0 !== strpos($class, $prefix)) {
                 continue;
-            }}
-            $path = $dir . implode('/', array_slice(explode('\\', $class), {})).'.php';
-            if (!$path = stream_resolve_include_path($path)) {{
+            }
+            $path = $dir . implode('/', array_slice(explode('\\', $class), "#,
+                levels,
+                r#")).'.php';
+            if (!$path = stream_resolve_include_path($path)) {
                 return false;
-            }}
+            }
             require $path;
 
             return true;
-        }}
-    }}
+        }
+    }
 "#,
-                legacy_lossy(&base_dir_from_target_dir_code),
-                legacy_lossy(&prefixes),
-                levels
             ));
         }
 
-        let mut excluded: Vec<String> = vec![];
+        let mut excluded: Vec<BString> = vec![];
         if let Some(ex) = autoloads
             .get(B("exclude-from-classmap"))
             .and_then(|v| v.as_array())
@@ -416,7 +395,7 @@ return array(
         {
             excluded = ex
                 .values()
-                .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                .filter_map(|v| v.as_string().map(BStr::to_owned))
                 .collect();
         }
 
@@ -429,7 +408,7 @@ return array(
             let dir_str = dir.as_string().unwrap_or_default();
             class_map_generator.scan_paths(
                 dir_str,
-                self.build_exclusion_regex(&dir_str.to_str_lossy(), excluded.clone()),
+                self.build_exclusion_regex(dir_str, excluded.clone()),
                 "classmap",
                 None,
                 vec![],
@@ -437,7 +416,7 @@ return array(
         }
 
         if scan_psr_packages {
-            let mut namespaces_to_scan: IndexMap<String, Vec<IndexMap<BString, PhpMixed>>> =
+            let mut namespaces_to_scan: IndexMap<BString, Vec<IndexMap<BString, PhpMixed>>> =
                 IndexMap::new();
 
             // Scan the PSR-0/4 directories for class files, and add them to the class map
@@ -448,8 +427,6 @@ return array(
                     .cloned()
                     .unwrap_or_default();
                 for (namespace, paths) in &map {
-                    // TODO(bytes): namespaces are Strings, so non-UTF-8 bytes are replaced.
-                    let namespace = namespace.to_str_lossy().into_owned();
                     let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
                     entry.insert("paths".into(), paths.clone());
                     entry.insert("type".into(), PhpMixed::string(psr_type.to_string()));
@@ -469,23 +446,20 @@ return array(
                         .and_then(|v| v.as_list())
                         .cloned()
                         .unwrap_or_default();
-                    let group_type = legacy_lossy(
-                        group
-                            .get(B("type"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default(),
-                    )
-                    .into_owned();
+                    let group_type = group
+                        .get(B("type"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default();
                     for dir in &paths {
-                        let dir_str =
-                            legacy_lossy(dir.as_string().unwrap_or_default()).into_owned();
-                        let joined = format!("{}/{}", base_path.display(), dir_str);
-                        let dir_str =
-                            filesystem.normalize_path(if filesystem.is_absolute_path(&dir_str) {
-                                &dir_str
+                        let dir_str = dir.as_string().unwrap_or_default();
+                        let joined = bconcat!(base_path, "/", dir_str);
+                        let dir_str = filesystem.normalize_path(path_from_bytes(
+                            if filesystem.is_absolute_path(path_from_bytes(dir_str)) {
+                                dir_str
                             } else {
-                                &joined
-                            });
+                                joined.as_bstr()
+                            },
+                        ));
                         if !is_dir(&dir_str) {
                             continue;
                         }
@@ -495,23 +469,22 @@ return array(
                             .contains_str(bconcat!(path_to_bytes(&dir_str), "/"))
                         {
                             let mut combined = excluded.clone();
-                            combined.push(format!("{}/", vendor_path.display()));
-                            self.build_exclusion_regex(
-                                &legacy_lossy(path_to_bytes(&dir_str)),
-                                combined,
-                            )
+                            combined.push(bconcat!(vendor_path, "/"));
+                            self.build_exclusion_regex(path_to_bytes(&dir_str).as_bstr(), combined)
                         } else {
                             self.build_exclusion_regex(
-                                &legacy_lossy(path_to_bytes(&dir_str)),
+                                path_to_bytes(&dir_str).as_bstr(),
                                 excluded.clone(),
                             )
                         };
 
+                        // TODO(bytes): ClassMapGenerator::scan_paths takes the autoload type as a
+                        // &str.
                         class_map_generator.scan_paths(
                             path_to_bytes(&dir_str),
                             exclusion_regex,
-                            &group_type,
-                            Some(bstr::BString::from(namespace.clone())),
+                            &legacy_lossy(group_type),
+                            Some(namespace.clone()),
                             vec![],
                         )?;
                     }
@@ -557,65 +530,51 @@ return array(
         }
 
         class_map.add_class(
-            "Composer\\InstalledVersions".to_string(),
-            format!("{}/composer/InstalledVersions.php", vendor_path.display()),
+            "Composer\\InstalledVersions",
+            bconcat!(vendor_path, "/composer/InstalledVersions.php"),
         );
         class_map.sort();
 
-        let mut classmap_file = format!(
-            r#"<?php
-
-// autoload_classmap.php @generated by Composer
-
-$vendorDir = {};
-$baseDir = {};
-
-return array(
-"#,
-            vendor_path_code, app_base_dir_code
+        let mut classmap_file = bconcat!(
+            "<?php\n\n// autoload_classmap.php @generated by Composer\n\n$vendorDir = ",
+            vendor_path_code,
+            ";\n$baseDir = ",
+            app_base_dir_code,
+            ";\n\nreturn array(\n",
         );
         for (class_name, path) in class_map.get_map() {
-            let path_code = format!(
-                "{},\n",
-                self.get_path_code(
-                    &filesystem,
-                    &legacy_lossy(path_to_bytes(&base_path)),
-                    &legacy_lossy(path_to_bytes(&vendor_path)),
-                    &legacy_lossy(path)
-                )?
+            let path_code = bconcat!(
+                self.get_path_code(&filesystem, &base_path, &vendor_path, path.as_bstr())?,
+                ",\n"
             );
-            classmap_file.push_str(&format!(
-                "    {} => {}",
-                legacy_lossy(&var_export(&PhpMixed::string(class_name.clone()), true)),
+            classmap_file.extend_from_slice(&bconcat!(
+                "    ",
+                var_export(&PhpMixed::string(class_name.clone()), true),
+                " => ",
                 path_code
             ));
         }
-        classmap_file.push_str(");\n");
+        classmap_file.extend_from_slice(b");\n");
 
-        let mut suffix = suffix;
-        if suffix.as_deref() == Some("") {
+        let mut suffix: Option<BString> = suffix.map(BString::from);
+        if suffix.as_ref().is_some_and(|s| s.is_empty()) {
             suffix = None;
         }
         if suffix.is_none() {
             suffix = config
                 .get("autoloader-suffix")
                 .as_string()
-                .map(|s| legacy_lossy(s).into_owned());
+                .map(BStr::to_owned);
 
             // carry over existing autoload.php's suffix if possible and none is configured
-            if suffix.is_none()
-                && Filesystem::is_readable(format!("{}/autoload.php", vendor_path.display()))
-            {
-                // TODO(bytes): preg_match matches over a &str.
-                let content = String::from_utf8_lossy(
-                    &file_get_contents(format!("{}/autoload.php", vendor_path.display()))
-                        .unwrap_or_default(),
-                )
-                .into_owned();
+            let autoload_file =
+                PathBuf::from(path_from_bytes(&bconcat!(vendor_path, "/autoload.php")));
+            if suffix.is_none() && Filesystem::is_readable(&autoload_file) {
+                let content = file_get_contents(&autoload_file).unwrap_or_default();
                 if let Some(matches) =
                     preg_match(php_regex!("{ComposerAutoloaderInit([^:\\s]+)::}"), &content)
                 {
-                    suffix = matches.get(1).map(|s| legacy_lossy(s).into_owned());
+                    suffix = matches.get(1).map(BStr::to_owned);
                 }
             }
 
@@ -623,19 +582,17 @@ return array(
                 suffix = Some(if let Some(l) = locker {
                     let is_locked = l.borrow_mut().is_locked();
                     if is_locked {
-                        legacy_lossy(
-                            l.borrow_mut()
-                                .get_lock_data()?
-                                .get(B("content-hash"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default(),
-                        )
-                        .into_owned()
+                        l.borrow_mut()
+                            .get_lock_data()?
+                            .get(B("content-hash"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default()
+                            .to_owned()
                     } else {
-                        legacy_lossy(&bin2hex(random_bytes(16))).into_owned()
+                        bin2hex(random_bytes(16))
                     }
                 } else {
-                    legacy_lossy(&bin2hex(random_bytes(16))).into_owned()
+                    bin2hex(random_bytes(16))
                 });
             }
         }
@@ -645,53 +602,46 @@ return array(
             return Ok(class_map);
         }
 
+        let target_file =
+            |name: &str| PathBuf::from(path_from_bytes(&bconcat!(target_dir, "/", name)));
         filesystem.file_put_contents_if_modified(
-            format!("{}/autoload_namespaces.php", target_dir),
+            target_file("autoload_namespaces.php"),
             &namespaces_file,
         )?;
-        filesystem.file_put_contents_if_modified(
-            format!("{}/autoload_psr4.php", target_dir),
-            &psr4_file,
-        )?;
-        filesystem.file_put_contents_if_modified(
-            format!("{}/autoload_classmap.php", target_dir),
-            &classmap_file,
-        )?;
-        let include_path_file_path = format!("{}/include_paths.php", target_dir);
+        filesystem.file_put_contents_if_modified(target_file("autoload_psr4.php"), &psr4_file)?;
+        filesystem
+            .file_put_contents_if_modified(target_file("autoload_classmap.php"), &classmap_file)?;
+        let include_path_file_path = target_file("include_paths.php");
         let include_path_file_contents = self.get_include_paths_file(
             &package_map,
             &filesystem,
-            &legacy_lossy(path_to_bytes(&base_path)),
-            &legacy_lossy(path_to_bytes(&vendor_path)),
-            &vendor_path_code,
-            &app_base_dir_code,
+            &base_path,
+            &vendor_path,
+            vendor_path_code.as_bstr(),
+            app_base_dir_code.as_bstr(),
         )?;
         if let Some(ref c) = include_path_file_contents {
             filesystem.file_put_contents_if_modified(&include_path_file_path, c)?;
         } else if file_exists(&include_path_file_path) {
             unlink(&include_path_file_path);
         }
-        let include_files_file_path = format!("{}/autoload_files.php", target_dir);
+        let include_files_file_path = target_file("autoload_files.php");
         let files_map = autoloads
             .get(B("files"))
             .and_then(|v| v.as_array())
             .cloned()
             .unwrap_or_default();
-        let mut files_str_map: IndexMap<String, String> = IndexMap::new();
-        for (k, v) in &files_map {
-            // TODO(bytes): file identifiers are Strings, so non-UTF-8 bytes are replaced.
-            files_str_map.insert(
-                k.to_str_lossy().into_owned(),
-                legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
-            );
-        }
+        let files_map: IndexMap<BString, BString> = files_map
+            .iter()
+            .map(|(k, v)| (k.clone(), v.as_string().unwrap_or_default().to_owned()))
+            .collect();
         let include_files_file_contents = self.get_include_files_file(
-            &files_str_map,
+            &files_map,
             &filesystem,
-            &legacy_lossy(path_to_bytes(&base_path)),
-            &legacy_lossy(path_to_bytes(&vendor_path)),
-            &vendor_path_code,
-            &app_base_dir_code,
+            &base_path,
+            &vendor_path,
+            vendor_path_code.as_bstr(),
+            app_base_dir_code.as_bstr(),
         )?;
         if let Some(ref c) = include_files_file_contents {
             filesystem.file_put_contents_if_modified(&include_files_file_path, c)?;
@@ -699,13 +649,8 @@ return array(
             unlink(&include_files_file_path);
         }
         filesystem.file_put_contents_if_modified(
-            format!("{}/autoload_static.php", target_dir),
-            &self.get_static_file(
-                &suffix,
-                &target_dir,
-                &legacy_lossy(path_to_bytes(&vendor_path)),
-                &legacy_lossy(path_to_bytes(&base_path)),
-            )?,
+            target_file("autoload_static.php"),
+            self.get_static_file(suffix.as_bstr(), &target_dir, &vendor_path, &base_path)?,
         )?;
         let mut check_platform = config.get("platform-check").as_bool() != Some(false)
             && self
@@ -714,15 +659,12 @@ return array(
                 .as_any()
                 .downcast_ref::<IgnoreAllPlatformRequirementFilter>()
                 .is_none();
-        let mut platform_check_content: Option<String> = None;
+        let mut platform_check_content: Option<BString> = None;
         if check_platform {
             platform_check_content = self.get_platform_check(
                 &package_map,
                 config.get("platform-check"),
-                &dev_package_names
-                    .iter()
-                    .map(|s| legacy_lossy(s).into_owned())
-                    .collect::<Vec<_>>(),
+                &dev_package_names,
             );
             if platform_check_content.is_none() {
                 check_platform = false;
@@ -730,26 +672,26 @@ return array(
         }
         if check_platform {
             filesystem.file_put_contents_if_modified(
-                format!("{}/platform_check.php", target_dir),
+                target_file("platform_check.php"),
                 platform_check_content.as_ref().unwrap(),
             )?;
-        } else if file_exists(format!("{}/platform_check.php", target_dir)) {
-            unlink(format!("{}/platform_check.php", target_dir));
+        } else if file_exists(target_file("platform_check.php")) {
+            unlink(target_file("platform_check.php"));
         }
         filesystem.file_put_contents_if_modified(
-            format!("{}/autoload.php", vendor_path.display()),
-            self.get_autoload_file(&vendor_path_to_target_dir_code, &suffix),
+            path_from_bytes(&bconcat!(vendor_path, "/autoload.php")),
+            self.get_autoload_file(vendor_path_to_target_dir_code.as_bstr(), suffix.as_bstr()),
         )?;
         filesystem.file_put_contents_if_modified(
-            format!("{}/autoload_real.php", target_dir),
+            target_file("autoload_real.php"),
             self.get_autoload_real_file(
                 true,
                 include_path_file_contents.is_some(),
                 target_dir_loader,
                 include_files_file_contents.is_some(),
-                &vendor_path_code,
-                &app_base_dir_code,
-                &suffix,
+                vendor_path_code.as_bstr(),
+                app_base_dir_code.as_bstr(),
+                suffix.as_bstr(),
                 use_global_include_path,
                 prepend_autoloader,
                 check_platform,
@@ -760,11 +702,11 @@ return array(
         // tree at run time, so they are embedded at build time, as InstalledVersions.php is in
         // FilesystemRepository.
         filesystem.file_put_contents_if_modified(
-            format!("{}/ClassLoader.php", target_dir),
+            target_file("ClassLoader.php"),
             include_str!("../../../../composer/src/Composer/Autoload/ClassLoader.php"),
         )?;
         filesystem.file_put_contents_if_modified(
-            format!("{}/LICENSE", target_dir),
+            target_file("LICENSE"),
             include_str!("../../../../composer/LICENSE"),
         )?;
 
@@ -782,7 +724,7 @@ return array(
         Ok(class_map)
     }
 
-    fn build_exclusion_regex(&self, dir: &str, excluded: Vec<String>) -> Option<String> {
+    fn build_exclusion_regex(&self, dir: &BStr, excluded: Vec<BString>) -> Option<BString> {
         let mut excluded = excluded;
         if excluded.is_empty() {
             return None;
@@ -791,13 +733,11 @@ return array(
         // filter excluded patterns here to only use those matching $dir
         // exclude-from-classmap patterns are all realpath'd so we can only filter them if $dir exists so that realpath($dir) will work
         // if $dir does not exist, it should anyway not find anything there so no trouble
-        if file_exists(dir) {
+        if file_exists(path_from_bytes(dir)) {
             // transform $dir in the same way that exclude-from-classmap patterns are transformed so we can match them against each other
             let dir_match = preg_quote(
                 strtr(
-                    realpath(dir)
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                        .unwrap_or_default(),
+                    path_to_bytes(&realpath(path_from_bytes(dir)).unwrap_or_default()),
                     "\\",
                     "/",
                 ),
@@ -805,40 +745,43 @@ return array(
             );
             // also match against the non-realpath version for symlinks
             let fs = Filesystem::new(None);
-            let abs_dir = if fs.is_absolute_path(dir) {
-                dir.to_string()
+            let abs_dir = if fs.is_absolute_path(path_from_bytes(dir)) {
+                dir.to_owned()
             } else {
-                format!(
-                    "{}/{}",
-                    realpath(Platform::get_cwd(false).unwrap_or_default())
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                        .unwrap_or_default(),
+                bconcat!(
+                    realpath(Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default(),
+                    "/",
                     dir
                 )
             };
             let dir_match_normalized = preg_quote(
-                strtr(path_to_bytes(&fs.normalize_path(&abs_dir)), "\\", "/"),
+                strtr(
+                    path_to_bytes(&fs.normalize_path(path_from_bytes(&abs_dir))),
+                    "\\",
+                    "/",
+                ),
                 None,
             );
             let is_symlink = dir_match != dir_match_normalized;
 
-            let mut new_excluded: Vec<String> = vec![];
+            let mut new_excluded: Vec<BString> = vec![];
             for pattern in &excluded {
                 // extract the constant string prefix of the pattern here, until we reach a non-escaped regex special character
-                let pattern_processed = legacy_lossy(&preg_replace(
+                let pattern_processed = preg_replace(
                     php_regex!(
                         "{^(([^.+*?\\[^\\]$(){}=!<>|:\\\\#-]+|\\\\[.+*?\\[^\\]$(){}=!<>|:#-])*).*}"
                     ),
                     "$1",
                     pattern,
-                ))
-                .into_owned();
+                );
                 // if the pattern is not a subset or superset of $dir, it is unrelated and we skip it
-                let unrelated = (!pattern_processed.starts_with(&dir_match)
-                    && !dir_match.starts_with(&pattern_processed))
+                let unrelated = (!pattern_processed.starts_with(dir_match.as_bytes())
+                    && !dir_match.as_bytes().starts_with(&pattern_processed))
                     && (!is_symlink
-                        || (!pattern_processed.starts_with(&dir_match_normalized)
-                            && !dir_match_normalized.starts_with(&pattern_processed)));
+                        || (!pattern_processed.starts_with(dir_match_normalized.as_bytes())
+                            && !dir_match_normalized
+                                .as_bytes()
+                                .starts_with(&pattern_processed)));
                 if !unrelated {
                     new_excluded.push(pattern.clone());
                 }
@@ -847,7 +790,7 @@ return array(
         }
 
         if !excluded.is_empty() {
-            Some(format!("{{({})}}", legacy_lossy(&implode("|", &excluded))))
+            Some(bconcat!("{(", implode("|", &excluded), ")}"))
         } else {
             None
         }
@@ -858,11 +801,11 @@ return array(
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
-    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>> {
+    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<PathBuf>)>> {
         // build package => install path map
         let root_package_handle: PackageInterfaceHandle = root_package.into();
-        let mut package_map: Vec<(PackageInterfaceHandle, Option<String>)> =
-            vec![(root_package_handle, Some(String::new()))];
+        let mut package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)> =
+            vec![(root_package_handle, Some(PathBuf::new()))];
 
         for package in packages {
             if package.as_alias().is_some() {
@@ -872,10 +815,7 @@ return array(
             let install_path = installation_manager
                 .borrow()
                 .get_install_path(package.clone());
-            package_map.push((
-                package,
-                install_path.map(|p| legacy_lossy(path_to_bytes(&p)).into_owned()),
-            ));
+            package_map.push((package, install_path));
         }
 
         Ok(package_map)
@@ -909,24 +849,24 @@ return array(
     /// Compiles an ordered list of namespace => path mappings
     pub fn parse_autoloads(
         &self,
-        package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
+        package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
         root_package: RootPackageInterfaceHandle,
         filtered_dev_packages: PhpMixed,
     ) -> IndexMap<BString, PhpMixed> {
         let mut package_map = package_map;
         let root_package_map = array_shift(&mut package_map).unwrap();
         let package_map = if is_array(&filtered_dev_packages) {
-            let dev_list = filtered_dev_packages
+            let dev_list: Vec<BString> = filtered_dev_packages
                 .as_list()
                 .map(|l| {
                     l.iter()
-                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
-                        .collect::<Vec<_>>()
+                        .filter_map(|v| v.as_string().map(BStr::to_owned))
+                        .collect()
                 })
                 .unwrap_or_default();
             package_map
                 .into_iter()
-                .filter(|item| !dev_list.contains(&legacy_lossy(&item.0.get_name()).into_owned()))
+                .filter(|item| !dev_list.contains(&item.0.get_name()))
                 .collect()
         } else if filtered_dev_packages.as_bool() == Some(true) {
             self.filter_package_map(package_map, root_package.clone())
@@ -935,7 +875,7 @@ return array(
         };
         let mut sorted_package_map = self.sort_package_map(package_map);
         sorted_package_map.push(root_package_map);
-        let reverse_sorted_map: Vec<(PackageInterfaceHandle, Option<String>)> =
+        let reverse_sorted_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)> =
             sorted_package_map.iter().rev().cloned().collect();
 
         // reverse-sorted means root first, then dependents, then their dependents, etc.
@@ -969,53 +909,42 @@ return array(
     pub fn create_loader(
         &self,
         autoloads: &IndexMap<BString, PhpMixed>,
-        vendor_dir: Option<String>,
+        vendor_dir: Option<BString>,
     ) -> anyhow::Result<ClassLoader> {
         let mut loader = ClassLoader::new(vendor_dir);
 
+        let path_list = |path: &PhpMixed| -> Vec<BString> {
+            path.as_list()
+                .map(|l| {
+                    l.iter()
+                        .filter_map(|v| v.as_string().map(BStr::to_owned))
+                        .collect()
+                })
+                .or_else(|| path.as_string().map(|s| vec![s.to_owned()]))
+                .unwrap_or_default()
+        };
+
         if let Some(psr0) = autoloads.get(B("psr-0")).and_then(|v| v.as_array()) {
             for (namespace, path) in psr0 {
-                // TODO(bytes): namespaces are Strings, so non-UTF-8 bytes are replaced.
-                let namespace: &str = &namespace.to_str_lossy();
-                let paths = path
-                    .as_list()
-                    .map(|l| {
-                        l.iter()
-                            .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
-                            .collect()
-                    })
-                    .or_else(|| path.as_string().map(|s| vec![legacy_lossy(s).into_owned()]))
-                    .unwrap_or_default();
-                loader.add(namespace, paths, false);
+                loader.add(namespace, path_list(path), false);
             }
         }
 
         if let Some(psr4) = autoloads.get(B("psr-4")).and_then(|v| v.as_array()) {
             for (namespace, path) in psr4 {
-                // TODO(bytes): namespaces are Strings, so non-UTF-8 bytes are replaced.
-                let namespace: &str = &namespace.to_str_lossy();
-                let paths = path
-                    .as_list()
-                    .map(|l| {
-                        l.iter()
-                            .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
-                            .collect()
-                    })
-                    .or_else(|| path.as_string().map(|s| vec![legacy_lossy(s).into_owned()]))
-                    .unwrap_or_default();
-                loader.add_psr4(namespace, paths, false)?;
+                loader.add_psr4(namespace, path_list(path), false)?;
             }
         }
 
         if let Some(classmap) = autoloads.get(B("classmap")).filter(|v| !v.is_null()) {
-            let mut excluded: Vec<String> = vec![];
+            let mut excluded: Vec<BString> = vec![];
             if let Some(ex) = autoloads.get(B("exclude-from-classmap"))
                 && !empty(ex)
             {
                 excluded = ex
                     .values()
                     .into_iter()
-                    .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                    .filter_map(|v| v.as_string().map(BStr::to_owned))
                     .collect();
             }
 
@@ -1030,7 +959,7 @@ return array(
                 let dir = dir.as_string().unwrap_or_default();
                 if let Err(e) = class_map_generator.scan_paths(
                     dir,
-                    self.build_exclusion_regex(&dir.to_str_lossy(), excluded.clone()),
+                    self.build_exclusion_regex(dir, excluded.clone()),
                     "classmap",
                     None,
                     vec![],
@@ -1045,19 +974,7 @@ return array(
                 }
             }
 
-            loader.add_class_map(
-                class_map_generator
-                    .get_class_map()
-                    .get_map()
-                    .iter()
-                    .map(|(class, path)| {
-                        (
-                            legacy_lossy(class).into_owned(),
-                            legacy_lossy(path).into_owned(),
-                        )
-                    })
-                    .collect(),
-            );
+            loader.add_class_map(class_map_generator.get_class_map().get_map().clone());
         }
 
         Ok(loader)
@@ -1065,43 +982,36 @@ return array(
 
     fn get_include_paths_file(
         &self,
-        package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
+        package_map: &Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
         filesystem: &Filesystem,
-        base_path: &str,
-        vendor_path: &str,
-        vendor_path_code: &str,
-        app_base_dir_code: &str,
-    ) -> anyhow::Result<Option<String>> {
-        let mut include_paths: Vec<String> = vec![];
+        base_path: &Path,
+        vendor_path: &Path,
+        vendor_path_code: &BStr,
+        app_base_dir_code: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
+        let mut include_paths: Vec<BString> = vec![];
 
         for item in package_map {
             let (package, install_path) = item;
 
             // packages that are not installed cannot autoload anything
-            let install_path = match install_path {
-                Some(p) => p.clone(),
-                None => continue,
+            let Some(install_path) = install_path else {
+                continue;
             };
 
-            let mut install_path = install_path;
+            let mut install_path = BString::from(path_to_bytes(install_path));
             if let Some(target_dir) = package.get_target_dir()
                 && !target_dir.is_empty()
             {
-                let suffix_to_remove = format!("/{}", legacy_lossy(&target_dir));
-                install_path = legacy_lossy(&substr(
-                    &install_path,
-                    0,
-                    Some(-(suffix_to_remove.len() as i64)),
-                ))
-                .into_owned();
+                install_path = substr(&install_path, 0, Some(-strlen(bconcat!("/", target_dir))));
             }
 
             for include_path in package.get_include_paths() {
-                let include_path = legacy_lossy(&trim2(&include_path, "/")).into_owned();
+                let include_path = trim2(&include_path, "/");
                 include_paths.push(if install_path.is_empty() {
                     include_path
                 } else {
-                    format!("{}/{}", install_path, include_path)
+                    bconcat!(install_path, "/", include_path)
                 });
             }
         }
@@ -1110,77 +1020,79 @@ return array(
             return Ok(None);
         }
 
-        let mut include_paths_code = String::new();
+        let mut include_paths_code = BString::default();
         for path in &include_paths {
-            include_paths_code.push_str(&format!(
-                "    {},\n",
-                self.get_path_code(filesystem, base_path, vendor_path, path)?
+            include_paths_code.extend_from_slice(&bconcat!(
+                "    ",
+                self.get_path_code(filesystem, base_path, vendor_path, path.as_bstr())?,
+                ",\n"
             ));
         }
 
-        Ok(Some(format!(
-            r#"<?php
-
-// include_paths.php @generated by Composer
-
-$vendorDir = {};
-$baseDir = {};
-
-return array(
-{});
-"#,
-            vendor_path_code, app_base_dir_code, include_paths_code
+        Ok(Some(bconcat!(
+            "<?php\n\n// include_paths.php @generated by Composer\n\n$vendorDir = ",
+            vendor_path_code,
+            ";\n$baseDir = ",
+            app_base_dir_code,
+            ";\n\nreturn array(\n",
+            include_paths_code,
+            ");\n",
         )))
     }
 
     fn get_include_files_file(
         &self,
-        files: &IndexMap<String, String>,
+        files: &IndexMap<BString, BString>,
         filesystem: &Filesystem,
-        base_path: &str,
-        vendor_path: &str,
-        vendor_path_code: &str,
-        app_base_dir_code: &str,
-    ) -> anyhow::Result<Option<String>> {
+        base_path: &Path,
+        vendor_path: &Path,
+        vendor_path_code: &BStr,
+        app_base_dir_code: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
         // Get the path to each file, and make sure these paths are unique.
-        let mut files: IndexMap<String, String> = files
+        let files: IndexMap<BString, BString> = files
             .iter()
             .map(|(k, function_file)| {
                 Ok((
                     k.clone(),
-                    self.get_path_code(filesystem, base_path, vendor_path, function_file)?,
+                    self.get_path_code(
+                        filesystem,
+                        base_path,
+                        vendor_path,
+                        function_file.as_bstr(),
+                    )?,
                 ))
             })
             .collect::<anyhow::Result<_>>()?;
-        let all_values: Vec<String> = files.values().cloned().collect();
-        let unique_files: Vec<String> = array_unique(&all_values);
+        let all_values: Vec<BString> = files.values().cloned().collect();
+        let unique_files: Vec<BString> = array_unique(&all_values);
         if unique_files.len() < files.len() {
             self.io.write_error("<warning>The following \"files\" autoload rules are included multiple times, this may cause issues and should be resolved:</warning>");
             // duplicates: array_diff_assoc(files, unique_files)
-            let mut seen: indexmap::IndexSet<String> = indexmap::IndexSet::new();
-            let mut duplicates: Vec<String> = vec![];
+            let mut seen: indexmap::IndexSet<BString> = indexmap::IndexSet::new();
+            let mut duplicates: Vec<BString> = vec![];
             for v in files.values() {
                 if !seen.insert(v.clone()) {
                     duplicates.push(v.clone());
                 }
             }
             for duplicate_file in array_unique(&duplicates) {
-                self.io
-                    .write_error(&format!("<warning> - {}</warning>", duplicate_file));
+                self.io.write_error(&format!(
+                    "<warning> - {}</warning>",
+                    duplicate_file.display_lossy()
+                ));
             }
         }
-        let _ = unique_files;
 
-        let mut files_code = String::new();
+        let mut files_code = BString::default();
 
         for (file_identifier, function_file) in &files {
-            files_code.push_str(&format!(
-                "    {} => {},\n",
-                legacy_lossy(&var_export(
-                    &PhpMixed::string(file_identifier.clone()),
-                    true
-                )),
-                function_file
+            files_code.extend_from_slice(&bconcat!(
+                "    ",
+                var_export(&PhpMixed::string(file_identifier.clone()), true),
+                " => ",
+                function_file,
+                ",\n"
             ));
         }
 
@@ -1188,74 +1100,68 @@ return array(
             return Ok(None);
         }
 
-        let _ = &mut files;
-
-        Ok(Some(format!(
-            r#"<?php
-
-// autoload_files.php @generated by Composer
-
-$vendorDir = {};
-$baseDir = {};
-
-return array(
-{});
-"#,
-            vendor_path_code, app_base_dir_code, files_code
+        Ok(Some(bconcat!(
+            "<?php\n\n// autoload_files.php @generated by Composer\n\n$vendorDir = ",
+            vendor_path_code,
+            ";\n$baseDir = ",
+            app_base_dir_code,
+            ";\n\nreturn array(\n",
+            files_code,
+            ");\n",
         )))
     }
 
     fn get_path_code(
         &self,
         filesystem: &Filesystem,
-        base_path: &str,
-        vendor_path: &str,
-        path: &str,
-    ) -> anyhow::Result<String> {
-        let mut path = if !filesystem.is_absolute_path(path) {
-            format!("{}/{}", base_path, path)
+        base_path: &Path,
+        vendor_path: &Path,
+        path: &BStr,
+    ) -> anyhow::Result<BString> {
+        let mut path = if !filesystem.is_absolute_path(path_from_bytes(path)) {
+            bconcat!(base_path, "/", path)
         } else {
-            path.to_string()
+            path.to_owned()
         };
-        path = legacy_lossy(path_to_bytes(&filesystem.normalize_path(&path))).into_owned();
+        path = BString::from(path_to_bytes(
+            &filesystem.normalize_path(path_from_bytes(&path)),
+        ));
 
-        let mut base_dir = String::new();
-        if strpos(format!("{}/", path), format!("{}/", vendor_path)) == Some(0) {
-            path = legacy_lossy(&substr(&path, vendor_path.len() as i64, None)).into_owned();
-            base_dir = "$vendorDir . ".to_string();
+        let mut base_dir = BString::default();
+        if strpos(bconcat!(path, "/"), bconcat!(vendor_path, "/")) == Some(0) {
+            path = substr(&path, strlen(path_to_bytes(vendor_path)), None);
+            base_dir = BString::from("$vendorDir . ");
         } else {
-            path = legacy_lossy(path_to_bytes(&filesystem.normalize_path(
-                &filesystem.find_shortest_path(base_path, &path, true, false)?,
-            )))
-            .into_owned();
-            if !filesystem.is_absolute_path(&path) {
-                base_dir = "$baseDir . ".to_string();
-                path = format!("/{}", path);
+            path = BString::from(path_to_bytes(&filesystem.normalize_path(
+                filesystem.find_shortest_path(base_path, path_from_bytes(&path), true, false)?,
+            )));
+            if !filesystem.is_absolute_path(path_from_bytes(&path)) {
+                base_dir = BString::from("$baseDir . ");
+                path = bconcat!("/", path);
             }
         }
 
         if preg_is_match(php_regex!("{\\.phar([\\\\/]|$)}"), &path) {
-            base_dir = format!("'phar://' . {}", base_dir);
+            base_dir = bconcat!("'phar://' . ", base_dir);
         }
 
-        Ok(format!(
-            "{}{}",
+        Ok(bconcat!(
             base_dir,
-            legacy_lossy(&var_export(&PhpMixed::string(path), true))
+            var_export(&PhpMixed::string(path), true)
         ))
     }
 
     fn get_platform_check(
         &self,
-        package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
+        package_map: &Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
         check_platform: PhpMixed,
-        dev_package_names: &[String],
-    ) -> Option<String> {
+        dev_package_names: &[BString],
+    ) -> Option<BString> {
         let mut lowest_php_version = Bound::zero();
         let mut required_php_64bit = false;
-        let mut required_extensions: IndexMap<String, String> = IndexMap::new();
+        let mut required_extensions: IndexMap<BString, BString> = IndexMap::new();
         let mut extension_providers: IndexMap<
-            String,
+            BString,
             Vec<shirabe_semver::constraint::AnyConstraint>,
         > = IndexMap::new();
 
@@ -1267,10 +1173,10 @@ return array(
             );
             for (_k, link) in links.iter() {
                 if let Some(matches) = preg_match(php_regex!("{^ext-(.+)$}iD"), link.get_target())
-                    && let Some(ext) = matches.get(1).map(|s| legacy_lossy(s).into_owned())
+                    && let Some(ext) = matches.get(1)
                 {
                     extension_providers
-                        .entry(ext)
+                        .entry(ext.to_owned())
                         .or_default()
                         .push(link.get_constraint().clone());
                 }
@@ -1280,11 +1186,12 @@ return array(
         'outer: for item in package_map {
             let package = &item.0;
             // skip dev dependencies platform requirements as platform-check really should only be a production safeguard
-            if dev_package_names.contains(&legacy_lossy(&package.get_name()).into_owned()) {
+            if dev_package_names.contains(&package.get_name()) {
                 continue;
             }
 
             for (_k, link) in package.get_requires().iter() {
+                // TODO(bytes): PlatformRequirementFilterInterface takes requirement names as &str.
                 if self
                     .platform_requirement_filter
                     .borrow()
@@ -1312,9 +1219,9 @@ return array(
                     && let Some(matches) =
                         preg_match(php_regex!("{^ext-(.+)$}iD"), link.get_target())
                 {
-                    let ext_key = legacy_lossy(matches.get(1).unwrap_or_default()).into_owned();
+                    let ext_key = matches.get(1).unwrap_or_default();
                     // skip extension checks if they have a valid provider/replacer
-                    if let Some(provided_list) = extension_providers.get(&ext_key) {
+                    if let Some(provided_list) = extension_providers.get(ext_key) {
                         for provided in provided_list {
                             if provided.matches(link.get_constraint()) {
                                 continue 'outer;
@@ -1323,28 +1230,32 @@ return array(
                     }
 
                     let ext_name = if ext_key == "zend-opcache" {
-                        "zend opcache".to_string()
+                        BString::from("zend opcache")
                     } else {
-                        ext_key.clone()
+                        ext_key.to_owned()
                     };
 
-                    let extension =
-                        legacy_lossy(&var_export(&PhpMixed::string(ext_name.clone()), true))
-                            .into_owned();
+                    let extension = var_export(&PhpMixed::string(ext_name.clone()), true);
                     if ext_name == "pcntl" || ext_name == "readline" {
                         required_extensions.insert(
                             extension.clone(),
-                            format!(
-                                "PHP_SAPI !== 'cli' || extension_loaded({}) || $missingExtensions[] = {};\n",
-                                extension, extension
+                            bconcat!(
+                                "PHP_SAPI !== 'cli' || extension_loaded(",
+                                extension,
+                                ") || $missingExtensions[] = ",
+                                extension,
+                                ";\n"
                             ),
                         );
                     } else {
                         required_extensions.insert(
                             extension.clone(),
-                            format!(
-                                "extension_loaded({}) || $missingExtensions[] = {};\n",
-                                extension, extension
+                            bconcat!(
+                                "extension_loaded(",
+                                extension,
+                                ") || $missingExtensions[] = ",
+                                extension,
+                                ";\n"
                             ),
                         );
                     }
@@ -1372,68 +1283,58 @@ return array(
             chunks[0] * 10000 + chunks[1] * 100 + chunks[2]
         };
 
-        let format_to_human_readable = |bound: &Bound| -> PhpMixed {
+        let format_to_human_readable = |bound: &Bound| -> BString {
             if bound.is_zero() {
-                return PhpMixed::Int(0);
+                return BString::from("0");
             }
 
             if bound.is_positive_infinity() {
-                return PhpMixed::Int(99999);
+                return BString::from("99999");
             }
 
             let version = str_replace("-", ".", bound.get_version());
             let chunks = explode(".", &version);
-            let chunks = array_slice_strs(
-                &chunks
-                    .iter()
-                    .map(|s| legacy_lossy(s).into_owned())
-                    .collect::<Vec<_>>(),
-                0,
-                Some(3),
-            );
+            let chunks = array_slice_strs(&chunks, 0, Some(3));
 
-            PhpMixed::string(implode(".", &chunks))
+            implode(".", &chunks)
         };
 
-        let mut required_php = String::new();
-        let mut required_php_error = String::new();
+        let mut required_php = BString::default();
+        let mut required_php_error = BString::default();
         if !lowest_php_version.is_zero() {
             let operator = if lowest_php_version.is_inclusive() {
                 ">="
             } else {
                 ">"
             };
-            required_php = format!(
-                "PHP_VERSION_ID {} {}",
+            required_php = bconcat!(
+                "PHP_VERSION_ID ",
                 operator,
+                " ",
                 format_to_php_version_id(&lowest_php_version)
             );
-            let human_readable = format_to_human_readable(&lowest_php_version);
-            required_php_error = format!(
-                "\"{} {}\"",
+            required_php_error = bconcat!(
+                "\"",
                 operator,
-                match &human_readable {
-                    PhpMixed::String(s) => s.to_str_lossy().into_owned(),
-                    PhpMixed::Int(i) => i.to_string(),
-                    _ => String::new(),
-                }
+                " ",
+                format_to_human_readable(&lowest_php_version),
+                "\""
             );
         }
 
         if !required_php.is_empty() {
-            required_php = format!(
-                r#"
-if (!({})) {{
-    $issues[] = 'Your Composer dependencies require a PHP version {}. You are running ' . PHP_VERSION . '.';
-}}
-"#,
-                required_php, required_php_error
+            required_php = bconcat!(
+                "\nif (!(",
+                required_php,
+                ")) {\n    $issues[] = 'Your Composer dependencies require a PHP version ",
+                required_php_error,
+                ". You are running ' . PHP_VERSION . '.';\n}\n",
             );
         }
 
         if required_php_64bit {
-            required_php.push_str(
-                r#"
+            required_php.extend_from_slice(
+                br#"
 if (PHP_INT_SIZE !== 8) {
     $issues[] = 'Your Composer dependencies require a 64-bit build of PHP.';
 }
@@ -1446,91 +1347,84 @@ if (PHP_INT_SIZE !== 8) {
             &required_extensions.values().cloned().collect::<Vec<_>>(),
         );
         let required_extensions_block = if !required_extensions_str.is_empty() {
-            format!(
+            bconcat!(
+                "\n$missingExtensions = array();\n",
+                required_extensions_str,
                 r#"
-$missingExtensions = array();
-{}
-if ($missingExtensions) {{
+if ($missingExtensions) {
     $issues[] = 'Your Composer dependencies require the following PHP extensions to be installed: ' . implode(', ', $missingExtensions) . '.';
-}}
+}
 "#,
-                legacy_lossy(&required_extensions_str)
             )
         } else {
-            String::new()
+            BString::default()
         };
 
         if required_php.is_empty() && required_extensions_block.is_empty() {
             return None;
         }
 
-        Some(format!(
-            r#"<?php
-
-// platform_check.php @generated by Composer
-
-$issues = array();
-{}{}
-if ($issues) {{
-    if (!headers_sent()) {{
+        Some(bconcat!(
+            "<?php\n\n// platform_check.php @generated by Composer\n\n$issues = array();\n",
+            required_php,
+            required_extensions_block,
+            r#"
+if ($issues) {
+    if (!headers_sent()) {
         header('HTTP/1.1 500 Internal Server Error');
-    }}
-    if (!ini_get('display_errors')) {{
-        if (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg') {{
+    }
+    if (!ini_get('display_errors')) {
+        if (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg') {
             fwrite(STDERR, 'Composer detected issues in your platform:' . PHP_EOL.PHP_EOL . implode(PHP_EOL, $issues) . PHP_EOL.PHP_EOL);
-        }} elseif (!headers_sent()) {{
+        } elseif (!headers_sent()) {
             echo 'Composer detected issues in your platform:' . PHP_EOL.PHP_EOL . str_replace('You are running '.PHP_VERSION.'.', '', implode(PHP_EOL, $issues)) . PHP_EOL.PHP_EOL;
-        }}
-    }}
+        }
+    }
     throw new \RuntimeException(
         'Composer detected issues in your platform: ' . implode(' ', $issues)
     );
-}}
+}
 "#,
-            required_php, required_extensions_block
         ))
     }
 
-    fn get_autoload_file(&self, vendor_path_to_target_dir_code: &str, suffix: &str) -> String {
-        let last_char = vendor_path_to_target_dir_code
-            .chars()
-            .nth(vendor_path_to_target_dir_code.len() - 1)
-            .unwrap_or(' ');
-        let vendor_path_to_target_dir_code = if last_char == '\'' || last_char == '"' {
-            format!(
-                "{}/autoload_real.php{}",
-                legacy_lossy(&substr(vendor_path_to_target_dir_code, 0, Some(-1))),
+    fn get_autoload_file(&self, vendor_path_to_target_dir_code: &BStr, suffix: &BStr) -> BString {
+        let last_char = substr(vendor_path_to_target_dir_code, -1, None);
+        let vendor_path_to_target_dir_code = if last_char == "'" || last_char == "\"" {
+            bconcat!(
+                substr(vendor_path_to_target_dir_code, 0, Some(-1)),
+                "/autoload_real.php",
                 last_char
             )
         } else {
-            format!("{} . '/autoload_real.php'", vendor_path_to_target_dir_code)
+            bconcat!(vendor_path_to_target_dir_code, " . '/autoload_real.php'")
         };
 
-        format!(
+        bconcat!(
             r#"<?php
 
 // autoload.php @generated by Composer
 
-if (PHP_VERSION_ID < 50600) {{
-    if (!headers_sent()) {{
+if (PHP_VERSION_ID < 50600) {
+    if (!headers_sent()) {
         header('HTTP/1.1 500 Internal Server Error');
-    }}
+    }
     $err = 'Composer 2.3.0 dropped support for autoloading on PHP <5.6 and you are running '.PHP_VERSION.', please upgrade PHP or use Composer 2.2 LTS via "composer self-update --2.2". Aborting.'.PHP_EOL;
-    if (!ini_get('display_errors')) {{
-        if (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg') {{
+    if (!ini_get('display_errors')) {
+        if (PHP_SAPI === 'cli' || PHP_SAPI === 'phpdbg') {
             fwrite(STDERR, $err);
-        }} elseif (!headers_sent()) {{
+        } elseif (!headers_sent()) {
             echo $err;
-        }}
-    }}
+        }
+    }
     throw new RuntimeException($err);
-}}
+}
 
-require_once {};
-
-return ComposerAutoloaderInit{}::getLoader();
-"#,
-            vendor_path_to_target_dir_code, suffix
+require_once "#,
+            vendor_path_to_target_dir_code,
+            ";\n\nreturn ComposerAutoloaderInit",
+            suffix,
+            "::getLoader();\n",
         )
     }
 
@@ -1540,64 +1434,62 @@ return ComposerAutoloaderInit{}::getLoader();
         &self,
         _use_class_map: bool,
         use_include_path: bool,
-        target_dir_loader: Option<String>,
+        target_dir_loader: Option<BString>,
         use_include_files: bool,
-        _vendor_path_code: &str,
-        _app_base_dir_code: &str,
-        suffix: &str,
+        _vendor_path_code: &BStr,
+        _app_base_dir_code: &BStr,
+        suffix: &BStr,
         use_global_include_path: bool,
         prepend_autoloader: &str,
         check_platform: bool,
-    ) -> String {
-        let mut file = format!(
-            r#"<?php
-
-// autoload_real.php @generated by Composer
-
-class ComposerAutoloaderInit{}
-{{
+    ) -> BString {
+        let mut file = bconcat!(
+            "<?php\n\n// autoload_real.php @generated by Composer\n\nclass ComposerAutoloaderInit",
+            suffix,
+            r#"
+{
     private static $loader;
 
     public static function loadClassLoader($class)
-    {{
-        if ('Composer\Autoload\ClassLoader' === $class) {{
+    {
+        if ('Composer\Autoload\ClassLoader' === $class) {
             require __DIR__ . '/ClassLoader.php';
-        }}
-    }}
+        }
+    }
 
     /**
      * @return \Composer\Autoload\ClassLoader
      */
     public static function getLoader()
-    {{
-        if (null !== self::$loader) {{
+    {
+        if (null !== self::$loader) {
             return self::$loader;
-        }}
+        }
 
 "#,
-            suffix
         );
 
         if check_platform {
-            file.push_str(
-                r#"        require __DIR__ . '/platform_check.php';
+            file.extend_from_slice(
+                br#"        require __DIR__ . '/platform_check.php';
 
 "#,
             );
         }
 
-        file.push_str(&format!(
-            r#"        spl_autoload_register(array('ComposerAutoloaderInit{}', 'loadClassLoader'), true, {});
-        self::$loader = $loader = new \Composer\Autoload\ClassLoader(\dirname(__DIR__));
-        spl_autoload_unregister(array('ComposerAutoloaderInit{}', 'loadClassLoader'));
-
-"#,
-            suffix, prepend_autoloader, suffix
+        file.extend_from_slice(&bconcat!(
+            "        spl_autoload_register(array('ComposerAutoloaderInit",
+            suffix,
+            "', 'loadClassLoader'), true, ",
+            prepend_autoloader,
+            ");\n        self::$loader = $loader = new \\Composer\\Autoload\\ClassLoader(\\dirname(__DIR__));\n        spl_autoload_unregister(array('ComposerAutoloaderInit",
+            suffix,
+            "', 'loadClassLoader'));\n\n",
         ));
 
         if use_include_path {
-            file.push_str(
-                r#"        $includePaths = require __DIR__ . '/include_paths.php';
+            file.extend_from_slice(
+                br#"        $includePaths = require __DIR__ . '/include_paths.php';
         $includePaths[] = get_include_path();
         set_include_path(implode(PATH_SEPARATOR, $includePaths));
 
@@ -1606,280 +1498,186 @@ class ComposerAutoloaderInit{}
         }
 
         // keeping PHP 5.6+ compatibility for the autoloader here by using call_user_func vs getInitializer()()
-        file.push_str(&format!(
-            r#"        require __DIR__ . '/autoload_static.php';
-        call_user_func(\Composer\Autoload\ComposerStaticInit{}::getInitializer($loader));
-
-"#,
-            suffix
+        file.extend_from_slice(&bconcat!(
+            "        require __DIR__ . '/autoload_static.php';\n        call_user_func(\\Composer\\Autoload\\ComposerStaticInit",
+            suffix,
+            "::getInitializer($loader));\n\n",
         ));
 
         if self.class_map_authoritative.get() {
-            file.push_str("        $loader->setClassMapAuthoritative(true);\n");
+            file.extend_from_slice(b"        $loader->setClassMapAuthoritative(true);\n");
         }
 
         if self.apcu.get() {
             let apcu_prefix = var_export(
                 &PhpMixed::string(if let Some(ref prefix) = *self.apcu_prefix.borrow() {
-                    prefix.clone()
+                    BString::from(prefix.as_str())
                 } else {
-                    legacy_lossy(&bin2hex(random_bytes(10))).into_owned()
+                    bin2hex(random_bytes(10))
                 }),
                 true,
             );
-            file.push_str(&format!(
-                "        $loader->setApcuPrefix({});\n",
-                legacy_lossy(&apcu_prefix)
+            file.extend_from_slice(&bconcat!(
+                "        $loader->setApcuPrefix(",
+                apcu_prefix,
+                ");\n"
             ));
         }
 
         if use_global_include_path {
-            file.push_str("        $loader->setUseIncludePath(true);\n");
+            file.extend_from_slice(b"        $loader->setUseIncludePath(true);\n");
         }
 
         if target_dir_loader.is_some() {
-            file.push_str(&format!(
-                r#"        spl_autoload_register(array('ComposerAutoloaderInit{}', 'autoload'), true, true);
-
-"#,
-                suffix
+            file.extend_from_slice(&bconcat!(
+                "        spl_autoload_register(array('ComposerAutoloaderInit",
+                suffix,
+                "', 'autoload'), true, true);\n\n",
             ));
         }
 
-        file.push_str(&format!(
-            r#"        $loader->register({});
-
-"#,
-            prepend_autoloader
+        file.extend_from_slice(&bconcat!(
+            "        $loader->register(",
+            prepend_autoloader,
+            ");\n\n"
         ));
 
         if use_include_files {
-            file.push_str(&format!(
-                r#"        $filesToLoad = \Composer\Autoload\ComposerStaticInit{}::$files;
-        $requireFile = \Closure::bind(static function ($fileIdentifier, $file) {{
-            if (empty($GLOBALS['__composer_autoload_files'][$fileIdentifier])) {{
+            file.extend_from_slice(&bconcat!(
+                "        $filesToLoad = \\Composer\\Autoload\\ComposerStaticInit",
+                suffix,
+                r#"::$files;
+        $requireFile = \Closure::bind(static function ($fileIdentifier, $file) {
+            if (empty($GLOBALS['__composer_autoload_files'][$fileIdentifier])) {
                 $GLOBALS['__composer_autoload_files'][$fileIdentifier] = true;
 
                 require $file;
-            }}
-        }}, null, null);
-        foreach ($filesToLoad as $fileIdentifier => $file) {{
+            }
+        }, null, null);
+        foreach ($filesToLoad as $fileIdentifier => $file) {
             $requireFile($fileIdentifier, $file);
-        }}
+        }
 
 "#,
-                suffix
             ));
         }
 
-        file.push_str(
-            r#"        return $loader;
+        file.extend_from_slice(
+            br#"        return $loader;
     }
 "#,
         );
 
         if let Some(target_dir_loader_str) = target_dir_loader {
-            file.push_str(&target_dir_loader_str);
+            file.extend_from_slice(&target_dir_loader_str);
         }
 
-        format!("{}}}\n", file)
+        bconcat!(file, "}\n")
     }
 
     fn get_static_file(
         &self,
-        suffix: &str,
-        target_dir: &str,
-        vendor_path: &str,
-        base_path: &str,
-    ) -> anyhow::Result<String> {
-        let mut file = format!(
-            r#"<?php
-
-// autoload_static.php @generated by Composer
-
-namespace Composer\Autoload;
-
-class ComposerStaticInit{}
-{{
-"#,
-            suffix
+        suffix: &BStr,
+        target_dir: &Path,
+        vendor_path: &Path,
+        base_path: &Path,
+    ) -> anyhow::Result<BString> {
+        let mut file = bconcat!(
+            "<?php\n\n// autoload_static.php @generated by Composer\n\nnamespace Composer\\Autoload;\n\nclass ComposerStaticInit",
+            suffix,
+            "\n{\n",
         );
 
         let mut loader = ClassLoader::new(None);
+        let target_file =
+            |name: &str| PathBuf::from(path_from_bytes(&bconcat!(target_dir, "/", name)));
+        let path_list = |path: &PhpMixed| -> Vec<BString> {
+            if let PhpMixed::List(items) = path {
+                items
+                    .iter()
+                    .map(|i| i.as_string().unwrap_or_default().to_owned())
+                    .collect()
+            } else {
+                vec![]
+            }
+        };
 
         // PHP: $map = require $targetDir . '/autoload_namespaces.php';
-        let map = require_generated_php_array(&format!("{}/autoload_namespaces.php", target_dir));
+        let map = require_generated_php_array(&target_file("autoload_namespaces.php"));
         if let Some(map_arr) = map.as_array() {
             for (namespace, path) in map_arr {
-                // TODO(bytes): namespaces are Strings, so non-UTF-8 bytes are replaced.
-                let namespace: &str = &namespace.to_str_lossy();
-                let paths: Vec<String> = if let PhpMixed::List(items) = path.clone() {
-                    items
-                        .iter()
-                        .map(|i| legacy_lossy(i.as_string().unwrap_or_default()).into_owned())
-                        .collect()
-                } else {
-                    vec![]
-                };
-                loader.set(namespace, paths);
+                loader.set(namespace, path_list(path));
             }
         }
 
-        let map = require_generated_php_array(&format!("{}/autoload_psr4.php", target_dir));
+        let map = require_generated_php_array(&target_file("autoload_psr4.php"));
         if let Some(map_arr) = map.as_array() {
             for (namespace, path) in map_arr {
-                // TODO(bytes): namespaces are Strings, so non-UTF-8 bytes are replaced.
-                let namespace: &str = &namespace.to_str_lossy();
-                let paths: Vec<String> = if let PhpMixed::List(items) = path.clone() {
-                    items
-                        .iter()
-                        .map(|i| legacy_lossy(i.as_string().unwrap_or_default()).into_owned())
-                        .collect()
-                } else {
-                    vec![]
-                };
-                loader.set_psr4(namespace, paths).unwrap_or(());
+                loader.set_psr4(namespace, path_list(path)).unwrap_or(());
             }
         }
 
-        let class_map =
-            require_generated_php_array(&format!("{}/autoload_classmap.php", target_dir));
+        let class_map = require_generated_php_array(&target_file("autoload_classmap.php"));
         if class_map.as_bool() != Some(false)
             && !class_map.is_null()
             && let Some(cm) = class_map.as_array()
         {
-            let cm_str: IndexMap<String, String> = cm
-                .iter()
-                // TODO(bytes): class names are Strings, so non-UTF-8 bytes are replaced.
-                .map(|(k, v)| {
-                    (
-                        k.to_str_lossy().into_owned(),
-                        legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
-                    )
-                })
-                .collect();
-            loader.add_class_map(cm_str);
+            loader.add_class_map(
+                cm.iter()
+                    .map(|(k, v)| (k.clone(), v.as_string().unwrap_or_default().to_owned()))
+                    .collect(),
+            );
         }
 
         let filesystem = Filesystem::new(None);
 
-        let vendor_path_code = format!(
-            " => {} . '/",
-            legacy_lossy(
-                &filesystem.find_shortest_path_code(
-                    realpath(target_dir)
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                        .unwrap_or_default(),
-                    vendor_path,
-                    true,
-                    true,
-                    false,
-                )?
-            )
+        let real_target_dir = realpath(target_dir).unwrap_or_default();
+        let vendor_path_code = bconcat!(
+            " => ",
+            filesystem.find_shortest_path_code(&real_target_dir, vendor_path, true, true, false)?,
+            " . '/"
         );
-        let vendor_phar_path_code = format!(
-            " => 'phar://' . {} . '/",
-            legacy_lossy(
-                &filesystem.find_shortest_path_code(
-                    realpath(target_dir)
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                        .unwrap_or_default(),
-                    vendor_path,
-                    true,
-                    true,
-                    false,
-                )?
-            )
+        let vendor_phar_path_code = bconcat!(
+            " => 'phar://' . ",
+            filesystem.find_shortest_path_code(&real_target_dir, vendor_path, true, true, false)?,
+            " . '/"
         );
-        let app_base_dir_code = format!(
-            " => {} . '/",
-            legacy_lossy(
-                &filesystem.find_shortest_path_code(
-                    realpath(target_dir)
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                        .unwrap_or_default(),
-                    base_path,
-                    true,
-                    true,
-                    false,
-                )?
-            )
+        let app_base_dir_code = bconcat!(
+            " => ",
+            filesystem.find_shortest_path_code(&real_target_dir, base_path, true, true, false)?,
+            " . '/"
         );
-        let app_base_dir_phar_code = format!(
-            " => 'phar://' . {} . '/",
-            legacy_lossy(
-                &filesystem.find_shortest_path_code(
-                    realpath(target_dir)
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                        .unwrap_or_default(),
-                    base_path,
-                    true,
-                    true,
-                    false,
-                )?
-            )
+        let app_base_dir_phar_code = bconcat!(
+            " => 'phar://' . ",
+            filesystem.find_shortest_path_code(&real_target_dir, base_path, true, true, false)?,
+            " . '/"
         );
 
         // PHP: ' => ' . substr(var_export(rtrim($vendorDir, '\\/') . '/', true), 0, -1)
-        let absolute_vendor_path_code = format!(
-            " => {}",
-            legacy_lossy(&substr(
-                var_export(
-                    &PhpMixed::string(bconcat!(rtrim2(vendor_path, "\\/"), "/")),
-                    true
-                ),
-                0,
-                Some(-1),
-            ))
-        );
-        let absolute_vendor_phar_path_code = format!(
-            " => {}",
-            legacy_lossy(&substr(
-                var_export(
-                    &PhpMixed::string(bconcat!(
-                        rtrim2(format!("phar://{}", vendor_path), "\\/"),
-                        "/"
-                    )),
-                    true
-                ),
-                0,
-                Some(-1),
-            ))
-        );
-        let absolute_app_base_dir_code = format!(
-            " => {}",
-            legacy_lossy(&substr(
-                var_export(
-                    &PhpMixed::string(bconcat!(rtrim2(base_path, "\\/"), "/")),
-                    true
-                ),
-                0,
-                Some(-1),
-            ))
-        );
-        let absolute_app_base_dir_phar_code = format!(
-            " => {}",
-            legacy_lossy(&substr(
-                var_export(
-                    &PhpMixed::string(bconcat!(
-                        rtrim2(format!("phar://{}", base_path), "\\/"),
-                        "/"
-                    )),
-                    true
-                ),
-                0,
-                Some(-1),
-            ))
-        );
+        let export_dir_prefix = |dir: BString| {
+            bconcat!(
+                " => ",
+                substr(
+                    var_export(&PhpMixed::string(bconcat!(rtrim2(dir, "\\/"), "/")), true),
+                    0,
+                    Some(-1),
+                )
+            )
+        };
+        let absolute_vendor_path_code =
+            export_dir_prefix(BString::from(path_to_bytes(vendor_path)));
+        let absolute_vendor_phar_path_code = export_dir_prefix(bconcat!("phar://", vendor_path));
+        let absolute_app_base_dir_code = export_dir_prefix(BString::from(path_to_bytes(base_path)));
+        let absolute_app_base_dir_phar_code = export_dir_prefix(bconcat!("phar://", base_path));
 
-        let mut initializer = String::new();
+        let mut initializer = BString::default();
         let prefix = "\0Composer\\Autoload\\ClassLoader\0";
         let prefix_len = strlen(prefix);
         let mut maps: IndexMap<BString, PhpMixed> = IndexMap::new();
-        if file_exists(format!("{}/autoload_files.php", target_dir)) {
+        if file_exists(target_file("autoload_files.php")) {
             maps.insert(
                 "files".into(),
-                require_generated_php_array(&format!("{}/autoload_files.php", target_dir)),
+                require_generated_php_array(&target_file("autoload_files.php")),
             );
         }
 
@@ -1887,70 +1685,57 @@ class ComposerStaticInit{}
         for (prop, value) in loader.as_array_iter() {
             if !is_array(&value)
                 || value.as_array().map_or(0, |a| a.len()) == 0
-                || !prop.starts_with(prefix)
+                || !prop.starts_with(prefix.as_bytes())
             {
                 continue;
             }
             maps.insert(substr(&prop, prefix_len, None), value);
         }
 
+        let replacements: IndexMap<BString, BString> = [
+            (absolute_vendor_path_code, vendor_path_code),
+            (absolute_vendor_phar_path_code, vendor_phar_path_code),
+            (absolute_app_base_dir_code, app_base_dir_code),
+            (absolute_app_base_dir_phar_code, app_base_dir_phar_code),
+        ]
+        .into_iter()
+        .collect();
         for (prop, value) in &maps {
-            let value = strtr_array(var_export(value, true), &{
-                let mut m: IndexMap<String, String> = IndexMap::new();
-                m.insert(absolute_vendor_path_code.clone(), vendor_path_code.clone());
-                m.insert(
-                    absolute_vendor_phar_path_code.clone(),
-                    vendor_phar_path_code.clone(),
-                );
-                m.insert(
-                    absolute_app_base_dir_code.clone(),
-                    app_base_dir_code.clone(),
-                );
-                m.insert(
-                    absolute_app_base_dir_phar_code.clone(),
-                    app_base_dir_phar_code.clone(),
-                );
-                m
-            });
-            let value = legacy_lossy(&ltrim(preg_replace(
-                php_regex!("/^ */m"),
-                "    $0$0",
-                &value,
-            )))
-            .into_owned();
-            let value = legacy_lossy(&preg_replace(php_regex!("/ +$/m"), "", &value)).into_owned();
+            let value = strtr_array(var_export(value, true), &replacements);
+            let value = ltrim(preg_replace(php_regex!("/^ */m"), "    $0$0", &value));
+            let value = preg_replace(php_regex!("/ +$/m"), "", &value);
 
-            file.push_str(&format!(
-                "    public static ${} = {};\n\n",
-                legacy_lossy(&prop.clone()),
-                value.clone(),
+            file.extend_from_slice(&bconcat!(
+                "    public static $",
+                prop,
+                " = ",
+                value,
+                ";\n\n"
             ));
             if *prop != "files" {
-                initializer.push_str(&format!(
-                    "            $loader->{} = ComposerStaticInit{}::${};\n",
-                    legacy_lossy(&prop),
+                initializer.extend_from_slice(&bconcat!(
+                    "            $loader->",
+                    prop,
+                    " = ComposerStaticInit",
                     suffix,
-                    legacy_lossy(&prop)
+                    "::$",
+                    prop,
+                    ";\n"
                 ));
             }
         }
 
-        Ok(format!(
-            r#"{}    public static function getInitializer(ClassLoader $loader)
-    {{
-        return \Closure::bind(function () use ($loader) {{
-{}
-        }}, null, ClassLoader::class);
-    }}
-}}
-"#,
-            file, initializer
+        Ok(bconcat!(
+            file,
+            "    public static function getInitializer(ClassLoader $loader)\n    {\n        return \\Closure::bind(function () use ($loader) {\n",
+            initializer,
+            "\n        }, null, ClassLoader::class);\n    }\n}\n",
         ))
     }
 
     fn parse_autoloads_type(
         &self,
-        package_map: &Vec<(PackageInterfaceHandle, Option<String>)>,
+        package_map: &Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
         r#type: &str,
         root_package: RootPackageInterfaceHandle,
     ) -> IndexMap<BString, PhpMixed> {
@@ -1961,9 +1746,8 @@ class ComposerStaticInit{}
             let (package, install_path) = item;
 
             // packages that are not installed cannot autoload anything
-            let install_path = match install_path {
-                Some(p) => p.clone(),
-                None => continue,
+            let Some(install_path) = install_path else {
+                continue;
             };
 
             let mut autoload = package.get_autoload();
@@ -1987,18 +1771,16 @@ class ComposerStaticInit{}
             if !is_array(type_value) {
                 continue;
             }
-            let mut install_path = install_path;
+            let mut install_path = BString::from(path_to_bytes(install_path));
             if package.get_target_dir().is_some() && !is_root {
-                let suffix_to_remove = format!(
-                    "/{}",
-                    legacy_lossy(&package.get_target_dir().unwrap_or_default())
-                );
-                install_path = legacy_lossy(&substr(
+                install_path = substr(
                     &install_path,
                     0,
-                    Some(-(suffix_to_remove.len() as i64)),
-                ))
-                .into_owned();
+                    Some(-strlen(bconcat!(
+                        "/",
+                        package.get_target_dir().unwrap_or_default()
+                    ))),
+                );
             }
 
             // PHP iterates `$autoload[$type]` as a PHP array regardless of whether it is a
@@ -2015,13 +1797,11 @@ class ComposerStaticInit{}
                 _ => IndexMap::new(),
             };
             for (namespace, paths) in type_arr {
-                // TODO(bytes): namespaces are Strings, so non-UTF-8 bytes are replaced.
-                let namespace = namespace.to_str_lossy().into_owned();
                 let namespace = if ["psr-4", "psr-0"].contains(&r#type) {
                     // normalize namespaces to ensure "\" becomes "" and others do not have leading separators as they are not needed
                     ltrim2(&namespace, "\\")
                 } else {
-                    bstr::BString::from(namespace)
+                    namespace
                 };
                 // PHP: foreach ((array) $paths as $path) — handles scalar by wrapping in an array
                 let path_list: Vec<PhpMixed> = match &paths {
@@ -2030,13 +1810,16 @@ class ComposerStaticInit{}
                     other => vec![other.clone()],
                 };
                 for path in path_list {
-                    let mut path_str =
-                        legacy_lossy(path.as_string().unwrap_or_default()).into_owned();
+                    let mut path_str = path.as_string().unwrap_or_default().to_owned();
                     if (r#type == "files"
                         || r#type == "classmap"
                         || r#type == "exclude-from-classmap")
                         && package.get_target_dir().is_some()
-                        && !Filesystem::is_readable(format!("{}/{}", install_path, path_str))
+                        && !Filesystem::is_readable(path_from_bytes(&bconcat!(
+                            install_path,
+                            "/",
+                            path_str
+                        )))
                     {
                         // remove target-dir from file paths of the root package
                         if is_root {
@@ -2048,27 +1831,28 @@ class ComposerStaticInit{}
                             // boundaries, so the marker is not recoverable from the quoted
                             // string. Quote each separator-delimited segment on its own and join
                             // the segments with the same character class.
-                            let target_dir = package
-                                .get_target_dir()
-                                .unwrap_or_default()
-                                .split(|b| *b == b'/' || *b == b'\\')
-                                .map(|segment| preg_quote(segment, None))
-                                .collect::<Vec<String>>()
-                                .join("[\\\\/]");
-                            path_str = legacy_lossy(&ltrim2(
+                            let target_dir = implode(
+                                "[\\\\/]",
+                                &package
+                                    .get_target_dir()
+                                    .unwrap_or_default()
+                                    .split(|b| *b == b'/' || *b == b'\\')
+                                    .map(|segment| preg_quote(segment, None))
+                                    .collect::<Vec<String>>(),
+                            );
+                            path_str = ltrim2(
                                 preg_replace(
-                                    format!("{{^{}}}", target_dir),
+                                    bconcat!("{^", target_dir, "}"),
                                     "",
                                     ltrim2(&path_str, "\\/"),
                                 ),
                                 "\\/",
-                            ))
-                            .into_owned();
+                            );
                         } else {
                             // add target-dir from file paths that don't have it
-                            path_str = format!(
-                                "{}/{}",
-                                legacy_lossy(&package.get_target_dir().unwrap_or_default()),
+                            path_str = bconcat!(
+                                package.get_target_dir().unwrap_or_default(),
+                                "/",
                                 path_str
                             );
                         }
@@ -2084,37 +1868,31 @@ class ComposerStaticInit{}
 
                         // add support for wildcards * and **
                         let p = strtr_array(&p, &{
-                            let mut m: IndexMap<String, String> = IndexMap::new();
-                            m.insert("\\*\\*".to_string(), ".+?".to_string());
-                            m.insert("\\*".to_string(), "[^/]+?".to_string());
+                            let mut m: IndexMap<&str, &str> = IndexMap::new();
+                            m.insert("\\*\\*", ".+?");
+                            m.insert("\\*", "[^/]+?");
                             m
                         });
 
                         // add support for up-level relative paths
-                        let updir_cell: std::cell::RefCell<Option<String>> =
+                        let updir_cell: std::cell::RefCell<Option<BString>> =
                             std::cell::RefCell::new(None);
-                        let p = legacy_lossy(
-                            &preg_replace_callback(
-                                php_regex!("{^((?:(?:\\\\\\.){1,2}+/)+)}"),
-                                |matches: &PregMatches| -> anyhow::Result<String> {
-                                    // undo preg_quote for the matched string
-                                    *updir_cell.borrow_mut() = Some(
-                                        legacy_lossy(&str_replace(
-                                            "\\.",
-                                            ".",
-                                            matches.get(1).unwrap_or_default(),
-                                        ))
-                                        .into_owned(),
-                                    );
+                        let p = preg_replace_callback(
+                            php_regex!("{^((?:(?:\\\\\\.){1,2}+/)+)}"),
+                            |matches: &PregMatches| -> anyhow::Result<String> {
+                                // undo preg_quote for the matched string
+                                *updir_cell.borrow_mut() = Some(str_replace(
+                                    "\\.",
+                                    ".",
+                                    matches.get(1).unwrap_or_default(),
+                                ));
 
-                                    Ok(String::new())
-                                },
-                                &p,
-                            )
-                            .expect("the replacement callback cannot fail"),
+                                Ok(String::new())
+                            },
+                            &p,
                         )
-                        .into_owned();
-                        let updir: Option<String> = updir_cell.into_inner();
+                        .expect("the replacement callback cannot fail");
+                        let updir: Option<BString> = updir_cell.into_inner();
                         let install_path_for_resolve = if install_path.is_empty() {
                             strtr(
                                 path_to_bytes(&Platform::get_cwd(false).unwrap_or_default()),
@@ -2122,23 +1900,22 @@ class ComposerStaticInit{}
                                 "/",
                             )
                         } else {
-                            bstr::BString::from(install_path.clone())
+                            install_path.clone()
                         };
 
-                        let resolved_path = realpath(format!(
-                            "{}/{}",
-                            legacy_lossy(&install_path_for_resolve),
+                        let resolved_path = realpath(path_from_bytes(&bconcat!(
+                            install_path_for_resolve,
+                            "/",
                             updir.clone().unwrap_or_default()
-                        ))
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
-                        let resolved_path = match resolved_path {
-                            Some(rp) => rp,
-                            None => continue,
+                        )));
+                        let Some(resolved_path) = resolved_path else {
+                            continue;
                         };
-                        let entry = format!(
-                            "{}/{}($|/)",
-                            preg_quote(strtr(&resolved_path, "\\", "/"), None),
-                            p
+                        let entry = bconcat!(
+                            preg_quote(strtr(path_to_bytes(&resolved_path), "\\", "/"), None),
+                            "/",
+                            p,
+                            "($|/)"
                         );
                         autoloads.insert(numeric_index.to_string().into(), PhpMixed::string(entry));
                         numeric_index += 1;
@@ -2147,17 +1924,17 @@ class ComposerStaticInit{}
 
                     let relative_path = if install_path.is_empty() {
                         if path_str.is_empty() {
-                            ".".to_string()
+                            BString::from(".")
                         } else {
                             path_str.clone()
                         }
                     } else {
-                        format!("{}/{}", install_path, path_str)
+                        bconcat!(install_path, "/", path_str)
                     };
 
                     if r#type == "files" {
                         autoloads.insert(
-                            self.get_file_identifier(package.clone(), &path_str).into(),
+                            self.get_file_identifier(package.clone(), path_str.as_bstr()),
                             PhpMixed::string(relative_path),
                         );
                         continue;
@@ -2185,46 +1962,39 @@ class ComposerStaticInit{}
         autoloads
     }
 
-    fn get_file_identifier(&self, package: PackageInterfaceHandle, path: &str) -> String {
+    fn get_file_identifier(&self, package: PackageInterfaceHandle, path: &BStr) -> BString {
         // TODO composer v3 change this to sha1 or xxh3? Possibly not worth the potential breakage though
-        legacy_lossy(&hash(
-            "md5",
-            format!("{}:{}", legacy_lossy(&package.get_name()), path),
-        ))
-        .into_owned()
+        hash("md5", bconcat!(package.get_name(), ":", path))
     }
 
     /// Filters out dev-dependencies
     fn filter_package_map(
         &self,
-        package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
+        package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
         root_package: RootPackageInterfaceHandle,
-    ) -> Vec<(PackageInterfaceHandle, Option<String>)> {
-        let mut packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
-        let mut include: IndexMap<String, bool> = IndexMap::new();
-        let mut replaced_by: IndexMap<String, String> = IndexMap::new();
+    ) -> Vec<(PackageInterfaceHandle, Option<PathBuf>)> {
+        let mut packages: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
+        let mut include: IndexMap<BString, bool> = IndexMap::new();
+        let mut replaced_by: IndexMap<BString, BString> = IndexMap::new();
 
         for item in &package_map {
             let package = &item.0;
-            let name = legacy_lossy(&package.get_name()).into_owned();
+            let name = package.get_name();
             packages.insert(name.clone(), package.clone());
             for (_k, replace) in package.get_replaces().iter() {
-                replaced_by.insert(
-                    legacy_lossy(replace.get_target()).into_owned(),
-                    name.clone(),
-                );
+                replaced_by.insert(replace.get_target().to_owned(), name.clone());
             }
         }
 
         // Recursive walk emulating PHP's by-reference closure capture.
         fn add(
             package: PackageInterfaceHandle,
-            packages: &IndexMap<String, PackageInterfaceHandle>,
-            include: &mut IndexMap<String, bool>,
-            replaced_by: &IndexMap<String, String>,
+            packages: &IndexMap<BString, PackageInterfaceHandle>,
+            include: &mut IndexMap<BString, bool>,
+            replaced_by: &IndexMap<BString, BString>,
         ) {
             for (_k, link) in package.get_requires().iter() {
-                let mut target = legacy_lossy(link.get_target()).into_owned();
+                let mut target = link.get_target().to_owned();
                 if let Some(rep) = replaced_by.get(&target) {
                     target = rep.clone();
                 }
@@ -2243,7 +2013,7 @@ class ComposerStaticInit{}
             .filter(|item| {
                 let package = &item.0;
                 for name in package.get_names(true) {
-                    if include.contains_key(&*legacy_lossy(&name)) {
+                    if include.contains_key(&name) {
                         return true;
                     }
                 }
@@ -2257,14 +2027,14 @@ class ComposerStaticInit{}
     /// Packages of equal weight are sorted alphabetically
     fn sort_package_map(
         &self,
-        package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
-    ) -> Vec<(PackageInterfaceHandle, Option<String>)> {
-        let mut packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
-        let mut paths: IndexMap<String, Option<String>> = IndexMap::new();
+        package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
+    ) -> Vec<(PackageInterfaceHandle, Option<PathBuf>)> {
+        let mut packages: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
+        let mut paths: IndexMap<BString, Option<PathBuf>> = IndexMap::new();
 
         for item in &package_map {
             let (package, path) = item;
-            let name = legacy_lossy(&package.get_name()).into_owned();
+            let name = package.get_name();
             packages.insert(name.clone(), package.clone());
             paths.insert(name, path.clone());
         }
@@ -2272,10 +2042,10 @@ class ComposerStaticInit{}
         let sorted_packages =
             PackageSorter::sort_packages(packages.values().cloned().collect(), IndexMap::new());
 
-        let mut sorted_package_map: Vec<(PackageInterfaceHandle, Option<String>)> = vec![];
+        let mut sorted_package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)> = vec![];
 
         for package in sorted_packages {
-            let name = legacy_lossy(&package.get_name()).into_owned();
+            let name = package.get_name();
             sorted_package_map.push((
                 packages.get(&name).unwrap().clone(),
                 paths.get(&name).cloned().flatten(),
@@ -2317,17 +2087,17 @@ pub trait AutoloadGeneratorInterface: std::fmt::Debug {
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
-    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>>;
+    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<PathBuf>)>>;
     fn parse_autoloads(
         &self,
-        package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
+        package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
         root_package: RootPackageInterfaceHandle,
         filtered_dev_packages: PhpMixed,
     ) -> IndexMap<BString, PhpMixed>;
     fn create_loader(
         &self,
         autoloads: &IndexMap<BString, PhpMixed>,
-        vendor_dir: Option<String>,
+        vendor_dir: Option<BString>,
     ) -> anyhow::Result<ClassLoader>;
 }
 
@@ -2390,13 +2160,13 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
         installation_manager: std::rc::Rc<std::cell::RefCell<dyn InstallationManagerInterface>>,
         root_package: RootPackageInterfaceHandle,
         packages: Vec<PackageInterfaceHandle>,
-    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<String>)>> {
+    ) -> anyhow::Result<Vec<(PackageInterfaceHandle, Option<PathBuf>)>> {
         self.build_package_map(installation_manager, root_package, packages)
     }
 
     fn parse_autoloads(
         &self,
-        package_map: Vec<(PackageInterfaceHandle, Option<String>)>,
+        package_map: Vec<(PackageInterfaceHandle, Option<PathBuf>)>,
         root_package: RootPackageInterfaceHandle,
         filtered_dev_packages: PhpMixed,
     ) -> IndexMap<BString, PhpMixed> {
@@ -2406,7 +2176,7 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
     fn create_loader(
         &self,
         autoloads: &IndexMap<BString, PhpMixed>,
-        vendor_dir: Option<String>,
+        vendor_dir: Option<BString>,
     ) -> anyhow::Result<ClassLoader> {
         self.create_loader(autoloads, vendor_dir)
     }
@@ -2420,30 +2190,33 @@ impl AutoloadGeneratorInterface for AutoloadGenerator {
 /// values are either a single path expression or `array(<expr>, ...)`. Each expression is a ` . `
 /// joined chain of `'literal'`, `$vendorDir`, `$baseDir`, `__DIR__`, and `dirname(...)` terms.
 /// Returns `PhpMixed::Bool(false)` when the file is absent (mirroring a failed `require`).
-fn require_generated_php_array(file: &str) -> PhpMixed {
-    let contents = match std::fs::read_to_string(file) {
-        Ok(c) => c,
+fn require_generated_php_array(file: &Path) -> PhpMixed {
+    let contents = match std::fs::read(file) {
+        Ok(c) => BString::from(c),
         Err(_) => return PhpMixed::Bool(false),
     };
 
     // __DIR__ inside the generated file is the directory that contains it.
-    let dir = std::path::Path::new(file)
-        .parent()
-        .map(|p| {
-            p.to_str()
-                .expect("the parent of a UTF-8 path is valid UTF-8")
-                .replace('\\', "/")
-        })
-        .unwrap_or_default();
+    let dir = strtr(dirname(path_to_bytes(file)), "\\", "/");
 
-    let mut vendor_dir = String::new();
-    let mut base_dir = String::new();
+    let mut vendor_dir = BString::default();
+    let mut base_dir = BString::default();
     for line in contents.lines() {
-        let line = line.trim();
-        if let Some(rest) = line.strip_prefix("$vendorDir = ") {
-            vendor_dir = eval_php_path_expr(rest.trim_end_matches(';'), &dir, "", "");
-        } else if let Some(rest) = line.strip_prefix("$baseDir = ") {
-            base_dir = eval_php_path_expr(rest.trim_end_matches(';'), &dir, &vendor_dir, "");
+        let line = trim(line);
+        if let Some(rest) = line.strip_prefix(b"$vendorDir = ") {
+            vendor_dir = eval_php_path_expr(
+                rtrim2(rest, ";").as_bstr(),
+                dir.as_bstr(),
+                b"".as_bstr(),
+                b"".as_bstr(),
+            );
+        } else if let Some(rest) = line.strip_prefix(b"$baseDir = ") {
+            base_dir = eval_php_path_expr(
+                rtrim2(rest, ";").as_bstr(),
+                dir.as_bstr(),
+                vendor_dir.as_bstr(),
+                b"".as_bstr(),
+            );
         }
     }
 
@@ -2455,37 +2228,47 @@ fn require_generated_php_array(file: &str) -> PhpMixed {
         Some(i) => i,
         None => return PhpMixed::Array(IndexMap::new()),
     };
-    let body = &contents[start..end];
+    let body = contents[start..end].as_bstr();
 
     let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();
     for entry in split_top_level_commas(body) {
-        let entry = entry.trim();
+        let entry = trim(&entry);
         if entry.is_empty() {
             continue;
         }
-        let Some(arrow) = find_top_level_arrow(entry) else {
+        let Some(arrow) = find_top_level_arrow(entry.as_bstr()) else {
             continue;
         };
-        let key_expr = entry[..arrow].trim();
-        let value_expr = entry[arrow + 2..].trim();
-        let key = eval_php_string_literal(key_expr);
+        let key_expr = trim(&entry[..arrow]);
+        let value_expr = trim(&entry[arrow + 2..]);
+        let key = eval_php_string_literal(key_expr.as_bstr());
 
         let value = if let Some(inner) = value_expr
-            .strip_prefix("array(")
-            .and_then(|s| s.strip_suffix(')'))
+            .strip_prefix(b"array(")
+            .and_then(|s| s.strip_suffix(b")"))
         {
-            let items: Vec<PhpMixed> = split_top_level_commas(inner)
+            let items: Vec<PhpMixed> = split_top_level_commas(inner.as_bstr())
                 .into_iter()
-                .filter(|p| !p.trim().is_empty())
+                .filter(|p| !trim(p).is_empty())
                 .map(|p| {
-                    PhpMixed::string(eval_php_path_expr(p.trim(), &dir, &vendor_dir, &base_dir))
+                    PhpMixed::string(eval_php_path_expr(
+                        trim(&p).as_bstr(),
+                        dir.as_bstr(),
+                        vendor_dir.as_bstr(),
+                        base_dir.as_bstr(),
+                    ))
                 })
                 .collect();
             PhpMixed::List(items)
         } else {
-            PhpMixed::string(eval_php_path_expr(value_expr, &dir, &vendor_dir, &base_dir))
+            PhpMixed::string(eval_php_path_expr(
+                value_expr.as_bstr(),
+                dir.as_bstr(),
+                vendor_dir.as_bstr(),
+                base_dir.as_bstr(),
+            ))
         };
-        map.insert(key.into(), value);
+        map.insert(key, value);
     }
 
     PhpMixed::Array(map)
@@ -2493,59 +2276,59 @@ fn require_generated_php_array(file: &str) -> PhpMixed {
 
 /// Evaluates a single PHP path expression from a generated autoload file (e.g.
 /// `$baseDir . '/lib'`, `dirname(__DIR__)`, `'phar://' . $vendorDir . '/x'`).
-fn eval_php_path_expr(expr: &str, dir: &str, vendor_dir: &str, base_dir: &str) -> String {
-    let mut out = String::new();
+fn eval_php_path_expr(expr: &BStr, dir: &BStr, vendor_dir: &BStr, base_dir: &BStr) -> BString {
+    let mut out = BString::default();
     for term in split_concat_terms(expr) {
-        let term = term.trim();
-        if term.starts_with('\'') {
-            out.push_str(&eval_php_string_literal(term));
+        let term = trim(&term);
+        if term.starts_with(b"'") {
+            out.extend_from_slice(&eval_php_string_literal(term.as_bstr()));
         } else if term == "__DIR__" {
-            out.push_str(dir);
+            out.extend_from_slice(dir);
         } else if term == "$vendorDir" {
-            out.push_str(vendor_dir);
+            out.extend_from_slice(vendor_dir);
         } else if term == "$baseDir" {
-            out.push_str(base_dir);
-        } else if term.starts_with("dirname(") {
-            out.push_str(&eval_php_dirname(term, dir, vendor_dir, base_dir));
+            out.extend_from_slice(base_dir);
+        } else if term.starts_with(b"dirname(") {
+            out.extend_from_slice(&eval_php_dirname(term.as_bstr(), dir, vendor_dir, base_dir));
         }
     }
     out
 }
 
 /// Evaluates a (possibly nested) `dirname(...)` call against the same variable bindings.
-fn eval_php_dirname(term: &str, dir: &str, vendor_dir: &str, base_dir: &str) -> String {
+fn eval_php_dirname(term: &BStr, dir: &BStr, vendor_dir: &BStr, base_dir: &BStr) -> BString {
     let inner = term
-        .strip_prefix("dirname(")
-        .and_then(|s| s.strip_suffix(')'))
+        .strip_prefix(b"dirname(")
+        .and_then(|s| s.strip_suffix(b")"))
         .unwrap_or_default();
-    let resolved = eval_php_path_expr(inner, dir, vendor_dir, base_dir);
-    let path = resolved.trim_end_matches('/');
-    match path.rfind('/') {
-        Some(0) => "/".to_string(),
-        Some(i) => path[..i].to_string(),
-        None => ".".to_string(),
+    let resolved = eval_php_path_expr(inner.as_bstr(), dir, vendor_dir, base_dir);
+    let path = rtrim2(&resolved, "/");
+    match path.rfind("/") {
+        Some(0) => BString::from("/"),
+        Some(i) => BString::from(&path[..i]),
+        None => BString::from("."),
     }
 }
 
 /// Unescapes a single-quoted PHP string literal (`'...'`), handling `\\` and `\'`.
-fn eval_php_string_literal(literal: &str) -> String {
-    let inner = literal
-        .trim()
-        .strip_prefix('\'')
-        .and_then(|s| s.strip_suffix('\''))
+fn eval_php_string_literal(literal: &BStr) -> BString {
+    let trimmed = trim(literal);
+    let inner = trimmed
+        .strip_prefix(b"'")
+        .and_then(|s| s.strip_suffix(b"'"))
         .unwrap_or(literal);
-    let mut out = String::new();
-    let mut chars = inner.chars();
-    while let Some(c) = chars.next() {
-        if c == '\\' {
-            match chars.next() {
-                Some('\\') => out.push('\\'),
-                Some('\'') => out.push('\''),
+    let mut out = BString::default();
+    let mut bytes = inner.iter().copied();
+    while let Some(c) = bytes.next() {
+        if c == b'\\' {
+            match bytes.next() {
+                Some(b'\\') => out.push(b'\\'),
+                Some(b'\'') => out.push(b'\''),
                 Some(other) => {
-                    out.push('\\');
+                    out.push(b'\\');
                     out.push(other);
                 }
-                None => out.push('\\'),
+                None => out.push(b'\\'),
             }
         } else {
             out.push(c);
@@ -2556,10 +2339,10 @@ fn eval_php_string_literal(literal: &str) -> String {
 
 /// Splits a PHP concatenation expression on top-level ` . ` separators, ignoring `.` inside string
 /// literals and inside parenthesised `dirname(...)` calls.
-fn split_concat_terms(expr: &str) -> Vec<String> {
-    let bytes: Vec<char> = expr.chars().collect();
+fn split_concat_terms(expr: &BStr) -> Vec<BString> {
+    let bytes = expr.as_bytes();
     let mut terms = Vec::new();
-    let mut current = String::new();
+    let mut current = BString::default();
     let mut in_string = false;
     let mut depth = 0i32;
     let mut i = 0;
@@ -2567,94 +2350,94 @@ fn split_concat_terms(expr: &str) -> Vec<String> {
         let c = bytes[i];
         if in_string {
             current.push(c);
-            if c == '\\' && i + 1 < bytes.len() {
+            if c == b'\\' && i + 1 < bytes.len() {
                 current.push(bytes[i + 1]);
                 i += 2;
                 continue;
             }
-            if c == '\'' {
+            if c == b'\'' {
                 in_string = false;
             }
             i += 1;
             continue;
         }
         match c {
-            '\'' => {
+            b'\'' => {
                 in_string = true;
                 current.push(c);
             }
-            '(' => {
+            b'(' => {
                 depth += 1;
                 current.push(c);
             }
-            ')' => {
+            b')' => {
                 depth -= 1;
                 current.push(c);
             }
-            '.' if depth == 0
+            b'.' if depth == 0
                 && i > 0
-                && bytes[i - 1] == ' '
+                && bytes[i - 1] == b' '
                 && i + 1 < bytes.len()
-                && bytes[i + 1] == ' ' =>
+                && bytes[i + 1] == b' ' =>
             {
-                terms.push(current.trim().to_string());
+                terms.push(trim(&current));
                 current.clear();
             }
             _ => current.push(c),
         }
         i += 1;
     }
-    if !current.trim().is_empty() {
-        terms.push(current.trim().to_string());
+    if !trim(&current).is_empty() {
+        terms.push(trim(&current));
     }
     terms
 }
 
 /// Splits an `array(...)`/`return array(...)` body on top-level commas, ignoring commas inside
 /// string literals and nested parentheses.
-fn split_top_level_commas(body: &str) -> Vec<String> {
-    let chars: Vec<char> = body.chars().collect();
+fn split_top_level_commas(body: &BStr) -> Vec<BString> {
+    let bytes = body.as_bytes();
     let mut parts = Vec::new();
-    let mut current = String::new();
+    let mut current = BString::default();
     let mut in_string = false;
     let mut depth = 0i32;
     let mut i = 0;
-    while i < chars.len() {
-        let c = chars[i];
+    while i < bytes.len() {
+        let c = bytes[i];
         if in_string {
             current.push(c);
-            if c == '\\' && i + 1 < chars.len() {
-                current.push(chars[i + 1]);
+            if c == b'\\' && i + 1 < bytes.len() {
+                current.push(bytes[i + 1]);
                 i += 2;
                 continue;
             }
-            if c == '\'' {
+            if c == b'\'' {
                 in_string = false;
             }
             i += 1;
             continue;
         }
         match c {
-            '\'' => {
+            b'\'' => {
                 in_string = true;
                 current.push(c);
             }
-            '(' => {
+            b'(' => {
                 depth += 1;
                 current.push(c);
             }
-            ')' => {
+            b')' => {
                 depth -= 1;
                 current.push(c);
             }
-            ',' if depth == 0 => {
+            b',' if depth == 0 => {
                 parts.push(std::mem::take(&mut current));
             }
             _ => current.push(c),
         }
         i += 1;
     }
-    if !current.trim().is_empty() {
+    if !trim(&current).is_empty() {
         parts.push(current);
     }
     parts
@@ -2662,7 +2445,7 @@ fn split_top_level_commas(body: &str) -> Vec<String> {
 
 /// Finds the byte offset of the top-level ` => ` separator in an array entry, skipping string
 /// literals and nested parentheses.
-fn find_top_level_arrow(entry: &str) -> Option<usize> {
+fn find_top_level_arrow(entry: &BStr) -> Option<usize> {
     let bytes = entry.as_bytes();
     let mut in_string = false;
     let mut depth = 0i32;

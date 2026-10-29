@@ -2322,7 +2322,7 @@ impl ApplicationHandle {
                                             .borrow()
                                             .get("vendor-dir")
                                             .as_string()
-                                            .map(|s| legacy_lossy(s).into_owned()),
+                                            .map(|s| s.to_owned()),
                                     )?;
                                     loader.register(false);
                                 }

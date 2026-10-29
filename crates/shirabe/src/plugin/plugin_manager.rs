@@ -25,7 +25,7 @@ use indexmap::IndexMap;
 use shirabe_php_rpc::{PluginValue, call_function_with_dispatcher};
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, dirname, empty,
-    file_get_contents, implode, ksort, legacy_lossy, path_to_bytes, php_regex, preg_is_match,
+    file_get_contents, implode, ksort, legacy_lossy, path_from_bytes, php_regex, preg_is_match,
     preg_quote, preg_replace2, strrpos, strtr_array, substr, trigger_error, trim2, var_export,
     var_export_str, version_compare,
 };
@@ -374,8 +374,10 @@ impl PluginManager {
 
         let generator = composer.borrow().get_autoload_generator();
         let root_package_as_package: PackageInterfaceHandle = root_package.clone().into();
-        let mut autoloads: Vec<(PackageInterfaceHandle, Option<String>)> =
-            vec![(root_package_as_package.clone(), Some(String::new()))];
+        let mut autoloads: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)> = vec![(
+            root_package_as_package.clone(),
+            Some(std::path::PathBuf::new()),
+        )];
         for (_name, autoload_package) in &autoload_packages {
             if autoload_package.ptr_eq(&root_package_as_package) {
                 continue;
@@ -403,7 +405,7 @@ impl PluginManager {
             .borrow()
             .get("vendor-dir")
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(|s| s.to_owned());
         let mut class_loader = generator.borrow().create_loader(&map, vendor_dir)?;
         class_loader.register(false);
 
@@ -430,8 +432,8 @@ impl PluginManager {
                 });
                 // TODO(bytes): file identifiers are Strings, so non-UTF-8 bytes are replaced.
                 self.php_runtime_composer_require(
-                    &file_identifier.to_str_lossy(),
-                    &file.to_str_lossy(),
+                    &legacy_lossy(file_identifier),
+                    &legacy_lossy(file),
                 )?;
             }
         }
@@ -445,11 +447,15 @@ impl PluginManager {
                 });
                 // TODO(bytes): the eval'd plugin source is carried as a String, so
                 // from_utf8_lossy corrupts a source file that is not valid UTF-8.
-                let code =
-                    String::from_utf8_lossy(&file_get_contents(&path).unwrap_or_else(|_| {
-                        panic!("unable to read the plugin class file `{path}`")
-                    }))
-                    .into_owned();
+                let code = String::from_utf8_lossy(
+                    &file_get_contents(path_from_bytes(&path)).unwrap_or_else(|_| {
+                        panic!(
+                            "unable to read the plugin class file `{}`",
+                            path.display_lossy()
+                        )
+                    }),
+                )
+                .into_owned();
                 let class_counter = CLASS_COUNTER.load(std::sync::atomic::Ordering::Relaxed);
                 let separator_pos = strrpos(&class, "\\");
                 let mut class_name = class.clone();
@@ -1007,15 +1013,14 @@ impl PluginManager {
         &mut self,
         package: PackageInterfaceHandle,
         global: bool,
-    ) -> Option<String> {
+    ) -> Option<std::path::PathBuf> {
         if !global {
             return self
                 .composer_full()
                 .borrow()
                 .get_installation_manager()
                 .borrow()
-                .get_install_path(package)
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
+                .get_install_path(package);
         }
 
         // PHP: assert(null !== $this->globalComposer);
@@ -1026,7 +1031,6 @@ impl PluginManager {
             .get_installation_manager()
             .borrow()
             .get_install_path(package)
-            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
     }
 
     fn get_capability_implementation_class_name(

@@ -312,7 +312,8 @@ pub(crate) fn io_stub_class(
 /// `spl_autoload_register` shim is a no-op, registering a second plugin loader under the same
 /// vendor-dir evicts the first one here, and a class of the earlier plugin that was never
 /// loaded can become unresolvable (PHP would still find it).
-pub(crate) fn find_file_in_registered_loaders(class: &str) -> Option<String> {
+pub(crate) fn find_file_in_registered_loaders(class: impl AsRef<[u8]>) -> Option<BString> {
+    let class = class.as_ref();
     for (_vendor_dir, mut loader) in ClassLoader::get_registered_loaders() {
         if let Some(file) = loader.find_file(class) {
             return Some(file);
@@ -346,7 +347,7 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
     ) -> Result<PluginValue, PhpThrow> {
         if rhandle == 0 {
             if method_name == "__shirabe_find_file" {
-                let class = arg::<String>(method_name, &args, 0)?;
+                let class = arg::<BString>(method_name, &args, 0)?;
                 return Ok(find_file_in_registered_loaders(&class).to_plugin_value());
             }
             if method_name == "__shirabe_run_rust_command" {
@@ -1008,7 +1009,7 @@ fn dispatch_autoload_generator_method(
         }
         "createLoader" => {
             let autoloads = arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?;
-            let vendor_dir = arg::<Option<String>>(method_name, args, 1)?;
+            let vendor_dir = arg::<Option<BString>>(method_name, args, 1)?;
             let loader = generator
                 .borrow()
                 .create_loader(&autoloads, vendor_dir.clone())
@@ -1058,7 +1059,7 @@ fn package_map_arg(
     method: &str,
     args: &[PluginValue],
     position: usize,
-) -> Result<Vec<(PackageInterfaceHandle, Option<String>)>, PhpThrow> {
+) -> Result<Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>, PhpThrow> {
     let entries: Vec<&PluginValue> = match args.get(position) {
         Some(PluginValue::List(items)) => items.iter().collect(),
         Some(PluginValue::Array(map)) => map.values().collect(),
@@ -1069,7 +1070,8 @@ fn package_map_arg(
         .map(|entry| match entry {
             PluginValue::List(pair) if pair.len() == 2 => Ok((
                 PackageInterfaceHandle::from_arg(method, position, pair.first())?,
-                Option::<String>::from_arg(method, position, pair.get(1))?,
+                Option::<BString>::from_arg(method, position, pair.get(1))?
+                    .map(|path| std::path::PathBuf::from(path_from_bytes(&path))),
             )),
             other => Err(arg_throw(
                 method,
@@ -1081,7 +1083,9 @@ fn package_map_arg(
         .collect()
 }
 
-fn package_map_value(package_map: Vec<(PackageInterfaceHandle, Option<String>)>) -> PluginValue {
+fn package_map_value(
+    package_map: Vec<(PackageInterfaceHandle, Option<std::path::PathBuf>)>,
+) -> PluginValue {
     PluginValue::List(
         package_map
             .into_iter()
@@ -1100,13 +1104,13 @@ fn package_map_value(package_map: Vec<(PackageInterfaceHandle, Option<String>)>)
 /// Rust-side loader ended up with, through the same methods `createLoader()` fills it with.
 fn class_loader_to_php(
     loader: &ClassLoader,
-    vendor_dir: Option<String>,
+    vendor_dir: Option<BString>,
 ) -> anyhow::Result<PluginValue> {
     let handle = new_php_object(
         "Composer\\Autoload\\ClassLoader",
         vec![vendor_dir.to_plugin_value()],
     )?;
-    let add = |method: &str, prefix: &str, paths: &[String]| {
+    let add = |method: &str, prefix: &[u8], paths: &[BString]| {
         call_php_entity_method(
             &handle,
             method,
@@ -1121,13 +1125,13 @@ fn class_loader_to_php(
         add("add", &prefix, &paths)?;
     }
     if !loader.get_fallback_dirs().is_empty() {
-        add("add", "", loader.get_fallback_dirs())?;
+        add("add", b"", loader.get_fallback_dirs())?;
     }
     for (prefix, paths) in loader.get_prefixes_psr4() {
         add("addPsr4", prefix, paths)?;
     }
     if !loader.get_fallback_dirs_psr4().is_empty() {
-        add("addPsr4", "", loader.get_fallback_dirs_psr4())?;
+        add("addPsr4", b"", loader.get_fallback_dirs_psr4())?;
     }
     if !loader.get_class_map().is_empty() {
         call_php_entity_method(
