@@ -12,7 +12,9 @@ use crate::plugin::php_plugin_proxy::{PluginRpcDispatcher, config_handle_value, 
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpObjHandle, PhpThrow, PluginValue};
-use shirabe_php_shim::{PhpMixed, RuntimeException, legacy_lossy, php_regex, preg_match};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, path_to_bytes, php_regex, preg_match, utf8_text,
+};
 
 const CLASS: &str = "Composer\\Util\\RemoteFilesystem";
 
@@ -21,7 +23,7 @@ const CLASS: &str = "Composer\\Util\\RemoteFilesystem";
 pub enum GetResult {
     False,
     True,
-    Content(String),
+    Content(Vec<u8>),
 }
 
 #[derive(Debug)]
@@ -53,18 +55,18 @@ impl RemoteFilesystem {
 
     pub fn copy(
         &self,
-        origin_url: &str,
-        file_url: &str,
-        file_name: &str,
+        origin_url: impl AsRef<[u8]>,
+        file_url: impl AsRef<[u8]>,
+        file_name: impl AsRef<std::path::Path>,
         progress: bool,
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<GetResult> {
         let value = self.call(
             "copy",
             vec![
-                PluginValue::string(origin_url),
-                PluginValue::string(file_url),
-                PluginValue::string(file_name),
+                PluginValue::string(origin_url.as_ref()),
+                PluginValue::string(file_url.as_ref()),
+                PluginValue::string(path_to_bytes(file_name.as_ref())),
                 PluginValue::Bool(progress),
                 PluginValue::from_php_mixed(&PhpMixed::Array(options)),
             ],
@@ -74,16 +76,16 @@ impl RemoteFilesystem {
 
     pub fn get_contents(
         &self,
-        origin_url: &str,
-        file_url: &str,
+        origin_url: impl AsRef<[u8]>,
+        file_url: impl AsRef<[u8]>,
         progress: bool,
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<GetResult> {
         let value = self.call(
             "getContents",
             vec![
-                PluginValue::string(origin_url),
-                PluginValue::string(file_url),
+                PluginValue::string(origin_url.as_ref()),
+                PluginValue::string(file_url.as_ref()),
                 PluginValue::Bool(progress),
                 PluginValue::from_php_mixed(&PhpMixed::Array(options)),
             ],
@@ -114,20 +116,20 @@ impl RemoteFilesystem {
         }
     }
 
-    pub fn get_last_headers(&self) -> anyhow::Result<Vec<String>> {
+    pub fn get_last_headers(&self) -> anyhow::Result<Vec<BString>> {
         let value = self.call("getLastHeaders", Vec::new())?;
         Self::string_list("getLastHeaders", value)
     }
 
     /// Computed on this side: a static method has no instance to forward to, and the function is
     /// pure.
-    pub fn find_status_code(headers: &[String]) -> Option<i64> {
+    pub fn find_status_code(headers: &[BString]) -> Option<i64> {
         let mut value: Option<i64> = None;
         for header in headers {
             if let Some(m) = preg_match(php_regex!("{^HTTP/\\S+ (\\d+)}i"), header) {
                 value = m
                     .get(1)
-                    .and_then(|s| legacy_lossy(s).parse().ok())
+                    .and_then(|s| utf8_text(s)?.parse().ok())
                     .or(Some(0));
             }
         }
@@ -135,19 +137,19 @@ impl RemoteFilesystem {
         value
     }
 
-    pub fn find_status_message(&self, headers: &[String]) -> anyhow::Result<Option<String>> {
+    pub fn find_status_message(&self, headers: &[BString]) -> anyhow::Result<Option<BString>> {
         let value = self.call(
             "findStatusMessage",
             vec![PluginValue::List(
                 headers
                     .iter()
-                    .map(|h| PluginValue::string(h.as_str()))
+                    .map(|h| PluginValue::string(h.clone()))
                     .collect(),
             )],
         )?;
         match value {
             PluginValue::Null => Ok(None),
-            PluginValue::String(message) => Ok(Some(String::from_utf8(message.into())?)),
+            PluginValue::String(message) => Ok(Some(message)),
             other => Err(Self::shape_error("findStatusMessage", &other)),
         }
     }
@@ -204,16 +206,12 @@ impl RemoteFilesystem {
         match value {
             PluginValue::Bool(true) => Ok(GetResult::True),
             PluginValue::Bool(false) => Ok(GetResult::False),
-            // TODO(bytes): GetResult carries the body as a String; from_utf8_lossy corrupts binary
-            // payloads.
-            PluginValue::String(content) => Ok(GetResult::Content(
-                String::from_utf8_lossy(&content).into_owned(),
-            )),
+            PluginValue::String(content) => Ok(GetResult::Content(content.into())),
             other => Err(Self::shape_error("get", &other)),
         }
     }
 
-    fn string_list(method: &str, value: PluginValue) -> anyhow::Result<Vec<String>> {
+    fn string_list(method: &str, value: PluginValue) -> anyhow::Result<Vec<BString>> {
         let PluginValue::List(list) = value else {
             return match value {
                 PluginValue::Array(ref map) if map.is_empty() => Ok(Vec::new()),
@@ -222,7 +220,7 @@ impl RemoteFilesystem {
         };
         list.into_iter()
             .map(|item| match item {
-                PluginValue::String(s) => Ok(String::from_utf8(s.into())?),
+                PluginValue::String(s) => Ok(s),
                 other => Err(Self::shape_error(method, &other)),
             })
             .collect()
@@ -239,13 +237,13 @@ impl RemoteFilesystem {
     /// the `ReflectionMethod` access in `RemoteFilesystemTest::callGetOptionsForUrl`.
     pub fn __get_options_for_url(
         &self,
-        origin_url: &str,
+        origin_url: impl AsRef<[u8]>,
         additional_options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         let value = self.reflection_invoke(
             "getOptionsForUrl",
             vec![
-                PluginValue::string(origin_url),
+                PluginValue::string(origin_url.as_ref()),
                 PluginValue::from_php_mixed(&PhpMixed::Array(additional_options)),
             ],
         )?;
@@ -257,8 +255,8 @@ impl RemoteFilesystem {
 
     /// For testing only. Sets the private `fileUrl` of the PHP instance, mirroring the
     /// `ReflectionProperty` access in `RemoteFilesystemTest::callGetOptionsForUrl`.
-    pub fn __set_file_url(&self, file_url: &str) -> anyhow::Result<()> {
-        self.reflection_set_property("fileUrl", PluginValue::string(file_url))
+    pub fn __set_file_url(&self, file_url: impl AsRef<[u8]>) -> anyhow::Result<()> {
+        self.reflection_set_property("fileUrl", PluginValue::string(file_url.as_ref()))
     }
 
     /// For testing only. Invokes the protected `callbackGet` of the PHP instance, mirroring the

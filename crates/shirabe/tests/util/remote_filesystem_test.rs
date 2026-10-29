@@ -243,11 +243,11 @@ fn test_callback_get_passes_through404() {
 }
 
 // Mirrors PHP's `(string)` cast of getContents()'s string|true|false result.
-fn get_result_to_string(res: &GetResult) -> String {
+fn get_result_to_string(res: &GetResult) -> bstr::BString {
     match res {
-        GetResult::Content(s) => s.clone(),
-        GetResult::True => "1".to_string(),
-        GetResult::False => String::new(),
+        GetResult::Content(s) => s.clone().into(),
+        GetResult::True => "1".into(),
+        GetResult::False => bstr::BString::default(),
     }
 }
 
@@ -348,7 +348,7 @@ fn test_bit_bucket_public_download() {
             .unwrap_or_default();
 
         let result = rfs
-            .get_contents(&legacy_lossy(&hostname), url, false, IndexMap::new())
+            .get_contents(&hostname, url, false, IndexMap::new())
             .unwrap();
 
         assert_eq!(contents, get_result_to_string(&result));

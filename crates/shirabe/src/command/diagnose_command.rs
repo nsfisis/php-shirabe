@@ -201,7 +201,7 @@ impl DiagnoseCommand {
             .unwrap()
             .borrow_mut()
             .get(
-                &format!("{}://repo.packagist.org/packages.json", proto),
+                format!("{}://repo.packagist.org/packages.json", proto),
                 IndexMap::new(),
             ) {
             Ok(_) => {}
@@ -324,7 +324,7 @@ impl DiagnoseCommand {
                 .unwrap()
                 .borrow_mut()
                 .get(
-                    &format!("{}://repo.packagist.org/packages.json", protocol),
+                    format!("{}://repo.packagist.org/packages.json", protocol),
                     IndexMap::new(),
                 )?
                 .decode_json()?;
@@ -359,10 +359,10 @@ impl DiagnoseCommand {
                     .unwrap()
                     .borrow_mut()
                     .get(
-                        &format!("{}://repo.packagist.org/{}", protocol, legacy_lossy(&path)),
+                        bconcat!(protocol, "://repo.packagist.org/", path),
                         IndexMap::new(),
                     )?;
-                let provider = response.get_body().unwrap_or_default().to_string();
+                let provider = response.get_body().unwrap_or_default().to_vec();
 
                 if hash("sha256", &provider) != hash_val.as_string().unwrap_or_default() {
                     return Ok(CheckResult::Message(format!(
@@ -422,7 +422,7 @@ impl DiagnoseCommand {
 
                 Ok(CheckResult::Message(format!(
                     "<info>OK</> <comment>expires on {}</>",
-                    expiration.unwrap()
+                    expiration.unwrap().display_lossy()
                 )))
             }
             Err(e) => {
@@ -1426,7 +1426,7 @@ impl Command for DiagnoseCommand {
                 let proxy = ProxyManager::get_instance()
                     .as_ref()
                     .unwrap()
-                    .get_proxy_for_request(&format!("{}://repo.packagist.org", proto))
+                    .get_proxy_for_request(format!("{}://repo.packagist.org", proto))
                     .map_err(|e| anyhow::anyhow!(e))?;
                 if !proxy.get_status(None)?.is_empty() {
                     let r#type = if proxy.is_secure() { "HTTPS" } else { "HTTP" };

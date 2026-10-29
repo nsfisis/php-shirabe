@@ -33,7 +33,7 @@ pub static DOWNLOAD_METADATA: LazyLock<Mutex<IndexMap<BString, PhpMixed>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 /// Collects response headers when running on GH Actions
-pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<BString, Vec<String>>>> =
+pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<BString, Vec<BString>>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 /// Base downloader for files
@@ -498,11 +498,7 @@ impl DownloaderInterface for FileDownloader {
                 let add_copy_result = self
                     .http_downloader
                     .borrow()
-                    .add_copy(
-                        &url.processed,
-                        &legacy_lossy(path_to_bytes(&file_name)),
-                        package.get_transport_options(),
-                    )
+                    .add_copy(&url.processed, &file_name, package.get_transport_options())
                     .await;
                 match add_copy_result {
                     Ok(mut response) => {
@@ -513,7 +509,7 @@ impl DownloaderInterface for FileDownloader {
                             None => PhpMixed::string(
                                 response
                                     .get_header("Content-Length")
-                                    .unwrap_or_else(|| "?".to_string()),
+                                    .unwrap_or_else(|| "?".into()),
                             ),
                         };
                         DOWNLOAD_METADATA

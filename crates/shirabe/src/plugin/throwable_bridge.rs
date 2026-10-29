@@ -122,14 +122,22 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
         "BadMethodCallException" => BadMethodCallException::new(message).into(),
         r"Composer\Downloader\TransportException" => {
             let mut exception = TransportException::new(message, code);
-            if let PhpMixed::List(_) | PhpMixed::Array(_) = property("headers") {
-                exception.set_headers(strings("headers"));
+            match property("headers") {
+                PhpMixed::List(items) => exception.set_headers(
+                    items
+                        .iter()
+                        .map(|item| item.as_string().unwrap_or_default().to_owned())
+                        .collect(),
+                ),
+                PhpMixed::Array(items) => exception.set_headers(
+                    items
+                        .values()
+                        .map(|item| item.as_string().unwrap_or_default().to_owned())
+                        .collect(),
+                ),
+                _ => {}
             }
-            exception.set_response(
-                property("response")
-                    .as_string()
-                    .map(|s| s.to_str_lossy().into_owned()),
-            );
+            exception.set_response(property("response").as_string().map(|s| s.to_vec()));
             exception.set_status_code(property("statusCode").as_int());
             exception.set_response_info(match property("responseInfo") {
                 PhpMixed::List(items) => items,
@@ -253,7 +261,9 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
         properties.insert(
             "headers".into(),
             match exception.get_headers() {
-                Some(headers) => strings(headers),
+                Some(headers) => {
+                    PluginValue::List(headers.iter().cloned().map(PluginValue::string).collect())
+                }
                 None => PluginValue::Null,
             },
         );
@@ -364,7 +374,7 @@ mod tests {
 
         let exception = error.catch::<TransportException>().unwrap();
         assert_eq!(Some(404), exception.get_status_code());
-        assert_eq!(Some("missing"), exception.get_response());
+        assert_eq!(Some(&b"missing"[..]), exception.get_response());
 
         let back = exception_into_throw(AnyThrowable::of(&error).unwrap(), &error);
         assert_eq!(

@@ -230,7 +230,7 @@ impl GitHub {
         match self
             .http_downloader
             .borrow_mut()
-            .get(&legacy_lossy(&bconcat!("https://", api_url)), http_options)
+            .get(bconcat!("https://", api_url), http_options)
         {
             Ok(_) => {}
             Err(te) => {

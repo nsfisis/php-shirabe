@@ -166,7 +166,7 @@ impl Versions {
                 self.http_downloader
                     .borrow_mut()
                     .get(
-                        &format!("{}://getcomposer.org/versions", protocol),
+                        format!("{}://getcomposer.org/versions", protocol),
                         IndexMap::new(),
                     )?
                     .decode_json()?,

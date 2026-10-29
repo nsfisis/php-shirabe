@@ -125,7 +125,7 @@ impl JsonFile {
                     .borrow_mut()
                     .get(&self.path, indexmap::IndexMap::new())?
                     .get_body()
-                    .map(|s| s.as_bytes().to_vec()))
+                    .map(<[u8]>::to_vec))
             } else {
                 if !Filesystem::is_readable(&self.path) {
                     return Err(RuntimeException::new(format!(

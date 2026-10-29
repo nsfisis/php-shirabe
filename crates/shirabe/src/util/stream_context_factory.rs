@@ -5,12 +5,12 @@ use crate::downloader::TransportException;
 use crate::repository::PlatformRepository;
 use crate::util::http::ProxyManager;
 use crate::util::{Filesystem, Platform};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
-    PhpMixed, array_replace_recursive, extension_loaded, is_dir, legacy_lossy, php_uname,
-    stream_context_create, stripos, uasort,
+    PhpMixed, array_replace_recursive, bconcat, extension_loaded, implode, is_dir, legacy_lossy,
+    php_uname, stream_context_create, stripos, uasort,
 };
 
 pub struct StreamContextFactory;
@@ -18,7 +18,7 @@ pub struct StreamContextFactory;
 impl StreamContextFactory {
     /// Creates a context supporting HTTP proxies.
     pub fn get_context(
-        url: &str,
+        url: impl AsRef<[u8]>,
         default_options: IndexMap<BString, PhpMixed>,
         default_params: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<PhpMixed, Box<TransportException>> {
@@ -59,10 +59,11 @@ impl StreamContextFactory {
     }
 
     pub fn init_options(
-        url: &str,
+        url: impl AsRef<[u8]>,
         mut options: IndexMap<BString, PhpMixed>,
         for_curl: bool,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>, Box<TransportException>> {
+        let url = url.as_ref();
         // Make sure the headers are in an array form
         let has_header = options
             .get(B("http"))
@@ -97,7 +98,7 @@ impl StreamContextFactory {
             let proxy = proxy_manager.get_proxy_for_request(url)?;
             let proxy_options = proxy.get_context_options();
             if let Some(proxy_options) = proxy_options {
-                let is_https_request = url.starts_with("https://");
+                let is_https_request = url.starts_with(b"https://");
 
                 if proxy.is_secure() {
                     if !extension_loaded("openssl") {
@@ -161,13 +162,14 @@ impl StreamContextFactory {
             .and_then(|a| a.get(B("header")))
             .and_then(|v| match v {
                 PhpMixed::List(list) => {
-                    let joined: String = list
-                        .iter()
-                        .filter_map(|item| item.as_string())
-                        .map(|s| s.to_str_lossy())
-                        .collect::<Vec<_>>()
-                        .join("");
-                    Some(joined.to_lowercase().contains("user-agent"))
+                    let joined = implode(
+                        "",
+                        &list
+                            .iter()
+                            .filter_map(|item| item.as_string())
+                            .collect::<Vec<_>>(),
+                    );
+                    Some(stripos(joined, "user-agent").is_some())
                 }
                 _ => None,
             })
@@ -175,22 +177,26 @@ impl StreamContextFactory {
 
         if !has_user_agent {
             let platform_php_version = PlatformRepository::get_platform_php_version();
-            let user_agent = format!(
-                "User-Agent: Composer/{} ({os}; {release}; {php_version}; {http_version}{platform}{ci})",
+            let user_agent = bconcat!(
+                "User-Agent: Composer/",
                 composer::get_version(),
-                os = legacy_lossy(&php_uname("s")),
-                release = legacy_lossy(&php_uname("r")),
-                php_version = php_version,
-                http_version = http_version,
-                platform = platform_php_version
-                    .as_deref()
-                    .map(|v| format!("; Platform-PHP {}", legacy_lossy(&v)))
+                " (",
+                php_uname("s"),
+                "; ",
+                php_uname("r"),
+                "; ",
+                php_version,
+                "; ",
+                http_version,
+                platform_php_version
+                    .map(|v| bconcat!("; Platform-PHP ", v))
                     .unwrap_or_default(),
-                ci = if Platform::get_env("CI").is_some_and(|v| !v.is_empty() && v != "0") {
+                if Platform::get_env("CI").is_some_and(|v| !v.is_empty() && v != "0") {
                     "; CI"
                 } else {
                     ""
                 },
+                ")"
             );
             if let Some(PhpMixed::Array(http)) = options.get_mut(B("http"))
                 && let Some(PhpMixed::List(headers)) = http.get_mut(B("header"))
@@ -357,16 +363,13 @@ impl StreamContextFactory {
     /// A bug in PHP prevents the headers from correctly being sent when a content-type header is
     /// present and NOT at the end of the array. This method fixes the array by moving the
     /// content-type header to the end.
-    fn fix_http_header_field(header: &PhpMixed) -> Vec<String> {
-        let mut headers: Vec<String> = match header {
-            PhpMixed::String(s) => s
-                .split_str("\r\n")
-                .map(|p| p.to_str_lossy().into_owned())
-                .collect(),
+    fn fix_http_header_field(header: &PhpMixed) -> Vec<BString> {
+        let mut headers: Vec<BString> = match header {
+            PhpMixed::String(s) => s.split_str("\r\n").map(BString::from).collect(),
             PhpMixed::List(list) => list
                 .iter()
                 .filter_map(|v| v.as_string())
-                .map(|s| legacy_lossy(s).into_owned())
+                .map(BStr::to_owned)
                 .collect(),
             _ => vec![],
         };

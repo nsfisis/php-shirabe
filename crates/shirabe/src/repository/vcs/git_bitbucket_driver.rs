@@ -429,7 +429,6 @@ impl GitBitbucketDriver {
         Ok(self
             .fetch_with_oauth_credentials(bstr::BStr::new(&resource), false)?
             .get_body()
-            .map(|s| s.to_string())
             .map(bstr::BString::from))
     }
 
@@ -695,10 +694,10 @@ impl GitBitbucketDriver {
                 self.attempt_clone_fallback()?;
 
                 return Ok(Response::new(
-                    "dummy".to_string(),
+                    "dummy".into(),
                     Some(200),
                     vec![],
-                    Some("null".to_string()),
+                    Some(b"null".to_vec()),
                 ));
             }
         }

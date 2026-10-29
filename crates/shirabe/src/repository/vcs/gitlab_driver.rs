@@ -412,7 +412,7 @@ impl GitLabDriver {
         );
 
         let content = match self.get_contents(bstr::BStr::new(&resource), false)? {
-            Ok(response) => response.get_body().map(|s| s.to_string()),
+            Ok(response) => response.get_body().map(bstr::BString::from),
             Err(e) => {
                 if e.get_code() != 404 {
                     return Err((*e).into());
@@ -422,7 +422,7 @@ impl GitLabDriver {
             }
         };
 
-        Ok(content.map(bstr::BString::from))
+        Ok(content)
     }
 
     pub fn get_change_date(
@@ -832,10 +832,10 @@ impl GitLabDriver {
                             this.attempt_clone_fallback()?;
 
                             return Ok(Ok(Response::new(
-                                "dummy".to_string(),
+                                "dummy".into(),
                                 Some(200),
                                 vec![],
-                                Some("null".to_string()),
+                                Some(b"null".to_vec()),
                             )));
                         }
                     }
@@ -905,10 +905,10 @@ impl GitLabDriver {
                     self.attempt_clone_fallback()?;
 
                     return Ok(Ok(Response::new(
-                        "dummy".to_string(),
+                        "dummy".into(),
                         Some(200),
                         vec![],
-                        Some("null".to_string()),
+                        Some(b"null".to_vec()),
                     )));
                 }
                 self.inner.io.write_error3(
@@ -943,10 +943,10 @@ impl GitLabDriver {
                     self.attempt_clone_fallback()?;
 
                     return Ok(Ok(Response::new(
-                        "dummy".to_string(),
+                        "dummy".into(),
                         Some(200),
                         vec![],
-                        Some("null".to_string()),
+                        Some(b"null".to_vec()),
                     )));
                 }
 

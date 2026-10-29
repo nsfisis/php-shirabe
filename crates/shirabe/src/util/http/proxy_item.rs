@@ -117,7 +117,7 @@ impl ProxyItem {
         })
     }
 
-    pub fn to_request_proxy(&self, scheme: String) -> RequestProxy {
+    pub fn to_request_proxy(&self, scheme: impl AsRef<[u8]>) -> RequestProxy {
         let mut http_options: IndexMap<BString, PhpMixed> = IndexMap::new();
         http_options.insert("proxy".into(), PhpMixed::string(self.options_proxy.clone()));
 
@@ -125,7 +125,7 @@ impl ProxyItem {
             http_options.insert("header".into(), PhpMixed::string(auth.clone()));
         }
 
-        if scheme == "http" {
+        if scheme.as_ref() == b"http" {
             http_options.insert("request_fulluri".into(), PhpMixed::Bool(true));
         }
 

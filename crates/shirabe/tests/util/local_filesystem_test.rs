@@ -20,11 +20,11 @@ fn config_mock() -> std::rc::Rc<std::cell::RefCell<shirabe::config::Config>> {
 }
 
 // Mirrors PHP's `(string)` cast of getContents()'s string|true|false result.
-fn get_result_to_string(res: &GetResult) -> String {
+fn get_result_to_string(res: &GetResult) -> bstr::BString {
     match res {
-        GetResult::Content(s) => s.clone(),
-        GetResult::True => "1".to_string(),
-        GetResult::False => String::new(),
+        GetResult::Content(s) => s.clone().into(),
+        GetResult::True => "1".into(),
+        GetResult::False => bstr::BString::default(),
     }
 }
 
@@ -46,7 +46,7 @@ fn test_get_contents() {
     let res = fs
         .get_contents(
             "http://example.org",
-            &format!("file://{}", this_file()),
+            format!("file://{}", this_file()),
             false,
             IndexMap::new(),
         )
@@ -65,7 +65,7 @@ fn test_copy() {
     assert!(matches!(
         fs.copy(
             "http://example.org",
-            &format!("file://{}", this_file()),
+            format!("file://{}", this_file()),
             &file,
             false,
             IndexMap::new()

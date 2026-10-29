@@ -116,7 +116,7 @@ impl Forgejo {
         );
 
         match self.http_downloader.borrow_mut().get(
-            &legacy_lossy(&bconcat!("https://", origin_url, "/api/v1/version")),
+            bconcat!("https://", origin_url, "/api/v1/version"),
             indexmap::indexmap! {
                 "retry-auth-failure".into() => false.into(),
             },

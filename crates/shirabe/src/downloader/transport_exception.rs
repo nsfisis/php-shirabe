@@ -1,12 +1,13 @@
 //! ref: composer/src/Composer/Downloader/TransportException.php
 
+use bstr::BString;
 use shirabe_php_shim::{PhpMixed, RuntimeException};
 
 #[derive(Debug, Clone)]
 pub struct TransportException {
     inner: RuntimeException,
-    headers: Option<Vec<String>>,
-    response: Option<String>,
+    headers: Option<Vec<BString>>,
+    response: Option<Vec<u8>>,
     status_code: Option<i64>,
     response_info: Vec<PhpMixed>,
 }
@@ -23,19 +24,19 @@ impl TransportException {
         }
     }
 
-    pub fn set_headers(&mut self, headers: Vec<String>) {
+    pub fn set_headers(&mut self, headers: Vec<BString>) {
         self.headers = Some(headers);
     }
 
-    pub fn get_headers(&self) -> Option<&Vec<String>> {
+    pub fn get_headers(&self) -> Option<&Vec<BString>> {
         self.headers.as_ref()
     }
 
-    pub fn set_response(&mut self, response: Option<String>) {
+    pub fn set_response(&mut self, response: Option<Vec<u8>>) {
         self.response = response;
     }
 
-    pub fn get_response(&self) -> Option<&str> {
+    pub fn get_response(&self) -> Option<&[u8]> {
         self.response.as_deref()
     }
 

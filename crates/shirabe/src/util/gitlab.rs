@@ -454,7 +454,7 @@ impl GitLab {
             .http_downloader
             .borrow_mut()
             .get(
-                &legacy_lossy(&bconcat!(scheme, "://", api_url, "/oauth/token")),
+                bconcat!(scheme, "://", api_url, "/oauth/token"),
                 options.into_iter().collect(),
             )?
             .decode_json()?;
@@ -522,7 +522,7 @@ impl GitLab {
             .http_downloader
             .borrow_mut()
             .get(
-                &legacy_lossy(&bconcat!(scheme, "://", origin_url, "/oauth/token")),
+                bconcat!(scheme, "://", origin_url, "/oauth/token"),
                 options.into_iter().collect(),
             )?
             .decode_json()?;

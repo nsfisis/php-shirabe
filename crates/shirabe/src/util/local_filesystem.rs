@@ -9,11 +9,11 @@ use crate::downloader::{MaxFileSizeExceededException, TransportException};
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::http::ProxyManager;
 use crate::util::{GetResult, Url};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, file_get_contents, file_get_contents_with_max_length,
-    file_put_contents, legacy_lossy, parse_url, php_regex, preg_is_match, strpos, strtr,
+    PhpMixed, RuntimeException, bconcat, file_get_contents, file_get_contents_with_max_length,
+    file_put_contents, parse_url, path_from_bytes, php_regex, preg_is_match, strpos, strtr,
 };
 
 #[derive(Debug)]
@@ -31,7 +31,7 @@ impl LocalFilesystem {
     }
 
     /// Whether `url` names a local file: a `file://` URL, or a path with no scheme.
-    pub fn handles(url: &str) -> bool {
+    pub fn handles(url: impl AsRef<[u8]>) -> bool {
         let scheme = parse_url(strtr(url, "\\", "/"))
             .and_then(|parsed| parsed.scheme)
             .unwrap_or_default();
@@ -45,38 +45,50 @@ impl LocalFilesystem {
 
     pub fn copy(
         &self,
-        origin_url: &str,
-        file_url: &str,
-        file_name: &str,
+        origin_url: impl AsRef<[u8]>,
+        file_url: impl AsRef<[u8]>,
+        file_name: impl AsRef<std::path::Path>,
         progress: bool,
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<GetResult> {
-        self.get(origin_url, file_url, options, Some(file_name), progress)
+        self.get(
+            origin_url.as_ref().as_bstr(),
+            file_url.as_ref().as_bstr(),
+            options,
+            Some(file_name.as_ref()),
+            progress,
+        )
     }
 
     pub fn get_contents(
         &self,
-        origin_url: &str,
-        file_url: &str,
+        origin_url: impl AsRef<[u8]>,
+        file_url: impl AsRef<[u8]>,
         progress: bool,
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<GetResult> {
-        self.get(origin_url, file_url, options, None, progress)
+        self.get(
+            origin_url.as_ref().as_bstr(),
+            file_url.as_ref().as_bstr(),
+            options,
+            None,
+            progress,
+        )
     }
 
     fn get(
         &self,
-        origin_url: &str,
-        file_url: &str,
+        origin_url: &BStr,
+        file_url: &BStr,
         mut options: IndexMap<BString, PhpMixed>,
-        file_name: Option<&str>,
+        file_name: Option<&std::path::Path>,
         progress: bool,
     ) -> anyhow::Result<GetResult> {
         options.shift_remove(B("retry-auth-failure"));
         let is_redirect = options.shift_remove(B("redirects")).is_some();
 
-        let orig_file_url = file_url.to_string();
-        let mut file_url = file_url.to_string();
+        let orig_file_url = file_url.to_owned();
+        let mut file_url = file_url.to_owned();
 
         if options.contains_key(B("prevent_ip_access_callable")) {
             return Err(RuntimeException::new(
@@ -92,11 +104,11 @@ impl LocalFilesystem {
             } else {
                 "&"
             };
-            file_url = format!(
-                "{}{}access_token={}",
+            file_url = bconcat!(
                 file_url,
                 separator,
-                legacy_lossy(&token.as_string().unwrap_or_default())
+                "access_token=",
+                token.as_string().unwrap_or_default()
             );
         }
 
@@ -136,7 +148,7 @@ impl LocalFilesystem {
         ) || (strpos(&file_url, "$").is_none() && strpos(&file_url, "%24").is_none())
         {
             self.config.borrow_mut().prohibit_url_by_config(
-                file_url.as_str().into(),
+                file_url.as_ref(),
                 Some(self.io.clone()),
                 &IndexMap::new(),
             )?;
@@ -155,8 +167,10 @@ impl LocalFilesystem {
         // not carried into error_message yet.
         let error_message = String::new();
         let result = match max_file_size {
-            Some(max) => file_get_contents_with_max_length(&file_url, max as usize),
-            None => file_get_contents(&file_url),
+            Some(max) => {
+                file_get_contents_with_max_length(path_from_bytes(&file_url), max as usize)
+            }
+            None => file_get_contents(path_from_bytes(&file_url)),
         }
         .ok();
 
@@ -192,7 +206,8 @@ impl LocalFilesystem {
             return Err(TransportException::new(
                 format!(
                     "The \"{}\" file could not be downloaded: {}",
-                    orig_file_url, error_message
+                    orig_file_url.display_lossy(),
+                    error_message
                 ),
                 0,
             )
@@ -206,7 +221,7 @@ impl LocalFilesystem {
                 return Err(TransportException::new(
                     format!(
                         "\"{}\" appears broken, and returned an empty 200 response",
-                        orig_file_url
+                        orig_file_url.display_lossy()
                     ),
                     0,
                 )
@@ -219,7 +234,8 @@ impl LocalFilesystem {
                 return Err(TransportException::new(
                     format!(
                         "The \"{}\" file could not be written to {}: ",
-                        orig_file_url, file_name
+                        orig_file_url.display_lossy(),
+                        file_name.display()
                     ),
                     0,
                 )
@@ -229,10 +245,6 @@ impl LocalFilesystem {
             return Ok(GetResult::True);
         }
 
-        // TODO(bytes): GetResult carries the body as a String; from_utf8_lossy corrupts binary
-        // payloads.
-        Ok(GetResult::Content(
-            String::from_utf8_lossy(&result).into_owned(),
-        ))
+        Ok(GetResult::Content(result))
     }
 }

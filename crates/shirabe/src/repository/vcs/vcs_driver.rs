@@ -81,11 +81,7 @@ impl VcsDriverBase {
             PhpMixed::Array(a) => a,
             _ => IndexMap::new(),
         };
-        match self
-            .http_downloader
-            .borrow_mut()
-            .get(&legacy_lossy(url), options)
-        {
+        match self.http_downloader.borrow_mut().get(url, options) {
             Ok(response) => Ok(Ok(response)),
             Err(e) => match e.catch::<TransportException>() {
                 Some(te) => Ok(Err(Box::new(te.clone()))),
@@ -330,11 +326,7 @@ pub trait VcsDriver: VcsDriverInterface {
             PhpMixed::Array(a) => a,
             _ => IndexMap::new(),
         };
-        match self
-            .http_downloader()
-            .borrow_mut()
-            .get(&legacy_lossy(url), options)
-        {
+        match self.http_downloader().borrow_mut().get(url, options) {
             Ok(response) => Ok(Ok(response)),
             Err(e) => match e.catch::<TransportException>() {
                 Some(te) => Ok(Err(Box::new(te.clone()))),

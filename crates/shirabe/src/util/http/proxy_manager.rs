@@ -3,7 +3,7 @@
 use crate::downloader::TransportException;
 use crate::util::NoProxyPattern;
 use crate::util::http::{ProxyItem, RequestProxy};
-use shirabe_php_shim::PHP_SERVER;
+use shirabe_php_shim::{PHP_SERVER, parse_url};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -70,8 +70,9 @@ impl ProxyManager {
 
     pub fn get_proxy_for_request(
         &self,
-        request_url: &str,
+        request_url: impl AsRef<[u8]>,
     ) -> Result<RequestProxy, Box<TransportException>> {
+        let request_url = request_url.as_ref();
         if let Some(ref error) = self.error {
             return Err(Box::new(TransportException::new(
                 format!("Unable to use a proxy: {}", error),
@@ -79,11 +80,9 @@ impl ProxyManager {
             )));
         }
 
-        let scheme = request_url
-            .split("://")
-            .next()
-            .unwrap_or_default()
-            .to_string();
+        let scheme = parse_url(request_url)
+            .and_then(|parsed| parsed.scheme)
+            .unwrap_or_default();
         let proxy = self.get_proxy_for_scheme(&scheme);
 
         if proxy.is_none() {
@@ -97,11 +96,11 @@ impl ProxyManager {
         Ok(proxy.unwrap().to_request_proxy(scheme))
     }
 
-    fn get_proxy_for_scheme(&self, scheme: &str) -> Option<&ProxyItem> {
-        if scheme == "http" {
+    fn get_proxy_for_scheme(&self, scheme: &[u8]) -> Option<&ProxyItem> {
+        if scheme == b"http" {
             return self.http_proxy.as_ref();
         }
-        if scheme == "https" {
+        if scheme == b"https" {
             return self.https_proxy.as_ref();
         }
         None
@@ -150,7 +149,7 @@ impl ProxyManager {
         (None, String::new())
     }
 
-    fn no_proxy(&self, request_url: &str) -> bool {
+    fn no_proxy(&self, request_url: &[u8]) -> bool {
         match self.no_proxy_handler.borrow_mut().as_mut() {
             None => false,
             Some(handler) => handler.test(request_url).unwrap_or(false),

@@ -1214,7 +1214,7 @@ impl ComposerRepository {
 
         if let Some(providers_api_url) = self.providers_api_url.clone() {
             let api_result = match self.http_downloader.borrow_mut().get(
-                &providers_api_url.replace("%package%", package_name),
+                providers_api_url.replace("%package%", package_name),
                 self.options.clone(),
             ) {
                 Ok(resp) => resp.decode_json()?,
@@ -2871,7 +2871,7 @@ impl ComposerRepository {
                 }
 
                 let mut response = self.http_downloader.borrow_mut().get(&filename, options)?;
-                let mut json = response.get_body().unwrap_or_default().to_string();
+                let mut json = response.get_body().unwrap_or_default().to_vec();
                 if let Some(sha256_val) = sha256
                     && sha256_val != hash("sha256", &json)
                 {
@@ -2934,7 +2934,8 @@ impl ComposerRepository {
                                 .map(|(k, v)| (k.clone(), v.clone()))
                                 .collect(),
                         );
-                        json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none())?;
+                        json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none())?
+                            .into_bytes();
                     }
                     self.cache.borrow_mut().write(ck, &json);
                 }
@@ -3070,7 +3071,7 @@ impl ComposerRepository {
                 .http_downloader
                 .borrow_mut()
                 .get(&filename, options.clone())?;
-            let mut json = response.get_body().unwrap_or_default().to_string();
+            let mut json = response.get_body().unwrap_or_default().to_vec();
             if json.is_empty() && response.get_status_code() == 304 {
                 return Ok(FetchFileIfLastModifiedResult::NotModified);
             }
@@ -3105,7 +3106,8 @@ impl ComposerRepository {
                 data.insert("last-modified".into(), PhpMixed::string(lmd.clone()));
                 let as_mixed =
                     PhpMixed::Array(data.iter().map(|(k, v)| (k.clone(), v.clone())).collect());
-                json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none())?;
+                json = JsonFile::encode_with_options(&as_mixed, JsonEncodeOptions::none())?
+                    .into_bytes();
             }
             if !self.cache.borrow().is_read_only() {
                 self.cache.borrow_mut().write(cache_key, &json);
@@ -3245,7 +3247,7 @@ impl ComposerRepository {
             return Ok(PhpMixed::Array(empty.into_iter().collect()));
         }
 
-        let mut json = response.get_body().unwrap_or_default().to_string();
+        let mut json = response.get_body().unwrap_or_default().to_vec();
         if json.is_empty() && response.get_status_code() == 304 {
             self.fresh_metadata_urls
                 .borrow_mut()
@@ -3289,7 +3291,8 @@ impl ComposerRepository {
                     pretty_print: false,
                     ..Default::default()
                 },
-            )?;
+            )?
+            .into_bytes();
         }
         if !self.cache.borrow().is_read_only() {
             self.cache.borrow_mut().write(cache_key, &json);
@@ -3331,7 +3334,12 @@ impl ComposerRepository {
 
         // if the file is in the cache, we fake a 304 Not Modified to allow the process to continue
         if last_modified_time.is_some() {
-            let resp = Response::new(self.url.clone(), Some(304), Vec::new(), Some(String::new()));
+            let resp = Response::new(
+                self.url.clone().into(),
+                Some(304),
+                Vec::new(),
+                Some(Vec::new()),
+            );
             return self.async_fetch_file_accept(resp, filename, cache_key);
         }
 
@@ -3339,7 +3347,12 @@ impl ComposerRepository {
         if let Some(te) = e.catch::<TransportException>()
             && te.get_status_code() == Some(499)
         {
-            let resp = Response::new(self.url.clone(), Some(404), Vec::new(), Some(String::new()));
+            let resp = Response::new(
+                self.url.clone().into(),
+                Some(404),
+                Vec::new(),
+                Some(Vec::new()),
+            );
             return self.async_fetch_file_accept(resp, filename, cache_key);
         }
 

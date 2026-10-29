@@ -610,10 +610,10 @@ impl ForgejoDriver {
                     self.attempt_clone_fallback()?;
 
                     return Ok(Ok(Response::new(
-                        "dummy".to_string(),
+                        "dummy".into(),
                         Some(200),
                         vec![],
-                        Some("null".to_string()),
+                        Some(b"null".to_vec()),
                     )));
                 }
 

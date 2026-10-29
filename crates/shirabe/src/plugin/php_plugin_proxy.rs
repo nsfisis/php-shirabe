@@ -1789,7 +1789,7 @@ fn dispatch_http_downloader_method(
             Ok(PluginValue::Null)
         }
         "get" => {
-            let url = arg::<String>(method_name, args, 0)?;
+            let url = arg::<BString>(method_name, args, 0)?;
             let options =
                 arg_or::<IndexMap<BString, PhpMixed>>(method_name, args, 1, IndexMap::new())?;
             let response = downloader
@@ -1799,22 +1799,22 @@ fn dispatch_http_downloader_method(
             Ok(response_to_wire(&response))
         }
         "copy" => {
-            let url = arg::<String>(method_name, args, 0)?;
-            let to = arg::<String>(method_name, args, 1)?;
+            let url = arg::<BString>(method_name, args, 0)?;
+            let to = arg::<BString>(method_name, args, 1)?;
             let options =
                 arg_or::<IndexMap<BString, PhpMixed>>(method_name, args, 2, IndexMap::new())?;
             let response = downloader
                 .borrow()
-                .copy(&url, &to, options)
+                .copy(&url, path_from_bytes(&to), options)
                 .map_err(|error| error_throw("copy failed", &error))?;
             Ok(response_to_wire(&response))
         }
         "add" | "addCopy" => {
-            let url = arg::<String>(method_name, args, 0)?;
+            let url = arg::<BString>(method_name, args, 0)?;
             let (to, options_position) = if method_name == "add" {
                 (None, 1)
             } else {
-                (Some(arg::<String>(method_name, args, 1)?), 2)
+                (Some(arg::<BString>(method_name, args, 1)?), 2)
             };
             let options = arg_or::<IndexMap<BString, PhpMixed>>(
                 method_name,
@@ -1829,7 +1829,12 @@ fn dispatch_http_downloader_method(
             // itself, before the promise exists; only a failed request becomes a rejection.
             let job = downloader
                 .borrow()
-                .add_job(&url, to.as_deref(), options, started.clone())
+                .add_job(
+                    url.as_bstr(),
+                    to.as_ref().map(path_from_bytes),
+                    options,
+                    started.clone(),
+                )
                 .map_err(failed)?;
             match job {
                 crate::util::http_downloader::HttpDownloaderJob::Settled(Ok(response)) => {
@@ -1844,7 +1849,10 @@ fn dispatch_http_downloader_method(
                         JobOwner::http_downloader(downloader),
                         downloader.clone(),
                         started,
-                        error_throw("", &crate::util::HttpDownloader::canceled(&url).into()),
+                        error_throw(
+                            "",
+                            &crate::util::HttpDownloader::canceled(url.as_bstr()).into(),
+                        ),
                         Box::pin(async move {
                             future
                                 .await

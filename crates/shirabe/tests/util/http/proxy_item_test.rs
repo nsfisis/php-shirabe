@@ -32,7 +32,7 @@ fn data_malformed() -> Vec<&'static str> {
 fn test_url_formatting() {
     for (url, expected) in data_formatting() {
         let proxy_item = ProxyItem::new(url, "http_proxy".to_string()).unwrap();
-        let proxy = proxy_item.to_request_proxy("http".to_string());
+        let proxy = proxy_item.to_request_proxy("http");
 
         assert_eq!(expected, proxy.get_status(None).unwrap());
     }

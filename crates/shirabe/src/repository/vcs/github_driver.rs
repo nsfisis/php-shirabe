@@ -451,7 +451,7 @@ impl GitHubDriver {
                 .inner
                 .http_downloader
                 .borrow_mut()
-                .get(&legacy_lossy(file_url), options);
+                .get(file_url, options);
             let response = match response {
                 Ok(r) => r,
                 Err(_) => continue,
@@ -1037,10 +1037,10 @@ impl GitHubDriver {
                             self.attempt_clone_fallback(Some(std::sync::Arc::new((*e).into())))?;
 
                             return Ok(Ok(Response::new(
-                                "dummy".to_string(),
+                                "dummy".into(),
                                 Some(200),
                                 vec![],
-                                Some("null".to_string()),
+                                Some(b"null".to_vec()),
                             )));
                         }
 
@@ -1088,18 +1088,14 @@ impl GitHubDriver {
                             self.attempt_clone_fallback(Some(std::sync::Arc::new((*e).into())))?;
 
                             return Ok(Ok(Response::new(
-                                "dummy".to_string(),
+                                "dummy".into(),
                                 Some(200),
                                 vec![],
-                                Some("null".to_string()),
+                                Some(b"null".to_vec()),
                             )));
                         }
 
-                        // TODO(bytes): TransportException holds the response headers as Strings.
-                        let headers: Vec<BString> = e
-                            .get_headers()
-                            .map(|h| h.iter().map(|x| BString::from(x.as_str())).collect())
-                            .unwrap_or_default();
+                        let headers: Vec<BString> = e.get_headers().cloned().unwrap_or_default();
                         let rate_limited = git_hub_util.is_rate_limited(&headers);
 
                         if !self
