@@ -916,11 +916,12 @@ try {{
                                     format!("{{\\b{}$}}", preg_quote(&callable_str, None)),
                                     local_exec,
                                 ) {
-                                    let caller =
-                                        BinaryInstaller::determine_binary_caller(local_exec);
+                                    let caller = BinaryInstaller::determine_binary_caller(
+                                        &legacy_lossy(local_exec),
+                                    );
                                     exec = legacy_lossy(&preg_replace(
                                         format!("{{^{}}}", preg_quote(&callable_str, None)),
-                                        format!("{} {}", caller, local_exec),
+                                        format!("{} {}", caller, legacy_lossy(&local_exec)),
                                         &exec,
                                     ))
                                     .into_owned();
@@ -1392,8 +1393,12 @@ try {{
         let package = composer.get_package();
         let scripts = package.get_scripts();
 
-        let event_scripts: Vec<String> = match scripts.get(event.get_name()) {
-            Some(v) if !v.is_empty() => v.clone(),
+        let event_scripts: Vec<String> = match scripts.get(bstr::B(event.get_name())) {
+            Some(v) if !v.is_empty() => v
+                .clone()
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<_>>(),
             _ => return Vec::new(),
         };
 
@@ -1564,7 +1569,13 @@ try {{
         let generator = composer.borrow().get_autoload_generator();
         let mut hash_input = packages
             .iter()
-            .map(|p| format!("{}/{}", p.get_name(), p.get_version()))
+            .map(|p| {
+                format!(
+                    "{}/{}",
+                    legacy_lossy(&p.get_name()),
+                    legacy_lossy(&p.get_version())
+                )
+            })
             .collect::<Vec<_>>()
             .join(",");
         let dev_mode = event

@@ -79,7 +79,7 @@ fn run_install_and_exec_binary_with_full_compat(contents: &[u8]) {
     // PHP mocks Package::getBinaries() to return ['binary']; here a real package is
     // configured via the __set_binaries test helper.
     let package = get_package("foo/bar", "1.0.0");
-    package.__set_binaries(vec!["binary".to_string()]);
+    package.__set_binaries(vec![bstr::BString::from("binary".to_string())]);
 
     let pkg_dir = setup.vendor_dir.join("foo/bar");
     fs::create_dir_all(&pkg_dir).unwrap();

@@ -171,7 +171,7 @@ impl JsonManipulator {
     fn sort_packages(packages: &mut PhpMixed) {
         let prefix = |requirement: &BStr| -> BString {
             // TODO(bytes): is_platform_package matches the name as a &str.
-            if PlatformRepository::is_platform_package(&legacy_lossy(requirement)) {
+            if PlatformRepository::is_platform_package(requirement) {
                 let patterns = ["/^php/", "/^hhvm/", "/^ext/", "/^lib/", "/^\\D/"];
                 let replacements = ["0-$0", "1-$0", "2-$0", "3-$0", "4-$0"];
                 let mut result = BString::from(requirement);

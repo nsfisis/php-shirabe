@@ -129,12 +129,18 @@ pub trait VcsDownloader:
         if package.get_source_reference().is_none() {
             return Err(InvalidArgumentException::new(format!(
                 "Package {} is missing reference information",
-                package.get_pretty_name(),
+                package.get_pretty_name().display_lossy(),
             ))
             .into());
         }
 
-        let mut urls = self.prepare_urls(package.get_source_urls());
+        let mut urls = self.prepare_urls(
+            package
+                .get_source_urls()
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<_>>(),
+        );
 
         while let Some(url) = array_shift(&mut urls) {
             let attempt: anyhow::Result<Option<PhpMixed>> = self
@@ -189,9 +195,10 @@ pub trait VcsDownloader:
         if r#type == "update" {
             self.clean_changes(prev_package.clone().unwrap(), path, true)
                 .await?;
-            self.has_cleaned_changes()
-                .borrow_mut()
-                .insert(prev_package.unwrap().get_unique_name(), true);
+            self.has_cleaned_changes().borrow_mut().insert(
+                legacy_lossy(&prev_package.unwrap().get_unique_name()).into_owned(),
+                true,
+            );
         } else if r#type == "install" {
             self.filesystem().borrow_mut().empty_directory(path, true)?;
         } else if r#type == "uninstall" {
@@ -214,14 +221,14 @@ pub trait VcsDownloader:
                 .map(|p| {
                     self.has_cleaned_changes()
                         .borrow()
-                        .contains_key(&p.get_unique_name())
+                        .contains_key(&*legacy_lossy(&p.get_unique_name()))
                 })
                 .unwrap_or(false)
         {
             self.reapply_changes(path)?;
             self.has_cleaned_changes()
                 .borrow_mut()
-                .shift_remove(&prev_package.unwrap().get_unique_name());
+                .shift_remove(&*legacy_lossy(&prev_package.unwrap().get_unique_name()));
         }
 
         Ok(None)
@@ -235,7 +242,7 @@ pub trait VcsDownloader:
         if package.get_source_reference().is_none() {
             return Err(InvalidArgumentException::new(format!(
                 "Package {} is missing reference information",
-                package.get_pretty_name(),
+                package.get_pretty_name().display_lossy(),
             ))
             .into());
         }
@@ -246,7 +253,13 @@ pub trait VcsDownloader:
             io_interface::NORMAL,
         );
 
-        let mut urls = self.prepare_urls(package.get_source_urls());
+        let mut urls = self.prepare_urls(
+            package
+                .get_source_urls()
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<_>>(),
+        );
         while let Some(url) = array_shift(&mut urls) {
             let attempt: anyhow::Result<Option<PhpMixed>> =
                 self.do_install(package.clone(), path, &url).await;
@@ -298,7 +311,7 @@ pub trait VcsDownloader:
         if target.get_source_reference().is_none() {
             return Err(InvalidArgumentException::new(format!(
                 "Package {} is missing reference information",
-                target.get_pretty_name(),
+                target.get_pretty_name().display_lossy(),
             ))
             .into());
         }
@@ -312,7 +325,13 @@ pub trait VcsDownloader:
             io_interface::NORMAL,
         );
 
-        let mut urls = self.prepare_urls(target.get_source_urls());
+        let mut urls = self.prepare_urls(
+            target
+                .get_source_urls()
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<_>>(),
+        );
 
         let mut exception: Option<anyhow::Error> = None;
         while let Some(url) = array_shift(&mut urls) {
@@ -359,8 +378,10 @@ pub trait VcsDownloader:
         // print the commit logs if in verbose mode and VCS metadata is present
         // because in case of missing metadata code would trigger another exception
         if exception.is_none() && self.io().is_verbose() && self.has_metadata_repository(path) {
-            let initial_ref = initial.get_source_reference().unwrap_or_default();
-            let target_ref = target.get_source_reference().unwrap_or_default();
+            let initial_ref =
+                legacy_lossy(&initial.get_source_reference().unwrap_or_default()).into_owned();
+            let target_ref =
+                legacy_lossy(&target.get_source_reference().unwrap_or_default()).into_owned();
             let mut message = "Pulling in changes:";
             let mut logs = self.get_commit_logs(&initial_ref, &target_ref, path)?;
 

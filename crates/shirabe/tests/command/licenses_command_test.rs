@@ -30,16 +30,16 @@ fn set_up() -> TearDown {
     );
 
     let first = get_complete_package("first/pkg", "2.3.4");
-    first.set_license(vec!["MIT".to_string()]);
+    first.set_license(vec![bstr::BString::from("MIT".to_string())]);
 
     let second = get_complete_package("second/pkg", "3.4.0");
-    second.set_license(vec!["LGPL-2.0-only".to_string()]);
-    second.set_homepage("https://example.org".to_string());
+    second.set_license(vec![bstr::BString::from("LGPL-2.0-only".to_string())]);
+    second.set_homepage(bstr::BString::from("https://example.org".to_string()));
 
     let third = get_complete_package("third/pkg", "1.5.4");
 
     let dev = get_complete_package("dev/pkg", "2.3.4.5");
-    dev.set_license(vec!["MIT".to_string()]);
+    dev.set_license(vec![bstr::BString::from("MIT".to_string())]);
 
     let packages: Vec<PackageInterfaceHandle> = vec![first.into(), second.into(), third.into()];
     let dev_packages: Vec<PackageInterfaceHandle> = vec![dev.into()];

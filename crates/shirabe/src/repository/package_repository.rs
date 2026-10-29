@@ -9,7 +9,7 @@ use crate::repository::{
     LoadPackagesResult, ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle,
     SearchResult, SecurityAdvisoryResult,
 };
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, json_encode, legacy_lossy, php_regex, preg_replace, var_export,
@@ -69,7 +69,9 @@ impl PackageRepository {
                         e,
                         json_encode(package).unwrap_or_default()
                     );
-                    return Ok(Err(InvalidRepositoryException::new(msg)));
+                    return Ok(Err(InvalidRepositoryException::new(
+                        legacy_lossy(&msg).into_owned(),
+                    )));
                 }
             };
             self.inner.add_package(package_loaded)?;
@@ -77,17 +79,18 @@ impl PackageRepository {
         Ok(Ok(()))
     }
 
-    pub fn get_repo_name(&self) -> anyhow::Result<String> {
+    pub fn get_repo_name(&self) -> anyhow::Result<BString> {
         use crate::repository::RepositoryInterface;
         // PHP: parent::getRepoName() counts through the late-bound $this->initialize(),
         // which resolves to PackageRepository::initialize (loading the config packages).
         self.ensure_initialized()?;
-        Ok(legacy_lossy(&preg_replace(
-            php_regex!(r"{^array }"),
-            "package ",
-            &self.inner.get_repo_name()?,
+        Ok(BString::from(
+            &preg_replace(
+                php_regex!(r"{^array }"),
+                "package ",
+                &self.inner.get_repo_name()?,
+            )[..],
         ))
-        .into_owned())
     }
 
     // In PHP the inherited ArrayRepository methods lazily call the overridden initialize() to load
@@ -118,7 +121,7 @@ impl RepositoryInterface for PackageRepository {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.ensure_initialized()?;
@@ -127,7 +130,7 @@ impl RepositoryInterface for PackageRepository {
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.ensure_initialized()?;
@@ -141,10 +144,10 @@ impl RepositoryInterface for PackageRepository {
 
     fn load_packages(
         &mut self,
-        package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<shirabe_semver::constraint::AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         self.ensure_initialized()?;
         self.inner.load_packages(
@@ -157,9 +160,9 @@ impl RepositoryInterface for PackageRepository {
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         self.ensure_initialized()?;
         self.inner.search(query, mode, r#type)
@@ -167,13 +170,13 @@ impl RepositoryInterface for PackageRepository {
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         self.ensure_initialized()?;
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> anyhow::Result<String> {
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
         PackageRepository::get_repo_name(self)
     }
 
@@ -201,15 +204,14 @@ impl AdvisoryProviderInterface for PackageRepository {
 
     fn get_security_advisories(
         &mut self,
-        package_constraint_map: IndexMap<String, AnyConstraint>,
+        package_constraint_map: IndexMap<BString, AnyConstraint>,
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult> {
         let parser = VersionParser::new();
 
         let mut advisories = IndexMap::new();
         for (package_name, package_advisories) in &self.security_advisories {
-            // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
-            let package_name: &str = &package_name.to_str_lossy();
+            let package_name: &BStr = package_name.as_bstr();
             let Some(package_constraint) = package_constraint_map.get(package_name) else {
                 continue;
             };
@@ -224,17 +226,20 @@ impl AdvisoryProviderInterface for PackageRepository {
                     PhpMixed::Array(m) => m.clone(),
                     _ => continue,
                 };
-                let advisory =
-                    match PartialSecurityAdvisory::create(package_name, &data_map, &parser) {
-                        Ok(a) => a,
-                        Err(_) => continue,
-                    };
+                let advisory = match PartialSecurityAdvisory::create(
+                    bstr::BStr::new(&*legacy_lossy(package_name)),
+                    &data_map,
+                    &parser,
+                ) {
+                    Ok(a) => a,
+                    Err(_) => continue,
+                };
                 if !allow_partial_advisories && matches!(advisory, AnySecurityAdvisory::Partial(_))
                 {
                     return Err(RuntimeException::new(format!(
                         "Advisory for {} could not be loaded as a full advisory from {}\n{}",
-                        package_name,
-                        self.get_repo_name()?,
+                        package_name.display_lossy(),
+                        self.get_repo_name()?.display_lossy(),
                         var_export(data, true).display_lossy()
                     ))
                     .into());
@@ -246,11 +251,11 @@ impl AdvisoryProviderInterface for PackageRepository {
 
                 items.push(std::rc::Rc::new(advisory));
             }
-            advisories.insert(package_name.to_string(), items);
+            advisories.insert(BString::from(package_name), items);
         }
 
-        let names_found: Vec<String> = advisories.keys().cloned().collect();
-        let advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> = advisories
+        let names_found: Vec<BString> = advisories.keys().cloned().collect();
+        let advisories: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> = advisories
             .into_iter()
             .filter(|(_, adv)| !adv.is_empty())
             .collect();

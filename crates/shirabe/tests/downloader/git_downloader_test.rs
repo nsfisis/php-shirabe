@@ -69,11 +69,18 @@ fn get_package(
 ) -> PackageInterfaceHandle {
     let norm_version =
         legacy_lossy(&VersionParser.normalize(pretty_version, None).unwrap()).into_owned();
-    let package =
-        CompletePackageHandle::new(name.to_string(), norm_version, pretty_version.to_string());
-    package.__set_source_type(Some("git".to_string()));
-    package.set_source_reference(source_reference.map(|s| s.to_string()));
-    package.set_source_url(source_url.map(|s| s.to_string()));
+    let package = CompletePackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from(norm_version),
+        bstr::BString::from(pretty_version.to_string()),
+    );
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.set_source_reference(
+        source_reference
+            .map(|s| s.to_string())
+            .map(bstr::BString::from),
+    );
+    package.set_source_url(source_url.map(|s| s.to_string()).map(bstr::BString::from));
     package.into()
 }
 
@@ -344,7 +351,7 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
     // of the source url, mirroring the PHP mock's
     // `willReturn(['https://github.com/mirrors/composer', 'https://github.com/composer/composer'])`.
     package.set_source_mirrors(Some(vec![Mirror {
-        url: "https://github.com/mirrors/composer".to_string(),
+        url: bstr::BString::from("https://github.com/mirrors/composer".to_string()),
         preferred: true,
     }]));
 
@@ -877,7 +884,7 @@ fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but
     // `willReturn(['/', 'https://github.com/composer/composer'])`: the first ("/") url fails,
     // and VcsDownloader::update retries with the second (the mirror).
     package.set_source_mirrors(Some(vec![Mirror {
-        url: "https://github.com/composer/composer".to_string(),
+        url: bstr::BString::from("https://github.com/composer/composer".to_string()),
         preferred: false,
     }]));
 
@@ -976,7 +983,7 @@ fn test_downgrade_shows_appropriate_message() {
 
     let old_package = get_package("composer/composer", "1.2.0", Some("ref"), Some("/foo/bar"));
     old_package.set_source_mirrors(Some(vec![Mirror {
-        url: url.to_string(),
+        url: bstr::BString::from(url.to_string()),
         preferred: false,
     }]));
     let new_package = get_package("composer/composer", "1.0.0", Some("ref"), Some(url));
@@ -1036,27 +1043,27 @@ fn test_not_using_downgrading_with_references() {
 
     // dev versions: getVersion() is the (non-normalized) branch name.
     let old_package = CompletePackageHandle::new(
-        "composer/composer".to_string(),
-        "dev-ref".to_string(),
-        "dev-ref".to_string(),
+        bstr::BString::from("composer/composer".to_string()),
+        bstr::BString::from("dev-ref".to_string()),
+        bstr::BString::from("dev-ref".to_string()),
     );
-    old_package.__set_source_type(Some("git".to_string()));
-    old_package.set_source_reference(Some("ref".to_string()));
-    old_package.set_source_url(Some("/foo/bar".to_string()));
+    old_package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    old_package.set_source_reference(Some(bstr::BString::from("ref".to_string())));
+    old_package.set_source_url(Some(bstr::BString::from("/foo/bar".to_string())));
     old_package.set_source_mirrors(Some(vec![Mirror {
-        url: url.to_string(),
+        url: bstr::BString::from(url.to_string()),
         preferred: false,
     }]));
     let old_package: PackageInterfaceHandle = old_package.into();
 
     let new_package = CompletePackageHandle::new(
-        "composer/composer".to_string(),
-        "dev-ref2".to_string(),
-        "dev-ref2".to_string(),
+        bstr::BString::from("composer/composer".to_string()),
+        bstr::BString::from("dev-ref2".to_string()),
+        bstr::BString::from("dev-ref2".to_string()),
     );
-    new_package.__set_source_type(Some("git".to_string()));
-    new_package.set_source_reference(Some("ref".to_string()));
-    new_package.set_source_url(Some(url.to_string()));
+    new_package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    new_package.set_source_reference(Some(bstr::BString::from("ref".to_string())));
+    new_package.set_source_url(Some(bstr::BString::from(url.to_string())));
     let new_package: PackageInterfaceHandle = new_package.into();
 
     let (process, _guard) = get_process_executor_mock(vec![], false, Default::default());

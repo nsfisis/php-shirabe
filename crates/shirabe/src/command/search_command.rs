@@ -206,10 +206,14 @@ impl Command for SearchCommand {
             .unwrap_or_default();
         let mut query = legacy_lossy(&implode(" ", &token_strings)).into_owned();
         if mode != repository_interface::SEARCH_FULLTEXT {
-            query = legacy_lossy(&bstr::BString::from(preg_quote(&query, None))).into_owned();
+            query = legacy_lossy(&preg_quote(&query, None)).into_owned();
         }
 
-        let results = repos.search(query, mode, r#type)?;
+        let results = repos.search(
+            bstr::BString::from(query),
+            mode,
+            r#type.map(bstr::BString::from),
+        )?;
 
         if !results.is_empty() && format == "text" {
             let width = self.get_terminal_width();
@@ -226,21 +230,22 @@ impl Command for SearchCommand {
                     ""
                 };
                 let remaining = width - name_length - warning.len() as i64 - 2;
-                let description = if description.len() as i64 > remaining {
+                let description = legacy_lossy(&if description.len() as i64 > remaining {
                     format!(
                         "{}...",
                         legacy_lossy(&substr(&description, 0, Some(remaining - 3)))
                     )
                 } else {
-                    description
-                };
+                    legacy_lossy(&description).into_owned()
+                })
+                .into_owned();
 
                 let link = result.url.as_deref();
                 if let Some(link) = link {
                     io.write(&format!(
                         "<href={}>{}</>{}{}{}",
                         legacy_lossy(&OutputFormatter::escape(link)?),
-                        result.name,
+                        legacy_lossy(&result.name),
                         " ".repeat(name_length as usize - result.name.len()),
                         warning,
                         description
@@ -248,7 +253,7 @@ impl Command for SearchCommand {
                 } else {
                     io.write(&format!(
                         "{:<width$}{}{}",
-                        result.name,
+                        legacy_lossy(&result.name),
                         warning,
                         description,
                         width = name_length as usize

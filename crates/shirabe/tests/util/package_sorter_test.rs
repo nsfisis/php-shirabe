@@ -4,10 +4,15 @@ use indexmap::IndexMap;
 use shirabe::package::Link;
 use shirabe::package::handle::{PackageHandle, PackageInterfaceHandle};
 use shirabe::util::package_sorter::PackageSorter;
+use shirabe_php_shim::legacy_lossy;
 use shirabe_semver::constraint::MatchAllConstraint;
 
 fn create_package(name: &str, requires: &[&str]) -> PackageInterfaceHandle {
-    let package = PackageHandle::new(name.to_string(), "1.0.0.0".to_string(), "1.0.0".to_string());
+    let package = PackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0.0".to_string()),
+    );
 
     let mut links: IndexMap<String, Link> = IndexMap::new();
     for require_name in requires {
@@ -15,20 +20,29 @@ fn create_package(name: &str, requires: &[&str]) -> PackageInterfaceHandle {
             require_name.to_string(),
             Link::new(
                 package.get_name(),
-                require_name.to_string(),
+                bstr::BString::from(require_name.to_string()),
                 MatchAllConstraint::new(None).into(),
                 None,
-                "*".to_string(),
+                bstr::BString::from("*".to_string()),
             ),
         );
     }
-    package.__set_requires(links);
+    package.__set_requires(
+        links
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     package.into()
 }
 
 fn names(packages: &[PackageInterfaceHandle]) -> Vec<String> {
-    packages.iter().map(|p| p.get_name()).collect()
+    packages
+        .iter()
+        .map(|p| p.get_name())
+        .map(|s| legacy_lossy(&s).into_owned())
+        .collect()
 }
 
 #[test]

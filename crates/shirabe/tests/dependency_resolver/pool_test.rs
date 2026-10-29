@@ -29,9 +29,12 @@ fn test_pool() {
 
     assert!(same_packages(
         std::slice::from_ref(&package),
-        &pool.what_provides("foo", None)
+        &pool.what_provides(bstr::BStr::new("foo"), None)
     ));
-    assert!(same_packages(&[package], &pool.what_provides("foo", None)));
+    assert!(same_packages(
+        &[package],
+        &pool.what_provides(bstr::BStr::new("foo"), None)
+    ));
 }
 
 #[test]
@@ -43,11 +46,14 @@ fn test_what_provides_package_with_constraint() {
 
     assert!(same_packages(
         &[first_package, second_package.clone()],
-        &pool.what_provides("foo", None)
+        &pool.what_provides(bstr::BStr::new("foo"), None)
     ));
     assert!(same_packages(
         &[second_package],
-        &pool.what_provides("foo", Some(&get_version_constraint("==", "2")))
+        &pool.what_provides(
+            bstr::BStr::new("foo"),
+            Some(&get_version_constraint("==", "2"))
+        )
     ));
 }
 
@@ -64,5 +70,5 @@ fn test_package_by_id() {
 fn test_what_provides_when_package_cannot_be_found() {
     let mut pool = create_pool(vec![]);
 
-    assert!(pool.what_provides("foo", None).is_empty());
+    assert!(pool.what_provides(bstr::BStr::new("foo"), None).is_empty());
 }

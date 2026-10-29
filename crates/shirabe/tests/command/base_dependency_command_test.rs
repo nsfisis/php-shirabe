@@ -383,28 +383,36 @@ fn test_why_command_outputs() {
         req1.insert(
             "vendor1/package2".to_string(),
             Link::new(
-                "vendor1/package1".to_string(),
-                "vendor1/package2".to_string(),
+                bstr::BString::from("vendor1/package1".to_string()),
+                bstr::BString::from("vendor1/package2".to_string()),
                 match_all(),
-                Some(Link::TYPE_REQUIRE.to_string()),
-                "^2".to_string(),
+                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                bstr::BString::from("^2".to_string()),
             ),
         );
-        first_required_package.__set_requires(req1);
+        first_required_package.__set_requires(
+            req1.into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), v))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        );
 
         let second_required_package = get_package("vendor1/package2", "2.3.0");
         let mut req2 = indexmap::IndexMap::new();
         req2.insert(
             "vendor1/package3".to_string(),
             Link::new(
-                "vendor1/package2".to_string(),
-                "vendor1/package3".to_string(),
+                bstr::BString::from("vendor1/package2".to_string()),
+                bstr::BString::from("vendor1/package3".to_string()),
                 match_all(),
-                Some(Link::TYPE_REQUIRE.to_string()),
-                "^1".to_string(),
+                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                bstr::BString::from("^1".to_string()),
             ),
         );
-        second_required_package.__set_requires(req2);
+        second_required_package.__set_requires(
+            req2.into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), v))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        );
 
         let third_required_package = get_package("vendor1/package3", "2.1.0");
         let some_dev_required_package = get_package("vendor2/package1", "1.0.0");
@@ -556,18 +564,18 @@ fn test_why_not_command_outputs() {
         req.insert(
             "vendor2/package3".to_string(),
             Link::new(
-                "vendor2/package2".to_string(),
-                "vendor2/package3".to_string(),
+                bstr::BString::from("vendor2/package2".to_string()),
+                bstr::BString::from("vendor2/package3".to_string()),
                 match_all(),
-                Some(Link::TYPE_REQUIRE.to_string()),
-                "1.4.*".to_string(),
+                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                bstr::BString::from("1.4.*".to_string()),
             ),
         );
         req.insert(
             "php".to_string(),
             Link::new(
-                "vendor2/package2".to_string(),
-                "php".to_string(),
+                bstr::BString::from("vendor2/package2".to_string()),
+                bstr::BString::from("php".to_string()),
                 AnyConstraint::Multi(MultiConstraint::new(
                     vec![
                         get_version_constraint(">=", "8.2.0.0"),
@@ -576,11 +584,15 @@ fn test_why_not_command_outputs() {
                     true,
                     None,
                 )),
-                Some(Link::TYPE_REQUIRE.to_string()),
-                "^8.2".to_string(),
+                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                bstr::BString::from("^8.2".to_string()),
             ),
         );
-        second_dev_required_package.__set_requires(req);
+        second_dev_required_package.__set_requires(
+            req.into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), v))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        );
 
         let second_dev_nested_required_package = get_package("vendor2/package3", "1.4.0");
 

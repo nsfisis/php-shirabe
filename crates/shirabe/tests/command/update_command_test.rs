@@ -456,24 +456,29 @@ fn test_interactive_tmp() {
         requires.insert(
             "dep/pkg".to_string(),
             Link::new(
-                "root/req".to_string(),
-                "dep/pkg".to_string(),
+                bstr::BString::from("root/req".to_string()),
+                bstr::BString::from("dep/pkg".to_string()),
                 AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
-                Some(Link::TYPE_REQUIRE.to_string()),
-                "^1".to_string(),
+                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                bstr::BString::from("^1".to_string()),
             ),
         );
         requires.insert(
             "another-dep/pkg".to_string(),
             Link::new(
-                "root/req".to_string(),
-                "another-dep/pkg".to_string(),
+                bstr::BString::from("root/req".to_string()),
+                bstr::BString::from("another-dep/pkg".to_string()),
                 AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
-                Some(Link::TYPE_REQUIRE.to_string()),
-                "^1".to_string(),
+                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                bstr::BString::from("^1".to_string()),
             ),
         );
-        root_package.__set_requires(requires);
+        root_package.__set_requires(
+            requires
+                .into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), v))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        );
 
         create_composer_lock(&packages, &[]);
         create_installed_json(&packages, &[], true);

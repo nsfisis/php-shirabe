@@ -52,8 +52,10 @@ fn test_find_packages_with_replacers_and_providers() {
 
     let foo_matches = repo
         .find_packages_with_replacers_and_providers(
-            "foo",
-            Some(FindPackageConstraint::String("2".to_string())),
+            bstr::BStr::new("foo"),
+            Some(FindPackageConstraint::String(bstr::BString::from(
+                "2".to_string(),
+            ))),
         )
         .unwrap();
     assert_eq!(1, foo_matches.len());
@@ -61,15 +63,17 @@ fn test_find_packages_with_replacers_and_providers() {
 
     let bar_matches = repo
         .find_packages_with_replacers_and_providers(
-            "bar",
-            Some(FindPackageConstraint::String("1".to_string())),
+            bstr::BStr::new("bar"),
+            Some(FindPackageConstraint::String(bstr::BString::from(
+                "1".to_string(),
+            ))),
         )
         .unwrap();
     assert_eq!(1, bar_matches.len());
     assert!(bar_matches[0].ptr_eq(&bar));
 
     let provided_matches = repo
-        .find_packages_with_replacers_and_providers("provided", None)
+        .find_packages_with_replacers_and_providers(bstr::BStr::new("provided"), None)
         .unwrap();
     assert_eq!(2, provided_matches.len());
     assert!(provided_matches[0].ptr_eq(&foo));

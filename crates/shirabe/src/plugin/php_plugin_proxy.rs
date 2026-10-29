@@ -548,7 +548,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
         }
     };
     let class_name = legacy_lossy(class).into_owned();
-    let string_arg = |position: usize| arg::<String>(&class_name, ctor_args, position);
+    let string_arg = |position: usize| arg::<BString>(&class_name, ctor_args, position);
     let package_arg =
         |position: usize| arg::<PackageInterfaceHandle>(&class_name, ctor_args, position);
     let io_arg = |position: usize| {
@@ -2116,11 +2116,11 @@ fn dispatch_locker_method(
                 .set_lock_data(
                     arg::<Vec<PackageInterfaceHandle>>(method_name, args, 0)?,
                     arg::<Option<Vec<PackageInterfaceHandle>>>(method_name, args, 1)?,
-                    arg::<IndexMap<String, String>>(method_name, args, 2)?,
-                    arg::<IndexMap<String, String>>(method_name, args, 3)?,
+                    arg::<IndexMap<BString, BString>>(method_name, args, 2)?,
+                    arg::<IndexMap<BString, BString>>(method_name, args, 3)?,
                     arg::<Vec<IndexMap<BString, PhpMixed>>>(method_name, args, 4)?,
                     &arg::<String>(method_name, args, 5)?,
-                    arg::<IndexMap<String, i64>>(method_name, args, 6)?,
+                    arg::<IndexMap<BString, i64>>(method_name, args, 6)?,
                     arg::<bool>(method_name, args, 7)?,
                     arg::<bool>(method_name, args, 8)?,
                     arg::<IndexMap<BString, PhpMixed>>(method_name, args, 9)?,
@@ -2457,7 +2457,10 @@ impl FromPluginArg for crate::package::Mirror {
             row.get(b"preferred".as_slice()),
             Some(PluginValue::Bool(true))
         );
-        Ok(crate::package::Mirror { url, preferred })
+        Ok(crate::package::Mirror {
+            url: bstr::BString::from(url),
+            preferred,
+        })
     }
 }
 
@@ -2885,15 +2888,23 @@ fn dispatch_package_method(
             let mut borrowed = package.borrow_mut();
             let package = borrowed.as_package_interface_mut();
             match method_name {
-                "setInstallationSource" => package.set_installation_source(value),
-                "setSourceReference" => package.set_source_reference(value),
-                "setSourceUrl" => package.set_source_url(value),
-                "setDistUrl" => package.set_dist_url(value),
-                "setDistType" => package.set_dist_type(value),
-                "setDistReference" => package.set_dist_reference(value),
-                _ => package.set_source_dist_references(value.ok_or_else(|| {
-                    runtime_throw("setSourceDistReferences expects a reference string".to_string())
-                })?),
+                "setInstallationSource" => {
+                    package.set_installation_source(value.map(bstr::BString::from))
+                }
+                "setSourceReference" => {
+                    package.set_source_reference(value.map(bstr::BString::from))
+                }
+                "setSourceUrl" => package.set_source_url(value.map(bstr::BString::from)),
+                "setDistUrl" => package.set_dist_url(value.map(bstr::BString::from)),
+                "setDistType" => package.set_dist_type(value.map(bstr::BString::from)),
+                "setDistReference" => package.set_dist_reference(value.map(bstr::BString::from)),
+                _ => package.set_source_dist_references(bstr::BString::from(value.ok_or_else(
+                    || {
+                        runtime_throw(
+                            "setSourceDistReferences expects a reference string".to_string(),
+                        )
+                    },
+                )?)),
             }
             return Ok(PluginValue::Null);
         }
@@ -2947,12 +2958,12 @@ fn dispatch_package_method(
                 .expect("a root package exposes RootPackageInterface");
             match method_name {
                 "setRequires" => package.set_requires(arg_or::<
-                    IndexMap<String, crate::package::Link>,
+                    IndexMap<BString, crate::package::Link>,
                 >(
                     method_name, args, 0, IndexMap::new()
                 )?),
                 "setDevRequires" => {
-                    package.set_dev_requires(arg_or::<IndexMap<String, crate::package::Link>>(
+                    package.set_dev_requires(arg_or::<IndexMap<BString, crate::package::Link>>(
                         method_name,
                         args,
                         0,
@@ -2960,17 +2971,17 @@ fn dispatch_package_method(
                     )?)
                 }
                 "setConflicts" => package.set_conflicts(arg_or::<
-                    IndexMap<String, crate::package::Link>,
+                    IndexMap<BString, crate::package::Link>,
                 >(
                     method_name, args, 0, IndexMap::new()
                 )?),
                 "setProvides" => package.set_provides(arg_or::<
-                    IndexMap<String, crate::package::Link>,
+                    IndexMap<BString, crate::package::Link>,
                 >(
                     method_name, args, 0, IndexMap::new()
                 )?),
                 "setReplaces" => package.set_replaces(arg_or::<
-                    IndexMap<String, crate::package::Link>,
+                    IndexMap<BString, crate::package::Link>,
                 >(
                     method_name, args, 0, IndexMap::new()
                 )?),
@@ -2983,7 +2994,7 @@ fn dispatch_package_method(
                     0,
                 )?),
                 "setSuggests" => {
-                    package.set_suggests(arg::<IndexMap<String, String>>(method_name, args, 0)?)
+                    package.set_suggests(arg::<IndexMap<BString, BString>>(method_name, args, 0)?)
                 }
                 _ => package.set_extra(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?),
             }
@@ -3013,22 +3024,27 @@ fn dispatch_package_method(
                 ))
             })?;
             match method_name {
-                "setType" => package.set_type(arg::<String>(method_name, args, 0)?),
+                "setType" => package.set_type(arg::<BString>(method_name, args, 0)?),
                 "setTargetDir" => {
-                    package.set_target_dir(arg::<Option<String>>(method_name, args, 0)?)
+                    package.set_target_dir(arg::<Option<BString>>(method_name, args, 0)?)
                 }
                 "setExtra" => {
                     package.set_extra(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
                 }
-                "setBinaries" => package.set_binaries(arg::<Vec<String>>(method_name, args, 0)?),
+                "setBinaries" => package.set_binaries(
+                    arg::<Vec<String>>(method_name, args, 0)?
+                        .into_iter()
+                        .map(bstr::BString::from)
+                        .collect::<Vec<_>>(),
+                ),
                 "setSourceType" => {
-                    package.set_source_type(arg::<Option<String>>(method_name, args, 0)?)
+                    package.set_source_type(arg::<Option<BString>>(method_name, args, 0)?)
                 }
                 "setDistSha1Checksum" => {
-                    package.set_dist_sha1_checksum(arg::<Option<String>>(method_name, args, 0)?)
+                    package.set_dist_sha1_checksum(arg::<Option<BString>>(method_name, args, 0)?)
                 }
                 "setSuggests" => {
-                    package.set_suggests(arg::<IndexMap<String, String>>(method_name, args, 0)?)
+                    package.set_suggests(arg::<IndexMap<BString, BString>>(method_name, args, 0)?)
                 }
                 "setAutoload" => {
                     package.set_autoload(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
@@ -3038,29 +3054,32 @@ fn dispatch_package_method(
                     args,
                     0,
                 )?),
-                "setIncludePaths" => {
-                    package.set_include_paths(arg::<Vec<String>>(method_name, args, 0)?)
-                }
+                "setIncludePaths" => package.set_include_paths(
+                    arg::<Vec<String>>(method_name, args, 0)?
+                        .into_iter()
+                        .map(bstr::BString::from)
+                        .collect::<Vec<_>>(),
+                ),
                 "setPhpExt" => package.set_php_ext(arg::<Option<IndexMap<BString, PhpMixed>>>(
                     method_name,
                     args,
                     0,
                 )?),
                 "setNotificationUrl" => {
-                    package.set_notification_url(arg::<String>(method_name, args, 0)?)
+                    package.set_notification_url(arg::<BString>(method_name, args, 0)?)
                 }
                 "setIsDefaultBranch" => {
                     package.set_is_default_branch(arg::<bool>(method_name, args, 0)?)
                 }
                 _ => package.replace_version(
-                    arg::<String>(method_name, args, 0)?,
-                    arg::<String>(method_name, args, 1)?,
+                    arg::<BString>(method_name, args, 0)?,
+                    arg::<BString>(method_name, args, 1)?,
                 ),
             }
             return Ok(PluginValue::Null);
         }
         "setRequires" | "setConflicts" | "setProvides" | "setReplaces" | "setDevRequires" => {
-            let links = arg_or::<IndexMap<String, crate::package::Link>>(
+            let links = arg_or::<IndexMap<BString, crate::package::Link>>(
                 method_name,
                 args,
                 0,
@@ -3104,23 +3123,37 @@ fn dispatch_package_method(
                     ))
                 })?;
             match method_name {
-                "setScripts" => {
-                    package.set_scripts(arg::<IndexMap<String, Vec<String>>>(method_name, args, 0)?)
-                }
+                "setScripts" => package.set_scripts(arg::<IndexMap<BString, Vec<BString>>>(
+                    method_name,
+                    args,
+                    0,
+                )?),
                 "setRepositories" => package.set_repositories(arg::<IndexMap<BString, PhpMixed>>(
                     method_name,
                     args,
                     0,
                 )?),
-                "setLicense" => package.set_license(arg::<Vec<String>>(method_name, args, 0)?),
-                "setKeywords" => package.set_keywords(arg::<Vec<String>>(method_name, args, 0)?),
-                "setDescription" => package.set_description(arg::<String>(method_name, args, 0)?),
-                "setHomepage" => package.set_homepage(arg::<String>(method_name, args, 0)?),
-                "setAuthors" => {
-                    package.set_authors(arg::<Vec<IndexMap<String, String>>>(method_name, args, 0)?)
-                }
+                "setLicense" => package.set_license(
+                    arg::<Vec<String>>(method_name, args, 0)?
+                        .into_iter()
+                        .map(bstr::BString::from)
+                        .collect::<Vec<_>>(),
+                ),
+                "setKeywords" => package.set_keywords(
+                    arg::<Vec<String>>(method_name, args, 0)?
+                        .into_iter()
+                        .map(bstr::BString::from)
+                        .collect::<Vec<_>>(),
+                ),
+                "setDescription" => package.set_description(arg::<BString>(method_name, args, 0)?),
+                "setHomepage" => package.set_homepage(arg::<BString>(method_name, args, 0)?),
+                "setAuthors" => package.set_authors(arg::<Vec<IndexMap<BString, BString>>>(
+                    method_name,
+                    args,
+                    0,
+                )?),
                 "setSupport" => {
-                    package.set_support(arg::<IndexMap<String, String>>(method_name, args, 0)?)
+                    package.set_support(arg::<IndexMap<BString, BString>>(method_name, args, 0)?)
                 }
                 "setFunding" => package.set_funding(arg::<Vec<IndexMap<BString, PhpMixed>>>(
                     method_name,
@@ -3128,8 +3161,13 @@ fn dispatch_package_method(
                     0,
                 )?),
                 "setAbandoned" => package.set_abandoned(arg::<PhpMixed>(method_name, args, 0)?),
-                "setArchiveName" => package.set_archive_name(arg::<String>(method_name, args, 0)?),
-                _ => package.set_archive_excludes(arg::<Vec<String>>(method_name, args, 0)?),
+                "setArchiveName" => package.set_archive_name(arg::<BString>(method_name, args, 0)?),
+                _ => package.set_archive_excludes(
+                    arg::<Vec<String>>(method_name, args, 0)?
+                        .into_iter()
+                        .map(bstr::BString::from)
+                        .collect::<Vec<_>>(),
+                ),
             }
             return Ok(PluginValue::Null);
         }
@@ -3146,22 +3184,26 @@ fn dispatch_package_method(
                 ))
             })?;
             match method_name {
-                "setStabilityFlags" => {
-                    package.set_stability_flags(arg::<IndexMap<String, i64>>(method_name, args, 0)?)
-                }
+                "setStabilityFlags" => package.set_stability_flags(arg::<IndexMap<BString, i64>>(
+                    method_name,
+                    args,
+                    0,
+                )?),
                 "setMinimumStability" => {
-                    package.set_minimum_stability(arg::<String>(method_name, args, 0)?)
+                    package.set_minimum_stability(arg::<BString>(method_name, args, 0)?)
                 }
                 "setPreferStable" => package.set_prefer_stable(arg::<bool>(method_name, args, 0)?),
                 "setConfig" => {
                     package.set_config(arg::<IndexMap<BString, PhpMixed>>(method_name, args, 0)?)
                 }
                 "setReferences" => {
-                    package.set_references(arg::<IndexMap<String, String>>(method_name, args, 0)?)
+                    package.set_references(arg::<IndexMap<BString, BString>>(method_name, args, 0)?)
                 }
-                _ => {
-                    package.set_aliases(arg::<Vec<IndexMap<String, String>>>(method_name, args, 0)?)
-                }
+                _ => package.set_aliases(arg::<Vec<IndexMap<BString, BString>>>(
+                    method_name,
+                    args,
+                    0,
+                )?),
             }
             return Ok(PluginValue::Null);
         }
@@ -3209,8 +3251,12 @@ fn dispatch_package_method(
     let borrowed = package.borrow();
     let package = borrowed.as_package_interface();
     match method_name {
-        "getName" => Ok(package.get_name().to_string().to_plugin_value()),
-        "getPrettyName" => Ok(package.get_pretty_name().to_string().to_plugin_value()),
+        "getName" => Ok(legacy_lossy(package.get_name())
+            .into_owned()
+            .to_plugin_value()),
+        "getPrettyName" => Ok(legacy_lossy(package.get_pretty_name())
+            .into_owned()
+            .to_plugin_value()),
         "getNames" => {
             let provides = arg_or::<bool>(method_name, args, 0, true)?;
             Ok(package.get_names(provides).to_plugin_value())
@@ -3232,8 +3278,12 @@ fn dispatch_package_method(
         "getDistReference" => Ok(package.get_dist_reference().to_plugin_value()),
         "getDistSha1Checksum" => Ok(package.get_dist_sha1_checksum().to_plugin_value()),
         "getDistMirrors" => Ok(package.get_dist_mirrors().to_plugin_value()),
-        "getVersion" => Ok(package.get_version().to_string().to_plugin_value()),
-        "getPrettyVersion" => Ok(package.get_pretty_version().to_string().to_plugin_value()),
+        "getVersion" => Ok(legacy_lossy(package.get_version())
+            .into_owned()
+            .to_plugin_value()),
+        "getPrettyVersion" => Ok(legacy_lossy(package.get_pretty_version())
+            .into_owned()
+            .to_plugin_value()),
         "getFullPrettyVersion" => {
             let truncate = arg_or::<bool>(method_name, args, 0, true)?;
             let display_mode =
@@ -3242,7 +3292,9 @@ fn dispatch_package_method(
                 .get_full_pretty_version(truncate, display_mode)
                 .to_plugin_value())
         }
-        "getStability" => Ok(package.get_stability().to_string().to_plugin_value()),
+        "getStability" => Ok(legacy_lossy(package.get_stability())
+            .into_owned()
+            .to_plugin_value()),
         "getRequires" => Ok((*package.get_requires()).clone().to_plugin_value()),
         "getConflicts" => Ok((*package.get_conflicts()).clone().to_plugin_value()),
         "getProvides" => Ok((*package.get_provides()).clone().to_plugin_value()),
@@ -3272,10 +3324,9 @@ fn dispatch_package_method(
             .get_repository()
             .is_some_and(|repository| repository.is::<crate::repository::PlatformRepository>())
             .to_plugin_value()),
-        "getStabilityPriority" => Ok((*crate::package::base_package::STABILITIES
-            .get(package.get_stability())
-            .unwrap_or(&crate::package::base_package::STABILITY_STABLE))
-        .to_plugin_value()),
+        "getStabilityPriority" => Ok(crate::package::stability_priority(package.get_stability())
+            .unwrap_or(crate::package::base_package::STABILITY_STABLE)
+            .to_plugin_value()),
         "getTransportOptions" => Ok(package.get_transport_options().to_plugin_value()),
         "getReleaseDate" => Ok(package.get_release_date().to_plugin_value()),
         other => Err(runtime_throw(format!(

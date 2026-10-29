@@ -2,41 +2,41 @@
 
 use crate::advisory::Auditor;
 use crate::config::Config;
-use bstr::{B, ByteSlice};
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed, canonical_int_key, legacy_lossy};
 
 #[derive(Debug, Clone)]
 pub struct AuditConfig {
     pub audit: bool,
-    pub audit_format: String,
-    pub audit_abandoned: String,
+    pub audit_format: BString,
+    pub audit_abandoned: BString,
     pub block_insecure: bool,
     pub block_abandoned: bool,
     pub ignore_unreachable: bool,
-    pub ignore_list_for_audit: IndexMap<String, Option<String>>,
-    pub ignore_list_for_blocking: IndexMap<String, Option<String>>,
-    pub ignore_severity_for_audit: IndexMap<String, Option<String>>,
-    pub ignore_severity_for_blocking: IndexMap<String, Option<String>>,
-    pub ignore_abandoned_for_audit: IndexMap<String, Option<String>>,
-    pub ignore_abandoned_for_blocking: IndexMap<String, Option<String>>,
+    pub ignore_list_for_audit: IndexMap<BString, Option<BString>>,
+    pub ignore_list_for_blocking: IndexMap<BString, Option<BString>>,
+    pub ignore_severity_for_audit: IndexMap<BString, Option<BString>>,
+    pub ignore_severity_for_blocking: IndexMap<BString, Option<BString>>,
+    pub ignore_abandoned_for_audit: IndexMap<BString, Option<BString>>,
+    pub ignore_abandoned_for_blocking: IndexMap<BString, Option<BString>>,
 }
 
 impl AuditConfig {
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
         audit: bool,
-        audit_format: String,
-        audit_abandoned: String,
+        audit_format: BString,
+        audit_abandoned: BString,
         block_insecure: bool,
         block_abandoned: bool,
         ignore_unreachable: bool,
-        ignore_list_for_audit: IndexMap<String, Option<String>>,
-        ignore_list_for_blocking: IndexMap<String, Option<String>>,
-        ignore_severity_for_audit: IndexMap<String, Option<String>>,
-        ignore_severity_for_blocking: IndexMap<String, Option<String>>,
-        ignore_abandoned_for_audit: IndexMap<String, Option<String>>,
-        ignore_abandoned_for_blocking: IndexMap<String, Option<String>>,
+        ignore_list_for_audit: IndexMap<BString, Option<BString>>,
+        ignore_list_for_blocking: IndexMap<BString, Option<BString>>,
+        ignore_severity_for_audit: IndexMap<BString, Option<BString>>,
+        ignore_severity_for_blocking: IndexMap<BString, Option<BString>>,
+        ignore_abandoned_for_audit: IndexMap<BString, Option<BString>>,
+        ignore_abandoned_for_blocking: IndexMap<BString, Option<BString>>,
     ) -> Self {
         Self {
             audit,
@@ -61,19 +61,19 @@ impl AuditConfig {
     fn parse_ignore_with_apply(
         config: &PhpMixed,
     ) -> anyhow::Result<(
-        IndexMap<String, Option<String>>,
-        IndexMap<String, Option<String>>,
+        IndexMap<BString, Option<BString>>,
+        IndexMap<BString, Option<BString>>,
     )> {
-        let mut for_audit: IndexMap<String, Option<String>> = IndexMap::new();
-        let mut for_block: IndexMap<String, Option<String>> = IndexMap::new();
+        let mut for_audit: IndexMap<BString, Option<BString>> = IndexMap::new();
+        let mut for_block: IndexMap<BString, Option<BString>> = IndexMap::new();
 
         let entries = match config {
             PhpMixed::Array(arr) => arr,
             PhpMixed::List(list) => {
                 for value in list {
                     if let Some(id) = value.as_string() {
-                        for_audit.insert(legacy_lossy(id).into_owned(), None);
-                        for_block.insert(legacy_lossy(id).into_owned(), None);
+                        for_audit.insert(BString::from(id), None);
+                        for_block.insert(BString::from(id), None);
                     }
                 }
                 return Ok((for_audit, for_block));
@@ -82,49 +82,38 @@ impl AuditConfig {
         };
 
         for (key, value) in entries {
-            // TODO(bytes): advisory IDs and package names are Strings, so non-UTF-8 bytes are
-            // replaced.
             let (id, apply, reason) = match value {
                 PhpMixed::String(reason_str) => {
                     // TODO(type-model): PHP's `array` type must be modeled more precisely. This is
                     // escape hatch.
                     if canonical_int_key(key).is_some() {
-                        (
-                            reason_str.to_str_lossy().into_owned(),
-                            "all".to_string(),
-                            None,
-                        )
+                        (reason_str.clone(), BString::from("all"), None)
                     } else {
-                        (
-                            key.to_str_lossy().into_owned(),
-                            "all".to_string(),
-                            Some(reason_str.to_str_lossy().into_owned()),
-                        )
+                        (key.clone(), BString::from("all"), Some(reason_str.clone()))
                     }
                 }
                 PhpMixed::Array(detail) => {
-                    let apply = legacy_lossy(
+                    let apply = BString::from(
                         detail
                             .get(B("apply"))
                             .and_then(|v| v.as_string())
                             .unwrap_or("all".into()),
-                    )
-                    .into_owned();
+                    );
                     let reason = detail
                         .get(B("reason"))
                         .and_then(|v| v.as_string())
-                        .map(|s| legacy_lossy(s).into_owned());
+                        .map(BString::from);
 
-                    if !["audit", "block", "all"].contains(&apply.as_str()) {
+                    if !["audit", "block", "all"].iter().any(|a| apply == *a) {
                         return Err(InvalidArgumentException::new(format!(
                             "Invalid 'apply' value for '{}': {}. Expected 'audit', 'block', or 'all'.",
-                            key.display_lossy(), apply
+                            key.display_lossy(), apply.display_lossy()
                         )).into());
                     }
 
-                    (key.to_str_lossy().into_owned(), apply, reason)
+                    (key.clone(), apply, reason)
                 }
-                PhpMixed::Null => (key.to_str_lossy().into_owned(), "all".to_string(), None),
+                PhpMixed::Null => (key.clone(), BString::from("all"), None),
                 _ => continue,
             };
 
@@ -144,7 +133,7 @@ impl AuditConfig {
         audit: bool,
         audit_format: &str,
     ) -> anyhow::Result<Self> {
-        let audit_config_raw = config.get("audit");
+        let audit_config_raw = config.get(&legacy_lossy(b"audit".as_slice()));
         let audit_config = audit_config_raw.as_array();
 
         let empty_array = PhpMixed::Array(IndexMap::new());
@@ -170,13 +159,12 @@ impl AuditConfig {
         let (ignore_severity_for_audit, ignore_severity_for_blocking) =
             Self::parse_ignore_with_apply(&ignore_severity_raw)?;
 
-        let audit_abandoned = legacy_lossy(
+        let audit_abandoned = BString::from(
             audit_config
                 .and_then(|m| m.get(B("abandoned")))
                 .and_then(|v| v.as_string())
                 .unwrap_or(Auditor::ABANDONED_FAIL.into()),
-        )
-        .into_owned();
+        );
 
         let block_insecure = audit_config
             .and_then(|m| m.get(B("block-insecure")))
@@ -198,7 +186,7 @@ impl AuditConfig {
 
         Ok(Self::new(
             audit,
-            audit_format.to_string(),
+            bstr::BString::from(audit_format.to_string()),
             audit_abandoned,
             block_insecure,
             block_abandoned,

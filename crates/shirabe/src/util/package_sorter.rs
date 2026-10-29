@@ -1,8 +1,9 @@
 //! ref: composer/src/Composer/Util/PackageSorter.php
 
 use crate::package::{Link, PackageInterfaceHandle};
+use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, strnatcasecmp, version_compare};
+use shirabe_php_shim::{CmpOp, legacy_lossy, strnatcasecmp, version_compare};
 
 pub struct PackageSorter;
 
@@ -42,7 +43,7 @@ impl PackageSorter {
         let mut usage_list: IndexMap<String, Vec<String>> = IndexMap::new();
 
         for package in &packages {
-            let mut links: IndexMap<String, Link> = (*package.get_requires()).clone();
+            let mut links: IndexMap<BString, Link> = (*package.get_requires()).clone();
             if let Some(root_package) = package.as_root() {
                 links.extend(
                     root_package
@@ -52,11 +53,11 @@ impl PackageSorter {
                 );
             }
             for link in links.values() {
-                let target = link.get_target().to_string();
+                let target = legacy_lossy(link.get_target()).into_owned();
                 usage_list
                     .entry(target)
                     .or_default()
-                    .push(package.get_name());
+                    .push(legacy_lossy(&package.get_name()).into_owned());
             }
         }
 
@@ -69,7 +70,7 @@ impl PackageSorter {
 
         let mut weighted_packages: Vec<(String, i64, usize)> = Vec::new();
         for (index, package) in packages.iter().enumerate() {
-            let name = package.get_name().to_string();
+            let name = legacy_lossy(&package.get_name()).into_owned();
             let weight = helper.compute(&name);
             weighted_packages.push((name, weight, index));
         }

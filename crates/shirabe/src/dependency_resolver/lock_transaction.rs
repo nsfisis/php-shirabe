@@ -2,27 +2,26 @@
 
 use crate::dependency_resolver::{Decisions, Pool, Transaction};
 use crate::package::PackageInterfaceHandle;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    PregMatches, legacy_lossy, php_regex, preg_is_match, preg_replace_callback,
-};
+use shirabe_php_shim::{PregMatches, bconcat, php_regex, preg_is_match, preg_replace_callback};
 
 #[derive(Debug)]
 pub struct LockTransaction {
     inner: Transaction,
     /// packages in current lock file, platform repo or otherwise present
     /// Indexed by spl_object_hash
-    present_map: IndexMap<String, PackageInterfaceHandle>,
+    present_map: IndexMap<BString, PackageInterfaceHandle>,
     /// Packages which cannot be mapped, platform repo, root package, other fixed repos
     /// Indexed by package id
     unlockable_map: IndexMap<i64, PackageInterfaceHandle>,
-    result_packages: IndexMap<String, Vec<PackageInterfaceHandle>>,
+    result_packages: IndexMap<BString, Vec<PackageInterfaceHandle>>,
 }
 
 impl LockTransaction {
     pub fn new(
         pool: &Pool,
-        present_map: IndexMap<String, PackageInterfaceHandle>,
+        present_map: IndexMap<BString, PackageInterfaceHandle>,
         unlockable_map: IndexMap<i64, PackageInterfaceHandle>,
         decisions: &Decisions,
     ) -> Self {
@@ -35,7 +34,7 @@ impl LockTransaction {
         this.set_result_packages(pool, decisions);
         let all: Vec<PackageInterfaceHandle> = this
             .result_packages
-            .get("all")
+            .get(b"all".as_slice())
             .map(|v| v.to_vec())
             .unwrap_or_default();
         let present: Vec<PackageInterfaceHandle> = this.present_map.values().cloned().collect();
@@ -44,10 +43,10 @@ impl LockTransaction {
     }
 
     pub fn set_result_packages(&mut self, pool: &Pool, decisions: &Decisions) {
-        let mut result_packages: IndexMap<String, Vec<PackageInterfaceHandle>> = IndexMap::new();
-        result_packages.insert("all".to_string(), vec![]);
-        result_packages.insert("non-dev".to_string(), vec![]);
-        result_packages.insert("dev".to_string(), vec![]);
+        let mut result_packages: IndexMap<BString, Vec<PackageInterfaceHandle>> = IndexMap::new();
+        result_packages.insert(bstr::BString::from("all".to_string()), vec![]);
+        result_packages.insert(bstr::BString::from("non-dev".to_string()), vec![]);
+        result_packages.insert(bstr::BString::from("dev".to_string()), vec![]);
 
         for decision in decisions.decision_queue.iter() {
             let literal = decision.0;
@@ -56,12 +55,12 @@ impl LockTransaction {
                 let package = pool.literal_to_package(literal);
 
                 result_packages
-                    .get_mut("all")
+                    .get_mut(bstr::B("all"))
                     .unwrap()
                     .push(package.clone());
                 if !self.unlockable_map.contains_key(&package.get_id()) {
                     result_packages
-                        .get_mut("non-dev")
+                        .get_mut(bstr::B("non-dev"))
                         .unwrap()
                         .push(package.clone());
                 }
@@ -76,19 +75,24 @@ impl LockTransaction {
 
         let non_dev = self
             .result_packages
-            .shift_remove("non-dev")
+            .shift_remove(b"non-dev".as_slice())
             .unwrap_or_default();
-        self.result_packages.insert("dev".to_string(), non_dev);
-        self.result_packages.insert("non-dev".to_string(), vec![]);
+        self.result_packages
+            .insert(bstr::BString::from("dev".to_string()), non_dev);
+        self.result_packages
+            .insert(bstr::BString::from("non-dev".to_string()), vec![]);
 
-        let mut remaining_dev = self.result_packages.shift_remove("dev").unwrap_or_default();
+        let mut remaining_dev = self
+            .result_packages
+            .shift_remove(b"dev".as_slice())
+            .unwrap_or_default();
         for package in &packages {
             let mut i = 0;
             while i < remaining_dev.len() {
                 if package.get_name() == remaining_dev[i].get_name() {
                     let result_package = remaining_dev.remove(i);
                     self.result_packages
-                        .get_mut("non-dev")
+                        .get_mut(bstr::B("non-dev"))
                         .unwrap()
                         .push(result_package);
                 } else {
@@ -97,7 +101,7 @@ impl LockTransaction {
             }
         }
         self.result_packages
-            .insert("dev".to_string(), remaining_dev);
+            .insert(bstr::BString::from("dev".to_string()), remaining_dev);
     }
 
     pub fn get_new_lock_packages(
@@ -110,7 +114,7 @@ impl LockTransaction {
 
         let source = self
             .result_packages
-            .get(key)
+            .get(bstr::B(key))
             .map(|v| v.as_slice())
             .unwrap_or_default();
         for package in source {
@@ -118,7 +122,11 @@ impl LockTransaction {
                 continue;
             }
 
-            if update_mirrors && !self.present_map.contains_key(&package.ptr_id().to_string()) {
+            if update_mirrors
+                && !self
+                    .present_map
+                    .contains_key(package.ptr_id().to_string().as_bytes())
+            {
                 let updated = self.update_mirror_and_urls(package.clone());
                 packages.push(updated);
             } else {
@@ -173,20 +181,19 @@ impl LockTransaction {
                 // 40-hex SHAs sharing a single `/` between them would not both match; harmless
                 // here since a dist URL never carries more than one SHA reference.
                 let dist_reference = present_package.get_dist_reference().unwrap();
-                let new_dist_url = legacy_lossy(
+                let new_dist_url = BString::from(
                     &preg_replace_callback(
                         php_regex!(r"{(/|sha=)[a-f0-9]{40}(/|$)}i"),
-                        |m: &PregMatches| -> anyhow::Result<String> {
-                            let get = |i: usize| -> String {
-                                legacy_lossy(m.get(i).unwrap_or_default()).into_owned()
+                        |m: &PregMatches| -> anyhow::Result<BString> {
+                            let get = |i: usize| -> BString {
+                                bstr::BString::from(m.get(i).unwrap_or_default())
                             };
-                            Ok(format!("{}{}{}", get(1), dist_reference, get(2)))
+                            Ok(bconcat!(get(1), dist_reference, get(2)))
                         },
                         &package.get_dist_url().unwrap(),
                     )
-                    .expect("the replacement callback cannot fail"),
-                )
-                .into_owned();
+                    .expect("the replacement callback cannot fail")[..],
+                );
                 present_package.set_dist_url(Some(new_dist_url));
             }
             present_package.set_dist_mirrors(package.get_dist_mirrors());
@@ -199,18 +206,20 @@ impl LockTransaction {
 
     pub fn get_aliases(
         &self,
-        aliases: Vec<IndexMap<String, String>>,
-    ) -> Vec<IndexMap<String, String>> {
+        aliases: Vec<IndexMap<BString, BString>>,
+    ) -> Vec<IndexMap<BString, BString>> {
         let mut used_aliases = vec![];
         let mut remaining_aliases = aliases;
 
-        if let Some(all_packages) = self.result_packages.get("all") {
+        if let Some(all_packages) = self.result_packages.get(b"all".as_slice()) {
             for package in all_packages {
                 if package.as_alias().is_some() {
                     let mut i = 0;
                     while i < remaining_aliases.len() {
-                        if remaining_aliases[i].get("package").map(|s| s.as_str())
-                            == Some(package.get_name().as_str())
+                        if remaining_aliases[i]
+                            .get(b"package".as_slice())
+                            .map(|s| s.as_bstr())
+                            == Some(package.get_name().as_bstr())
                         {
                             used_aliases.push(remaining_aliases.remove(i));
                         } else {
@@ -222,8 +231,14 @@ impl LockTransaction {
         }
 
         used_aliases.sort_by(|a, b| {
-            let a_pkg = a.get("package").map(|s| s.as_str()).unwrap_or_default();
-            let b_pkg = b.get("package").map(|s| s.as_str()).unwrap_or_default();
+            let a_pkg = a
+                .get(b"package".as_slice())
+                .map(|s| s.as_bstr())
+                .unwrap_or_default();
+            let b_pkg = b
+                .get(b"package".as_slice())
+                .map(|s| s.as_bstr())
+                .unwrap_or_default();
             a_pkg.cmp(b_pkg)
         });
 

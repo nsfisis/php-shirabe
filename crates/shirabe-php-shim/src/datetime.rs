@@ -37,11 +37,14 @@ fn parse_to_fixed(s: &str) -> Option<chrono::DateTime<chrono::FixedOffset>> {
     Some(utc.fixed_offset())
 }
 
-pub fn date_create<Tz: chrono::TimeZone>(s: &str) -> chrono::ParseResult<chrono::DateTime<Tz>>
+pub fn date_create<Tz: chrono::TimeZone>(
+    s: impl AsRef<[u8]>,
+) -> chrono::ParseResult<chrono::DateTime<Tz>>
 where
     chrono::DateTime<Tz>: From<chrono::DateTime<chrono::FixedOffset>>,
 {
-    match parse_to_fixed(s) {
+    // Every format `parse_to_fixed` accepts is ASCII, so bytes that are not UTF-8 cannot parse.
+    match crate::utf8_text(s.as_ref()).and_then(parse_to_fixed) {
         Some(dt) => Ok(dt.into()),
         // PHP `date_create` returns `false` here; the closest faithful signal under chrono's
         // `ParseResult` is a parse error, produced by replaying a deliberately invalid parse.

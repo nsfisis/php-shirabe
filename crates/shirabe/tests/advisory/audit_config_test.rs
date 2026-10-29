@@ -23,10 +23,10 @@ fn s(v: &str) -> PhpMixed {
     PhpMixed::string(v.to_string())
 }
 
-fn ignore_list(pairs: Vec<(&str, Option<&str>)>) -> IndexMap<String, Option<String>> {
+fn ignore_list(pairs: Vec<(&str, Option<&str>)>) -> IndexMap<BString, Option<BString>> {
     pairs
         .into_iter()
-        .map(|(k, v)| (k.to_string(), v.map(String::from)))
+        .map(|(k, v)| (BString::from(k), v.map(BString::from)))
         .collect()
 }
 

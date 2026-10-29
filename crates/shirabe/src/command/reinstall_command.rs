@@ -10,7 +10,7 @@ use crate::package::base_package;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::script::ScriptEvents;
 use crate::util::Platform;
-use shirabe_php_shim::{InvalidArgumentException, impl_php_class, preg_is_match};
+use shirabe_php_shim::{InvalidArgumentException, impl_php_class, legacy_lossy, preg_is_match};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -104,8 +104,8 @@ impl Command for ReinstallCommand {
                 .map(<[String]>::to_vec)
                 .unwrap_or_default();
             for package in local_repo.get_canonical_packages()? {
-                if filter_types.contains(&package.get_type()) {
-                    package_names_to_reinstall.push(package.get_name());
+                if filter_types.contains(&legacy_lossy(&package.get_type()).into_owned()) {
+                    package_names_to_reinstall.push(legacy_lossy(&package.get_name()).into_owned());
                     packages_to_reinstall.push(package);
                 }
             }
@@ -126,7 +126,8 @@ impl Command for ReinstallCommand {
                 for package in local_repo.get_canonical_packages()? {
                     if preg_is_match(&pattern_regexp, package.get_name()) {
                         matched = true;
-                        package_names_to_reinstall.push(package.get_name());
+                        package_names_to_reinstall
+                            .push(legacy_lossy(&package.get_name()).into_owned());
                         packages_to_reinstall.push(package);
                     }
                 }
@@ -151,7 +152,10 @@ impl Command for ReinstallCommand {
             present_packages.to_vec();
         let present_packages: Vec<crate::package::PackageInterfaceHandle> = present_packages
             .into_iter()
-            .filter(|package| !package_names_to_reinstall.contains(&package.get_name()))
+            .filter(|package| {
+                !package_names_to_reinstall
+                    .contains(&legacy_lossy(&package.get_name()).into_owned())
+            })
             .collect();
 
         let transaction = Transaction::new(present_packages, result_packages);

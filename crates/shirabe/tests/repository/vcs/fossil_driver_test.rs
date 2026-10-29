@@ -68,7 +68,7 @@ fn test_support() {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
         let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
-        let result = FossilDriver::supports(io, config, url, false).unwrap();
+        let result = FossilDriver::supports(io, config, bstr::BStr::new(url), false).unwrap();
         assert_eq!(assertion, result);
     }
 }

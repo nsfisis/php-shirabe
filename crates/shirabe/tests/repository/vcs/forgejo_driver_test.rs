@@ -11,7 +11,7 @@ use shirabe::repository::vcs::ForgejoDriver;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::{HttpDownloader, HttpDownloaderMockHandler};
 use shirabe::util::process_executor::MockHandler;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -148,21 +148,21 @@ fn test_public_repository() {
     assert_eq!("main", driver.get_root_identifier().unwrap());
 
     let sha = "SOMESHA";
-    let dist = driver.get_dist(sha).unwrap();
-    assert_eq!("zip", dist.get("type").unwrap());
+    let dist = driver.get_dist(bstr::BStr::new(sha)).unwrap();
+    assert_eq!("zip", dist.get(bstr::B("type")).unwrap());
     assert_eq!(
         "https://codeberg.org/api/v1/repos/acme/repo/archive/SOMESHA.zip",
-        dist.get("url").unwrap()
+        dist.get(bstr::B("url")).unwrap()
     );
-    assert_eq!(sha, dist.get("reference").unwrap());
+    assert_eq!(sha, dist.get(bstr::B("reference")).unwrap());
 
-    let source = driver.get_source(sha);
-    assert_eq!("git", source.get("type").unwrap());
+    let source = driver.get_source(bstr::BStr::new(sha));
+    assert_eq!("git", source.get(bstr::B("type")).unwrap());
     assert_eq!(
         "https://codeberg.org/acme/repo.git",
-        source.get("url").unwrap()
+        source.get(bstr::B("url")).unwrap()
     );
-    assert_eq!(sha, source.get("reference").unwrap());
+    assert_eq!(sha, source.get(bstr::B("reference")).unwrap());
 }
 
 #[test]
@@ -205,7 +205,16 @@ fn test_get_branches() {
 
     let mut expected: IndexMap<String, String> = IndexMap::new();
     expected.insert("main".to_string(), "SOMESHA".to_string());
-    assert_eq!(expected, driver.get_branches().unwrap());
+    assert_eq!(
+        expected
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_str()),
+                bstr::BString::from(v.as_str())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        driver.get_branches().unwrap()
+    );
 }
 
 #[test]
@@ -248,7 +257,16 @@ fn test_get_tags() {
 
     let mut expected: IndexMap<String, String> = IndexMap::new();
     expected.insert("1.0".to_string(), "SOMESHA".to_string());
-    assert_eq!(expected, driver.get_tags().unwrap());
+    assert_eq!(
+        expected
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_str()),
+                bstr::BString::from(v.as_str())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        driver.get_tags().unwrap()
+    );
 }
 
 #[test]
@@ -281,7 +299,10 @@ fn test_get_empty_file_content() {
 
     assert_eq!(
         Some(String::new()),
-        driver.get_file_content("composer.json", "main").unwrap()
+        driver
+            .get_file_content(bstr::BStr::new("composer.json"), bstr::BStr::new("main"))
+            .unwrap()
+            .map(|s| legacy_lossy(&s).into_owned())
     );
 }
 
@@ -300,8 +321,13 @@ fn test_supports() {
     for (expected, repo_url) in supports_provider() {
         assert_eq!(
             expected,
-            ForgejoDriver::supports(set_up.io.clone(), set_up.config.clone(), repo_url, false)
-                .unwrap()
+            ForgejoDriver::supports(
+                set_up.io.clone(),
+                set_up.config.clone(),
+                bstr::BStr::new(repo_url),
+                false
+            )
+            .unwrap()
         );
     }
 }

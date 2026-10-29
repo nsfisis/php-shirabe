@@ -57,7 +57,7 @@ impl SvnDownloader {
             .map_err(|e| {
                 anyhow::anyhow!(
                     "{} could not be downloaded, {}",
-                    package.get_pretty_name(),
+                    package.get_pretty_name().display_lossy(),
                     e
                 )
             })
@@ -174,7 +174,10 @@ impl VcsDownloader for SvnDownloader {
         self.inner.io.write_error3(
             &format!(
                 " Checking out {}",
-                package.get_source_reference().unwrap_or_default()
+                package
+                    .get_source_reference()
+                    .unwrap_or_default()
+                    .display_lossy()
             ),
             true,
             io_interface::NORMAL,
@@ -183,7 +186,7 @@ impl VcsDownloader for SvnDownloader {
             package,
             url,
             vec!["svn".to_string(), "co".to_string()],
-            &format!("{}/{}", url, r#ref.unwrap_or_default()),
+            &format!("{}/{}", url, legacy_lossy(&r#ref.unwrap_or_default())),
             None,
             Some(path),
         )?;
@@ -225,7 +228,10 @@ impl VcsDownloader for SvnDownloader {
         }
 
         self.inner.io.write_error3(
-            &format!(" Checking out {}", r#ref.clone().unwrap_or_default()),
+            &format!(
+                " Checking out {}",
+                r#ref.clone().unwrap_or_default().display_lossy()
+            ),
             true,
             io_interface::NORMAL,
         );
@@ -235,7 +241,7 @@ impl VcsDownloader for SvnDownloader {
             target,
             url,
             command,
-            &format!("{}/{}", url, r#ref.unwrap_or_default()),
+            &format!("{}/{}", url, legacy_lossy(&r#ref.unwrap_or_default())),
             Some(path),
             None,
         )?;
@@ -279,7 +285,7 @@ impl VcsDownloader for SvnDownloader {
         self.inner.io.write_error3(
             &format!(
                 "    <error>{} has modified file{}:</error>",
-                package.get_pretty_name(),
+                package.get_pretty_name().display_lossy(),
                 if count_changes == 1 { "" } else { "s" }
             ),
             true,

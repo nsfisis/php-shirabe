@@ -22,10 +22,10 @@ fn run_use_case(
 
     for (pkg, url) in urls {
         if *pkg == "vendor/package" {
-            package.set_homepage(url.to_string());
+            package.set_homepage(bstr::BString::from(url.to_string()));
         }
         if *pkg == "vendor/devpackage" {
-            dev_package.set_homepage(url.to_string());
+            dev_package.set_homepage(bstr::BString::from(url.to_string()));
         }
     }
 

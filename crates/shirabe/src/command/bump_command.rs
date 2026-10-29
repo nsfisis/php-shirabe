@@ -197,8 +197,10 @@ impl BumpCommand {
                 let current_constraint = link.get_pretty_constraint();
 
                 let package_opt = repo.find_package(
-                    pkg_name,
-                    crate::repository::FindPackageConstraint::String("*".to_string()),
+                    bstr::BStr::new(&*legacy_lossy(pkg_name)),
+                    crate::repository::FindPackageConstraint::String(bstr::BString::from(
+                        "*".to_string(),
+                    )),
                 )?;
                 let mut package = match package_opt {
                     None => continue,
@@ -217,7 +219,7 @@ impl BumpCommand {
                 updates
                     .entry(*key)
                     .or_default()
-                    .insert(pkg_name.clone(), bumped);
+                    .insert(legacy_lossy(&pkg_name.clone()).into_owned(), bumped);
             }
         }
 

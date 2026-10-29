@@ -13,7 +13,7 @@ use crate::repository::{InstalledRepositoryInterface, InstalledRepositoryInterfa
 use crate::signal::SignalSubscription;
 use crate::util::Platform;
 use crate::util::r#loop::Loop;
-use bstr::{B, BString};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, array_splice, array_unshift, http_build_query, json_encode,
@@ -25,8 +25,8 @@ use shirabe_php_shim::{
 pub struct InstallationManager {
     installers: std::cell::RefCell<Vec<std::rc::Rc<dyn InstallerInterface>>>,
     /// Maps a package type to its installer.
-    cache: std::cell::RefCell<IndexMap<String, std::rc::Rc<dyn InstallerInterface>>>,
-    notifiable_packages: std::cell::RefCell<IndexMap<String, Vec<PackageInterfaceHandle>>>,
+    cache: std::cell::RefCell<IndexMap<BString, std::rc::Rc<dyn InstallerInterface>>>,
+    notifiable_packages: std::cell::RefCell<IndexMap<BString, Vec<PackageInterfaceHandle>>>,
     loop_: std::rc::Rc<std::cell::RefCell<Loop>>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
@@ -157,7 +157,7 @@ impl InstallationManager {
     ) -> anyhow::Result<std::rc::Rc<dyn InstallerInterface>> {
         let r#type = strtolower(r#type);
 
-        if let Some(installer) = self.cache.borrow().get(&*legacy_lossy(&r#type)) {
+        if let Some(installer) = self.cache.borrow().get(bstr::B(&*legacy_lossy(&r#type))) {
             return Ok(installer.clone());
         }
 
@@ -168,7 +168,7 @@ impl InstallationManager {
             if installer.supports(&legacy_lossy(&r#type))? {
                 self.cache
                     .borrow_mut()
-                    .insert(legacy_lossy(&r#type).into_owned(), installer.clone());
+                    .insert(bstr::BString::from(&r#type[..]), installer.clone());
                 return Ok(installer);
             }
         }
@@ -197,14 +197,14 @@ impl InstallationManager {
                 && self.is_package_installed(repo, alias_of)?);
         }
 
-        self.get_installer(&package.get_type())?
+        self.get_installer(&legacy_lossy(&package.get_type()))?
             .is_installed(repo, package)
     }
 
     /// Install binary for the given package.
     /// If the installer associated to this package doesn't handle that function, it'll do nothing.
     pub fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
-        let installer = self.get_installer(&package.get_type());
+        let installer = self.get_installer(&legacy_lossy(&package.get_type()));
         let installer = match installer {
             Ok(i) => i,
             Err(_e) => {
@@ -420,7 +420,7 @@ impl InstallationManager {
                 AnyOperation::Update(update_op) => Some(update_op.get_initial_package()),
                 _ => None,
             };
-            let installer = self.get_installer(&package.get_type())?;
+            let installer = self.get_installer(&legacy_lossy(&package.get_type()))?;
 
             // PHP: $cleanupPromises[$index] = static function () use ($opType, $installer, $package, $initialPackage) {
             //   if (null === $package->getInstallationSource()) { return \React\Promise\resolve(null); }
@@ -613,7 +613,7 @@ impl InstallationManager {
                 )?;
             }
 
-            let installer = self.get_installer(&package.get_type())?;
+            let installer = self.get_installer(&legacy_lossy(&package.get_type()))?;
 
             // PHP: $promise = $installer->prepare(...)
             //      ->then(fn() => $this->{$opType}($repo, $operation))
@@ -659,7 +659,7 @@ impl InstallationManager {
                     self.io.write_error(&format!(
                         "    <error>{} of {} failed</error>",
                         ucfirst(op_type).display_lossy(),
-                        package.get_pretty_name()
+                        package.get_pretty_name().display_lossy()
                     ));
                     return Err(e);
                 }
@@ -714,7 +714,9 @@ impl InstallationManager {
 
     /// Executes download operation.
     pub async fn download(&self, package: PackageInterfaceHandle) -> Option<PhpMixed> {
-        let installer = self.get_installer(&package.get_type()).ok()?;
+        let installer = self
+            .get_installer(&legacy_lossy(&package.get_type()))
+            .ok()?;
 
         installer.cleanup("install", package, None).await.ok()?
     }
@@ -726,7 +728,7 @@ impl InstallationManager {
         operation: &InstallOperation,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let package = operation.get_package();
-        let package_type = package.get_type();
+        let package_type = legacy_lossy(&package.get_type()).into_owned();
         let installer = self.get_installer(&package_type)?;
         let promise = installer.install(repo, package.clone()).await?;
         self.mark_for_notification(package.clone());
@@ -743,8 +745,8 @@ impl InstallationManager {
         let initial = operation.get_initial_package().clone();
         let target = operation.get_target_package().clone();
 
-        let initial_type = initial.get_type();
-        let target_type = target.get_type();
+        let initial_type = legacy_lossy(&initial.get_type()).into_owned();
+        let target_type = legacy_lossy(&target.get_type()).into_owned();
 
         if initial_type == target_type {
             let installer = self.get_installer(&initial_type)?;
@@ -769,7 +771,7 @@ impl InstallationManager {
         operation: &UninstallOperation,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let package = operation.get_package();
-        let package_type = package.get_type();
+        let package_type = legacy_lossy(&package.get_type()).into_owned();
         let installer = self.get_installer(&package_type)?;
 
         installer.uninstall(repo, package).await
@@ -805,10 +807,12 @@ impl InstallationManager {
     pub fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
         // For testing only (ref InstallationManagerMock::getInstallPath).
         if self.mock.is_some() {
-            return Some(format!("vendor/{}", package.get_name()));
+            return Some(format!("vendor/{}", legacy_lossy(&package.get_name())));
         }
 
-        let installer = self.get_installer(&package.get_type()).ok()?;
+        let installer = self
+            .get_installer(&legacy_lossy(&package.get_type()))
+            .ok()?;
 
         installer.get_install_path(package)
     }
@@ -832,7 +836,7 @@ impl InstallationManager {
             > = vec![];
             for (repo_url, packages) in self.notifiable_packages.borrow().iter() {
                 // non-batch API, deprecated
-                if repo_url.contains("%package%") {
+                if repo_url.contains_str("%package%") {
                     for package in packages {
                         let url = legacy_lossy(&str_replace(
                             "%package%",
@@ -841,9 +845,15 @@ impl InstallationManager {
                         ))
                         .into_owned();
 
-                        let mut params: IndexMap<String, String> = IndexMap::new();
-                        params.insert("version".to_string(), package.get_pretty_version());
-                        params.insert("version_normalized".to_string(), package.get_version());
+                        let mut params: IndexMap<BString, BString> = IndexMap::new();
+                        params.insert(
+                            bstr::BString::from("version".to_string()),
+                            bstr::BString::from(&package.get_pretty_version()[..]),
+                        );
+                        params.insert(
+                            bstr::BString::from("version_normalized".to_string()),
+                            bstr::BString::from(&package.get_version()[..]),
+                        );
                         let mut opts: IndexMap<BString, PhpMixed> = IndexMap::new();
                         opts.insert("retry-auth-failure".into(), PhpMixed::Bool(false));
                         let mut http: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -854,10 +864,7 @@ impl InstallationManager {
                                 "Content-type: application/x-www-form-urlencoded".to_string(),
                             )]),
                         );
-                        let params_vec: Vec<(&str, &str)> = params
-                            .iter()
-                            .map(|(k, v)| (k.as_str(), v.as_str()))
-                            .collect();
+                        let params_vec: Vec<(&BString, &BString)> = params.iter().collect();
                         http.insert(
                             "content".into(),
                             PhpMixed::string(http_build_query(&params_vec)),
@@ -917,7 +924,7 @@ impl InstallationManager {
                 opts.insert("http".into(), PhpMixed::Array(http.into_iter().collect()));
 
                 let http_downloader = &*http_downloader;
-                let repo_url = repo_url.clone();
+                let repo_url = legacy_lossy(&repo_url.clone()).into_owned();
                 promises.push(Box::pin(async move {
                     http_downloader.add(&repo_url, opts).await.map(|_| ())
                 }));
@@ -936,7 +943,7 @@ impl InstallationManager {
         if let Some(notification_url) = package.get_notification_url() {
             self.notifiable_packages
                 .borrow_mut()
-                .entry(notification_url)
+                .entry(bstr::BString::from(&notification_url[..]))
                 .or_default()
                 .push(package);
         }

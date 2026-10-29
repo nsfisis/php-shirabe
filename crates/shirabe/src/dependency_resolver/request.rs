@@ -2,8 +2,9 @@
 
 use crate::package::BasePackageHandle;
 use crate::repository::{LockArrayRepositoryHandle, RepositoryInterface};
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{LogicException, legacy_lossy, strtolower};
+use shirabe_php_shim::{LogicException, strtolower};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 
 /// Identifies a partial update for listed packages only, all dependencies will remain at locked versions
@@ -39,15 +40,15 @@ impl Request {
 
     pub fn require_name(
         &mut self,
-        package_name: &str,
+        package_name: &BStr,
         constraint: Option<AnyConstraint>,
     ) -> anyhow::Result<()> {
-        let package_name = legacy_lossy(&strtolower(package_name)).into_owned();
+        let package_name = BString::from(&strtolower(package_name)[..]);
         let constraint = constraint.unwrap_or_else(|| MatchAllConstraint::new(None).into());
         if self.requires.contains_key(&package_name) {
             return Err(LogicException::new(format!(
                 "Overwriting requires seems like a bug ({} {} => {}, check why it is happening, might be a root alias",
-                package_name,
+                package_name.display_lossy(),
                 self.requires[&package_name].get_pretty_string().display_lossy(),
                 constraint.get_pretty_string().display_lossy()
             ))
@@ -64,7 +65,8 @@ impl Request {
     /// cannot in any way modify these packages.
     pub fn fix_package(&mut self, package: BasePackageHandle) {
         let hash = package.ptr_id().to_string();
-        self.fixed_packages.insert(hash, package);
+        self.fixed_packages
+            .insert(bstr::BString::from(hash), package);
     }
 
     /// Mark a package as locked to a specific version but removable.
@@ -79,7 +81,8 @@ impl Request {
     /// explicitly requested as part of the update.
     pub fn lock_package(&mut self, package: BasePackageHandle) {
         let hash = package.ptr_id().to_string();
-        self.locked_packages.insert(hash, package);
+        self.locked_packages
+            .insert(bstr::BString::from(hash), package);
     }
 
     /// Marks a locked package fixed. So it's treated irremovable like a platform package.
@@ -90,25 +93,27 @@ impl Request {
     /// still marks them as locked packages at the same time.
     pub fn fix_locked_package(&mut self, package: BasePackageHandle) {
         let hash = package.ptr_id().to_string();
-        self.fixed_packages.insert(hash.clone(), package.clone());
-        self.fixed_locked_packages.insert(hash, package);
+        self.fixed_packages
+            .insert(bstr::BString::from(hash.clone()), package.clone());
+        self.fixed_locked_packages
+            .insert(bstr::BString::from(hash), package);
     }
 
     pub fn unlock_package(&mut self, package: BasePackageHandle) {
         self.locked_packages
-            .shift_remove(&package.ptr_id().to_string());
+            .shift_remove(package.ptr_id().to_string().as_bytes());
     }
 
     pub fn set_update_allow_list(
         &mut self,
-        update_allow_list: Vec<String>,
+        update_allow_list: Vec<BString>,
         update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
     ) {
         self.update_allow_list = update_allow_list;
         self.update_allow_transitive_dependencies = update_allow_transitive_dependencies;
     }
 
-    pub fn get_update_allow_list(&self) -> &Vec<String> {
+    pub fn get_update_allow_list(&self) -> &Vec<BString> {
         &self.update_allow_list
     }
 
@@ -123,30 +128,31 @@ impl Request {
             == UpdateAllowTransitiveDeps::UpdateListedWithTransitiveDeps
     }
 
-    pub fn get_requires(&self) -> &IndexMap<String, AnyConstraint> {
+    pub fn get_requires(&self) -> &IndexMap<BString, AnyConstraint> {
         &self.requires
     }
 
-    pub fn get_fixed_packages(&self) -> &IndexMap<String, BasePackageHandle> {
+    pub fn get_fixed_packages(&self) -> &IndexMap<BString, BasePackageHandle> {
         &self.fixed_packages
     }
 
     pub fn is_fixed_package(&self, package: BasePackageHandle) -> bool {
         self.fixed_packages
-            .contains_key(&package.ptr_id().to_string())
+            .contains_key(package.ptr_id().to_string().as_bytes())
     }
 
-    pub fn get_locked_packages(&self) -> &IndexMap<String, BasePackageHandle> {
+    pub fn get_locked_packages(&self) -> &IndexMap<BString, BasePackageHandle> {
         &self.locked_packages
     }
 
     pub fn is_locked_package(&self, package: BasePackageHandle) -> bool {
         let hash = package.ptr_id().to_string();
-        self.locked_packages.contains_key(&hash) || self.fixed_locked_packages.contains_key(&hash)
+        self.locked_packages.contains_key(bstr::B(&hash))
+            || self.fixed_locked_packages.contains_key(bstr::B(&hash))
     }
 
-    pub fn get_fixed_or_locked_packages(&self) -> IndexMap<String, BasePackageHandle> {
-        let mut result: IndexMap<String, BasePackageHandle> = self
+    pub fn get_fixed_or_locked_packages(&self) -> IndexMap<BString, BasePackageHandle> {
+        let mut result: IndexMap<BString, BasePackageHandle> = self
             .fixed_packages
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
@@ -166,8 +172,8 @@ impl Request {
     pub fn get_present_map(
         &self,
         package_ids: bool,
-    ) -> anyhow::Result<IndexMap<String, crate::package::BasePackageHandle>> {
-        let mut present_map: IndexMap<String, crate::package::BasePackageHandle> = IndexMap::new();
+    ) -> anyhow::Result<IndexMap<BString, crate::package::BasePackageHandle>> {
+        let mut present_map: IndexMap<BString, crate::package::BasePackageHandle> = IndexMap::new();
 
         if let Some(ref locked_repository) = self.locked_repository {
             for package in RepositoryInterface::get_packages(&mut *locked_repository.borrow_mut())?
@@ -177,7 +183,7 @@ impl Request {
                 } else {
                     package.ptr_id().to_string()
                 };
-                present_map.insert(key, package);
+                present_map.insert(bstr::BString::from(key), package);
             }
         }
 
@@ -187,7 +193,7 @@ impl Request {
             } else {
                 package.ptr_id().to_string()
             };
-            present_map.insert(key, package.clone());
+            present_map.insert(bstr::BString::from(key), package.clone());
         }
 
         Ok(present_map)
@@ -206,11 +212,11 @@ impl Request {
     }
 
     /// Restricts the pool builder from loading other packages than those listed here.
-    pub fn restrict_packages(&mut self, names: Vec<String>) {
+    pub fn restrict_packages(&mut self, names: Vec<BString>) {
         self.restrict_packages = Some(names);
     }
 
-    pub fn get_restricted_packages(&self) -> Option<&Vec<String>> {
+    pub fn get_restricted_packages(&self) -> Option<&Vec<BString>> {
         self.restrict_packages.as_ref()
     }
 }
@@ -230,11 +236,11 @@ pub enum UpdateAllowTransitiveDeps {
 #[derive(Debug)]
 pub struct Request {
     locked_repository: Option<LockArrayRepositoryHandle>,
-    requires: IndexMap<String, AnyConstraint>,
-    fixed_packages: IndexMap<String, BasePackageHandle>,
-    locked_packages: IndexMap<String, BasePackageHandle>,
-    fixed_locked_packages: IndexMap<String, BasePackageHandle>,
-    update_allow_list: Vec<String>,
+    requires: IndexMap<BString, AnyConstraint>,
+    fixed_packages: IndexMap<BString, BasePackageHandle>,
+    locked_packages: IndexMap<BString, BasePackageHandle>,
+    fixed_locked_packages: IndexMap<BString, BasePackageHandle>,
+    update_allow_list: Vec<BString>,
     update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
-    restrict_packages: Option<Vec<String>>,
+    restrict_packages: Option<Vec<BString>>,
 }

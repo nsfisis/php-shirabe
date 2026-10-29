@@ -106,11 +106,11 @@ impl InstallerInterface for InstallPathStubInstaller {
             return None;
         }
 
-        let mut path = self.vendor_dir.join(package.get_name());
+        let mut path = self.vendor_dir.join(path_from_bytes(&package.get_name()));
         if let Some(dir) = package.get_target_dir()
             && !dir.is_empty()
         {
-            path = path.join(dir);
+            path = path.join(path_from_bytes(&dir));
         }
 
         Some(path.to_str().unwrap().to_string())
@@ -311,11 +311,11 @@ fn constraint(operator: &str, version: &str) -> AnyConstraint {
 
 fn link(source: &str, target: &str, constraint: AnyConstraint, description: Option<&str>) -> Link {
     Link::new(
-        source.to_string(),
-        target.to_string(),
+        bstr::BString::from(source.to_string()),
+        bstr::BString::from(target.to_string()),
         constraint,
-        description.map(|d| d.to_string()),
-        String::new(),
+        description.map(|d| d.to_string()).map(bstr::BString::from),
+        bstr::BString::from(String::new()),
     )
 }
 
@@ -353,11 +353,19 @@ fn pstr(v: &str) -> PhpMixed {
 }
 
 fn new_root_pkg(name: &str) -> RootPackageHandle {
-    RootPackageHandle::new(name.to_string(), null_path("1.0"), "1.0".to_string())
+    RootPackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from(null_path("1.0")),
+        bstr::BString::from("1.0".to_string()),
+    )
 }
 
 fn new_pkg(name: &str) -> PackageHandle {
-    PackageHandle::new(name.to_string(), "1.0".to_string(), "1.0".to_string())
+    PackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from("1.0".to_string()),
+        bstr::BString::from("1.0".to_string()),
+    )
 }
 
 fn dump(
@@ -609,7 +617,7 @@ fn test_root_package_autoloading_with_target_dir() {
         ("classmap", str_list(&["Main/Foo/src", "lib"])),
         ("files", str_list(&["foo.php", "Main/Foo/bar.php"])),
     ]));
-    package.__set_target_dir(Some("Main/Foo/".to_string()));
+    package.__set_target_dir(Some(bstr::BString::from("Main/Foo/".to_string())));
 
     s.ensure_dir(s.vendor_dir.join("a"));
     s.ensure_dir(s.working_dir.join("src"));
@@ -685,14 +693,23 @@ fn test_duplicate_files_warning() {
 fn test_vendors_autoloading() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![
-        ("a/a", link("a", "a/a", match_all(), None)),
-        ("b/b", link("a", "b/b", match_all(), None)),
-    ]));
+    package.set_requires(
+        requires(vec![
+            ("a/a", link("a", "a/a", match_all(), None)),
+            ("b/b", link("a", "b/b", match_all(), None)),
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
-    let c = AliasPackageHandle::new(b.clone(), "1.2".to_string(), "1.2".to_string());
+    let c = AliasPackageHandle::new(
+        b.clone(),
+        bstr::BString::from("1.2".to_string()),
+        bstr::BString::from("1.2".to_string()),
+    );
     a.__set_autoload(autoload(vec![(
         "psr-0",
         str_map(&[("A", pstr("src/")), ("A\\B", pstr("lib/"))]),
@@ -720,11 +737,20 @@ fn test_vendors_autoloading() {
 fn test_vendors_autoloading_with_metapackages() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![("a/a", link("a", "a/a", match_all(), None))]));
+    package.set_requires(
+        requires(vec![("a/a", link("a", "a/a", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
-    let c = AliasPackageHandle::new(b.clone(), "1.2".to_string(), "1.2".to_string());
+    let c = AliasPackageHandle::new(
+        b.clone(),
+        bstr::BString::from("1.2".to_string()),
+        bstr::BString::from("1.2".to_string()),
+    );
     a.__set_autoload(autoload(vec![(
         "psr-0",
         str_map(&[("A", pstr("src/")), ("A\\B", pstr("lib/"))]),
@@ -733,11 +759,13 @@ fn test_vendors_autoloading_with_metapackages() {
         "psr-0",
         str_map(&[("B\\Sub\\Name", pstr("src/"))]),
     )]));
-    a.__set_type("metapackage".to_string());
-    a.__set_requires(requires(vec![(
-        "b/b",
-        link("a/a", "b/b", match_all(), None),
-    )]));
+    a.__set_type(bstr::BString::from("metapackage".to_string()));
+    a.__set_requires(
+        requires(vec![("b/b", link("a/a", "b/b", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     s.set_canonical_packages(vec![a.into(), b.into(), c.into()]);
 
@@ -757,7 +785,12 @@ fn test_vendors_autoloading_with_metapackages() {
 fn test_non_dev_autoload_exclusion_with_recursion() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![("a/a", link("a", "a/a", match_all(), None))]));
+    package.set_requires(
+        requires(vec![("a/a", link("a", "a/a", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
@@ -765,18 +798,22 @@ fn test_non_dev_autoload_exclusion_with_recursion() {
         "psr-0",
         str_map(&[("A", pstr("src/")), ("A\\B", pstr("lib/"))]),
     )]));
-    a.__set_requires(requires(vec![(
-        "b/b",
-        link("a/a", "b/b", match_all(), None),
-    )]));
+    a.__set_requires(
+        requires(vec![("b/b", link("a/a", "b/b", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     b.__set_autoload(autoload(vec![(
         "psr-0",
         str_map(&[("B\\Sub\\Name", pstr("src/"))]),
     )]));
-    b.__set_requires(requires(vec![(
-        "a/a",
-        link("b/b", "a/a", match_all(), None),
-    )]));
+    b.__set_requires(
+        requires(vec![("a/a", link("b/b", "a/a", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     s.set_canonical_packages(vec![a.into(), b.into()]);
 
@@ -796,24 +833,36 @@ fn test_non_dev_autoload_exclusion_with_recursion() {
 fn test_non_dev_autoload_should_include_replaced_packages() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![("a/a", link("a", "a/a", match_all(), None))]));
+    package.set_requires(
+        requires(vec![("a/a", link("a", "a/a", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
-    a.__set_requires(requires(vec![(
-        "b/c",
-        link("a/a", "b/c", match_all(), None),
-    )]));
+    a.__set_requires(
+        requires(vec![("b/c", link("a/a", "b/c", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     b.__set_autoload(autoload(vec![("psr-4", str_map(&[("B\\", pstr("src/"))]))]));
-    b.__set_replaces(requires(vec![(
-        "b/c",
-        link(
-            "b/b",
+    b.__set_replaces(
+        requires(vec![(
             "b/c",
-            constraint("==", "1.0"),
-            Some(Link::TYPE_REPLACE),
-        ),
-    )]));
+            link(
+                "b/b",
+                "b/c",
+                constraint("==", "1.0"),
+                Some(Link::TYPE_REPLACE),
+            ),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     s.set_canonical_packages(vec![a.into(), b.into()]);
 
@@ -853,7 +902,12 @@ fn test_non_dev_autoload_should_include_replaced_packages() {
 fn test_non_dev_autoload_exclusion_with_recursion_replace() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![("a/a", link("a", "a/a", match_all(), None))]));
+    package.set_requires(
+        requires(vec![("a/a", link("a", "a/a", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
@@ -861,18 +915,22 @@ fn test_non_dev_autoload_exclusion_with_recursion_replace() {
         "psr-0",
         str_map(&[("A", pstr("src/")), ("A\\B", pstr("lib/"))]),
     )]));
-    a.__set_requires(requires(vec![(
-        "c/c",
-        link("a/a", "c/c", match_all(), None),
-    )]));
+    a.__set_requires(
+        requires(vec![("c/c", link("a/a", "c/c", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     b.__set_autoload(autoload(vec![(
         "psr-0",
         str_map(&[("B\\Sub\\Name", pstr("src/"))]),
     )]));
-    b.__set_replaces(requires(vec![(
-        "c/c",
-        link("b/b", "c/c", match_all(), None),
-    )]));
+    b.__set_replaces(
+        requires(vec![("c/c", link("b/b", "c/c", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     s.set_canonical_packages(vec![a.into(), b.into()]);
 
@@ -892,7 +950,12 @@ fn test_non_dev_autoload_exclusion_with_recursion_replace() {
 fn test_non_dev_autoload_replaces_nested_requirements() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![("a/a", link("a", "a/a", match_all(), None))]));
+    package.set_requires(
+        requires(vec![("a/a", link("a", "a/a", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
@@ -900,24 +963,32 @@ fn test_non_dev_autoload_replaces_nested_requirements() {
     let d = new_pkg("d/d");
     let e = new_pkg("e/e");
     a.__set_autoload(autoload(vec![("classmap", str_list(&["src/A.php"]))]));
-    a.__set_requires(requires(vec![(
-        "b/b",
-        link("a/a", "b/b", match_all(), None),
-    )]));
+    a.__set_requires(
+        requires(vec![("b/b", link("a/a", "b/b", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     b.__set_autoload(autoload(vec![("classmap", str_list(&["src/B.php"]))]));
-    b.__set_requires(requires(vec![(
-        "e/e",
-        link("b/b", "e/e", match_all(), None),
-    )]));
+    b.__set_requires(
+        requires(vec![("e/e", link("b/b", "e/e", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     c.__set_autoload(autoload(vec![("classmap", str_list(&["src/C.php"]))]));
-    c.__set_replaces(requires(vec![(
-        "b/b",
-        link("c/c", "b/b", match_all(), None),
-    )]));
-    c.__set_requires(requires(vec![(
-        "d/d",
-        link("c/c", "d/d", match_all(), None),
-    )]));
+    c.__set_replaces(
+        requires(vec![("b/b", link("c/c", "b/b", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    c.__set_requires(
+        requires(vec![("d/d", link("c/c", "d/d", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     d.__set_autoload(autoload(vec![("classmap", str_list(&["src/D.php"]))]));
     e.__set_autoload(autoload(vec![("classmap", str_list(&["src/E.php"]))]));
 
@@ -950,7 +1021,12 @@ fn test_non_dev_autoload_replaces_nested_requirements() {
 fn test_phar_autoload() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![("a/a", link("a", "a/a", match_all(), None))]));
+    package.set_requires(
+        requires(vec![("a/a", link("a", "a/a", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     package.set_autoload(autoload(vec![
         (
             "psr-0",
@@ -1070,10 +1146,15 @@ fn test_psr_to_class_map_ignores_non_psr_classes() {
 fn test_vendors_class_map_autoloading() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![
-        ("a/a", link("a", "a/a", match_all(), None)),
-        ("b/b", link("a", "b/b", match_all(), None)),
-    ]));
+    package.set_requires(
+        requires(vec![
+            ("a/a", link("a", "a/a", match_all(), None)),
+            ("b/b", link("a", "b/b", match_all(), None)),
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
@@ -1149,10 +1230,15 @@ fn test_vendors_class_map_autoloading() {
 fn test_vendors_class_map_autoloading_with_target_dir() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![
-        ("a/a", link("a", "a/a", match_all(), None)),
-        ("b/b", link("a", "b/b", match_all(), None)),
-    ]));
+    package.set_requires(
+        requires(vec![
+            ("a/a", link("a", "a/a", match_all(), None)),
+            ("b/b", link("a", "b/b", match_all(), None)),
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
@@ -1160,7 +1246,7 @@ fn test_vendors_class_map_autoloading_with_target_dir() {
         "classmap",
         str_list(&["target/src/", "lib/"]),
     )]));
-    a.__set_target_dir(Some("target".to_string()));
+    a.__set_target_dir(Some(bstr::BString::from("target".to_string())));
     b.__set_autoload(autoload(vec![("classmap", str_list(&["src/"]))]));
 
     s.set_canonical_packages(vec![a.into(), b.into()]);
@@ -1233,11 +1319,16 @@ fn test_vendors_class_map_autoloading_with_target_dir() {
 fn test_class_map_autoloading_empty_dir_and_exact_file() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![
-        ("a/a", link("a", "a/a", match_all(), None)),
-        ("b/b", link("a", "b/b", match_all(), None)),
-        ("c/c", link("a", "c/c", match_all(), None)),
-    ]));
+    package.set_requires(
+        requires(vec![
+            ("a/a", link("a", "a/a", match_all(), None)),
+            ("b/b", link("a", "b/b", match_all(), None)),
+            ("c/c", link("a", "c/c", match_all(), None)),
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
@@ -1320,11 +1411,16 @@ fn test_class_map_autoloading_empty_dir_and_exact_file() {
 fn test_class_map_autoloading_authoritative_and_apcu() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![
-        ("a/a", link("a", "a/a", match_all(), None)),
-        ("b/b", link("a", "b/b", match_all(), None)),
-        ("c/c", link("a", "c/c", match_all(), None)),
-    ]));
+    package.set_requires(
+        requires(vec![
+            ("a/a", link("a", "a/a", match_all(), None)),
+            ("b/b", link("a", "b/b", match_all(), None)),
+            ("c/c", link("a", "c/c", match_all(), None)),
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
@@ -1409,11 +1505,16 @@ fn test_class_map_autoloading_authoritative_and_apcu() {
 fn test_class_map_autoloading_authoritative_and_apcu_prefix() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![
-        ("a/a", link("a", "a/a", match_all(), None)),
-        ("b/b", link("a", "b/b", match_all(), None)),
-        ("c/c", link("a", "c/c", match_all(), None)),
-    ]));
+    package.set_requires(
+        requires(vec![
+            ("a/a", link("a", "a/a", match_all(), None)),
+            ("b/b", link("a", "b/b", match_all(), None)),
+            ("c/c", link("a", "c/c", match_all(), None)),
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
@@ -1500,11 +1601,16 @@ fn test_files_autoload_generation() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
     package.set_autoload(autoload(vec![("files", str_list(&["root.php"]))]));
-    package.set_requires(requires(vec![
-        ("a/a", link("a", "a/a", match_all(), None)),
-        ("b/b", link("a", "b/b", match_all(), None)),
-        ("c/c", link("a", "c/c", match_all(), None)),
-    ]));
+    package.set_requires(
+        requires(vec![
+            ("a/a", link("a", "a/a", match_all(), None)),
+            ("b/b", link("a", "b/b", match_all(), None)),
+            ("c/c", link("a", "c/c", match_all(), None)),
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
@@ -1515,7 +1621,7 @@ fn test_files_autoload_generation() {
         "files",
         str_list(&["test3.php", "foo/bar/test4.php"]),
     )]));
-    c.__set_target_dir(Some("foo/bar".to_string()));
+    c.__set_target_dir(Some(bstr::BString::from("foo/bar".to_string())));
 
     s.set_canonical_packages(vec![a.into(), b.into(), c.into()]);
 
@@ -1581,10 +1687,15 @@ fn test_override_vendors_autoloading() {
             str_list(&[working_dir.join("src").to_str().unwrap()]),
         ),
     ]));
-    root_package.set_requires(requires(vec![
-        ("a/a", link("z", "a/a", match_all(), None)),
-        ("b/b", link("z", "b/b", match_all(), None)),
-    ]));
+    root_package.set_requires(
+        requires(vec![
+            ("a/a", link("z", "a/a", match_all(), None)),
+            ("b/b", link("z", "b/b", match_all(), None)),
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
@@ -1655,11 +1766,11 @@ fn test_include_path_file_generation() {
     let package = new_root_pkg("root/a");
 
     let a = new_pkg("a/a");
-    a.__set_include_paths(vec!["lib/".to_string()]);
+    a.__set_include_paths(vec![bstr::BString::from("lib/".to_string())]);
     let b = new_pkg("b/b");
-    b.__set_include_paths(vec!["library".to_string()]);
+    b.__set_include_paths(vec![bstr::BString::from("library".to_string())]);
     let c = new_pkg("c");
-    c.__set_include_paths(vec!["library".to_string()]);
+    c.__set_include_paths(vec![bstr::BString::from("library".to_string())]);
 
     s.set_canonical_packages(vec![a.into(), b.into(), c.into()]);
 
@@ -1871,7 +1982,10 @@ fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
     let mut s = set_up();
     let autoload_package = new_root_pkg("root/a");
     autoload_package.set_autoload(autoload(vec![("files", str_list(&["root.php"]))]));
-    autoload_package.__set_include_paths(vec!["/lib".to_string(), "/src".to_string()]);
+    autoload_package.__set_include_paths(vec![
+        bstr::BString::from("/lib".to_string()),
+        bstr::BString::from("/src".to_string()),
+    ]);
 
     let not_autoload_package = new_root_pkg("root/a");
 
@@ -1882,22 +1996,35 @@ fn test_files_autoload_generation_remove_extra_entities_from_autoload_files() {
             ("c/c", link("a", "c/c", match_all(), None)),
         ])
     };
-    autoload_package.set_requires(requires_());
-    not_autoload_package.set_requires(requires_());
+    autoload_package.set_requires(
+        requires_()
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    not_autoload_package.set_requires(
+        requires_()
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let a = new_pkg("a/a");
     let b = new_pkg("b/b");
     let c = new_pkg("c/c");
     a.__set_autoload(autoload(vec![("files", str_list(&["test.php"]))]));
-    a.__set_include_paths(vec!["lib1".to_string(), "src1".to_string()]);
+    a.__set_include_paths(vec![
+        bstr::BString::from("lib1".to_string()),
+        bstr::BString::from("src1".to_string()),
+    ]);
     b.__set_autoload(autoload(vec![("files", str_list(&["test2.php"]))]));
-    b.__set_include_paths(vec!["lib2".to_string()]);
+    b.__set_include_paths(vec![bstr::BString::from("lib2".to_string())]);
     c.__set_autoload(autoload(vec![(
         "files",
         str_list(&["test3.php", "foo/bar/test4.php"]),
     )]));
-    c.__set_include_paths(vec!["lib3".to_string()]);
-    c.__set_target_dir(Some("foo/bar".to_string()));
+    c.__set_include_paths(vec![bstr::BString::from("lib3".to_string())]);
+    c.__set_target_dir(Some(bstr::BString::from("foo/bar".to_string())));
     let autoload_packages: Vec<PackageInterfaceHandle> = vec![a.into(), b.into(), c.into()];
 
     // PHP re-creates the three packages without autoload/include-path settings for the second and
@@ -2089,7 +2216,7 @@ fn test_use_global_include_path() {
         "psr-0",
         str_map(&[("Main\\Foo", pstr("")), ("Main\\Bar", pstr(""))]),
     )]));
-    package.__set_target_dir(Some("Main/Foo/".to_string()));
+    package.__set_target_dir(Some(bstr::BString::from("Main/Foo/".to_string())));
 
     s.use_include_path = true;
 
@@ -2127,7 +2254,12 @@ fn test_vendor_dir_excluded_from_working_dir() {
         ("classmap", str_list(&["classmap"])),
         ("files", str_list(&["test.php"])),
     ]));
-    package.set_requires(requires(vec![("b/b", link("a", "b/b", match_all(), None))]));
+    package.set_requires(
+        requires(vec![("b/b", link("a", "b/b", match_all(), None))])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let vendor_package = new_pkg("b/b");
     vendor_package.__set_autoload(autoload(vec![
@@ -2305,11 +2437,20 @@ fn test_up_level_relative_paths() {
 fn test_autoload_rules_in_package_that_does_not_exist_on_disk() {
     let mut s = set_up();
     let package = new_root_pkg("root/a");
-    package.set_requires(requires(vec![(
-        "dep/a",
-        link("root/a", "dep/a", match_all(), Some("requires")),
-    )]));
-    let dep = CompletePackageHandle::new("dep/a".to_string(), "1.0".to_string(), "1.0".to_string());
+    package.set_requires(
+        requires(vec![(
+            "dep/a",
+            link("root/a", "dep/a", match_all(), Some("requires")),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    let dep = CompletePackageHandle::new(
+        bstr::BString::from("dep/a".to_string()),
+        bstr::BString::from("1.0".to_string()),
+        bstr::BString::from("1.0".to_string()),
+    );
 
     s.set_canonical_packages(vec![dep.clone().into()]);
 
@@ -2566,14 +2707,29 @@ fn test_generates_platform_check() {
     for scenario in scenarios {
         let mut s = set_up();
         let package = new_root_pkg("root/a");
-        package.set_requires(platform_links(&vp, &scenario.requires));
+        package.set_requires(
+            platform_links(&vp, &scenario.requires)
+                .into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), v))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        );
 
         if !scenario.provides.is_empty() {
-            package.set_provides(platform_links(&vp, &scenario.provides));
+            package.set_provides(
+                platform_links(&vp, &scenario.provides)
+                    .into_iter()
+                    .map(|(k, v)| (bstr::BString::from(k), v))
+                    .collect::<indexmap::IndexMap<_, _>>(),
+            );
         }
 
         if !scenario.replaces.is_empty() {
-            package.set_replaces(platform_links(&vp, &scenario.replaces));
+            package.set_replaces(
+                platform_links(&vp, &scenario.replaces)
+                    .into_iter()
+                    .map(|(k, v)| (bstr::BString::from(k), v))
+                    .collect::<indexmap::IndexMap<_, _>>(),
+            );
         }
 
         s.generator.set_platform_requirement_filter(

@@ -40,14 +40,23 @@ use tempfile::TempDir;
 /// ref: TestCase::getPackage (default class CompletePackage)
 pub fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
     let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
-    CompletePackageHandle::new(name.to_string(), norm_version, version.to_string()).into()
+    CompletePackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from(norm_version),
+        bstr::BString::from(version.to_string()),
+    )
+    .into()
 }
 
 /// ref: TestCase::getPackage but returning the concrete `CompletePackageHandle` so the
 /// `CompletePackage`-only setters (`set_license`, `set_homepage`, ...) are reachable.
 pub fn get_complete_package(name: &str, version: &str) -> CompletePackageHandle {
     let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
-    CompletePackageHandle::new(name.to_string(), norm_version, version.to_string())
+    CompletePackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from(norm_version),
+        bstr::BString::from(version.to_string()),
+    )
 }
 
 /// ref: TestCase::getAliasPackage (default class CompleteAliasPackage)
@@ -57,7 +66,12 @@ pub fn get_alias_package(
 ) -> PackageInterfaceHandle {
     let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
     let complete = CompletePackageHandle::from_rc_unchecked(package.as_rc().clone());
-    CompleteAliasPackageHandle::new(complete, norm_version, version.to_string()).into()
+    CompleteAliasPackageHandle::new(
+        complete,
+        bstr::BString::from(norm_version),
+        bstr::BString::from(version.to_string()),
+    )
+    .into()
 }
 
 /// ref: TestCase::getVersionConstraint
@@ -255,7 +269,7 @@ pub fn create_installed_json(
     );
     for pkg in packages.iter().chain(dev_packages.iter()) {
         repo.add_package(pkg.clone()).unwrap();
-        std::fs::create_dir_all(format!("vendor/{}", pkg.get_name())).unwrap();
+        std::fs::create_dir_all(format!("vendor/{}", legacy_lossy(&pkg.get_name()))).unwrap();
     }
 
     let io = null_io();

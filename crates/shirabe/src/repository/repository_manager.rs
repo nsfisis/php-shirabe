@@ -6,16 +6,18 @@ use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{FilterRepository, RepositoryInterfaceHandle};
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, RuntimeException, json_encode};
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, RuntimeException, json_encode, legacy_lossy,
+};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
 pub struct RepositoryManager {
     local_repository: Option<RepositoryInterfaceHandle>,
     repositories: Vec<RepositoryInterfaceHandle>,
-    repository_classes: IndexMap<String, String>,
+    repository_classes: IndexMap<BString, BString>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
@@ -50,7 +52,7 @@ impl RepositoryManager {
 
     pub fn find_package(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: &AnyConstraint,
     ) -> anyhow::Result<Option<PackageInterfaceHandle>> {
         for repository in &self.repositories {
@@ -66,7 +68,7 @@ impl RepositoryManager {
 
     pub fn find_packages(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: &AnyConstraint,
     ) -> anyhow::Result<Vec<PackageInterfaceHandle>> {
         let mut packages: Vec<PackageInterfaceHandle> = vec![];
@@ -93,14 +95,14 @@ impl RepositoryManager {
 
     pub fn create_repository(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         config: IndexMap<BString, PhpMixed>,
         name: Option<&str>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
         if !self.repository_classes.contains_key(r#type) {
             return Err(InvalidArgumentException::new(format!(
                 "Repository type is not registered: {}",
-                r#type
+                r#type.display_lossy()
             ))
             .into());
         }
@@ -113,7 +115,7 @@ impl RepositoryManager {
             self.io.write_error(&format!("<warning>Repository \"{}\" ({}) has a packagist key which should be in its own repository definition</warning>", name.unwrap_or_default(), config_json));
         }
 
-        let class = self.repository_classes[r#type].clone();
+        let class = legacy_lossy(&self.repository_classes[r#type].clone()).into_owned();
 
         let has_filter = config.contains_key(B("only"))
             || config.contains_key(B("exclude"))
@@ -198,9 +200,11 @@ impl RepositoryManager {
         }
     }
 
-    pub fn set_repository_class(&mut self, r#type: &str, class: &str) {
-        self.repository_classes
-            .insert(r#type.to_string(), class.to_string());
+    pub fn set_repository_class(&mut self, r#type: &BStr, class: &str) {
+        self.repository_classes.insert(
+            bstr::BString::from(r#type),
+            bstr::BString::from(class.to_string()),
+        );
     }
 
     pub fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle> {
@@ -209,7 +213,7 @@ impl RepositoryManager {
 
     /// For testing only: exposes the private `repository_classes` map so tests
     /// can assert on its registered type keys (PHP reads it via ReflectionProperty).
-    pub fn __repository_classes(&self) -> &IndexMap<String, String> {
+    pub fn __repository_classes(&self) -> &IndexMap<BString, BString> {
         &self.repository_classes
     }
 
@@ -230,7 +234,7 @@ pub trait RepositoryManagerInterface: std::fmt::Debug {
     fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
     fn create_repository(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         config: IndexMap<BString, PhpMixed>,
         name: Option<&str>,
     ) -> anyhow::Result<RepositoryInterfaceHandle>;
@@ -249,7 +253,7 @@ impl RepositoryManagerInterface for RepositoryManager {
 
     fn create_repository(
         &self,
-        r#type: &str,
+        r#type: &BStr,
         config: IndexMap<BString, PhpMixed>,
         name: Option<&str>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {

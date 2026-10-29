@@ -1,16 +1,17 @@
 //! ref: composer/src/Composer/Package/Link.php
 
 use crate::package::PackageInterfaceHandle;
-use shirabe_php_shim::legacy_lossy;
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{bconcat, strtolower};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Clone, Debug)]
 pub struct Link {
-    source: String,
-    target: String,
+    source: BString,
+    target: BString,
     constraint: AnyConstraint,
-    description: String,
-    pretty_constraint: String,
+    description: BString,
+    pretty_constraint: BString,
 }
 
 impl Link {
@@ -36,67 +37,70 @@ impl Link {
     }
 
     pub fn new(
-        source: String,
-        target: String,
+        source: BString,
+        target: BString,
         constraint: AnyConstraint,
-        description: Option<String>,
-        pretty_constraint: String,
+        description: Option<BString>,
+        pretty_constraint: BString,
     ) -> Self {
-        let description = description.unwrap_or_else(|| Self::TYPE_UNKNOWN.to_string());
+        let description = description.unwrap_or_else(|| Self::TYPE_UNKNOWN.into());
         let description = if description == Self::TYPE_DEV_REQUIRE {
-            "requires (for development)".to_string()
+            "requires (for development)".into()
         } else {
             description
         };
         Self {
-            source: source.to_lowercase(),
-            target: target.to_lowercase(),
+            source: strtolower(&source),
+            target: strtolower(&target),
             constraint,
             description,
             pretty_constraint,
         }
     }
 
-    pub fn get_description(&self) -> &str {
-        &self.description
+    pub fn get_description(&self) -> &BStr {
+        self.description.as_bstr()
     }
 
-    pub fn get_source(&self) -> &str {
-        &self.source
+    pub fn get_source(&self) -> &BStr {
+        self.source.as_bstr()
     }
 
-    pub fn get_target(&self) -> &str {
-        &self.target
+    pub fn get_target(&self) -> &BStr {
+        self.target.as_bstr()
     }
 
     pub fn get_constraint(&self) -> &AnyConstraint {
         &self.constraint
     }
 
-    pub fn get_pretty_constraint(&self) -> &str {
-        &self.pretty_constraint
+    pub fn get_pretty_constraint(&self) -> &BStr {
+        self.pretty_constraint.as_bstr()
     }
 
-    pub fn get_pretty_string(&self, source_package: PackageInterfaceHandle) -> String {
-        format!(
-            "{} {} {} {}",
+    pub fn get_pretty_string(&self, source_package: PackageInterfaceHandle) -> BString {
+        bconcat!(
             source_package.get_pretty_string(),
+            " ",
             self.description,
+            " ",
             self.target,
-            legacy_lossy(&self.constraint.get_pretty_string())
+            " ",
+            self.constraint.get_pretty_string()
         )
     }
-}
 
-impl std::fmt::Display for Link {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {} {} ({})",
+    /// PHP's `__toString()`.
+    pub fn to_php_string(&self) -> BString {
+        bconcat!(
             self.source,
+            " ",
             self.description,
+            " ",
             self.target,
-            legacy_lossy(&self.constraint.to_php_string()),
+            " (",
+            self.constraint.to_php_string(),
+            ")"
         )
     }
 }

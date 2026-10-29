@@ -26,7 +26,7 @@ fn get_version_constraint(operator: &str, version: &str) -> AnyConstraint {
 #[test]
 fn test_request_install() {
     let mut request = Request::new(None);
-    request.require_name("foo", None).unwrap();
+    request.require_name(bstr::BStr::new("foo"), None).unwrap();
 
     let mut expected: IndexMap<String, AnyConstraint> = IndexMap::new();
     expected.insert("foo".to_string(), MatchAllConstraint::new(None).into());
@@ -43,7 +43,7 @@ fn test_request_install_same_package_from_different_repositories() {
 
     let mut request = Request::new(None);
     request
-        .require_name("foo", Some(constraint.clone()))
+        .require_name(bstr::BStr::new("foo"), Some(constraint.clone()))
         .unwrap();
 
     let mut expected: IndexMap<String, AnyConstraint> = IndexMap::new();

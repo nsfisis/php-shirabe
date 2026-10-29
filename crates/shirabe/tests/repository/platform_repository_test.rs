@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Repository/PlatformRepositoryTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::package::{BasePackageHandle, Link};
 use shirabe::platform::HhvmDetectorInterface;
@@ -7,7 +8,7 @@ use shirabe::repository::{
     FindPackageConstraint, PlatformRepository, RepositoryInterface, SEARCH_NAME,
 };
 use shirabe_php_rpc::PlatformInfo;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 use shirabe_semver::constraint::SimpleConstraint;
 
 mockall::mock! {
@@ -98,7 +99,10 @@ fn test_hhvm_package() {
             .unwrap();
 
     let hhvm = platform_repository
-        .find_package("hhvm", FindPackageConstraint::String("*".to_string()))
+        .find_package(
+            bstr::BStr::new("hhvm"),
+            FindPackageConstraint::String(bstr::BString::from("*".to_string())),
+        )
         .unwrap();
     assert!(hhvm.is_some(), "hhvm found");
 
@@ -184,7 +188,10 @@ fn test_php_version() {
 
         for (package_name, version) in packages {
             let package = repository
-                .find_package(package_name, FindPackageConstraint::String("*".to_string()))
+                .find_package(
+                    bstr::BStr::new(package_name),
+                    FindPackageConstraint::String(bstr::BString::from("*".to_string())),
+                )
                 .unwrap();
             assert!(
                 package.is_some(),
@@ -234,7 +241,10 @@ fn test_inet_pton_regression() {
     let mut repository =
         PlatformRepository::new(vec![], IndexMap::new(), Some(platform_info), None).unwrap();
     let package = repository
-        .find_package("php-ipv6", FindPackageConstraint::String("*".to_string()))
+        .find_package(
+            bstr::BStr::new("php-ipv6"),
+            FindPackageConstraint::String(bstr::BString::from("*".to_string())),
+        )
         .unwrap();
     assert!(package.is_none());
 }
@@ -1584,7 +1594,7 @@ fn assert_package_links(
     context: &str,
     expected_links: &[&str],
     source_package: &BasePackageHandle,
-    links: &IndexMap<String, Link>,
+    links: &IndexMap<BString, Link>,
 ) {
     assert_eq!(
         expected_links.len(),
@@ -1596,10 +1606,10 @@ fn assert_package_links(
     for link in links.values() {
         assert_eq!(source_package.get_name(), link.get_source());
         assert!(
-            expected_links.contains(&link.get_target()),
+            expected_links.iter().any(|l| link.get_target() == *l),
             "{}: package {} not in {:?}",
             context,
-            link.get_target(),
+            link.get_target().display_lossy(),
             expected_links
         );
         let version_constraint = SimpleConstraint::new("=", source_package.get_version(), None);
@@ -1638,11 +1648,12 @@ fn test_library_information() {
             PlatformRepository::new(vec![], IndexMap::new(), Some(platform_info), None).unwrap();
 
         let libraries: Vec<String> = platform_repository
-            .search("lib".to_string(), SEARCH_NAME, None)
+            .search(bstr::BString::from("lib".to_string()), SEARCH_NAME, None)
             .unwrap()
             .into_iter()
             .map(|package| package.name)
-            .filter(|name| name.starts_with("lib-"))
+            .filter(|name| name.starts_with(b"lib-"))
+            .map(|s| legacy_lossy(&s).into_owned())
             .collect();
         let expected_libraries: Vec<&str> = case
             .expectations
@@ -1675,8 +1686,8 @@ fn test_library_information() {
         {
             let package = platform_repository
                 .find_package(
-                    &package_name,
-                    FindPackageConstraint::String("*".to_string()),
+                    bstr::BStr::new(&package_name),
+                    FindPackageConstraint::String(bstr::BString::from("*".to_string())),
                 )
                 .unwrap();
             match expected_version {
@@ -1743,8 +1754,11 @@ fn test_composer_platform_version() {
 
     let package = platform_repository
         .find_package(
-            "composer",
-            FindPackageConstraint::String(format!("={}", shirabe::composer::get_version())),
+            bstr::BStr::new("composer"),
+            FindPackageConstraint::String(BString::from(format!(
+                "={}",
+                shirabe::composer::get_version()
+            ))),
         )
         .unwrap();
     assert!(package.is_some(), "Composer package exists");

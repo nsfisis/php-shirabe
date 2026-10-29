@@ -16,9 +16,9 @@ fn create_composer_instance() -> ComposerHandle {
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
     composer.borrow_mut().set_config(config);
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
-        "foo".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0.0".to_string(),
+        bstr::BString::from("foo".to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0.0".to_string()),
     )
     .into();
     composer.borrow_mut().set_package(package);

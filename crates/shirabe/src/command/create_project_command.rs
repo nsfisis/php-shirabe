@@ -25,7 +25,7 @@ use crate::repository::{
 use crate::script::ScriptEvents;
 use crate::signal::SignalSubscription;
 use crate::util::{Filesystem, Platform, ProcessExecutor};
-use bstr::{B, BString};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
@@ -172,11 +172,12 @@ impl CreateProjectCommand {
                         .get_config()
                         .borrow()
                         .get_repositories();
-                let name = RepositoryFactory::generate_repository_name(
+                let name = legacy_lossy(&RepositoryFactory::generate_repository_name(
                     &PhpMixed::Int(index as i64),
                     &repo_config,
                     &composer_json_repositories_config,
-                );
+                ))
+                .into_owned();
                 let mut config_source = JsonConfigSource::new(
                     std::rc::Rc::new(std::cell::RefCell::new(JsonFile::new(
                         "composer.json".to_string(),
@@ -389,8 +390,8 @@ impl CreateProjectCommand {
                     if link.get_pretty_constraint() == "self.version" {
                         config_source.add_link(
                             r#type,
-                            link.get_target(),
-                            &package.get_pretty_version(),
+                            &legacy_lossy(link.get_target()),
+                            &legacy_lossy(&package.get_pretty_version()),
                         )?;
                     }
                 }
@@ -434,16 +435,19 @@ impl CreateProjectCommand {
         secure_http: bool,
     ) -> anyhow::Result<bool> {
         let parser: VersionParser = VersionParser::new();
-        let requirements = parser.parse_name_version_pairs(vec![package_name.to_string()])?;
+        let requirements =
+            parser.parse_name_version_pairs(vec![bstr::BString::from(package_name.to_string())])?;
         let name = legacy_lossy(&strtolower(
             requirements[0]
-                .get("name")
-                .map(|s| s.as_str())
+                .get(bstr::B("name"))
+                .map(|s| s.as_bstr())
                 .unwrap_or_default(),
         ))
         .into_owned();
-        if package_version.is_none() && requirements[0].contains_key("version") {
-            package_version = requirements[0].get("version").cloned();
+        if package_version.is_none() && requirements[0].contains_key(bstr::B("version")) {
+            package_version = requirements[0]
+                .get(bstr::B("version"))
+                .map(|s| legacy_lossy(s).into_owned());
         }
 
         // if no directory was specified, use the 2nd part of the package name
@@ -535,9 +539,12 @@ impl CreateProjectCommand {
                 if let Some(matched) = matched {
                     stability = Some(legacy_lossy(matched.get(1).unwrap_or_default()).into_owned());
                 } else {
-                    stability = Some(VersionParser::parse_stability(
-                        package_version.as_deref().unwrap_or_default(),
-                    ));
+                    stability = Some(
+                        legacy_lossy(&VersionParser::parse_stability(
+                            package_version.as_deref().unwrap_or_default(),
+                        ))
+                        .into_owned(),
+                    );
                 }
             }
         }
@@ -546,10 +553,10 @@ impl CreateProjectCommand {
             VersionParser::normalize_stability(stability.as_deref().unwrap_or_default())
                 .unwrap_or_default();
 
-        if !STABILITIES.contains_key(stability.as_str()) {
+        if crate::package::stability_priority(&stability).is_none() {
             return Err(InvalidArgumentException::new(format!(
                 "Invalid stability provided ({}), must be one of: {}",
-                stability,
+                stability.display_lossy(),
                 implode(
                     ", ",
                     &STABILITIES
@@ -576,7 +583,7 @@ impl CreateProjectCommand {
         let rm = composer.get_repository_manager();
 
         let mut repository_set = RepositorySet::new(
-            &stability,
+            &legacy_lossy(&stability),
             indexmap::IndexMap::new(),
             vec![],
             indexmap::IndexMap::new(),
@@ -670,7 +677,7 @@ impl CreateProjectCommand {
         let package = version_selector.find_best_candidate(
             &name,
             package_version.as_deref(),
-            &stability,
+            &legacy_lossy(&stability),
             Some(platform_requirement_filter.clone()),
             0,
             Some(io.clone()),
@@ -684,7 +691,7 @@ impl CreateProjectCommand {
                 if let Some(v) = package_version.as_ref() {
                     format!("version {}", v)
                 } else {
-                    format!("stability {}", stability)
+                    format!("stability {}", legacy_lossy(&stability))
                 }
             );
             let is_ignore_all = platform_requirement_filter
@@ -696,7 +703,7 @@ impl CreateProjectCommand {
                     .find_best_candidate(
                         &name,
                         package_version.as_deref(),
-                        &stability,
+                        &legacy_lossy(&stability),
                         Some(PlatformRequirementFilterFactory::ignore_all()),
                         0,
                         None,
@@ -744,8 +751,10 @@ impl CreateProjectCommand {
 
         io.write_error(&format!(
             "<info>Installing {} ({})</info>",
-            package.get_name(),
-            package.get_full_pretty_version(false, crate::package::DisplayMode::SourceRefIfDev)
+            package.get_name().display_lossy(),
+            package
+                .get_full_pretty_version(false, crate::package::DisplayMode::SourceRefIfDev)
+                .display_lossy()
         ));
 
         if disable_plugins {
@@ -801,7 +810,9 @@ impl CreateProjectCommand {
             .borrow_mut()
             .add_suggestions_from_package(package.clone());
 
-        let installed_from_vcs = package.get_installation_source().as_deref() == Some("source");
+        let installed_from_vcs = package
+            .get_installation_source()
+            .is_some_and(|s| s == "source");
 
         io.write_error(&format!("<info>Created project in {}</info>", directory));
         chdir(&directory);
@@ -815,7 +826,10 @@ impl CreateProjectCommand {
             Platform::clear_env("COMPOSER");
         }
 
-        Platform::put_env("COMPOSER_ROOT_VERSION", &package.get_pretty_version());
+        Platform::put_env(
+            "COMPOSER_ROOT_VERSION",
+            &legacy_lossy(&package.get_pretty_version()),
+        );
 
         if let Some(signals) = &signals
             && signals.is_triggered()

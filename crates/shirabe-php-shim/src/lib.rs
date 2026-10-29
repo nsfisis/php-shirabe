@@ -79,6 +79,106 @@ fn json_utf8<S: serde::Serializer>(s: &[u8]) -> Result<&str, S::Error> {
     })
 }
 
+/// `#[serde(serialize_with = "...")]` adapters for PHP strings held as bytes. Each writes the
+/// bytes the way `json_encode()` does, failing on invalid UTF-8.
+pub mod json_bytes {
+    use super::json_utf8;
+    use bstr::BString;
+    use indexmap::IndexMap;
+    use serde::ser::{SerializeMap, SerializeSeq};
+    use serde::{Serialize, Serializer};
+
+    struct Str<'a>(&'a [u8]);
+
+    impl Serialize for Str<'_> {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            serializer.serialize_str(json_utf8::<S>(self.0)?)
+        }
+    }
+
+    struct StrMap<'a>(&'a IndexMap<BString, BString>);
+
+    impl Serialize for StrMap<'_> {
+        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            str_map(self.0, serializer)
+        }
+    }
+
+    pub fn str<S: Serializer>(value: &BString, serializer: S) -> Result<S::Ok, S::Error> {
+        Str(value).serialize(serializer)
+    }
+
+    pub fn option_str<S: Serializer>(
+        value: &Option<BString>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        match value {
+            Some(value) => Str(value).serialize(serializer),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn str_vec<S: Serializer>(value: &[BString], serializer: S) -> Result<S::Ok, S::Error> {
+        let mut seq = serializer.serialize_seq(Some(value.len()))?;
+        for item in value {
+            seq.serialize_element(&Str(item))?;
+        }
+        seq.end()
+    }
+
+    pub fn str_map<S: Serializer>(
+        value: &IndexMap<BString, BString>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(value.len()))?;
+        for (k, v) in value {
+            map.serialize_entry(&Str(k), &Str(v))?;
+        }
+        map.end()
+    }
+
+    pub fn str_map_vec<S: Serializer>(
+        value: &[IndexMap<BString, BString>],
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let mut seq = serializer.serialize_seq(Some(value.len()))?;
+        for item in value {
+            seq.serialize_element(&StrMap(item))?;
+        }
+        seq.end()
+    }
+
+    /// A map keyed by PHP strings. PHP's `json_encode()` writes an empty array as `[]`.
+    pub fn keyed<S: Serializer, V: Serialize>(
+        value: &IndexMap<BString, V>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if value.is_empty() {
+            return serializer.serialize_seq(Some(0))?.end();
+        }
+        let mut map = serializer.serialize_map(Some(value.len()))?;
+        for (k, v) in value {
+            map.serialize_entry(&Str(k), v)?;
+        }
+        map.end()
+    }
+
+    /// Like [`keyed`], for values that are themselves optional PHP strings.
+    pub fn keyed_option_str<S: Serializer>(
+        value: &IndexMap<BString, Option<BString>>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if value.is_empty() {
+            return serializer.serialize_seq(Some(0))?.end();
+        }
+        let mut map = serializer.serialize_map(Some(value.len()))?;
+        for (k, v) in value {
+            map.serialize_entry(&Str(k), &v.as_ref().map(|v| Str(v)))?;
+        }
+        map.end()
+    }
+}
+
 impl serde::Serialize for PhpMixed {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

@@ -1,5 +1,6 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionParserTest.php
 
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::package::version::version_parser::VersionParser;
 
@@ -24,8 +25,22 @@ fn test_parse_name_version_pairs() {
         let version_parser = VersionParser::new();
 
         assert_eq!(
-            result,
-            version_parser.parse_name_version_pairs(input).unwrap()
+            result
+                .iter()
+                .map(|m| {
+                    m.iter()
+                        .map(|(k, v)| (BString::from(k.as_str()), BString::from(v.as_str())))
+                        .collect::<IndexMap<_, _>>()
+                })
+                .collect::<Vec<_>>(),
+            version_parser
+                .parse_name_version_pairs(
+                    input
+                        .into_iter()
+                        .map(bstr::BString::from)
+                        .collect::<Vec<_>>()
+                )
+                .unwrap()
         );
     }
 }

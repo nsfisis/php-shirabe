@@ -2,6 +2,7 @@
 
 use crate::io_mock::{Expectation, get_io_mock};
 use crate::test_case::{get_complete_package, get_package};
+use bstr::{BStr, BString};
 use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe::advisory::{AnySecurityAdvisory, Auditor, PartialSecurityAdvisory, SecurityAdvisory};
@@ -27,11 +28,16 @@ fn full_advisory() -> std::rc::Rc<AnySecurityAdvisory> {
     source.insert("name".to_string(), "foo".to_string());
     source.insert("remoteId".to_string(), "remoteID".to_string());
     std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
-        "foo/bar".to_string(),
-        "123".to_string(),
+        bstr::BString::from("foo/bar".to_string()),
+        bstr::BString::from("123".to_string()),
         constraint("=", "1.0.0.0"),
-        "test".to_string(),
-        vec![source],
+        bstr::BString::from("test".to_string()),
+        vec![
+            source
+                .into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        ],
         Utc::now(),
         None,
         None,
@@ -44,11 +50,16 @@ fn full_advisory_with_id(advisory_id: &str) -> std::rc::Rc<AnySecurityAdvisory> 
     source.insert("name".to_string(), "foo".to_string());
     source.insert("remoteId".to_string(), "remoteID".to_string());
     std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
-        "foo/bar".to_string(),
-        advisory_id.to_string(),
+        bstr::BString::from("foo/bar".to_string()),
+        bstr::BString::from(advisory_id.to_string()),
         constraint("=", "1.0.0.0"),
-        "test".to_string(),
-        vec![source],
+        bstr::BString::from("test".to_string()),
+        vec![
+            source
+                .into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        ],
         Utc::now(),
         None,
         None,
@@ -58,16 +69,16 @@ fn full_advisory_with_id(advisory_id: &str) -> std::rc::Rc<AnySecurityAdvisory> 
 
 fn partial_advisory(advisory_id: &str) -> std::rc::Rc<AnySecurityAdvisory> {
     std::rc::Rc::new(AnySecurityAdvisory::Partial(PartialSecurityAdvisory::new(
-        "foo/bar".to_string(),
-        advisory_id.to_string(),
+        bstr::BString::from("foo/bar".to_string()),
+        bstr::BString::from(advisory_id.to_string()),
         constraint("=", "1.0.0.0"),
     )))
 }
 
-fn ignore_list(pairs: Vec<(&str, Option<&str>)>) -> IndexMap<String, Option<String>> {
+fn ignore_list(pairs: Vec<(&str, Option<&str>)>) -> IndexMap<BString, Option<BString>> {
     pairs
         .into_iter()
-        .map(|(k, v)| (k.to_string(), v.map(String::from)))
+        .map(|(k, v)| (BString::from(k), v.map(BString::from)))
         .collect()
 }
 
@@ -79,7 +90,7 @@ enum AdvisorySource {
     /// Mirrors `AuditorTest::getMockAdvisories()` filtered by the package constraint map.
     Table,
     /// Returns a fixed advisory map regardless of the request (reachable repo).
-    Fixed(IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>),
+    Fixed(IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>),
     /// Throws a `TransportException`, simulating an unreachable repository.
     Unreachable(String),
 }
@@ -96,7 +107,7 @@ impl AdvisoryProviderInterface for MockAdvisoryRepository {
 
     fn get_security_advisories(
         &mut self,
-        package_constraint_map: IndexMap<String, AnyConstraint>,
+        package_constraint_map: IndexMap<BString, AnyConstraint>,
         _allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult> {
         match &self.source {
@@ -108,10 +119,10 @@ impl AdvisoryProviderInterface for MockAdvisoryRepository {
                 advisories: advisories.clone(),
             }),
             AdvisorySource::Table => {
-                let mut advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+                let mut advisories: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
                     IndexMap::new();
                 for (package, list) in mock_advisories() {
-                    let Some(constraint) = package_constraint_map.get(&package) else {
+                    let Some(constraint) = package_constraint_map.get(bstr::B(&package)) else {
                         continue;
                     };
                     let filtered: Vec<std::rc::Rc<AnySecurityAdvisory>> = list
@@ -140,14 +151,14 @@ impl RepositoryInterface for MockAdvisoryRepository {
     }
     fn find_package(
         &mut self,
-        _name: &str,
+        _name: &BStr,
         _constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         unimplemented!("not used by Auditor")
     }
     fn find_packages(
         &mut self,
-        _name: &str,
+        _name: &BStr,
         _constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         unimplemented!("not used by Auditor")
@@ -157,29 +168,29 @@ impl RepositoryInterface for MockAdvisoryRepository {
     }
     fn load_packages(
         &mut self,
-        _package_name_map: IndexMap<String, Option<AnyConstraint>>,
-        _acceptable_stabilities: IndexMap<String, i64>,
-        _stability_flags: IndexMap<String, i64>,
-        _already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        _package_name_map: IndexMap<BString, Option<AnyConstraint>>,
+        _acceptable_stabilities: IndexMap<BString, i64>,
+        _stability_flags: IndexMap<BString, i64>,
+        _already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         unimplemented!("not used by Auditor")
     }
     fn search(
         &mut self,
-        _query: String,
+        _query: BString,
         _mode: i64,
-        _type: Option<String>,
+        _type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         unimplemented!("not used by Auditor")
     }
     fn get_providers(
         &mut self,
-        _package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        _package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         unimplemented!("not used by Auditor")
     }
-    fn get_repo_name(&self) -> anyhow::Result<String> {
-        Ok("mock advisory repo".to_string())
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
+        Ok("mock advisory repo".into())
     }
     fn as_advisory_provider_mut(&mut self) -> Option<&mut dyn AdvisoryProviderInterface> {
         Some(self)
@@ -191,10 +202,10 @@ impl RepositoryInterface for MockAdvisoryRepository {
 
 /// ref: AuditorTest::getMockAdvisories. All entries carry full data so they load as
 /// `SecurityAdvisory` (never partial) regardless of `allowPartialAdvisories`.
-fn mock_advisories() -> IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> {
-    let mut advisories: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> = IndexMap::new();
+fn mock_advisories() -> IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> {
+    let mut advisories: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> = IndexMap::new();
     advisories.insert(
-        "vendor1/package1".to_string(),
+        BString::from("vendor1/package1"),
         vec![
             mock_advisory(
                 "vendor1/package1",
@@ -235,7 +246,7 @@ fn mock_advisories() -> IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> 
         ],
     );
     advisories.insert(
-        "vendor1/package2".to_string(),
+        BString::from("vendor1/package2"),
         vec![mock_advisory(
             "vendor1/package2",
             "ID2",
@@ -250,7 +261,7 @@ fn mock_advisories() -> IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> 
         )],
     );
     advisories.insert(
-        "vendorx/packagex".to_string(),
+        BString::from("vendorx/packagex"),
         vec![mock_advisory(
             "vendorx/packagex",
             "IDx",
@@ -265,7 +276,7 @@ fn mock_advisories() -> IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> 
         )],
     );
     advisories.insert(
-        "vendor2/package1".to_string(),
+        BString::from("vendor2/package1"),
         vec![
             mock_advisory(
                 "vendor2/package1",
@@ -294,7 +305,7 @@ fn mock_advisories() -> IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> 
         ],
     );
     advisories.insert(
-        "vendory/packagey".to_string(),
+        BString::from("vendory/packagey"),
         vec![mock_advisory(
             "vendory/packagey",
             "IDy",
@@ -309,7 +320,7 @@ fn mock_advisories() -> IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> 
         )],
     );
     advisories.insert(
-        "vendor3/package1".to_string(),
+        BString::from("vendor3/package1"),
         vec![mock_advisory(
             "vendor3/package1",
             "ID7",
@@ -346,15 +357,20 @@ fn mock_advisory(
     source.insert("name".to_string(), source_name.to_string());
     source.insert("remoteId".to_string(), remote_id.to_string());
     std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
-        package_name.to_string(),
-        advisory_id.to_string(),
+        bstr::BString::from(package_name.to_string()),
+        bstr::BString::from(advisory_id.to_string()),
         VersionParser.parse_constraints(affected_versions).unwrap(),
-        title.to_string(),
-        vec![source],
+        bstr::BString::from(title.to_string()),
+        vec![
+            source
+                .into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        ],
         date_create::<Utc>(reported_at).unwrap(),
-        Some(cve.to_string()),
-        Some(link.to_string()),
-        Some(severity.to_string()),
+        Some(bstr::BString::from(cve.to_string())),
+        Some(bstr::BString::from(link.to_string())),
+        Some(bstr::BString::from(severity.to_string())),
     )))
 }
 
@@ -386,7 +402,7 @@ fn test_audit() {
         warning_only: bool,
         abandoned: &'static str,
         format: &'static str,
-        ignore_abandoned: IndexMap<String, Option<String>>,
+        ignore_abandoned: IndexMap<BString, Option<BString>>,
         expected: i64,
         output: &'static str,
     }
@@ -587,10 +603,10 @@ Found 2 abandoned packages:
                 &io,
                 &repo_set,
                 case.packages.clone(),
-                case.format,
+                bstr::BStr::new(case.format),
                 case.warning_only,
                 IndexMap::new(),
-                case.abandoned,
+                bstr::BStr::new(case.abandoned),
                 IndexMap::new(),
                 false,
                 case.ignore_abandoned.clone(),
@@ -615,7 +631,7 @@ Found 2 abandoned packages:
 fn test_audit_with_ignore() {
     struct Case {
         packages: Vec<PackageInterfaceHandle>,
-        ignored_ids: IndexMap<String, Option<String>>,
+        ignored_ids: IndexMap<BString, Option<BString>>,
         exit_code: i64,
         expected_output: Vec<Expectation>,
     }
@@ -814,10 +830,10 @@ fn test_audit_with_ignore() {
                 &io_dyn,
                 &repo_set,
                 case.packages.clone(),
-                Auditor::FORMAT_PLAIN,
+                bstr::BStr::new(Auditor::FORMAT_PLAIN),
                 false,
                 case.ignored_ids.clone(),
-                Auditor::ABANDONED_FAIL,
+                bstr::BStr::new(Auditor::ABANDONED_FAIL),
                 IndexMap::new(),
                 false,
                 IndexMap::new(),
@@ -843,41 +859,49 @@ fn test_audit_with_ignore_unreachable() {
             .to_string();
 
     let make_repo_set = || {
-        let mut fixed: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> = IndexMap::new();
+        let mut fixed: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> = IndexMap::new();
         fixed.insert(
-            "vendor1/package1".to_string(),
+            BString::from("vendor1/package1"),
             vec![
                 std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
-                    "vendor1/package1".to_string(),
-                    "CVE-2023-12345".to_string(),
+                    bstr::BString::from("vendor1/package1".to_string()),
+                    bstr::BString::from("CVE-2023-12345".to_string()),
                     constraint("=", "3.0.0.0"),
-                    "First repo advisory".to_string(),
+                    bstr::BString::from("First repo advisory".to_string()),
                     vec![{
                         let mut s: IndexMap<String, String> = IndexMap::new();
                         s.insert("name".to_string(), "test".to_string());
                         s.insert("remoteId".to_string(), "1".to_string());
-                        s
+                        s.into_iter()
+                            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+                            .collect::<indexmap::IndexMap<_, _>>()
                     }],
                     date_create::<Utc>("2023-01-01").unwrap(),
-                    Some("CVE-2023-12345".to_string()),
-                    Some("https://example.com/advisory/1".to_string()),
-                    Some("medium".to_string()),
+                    Some(bstr::BString::from("CVE-2023-12345".to_string())),
+                    Some(bstr::BString::from(
+                        "https://example.com/advisory/1".to_string(),
+                    )),
+                    Some(bstr::BString::from("medium".to_string())),
                 ))),
                 std::rc::Rc::new(AnySecurityAdvisory::Full(SecurityAdvisory::new(
-                    "vendor1/package1".to_string(),
-                    "CVE-2023-67890".to_string(),
+                    bstr::BString::from("vendor1/package1".to_string()),
+                    bstr::BString::from("CVE-2023-67890".to_string()),
                     constraint("=", "3.0.0.0"),
-                    "Third repo advisory".to_string(),
+                    bstr::BString::from("Third repo advisory".to_string()),
                     vec![{
                         let mut s: IndexMap<String, String> = IndexMap::new();
                         s.insert("name".to_string(), "test".to_string());
                         s.insert("remoteId".to_string(), "3".to_string());
-                        s
+                        s.into_iter()
+                            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+                            .collect::<indexmap::IndexMap<_, _>>()
                     }],
                     date_create::<Utc>("2023-01-01").unwrap(),
-                    Some("CVE-2023-67890".to_string()),
-                    Some("https://example.com/advisory/3".to_string()),
-                    Some("high".to_string()),
+                    Some(bstr::BString::from("CVE-2023-67890".to_string())),
+                    Some(bstr::BString::from(
+                        "https://example.com/advisory/3".to_string(),
+                    )),
+                    Some(bstr::BString::from("high".to_string())),
                 ))),
             ],
         );
@@ -917,10 +941,10 @@ fn test_audit_with_ignore_unreachable() {
                 &io,
                 &repo_set,
                 packages.clone(),
-                Auditor::FORMAT_PLAIN,
+                bstr::BStr::new(Auditor::FORMAT_PLAIN),
                 false,
                 IndexMap::new(),
-                Auditor::ABANDONED_IGNORE,
+                bstr::BStr::new(Auditor::ABANDONED_IGNORE),
                 IndexMap::new(),
                 false,
                 IndexMap::new(),
@@ -941,10 +965,10 @@ fn test_audit_with_ignore_unreachable() {
                 &io,
                 &repo_set,
                 packages.clone(),
-                Auditor::FORMAT_PLAIN,
+                bstr::BStr::new(Auditor::FORMAT_PLAIN),
                 false,
                 IndexMap::new(),
-                Auditor::ABANDONED_IGNORE,
+                bstr::BStr::new(Auditor::ABANDONED_IGNORE),
                 IndexMap::new(),
                 true,
                 IndexMap::new(),
@@ -978,10 +1002,10 @@ fn test_audit_with_ignore_unreachable() {
                 &io,
                 &repo_set,
                 packages,
-                Auditor::FORMAT_JSON,
+                bstr::BStr::new(Auditor::FORMAT_JSON),
                 false,
                 IndexMap::new(),
-                Auditor::ABANDONED_IGNORE,
+                bstr::BStr::new(Auditor::ABANDONED_IGNORE),
                 IndexMap::new(),
                 true,
                 IndexMap::new(),
@@ -1033,7 +1057,7 @@ fn test_audit_with_ignore_unreachable() {
 fn test_audit_with_ignore_severity() {
     struct Case {
         packages: Vec<PackageInterfaceHandle>,
-        ignored_severities: IndexMap<String, Option<String>>,
+        ignored_severities: IndexMap<BString, Option<BString>>,
         exit_code: i64,
         expected_output: Vec<Expectation>,
     }
@@ -1075,10 +1099,10 @@ fn test_audit_with_ignore_severity() {
                 &io_dyn,
                 &repo_set,
                 case.packages.clone(),
-                Auditor::FORMAT_PLAIN,
+                bstr::BStr::new(Auditor::FORMAT_PLAIN),
                 false,
                 IndexMap::new(),
-                Auditor::ABANDONED_IGNORE,
+                bstr::BStr::new(Auditor::ABANDONED_IGNORE),
                 case.ignored_severities.clone(),
                 false,
                 IndexMap::new(),
@@ -1095,8 +1119,8 @@ fn test_audit_with_ignore_severity() {
 #[test]
 fn test_needs_complete_advisory_load() {
     let cases: Vec<(
-        IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
-        IndexMap<String, Option<String>>,
+        IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+        IndexMap<BString, Option<BString>>,
         bool,
     )> = vec![
         // no filter or advisories
@@ -1110,10 +1134,10 @@ fn test_needs_complete_advisory_load() {
         // packagist filters are IDs so work fine with partial advisories/2
         (
             {
-                let mut m: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+                let mut m: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
                     IndexMap::new();
                 m.insert(
-                    "vendor1/package1".to_string(),
+                    BString::from("vendor1/package1"),
                     vec![full_advisory(), partial_advisory("1234")],
                 );
                 m
@@ -1130,9 +1154,9 @@ fn test_needs_complete_advisory_load() {
         // no advisories no need to load any further/2
         (
             {
-                let mut m: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+                let mut m: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
                     IndexMap::new();
-                m.insert("vendor1/package1".to_string(), vec![]);
+                m.insert(BString::from("vendor1/package1"), vec![]);
                 m
             },
             ignore_list(vec![("CVE-2025-1234", None)]),
@@ -1141,10 +1165,10 @@ fn test_needs_complete_advisory_load() {
         // CVE filter or other non-packagist ones might need to fully load for safety if partial advisories are present
         (
             {
-                let mut m: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+                let mut m: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
                     IndexMap::new();
                 m.insert(
-                    "vendor1/package1".to_string(),
+                    BString::from("vendor1/package1"),
                     vec![full_advisory(), partial_advisory("1234")],
                 );
                 m
@@ -1155,11 +1179,11 @@ fn test_needs_complete_advisory_load() {
         // filter does not trigger load if all advisories are fully loaded
         (
             {
-                let mut m: IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
+                let mut m: IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>> =
                     IndexMap::new();
-                m.insert("vendor1/package1".to_string(), vec![full_advisory()]);
+                m.insert(BString::from("vendor1/package1"), vec![full_advisory()]);
                 m.insert(
-                    "vendor1/package2".to_string(),
+                    BString::from("vendor1/package2"),
                     vec![full_advisory_with_id("1234")],
                 );
                 m

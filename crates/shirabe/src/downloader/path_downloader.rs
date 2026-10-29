@@ -81,12 +81,14 @@ impl PathDownloader {
         let url = package.get_dist_url().ok_or_else(|| {
             RuntimeException::new(format!(
                 "The package {} has no dist url configured, cannot install.",
-                package.get_pretty_name()
+                package.get_pretty_name().display_lossy()
             ))
         })?;
-        let real_url = realpath(&url)
+        let real_url = realpath(path_from_bytes(&url))
             .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            .ok_or_else(|| RuntimeException::new(format!("Failed to realpath {}", url)))?;
+            .ok_or_else(|| {
+                RuntimeException::new(format!("Failed to realpath {}", url.display_lossy()))
+            })?;
 
         if realpath(path)
             .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
@@ -103,19 +105,19 @@ impl PathDownloader {
             if Platform::is_windows() {
                 return Ok(format!(
                     ": Junctioning from {}",
-                    package.get_dist_url().unwrap_or_default()
+                    legacy_lossy(&package.get_dist_url().unwrap_or_default())
                 ));
             }
 
             return Ok(format!(
                 ": Symlinking from {}",
-                package.get_dist_url().unwrap_or_default()
+                legacy_lossy(&package.get_dist_url().unwrap_or_default())
             ));
         }
 
         Ok(format!(
             ": Mirroring from {}",
-            package.get_dist_url().unwrap_or_default()
+            legacy_lossy(&package.get_dist_url().unwrap_or_default())
         ))
     }
 
@@ -217,18 +219,19 @@ impl DownloaderInterface for PathDownloader {
         let url = package.get_dist_url().ok_or_else(|| {
             RuntimeException::new(format!(
                 "The package {} has no dist url configured, cannot download.",
-                package.get_pretty_name()
+                package.get_pretty_name().display_lossy()
             ))
         })?;
-        let real_url = realpath(&url).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
+        let real_url =
+            realpath(path_from_bytes(&url)).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
         if real_url.is_none()
             || !file_exists(real_url.as_deref().unwrap_or_default())
             || !is_dir(real_url.as_deref().unwrap_or_default())
         {
             return Err(RuntimeException::new(format!(
                 "Source path \"{}\" is not found for package {}",
-                url,
-                package.get_name()
+                url.display_lossy(),
+                package.get_name().display_lossy()
             ))
             .into());
         }
@@ -257,7 +260,7 @@ impl DownloaderInterface for PathDownloader {
             // for previous attempts that were shut down because they did not work well enough or introduced too many risks.
             return Err(RuntimeException::new(format!(
                 "Package {} cannot install to \"{}\" inside its source at \"{}\"",
-                package.get_name(),
+                package.get_name().display_lossy(),
                 realpath(&path)
                     .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                     .unwrap_or_default(),
@@ -291,12 +294,14 @@ impl DownloaderInterface for PathDownloader {
         let url = package.get_dist_url().ok_or_else(|| {
             RuntimeException::new(format!(
                 "The package {} has no dist url configured, cannot install.",
-                package.get_pretty_name()
+                package.get_pretty_name().display_lossy()
             ))
         })?;
-        let real_url = realpath(&url)
+        let real_url = realpath(path_from_bytes(&url))
             .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            .ok_or_else(|| RuntimeException::new(format!("Failed to realpath {}", url)))?;
+            .ok_or_else(|| {
+                RuntimeException::new(format!("Failed to realpath {}", url.display_lossy()))
+            })?;
 
         if realpath(&path)
             .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
@@ -349,7 +354,7 @@ impl DownloaderInterface for PathDownloader {
                     // Implement symlinks as NTFS junctions on Windows
                     if output {
                         self.inner.io.borrow().write_error3(
-                            &format!("Junctioning from {}", url),
+                            &format!("Junctioning from {}", url.display_lossy()),
                             false,
                             io_interface::NORMAL,
                         );
@@ -363,7 +368,7 @@ impl DownloaderInterface for PathDownloader {
                     let path = Filesystem::trim_trailing_slash(&path);
                     if output {
                         self.inner.io.borrow().write_error3(
-                            &format!("Symlinking from {}", url),
+                            &format!("Symlinking from {}", url.display_lossy()),
                             false,
                             io_interface::NORMAL,
                         );
@@ -436,7 +441,7 @@ impl DownloaderInterface for PathDownloader {
                     &format!(
                         "{}Mirroring from {}",
                         if is_fallback { "    " } else { "" },
-                        url
+                        url.display_lossy()
                     ),
                     false,
                     io_interface::NORMAL,
@@ -507,7 +512,7 @@ impl DownloaderInterface for PathDownloader {
                 );
                 return Err(RuntimeException::new(format!(
                     "Could not reliably remove junction for package {}",
-                    package.get_name()
+                    package.get_name().display_lossy()
                 ))
                 .into());
             }
@@ -518,7 +523,7 @@ impl DownloaderInterface for PathDownloader {
         let url = package.get_dist_url().ok_or_else(|| {
             RuntimeException::new(format!(
                 "The package {} has no dist url configured, cannot remove.",
-                package.get_pretty_name()
+                package.get_pretty_name().display_lossy()
             ))
         })?;
 
@@ -536,10 +541,14 @@ impl DownloaderInterface for PathDownloader {
                 path.display()
             ))
         };
-        let abs_dist_url = if fs.is_absolute_path(&url) {
-            url.to_string()
+        let abs_dist_url = if fs.is_absolute_path(path_from_bytes(&url)) {
+            legacy_lossy(&url).into_owned()
         } else {
-            format!("{}/{}", Platform::get_cwd(false)?.display(), url)
+            format!(
+                "{}/{}",
+                Platform::get_cwd(false)?.display(),
+                legacy_lossy(&url)
+            )
         };
         if fs.normalize_path(&abs_path).as_os_str() == fs.normalize_path(&abs_dist_url).as_os_str()
         {

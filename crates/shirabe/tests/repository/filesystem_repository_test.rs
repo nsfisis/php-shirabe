@@ -149,7 +149,7 @@ fn test_repository_write() {
         .times(2)
         .returning(move |_| Some(fixed_path.clone()));
 
-    repository.set_dev_package_names(vec!["mypkg2".to_string()]);
+    repository.set_dev_package_names(vec![bstr::BString::from("mypkg2".to_string())]);
     repository
         .add_package(get_package("mypkg2", "1.2.3"))
         .unwrap();
@@ -206,7 +206,7 @@ fn configure_links(
     pretty_version: &str,
     description: &str,
     links: &[(&str, &str)],
-) -> IndexMap<String, Link> {
+) -> IndexMap<BString, Link> {
     let mut map: IndexMap<BString, PhpMixed> = IndexMap::new();
     for (target, constraint) in links {
         map.insert(
@@ -215,7 +215,12 @@ fn configure_links(
         );
     }
     ArrayLoader::new(None, false)
-        .parse_links(name, pretty_version, description, map)
+        .parse_links(
+            bstr::BStr::new(name),
+            bstr::BStr::new(pretty_version),
+            description,
+            map,
+        )
         .unwrap()
 }
 
@@ -235,12 +240,14 @@ fn test_repository_writes_installed_php() {
     .unwrap();
 
     let root_package = RootPackageHandle::new(
-        "__root__".to_string(),
-        legacy_lossy(&VersionParser.normalize("dev-master", None).unwrap()).into_owned(),
-        "dev-master".to_string(),
+        bstr::BString::from("__root__".to_string()),
+        bstr::BString::from(&VersionParser.normalize("dev-master", None).unwrap()[..]),
+        bstr::BString::from("dev-master".to_string()),
     );
-    root_package.set_source_reference(Some("sourceref-by-default".to_string()));
-    root_package.set_dist_reference(Some("distref".to_string()));
+    root_package.set_source_reference(Some(bstr::BString::from(
+        "sourceref-by-default".to_string(),
+    )));
+    root_package.set_dist_reference(Some(bstr::BString::from("distref".to_string())));
     root_package.set_provides(configure_links(
         "__root__",
         "dev-master",
@@ -249,13 +256,13 @@ fn test_repository_writes_installed_php() {
     ));
     let root_package = RootAliasPackageHandle::new(
         root_package,
-        legacy_lossy(&VersionParser.normalize("1.10.x-dev", None).unwrap()).into_owned(),
-        "1.10.x-dev".to_string(),
+        bstr::BString::from(&VersionParser.normalize("1.10.x-dev", None).unwrap()[..]),
+        bstr::BString::from("1.10.x-dev".to_string()),
     );
 
     let mut repository =
         FilesystemRepository::new(json, true, Some(root_package.into()), None).unwrap();
-    repository.set_dev_package_names(vec!["c/c".to_string()]);
+    repository.set_dev_package_names(vec![bstr::BString::from("c/c".to_string())]);
 
     let pkg = get_package("a/provider", "1.1");
     pkg.__set_provides(configure_links(
@@ -264,7 +271,9 @@ fn test_repository_writes_installed_php() {
         Link::TYPE_PROVIDE,
         &[("foo/impl", "^1.1"), ("foo/impl2", "2.0")],
     ));
-    pkg.set_dist_reference(Some("distref-as-no-source".to_string()));
+    pkg.set_dist_reference(Some(bstr::BString::from(
+        "distref-as-no-source".to_string(),
+    )));
     repository.add_package(pkg).unwrap();
 
     let pkg = get_package("a/provider2", "1.2");
@@ -274,9 +283,11 @@ fn test_repository_writes_installed_php() {
         Link::TYPE_PROVIDE,
         &[("foo/impl", "self.version"), ("foo/impl2", "2.0")],
     ));
-    pkg.set_source_reference(Some("sourceref".to_string()));
-    pkg.set_dist_reference(Some("distref-as-installed-from-dist".to_string()));
-    pkg.set_installation_source(Some("dist".to_string()));
+    pkg.set_source_reference(Some(bstr::BString::from("sourceref".to_string())));
+    pkg.set_dist_reference(Some(bstr::BString::from(
+        "distref-as-installed-from-dist".to_string(),
+    )));
+    pkg.set_installation_source(Some(bstr::BString::from("dist".to_string())));
     repository.add_package(pkg.clone()).unwrap();
 
     repository
@@ -293,13 +304,13 @@ fn test_repository_writes_installed_php() {
     repository.add_package(pkg).unwrap();
 
     let pkg = get_package("c/c", "3.0");
-    pkg.set_dist_reference(Some(
+    pkg.set_dist_reference(Some(bstr::BString::from(
         "{${passthru('bash -i')}} Foo\\Bar\n\ttab\u{0b}verticaltab\0".to_string(),
-    ));
+    )));
     repository.add_package(pkg).unwrap();
 
     let pkg = get_package("meta/package", "3.0");
-    pkg.__set_type("metapackage".to_string());
+    pkg.__set_type(bstr::BString::from("metapackage".to_string()));
     repository.add_package(pkg).unwrap();
 
     let mut im = MockInstallationManager::new();
@@ -321,7 +332,7 @@ fn test_repository_writes_installed_php() {
             return Some(cwd.clone());
         }
         // check for relative paths
-        Some(format!("vendor/{}", package.get_name()))
+        Some(format!("vendor/{}", legacy_lossy(&package.get_name())))
     });
 
     repository.write(true, &im).unwrap();

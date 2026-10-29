@@ -101,26 +101,31 @@ impl DownloadManager {
             return Ok(None);
         }
 
-        let downloader = if installation_source.as_deref() == Some("dist") {
-            self.get_downloader(&package.get_dist_type().unwrap_or_default())?
-        } else if installation_source.as_deref() == Some("source") {
-            self.get_downloader(&package.get_source_type().unwrap_or_default())?
+        let downloader = if installation_source.as_ref().is_some_and(|s| s == "dist") {
+            self.get_downloader(&legacy_lossy(&package.get_dist_type().unwrap_or_default()))?
+        } else if installation_source.as_ref().is_some_and(|s| s == "source") {
+            self.get_downloader(&legacy_lossy(
+                &package.get_source_type().unwrap_or_default(),
+            ))?
         } else {
             return Err(InvalidArgumentException::new(format!(
                 "Package {} does not have an installation source set",
-                package,
+                package.to_php_string().display_lossy(),
             ))
             .into());
         };
 
         let downloader_installation_source = downloader.borrow().get_installation_source();
-        if installation_source.as_deref() != Some(&downloader_installation_source) {
+        if installation_source
+            .as_ref()
+            .is_none_or(|s| *s != downloader_installation_source)
+        {
             return Err(LogicException::new(format!(
                 "Downloader \"{}\" is a {} type downloader and can not be used to download {} for package {}",
                 downloader.borrow().php_class_name(),
                 downloader_installation_source,
-                installation_source.unwrap_or_default(),
-                package,
+                installation_source.unwrap_or_default().display_lossy(),
+                package.to_php_string().display_lossy(),
             ))
             .into());
         }
@@ -173,7 +178,7 @@ impl DownloadManager {
                     io_interface::NORMAL,
                 );
             }
-            package.set_installation_source(Some(source.clone()));
+            package.set_installation_source(Some(bstr::BString::from(source.clone())));
 
             let Some(downloader) = self.get_downloader_for_package(package.clone())? else {
                 return Ok(None);
@@ -201,7 +206,7 @@ impl DownloadManager {
                         self.io.write_error3(
                             &format!(
                                 "    <warning>Failed to download {} from {}: {}</warning>",
-                                package.get_pretty_name(),
+                                package.get_pretty_name().display_lossy(),
                                 source,
                                 message,
                             ),
@@ -407,7 +412,7 @@ impl DownloadManager {
         if sources.is_empty() {
             return Err(InvalidArgumentException::new(format!(
                 "Package {} must have a source or dist specified",
-                package
+                package.to_php_string().display_lossy()
             ))
             .into());
         }
@@ -424,7 +429,7 @@ impl DownloadManager {
             )
                 // unless the previous package was stable dist (by default) and the new package is dev, then we allow the new default to take over
                 && !(!prev.is_dev()
-                    && prev.get_installation_source().as_deref() == Some("dist")
+                    && prev.get_installation_source().is_some_and(|s| s == "dist")
                     && package.is_dev())
             {
                 let prev_source_owned = prev_source.unwrap_or_default();

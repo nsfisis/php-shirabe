@@ -145,7 +145,7 @@ fn dist_refs_provider() -> Vec<(
 #[test]
 fn test_sanitize() {
     for (expected, url) in sanitize_provider() {
-        assert_eq!(expected, Url::sanitize(url.to_string()));
+        assert_eq!(expected, Url::sanitize(url));
     }
 }
 

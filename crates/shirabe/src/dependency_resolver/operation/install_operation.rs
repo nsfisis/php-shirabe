@@ -2,6 +2,7 @@
 
 use crate::dependency_resolver::operation::SolverOperation;
 use crate::package::PackageInterfaceHandle;
+use shirabe_php_shim::legacy_lossy;
 
 #[derive(Debug, Clone)]
 pub struct InstallOperation {
@@ -25,8 +26,10 @@ impl InstallOperation {
         format!(
             "{}<info>{}</info> (<comment>{}</comment>)",
             if lock { "Locking " } else { "Installing " },
-            package.get_pretty_name(),
-            package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+            legacy_lossy(&package.get_pretty_name()),
+            legacy_lossy(
+                &package.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+            ),
         )
     }
 }

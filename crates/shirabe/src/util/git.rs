@@ -6,6 +6,7 @@ use crate::util::{
     AuthHelper, Bitbucket, CommandLine, Filesystem, GitHub, GitLab, HttpDownloader, Platform,
     ProcessExecutor, StoreAuth, Url,
 };
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
@@ -659,10 +660,7 @@ impl Git {
                 let mut auth_parts: Option<String> = None;
                 if m2.contains("@") {
                     let parts = explode("@", &m2);
-                    auth_parts = parts
-                        .first()
-                        .cloned()
-                        .map(|s| legacy_lossy(&s).into_owned());
+                    auth_parts = parts.first().map(|s| legacy_lossy(s).into_owned());
                     m2 = legacy_lossy(&parts.get(1).cloned().unwrap_or_default()).into_owned();
                 }
 
@@ -676,10 +674,7 @@ impl Git {
                     {
                         if parts.contains(":") {
                             let split = explode(":", parts);
-                            default_username = split
-                                .first()
-                                .cloned()
-                                .map(|s| legacy_lossy(&s).into_owned());
+                            default_username = split.first().map(|s| legacy_lossy(s).into_owned());
                         } else {
                             default_username = Some(parts.clone());
                         }
@@ -779,10 +774,9 @@ impl Git {
             })
             .into_owned();
             if (credentials.len() as i64) > 0 {
-                last_command_str = legacy_lossy(&bstr::BString::from(
-                    self.mask_credentials(&last_command_str, &credentials),
-                ))
-                .into_owned();
+                last_command_str =
+                    legacy_lossy(&self.mask_credentials(&last_command_str, &credentials))
+                        .into_owned();
                 error_msg = self.mask_credentials(&error_msg, &credentials);
             }
             self.throw_exception(
@@ -1002,30 +996,26 @@ impl Git {
 
     pub fn get_no_show_signature_flag(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<BString> {
         let git_version = Self::get_version(process)?;
         if let Some(v) = git_version
             && version_compare(&v, "2.10.0-rc0", CmpOp::Ge)
         {
-            return Ok(" --no-show-signature".to_string());
+            return Ok(" --no-show-signature".into());
         }
 
-        Ok(String::new())
+        Ok(BString::default())
     }
 
     pub fn get_no_show_signature_flags(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> anyhow::Result<Vec<String>> {
+    ) -> anyhow::Result<Vec<BString>> {
         let flags = Self::get_no_show_signature_flag(process)?;
         if flags.is_empty() {
             return Ok(vec![]);
         }
 
-        // TODO(bytes): Git commands are built as Strings.
-        Ok(explode(" ", substr(&flags, 1, None))
-            .iter()
-            .map(|s| legacy_lossy(s).into_owned())
-            .collect::<Vec<_>>())
+        Ok(explode(" ", substr(&flags, 1, None)))
     }
 
     /// Checks if git version supports --no-commit-header flag (git 2.33+)
@@ -1042,11 +1032,11 @@ impl Git {
     /// Builds a git rev-list command with --no-commit-header flag when supported (git 2.33+)
     pub fn build_rev_list_command(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-        arguments: Vec<String>,
-    ) -> anyhow::Result<Vec<String>> {
-        let mut command = vec!["git".to_string(), "rev-list".to_string()];
+        arguments: Vec<BString>,
+    ) -> anyhow::Result<Vec<BString>> {
+        let mut command: Vec<BString> = vec!["git".into(), "rev-list".into()];
         if Self::supports_no_commit_header_flag(process)? {
-            command.push("--no-commit-header".to_string());
+            command.push("--no-commit-header".into());
         }
 
         command.extend(arguments);
@@ -1297,15 +1287,15 @@ impl Git {
             Option::<&str>::None.map(std::path::Path::new),
         )? != 0
         {
-            return Err(RuntimeException::new(Url::sanitize(format!(
+            return Err(RuntimeException::new(legacy_lossy(&Url::sanitize(format!(
                 "Failed to clone {}, git was not found, check that it is installed and in your PATH env.\n\n{}",
                 url,
                 self.process.borrow().get_error_output().display_lossy()
-            )))
+            ))).into_owned())
             .into());
         }
 
-        Err(RuntimeException::new(Url::sanitize(message.to_string())).into())
+        Err(RuntimeException::new(legacy_lossy(&Url::sanitize(message)).into_owned()).into())
     }
 
     /// Retrieves the current git version.

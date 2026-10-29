@@ -261,18 +261,22 @@ impl AutoloadGeneratorInterface for StubAutoloadGenerator {
 /// ref: TestCase::getPackage with class `Composer\Package\RootPackage`.
 fn root_package(name: &str, version: &str) -> RootPackageHandle {
     let normalized = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
-    RootPackageHandle::new(name.to_string(), normalized, version.to_string())
+    RootPackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from(normalized),
+        bstr::BString::from(version.to_string()),
+    )
 }
 
 /// ref: `new Link($source, $target, $constraint, $type, $constraint->getPrettyString())`.
 fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &str) -> Link {
     let pretty = legacy_lossy(&constraint.get_pretty_string()).into_owned();
     Link::new(
-        source.to_string(),
-        target.to_string(),
+        bstr::BString::from(source.to_string()),
+        bstr::BString::from(target.to_string()),
         constraint,
-        Some(r#type.to_string()),
-        pretty,
+        Some(bstr::BString::from(r#type.to_string())),
+        bstr::BString::from(pretty),
     )
 }
 
@@ -292,19 +296,23 @@ fn provide_installer() -> Vec<InstallerCase> {
     // when A requires B and B requires A, and A is a non-published root package
     // the install of B should succeed
     let a = root_package("A", "1.0.0");
-    a.set_requires(IndexMap::from([(
-        "b".to_string(),
-        link(
-            "A",
-            "B",
-            get_version_constraint("=", "1.0.0"),
-            Link::TYPE_REQUIRE,
-        ),
-    )]));
+    a.set_requires(
+        IndexMap::from([(
+            "b".to_string(),
+            link(
+                "A",
+                "B",
+                get_version_constraint("=", "1.0.0"),
+                Link::TYPE_REQUIRE,
+            ),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let b = get_package("B", "1.0.0");
-    b.as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    b.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "a".to_string(),
             link(
                 "B",
@@ -312,7 +320,11 @@ fn provide_installer() -> Vec<InstallerCase> {
                 get_version_constraint("=", "1.0.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     cases.push(InstallerCase {
         root_package: a,
@@ -327,19 +339,23 @@ fn provide_installer() -> Vec<InstallerCase> {
     // #480: when A requires B and B requires A, and A is a published root package
     // only B should be installed, as A is the root
     let a = root_package("A", "1.0.0");
-    a.set_requires(IndexMap::from([(
-        "b".to_string(),
-        link(
-            "A",
-            "B",
-            get_version_constraint("=", "1.0.0"),
-            Link::TYPE_REQUIRE,
-        ),
-    )]));
+    a.set_requires(
+        IndexMap::from([(
+            "b".to_string(),
+            link(
+                "A",
+                "B",
+                get_version_constraint("=", "1.0.0"),
+                Link::TYPE_REQUIRE,
+            ),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let b = get_package("B", "1.0.0");
-    b.as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    b.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "a".to_string(),
             link(
                 "B",
@@ -347,7 +363,11 @@ fn provide_installer() -> Vec<InstallerCase> {
                 get_version_constraint("=", "1.0.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     cases.push(InstallerCase {
         root_package: a.clone(),

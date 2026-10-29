@@ -1390,6 +1390,7 @@ fn install_worker_socket_fd(child_end: &std::os::fd::OwnedFd) -> std::io::Result
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shirabe_php_shim::utf8_text;
 
     #[test]
     fn request_error_reports_dead_worker_exit_status() {
@@ -1499,7 +1500,7 @@ mod tests {
             php.version
                 .split_str(".")
                 .next()
-                .and_then(|n| shirabe_php_shim::utf8_text(n)?.parse::<i64>().ok()),
+                .and_then(|n| utf8_text(n)?.parse::<i64>().ok()),
             Some(php.major),
             "version should start with the major version: {}",
             php.version.display_lossy(),

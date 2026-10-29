@@ -23,27 +23,42 @@ fn get_package_with_suggest_and_requires(
         .iter()
         .map(|(k, v)| (k.to_string(), v.to_string()))
         .collect();
-    pkg.__set_suggests(suggests_map);
+    pkg.__set_suggests(
+        suggests_map
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let requires_map: IndexMap<String, Link> = requires
         .iter()
         .map(|(k, v)| (k.to_string(), v.clone()))
         .collect();
-    pkg.__set_requires(requires_map);
+    pkg.__set_requires(
+        requires_map
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let dev_requires_map: IndexMap<String, Link> = require_devs
         .iter()
         .map(|(k, v)| (k.to_string(), v.clone()))
         .collect();
-    pkg.__set_dev_requires(dev_requires_map);
+    pkg.__set_dev_requires(
+        dev_requires_map
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     pkg
 }
 
 fn link(source: &str, target: &str, description: &str) -> Link {
     Link::new(
-        source.to_string(),
-        target.to_string(),
+        bstr::BString::from(source.to_string()),
+        bstr::BString::from(target.to_string()),
         get_version_constraint(">=", "1.0"),
-        Some(description.to_string()),
-        "^1.0".to_string(),
+        Some(bstr::BString::from(description.to_string())),
+        bstr::BString::from("^1.0".to_string()),
     )
 }
 

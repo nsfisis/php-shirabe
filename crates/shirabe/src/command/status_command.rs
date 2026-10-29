@@ -9,8 +9,9 @@ use crate::package::version::{VersionGuesser, VersionParser};
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::script::ScriptEvents;
 use crate::util::ProcessExecutor;
+use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::impl_php_class;
+use shirabe_php_shim::{impl_php_class, legacy_lossy};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -117,9 +118,13 @@ impl StatusCommand {
                     .get_vcs_reference(package.clone(), target_dir.clone())
                     .is_some()
             {
-                let previous_ref = match package.get_installation_source().as_deref() {
-                    Some("source") => package.get_source_reference(),
-                    Some("dist") => package.get_dist_reference(),
+                let previous_ref = match package
+                    .get_installation_source()
+                    .as_deref()
+                    .map(|s| s.as_slice())
+                {
+                    Some(b"source") => package.get_source_reference(),
+                    Some(b"dist") => package.get_dist_reference(),
                     _ => None,
                 };
 
@@ -127,15 +132,19 @@ impl StatusCommand {
                     guesser.guess_version(&dumper.dump(package.clone()), &target_dir)?;
 
                 if let (Some(prev_ref), Some(cur_version)) = (&previous_ref, &current_version)
-                    && cur_version.commit.as_deref() != Some(prev_ref.as_str())
-                    && cur_version.pretty_version.as_deref() != Some(prev_ref.as_str())
+                    && cur_version.commit.as_deref() != Some(&*legacy_lossy(prev_ref.as_bstr()))
+                    && cur_version.pretty_version.as_deref()
+                        != Some(&*legacy_lossy(prev_ref.as_bstr()))
                 {
                     let mut previous = IndexMap::new();
                     previous.insert(
                         "version".to_string(),
-                        package.get_pretty_version().to_string(),
+                        legacy_lossy(&package.get_pretty_version()).into_owned(),
                     );
-                    previous.insert("ref".to_string(), prev_ref.clone());
+                    previous.insert(
+                        "ref".to_string(),
+                        legacy_lossy(&prev_ref.clone()).into_owned(),
+                    );
 
                     let mut current = IndexMap::new();
                     current.insert(

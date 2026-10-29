@@ -9,10 +9,11 @@ use crate::repository::{
     ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
 };
 use crate::util::{Platform, Tar, Zip};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash_file, legacy_lossy,
+    PhpMixed, RuntimeException, UnexpectedValueException, bconcat, extension_loaded, hash_file,
+    legacy_lossy,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use std::path::Path;
@@ -20,7 +21,7 @@ use std::path::Path;
 pub struct ArtifactRepository {
     inner: ArrayRepository,
     loader: Box<dyn LoaderInterface>,
-    lookup: String,
+    lookup: BString,
     repo_config: IndexMap<BString, PhpMixed>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
@@ -46,19 +47,22 @@ impl ArtifactRepository {
             .into());
         }
 
-        let url = legacy_lossy(repo_config[B("url")].as_string().unwrap_or_default()).into_owned();
+        let url = legacy_lossy(&BString::from(
+            repo_config[B("url")].as_string().unwrap_or_default(),
+        ))
+        .into_owned();
         let lookup = Platform::expand_path(&url);
         Ok(Self {
             inner: ArrayRepository::new(Vec::new())?,
             loader: Box::new(ArrayLoader::new(None, true)),
-            lookup,
+            lookup: bstr::BString::from(lookup),
             repo_config,
             io,
         })
     }
 
-    pub fn get_repo_name(&self) -> String {
-        format!("artifact repo ({})", self.lookup)
+    pub fn get_repo_name(&self) -> BString {
+        bconcat!("artifact repo (", self.lookup, ")")
     }
 
     /// For testing only: drives `initialize` (scanning the lookup directory) and returns the
@@ -72,7 +76,7 @@ impl ArtifactRepository {
 
     fn initialize(&self) -> anyhow::Result<()> {
         self.inner.initialize();
-        let lookup = self.lookup.clone();
+        let lookup = legacy_lossy(&BString::from(&self.lookup.clone()[..])).into_owned();
         self.scan_directory(&lookup)
     }
 
@@ -138,8 +142,8 @@ impl ArtifactRepository {
                 Some(package) => {
                     self.io.write_error3(&format!(
                         "Found package <info>{}</info> (<comment>{}</comment>) in file <info>{}</info>",
-                        package.get_name(),
-                        package.get_pretty_version(),
+                        package.get_name().display_lossy(),
+                        package.get_pretty_version().display_lossy(),
                         basename,
                     ), true, io_interface::VERBOSE);
                     self.inner.add_package(package);
@@ -153,7 +157,7 @@ impl ArtifactRepository {
         &self,
         file: &Path,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
-        let mut json: Option<String> = None;
+        let mut json: Option<BString> = None;
         let file_extension = file
             .extension()
             .and_then(|e| e.to_str())
@@ -180,7 +184,7 @@ impl ArtifactRepository {
             Zip::get_composer_json(file)
         };
         match get_result {
-            Ok(j) => json = j,
+            Ok(j) => json = j.map(bstr::BString::from),
             Err(exception) => {
                 self.io.write3(
                     &format!("Failed loading package {}: {}", pathname, exception),
@@ -255,7 +259,7 @@ impl RepositoryInterface for ArtifactRepository {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.ensure_initialized()?;
@@ -264,7 +268,7 @@ impl RepositoryInterface for ArtifactRepository {
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.ensure_initialized()?;
@@ -278,10 +282,10 @@ impl RepositoryInterface for ArtifactRepository {
 
     fn load_packages(
         &mut self,
-        package_name_map: IndexMap<String, Option<AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         self.ensure_initialized()?;
         self.inner.load_packages(
@@ -294,9 +298,9 @@ impl RepositoryInterface for ArtifactRepository {
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         self.ensure_initialized()?;
         self.inner.search(query, mode, r#type)
@@ -304,13 +308,13 @@ impl RepositoryInterface for ArtifactRepository {
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         self.ensure_initialized()?;
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> anyhow::Result<String> {
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
         Ok(ArtifactRepository::get_repo_name(self))
     }
 

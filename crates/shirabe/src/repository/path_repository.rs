@@ -12,12 +12,12 @@ use crate::repository::{
     ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
 };
 use crate::util::{Filesystem, Git as GitUtil, HttpDownloader, Platform, ProcessExecutor, Url};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined, dirname, file_exists,
-    file_get_contents, glob_with_flags, hash, is_dir, legacy_lossy, path_to_bytes, php_regex,
-    preg_is_match, realpath, rtrim2, serialize, str_replace, trim,
+    GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, bconcat, defined, dirname,
+    file_exists, file_get_contents, glob_with_flags, hash, is_dir, legacy_lossy, path_from_bytes,
+    path_to_bytes, php_regex, preg_is_match, realpath, rtrim2, serialize, str_replace, trim,
 };
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ pub struct PathRepository {
     inner: ArrayRepository,
     loader: ArrayLoader,
     version_guesser: std::cell::RefCell<VersionGuesser>,
-    url: String,
+    url: BString,
     repo_config: IndexMap<BString, PhpMixed>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     options: IndexMap<BString, PhpMixed>,
@@ -53,12 +53,12 @@ impl PathRepository {
             .into());
         }
 
-        let url_str = legacy_lossy(
+        let url_str = legacy_lossy(&BString::from(
             repo_config
                 .get(B("url"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default(),
-        )
+        ))
         .into_owned();
         let url = Platform::expand_path(&url_str);
         let process = process.unwrap_or_else(|| {
@@ -89,25 +89,23 @@ impl PathRepository {
             inner: ArrayRepository::new(vec![])?,
             loader: ArrayLoader::new(None, true),
             version_guesser: std::cell::RefCell::new(version_guesser),
-            url,
+            url: bstr::BString::from(url),
             repo_config,
             process,
             options,
         })
     }
 
-    pub fn get_repo_name(&self) -> String {
-        format!(
-            "path repo ({})",
+    pub fn get_repo_name(&self) -> BString {
+        bconcat!(
+            "path repo (",
             Url::sanitize(
-                legacy_lossy(
-                    self.repo_config
-                        .get(B("url"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                )
-                .into_owned()
-            )
+                self.repo_config
+                    .get(B("url"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default()
+            ),
+            ")"
         )
     }
 
@@ -157,17 +155,17 @@ impl PathRepository {
             if preg_is_match(php_regex!(r"{[*{}]}"), &self.url) {
                 let mut url = self.url.clone();
                 while preg_is_match(php_regex!(r"{[*{}]}"), &url) {
-                    url = legacy_lossy(&dirname(&url)).into_owned();
+                    url = BString::from(&dirname(&url)[..]);
                 }
                 // the parent directory before any wildcard exists, so we assume it is correctly configured but simply empty
-                if is_dir(&url) {
+                if is_dir(path_from_bytes(&url)) {
                     return Ok(());
                 }
             }
 
             return Err(RuntimeException::new(format!(
                 "The `url` supplied for the path ({}) repository does not exist",
-                self.url
+                self.url.display_lossy()
             ))
             .into());
         }
@@ -175,9 +173,11 @@ impl PathRepository {
         for url in url_matches {
             let path = format!(
                 "{}/",
-                realpath(&url)
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                    .unwrap_or_default()
+                legacy_lossy(
+                    &realpath(path_from_bytes(&url))
+                        .map(|p| BString::from(path_to_bytes(&p)))
+                        .unwrap_or_default()
+                )
             );
             let composer_file_path = format!("{}composer.json", path);
 
@@ -199,13 +199,12 @@ impl PathRepository {
             };
             package.insert("dist".into(), PhpMixed::Array(dist));
 
-            let reference = legacy_lossy(
+            let reference = BString::from(
                 self.options
                     .get(B("reference"))
                     .and_then(|v| v.as_string())
                     .unwrap_or("auto".into()),
-            )
-            .into_owned();
+            );
             if reference == "none" {
                 if let Some(PhpMixed::Array(dist)) = package.get_mut(B("dist")) {
                     dist.insert("reference".into(), PhpMixed::Null);
@@ -242,14 +241,14 @@ impl PathRepository {
             if let Some(name) = package
                 .get(B("name"))
                 .and_then(|v| v.as_string())
-                .map(|s| legacy_lossy(s).into_owned())
+                .map(BString::from)
                 && let Some(version) = self
                     .options
                     .get(B("versions"))
                     .and_then(|v| v.as_array())
                     .and_then(|a| a.get(B(&name)))
                     .and_then(|v| v.as_string())
-                    .map(|s| legacy_lossy(s).into_owned())
+                    .map(BString::from)
             {
                 package.insert("version".into(), PhpMixed::string(version));
             }
@@ -284,11 +283,8 @@ impl PathRepository {
 
             let mut output = PhpMixed::Null;
             let command = GitUtil::build_rev_list_command(&self.process, {
-                let mut args = vec![
-                    "-n1".to_string(),
-                    "--format=%H".to_string(),
-                    "HEAD".to_string(),
-                ];
+                let mut args: Vec<BString> =
+                    vec!["-n1".into(), "--format=%H".into(), "HEAD".into()];
                 args.extend(GitUtil::get_no_show_signature_flags(&self.process)?);
                 args
             })?;
@@ -361,15 +357,15 @@ impl PathRepository {
         Ok(())
     }
 
-    fn get_url_matches(&self) -> anyhow::Result<Vec<String>> {
+    fn get_url_matches(&self) -> anyhow::Result<Vec<BString>> {
         let mut flags = GLOB_MARK | GLOB_ONLYDIR;
 
         if defined("GLOB_BRACE") {
             flags |= GLOB_BRACE;
-        } else if self.url.contains('{') || self.url.contains('}') {
+        } else if self.url.contains(&b'{') || self.url.contains(&b'}') {
             return Err(RuntimeException::new(format!(
                 "The operating system does not support GLOB_BRACE which is required for the url {}",
-                self.url
+                self.url.display_lossy()
             ))
             .into());
         }
@@ -378,11 +374,9 @@ impl PathRepository {
         Ok(glob_with_flags(&self.url, flags)
             .into_iter()
             .map(|val| {
-                legacy_lossy(&rtrim2(
-                    str_replace(std::path::MAIN_SEPARATOR_STR, "/", &val),
-                    "/",
-                ))
-                .into_owned()
+                BString::from(
+                    &rtrim2(str_replace(std::path::MAIN_SEPARATOR_STR, "/", &val), "/")[..],
+                )
             })
             .collect())
     }
@@ -404,7 +398,7 @@ impl RepositoryInterface for PathRepository {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.ensure_initialized()?;
@@ -413,7 +407,7 @@ impl RepositoryInterface for PathRepository {
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.ensure_initialized()?;
@@ -427,10 +421,10 @@ impl RepositoryInterface for PathRepository {
 
     fn load_packages(
         &mut self,
-        package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<shirabe_semver::constraint::AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         self.ensure_initialized()?;
         self.inner.load_packages(
@@ -443,9 +437,9 @@ impl RepositoryInterface for PathRepository {
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         self.ensure_initialized()?;
         self.inner.search(query, mode, r#type)
@@ -453,13 +447,13 @@ impl RepositoryInterface for PathRepository {
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         self.ensure_initialized()?;
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> anyhow::Result<String> {
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
         Ok(PathRepository::get_repo_name(self))
     }
 

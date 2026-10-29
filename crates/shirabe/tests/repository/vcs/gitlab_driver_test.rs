@@ -335,7 +335,12 @@ fn test_invalid_support_data() {
 
     let mut branches: IndexMap<String, String> = IndexMap::new();
     branches.insert("main".to_string(), "SOMESHA".to_string());
-    driver.__set_branches(Some(branches));
+    driver.__set_branches(Some(
+        branches
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    ));
     driver.__set_tags(Some(IndexMap::new()));
 
     let (http_downloader, _guard) = get_http_downloader_mock(
@@ -351,7 +356,10 @@ fn test_invalid_support_data() {
     );
     driver.set_http_downloader(http_downloader);
 
-    let data = driver.get_composer_information("main").unwrap().unwrap();
+    let data = driver
+        .get_composer_information(bstr::BStr::new("main"))
+        .unwrap()
+        .unwrap();
 
     let source = data
         .get(B("support"))
@@ -384,7 +392,7 @@ fn test_get_dist() {
     expected.insert("reference".into(), PhpMixed::string(reference.to_string()));
     expected.insert("shasum".into(), PhpMixed::string(String::new()));
 
-    assert_eq!(Some(expected), driver.get_dist(reference));
+    assert_eq!(Some(expected), driver.get_dist(bstr::BStr::new(reference)));
 }
 
 #[test]
@@ -405,7 +413,7 @@ fn test_get_source() {
     );
     expected.insert("reference".into(), PhpMixed::string(reference.to_string()));
 
-    assert_eq!(expected, driver.get_source(reference));
+    assert_eq!(expected, driver.get_source(bstr::BStr::new(reference)));
 }
 
 #[test]
@@ -426,7 +434,7 @@ fn test_get_source_given_public_project() {
     );
     expected.insert("reference".into(), PhpMixed::string(reference.to_string()));
 
-    assert_eq!(expected, driver.get_source(reference));
+    assert_eq!(expected, driver.get_source(bstr::BStr::new(reference)));
 }
 
 #[test]
@@ -472,8 +480,27 @@ fn test_get_tags() {
         "8e8f60b3ec86d63733db3bd6371117a758027ec6".to_string(),
     );
 
-    assert_eq!(expected, driver.get_tags().unwrap());
-    assert_eq!(expected, driver.get_tags().unwrap(), "Tags are cached");
+    assert_eq!(
+        expected
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_str()),
+                bstr::BString::from(v.as_str())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        driver.get_tags().unwrap()
+    );
+    assert_eq!(
+        expected
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_str()),
+                bstr::BString::from(v.as_str())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        driver.get_tags().unwrap(),
+        "Tags are cached"
+    );
 }
 
 #[test]
@@ -543,9 +570,24 @@ fn test_get_paginated_refs() {
         "502cffe49f136443f2059803f2e7192d1ac066cd".to_string(),
     );
 
-    assert_eq!(expected, driver.get_branches().unwrap());
     assert_eq!(
-        expected,
+        expected
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_str()),
+                bstr::BString::from(v.as_str())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        driver.get_branches().unwrap()
+    );
+    assert_eq!(
+        expected
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_str()),
+                bstr::BString::from(v.as_str())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
         driver.get_branches().unwrap(),
         "Branches are cached"
     );
@@ -607,9 +649,24 @@ fn test_get_branches() {
         "502cffe49f136443f2059803f2e7192d1ac066cd".to_string(),
     );
 
-    assert_eq!(expected, driver.get_branches().unwrap());
     assert_eq!(
-        expected,
+        expected
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_str()),
+                bstr::BString::from(v.as_str())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        driver.get_branches().unwrap()
+    );
+    assert_eq!(
+        expected
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_str()),
+                bstr::BString::from(v.as_str())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
         driver.get_branches().unwrap(),
         "Branches are cached"
     );
@@ -624,7 +681,7 @@ fn test_supports() {
 
         assert_eq!(
             expected,
-            GitLabDriver::supports(io, config, url, false).unwrap()
+            GitLabDriver::supports(io, config, bstr::BStr::new(url), false).unwrap()
         );
     }
 }

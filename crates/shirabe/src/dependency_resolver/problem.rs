@@ -5,7 +5,7 @@ use crate::dependency_resolver::{Pool, Request};
 use crate::package::version::VersionParser;
 use crate::package::{BasePackageHandle, Link};
 use crate::repository::{LockArrayRepository, PlatformRepository, RepositorySet};
-use bstr::B;
+use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, LogicException, PhpMixed, bconcat, extension_loaded, implode, legacy_lossy,
@@ -60,7 +60,7 @@ impl Problem {
         request: &Request,
         pool: &mut Pool,
         is_verbose: bool,
-        installed_map: &IndexMap<String, BasePackageHandle>,
+        installed_map: &IndexMap<BString, BasePackageHandle>,
         learned_pool: &Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
     ) -> anyhow::Result<String> {
         // TODO doesn't this entirely defeat the purpose of the problem sections? what's the point of sections?
@@ -91,7 +91,7 @@ impl Problem {
                 _ => (String::new(), None),
             };
 
-            let packages = pool.compute_what_provides(&package_name, constraint);
+            let packages = pool.compute_what_provides(bstr::BStr::new(&package_name), constraint);
             if packages.is_empty() {
                 let missing = Self::get_missing_package_reason(
                     repository_set,
@@ -143,22 +143,28 @@ impl Problem {
                 _ => String::new(),
             },
             rule::RULE_FIXED => match rule.get_reason_data() {
-                rule::ReasonData::Fixed { package } => package.get_unique_name(),
+                rule::ReasonData::Fixed { package } => {
+                    legacy_lossy(&package.get_unique_name()).into_owned()
+                }
                 _ => String::new(),
             },
             rule::RULE_PACKAGE_CONFLICT | rule::RULE_PACKAGE_REQUIRES => {
                 let source = rule.get_source_package(pool).unwrap();
                 let link_pretty = match rule.get_reason_data() {
                     rule::ReasonData::Link(link) => link.get_pretty_string(source.clone()),
-                    _ => String::new(),
+                    _ => bstr::BString::from(String::new()),
                 };
-                format!("{}//{}", source.get_unique_name(), link_pretty)
+                format!(
+                    "{}//{}",
+                    source.get_unique_name().display_lossy(),
+                    link_pretty.display_lossy()
+                )
             }
             rule::RULE_PACKAGE_SAME_NAME
             | rule::RULE_PACKAGE_ALIAS
             | rule::RULE_PACKAGE_INVERSE_ALIAS => match rule.get_reason_data() {
                 rule::ReasonData::String(s) => s.clone(),
-                rule::ReasonData::BasePackage(p) => p.to_string(),
+                rule::ReasonData::BasePackage(p) => p.to_php_string().display_lossy().to_string(),
                 _ => unreachable!(),
             },
             rule::RULE_LEARNED => legacy_lossy(&implode(
@@ -199,7 +205,7 @@ impl Problem {
         request: &Request,
         pool: &mut Pool,
         is_verbose: bool,
-        installed_map: &IndexMap<String, BasePackageHandle>,
+        installed_map: &IndexMap<BString, BasePackageHandle>,
         learned_pool: &Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
     ) -> anyhow::Result<String> {
         let mut messages: Vec<String> = Vec::new();
@@ -237,7 +243,9 @@ impl Problem {
                     legacy_lossy(&preg_replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &message))
                         .into_owned();
                 messages.push(template.clone());
-                let version_key = parser.normalize(&m2, Some("")).unwrap_or_default();
+                let version_key =
+                    legacy_lossy(&parser.normalize(&m2, Some(b"")).unwrap_or_default())
+                        .into_owned();
                 templates
                     .entry(template.clone())
                     .or_default()
@@ -253,7 +261,10 @@ impl Problem {
                         .unwrap()
                         .get_mut(&pkg_key)
                         .unwrap()
-                        .insert(version, pretty_version);
+                        .insert(
+                            legacy_lossy(&version).into_owned(),
+                            legacy_lossy(&pretty_version).into_owned(),
+                        );
                 }
             } else if !message.is_empty() {
                 messages.push(message);
@@ -403,7 +414,11 @@ impl Problem {
                     Self::constraint_to_text(constraint)
                 );
 
-                if package_name == "hhvm" && !pool.what_provides(package_name, None).is_empty() {
+                if package_name == "hhvm"
+                    && !pool
+                        .what_provides(bstr::BStr::new(package_name), None)
+                        .is_empty()
+                {
                     return Ok((
                         msg,
                         "your HHVM version does not satisfy that requirement.".to_string(),
@@ -545,15 +560,15 @@ impl Problem {
 
         let mut locked_package: Option<BasePackageHandle> = None;
         for (_key, package) in request.get_locked_packages() {
-            if package.get_name().as_str() == package_name {
+            if package.get_name() == package_name {
                 locked_package = Some(package.clone());
                 if pool.is_unacceptable_fixed_or_locked_package(package.clone()) {
                     return Ok((
                         "- ".to_string(),
                         format!(
                             "{} is fixed to {} (lock file version) by a partial update but that version is rejected by your minimum-stability. Make sure you list it as an argument for the update command.",
-                            package.get_pretty_name(),
-                            package.get_pretty_version()
+                            package.get_pretty_name().display_lossy(),
+                            package.get_pretty_version().display_lossy()
                         ),
                     ));
                 }
@@ -573,7 +588,7 @@ impl Problem {
             ))
             .into_owned();
             let packages = repository_set.find_packages(
-                package_name,
+                bstr::BStr::new(package_name),
                 Some(
                     MultiConstraint::new(
                         vec![
@@ -619,14 +634,15 @@ impl Problem {
 
         // first check if the actual requested package is found in normal conditions
         // if so it must mean it is rejected by another constraint than the one given here
-        let packages = repository_set.find_packages(package_name, constraint.cloned(), 0)?;
+        let packages =
+            repository_set.find_packages(bstr::BStr::new(package_name), constraint.cloned(), 0)?;
         if !packages.is_empty() {
             let root_reqs = repository_set.get_root_requires();
-            if root_reqs.contains_key(package_name) {
+            if root_reqs.contains_key(bstr::B(package_name)) {
                 let filtered: Vec<&BasePackageHandle> = packages
                     .iter()
                     .filter(|p| {
-                        root_reqs[package_name]
+                        root_reqs[bstr::B(package_name)]
                             .matches(&SimpleConstraint::new("==", p.get_version(), None).into())
                     })
                     .collect();
@@ -651,7 +667,9 @@ impl Problem {
                             } else {
                                 "it conflicts"
                             },
-                            root_reqs[package_name].get_pretty_string().display_lossy()
+                            root_reqs[bstr::B(package_name)]
+                                .get_pretty_string()
+                                .display_lossy()
                         ),
                     ));
                 }
@@ -672,7 +690,7 @@ impl Problem {
                         return Ok((
                             format!(
                                 "- Root composer.json requires {}{}, ",
-                                name,
+                                name.display_lossy(),
                                 Self::constraint_to_text(constraint)
                             ),
                             format!(
@@ -689,7 +707,7 @@ impl Problem {
                                 } else {
                                     "it conflicts"
                                 },
-                                name,
+                                name.display_lossy(),
                                 temp_reqs[&name].get_pretty_string().display_lossy()
                             ),
                         ));
@@ -723,7 +741,7 @@ impl Problem {
                                 constraint,
                                 false
                             ),
-                            lp.get_pretty_version()
+                            lp.get_pretty_version().display_lossy()
                         ),
                     ));
                 }
@@ -757,7 +775,8 @@ impl Problem {
                 ));
             }
 
-            if pool.is_abandoned_removed_package_version(package_name, constraint) {
+            if pool.is_abandoned_removed_package_version(bstr::BStr::new(package_name), constraint)
+            {
                 return Ok((
                     format!(
                         "- Root composer.json requires {}{}, ",
@@ -777,72 +796,74 @@ impl Problem {
                 ));
             }
 
-            if pool.is_security_removed_package_version(package_name, constraint) {
+            if pool.is_security_removed_package_version(bstr::BStr::new(package_name), constraint) {
                 let advisories = repository_set.get_matching_security_advisories(
                     packages.clone(),
                     false,
                     true,
                 )?;
-                let advisories_list: Vec<String> = match advisories.advisories.get(package_name) {
-                    Some(list) if !list.is_empty() => list
-                        .iter()
-                        .map(|advisory| {
-                            let advisory_id = advisory.advisory_id();
-                            let link = advisory
-                                .as_security_advisory()
-                                .and_then(|a| a.link.as_deref());
-                            if let Some(link) = link
-                                && !link.is_empty()
-                            {
-                                return format!(
-                                    "<href={}>{}</>",
-                                    OutputFormatter::escape(link)
+                let advisories_list: Vec<String> =
+                    match advisories.advisories.get(bstr::B(package_name)) {
+                        Some(list) if !list.is_empty() => list
+                            .iter()
+                            .map(|advisory| {
+                                let advisory_id = advisory.advisory_id();
+                                let link = advisory
+                                    .as_security_advisory()
+                                    .and_then(|a| a.link.as_deref());
+                                if let Some(link) = link
+                                    && !link.is_empty()
+                                {
+                                    return format!(
+                                        "<href={}>{}</>",
+                                        OutputFormatter::escape(link)
+                                            .expect("OutputFormatter::escape does not fail")
+                                            .display_lossy(),
+                                        advisory_id.display_lossy()
+                                    );
+                                }
+
+                                if advisory_id.starts_with(b"PKSA-") {
+                                    return format!(
+                                        "<href={}>{}</>",
+                                        OutputFormatter::escape(format!(
+                                            "https://packagist.org/security-advisories/{}",
+                                            advisory_id.display_lossy()
+                                        ))
                                         .expect("OutputFormatter::escape does not fail")
                                         .display_lossy(),
-                                    advisory_id
-                                );
-                            }
+                                        advisory_id.display_lossy()
+                                    );
+                                }
 
-                            if advisory_id.starts_with("PKSA-") {
-                                return format!(
-                                    "<href={}>{}</>",
-                                    OutputFormatter::escape(format!(
-                                        "https://packagist.org/security-advisories/{}",
+                                legacy_lossy(advisory_id).into_owned()
+                            })
+                            .collect(),
+                        _ => pool
+                            .get_security_advisory_identifiers_for_package_version(
+                                bstr::BStr::new(package_name),
+                                constraint,
+                            )
+                            .into_iter()
+                            .map(|advisory_id| {
+                                let advisory_id = advisory_id.display_lossy().to_string();
+                                if advisory_id.starts_with("PKSA-") {
+                                    return format!(
+                                        "<href={}>{}</>",
+                                        OutputFormatter::escape(format!(
+                                            "https://packagist.org/security-advisories/{}",
+                                            advisory_id
+                                        ))
+                                        .expect("OutputFormatter::escape does not fail")
+                                        .display_lossy(),
                                         advisory_id
-                                    ))
-                                    .expect("OutputFormatter::escape does not fail")
-                                    .display_lossy(),
-                                    advisory_id
-                                );
-                            }
+                                    );
+                                }
 
-                            advisory_id.to_string()
-                        })
-                        .collect(),
-                    _ => pool
-                        .get_security_advisory_identifiers_for_package_version(
-                            package_name,
-                            constraint,
-                        )
-                        .into_iter()
-                        .map(|advisory_id: String| {
-                            if advisory_id.starts_with("PKSA-") {
-                                return format!(
-                                    "<href={}>{}</>",
-                                    OutputFormatter::escape(format!(
-                                        "https://packagist.org/security-advisories/{}",
-                                        advisory_id
-                                    ))
-                                    .expect("OutputFormatter::escape does not fail")
-                                    .display_lossy(),
-                                    advisory_id
-                                );
-                            }
-
-                            advisory_id
-                        })
-                        .collect(),
-                };
+                                advisory_id
+                            })
+                            .collect(),
+                    };
 
                 return Ok((
                     format!(
@@ -884,14 +905,14 @@ impl Problem {
 
         // check if the package is found when bypassing stability checks
         let packages = repository_set.find_packages(
-            package_name,
+            bstr::BStr::new(package_name),
             constraint.cloned(),
             RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
         )?;
         if !packages.is_empty() {
             // we must first verify if a valid package would be found in a lower priority repository
             let all_repos_packages = repository_set.find_packages(
-                package_name,
+                bstr::BStr::new(package_name),
                 constraint.cloned(),
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
             )?;
@@ -927,14 +948,14 @@ impl Problem {
 
         // check if the package is found when bypassing the constraint and stability checks
         let packages = repository_set.find_packages(
-            package_name,
+            bstr::BStr::new(package_name),
             None,
             RepositorySet::ALLOW_UNACCEPTABLE_STABILITIES,
         )?;
         if !packages.is_empty() {
             // we must first verify if a valid package would be found in a lower priority repository
             let all_repos_packages = repository_set.find_packages(
-                package_name,
+                bstr::BStr::new(package_name),
                 constraint.cloned(),
                 RepositorySet::ALLOW_SHADOWED_REPOSITORIES,
             )?;
@@ -956,10 +977,13 @@ impl Problem {
                 && c.get_version() == "dev-master"
             {
                 for candidate in &packages {
-                    if matches!(candidate.get_version().as_str(), "dev-default" | "dev-main") {
+                    if matches!(
+                        candidate.get_version().as_slice(),
+                        b"dev-default" | b"dev-main"
+                    ) {
                         suffix = format!(
                             " Perhaps dev-master was renamed to {}?",
-                            candidate.get_pretty_version()
+                            candidate.get_pretty_version().display_lossy()
                         );
                         break;
                     }
@@ -1043,28 +1067,40 @@ impl Problem {
         let mut prepared: IndexMap<String, PreparedEntry> = IndexMap::new();
         let mut has_default_branch: IndexMap<String, bool> = IndexMap::new();
         for package in packages {
-            let pkg_name = package.get_name().to_string();
+            let pkg_name = legacy_lossy(&package.get_name()).into_owned();
             let entry = prepared
                 .entry(pkg_name.clone())
                 .or_insert_with(|| PreparedEntry {
-                    name: package.get_pretty_name(),
+                    name: legacy_lossy(&package.get_pretty_name()).into_owned(),
                     versions: IndexMap::new(),
                 });
-            entry.name = package.get_pretty_name().to_string();
+            entry.name = legacy_lossy(&package.get_pretty_name()).into_owned();
             let alias_suffix = if let Some(alias) = package.as_alias() {
-                format!(" (alias of {})", alias.get_alias_of().get_pretty_version())
+                format!(
+                    " (alias of {})",
+                    alias.get_alias_of().get_pretty_version().display_lossy()
+                )
             } else {
                 String::new()
             };
             entry.versions.insert(
-                package.get_version().to_string(),
-                format!("{}{}", package.get_pretty_version(), alias_suffix),
+                legacy_lossy(&package.get_version()).into_owned(),
+                format!(
+                    "{}{}",
+                    package.get_pretty_version().display_lossy(),
+                    alias_suffix
+                ),
             );
             if let Some(pool) = pool
                 && let Some(constraint) = constraint
             {
-                for (version, pretty_version) in pool.get_removed_versions(&pkg_name, constraint) {
-                    entry.versions.insert(version, pretty_version);
+                for (version, pretty_version) in
+                    pool.get_removed_versions(bstr::BStr::new(&pkg_name), constraint)
+                {
+                    entry.versions.insert(
+                        legacy_lossy(&version).into_owned(),
+                        legacy_lossy(&pretty_version).into_owned(),
+                    );
                 }
             }
             if let Some(pool) = pool
@@ -1073,7 +1109,10 @@ impl Problem {
                 for (version, pretty_version) in
                     pool.get_removed_versions_by_package(&package.ptr_id().to_string())
                 {
-                    entry.versions.insert(version, pretty_version);
+                    entry.versions.insert(
+                        legacy_lossy(&version).into_owned(),
+                        legacy_lossy(&pretty_version).into_owned(),
+                    );
                 }
             }
             if package.is_default_branch() {
@@ -1131,7 +1170,7 @@ impl Problem {
         package_name: &str,
         version: &str,
     ) -> Option<String> {
-        let available = pool.what_provides(package_name, None);
+        let available = pool.what_provides(bstr::BStr::new(package_name), None);
 
         if !available.is_empty() {
             let mut selected: Option<&BasePackageHandle> = None;
@@ -1157,24 +1196,27 @@ impl Problem {
                     if link.get_target() == package_name {
                         return Some(format!(
                             "{} {}d by {}",
-                            link.get_pretty_constraint(),
+                            link.get_pretty_constraint().display_lossy(),
                             substr(link.get_description(), 0, Some(-1)).display_lossy(),
-                            selected.get_pretty_string()
+                            selected.get_pretty_string().display_lossy()
                         ));
                     }
                 }
             }
 
-            let mut version: String = selected.get_pretty_version();
+            let mut version: String = legacy_lossy(&selected.get_pretty_version()).into_owned();
             let extra = selected.get_extra();
             if selected.as_complete().is_some()
                 && extra.contains_key(B("config.platform"))
                 && extra[B("config.platform")].as_bool() == Some(true)
             {
-                let description: String = selected
-                    .as_complete()
-                    .and_then(|c| c.get_description())
-                    .unwrap_or_default();
+                let description: String = legacy_lossy(
+                    &selected
+                        .as_complete()
+                        .and_then(|c| c.get_description())
+                        .unwrap_or_default(),
+                )
+                .into_owned();
                 version = format!(
                     "{}; {}",
                     version,
@@ -1231,8 +1273,8 @@ impl Problem {
     fn has_multiple_names(packages: &Vec<BasePackageHandle>) -> bool {
         let mut name: Option<String> = None;
         for package in packages {
-            if name.is_none() || name.as_deref() == Some(package.get_name().as_str()) {
-                name = Some(package.get_name().to_string());
+            if name.is_none() || name.is_some_and(|n| n == package.get_name()) {
+                name = Some(legacy_lossy(&package.get_name()).into_owned());
             } else {
                 return true;
             }
@@ -1286,9 +1328,9 @@ impl Problem {
                             constraint,
                             false
                         ),
-                        next_repo.get_repo_name()?,
-                        top_package.get_pretty_name(),
-                        top_package.get_pretty_version()
+                        next_repo.get_repo_name()?.display_lossy(),
+                        top_package.get_pretty_name().display_lossy(),
+                        top_package.get_pretty_version().display_lossy()
                     ),
                 ));
             }
@@ -1309,7 +1351,9 @@ impl Problem {
                 )
             );
             // symlinked path repos cannot be locked so do not suggest keeping it locked
-            if next_repo_packages[0].get_dist_type() == Some("path".to_string()) {
+            if next_repo_packages[0].get_dist_type()
+                == Some(bstr::BString::from("path".to_string()))
+            {
                 let transport_options = next_repo_packages[0].get_transport_options();
                 if !transport_options.contains_key(B("symlink"))
                     || transport_options[B("symlink")].as_bool() != Some(false)
@@ -1359,7 +1403,7 @@ impl Problem {
                     constraint,
                     false
                 ),
-                next_repo.get_repo_name()?,
+                next_repo.get_repo_name()?.display_lossy(),
                 Self::get_package_list(
                     higher_repo_packages,
                     is_verbose,
@@ -1372,7 +1416,8 @@ impl Problem {
                     .and_then(|p| p.get_repository())
                     .map(|r| r.get_repo_name())
                     .transpose()?
-                    .unwrap_or_default(),
+                    .unwrap_or_default()
+                    .display_lossy(),
                 reason
             ),
         ))
@@ -1428,7 +1473,7 @@ impl Problem {
         package_name: &str,
         max_providers: i64,
     ) -> anyhow::Result<Option<String>> {
-        let providers = repository_set.get_providers(package_name)?;
+        let providers = repository_set.get_providers(bstr::BStr::new(package_name))?;
         if !providers.is_empty() {
             let provider_count = providers.len() as i64;
             let slice: Vec<crate::repository::ProviderInfo> = if provider_count > max_providers + 1
@@ -1453,7 +1498,7 @@ impl Problem {
                             _ => String::new(),
                         };
 
-                        format!("      - {}{}\n", p.name, description)
+                        format!("      - {}{}\n", p.name.display_lossy(), description)
                     })
                     .collect::<Vec<_>>(),
             ))

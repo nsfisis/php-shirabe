@@ -136,11 +136,11 @@ impl ZipDownloader {
                     if self
                         .cleanup_executed
                         .borrow()
-                        .contains_key(&package.get_name())
+                        .contains_key(&*legacy_lossy(&package.get_name()))
                     {
                         return Err(RuntimeException::new(format!(
                             "Failed to extract {} as the installation was aborted by another package operation.",
-                            package.get_name()
+                            package.get_name().display_lossy()
                         ))
                         .into());
                     }
@@ -153,7 +153,7 @@ impl ZipDownloader {
                         .try_fallback(
                             RuntimeException::new(format!(
                                 "Failed to extract {}: ({}) {}\n\n{}",
-                                package.get_name(),
+                                package.get_name().display_lossy(),
                                 process
                                     .get_exit_code()
                                     .map(|c| c.to_string())
@@ -251,14 +251,14 @@ impl ZipDownloader {
                         "Origin URL: {}",
                         self.inner.process_url(
                             package.clone(),
-                            &package.get_dist_url().unwrap_or_default()
+                            &legacy_lossy(&package.get_dist_url().unwrap_or_default())
                         )?
                     ));
                     let headers = {
                         let response_headers = crate::downloader::file_downloader::RESPONSE_HEADERS
                             .lock()
                             .unwrap();
-                        match response_headers.get(&package.get_name()) {
+                        match response_headers.get(&*legacy_lossy(&package.get_name())) {
                             Some(list) => PhpMixed::List(
                                 list.iter().map(|s| PhpMixed::string(s.clone())).collect(),
                             ),
@@ -327,7 +327,7 @@ impl ZipDownloader {
                         {
                             return Err(RuntimeException::new(format!(
                                 "Invalid zip file for \"{}\" with compression ratio >99% (possible zip bomb)",
-                                package.get_name(),
+                                package.get_name().display_lossy(),
                             )).into());
                         }
                     }
@@ -341,7 +341,7 @@ impl ZipDownloader {
 
                     Err(RuntimeException::new(format!(
                         "There was an error extracting the ZIP file for \"{}\", it is either corrupted or using an invalid format.",
-                        package.get_name(),
+                        package.get_name().display_lossy(),
                     )).into())
                 }
                 Err(code) => Err(UnexpectedValueException::with_code(
@@ -356,7 +356,7 @@ impl ZipDownloader {
             if let Some(err) = e.catch::<ErrorException>() {
                 let message = format!(
                     "The archive for \"{}\" may contain identical file names with different capitalization (which fails on case insensitive filesystems): {}",
-                    package.get_name(),
+                    legacy_lossy(&package.get_name()),
                     err.get_message(),
                 );
                 RuntimeException::with_code_and_previous(message, 0, Some(std::sync::Arc::new(e)))

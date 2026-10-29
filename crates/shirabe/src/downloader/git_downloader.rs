@@ -468,7 +468,7 @@ impl GitDownloader {
                 } else {
                     "the tag was recreated"
                 },
-                package.get_pretty_name(),
+                legacy_lossy(&package.get_pretty_name()),
             );
         }
 
@@ -478,16 +478,19 @@ impl GitDownloader {
             legacy_lossy(&implode(" ", &command2))
         );
 
-        Err(RuntimeException::new(Url::sanitize(format!(
-            "Failed to execute {}\n\n{}{}",
-            command,
-            self.inner
-                .process
-                .borrow()
-                .get_error_output()
-                .display_lossy(),
-            exception_extra,
-        )))
+        Err(RuntimeException::new(
+            legacy_lossy(&Url::sanitize(format!(
+                "Failed to execute {}\n\n{}{}",
+                command,
+                self.inner
+                    .process
+                    .borrow()
+                    .get_error_output()
+                    .display_lossy(),
+                exception_extra,
+            )))
+            .into_owned(),
+        )
         .into())
     }
 
@@ -789,11 +792,7 @@ impl VcsDownloader for GitDownloader {
                     .as_string()
                     .unwrap_or_default()
             ),
-            legacy_lossy(&preg_replace(
-                r"{[^a-z0-9.]}i",
-                "-",
-                Url::sanitize(url.to_string())
-            )),
+            legacy_lossy(&preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url))),
         );
         let git_version = GitUtil::get_version(&self.inner.process)?;
 
@@ -809,9 +808,10 @@ impl VcsDownloader for GitDownloader {
             self.inner.io.write_error3(
                 &format!(
                     "  - Syncing <info>{}</info> (<comment>{}</comment>) into cache",
-                    package.get_name(),
+                    package.get_name().display_lossy(),
                     package
-                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev),
+                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                        .display_lossy(),
                 ),
                 true,
                 io_interface::NORMAL,
@@ -822,11 +822,11 @@ impl VcsDownloader for GitDownloader {
                 io_interface::DEBUG,
             );
             let r#ref = package.get_source_reference();
-            let pretty_version = package.get_pretty_version();
+            let pretty_version = legacy_lossy(&package.get_pretty_version()).into_owned();
             if self.git_util.borrow_mut().fetch_ref_or_sync_mirror(
                 url,
                 &cache_path,
-                r#ref.as_deref().unwrap_or_default(),
+                &legacy_lossy(&r#ref.clone().unwrap_or_default()),
                 Some(&pretty_version),
             )? && is_dir(&cache_path)
             {
@@ -834,7 +834,10 @@ impl VcsDownloader for GitDownloader {
                     .borrow_mut()
                     .entry(package.get_id())
                     .or_default()
-                    .insert(r#ref.as_deref().unwrap_or_default().to_string(), true);
+                    .insert(
+                        legacy_lossy(&r#ref.clone().unwrap_or_default()).into_owned(),
+                        true,
+                    );
             }
         } else if git_version.is_none() {
             return Err(RuntimeException::new(
@@ -865,11 +868,7 @@ impl VcsDownloader for GitDownloader {
                     .as_string()
                     .unwrap_or_default()
             ),
-            legacy_lossy(&preg_replace(
-                r"{[^a-z0-9.]}i",
-                "-",
-                Url::sanitize(url.to_string())
-            )),
+            legacy_lossy(&preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url))),
         );
         let r#ref = package.get_source_reference().unwrap_or_default();
 
@@ -879,11 +878,14 @@ impl VcsDownloader for GitDownloader {
             .cached_packages
             .borrow()
             .get(&package.get_id())
-            .and_then(|m| m.get(&r#ref))
+            .and_then(|m| m.get(&*legacy_lossy(&r#ref)))
             .copied()
             .unwrap_or(false);
         if has_cached {
-            msg = format!("Cloning {} from cache", self.get_short_hash(&r#ref));
+            msg = format!(
+                "Cloning {} from cache",
+                self.get_short_hash(&legacy_lossy(&r#ref))
+            );
 
             let mut clone_flags: Vec<String> = vec![
                 "--dissociate".to_string(),
@@ -929,7 +931,7 @@ impl VcsDownloader for GitDownloader {
                 ],
             ];
         } else {
-            msg = format!("Cloning {}", self.get_short_hash(&r#ref));
+            msg = format!("Cloning {}", self.get_short_hash(&legacy_lossy(&r#ref)));
             commands = vec![
                 vec![
                     "git".to_string(),
@@ -972,7 +974,7 @@ impl VcsDownloader for GitDownloader {
             if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
                 return Err(RuntimeException::new(format!(
                     "The required git reference for {} is not in cache and network is disabled, aborting",
-                    package.get_name(),
+                    package.get_name().display_lossy(),
                 ))
                 .into());
             }
@@ -985,20 +987,23 @@ impl VcsDownloader for GitDownloader {
             .run_commands(commands, url, Some(&path), true, ())?;
 
         let source_url = package.get_source_url();
-        if Some(url) != source_url.as_deref() && source_url.is_some() {
-            self.update_origin_url(&path, source_url.as_deref().unwrap());
+        if source_url.as_ref().is_none_or(|s| s != url) && source_url.is_some() {
+            self.update_origin_url(&path, &legacy_lossy(source_url.as_deref().unwrap()));
         } else {
             self.set_push_url(&path, url);
         }
 
-        let pretty_version = package.get_pretty_version();
-        if let Some(new_ref) =
-            self.update_to_commit(package.clone(), &path, &r#ref, &pretty_version)?
-        {
+        let pretty_version = legacy_lossy(&package.get_pretty_version()).into_owned();
+        if let Some(new_ref) = self.update_to_commit(
+            package.clone(),
+            &path,
+            &legacy_lossy(&r#ref),
+            &pretty_version,
+        )? {
             if package.get_dist_reference() == package.get_source_reference() {
-                package.set_dist_reference(Some(new_ref.clone()));
+                package.set_dist_reference(Some(bstr::BString::from(new_ref.clone())));
             }
-            package.set_source_reference(Some(new_ref));
+            package.set_source_reference(Some(bstr::BString::from(new_ref)));
         }
 
         Ok(None)
@@ -1032,11 +1037,7 @@ impl VcsDownloader for GitDownloader {
                     .as_string()
                     .unwrap_or_default()
             ),
-            legacy_lossy(&preg_replace(
-                r"{[^a-z0-9.]}i",
-                "-",
-                Url::sanitize(url.to_string())
-            )),
+            legacy_lossy(&preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url))),
         );
         let r#ref = target.get_source_reference().unwrap_or_default();
 
@@ -1046,19 +1047,25 @@ impl VcsDownloader for GitDownloader {
             .cached_packages
             .borrow()
             .get(&target.get_id())
-            .and_then(|m| m.get(&r#ref))
+            .and_then(|m| m.get(&*legacy_lossy(&r#ref)))
             .copied()
             .unwrap_or(false);
         if has_cached {
-            msg = format!("Checking out {} from cache", self.get_short_hash(&r#ref));
+            msg = format!(
+                "Checking out {} from cache",
+                self.get_short_hash(&legacy_lossy(&r#ref))
+            );
             remote_url = cache_path;
         } else {
-            msg = format!("Checking out {}", self.get_short_hash(&r#ref));
+            msg = format!(
+                "Checking out {}",
+                self.get_short_hash(&legacy_lossy(&r#ref))
+            );
             remote_url = "%url%".to_string();
             if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
                 return Err(RuntimeException::new(format!(
                     "The required git reference for {} is not in cache and network is disabled, aborting",
-                    target.get_name(),
+                    target.get_name().display_lossy(),
                 ))
                 .into());
             }
@@ -1073,7 +1080,7 @@ impl VcsDownloader for GitDownloader {
                 "rev-parse".to_string(),
                 "--quiet".to_string(),
                 "--verify".to_string(),
-                format!("{}^{{commit}}", r#ref),
+                format!("{}^{{commit}}", legacy_lossy(&r#ref)),
             ],
             &mut output,
             Some(std::path::Path::new(&path)),
@@ -1118,14 +1125,17 @@ impl VcsDownloader for GitDownloader {
             .borrow_mut()
             .run_commands(vec![command], url, Some(&path), false, ())?;
 
-        let pretty_version = target.get_pretty_version();
-        if let Some(new_ref) =
-            self.update_to_commit(target.clone(), &path, &r#ref, &pretty_version)?
-        {
+        let pretty_version = legacy_lossy(&target.get_pretty_version()).into_owned();
+        if let Some(new_ref) = self.update_to_commit(
+            target.clone(),
+            &path,
+            &legacy_lossy(&r#ref),
+            &pretty_version,
+        )? {
             if target.get_dist_reference() == target.get_source_reference() {
-                target.set_dist_reference(Some(new_ref.clone()));
+                target.set_dist_reference(Some(bstr::BString::from(new_ref.clone())));
             }
-            target.set_source_reference(Some(new_ref));
+            target.set_source_reference(Some(bstr::BString::from(new_ref)));
         }
 
         let mut update_origin_url = false;
@@ -1145,13 +1155,15 @@ impl VcsDownloader for GitDownloader {
             let composer_url =
                 legacy_lossy(composer_match.name("url").unwrap_or_default()).into_owned();
             if origin_url == composer_url
-                && Some(composer_url.as_str()) != target.get_source_url().as_deref()
+                && target
+                    .get_source_url()
+                    .is_none_or(|s| s != composer_url.as_str())
             {
                 update_origin_url = true;
             }
         }
         if update_origin_url && target.get_source_url().is_some() {
-            self.update_origin_url(&path, &target.get_source_url().unwrap());
+            self.update_origin_url(&path, &legacy_lossy(&target.get_source_url().unwrap()));
         }
 
         Ok(None)
@@ -1214,7 +1226,7 @@ impl VcsDownloader for GitDownloader {
         self.inner.io.write_error3(
             &format!(
                 "    <error>{} has modified files:</error>",
-                package.get_pretty_name()
+                package.get_pretty_name().display_lossy()
             ),
             true,
             io_interface::NORMAL,
@@ -1367,8 +1379,17 @@ impl VcsDownloader for GitDownloader {
             "--format=%h - %an: %s".to_string(),
             format!("{}..{}", from_reference, to_reference),
         ];
-        args.extend(GitUtil::get_no_show_signature_flags(&self.inner.process)?);
-        let command = GitUtil::build_rev_list_command(&self.inner.process, args)?;
+        args.extend(
+            GitUtil::get_no_show_signature_flags(&self.inner.process)?
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned()),
+        );
+        let command = GitUtil::build_rev_list_command(
+            &self.inner.process,
+            args.into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+        )?;
 
         let mut output = bstr::BString::default();
         if self.inner.process.borrow_mut().execute(

@@ -84,7 +84,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             let platform_overrides: IndexMap<BString, PhpMixed> = locker
                 .get_platform_overrides()?
                 .into_iter()
-                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                .map(|(k, v)| (k, PhpMixed::string(v)))
                 .collect();
             repos.push(crate::repository::RepositoryInterfaceHandle::new(
                 PlatformRepository::new(vec![], platform_overrides, None, None)?,
@@ -141,7 +141,8 @@ pub trait BaseDependencyCommand: BaseCommand {
             "*".to_string()
         };
 
-        let packages = installed_repo.find_packages_with_replacers_and_providers(&needle, None)?;
+        let packages = installed_repo
+            .find_packages_with_replacers_and_providers(bstr::BStr::new(&needle), None)?;
         if packages.is_empty() {
             return Err(InvalidArgumentException::new(format!(
                 "Could not find package \"{}\" in your project",
@@ -151,8 +152,8 @@ pub trait BaseDependencyCommand: BaseCommand {
         }
 
         let matched_package = installed_repo.find_package(
-            &needle,
-            FindPackageConstraint::String(text_constraint.clone()),
+            bstr::BStr::new(&needle),
+            FindPackageConstraint::String(bstr::BString::from(text_constraint.clone())),
         )?;
         match &matched_package {
             None => {
@@ -167,8 +168,8 @@ pub trait BaseDependencyCommand: BaseCommand {
                     .collect(),
                 );
                 if let Some(r#match) = default_repos.find_package(
-                    &needle,
-                    FindPackageConstraint::String(text_constraint.clone()),
+                    bstr::BStr::new(&needle),
+                    FindPackageConstraint::String(bstr::BString::from(text_constraint.clone())),
                 )? {
                     installed_repo.add_repository(
                         crate::repository::RepositoryInterfaceHandle::new(
@@ -184,8 +185,11 @@ pub trait BaseDependencyCommand: BaseCommand {
                         let version =
                             legacy_lossy(platform_constraint.get_lower_bound().get_version())
                                 .into_owned();
-                        let temp_platform_pkg =
-                            Package::new(needle.clone(), version.clone(), version);
+                        let temp_platform_pkg = Package::new(
+                            bstr::BString::from(needle.clone()),
+                            bstr::BString::from(version.clone()),
+                            bstr::BString::from(version),
+                        );
                         installed_repo.add_repository(
                             crate::repository::RepositoryInterfaceHandle::new(
                                 InstalledArrayRepository::new_with_packages(vec![
@@ -217,7 +221,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                     "<info>Package \"{} {}\" found in version \"{}\"{}.</info>",
                     needle,
                     text_constraint,
-                    matched.get_pretty_version(),
+                    matched.get_pretty_version().display_lossy(),
                     extra_notice
                 ));
             }
@@ -225,7 +229,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 self.get_io().write(&format!(
                     "<comment>Package \"{}\" {} is already installed! To find out why, run `shirabe why {}`</comment>",
                     needle,
-                    matched.get_pretty_version(),
+                    legacy_lossy(&matched.get_pretty_version()),
                     needle
                 ));
 
@@ -240,7 +244,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 let replaces: Vec<String> = package
                     .get_replaces()
                     .values()
-                    .map(|link| link.get_target().to_string())
+                    .map(|link| legacy_lossy(link.get_target()).into_owned())
                     .collect();
                 needles.extend(replaces);
             }
@@ -269,7 +273,12 @@ pub trait BaseDependencyCommand: BaseCommand {
         let mut r#return: i64 = if inverted { 1 } else { 0 };
 
         let results = installed_repo.get_dependents(
-            NeedleInput::Multiple(needles),
+            NeedleInput::Multiple(
+                needles
+                    .into_iter()
+                    .map(bstr::BString::from)
+                    .collect::<Vec<_>>(),
+            ),
             constraint,
             inverted,
             recursive,
@@ -299,9 +308,9 @@ pub trait BaseDependencyCommand: BaseCommand {
                 .unwrap_or_default();
             self.get_io().write(&format!(
                 "<info>{}</info> {} {}",
-                root.get_pretty_name(),
-                root.get_pretty_version(),
-                description
+                legacy_lossy(&root.get_pretty_name()),
+                legacy_lossy(&root.get_pretty_version()),
+                legacy_lossy(&description)
             ));
             self.print_tree(&results, "", 1);
         } else {
@@ -352,7 +361,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             let mut queue: Vec<DependentsEntry> = vec![];
             let mut rows: Vec<Vec<String>> = vec![];
             for DependentsEntry(package, link, children) in results {
-                let unique = link.to_string();
+                let unique = legacy_lossy(&link.to_php_string()).into_owned();
                 if doubles.contains_key(&unique) {
                     continue;
                 }
@@ -361,7 +370,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 {
                     "-".to_string()
                 } else {
-                    package.get_pretty_version().to_string()
+                    legacy_lossy(&package.get_pretty_version()).into_owned()
                 };
                 let package_url = PackageInfo::get_view_source_or_homepage_url(package.clone());
                 let name_with_link = match &package_url {
@@ -371,15 +380,19 @@ pub trait BaseDependencyCommand: BaseCommand {
                             &OutputFormatter::escape(url)
                                 .expect("OutputFormatter::escape never fails")
                         ),
-                        package.get_pretty_name()
+                        legacy_lossy(&package.get_pretty_name())
                     ),
-                    None => package.get_pretty_name().to_string(),
+                    None => legacy_lossy(&package.get_pretty_name()).into_owned(),
                 };
                 rows.push(vec![
                     name_with_link,
                     version,
-                    link.get_description().to_string(),
-                    format!("{} ({})", link.get_target(), link.get_pretty_constraint()),
+                    legacy_lossy(link.get_description()).into_owned(),
+                    format!(
+                        "{} ({})",
+                        legacy_lossy(&link.get_target()),
+                        legacy_lossy(&link.get_pretty_constraint())
+                    ),
                 ]);
                 if let Some(children_vec) = children {
                     queue.extend(children_vec);
@@ -430,7 +443,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 if package.get_pretty_version() == RootPackage::DEFAULT_PRETTY_VERSION {
                     String::new()
                 } else {
-                    package.get_pretty_version().to_string()
+                    legacy_lossy(&package.get_pretty_version()).into_owned()
                 };
             let package_url = PackageInfo::get_view_source_or_homepage_url(package.clone());
             let name_with_link = match &package_url {
@@ -439,9 +452,9 @@ pub trait BaseDependencyCommand: BaseCommand {
                     legacy_lossy(
                         &OutputFormatter::escape(url).expect("OutputFormatter::escape never fails")
                     ),
-                    package.get_pretty_name()
+                    legacy_lossy(&package.get_pretty_name())
                 ),
-                None => package.get_pretty_name().to_string(),
+                None => legacy_lossy(&package.get_pretty_name()).into_owned(),
             };
             let package_text =
                 format!("<{}>{}</{}> {}", color, name_with_link, color, version_text)
@@ -449,11 +462,11 @@ pub trait BaseDependencyCommand: BaseCommand {
                     .to_string();
             let link_text = format!(
                 "{} <{}>{}</{}> {}",
-                link.get_description(),
+                legacy_lossy(&link.get_description()),
                 prev_color,
-                link.get_target(),
+                legacy_lossy(&link.get_target()),
                 prev_color,
-                link.get_pretty_constraint(),
+                legacy_lossy(&link.get_pretty_constraint()),
             );
             let circular_warn = if children.is_none() {
                 "(circular dependency aborted here)"

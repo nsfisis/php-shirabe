@@ -127,7 +127,7 @@ impl Command for SuggestsCommand {
                 .get_platform_overrides()?;
             let platform_overrides: IndexMap<BString, PhpMixed> = platform_overrides
                 .into_iter()
-                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                .map(|(k, v)| (k, PhpMixed::string(v)))
                 .collect();
             installed_repos.push(RepositoryInterfaceHandle::new(PlatformRepository::new(
                 vec![],

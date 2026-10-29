@@ -12,53 +12,53 @@ use crate::plugin::{PluginEvents, PrePoolCreateEvent};
 use crate::repository::{
     PlatformRepository, RepositoryInterface, RepositoryInterfaceHandle, RootPackageRepository,
 };
-use bstr::{B, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, LogicException, PhpMixed, array_flip_strings, array_map, in_array_strict, legacy_lossy,
-    microtime, number_format, preg_is_match, round, strpos,
+    CmpOp, LogicException, PhpMixed, array_flip_strings, array_map, bconcat, in_array_strict,
+    legacy_lossy, microtime, number_format, preg_is_match, round, strpos,
 };
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 use shirabe_semver::{CompilingMatcher, Intervals};
 
 #[derive(Debug)]
 pub struct PoolBuilder {
-    acceptable_stabilities: IndexMap<String, i64>,
-    stability_flags: IndexMap<String, i64>,
-    root_aliases: IndexMap<String, IndexMap<String, IndexMap<String, String>>>,
-    root_references: IndexMap<String, String>,
-    temporary_constraints: IndexMap<String, AnyConstraint>,
+    acceptable_stabilities: IndexMap<BString, i64>,
+    stability_flags: IndexMap<BString, i64>,
+    root_aliases: IndexMap<BString, IndexMap<BString, IndexMap<BString, BString>>>,
+    root_references: IndexMap<BString, BString>,
+    temporary_constraints: IndexMap<BString, AnyConstraint>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>>,
     pool_optimizer: Option<PoolOptimizer>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    alias_map: IndexMap<String, IndexMap<i64, AliasPackageHandle>>,
-    packages_to_load: IndexMap<String, AnyConstraint>,
-    loaded_packages: IndexMap<String, AnyConstraint>,
-    loaded_per_repo: IndexMap<i64, IndexMap<String, IndexMap<String, PackageInterfaceHandle>>>,
+    alias_map: IndexMap<BString, IndexMap<i64, AliasPackageHandle>>,
+    packages_to_load: IndexMap<BString, AnyConstraint>,
+    loaded_packages: IndexMap<BString, AnyConstraint>,
+    loaded_per_repo: IndexMap<i64, IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>>,
     packages: IndexMap<i64, BasePackageHandle>,
     unacceptable_fixed_or_locked_packages: Vec<BasePackageHandle>,
-    update_allow_list: Vec<String>,
-    skipped_load: IndexMap<String, Vec<PackageInterfaceHandle>>,
-    ignored_types: Vec<String>,
-    allowed_types: Option<Vec<String>>,
+    update_allow_list: Vec<BString>,
+    skipped_load: IndexMap<BString, Vec<PackageInterfaceHandle>>,
+    ignored_types: Vec<BString>,
+    allowed_types: Option<Vec<BString>>,
     /// If provided, only these package names are loaded
     ///
     /// This is a special-use functionality of the Request class to optimize the pool creation process
     /// when only a minimal subset of packages is needed and we do not need their dependencies.
-    restricted_packages_list: Option<IndexMap<String, i64>>,
+    restricted_packages_list: Option<IndexMap<BString, i64>>,
     /// Keeps a list of dependencies which are locked but were auto-unlocked as they are path repositories
     ///
     /// This half-unlocked state means the package itself will update but the UPDATE_LISTED_WITH_TRANSITIVE_DEPS*
     /// flags will not apply until the package really gets unlocked in some other way than being a path repo
-    path_repo_unlocked: IndexMap<String, bool>,
+    path_repo_unlocked: IndexMap<BString, bool>,
     /// Keeps a list of dependencies which are root requirements, and as such
     /// have already their maximum required range loaded and can not be
     /// extended by markPackageNameForLoading
     ///
     /// Packages get cleared from this list if they get unlocked as in that case
     /// we need to actually load them
-    max_extended_reqs: IndexMap<String, bool>,
-    update_allow_warned: IndexMap<String, bool>,
+    max_extended_reqs: IndexMap<BString, bool>,
+    update_allow_warned: IndexMap<BString, bool>,
     index_counter: i64,
     security_advisory_pool_filter: Option<SecurityAdvisoryPoolFilter>,
 }
@@ -68,14 +68,14 @@ impl PoolBuilder {
 
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     pub fn new(
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        root_aliases: IndexMap<String, IndexMap<String, IndexMap<String, String>>>,
-        root_references: IndexMap<String, String>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        root_aliases: IndexMap<BString, IndexMap<BString, IndexMap<BString, BString>>>,
+        root_references: IndexMap<BString, BString>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<dyn EventDispatcherInterface>>>,
         pool_optimizer: Option<PoolOptimizer>,
-        temporary_constraints: IndexMap<String, AnyConstraint>,
+        temporary_constraints: IndexMap<BString, AnyConstraint>,
         security_advisory_pool_filter: Option<SecurityAdvisoryPoolFilter>,
     ) -> Self {
         Self {
@@ -107,12 +107,12 @@ impl PoolBuilder {
     }
 
     /// Packages of those types are ignored
-    pub fn set_ignored_types(&mut self, types: Vec<String>) {
+    pub fn set_ignored_types(&mut self, types: Vec<BString>) {
         self.ignored_types = types;
     }
 
     /// Only packages of those types are allowed if set to non-null
-    pub fn set_allowed_types(&mut self, types: Option<Vec<String>>) {
+    pub fn set_allowed_types(&mut self, types: Option<Vec<BString>>) {
         self.allowed_types = types;
     }
 
@@ -124,11 +124,17 @@ impl PoolBuilder {
     ) -> anyhow::Result<Pool> {
         self.restricted_packages_list = if request.get_restricted_packages().is_some() {
             Some(
-                array_flip_strings(request.get_restricted_packages().unwrap())
-                    .into_iter()
-                    // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
-                    .map(|(k, v)| (k.to_str_lossy().into_owned(), v.as_int().unwrap_or(0)))
-                    .collect(),
+                array_flip_strings(
+                    &request
+                        .get_restricted_packages()
+                        .unwrap()
+                        .iter()
+                        .map(|s| legacy_lossy(s).into_owned())
+                        .collect::<Vec<_>>(),
+                )
+                .into_iter()
+                .map(|(k, v)| (k.clone(), v.as_int().unwrap_or(0)))
+                .collect(),
             )
         } else {
             None
@@ -154,12 +160,12 @@ impl PoolBuilder {
                 if !self.is_update_allowed(locked_package.clone()) {
                     // remember which packages we skipped loading remote content for in this partial update
                     self.skipped_load
-                        .entry(locked_package.get_name())
+                        .entry(BString::from(&locked_package.get_name()[..]))
                         .or_default()
                         .push(locked_package.clone());
                     for (_k, link) in locked_package.get_replaces().iter() {
                         self.skipped_load
-                            .entry(link.get_target().to_string())
+                            .entry(BString::from(link.get_target()))
                             .or_default()
                             .push(locked_package.clone());
                     }
@@ -168,7 +174,11 @@ impl PoolBuilder {
                     // unless symlinking is disabled in which case we probably should rather treat them like
                     // regular packages. We mark them specially so they can be reloaded fully including update propagation
                     // if they do get unlocked, but by default they are unlocked without update propagation.
-                    if locked_package.get_dist_type().as_deref() == Some("path") {
+                    if locked_package
+                        .get_dist_type()
+                        .as_ref()
+                        .is_some_and(|v| v == "path")
+                    {
                         let transport_options = locked_package.get_transport_options();
                         let symlink_disabled = transport_options
                             .get(B("symlink"))
@@ -176,7 +186,7 @@ impl PoolBuilder {
                             .unwrap_or(false);
                         if !transport_options.contains_key(B("symlink")) || !symlink_disabled {
                             self.path_repo_unlocked
-                                .insert(locked_package.get_name().to_string(), true);
+                                .insert(BString::from(&locked_package.get_name()[..]), true);
                             continue;
                         }
                     }
@@ -190,14 +200,14 @@ impl PoolBuilder {
             // using MatchAllConstraint here because fixed packages do not need to retrigger
             // loading any packages
             self.loaded_packages.insert(
-                package.get_name().to_string(),
+                BString::from(&package.get_name()[..]),
                 MatchAllConstraint::new(None).into(),
             );
 
             // replace means conflict, so if a fixed package replaces a name, no need to load that one, packages would conflict anyways
             for (_k, link) in package.get_replaces().iter() {
                 self.loaded_packages.insert(
-                    link.get_target().to_string(),
+                    BString::from(link.get_target()),
                     MatchAllConstraint::new(None).into(),
                 );
             }
@@ -212,8 +222,8 @@ impl PoolBuilder {
                 || StabilityFilter::is_package_acceptable(
                     &self.acceptable_stabilities,
                     &self.stability_flags,
-                    &package.get_names(true),
-                    &package.get_stability(),
+                    &package.get_names(true).to_vec(),
+                    bstr::BStr::new(&*legacy_lossy(&package.get_stability())),
                 )
             {
                 self.load_package(request, &repositories, package.clone(), false)?;
@@ -234,7 +244,7 @@ impl PoolBuilder {
         }
 
         // clean up packagesToLoad for anything we manually marked loaded above
-        let to_remove: Vec<String> = self
+        let to_remove: Vec<BString> = self
             .packages_to_load
             .keys()
             .filter(|name| self.loaded_packages.contains_key(*name))
@@ -268,7 +278,9 @@ impl PoolBuilder {
 
                     let mut package_and_aliases: Vec<(i64, BasePackageHandle)> = Vec::new();
                     package_and_aliases.push((i, package.clone()));
-                    if let Some(aliases) = self.alias_map.get(&package.ptr_id().to_string()) {
+                    if let Some(aliases) =
+                        self.alias_map.get(package.ptr_id().to_string().as_bytes())
+                    {
                         for (idx, alias) in aliases {
                             package_and_aliases.push((*idx, alias.clone().into()));
                         }
@@ -357,7 +369,7 @@ impl PoolBuilder {
     fn mark_package_name_for_loading(
         &mut self,
         request: &Request,
-        name: &str,
+        name: &BStr,
         constraint: &AnyConstraint,
     ) {
         let constraint = constraint.clone();
@@ -407,7 +419,8 @@ impl PoolBuilder {
                 .unwrap();
             }
 
-            self.packages_to_load.insert(name.to_string(), constraint);
+            self.packages_to_load
+                .insert(bstr::BString::from(name), constraint);
 
             return;
         }
@@ -424,7 +437,7 @@ impl PoolBuilder {
         // required. We extend the constraint and mark that package as not being loaded
         // yet so we get the required package versions
         self.packages_to_load.insert(
-            name.to_string(),
+            bstr::BString::from(name),
             Intervals::compact_constraint(
                 &MultiConstraint::create(
                     vec![self.loaded_packages.get(name).unwrap().clone(), constraint],
@@ -444,7 +457,7 @@ impl PoolBuilder {
         request: &mut Request,
         repositories: &Vec<RepositoryInterfaceHandle>,
     ) -> anyhow::Result<()> {
-        let to_remove: Vec<String> = self
+        let to_remove: Vec<BString> = self
             .packages_to_load
             .keys()
             .filter(|name| {
@@ -458,7 +471,7 @@ impl PoolBuilder {
         for name in to_remove {
             self.packages_to_load.shift_remove(&name);
         }
-        let snapshot: Vec<(String, AnyConstraint)> = self
+        let snapshot: Vec<(BString, AnyConstraint)> = self
             .packages_to_load
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
@@ -469,9 +482,9 @@ impl PoolBuilder {
         }
 
         // Load packages in chunks of 50 to prevent memory usage build-up due to caches of all sorts
-        let mut package_batches: Vec<IndexMap<String, AnyConstraint>> = {
-            let mut chunks: Vec<IndexMap<String, AnyConstraint>> = Vec::new();
-            let mut current: IndexMap<String, AnyConstraint> = IndexMap::new();
+        let mut package_batches: Vec<IndexMap<BString, AnyConstraint>> = {
+            let mut chunks: Vec<IndexMap<BString, AnyConstraint>> = Vec::new();
+            let mut current: IndexMap<BString, AnyConstraint> = IndexMap::new();
             for (k, v) in self.packages_to_load.iter() {
                 current.insert(k.clone(), v.clone());
                 if current.len() as i64 >= Self::LOAD_BATCH_SIZE {
@@ -501,7 +514,7 @@ impl PoolBuilder {
 
             // Iterate by index because we mutate package_batches inside the loop.
             for batch_index in 0..package_batches.len() {
-                let package_batch: IndexMap<String, Option<AnyConstraint>> = package_batches
+                let package_batch: IndexMap<BString, Option<AnyConstraint>> = package_batches
                     [batch_index]
                     .iter()
                     .map(|(k, v)| (k.clone(), Some(v.clone())))
@@ -537,9 +550,9 @@ impl PoolBuilder {
                 }
                 let packages_in_result = result.packages;
                 for (_, package) in &packages_in_result {
-                    let pkg_name = package.get_name().to_string();
-                    let pkg_version = package.get_version().to_string();
-                    let pkg_type = package.get_type().to_string();
+                    let pkg_name = BString::from(&package.get_name()[..]);
+                    let pkg_version = BString::from(&package.get_version()[..]);
+                    let pkg_type = BString::from(&package.get_type()[..]);
 
                     self.loaded_per_repo
                         .entry(repo_index as i64)
@@ -576,7 +589,7 @@ impl PoolBuilder {
             }
 
             // PHP: array_chunk(array_merge(...$packageBatches), self::LOAD_BATCH_SIZE, true)
-            let mut merged: IndexMap<String, AnyConstraint> = IndexMap::new();
+            let mut merged: IndexMap<BString, AnyConstraint> = IndexMap::new();
             for batch in &package_batches {
                 for (k, v) in batch {
                     merged.insert(k.clone(), v.clone());
@@ -584,8 +597,8 @@ impl PoolBuilder {
             }
             // Rebuild chunks from merged.
             package_batches = {
-                let mut chunks: Vec<IndexMap<String, AnyConstraint>> = Vec::new();
-                let mut current: IndexMap<String, AnyConstraint> = IndexMap::new();
+                let mut chunks: Vec<IndexMap<BString, AnyConstraint>> = Vec::new();
+                let mut current: IndexMap<BString, AnyConstraint> = IndexMap::new();
                 for (k, v) in merged.iter() {
                     current.insert(k.clone(), v.clone());
                     if current.len() as i64 >= Self::LOAD_BATCH_SIZE {
@@ -614,12 +627,14 @@ impl PoolBuilder {
 
         if let Some(alias) = package.as_alias() {
             self.alias_map
-                .entry(alias.get_alias_of().ptr_id().to_string())
+                .entry(bstr::BString::from(
+                    alias.get_alias_of().ptr_id().to_string(),
+                ))
                 .or_default()
                 .insert(index, alias);
         }
 
-        let name = package.get_name();
+        let name = BString::from(&package.get_name()[..]);
 
         // we're simply setting the root references on all versions for a name here and rely on the solver to pick the
         // right version. It'd be more work to figure out which versions and which aliases of those versions this may
@@ -652,8 +667,11 @@ impl PoolBuilder {
             } else {
                 package.clone()
             };
-            let alias_normalized = alias.get("alias_normalized").cloned().unwrap_or_default();
-            let alias_pretty = alias.get("alias").cloned().unwrap_or_default();
+            let alias_normalized = alias
+                .get(b"alias_normalized".as_slice())
+                .cloned()
+                .unwrap_or_default();
+            let alias_pretty = alias.get(b"alias".as_slice()).cloned().unwrap_or_default();
             let alias_handle: AliasPackageHandle =
                 if let Some(complete) = base_package.as_complete_package() {
                     CompleteAliasPackageHandle::new(complete, alias_normalized, alias_pretty).into()
@@ -669,14 +687,16 @@ impl PoolBuilder {
             self.index_counter += 1;
             self.packages.insert(new_index, alias_handle.clone().into());
             self.alias_map
-                .entry(alias_handle.get_alias_of().ptr_id().to_string())
+                .entry(bstr::BString::from(
+                    alias_handle.get_alias_of().ptr_id().to_string(),
+                ))
                 .or_default()
                 .insert(new_index, alias_handle);
         }
 
         let requires = package.get_requires();
         for (_k, link) in requires.iter() {
-            let require = link.get_target().to_string();
+            let require = BString::from(link.get_target());
             let link_constraint = link.get_constraint();
 
             // if the required package is loaded as a locked package only and hasn't had its deps analyzed
@@ -685,18 +705,23 @@ impl PoolBuilder {
                 // looking at a package which needs to be updated we need to unlock the package we now know is a
                 // dependency of another package which we are trying to update, and then attempt to load it again
                 if propagate_update && request.get_update_allow_transitive_dependencies() {
-                    let skipped_root_requires = self.get_skipped_root_requires(request, &require);
+                    let skipped_root_requires =
+                        self.get_skipped_root_requires(request, require.as_bstr());
 
                     if request.get_update_allow_transitive_root_dependencies()
                         || skipped_root_requires.is_empty()
                     {
-                        self.unlock_package(request, repositories, &require)?;
-                        self.mark_package_name_for_loading(request, &require, link_constraint);
+                        self.unlock_package(request, repositories, require.as_bstr())?;
+                        self.mark_package_name_for_loading(
+                            request,
+                            require.as_bstr(),
+                            link_constraint,
+                        );
                     } else {
                         for root_require in &skipped_root_requires {
                             if !self.update_allow_warned.contains_key(root_require) {
                                 self.update_allow_warned.insert(root_require.clone(), true);
-                                self.io.write_error(&format!("<warning>Dependency {} is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>", root_require));
+                                self.io.write_error(&format!("<warning>Dependency {} is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>", root_require.display_lossy()));
                             }
                         }
                     }
@@ -705,10 +730,10 @@ impl PoolBuilder {
                 {
                     // if doing a partial update and a package depends on a path-repo-unlocked package which is not referenced by the root, we need to ensure it gets loaded as it was not loaded by the request's root requirements
                     // and would not be loaded above if update propagation is not allowed (which happens if the requirer is itself a path-repo-unlocked package) or if transitive deps are not allowed to be unlocked
-                    self.mark_package_name_for_loading(request, &require, link_constraint);
+                    self.mark_package_name_for_loading(request, require.as_bstr(), link_constraint);
                 }
             } else {
-                self.mark_package_name_for_loading(request, &require, link_constraint);
+                self.mark_package_name_for_loading(request, require.as_bstr(), link_constraint);
             }
         }
 
@@ -716,23 +741,24 @@ impl PoolBuilder {
         // they are currently locked and thus prevent this updateable package from being installable/updateable
         if propagate_update && request.get_update_allow_transitive_dependencies() {
             for (_k, link) in package.get_replaces().iter() {
-                let replace = link.get_target().to_string();
+                let replace = BString::from(link.get_target());
                 if self.loaded_packages.contains_key(&replace)
                     && self.skipped_load.contains_key(&replace)
                 {
-                    let skipped_root_requires = self.get_skipped_root_requires(request, &replace);
+                    let skipped_root_requires =
+                        self.get_skipped_root_requires(request, replace.as_bstr());
 
                     if request.get_update_allow_transitive_root_dependencies()
                         || skipped_root_requires.is_empty()
                     {
-                        self.unlock_package(request, repositories, &replace)?;
+                        self.unlock_package(request, repositories, replace.as_bstr())?;
                         // the replaced package only needs to be loaded if something else requires it
-                        self.mark_package_name_for_loading_if_required(request, &replace);
+                        self.mark_package_name_for_loading_if_required(request, replace.as_bstr());
                     } else {
                         for root_require in &skipped_root_requires {
                             if !self.update_allow_warned.contains_key(root_require) {
                                 self.update_allow_warned.insert(root_require.clone(), true);
-                                self.io.write_error(&format!("<warning>Dependency {} is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>", root_require));
+                                self.io.write_error(&format!("<warning>Dependency {} is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>", root_require.display_lossy()));
                             }
                         }
                     }
@@ -743,26 +769,26 @@ impl PoolBuilder {
     }
 
     /// Checks if a particular name is required directly in the request
-    fn is_root_require(&self, request: &Request, name: &str) -> bool {
+    fn is_root_require(&self, request: &Request, name: &BStr) -> bool {
         let root_requires = request.get_requires();
 
         root_requires.contains_key(name)
     }
 
-    fn get_skipped_root_requires(&self, request: &Request, name: &str) -> Vec<String> {
+    fn get_skipped_root_requires(&self, request: &Request, name: &BStr) -> Vec<BString> {
         if !self.skipped_load.contains_key(name) {
             return vec![];
         }
 
         let root_requires = request.get_requires();
-        let mut matches: Vec<String> = vec![];
+        let mut matches: Vec<BString> = vec![];
 
         if root_requires.contains_key(name) {
-            let name_owned = name.to_string();
+            let name_owned = BString::from(name);
             return array_map(
-                |package: &PackageInterfaceHandle| -> String {
+                |package: &PackageInterfaceHandle| -> BString {
                     if name_owned != package.get_name() {
-                        format!("{} (via replace of {})", package.get_name(), name_owned)
+                        bconcat!(package.get_name(), " (via replace of ", name_owned, ")")
                     } else {
                         package.get_name()
                     }
@@ -773,18 +799,19 @@ impl PoolBuilder {
 
         for package_or_replacer in &self.skipped_load[name] {
             if root_requires.contains_key(&package_or_replacer.get_name()) {
-                matches.push(package_or_replacer.get_name());
+                matches.push(BString::from(&package_or_replacer.get_name()[..]));
             }
             for (_k, link) in package_or_replacer.get_replaces().iter() {
                 if root_requires.contains_key(link.get_target()) {
                     if name != package_or_replacer.get_name() {
-                        matches.push(format!(
-                            "{} (via replace of {})",
+                        matches.push(bconcat!(
                             package_or_replacer.get_name(),
-                            name
+                            " (via replace of ",
+                            name,
+                            ")"
                         ));
                     } else {
-                        matches.push(package_or_replacer.get_name().to_string());
+                        matches.push(BString::from(&package_or_replacer.get_name()[..]));
                     }
                     break;
                 }
@@ -842,17 +869,17 @@ impl PoolBuilder {
             if matched_platform_package {
                 self.io.write_error(&format!(
                     "<warning>Pattern \"{}\" listed for update matches platform packages, but these cannot be updated by Shirabe.</warning>",
-                    pattern
+                    pattern.display_lossy()
                 ));
             } else if strpos(pattern, "*").is_some() {
                 self.io.write_error(&format!(
                     "<warning>Pattern \"{}\" listed for update does not match any locked packages.</warning>",
-                    pattern
+                    pattern.display_lossy()
                 ));
             } else {
                 self.io.write_error(&format!(
                     "<warning>Package \"{}\" listed for update is not locked.</warning>",
-                    pattern
+                    pattern.display_lossy()
                 ));
             }
         }
@@ -865,7 +892,7 @@ impl PoolBuilder {
         &mut self,
         request: &mut Request,
         repositories: &Vec<RepositoryInterfaceHandle>,
-        name: &str,
+        name: &BStr,
     ) -> anyhow::Result<()> {
         let skipped: Vec<PackageInterfaceHandle> = self
             .skipped_load
@@ -880,17 +907,17 @@ impl PoolBuilder {
                     .skipped_load
                     .contains_key(&package_or_replacer.get_name())
             {
-                let replacer_name = package_or_replacer.get_name();
+                let replacer_name = BString::from(&package_or_replacer.get_name()[..]);
                 if request.get_update_allow_transitive_root_dependencies()
                     || (!self.is_root_require(request, name)
-                        && !self.is_root_require(request, &replacer_name))
+                        && !self.is_root_require(request, replacer_name.as_bstr()))
                 {
-                    self.unlock_package(request, repositories, &replacer_name)?;
+                    self.unlock_package(request, repositories, replacer_name.as_bstr())?;
 
-                    if self.is_root_require(request, &replacer_name) {
+                    if self.is_root_require(request, replacer_name.as_bstr()) {
                         self.mark_package_name_for_loading(
                             request,
-                            &replacer_name,
+                            replacer_name.as_bstr(),
                             &MatchAllConstraint::new(None).into(),
                         );
                     } else {
@@ -901,7 +928,7 @@ impl PoolBuilder {
                             if let Some(req_link) = requires.get(&replacer_name) {
                                 self.mark_package_name_for_loading(
                                     request,
-                                    &replacer_name,
+                                    replacer_name.as_bstr(),
                                     req_link.get_constraint(),
                                 );
                             }
@@ -972,7 +999,7 @@ impl PoolBuilder {
                             if let Some(req_link) = requires.get(&locked_package.get_name()) {
                                 self.mark_package_name_for_loading(
                                     request,
-                                    &locked_package.get_name(),
+                                    bstr::BStr::new(&*legacy_lossy(&locked_package.get_name())),
                                     req_link.get_constraint(),
                                 );
                             }
@@ -984,12 +1011,12 @@ impl PoolBuilder {
                                     self.unlock_package(
                                         request,
                                         repositories,
-                                        replace.get_target(),
+                                        bstr::BStr::new(&*legacy_lossy(replace.get_target())),
                                     )?;
                                     // this package is in $requires so no need to call markPackageNameForLoadingIfRequired
                                     self.mark_package_name_for_loading(
                                         request,
-                                        replace.get_target(),
+                                        bstr::BStr::new(&*legacy_lossy(replace.get_target())),
                                         replace.get_constraint(),
                                     );
                                 }
@@ -1002,7 +1029,7 @@ impl PoolBuilder {
         Ok(())
     }
 
-    fn mark_package_name_for_loading_if_required(&mut self, request: &Request, name: &str) {
+    fn mark_package_name_for_loading_if_required(&mut self, request: &Request, name: &BStr) {
         if self.is_root_require(request, name) {
             let cons = request.get_requires()[name].clone();
             self.mark_package_name_for_loading(request, name, &cons);
@@ -1014,7 +1041,7 @@ impl PoolBuilder {
                 if name == link.get_target() {
                     self.mark_package_name_for_loading(
                         request,
-                        link.get_target(),
+                        bstr::BStr::new(&*legacy_lossy(link.get_target())),
                         link.get_constraint(),
                     );
                 }
@@ -1047,7 +1074,7 @@ impl PoolBuilder {
         }
         self.packages.shift_remove(&index);
         let object_hash = package.ptr_id().to_string();
-        if let Some(aliases) = self.alias_map.shift_remove(&object_hash) {
+        if let Some(aliases) = self.alias_map.shift_remove(bstr::B(&object_hash)) {
             for (alias_index, alias_package) in &aliases {
                 if repo_index >= 0
                     && let Some(repo_map) = self.loaded_per_repo.get_mut(&repo_index)

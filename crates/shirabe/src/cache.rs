@@ -2,21 +2,23 @@
 
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::{Filesystem, Platform};
+use bstr::BString;
 use chrono::Utc;
 use shirabe_php_shim::{
-    bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space, file_exists,
-    file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable, legacy_lossy,
-    mkdir, path_from_bytes, php_regex, preg_is_match, preg_match, preg_replace, random_bytes,
-    random_int, rename, time, touch, touch3, unlink,
+    bconcat, bin2hex, clearstatcache, date_format_to_strftime, dirname, disk_free_space,
+    file_exists, file_get_contents, file_put_contents, filemtime, hash_file, is_dir, is_writable,
+    mkdir, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace,
+    random_bytes, random_int, rename, rtrim2, time, touch, touch3, unlink,
 };
 use shirabe_symfony_finder::Finder;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 /// Reads/writes to a filesystem cache
 #[derive(Debug)]
 pub struct Cache {
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    root: String,
+    root: PathBuf,
     enabled: Option<bool>,
     allowlist: String,
     filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
@@ -51,13 +53,15 @@ static CACHE_COLLECTED: Mutex<Option<bool>> = Mutex::new(None);
 impl Cache {
     pub fn new(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-        cache_dir: &str,
+        cache_dir: impl AsRef<Path>,
         allowlist: Option<&str>,
         filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
         read_only: bool,
     ) -> Self {
+        let cache_dir = cache_dir.as_ref();
         let allowlist = allowlist.unwrap_or("a-z0-9._").to_string();
-        let root = format!("{}/", cache_dir.trim_end_matches(['/', '\\']));
+        let root =
+            path_from_bytes(&bconcat!(rtrim2(path_to_bytes(cache_dir), "/\\"), "/")).to_path_buf();
         let filesystem = filesystem
             .unwrap_or_else(|| std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))));
         let mut this = Self {
@@ -85,10 +89,10 @@ impl Cache {
         self.read_only
     }
 
-    pub fn is_usable(path: &str) -> bool {
+    pub fn is_usable(path: impl AsRef<Path>) -> bool {
         !preg_is_match(
             php_regex!(r"{(^|[\\\\/])(\$null|nul|NUL|/dev/null)([\\\\/]|$)}"),
-            path,
+            path_to_bytes(path.as_ref()),
         )
     }
 
@@ -102,7 +106,7 @@ impl Cache {
             {
                 self.io.write_error(&format!(
                     "<warning>Cannot create cache directory {}, or directory is not writable. Proceeding without cache. See also cache-read-only config if your filesystem is read-only.</warning>",
-                    self.root,
+                    self.root.display(),
                 ));
                 self.enabled = Some(false);
             }
@@ -111,60 +115,61 @@ impl Cache {
         self.enabled.unwrap_or(false)
     }
 
-    pub fn get_root(&self) -> &str {
+    pub fn get_root(&self) -> &Path {
         &self.root
     }
 
-    pub fn read(&mut self, file: &str) -> Option<String> {
+    /// `$this->root . Preg::replace('{[^'.$this->allowlist.']}i', '-', $file)`
+    fn full_path(&self, file: impl AsRef<[u8]>) -> PathBuf {
+        let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
+        path_from_bytes(&bconcat!(path_to_bytes(&self.root), file)).to_path_buf()
+    }
+
+    pub fn read(&mut self, file: impl AsRef<[u8]>) -> Option<BString> {
         if self.is_enabled() {
-            let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
+            let full_path = self.full_path(file);
             if file_exists(&full_path) {
                 self.io.write_error3(
-                    &format!("Reading {} from cache", full_path),
+                    &format!("Reading {} from cache", full_path.display()),
                     true,
                     crate::io::DEBUG,
                 );
 
-                // TODO(bytes): the payload is handed back to callers as a String, so a cache
-                // entry that is not valid UTF-8 is corrupted by from_utf8_lossy.
-                return file_get_contents(&full_path)
-                    .map(|c| String::from_utf8_lossy(&c).into_owned())
-                    .ok();
+                return file_get_contents(&full_path).map(BString::from).ok();
             }
         }
 
         None
     }
 
-    pub fn write(&mut self, file: &str, contents: &str) -> anyhow::Result<bool> {
+    pub fn write(
+        &mut self,
+        file: impl AsRef<[u8]>,
+        contents: impl AsRef<[u8]>,
+    ) -> anyhow::Result<bool> {
+        let file = file.as_ref();
+        let contents = contents.as_ref();
         let was_enabled = self.enabled == Some(true);
 
         if self.is_enabled() && !self.read_only {
-            let file = legacy_lossy(&preg_replace(
-                format!("{{[^{}]}}i", self.allowlist),
-                "-",
-                file,
-            ))
-            .into_owned();
+            let dest = self.full_path(file);
 
             self.io.write_error3(
-                &format!("Writing {}{} into cache", self.root, file),
+                &format!("Writing {} into cache", dest.display()),
                 true,
                 crate::io::DEBUG,
             );
 
-            let temp_file_name = format!(
-                "{}{}{}.tmp",
-                self.root,
-                file,
-                legacy_lossy(&bin2hex(random_bytes(5)))
-            );
-            let dest = format!("{}{}", self.root, file);
+            let temp_file_name = path_from_bytes(&bconcat!(
+                path_to_bytes(&dest),
+                bin2hex(random_bytes(5)),
+                ".tmp"
+            ))
+            .to_path_buf();
             // TODO(php-semantics): the shim's file_put_contents() discards the io::Error, so a failed
             // write returns false here instead of reaching the error handling below. Only rename()
             // failures get there, which means the "Only N of M bytes written" branch never matches.
-            let attempt = if file_put_contents(&temp_file_name, contents.as_bytes()).is_some() {
+            let attempt = if file_put_contents(&temp_file_name, contents).is_some() {
                 rename(&temp_file_name, &dest).map(|()| true)
             } else {
                 Ok(false)
@@ -178,7 +183,7 @@ impl Cache {
                         clearstatcache();
                         self.enabled = None;
 
-                        return self.write(&file, contents);
+                        return self.write(file, contents);
                     }
 
                     self.io.write_error3(
@@ -193,17 +198,18 @@ impl Cache {
                         &e.to_string(),
                     ) {
                         // Remove partial file.
-                        unlink(&temp_file_name);
+                        let _ = unlink(&temp_file_name);
 
-                        let free_space =
-                            disk_free_space(path_from_bytes(&dirname(&temp_file_name)))
-                                .map(|space| space.to_string())
-                                .unwrap_or_default();
+                        let free_space = disk_free_space(path_from_bytes(&dirname(path_to_bytes(
+                            &temp_file_name,
+                        ))))
+                        .map(|space| space.to_string())
+                        .unwrap_or_default();
                         let message = format!(
                             "<warning>Writing {} into cache failed after {} of {} bytes written, only {} bytes of free space available</warning>",
-                            temp_file_name,
-                            legacy_lossy(&m.get(1).unwrap_or_default()),
-                            legacy_lossy(&m.get(2).unwrap_or_default()),
+                            temp_file_name.display(),
+                            m.get(1).unwrap_or_default().display_lossy(),
+                            m.get(2).unwrap_or_default().display_lossy(),
                             free_space,
                         );
 
@@ -221,22 +227,26 @@ impl Cache {
     }
 
     /// Copy a file into the cache
-    pub fn copy_from(&mut self, file: &str, source: &str) -> bool {
+    pub fn copy_from(&mut self, file: impl AsRef<[u8]>, source: impl AsRef<Path>) -> bool {
+        let source = source.as_ref();
         if self.is_enabled() && !self.read_only {
-            let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
-            self.filesystem
+            let full_path = self.full_path(file);
+            let _ = self
+                .filesystem
                 .borrow_mut()
-                .ensure_directory_exists(path_from_bytes(&dirname(&full_path)));
+                .ensure_directory_exists(path_from_bytes(&dirname(path_to_bytes(&full_path))));
 
             if !file_exists(source) {
                 self.io.write_error(&format!(
                     "<error>{} does not exist, can not write into cache</error>",
-                    source,
+                    source.display(),
                 ));
             } else if self.io.is_debug() {
-                self.io
-                    .write_error(&format!("Writing {} into cache from {}", full_path, source));
+                self.io.write_error(&format!(
+                    "Writing {} into cache from {}",
+                    full_path.display(),
+                    source.display()
+                ));
             }
 
             return self
@@ -250,10 +260,13 @@ impl Cache {
     }
 
     /// Copy a file out of the cache
-    pub fn copy_to(&mut self, file: &str, target: &str) -> anyhow::Result<bool> {
+    pub fn copy_to(
+        &mut self,
+        file: impl AsRef<[u8]>,
+        target: impl AsRef<Path>,
+    ) -> anyhow::Result<bool> {
         if self.is_enabled() {
-            let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
+            let full_path = self.full_path(file);
             if file_exists(&full_path) {
                 if !touch3(&full_path, filemtime(&full_path).unwrap_or(0), time()) {
                     // fallback in case the above failed due to incorrect ownership
@@ -262,12 +275,15 @@ impl Cache {
                 }
 
                 self.io.write_error3(
-                    &format!("Reading {} from cache", full_path),
+                    &format!("Reading {} from cache", full_path.display()),
                     true,
                     crate::io::DEBUG,
                 );
 
-                return self.filesystem.borrow_mut().copy(&full_path, target);
+                return self
+                    .filesystem
+                    .borrow_mut()
+                    .copy(&full_path, target.as_ref());
             }
         }
 
@@ -298,10 +314,9 @@ impl Cache {
         random_int(0..50) == 0
     }
 
-    pub fn remove(&mut self, file: &str) -> bool {
+    pub fn remove(&mut self, file: impl AsRef<[u8]>) -> bool {
         if self.is_enabled() && !self.read_only {
-            let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
+            let full_path = self.full_path(file);
             if file_exists(&full_path) {
                 return self
                     .filesystem
@@ -327,10 +342,9 @@ impl Cache {
         false
     }
 
-    pub fn get_age(&mut self, file: &str) -> Option<i64> {
+    pub fn get_age(&mut self, file: impl AsRef<[u8]>) -> Option<i64> {
         if self.is_enabled() {
-            let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
+            let full_path = self.full_path(file);
             if file_exists(&full_path)
                 && let Some(mtime) = filemtime(&full_path)
             {
@@ -444,24 +458,22 @@ impl Cache {
         false
     }
 
-    pub fn sha1(&mut self, file: &str) -> Option<String> {
+    pub fn sha1(&mut self, file: impl AsRef<[u8]>) -> Option<BString> {
         if self.is_enabled() {
-            let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
+            let full_path = self.full_path(file);
             if file_exists(&full_path) {
-                return hash_file("sha1", &full_path).map(|s| legacy_lossy(&s).into_owned());
+                return hash_file("sha1", &full_path);
             }
         }
 
         None
     }
 
-    pub fn sha256(&mut self, file: &str) -> Option<String> {
+    pub fn sha256(&mut self, file: impl AsRef<[u8]>) -> Option<BString> {
         if self.is_enabled() {
-            let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
+            let full_path = self.full_path(file);
             if file_exists(&full_path) {
-                return hash_file("sha256", &full_path).map(|s| legacy_lossy(&s).into_owned());
+                return hash_file("sha256", &full_path);
             }
         }
 

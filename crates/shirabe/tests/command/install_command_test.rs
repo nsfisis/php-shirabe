@@ -98,8 +98,8 @@ fn test_install_from_empty_vendor() {
     let another_package = get_package("root/another", "1.0.0");
     // Set as a metapackage so that we can do the whole post-remove update & install process without
     // Composer trying to download them (DownloadManager::getDownloaderForPackage).
-    root_req_package.__set_type("metapackage".to_string());
-    another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(bstr::BString::from("metapackage".to_string()));
+    another_package.__set_type(bstr::BString::from("metapackage".to_string()));
 
     create_composer_lock(&[root_req_package], &[another_package]);
 
@@ -138,8 +138,8 @@ fn test_install_from_empty_vendor_no_dev() {
     let another_package = get_package("root/another", "1.0.0");
     // Set as a metapackage so that we can do the whole post-remove update & install process without
     // Composer trying to download them (DownloadManager::getDownloaderForPackage).
-    root_req_package.__set_type("metapackage".to_string());
-    another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(bstr::BString::from("metapackage".to_string()));
+    another_package.__set_type(bstr::BString::from("metapackage".to_string()));
 
     create_composer_lock(&[root_req_package], &[another_package]);
 
@@ -180,8 +180,8 @@ fn test_install_new_packages_with_existing_partial_vendor() {
     let another_package = get_package("root/another", "1.0.0");
     // Set as a metapackage so that we can do the whole post-remove update & install process without
     // Composer trying to download them (DownloadManager::getDownloaderForPackage).
-    root_req_package.__set_type("metapackage".to_string());
-    another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(bstr::BString::from("metapackage".to_string()));
+    another_package.__set_type(bstr::BString::from("metapackage".to_string()));
 
     create_composer_lock(&[root_req_package.clone(), another_package], &[]);
     create_installed_json(&[root_req_package], &[], true);

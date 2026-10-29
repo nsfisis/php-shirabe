@@ -4,6 +4,7 @@ use crate::package::{BasePackageHandle, PackageInterfaceHandle, RootPackageInter
 use crate::repository::{
     ArrayRepository, ProviderInfo, RepositoryInterface, RepositoryInterfaceWeakHandle, SearchResult,
 };
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 
 #[derive(Debug)]
@@ -18,8 +19,8 @@ impl RootPackageRepository {
         }
     }
 
-    pub fn get_repo_name(&self) -> String {
-        "root package repo".to_string()
+    pub fn get_repo_name(&self) -> BString {
+        bstr::BString::from("root package repo".to_string())
     }
 }
 
@@ -34,7 +35,7 @@ impl RepositoryInterface for RootPackageRepository {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: crate::repository::FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.inner.find_package(name, constraint)
@@ -42,7 +43,7 @@ impl RepositoryInterface for RootPackageRepository {
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<crate::repository::FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.inner.find_packages(name, constraint)
@@ -54,10 +55,10 @@ impl RepositoryInterface for RootPackageRepository {
 
     fn load_packages(
         &mut self,
-        package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<shirabe_semver::constraint::AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<crate::repository::LoadPackagesResult> {
         self.inner.load_packages(
             package_name_map,
@@ -69,21 +70,21 @@ impl RepositoryInterface for RootPackageRepository {
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         self.inner.search(query, mode, r#type)
     }
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> anyhow::Result<String> {
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
         Ok(RootPackageRepository::get_repo_name(self))
     }
 

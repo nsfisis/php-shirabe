@@ -987,6 +987,12 @@ impl IntoExecCommand for &[BString] {
     }
 }
 
+impl<const N: usize> IntoExecCommand for &[BString; N] {
+    fn into_exec_command(self) -> CommandLine {
+        CommandLine::Args(self.to_vec())
+    }
+}
+
 /// Models the `mixed &$output` parameter of `ProcessExecutor::execute` (cf.
 /// `composer/src/Composer/Util/ProcessExecutor.php`). In PHP the behaviour is selected by
 /// `func_num_args()` and `is_callable($output)`; here each behaviour is a distinct implementing type:

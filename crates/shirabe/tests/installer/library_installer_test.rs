@@ -15,7 +15,7 @@ use shirabe::io::null_io::NullIO;
 use shirabe::package::PackageInterfaceHandle;
 use shirabe::repository::{InstalledArrayRepository, InstalledRepositoryInterfaceHandle};
 use shirabe::util::filesystem::Filesystem;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, path_from_bytes};
 use std::fs;
 use tempfile::TempDir;
 
@@ -210,7 +210,9 @@ fn test_is_installed() {
     assert!(!library.is_installed(&repository, package.clone()).unwrap());
 
     // package being in repo and vendor/pkg/foo dir present means it is seen as installed
-    let pkg_dir = setup.vendor_dir.join(package.get_pretty_name());
+    let pkg_dir = setup
+        .vendor_dir
+        .join(path_from_bytes(&package.get_pretty_name()));
     fs::create_dir_all(&pkg_dir).unwrap();
     assert!(library.is_installed(&repository, package.clone()).unwrap());
 
@@ -270,8 +272,8 @@ fn test_update() {
     let initial = get_package("vendor/package1", "1.0.0");
     let target = get_package("vendor/package1", "2.0.0");
 
-    initial.__set_target_dir(Some("oldtarget".to_string()));
-    target.__set_target_dir(Some("newtarget".to_string()));
+    initial.__set_target_dir(Some(bstr::BString::from("oldtarget".to_string())));
+    target.__set_target_dir(Some(bstr::BString::from("newtarget".to_string())));
 
     // PHP mocks Filesystem::rename; here a real Filesystem renames the actual oldtarget
     // dir, so it must exist first. The install path embeds the pretty-name twice because
@@ -391,7 +393,7 @@ fn test_get_install_path_without_target_dir() {
     assert_eq!(
         setup
             .vendor_dir
-            .join(package.get_pretty_name())
+            .join(path_from_bytes(&package.get_pretty_name()))
             .to_str()
             .unwrap(),
         library.get_install_path(package).unwrap()
@@ -405,12 +407,12 @@ fn test_get_install_path_with_target_dir() {
     let mut setup = set_up();
     let library = LibraryInstaller::new(setup.io.clone(), setup.composer.clone(), None, None, None);
     let package = get_package("Foo/Bar", "1.0.0");
-    package.__set_target_dir(Some("Some/Namespace".to_string()));
+    package.__set_target_dir(Some(bstr::BString::from("Some/Namespace".to_string())));
 
     assert_eq!(
         setup
             .vendor_dir
-            .join(package.get_pretty_name())
+            .join(path_from_bytes(&package.get_pretty_name()))
             .join("Some/Namespace")
             .to_str()
             .unwrap(),

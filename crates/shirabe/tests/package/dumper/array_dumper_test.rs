@@ -13,12 +13,20 @@ fn set_up() -> ArrayDumper {
 
 fn complete_package() -> CompletePackageHandle {
     let norm = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
-    CompletePackageHandle::new("dummy/pkg".to_string(), norm, "1.0.0".to_string())
+    CompletePackageHandle::new(
+        bstr::BString::from("dummy/pkg".to_string()),
+        bstr::BString::from(norm),
+        bstr::BString::from("1.0.0".to_string()),
+    )
 }
 
 fn root_package() -> RootPackageHandle {
     let norm = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
-    RootPackageHandle::new("dummy/pkg".to_string(), norm, "1.0.0".to_string())
+    RootPackageHandle::new(
+        bstr::BString::from("dummy/pkg".to_string()),
+        bstr::BString::from(norm),
+        bstr::BString::from("1.0.0".to_string()),
+    )
 }
 
 #[test]
@@ -42,7 +50,7 @@ fn test_required_information() {
 fn test_root_package() {
     let dumper = set_up();
     let package = root_package();
-    package.set_minimum_stability("dev".to_string());
+    package.set_minimum_stability(bstr::BString::from("dev".to_string()));
 
     let config = dumper.dump(package.into());
 

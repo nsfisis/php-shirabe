@@ -7,6 +7,7 @@ use crate::package::{
     AliasPackage, BasePackage, CompleteAliasPackage, CompletePackage, CompletePackageInterface,
     Package, PackageInterface, RootAliasPackage, RootPackage, RootPackageInterface,
 };
+use bstr::BString;
 
 /// Any package type.
 #[derive(Debug, Clone)]
@@ -231,13 +232,13 @@ impl AnyPackage {
 macro_rules! delegate_package_interface_to_inner {
     ($Type:ty, $field:ident) => {
         impl crate::package::PackageInterface for $Type {
-            fn get_name(&self) -> &str {
+            fn get_name(&self) -> &BStr {
                 self.$field.get_name()
             }
-            fn get_pretty_name(&self) -> &str {
+            fn get_pretty_name(&self) -> &BStr {
                 self.$field.get_pretty_name()
             }
-            fn get_names(&self, provides: bool) -> Vec<String> {
+            fn get_names(&self, provides: bool) -> Vec<BString> {
                 self.$field.get_names(provides)
             }
             fn set_id(&mut self, id: i64) {
@@ -249,31 +250,31 @@ macro_rules! delegate_package_interface_to_inner {
             fn is_dev(&self) -> bool {
                 self.$field.is_dev()
             }
-            fn get_type(&self) -> String {
+            fn get_type(&self) -> BString {
                 self.$field.get_type()
             }
-            fn get_target_dir(&self) -> Option<String> {
+            fn get_target_dir(&self) -> Option<BString> {
                 self.$field.get_target_dir()
             }
             fn get_extra(&self) -> indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
                 self.$field.get_extra()
             }
-            fn set_installation_source(&mut self, r#type: Option<String>) {
+            fn set_installation_source(&mut self, r#type: Option<BString>) {
                 self.$field.set_installation_source(r#type);
             }
-            fn get_installation_source(&self) -> Option<String> {
+            fn get_installation_source(&self) -> Option<BString> {
                 self.$field.get_installation_source()
             }
-            fn get_source_type(&self) -> Option<String> {
+            fn get_source_type(&self) -> Option<BString> {
                 self.$field.get_source_type()
             }
-            fn get_source_url(&self) -> Option<String> {
+            fn get_source_url(&self) -> Option<BString> {
                 self.$field.get_source_url()
             }
-            fn get_source_urls(&self) -> Vec<String> {
+            fn get_source_urls(&self) -> Vec<BString> {
                 self.$field.get_source_urls()
             }
-            fn get_source_reference(&self) -> Option<String> {
+            fn get_source_reference(&self) -> Option<BString> {
                 self.$field.get_source_reference()
             }
             fn get_source_mirrors(&self) -> Option<Vec<crate::package::Mirror>> {
@@ -282,19 +283,19 @@ macro_rules! delegate_package_interface_to_inner {
             fn set_source_mirrors(&mut self, mirrors: Option<Vec<crate::package::Mirror>>) {
                 self.$field.set_source_mirrors(mirrors);
             }
-            fn get_dist_type(&self) -> Option<String> {
+            fn get_dist_type(&self) -> Option<BString> {
                 self.$field.get_dist_type()
             }
-            fn get_dist_url(&self) -> Option<String> {
+            fn get_dist_url(&self) -> Option<BString> {
                 self.$field.get_dist_url()
             }
-            fn get_dist_urls(&self) -> Vec<String> {
+            fn get_dist_urls(&self) -> Vec<BString> {
                 self.$field.get_dist_urls()
             }
-            fn get_dist_reference(&self) -> Option<String> {
+            fn get_dist_reference(&self) -> Option<BString> {
                 self.$field.get_dist_reference()
             }
-            fn get_dist_sha1_checksum(&self) -> Option<String> {
+            fn get_dist_sha1_checksum(&self) -> Option<BString> {
                 self.$field.get_dist_sha1_checksum()
             }
             fn get_dist_mirrors(&self) -> Option<Vec<crate::package::Mirror>> {
@@ -303,51 +304,51 @@ macro_rules! delegate_package_interface_to_inner {
             fn set_dist_mirrors(&mut self, mirrors: Option<Vec<crate::package::Mirror>>) {
                 self.$field.set_dist_mirrors(mirrors);
             }
-            fn get_version(&self) -> &str {
+            fn get_version(&self) -> &BStr {
                 self.$field.get_version()
             }
-            fn get_pretty_version(&self) -> &str {
+            fn get_pretty_version(&self) -> &BStr {
                 self.$field.get_pretty_version()
             }
             fn get_full_pretty_version(
                 &self,
                 truncate: bool,
                 display_mode: crate::package::DisplayMode,
-            ) -> String {
+            ) -> BString {
                 self.$field.get_full_pretty_version(truncate, display_mode)
             }
             fn get_release_date(&self) -> Option<chrono::DateTime<chrono::Utc>> {
                 self.$field.get_release_date()
             }
-            fn get_stability(&self) -> &str {
+            fn get_stability(&self) -> &BStr {
                 self.$field.get_stability()
             }
             fn get_requires(
                 &self,
-            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
+            ) -> std::rc::Rc<indexmap::IndexMap<BString, crate::package::Link>> {
                 self.$field.get_requires()
             }
             fn get_conflicts(
                 &self,
-            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
+            ) -> std::rc::Rc<indexmap::IndexMap<BString, crate::package::Link>> {
                 self.$field.get_conflicts()
             }
             fn get_provides(
                 &self,
-            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
+            ) -> std::rc::Rc<indexmap::IndexMap<BString, crate::package::Link>> {
                 self.$field.get_provides()
             }
             fn get_replaces(
                 &self,
-            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
+            ) -> std::rc::Rc<indexmap::IndexMap<BString, crate::package::Link>> {
                 self.$field.get_replaces()
             }
             fn get_dev_requires(
                 &self,
-            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
+            ) -> std::rc::Rc<indexmap::IndexMap<BString, crate::package::Link>> {
                 self.$field.get_dev_requires()
             }
-            fn get_suggests(&self) -> indexmap::IndexMap<String, String> {
+            fn get_suggests(&self) -> indexmap::IndexMap<BString, BString> {
                 self.$field.get_suggests()
             }
             fn get_autoload(
@@ -360,7 +361,7 @@ macro_rules! delegate_package_interface_to_inner {
             ) -> indexmap::IndexMap<bstr::BString, shirabe_php_shim::PhpMixed> {
                 self.$field.get_dev_autoload()
             }
-            fn get_include_paths(&self) -> Vec<String> {
+            fn get_include_paths(&self) -> Vec<BString> {
                 self.$field.get_include_paths()
             }
             fn get_php_ext(
@@ -377,16 +378,19 @@ macro_rules! delegate_package_interface_to_inner {
             fn get_repository(&self) -> Option<crate::repository::RepositoryInterfaceHandle> {
                 self.$field.get_repository()
             }
-            fn get_binaries(&self) -> Vec<String> {
+            fn get_binaries(&self) -> Vec<BString> {
                 self.$field.get_binaries()
             }
-            fn get_unique_name(&self) -> String {
+            fn get_unique_name(&self) -> BString {
                 self.$field.get_unique_name()
             }
-            fn get_notification_url(&self) -> Option<String> {
+            fn to_php_string(&self) -> BString {
+                self.$field.to_php_string()
+            }
+            fn get_notification_url(&self) -> Option<BString> {
                 self.$field.get_notification_url()
             }
-            fn get_pretty_string(&self) -> String {
+            fn get_pretty_string(&self) -> BString {
                 self.$field.get_pretty_string()
             }
             fn is_default_branch(&self) -> bool {
@@ -403,22 +407,22 @@ macro_rules! delegate_package_interface_to_inner {
             ) {
                 self.$field.set_transport_options(options);
             }
-            fn set_source_reference(&mut self, reference: Option<String>) {
+            fn set_source_reference(&mut self, reference: Option<BString>) {
                 self.$field.set_source_reference(reference);
             }
-            fn set_source_url(&mut self, url: Option<String>) {
+            fn set_source_url(&mut self, url: Option<BString>) {
                 self.$field.set_source_url(url);
             }
-            fn set_dist_url(&mut self, url: Option<String>) {
+            fn set_dist_url(&mut self, url: Option<BString>) {
                 self.$field.set_dist_url(url);
             }
-            fn set_dist_type(&mut self, r#type: Option<String>) {
+            fn set_dist_type(&mut self, r#type: Option<BString>) {
                 self.$field.set_dist_type(r#type);
             }
-            fn set_dist_reference(&mut self, reference: Option<String>) {
+            fn set_dist_reference(&mut self, reference: Option<BString>) {
                 self.$field.set_dist_reference(reference);
             }
-            fn set_source_dist_references(&mut self, reference: String) {
+            fn set_source_dist_references(&mut self, reference: BString) {
                 self.$field.set_source_dist_references(reference);
             }
         }
@@ -429,23 +433,19 @@ pub(crate) use delegate_package_interface_to_inner;
 macro_rules! impl_package_interface_handle {
     ($Handle:ty) => {
         impl $Handle {
-            pub fn get_name(&self) -> String {
-                self.0
-                    .borrow()
-                    .as_package_interface()
-                    .get_name()
-                    .to_string()
+            pub fn get_name(&self) -> BString {
+                self.0.borrow().as_package_interface().get_name().into()
             }
 
-            pub fn get_pretty_name(&self) -> String {
+            pub fn get_pretty_name(&self) -> BString {
                 self.0
                     .borrow()
                     .as_package_interface()
                     .get_pretty_name()
-                    .to_string()
+                    .into()
             }
 
-            pub fn get_names(&self, provides: bool) -> Vec<String> {
+            pub fn get_names(&self, provides: bool) -> Vec<BString> {
                 self.0.borrow().as_package_interface().get_names(provides)
             }
 
@@ -466,15 +466,11 @@ macro_rules! impl_package_interface_handle {
                 self.0.borrow().as_package_interface().is_dev()
             }
 
-            pub fn get_type(&self) -> String {
-                self.0
-                    .borrow()
-                    .as_package_interface()
-                    .get_type()
-                    .to_string()
+            pub fn get_type(&self) -> BString {
+                self.0.borrow().as_package_interface().get_type()
             }
 
-            pub fn get_target_dir(&self) -> Option<String> {
+            pub fn get_target_dir(&self) -> Option<BString> {
                 self.0.borrow().as_package_interface().get_target_dir()
             }
 
@@ -484,33 +480,33 @@ macro_rules! impl_package_interface_handle {
                 self.0.borrow().as_package_interface().get_extra()
             }
 
-            pub fn set_installation_source(&self, r#type: Option<String>) {
+            pub fn set_installation_source(&self, r#type: Option<BString>) {
                 self.0
                     .borrow_mut()
                     .as_package_interface_mut()
                     .set_installation_source(r#type);
             }
 
-            pub fn get_installation_source(&self) -> Option<String> {
+            pub fn get_installation_source(&self) -> Option<BString> {
                 self.0
                     .borrow()
                     .as_package_interface()
                     .get_installation_source()
             }
 
-            pub fn get_source_type(&self) -> Option<String> {
+            pub fn get_source_type(&self) -> Option<BString> {
                 self.0.borrow().as_package_interface().get_source_type()
             }
 
-            pub fn get_source_url(&self) -> Option<String> {
+            pub fn get_source_url(&self) -> Option<BString> {
                 self.0.borrow().as_package_interface().get_source_url()
             }
 
-            pub fn get_source_urls(&self) -> Vec<String> {
+            pub fn get_source_urls(&self) -> Vec<BString> {
                 self.0.borrow().as_package_interface().get_source_urls()
             }
 
-            pub fn get_source_reference(&self) -> Option<String> {
+            pub fn get_source_reference(&self) -> Option<BString> {
                 self.0
                     .borrow()
                     .as_package_interface()
@@ -528,23 +524,23 @@ macro_rules! impl_package_interface_handle {
                     .set_source_mirrors(mirrors);
             }
 
-            pub fn get_dist_type(&self) -> Option<String> {
+            pub fn get_dist_type(&self) -> Option<BString> {
                 self.0.borrow().as_package_interface().get_dist_type()
             }
 
-            pub fn get_dist_url(&self) -> Option<String> {
+            pub fn get_dist_url(&self) -> Option<BString> {
                 self.0.borrow().as_package_interface().get_dist_url()
             }
 
-            pub fn get_dist_urls(&self) -> Vec<String> {
+            pub fn get_dist_urls(&self) -> Vec<BString> {
                 self.0.borrow().as_package_interface().get_dist_urls()
             }
 
-            pub fn get_dist_reference(&self) -> Option<String> {
+            pub fn get_dist_reference(&self) -> Option<BString> {
                 self.0.borrow().as_package_interface().get_dist_reference()
             }
 
-            pub fn get_dist_sha1_checksum(&self) -> Option<String> {
+            pub fn get_dist_sha1_checksum(&self) -> Option<BString> {
                 self.0
                     .borrow()
                     .as_package_interface()
@@ -562,27 +558,23 @@ macro_rules! impl_package_interface_handle {
                     .set_dist_mirrors(mirrors);
             }
 
-            pub fn get_version(&self) -> String {
-                self.0
-                    .borrow()
-                    .as_package_interface()
-                    .get_version()
-                    .to_string()
+            pub fn get_version(&self) -> BString {
+                self.0.borrow().as_package_interface().get_version().into()
             }
 
-            pub fn get_pretty_version(&self) -> String {
+            pub fn get_pretty_version(&self) -> BString {
                 self.0
                     .borrow()
                     .as_package_interface()
                     .get_pretty_version()
-                    .to_string()
+                    .into()
             }
 
             pub fn get_full_pretty_version(
                 &self,
                 truncate: bool,
                 display_mode: crate::package::DisplayMode,
-            ) -> String {
+            ) -> BString {
                 self.0
                     .borrow()
                     .as_package_interface()
@@ -593,52 +585,52 @@ macro_rules! impl_package_interface_handle {
                 self.0.borrow().as_package_interface().get_release_date()
             }
 
-            pub fn get_stability(&self) -> String {
+            pub fn get_stability(&self) -> BString {
                 self.0
                     .borrow()
                     .as_package_interface()
                     .get_stability()
-                    .to_string()
+                    .into()
             }
 
             pub fn get_requires(
                 &self,
-            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
+            ) -> std::rc::Rc<indexmap::IndexMap<BString, crate::package::Link>> {
                 self.0.borrow().as_package_interface().get_requires()
             }
 
             pub fn get_conflicts(
                 &self,
-            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
+            ) -> std::rc::Rc<indexmap::IndexMap<BString, crate::package::Link>> {
                 self.0.borrow().as_package_interface().get_conflicts()
             }
 
             pub fn get_provides(
                 &self,
-            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
+            ) -> std::rc::Rc<indexmap::IndexMap<BString, crate::package::Link>> {
                 self.0.borrow().as_package_interface().get_provides()
             }
 
             pub fn get_replaces(
                 &self,
-            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
+            ) -> std::rc::Rc<indexmap::IndexMap<BString, crate::package::Link>> {
                 self.0.borrow().as_package_interface().get_replaces()
             }
 
             pub fn get_dev_requires(
                 &self,
-            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
+            ) -> std::rc::Rc<indexmap::IndexMap<BString, crate::package::Link>> {
                 self.0.borrow().as_package_interface().get_dev_requires()
             }
 
-            pub fn get_suggests(&self) -> indexmap::IndexMap<String, String> {
+            pub fn get_suggests(&self) -> indexmap::IndexMap<BString, BString> {
                 self.0.borrow().as_package_interface().get_suggests()
             }
 
             pub fn get_links_for_type(
                 &self,
                 link_type: &str,
-            ) -> std::rc::Rc<indexmap::IndexMap<String, crate::package::Link>> {
+            ) -> std::rc::Rc<indexmap::IndexMap<BString, crate::package::Link>> {
                 self.0
                     .borrow()
                     .as_package_interface()
@@ -657,7 +649,7 @@ macro_rules! impl_package_interface_handle {
                 self.0.borrow().as_package_interface().get_dev_autoload()
             }
 
-            pub fn get_include_paths(&self) -> Vec<String> {
+            pub fn get_include_paths(&self) -> Vec<BString> {
                 self.0.borrow().as_package_interface().get_include_paths()
             }
 
@@ -681,22 +673,26 @@ macro_rules! impl_package_interface_handle {
                 self.0.borrow().as_package_interface().get_repository()
             }
 
-            pub fn get_binaries(&self) -> Vec<String> {
+            pub fn get_binaries(&self) -> Vec<BString> {
                 self.0.borrow().as_package_interface().get_binaries()
             }
 
-            pub fn get_unique_name(&self) -> String {
+            pub fn get_unique_name(&self) -> BString {
                 self.0.borrow().as_package_interface().get_unique_name()
             }
 
-            pub fn get_notification_url(&self) -> Option<String> {
+            pub fn to_php_string(&self) -> BString {
+                self.0.borrow().as_package_interface().to_php_string()
+            }
+
+            pub fn get_notification_url(&self) -> Option<BString> {
                 self.0
                     .borrow()
                     .as_package_interface()
                     .get_notification_url()
             }
 
-            pub fn get_pretty_string(&self) -> String {
+            pub fn get_pretty_string(&self) -> BString {
                 self.0.borrow().as_package_interface().get_pretty_string()
             }
 
@@ -723,42 +719,42 @@ macro_rules! impl_package_interface_handle {
                     .set_transport_options(options);
             }
 
-            pub fn set_source_reference(&self, reference: Option<String>) {
+            pub fn set_source_reference(&self, reference: Option<BString>) {
                 self.0
                     .borrow_mut()
                     .as_package_interface_mut()
                     .set_source_reference(reference);
             }
 
-            pub fn set_source_url(&self, url: Option<String>) {
+            pub fn set_source_url(&self, url: Option<BString>) {
                 self.0
                     .borrow_mut()
                     .as_package_interface_mut()
                     .set_source_url(url);
             }
 
-            pub fn set_dist_url(&self, url: Option<String>) {
+            pub fn set_dist_url(&self, url: Option<BString>) {
                 self.0
                     .borrow_mut()
                     .as_package_interface_mut()
                     .set_dist_url(url);
             }
 
-            pub fn set_dist_type(&self, r#type: Option<String>) {
+            pub fn set_dist_type(&self, r#type: Option<BString>) {
                 self.0
                     .borrow_mut()
                     .as_package_interface_mut()
                     .set_dist_type(r#type);
             }
 
-            pub fn set_dist_reference(&self, reference: Option<String>) {
+            pub fn set_dist_reference(&self, reference: Option<BString>) {
                 self.0
                     .borrow_mut()
                     .as_package_interface_mut()
                     .set_dist_reference(reference);
             }
 
-            pub fn set_source_dist_references(&self, reference: String) {
+            pub fn set_source_dist_references(&self, reference: BString) {
                 self.0
                     .borrow_mut()
                     .as_package_interface_mut()
@@ -771,7 +767,7 @@ macro_rules! impl_package_interface_handle {
 macro_rules! impl_complete_package_interface_handle {
     ($Handle:ty) => {
         impl $Handle {
-            pub fn get_scripts(&self) -> indexmap::IndexMap<String, Vec<String>> {
+            pub fn get_scripts(&self) -> indexmap::IndexMap<BString, Vec<BString>> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -779,7 +775,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .get_scripts()
             }
 
-            pub fn set_scripts(&self, scripts: indexmap::IndexMap<String, Vec<String>>) {
+            pub fn set_scripts(&self, scripts: indexmap::IndexMap<BString, Vec<BString>>) {
                 self.0
                     .borrow_mut()
                     .as_complete_package_interface_mut()
@@ -808,7 +804,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .set_repositories(repositories);
             }
 
-            pub fn get_license(&self) -> Vec<String> {
+            pub fn get_license(&self) -> Vec<BString> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -816,7 +812,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .get_license()
             }
 
-            pub fn set_license(&self, license: Vec<String>) {
+            pub fn set_license(&self, license: Vec<BString>) {
                 self.0
                     .borrow_mut()
                     .as_complete_package_interface_mut()
@@ -824,7 +820,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .set_license(license);
             }
 
-            pub fn get_keywords(&self) -> Vec<String> {
+            pub fn get_keywords(&self) -> Vec<BString> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -832,7 +828,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .get_keywords()
             }
 
-            pub fn set_keywords(&self, keywords: Vec<String>) {
+            pub fn set_keywords(&self, keywords: Vec<BString>) {
                 self.0
                     .borrow_mut()
                     .as_complete_package_interface_mut()
@@ -840,7 +836,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .set_keywords(keywords);
             }
 
-            pub fn get_description(&self) -> Option<String> {
+            pub fn get_description(&self) -> Option<BString> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -848,7 +844,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .get_description()
             }
 
-            pub fn set_description(&self, description: String) {
+            pub fn set_description(&self, description: BString) {
                 self.0
                     .borrow_mut()
                     .as_complete_package_interface_mut()
@@ -856,7 +852,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .set_description(description);
             }
 
-            pub fn get_homepage(&self) -> Option<String> {
+            pub fn get_homepage(&self) -> Option<BString> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -864,7 +860,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .get_homepage()
             }
 
-            pub fn set_homepage(&self, homepage: String) {
+            pub fn set_homepage(&self, homepage: BString) {
                 self.0
                     .borrow_mut()
                     .as_complete_package_interface_mut()
@@ -872,7 +868,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .set_homepage(homepage);
             }
 
-            pub fn get_authors(&self) -> Vec<indexmap::IndexMap<String, String>> {
+            pub fn get_authors(&self) -> Vec<indexmap::IndexMap<BString, BString>> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -880,7 +876,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .get_authors()
             }
 
-            pub fn set_authors(&self, authors: Vec<indexmap::IndexMap<String, String>>) {
+            pub fn set_authors(&self, authors: Vec<indexmap::IndexMap<BString, BString>>) {
                 self.0
                     .borrow_mut()
                     .as_complete_package_interface_mut()
@@ -888,7 +884,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .set_authors(authors);
             }
 
-            pub fn get_support(&self) -> indexmap::IndexMap<String, String> {
+            pub fn get_support(&self) -> indexmap::IndexMap<BString, BString> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -896,7 +892,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .get_support()
             }
 
-            pub fn set_support(&self, support: indexmap::IndexMap<String, String>) {
+            pub fn set_support(&self, support: indexmap::IndexMap<BString, BString>) {
                 self.0
                     .borrow_mut()
                     .as_complete_package_interface_mut()
@@ -933,7 +929,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .is_abandoned()
             }
 
-            pub fn get_replacement_package(&self) -> Option<String> {
+            pub fn get_replacement_package(&self) -> Option<BString> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -949,7 +945,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .set_abandoned(abandoned);
             }
 
-            pub fn get_archive_name(&self) -> Option<String> {
+            pub fn get_archive_name(&self) -> Option<BString> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -957,7 +953,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .get_archive_name()
             }
 
-            pub fn set_archive_name(&self, name: String) {
+            pub fn set_archive_name(&self, name: BString) {
                 self.0
                     .borrow_mut()
                     .as_complete_package_interface_mut()
@@ -965,7 +961,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .set_archive_name(name);
             }
 
-            pub fn get_archive_excludes(&self) -> Vec<String> {
+            pub fn get_archive_excludes(&self) -> Vec<BString> {
                 self.0
                     .borrow()
                     .as_complete_package_interface()
@@ -973,7 +969,7 @@ macro_rules! impl_complete_package_interface_handle {
                     .get_archive_excludes()
             }
 
-            pub fn set_archive_excludes(&self, excludes: Vec<String>) {
+            pub fn set_archive_excludes(&self, excludes: Vec<BString>) {
                 self.0
                     .borrow_mut()
                     .as_complete_package_interface_mut()
@@ -987,7 +983,7 @@ macro_rules! impl_complete_package_interface_handle {
 macro_rules! impl_root_package_interface_handle {
     ($Handle:ty) => {
         impl $Handle {
-            pub fn get_aliases(&self) -> Vec<indexmap::IndexMap<String, String>> {
+            pub fn get_aliases(&self) -> Vec<indexmap::IndexMap<BString, BString>> {
                 self.0
                     .borrow()
                     .as_root_package_interface()
@@ -995,7 +991,7 @@ macro_rules! impl_root_package_interface_handle {
                     .get_aliases()
             }
 
-            pub fn get_minimum_stability(&self) -> String {
+            pub fn get_minimum_stability(&self) -> BString {
                 self.0
                     .borrow()
                     .as_root_package_interface()
@@ -1003,7 +999,7 @@ macro_rules! impl_root_package_interface_handle {
                     .get_minimum_stability()
             }
 
-            pub fn get_stability_flags(&self) -> indexmap::IndexMap<String, i64> {
+            pub fn get_stability_flags(&self) -> indexmap::IndexMap<BString, i64> {
                 self.0
                     .borrow()
                     .as_root_package_interface()
@@ -1011,7 +1007,7 @@ macro_rules! impl_root_package_interface_handle {
                     .get_stability_flags()
             }
 
-            pub fn get_references(&self) -> indexmap::IndexMap<String, String> {
+            pub fn get_references(&self) -> indexmap::IndexMap<BString, BString> {
                 self.0
                     .borrow()
                     .as_root_package_interface()
@@ -1037,7 +1033,10 @@ macro_rules! impl_root_package_interface_handle {
                     .get_config()
             }
 
-            pub fn set_requires(&self, requires: indexmap::IndexMap<String, crate::package::Link>) {
+            pub fn set_requires(
+                &self,
+                requires: indexmap::IndexMap<BString, crate::package::Link>,
+            ) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1047,7 +1046,7 @@ macro_rules! impl_root_package_interface_handle {
 
             pub fn set_dev_requires(
                 &self,
-                dev_requires: indexmap::IndexMap<String, crate::package::Link>,
+                dev_requires: indexmap::IndexMap<BString, crate::package::Link>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1058,7 +1057,7 @@ macro_rules! impl_root_package_interface_handle {
 
             pub fn set_conflicts(
                 &self,
-                conflicts: indexmap::IndexMap<String, crate::package::Link>,
+                conflicts: indexmap::IndexMap<BString, crate::package::Link>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1067,7 +1066,10 @@ macro_rules! impl_root_package_interface_handle {
                     .set_conflicts(conflicts);
             }
 
-            pub fn set_provides(&self, provides: indexmap::IndexMap<String, crate::package::Link>) {
+            pub fn set_provides(
+                &self,
+                provides: indexmap::IndexMap<BString, crate::package::Link>,
+            ) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1075,7 +1077,10 @@ macro_rules! impl_root_package_interface_handle {
                     .set_provides(provides);
             }
 
-            pub fn set_replaces(&self, replaces: indexmap::IndexMap<String, crate::package::Link>) {
+            pub fn set_replaces(
+                &self,
+                replaces: indexmap::IndexMap<BString, crate::package::Link>,
+            ) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1105,7 +1110,7 @@ macro_rules! impl_root_package_interface_handle {
                     .set_dev_autoload(dev_autoload);
             }
 
-            pub fn set_stability_flags(&self, stability_flags: indexmap::IndexMap<String, i64>) {
+            pub fn set_stability_flags(&self, stability_flags: indexmap::IndexMap<BString, i64>) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1113,7 +1118,7 @@ macro_rules! impl_root_package_interface_handle {
                     .set_stability_flags(stability_flags);
             }
 
-            pub fn set_minimum_stability(&self, minimum_stability: String) {
+            pub fn set_minimum_stability(&self, minimum_stability: BString) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1140,7 +1145,7 @@ macro_rules! impl_root_package_interface_handle {
                     .set_config(config);
             }
 
-            pub fn set_references(&self, references: indexmap::IndexMap<String, String>) {
+            pub fn set_references(&self, references: indexmap::IndexMap<BString, BString>) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1148,7 +1153,7 @@ macro_rules! impl_root_package_interface_handle {
                     .set_references(references);
             }
 
-            pub fn set_aliases(&self, aliases: Vec<indexmap::IndexMap<String, String>>) {
+            pub fn set_aliases(&self, aliases: Vec<indexmap::IndexMap<BString, BString>>) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1156,7 +1161,7 @@ macro_rules! impl_root_package_interface_handle {
                     .set_aliases(aliases);
             }
 
-            pub fn set_suggests(&self, suggests: indexmap::IndexMap<String, String>) {
+            pub fn set_suggests(&self, suggests: indexmap::IndexMap<BString, BString>) {
                 self.0
                     .borrow_mut()
                     .as_root_package_interface_mut()
@@ -1184,7 +1189,7 @@ macro_rules! impl_real_package_test_setters {
             /// For testing only: mirrors PHP `Package::setRequires`.
             pub fn __set_requires(
                 &self,
-                requires: indexmap::IndexMap<String, crate::package::Link>,
+                requires: indexmap::IndexMap<BString, crate::package::Link>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1196,7 +1201,7 @@ macro_rules! impl_real_package_test_setters {
             /// For testing only: mirrors PHP `Package::setDevRequires`.
             pub fn __set_dev_requires(
                 &self,
-                dev_requires: indexmap::IndexMap<String, crate::package::Link>,
+                dev_requires: indexmap::IndexMap<BString, crate::package::Link>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1208,7 +1213,7 @@ macro_rules! impl_real_package_test_setters {
             /// For testing only: mirrors PHP `Package::setConflicts`.
             pub fn __set_conflicts(
                 &self,
-                conflicts: indexmap::IndexMap<String, crate::package::Link>,
+                conflicts: indexmap::IndexMap<BString, crate::package::Link>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1220,7 +1225,7 @@ macro_rules! impl_real_package_test_setters {
             /// For testing only: mirrors PHP `Package::setProvides`.
             pub fn __set_provides(
                 &self,
-                provides: indexmap::IndexMap<String, crate::package::Link>,
+                provides: indexmap::IndexMap<BString, crate::package::Link>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1232,7 +1237,7 @@ macro_rules! impl_real_package_test_setters {
             /// For testing only: mirrors PHP `Package::setReplaces`.
             pub fn __set_replaces(
                 &self,
-                replaces: indexmap::IndexMap<String, crate::package::Link>,
+                replaces: indexmap::IndexMap<BString, crate::package::Link>,
             ) {
                 self.0
                     .borrow_mut()
@@ -1254,7 +1259,7 @@ macro_rules! impl_real_package_test_setters {
             }
 
             /// For testing only: mirrors PHP `Package::setSuggests`.
-            pub fn __set_suggests(&self, suggests: indexmap::IndexMap<String, String>) {
+            pub fn __set_suggests(&self, suggests: indexmap::IndexMap<BString, BString>) {
                 self.0
                     .borrow_mut()
                     .as_package_mut()
@@ -1263,7 +1268,7 @@ macro_rules! impl_real_package_test_setters {
             }
 
             /// For testing only: mirrors PHP `Package::setType`.
-            pub fn __set_type(&self, r#type: String) {
+            pub fn __set_type(&self, r#type: BString) {
                 self.0
                     .borrow_mut()
                     .as_package_mut()
@@ -1272,7 +1277,7 @@ macro_rules! impl_real_package_test_setters {
             }
 
             /// For testing only: mirrors PHP `Package::setBinaries`.
-            pub fn __set_binaries(&self, binaries: Vec<String>) {
+            pub fn __set_binaries(&self, binaries: Vec<BString>) {
                 self.0
                     .borrow_mut()
                     .as_package_mut()
@@ -1281,7 +1286,7 @@ macro_rules! impl_real_package_test_setters {
             }
 
             /// For testing only: mirrors PHP `Package::setSourceType`.
-            pub fn __set_source_type(&self, r#type: Option<String>) {
+            pub fn __set_source_type(&self, r#type: Option<BString>) {
                 self.0
                     .borrow_mut()
                     .as_package_mut()
@@ -1290,7 +1295,7 @@ macro_rules! impl_real_package_test_setters {
             }
 
             /// For testing only: mirrors PHP `Package::setDistSha1Checksum`.
-            pub fn __set_dist_sha1_checksum(&self, sha1checksum: Option<String>) {
+            pub fn __set_dist_sha1_checksum(&self, sha1checksum: Option<BString>) {
                 self.0
                     .borrow_mut()
                     .as_package_mut()
@@ -1299,7 +1304,7 @@ macro_rules! impl_real_package_test_setters {
             }
 
             /// For testing only: mirrors PHP `Package::setTargetDir`.
-            pub fn __set_target_dir(&self, target_dir: Option<String>) {
+            pub fn __set_target_dir(&self, target_dir: Option<BString>) {
                 self.0
                     .borrow_mut()
                     .as_package_mut()
@@ -1332,7 +1337,7 @@ macro_rules! impl_real_package_test_setters {
             }
 
             /// For testing only: mirrors PHP `Package::setIncludePaths`.
-            pub fn __set_include_paths(&self, include_paths: Vec<String>) {
+            pub fn __set_include_paths(&self, include_paths: Vec<BString>) {
                 self.0
                     .borrow_mut()
                     .as_package_mut()
@@ -1390,12 +1395,6 @@ macro_rules! impl_handle_common {
         impl std::hash::Hash for $Handle {
             fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
                 self.ptr_id().hash(state);
-            }
-        }
-
-        impl std::fmt::Display for $Handle {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                std::fmt::Display::fmt(self.0.borrow().as_package_interface(), f)
             }
         }
     };
@@ -1609,7 +1608,7 @@ impl PackageHandle {
         )))
     }
 
-    pub fn new(name: String, version: String, pretty_version: String) -> Self {
+    pub fn new(name: BString, version: BString, pretty_version: BString) -> Self {
         Self::from_package(Package::new(name, version, pretty_version))
     }
 }
@@ -1621,7 +1620,7 @@ impl CompletePackageHandle {
         )))
     }
 
-    pub fn new(name: String, version: String, pretty_version: String) -> Self {
+    pub fn new(name: BString, version: BString, pretty_version: BString) -> Self {
         Self::from_complete_package(CompletePackage::new(name, version, pretty_version))
     }
 
@@ -1640,11 +1639,11 @@ impl RootPackageHandle {
         )))
     }
 
-    pub fn new(name: String, version: String, pretty_version: String) -> Self {
+    pub fn new(name: BString, version: BString, pretty_version: BString) -> Self {
         Self::from_root_package(RootPackage::new(name, version, pretty_version))
     }
 
-    pub fn replace_version(&self, version: String, pretty_version: String) {
+    pub fn replace_version(&self, version: BString, pretty_version: BString) {
         match &mut *self.0.borrow_mut() {
             AnyPackage::RootPackage(p) => p.replace_version(version, pretty_version),
             _ => unreachable!("RootPackageHandle invariant"),
@@ -1666,7 +1665,7 @@ impl AliasPackageHandle {
         )))
     }
 
-    pub fn new(alias_of: PackageHandle, version: String, pretty_version: String) -> Self {
+    pub fn new(alias_of: PackageHandle, version: BString, pretty_version: BString) -> Self {
         Self::from_alias_package(AliasPackage::new(alias_of, version, pretty_version))
     }
 
@@ -1715,7 +1714,7 @@ impl CompleteAliasPackageHandle {
         )))
     }
 
-    pub fn new(alias_of: CompletePackageHandle, version: String, pretty_version: String) -> Self {
+    pub fn new(alias_of: CompletePackageHandle, version: BString, pretty_version: BString) -> Self {
         Self::from_complete_alias_package(CompleteAliasPackage::new(
             alias_of,
             version,
@@ -1748,7 +1747,7 @@ impl RootAliasPackageHandle {
         )))
     }
 
-    pub fn new(alias_of: RootPackageHandle, version: String, pretty_version: String) -> Self {
+    pub fn new(alias_of: RootPackageHandle, version: BString, pretty_version: BString) -> Self {
         Self::from_root_alias_package(RootAliasPackage::new(alias_of, version, pretty_version))
     }
 

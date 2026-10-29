@@ -3,38 +3,38 @@
 use crate::package::version::VersionParser;
 use crate::package::{BasePackage, Link, Mirror, PackageHandle, PackageInterface};
 use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
-use shirabe_php_shim::{LogicException, PhpMixed};
+use shirabe_php_shim::{LogicException, PhpMixed, bconcat, strtolower};
 use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug, Clone)]
 pub struct AliasPackage {
     id: i64,
-    name: String,
-    pretty_name: String,
+    name: BString,
+    pretty_name: BString,
     /// Back-reference to the owning repository. `Weak` breaks the repository -> packages cycle.
     repository: Option<RepositoryInterfaceWeakHandle>,
 
-    version: String,
-    pretty_version: String,
+    version: BString,
+    pretty_version: BString,
     dev: bool,
     root_package_alias: bool,
-    stability: String,
+    stability: BString,
     has_self_version_requires: bool,
 
     pub(crate) alias_of: PackageHandle,
-    pub(crate) requires: std::rc::Rc<IndexMap<String, Link>>,
-    pub(crate) dev_requires: std::rc::Rc<IndexMap<String, Link>>,
-    pub(crate) conflicts: std::rc::Rc<IndexMap<String, Link>>,
-    pub(crate) provides: std::rc::Rc<IndexMap<String, Link>>,
-    pub(crate) replaces: std::rc::Rc<IndexMap<String, Link>>,
+    pub(crate) requires: std::rc::Rc<IndexMap<BString, Link>>,
+    pub(crate) dev_requires: std::rc::Rc<IndexMap<BString, Link>>,
+    pub(crate) conflicts: std::rc::Rc<IndexMap<BString, Link>>,
+    pub(crate) provides: std::rc::Rc<IndexMap<BString, Link>>,
+    pub(crate) replaces: std::rc::Rc<IndexMap<BString, Link>>,
 }
 
 impl AliasPackage {
     /// All descendants' constructors should call this parent constructor
-    pub fn new(alias_of: PackageHandle, version: String, pretty_version: String) -> Self {
+    pub fn new(alias_of: PackageHandle, version: BString, pretty_version: BString) -> Self {
         let alias_name = alias_of.get_name();
 
         let stability = VersionParser::parse_stability(&version);
@@ -42,7 +42,7 @@ impl AliasPackage {
 
         let mut this = Self {
             id: -1,
-            name: alias_name.to_lowercase(),
+            name: strtolower(&alias_name),
             pretty_name: alias_name,
             repository: None,
             version,
@@ -60,7 +60,7 @@ impl AliasPackage {
         };
 
         for r#type in Link::types() {
-            let links: std::rc::Rc<IndexMap<String, Link>> = match r#type {
+            let links: std::rc::Rc<IndexMap<BString, Link>> = match r#type {
                 Link::TYPE_REQUIRE => this.alias_of.get_requires(),
                 Link::TYPE_DEV_REQUIRE => this.alias_of.get_dev_requires(),
                 Link::TYPE_PROVIDE => this.alias_of.get_provides(),
@@ -100,9 +100,9 @@ impl AliasPackage {
 
     pub(crate) fn replace_self_version_dependencies(
         &mut self,
-        mut links: IndexMap<String, Link>,
+        mut links: IndexMap<BString, Link>,
         link_type: &str,
-    ) -> IndexMap<String, Link> {
+    ) -> IndexMap<BString, Link> {
         // for self.version requirements, we use the original package's branch name instead, to avoid leaking the magic dev-master-alias to users
         let mut pretty_version = self.pretty_version.clone();
         if pretty_version == VersionParser::DEFAULT_BRANCH_ALIAS {
@@ -119,21 +119,21 @@ impl AliasPackage {
                 if link.get_pretty_constraint() == "self.version" {
                     let constraint = SimpleConstraint::new(
                         "=",
-                        self.version.to_string(),
-                        Some(bstr::BString::from(pretty_version.clone())),
+                        self.version.clone(),
+                        Some(pretty_version.clone()),
                     );
                     let new_link = Link::new(
-                        link.get_source().to_string(),
-                        link.get_target().to_string(),
+                        BString::from(link.get_source()),
+                        BString::from(link.get_target()),
                         constraint.into(),
-                        Some(link_type.to_string()),
+                        Some(link_type.into()),
                         pretty_version.clone(),
                     );
                     new_links.push(new_link);
                 }
             }
             for (index, new_link) in new_links.into_iter().enumerate() {
-                links.insert(index.to_string(), new_link);
+                links.insert(BString::from(index.to_string()), new_link);
             }
         } else {
             for link in links.values_mut() {
@@ -143,14 +143,14 @@ impl AliasPackage {
                     }
                     let constraint = SimpleConstraint::new(
                         "=",
-                        self.version.to_string(),
-                        Some(bstr::BString::from(pretty_version.clone())),
+                        self.version.clone(),
+                        Some(pretty_version.clone()),
                     );
                     *link = Link::new(
-                        link.get_source().to_string(),
-                        link.get_target().to_string(),
+                        BString::from(link.get_source()),
+                        BString::from(link.get_target()),
                         constraint.into(),
-                        Some(link_type.to_string()),
+                        Some(link_type.into()),
                         pretty_version.clone(),
                     );
                 }
@@ -165,41 +165,28 @@ impl AliasPackage {
     }
 }
 
-impl std::fmt::Display for AliasPackage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}-{} ({}alias of {})",
-            self.name,
-            self.version,
-            if self.root_package_alias { "root " } else { "" },
-            self.alias_of.get_version(),
-        )
-    }
-}
-
 impl PackageInterface for AliasPackage {
-    fn get_name(&self) -> &str {
+    fn get_name(&self) -> &BStr {
         // PHP delegates to aliasOf; the local name mirrors aliasOf->getName().
-        &self.name
+        self.name.as_bstr()
     }
 
-    fn get_pretty_name(&self) -> &str {
-        &self.pretty_name
+    fn get_pretty_name(&self) -> &BStr {
+        self.pretty_name.as_bstr()
     }
 
-    fn get_names(&self, provides: bool) -> Vec<String> {
-        let mut names: IndexSet<String> = IndexSet::new();
-        names.insert(self.get_name().to_string());
+    fn get_names(&self, provides: bool) -> Vec<BString> {
+        let mut names: IndexSet<BString> = IndexSet::new();
+        names.insert(BString::from(self.get_name()));
 
         if provides {
             for link in self.provides.values() {
-                names.insert(link.get_target().to_string());
+                names.insert(BString::from(link.get_target()));
             }
         }
 
         for link in self.replaces.values() {
-            names.insert(link.get_target().to_string());
+            names.insert(BString::from(link.get_target()));
         }
 
         names.into_iter().collect()
@@ -217,43 +204,43 @@ impl PackageInterface for AliasPackage {
         self.dev
     }
 
-    fn get_version(&self) -> &str {
-        &self.version
+    fn get_version(&self) -> &BStr {
+        self.version.as_bstr()
     }
 
-    fn get_stability(&self) -> &str {
-        &self.stability
+    fn get_stability(&self) -> &BStr {
+        self.stability.as_bstr()
     }
 
-    fn get_pretty_version(&self) -> &str {
-        &self.pretty_version
+    fn get_pretty_version(&self) -> &BStr {
+        self.pretty_version.as_bstr()
     }
 
-    fn get_requires(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+    fn get_requires(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         std::rc::Rc::clone(&self.requires)
     }
 
-    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         std::rc::Rc::clone(&self.conflicts)
     }
 
-    fn get_provides(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+    fn get_provides(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         std::rc::Rc::clone(&self.provides)
     }
 
-    fn get_replaces(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+    fn get_replaces(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         std::rc::Rc::clone(&self.replaces)
     }
 
-    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         std::rc::Rc::clone(&self.dev_requires)
     }
 
-    fn get_type(&self) -> String {
+    fn get_type(&self) -> BString {
         self.alias_of.get_type()
     }
 
-    fn get_target_dir(&self) -> Option<String> {
+    fn get_target_dir(&self) -> Option<BString> {
         self.alias_of.get_target_dir()
     }
 
@@ -261,31 +248,31 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_extra()
     }
 
-    fn set_installation_source(&mut self, r#type: Option<String>) {
+    fn set_installation_source(&mut self, r#type: Option<BString>) {
         self.alias_of.set_installation_source(r#type);
     }
 
-    fn get_installation_source(&self) -> Option<String> {
+    fn get_installation_source(&self) -> Option<BString> {
         self.alias_of.get_installation_source()
     }
 
-    fn get_source_type(&self) -> Option<String> {
+    fn get_source_type(&self) -> Option<BString> {
         self.alias_of.get_source_type()
     }
 
-    fn get_source_url(&self) -> Option<String> {
+    fn get_source_url(&self) -> Option<BString> {
         self.alias_of.get_source_url()
     }
 
-    fn get_source_urls(&self) -> Vec<String> {
+    fn get_source_urls(&self) -> Vec<BString> {
         self.alias_of.get_source_urls()
     }
 
-    fn get_source_reference(&self) -> Option<String> {
+    fn get_source_reference(&self) -> Option<BString> {
         self.alias_of.get_source_reference()
     }
 
-    fn set_source_reference(&mut self, reference: Option<String>) {
+    fn set_source_reference(&mut self, reference: Option<BString>) {
         self.alias_of.set_source_reference(reference);
     }
 
@@ -297,27 +284,27 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_source_mirrors()
     }
 
-    fn get_dist_type(&self) -> Option<String> {
+    fn get_dist_type(&self) -> Option<BString> {
         self.alias_of.get_dist_type()
     }
 
-    fn get_dist_url(&self) -> Option<String> {
+    fn get_dist_url(&self) -> Option<BString> {
         self.alias_of.get_dist_url()
     }
 
-    fn get_dist_urls(&self) -> Vec<String> {
+    fn get_dist_urls(&self) -> Vec<BString> {
         self.alias_of.get_dist_urls()
     }
 
-    fn get_dist_reference(&self) -> Option<String> {
+    fn get_dist_reference(&self) -> Option<BString> {
         self.alias_of.get_dist_reference()
     }
 
-    fn set_dist_reference(&mut self, reference: Option<String>) {
+    fn set_dist_reference(&mut self, reference: Option<BString>) {
         self.alias_of.set_dist_reference(reference);
     }
 
-    fn get_dist_sha1_checksum(&self) -> Option<String> {
+    fn get_dist_sha1_checksum(&self) -> Option<BString> {
         self.alias_of.get_dist_sha1_checksum()
     }
 
@@ -345,7 +332,7 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_dev_autoload()
     }
 
-    fn get_include_paths(&self) -> Vec<String> {
+    fn get_include_paths(&self) -> Vec<BString> {
         self.alias_of.get_include_paths()
     }
 
@@ -357,15 +344,15 @@ impl PackageInterface for AliasPackage {
         self.alias_of.get_release_date()
     }
 
-    fn get_binaries(&self) -> Vec<String> {
+    fn get_binaries(&self) -> Vec<BString> {
         self.alias_of.get_binaries()
     }
 
-    fn get_suggests(&self) -> IndexMap<String, String> {
+    fn get_suggests(&self) -> IndexMap<BString, BString> {
         self.alias_of.get_suggests()
     }
 
-    fn get_notification_url(&self) -> Option<String> {
+    fn get_notification_url(&self) -> Option<BString> {
         self.alias_of.get_notification_url()
     }
 
@@ -373,19 +360,19 @@ impl PackageInterface for AliasPackage {
         self.alias_of.is_default_branch()
     }
 
-    fn set_source_url(&mut self, url: Option<String>) {
+    fn set_source_url(&mut self, url: Option<BString>) {
         self.alias_of.set_source_url(url);
     }
 
-    fn set_dist_url(&mut self, url: Option<String>) {
+    fn set_dist_url(&mut self, url: Option<BString>) {
         self.alias_of.set_dist_url(url);
     }
 
-    fn set_dist_type(&mut self, r#type: Option<String>) {
+    fn set_dist_type(&mut self, r#type: Option<BString>) {
         self.alias_of.set_dist_type(r#type);
     }
 
-    fn set_source_dist_references(&mut self, reference: String) {
+    fn set_source_dist_references(&mut self, reference: BString) {
         self.alias_of.set_source_dist_references(reference);
     }
 
@@ -393,16 +380,27 @@ impl PackageInterface for AliasPackage {
         &self,
         truncate: bool,
         display_mode: crate::package::DisplayMode,
-    ) -> String {
+    ) -> BString {
         BasePackage::get_full_pretty_version(self, truncate, display_mode)
     }
 
-    fn get_unique_name(&self) -> String {
-        format!("{}-{}", self.get_name(), self.get_version())
+    fn get_unique_name(&self) -> BString {
+        bconcat!(self.get_name(), "-", self.get_version())
     }
 
-    fn get_pretty_string(&self) -> String {
-        format!("{} {}", self.get_pretty_name(), self.get_pretty_version())
+    fn to_php_string(&self) -> BString {
+        bconcat!(
+            self.get_unique_name(),
+            " (",
+            if self.root_package_alias { "root " } else { "" },
+            "alias of ",
+            self.alias_of.get_version(),
+            ")"
+        )
+    }
+
+    fn get_pretty_string(&self) -> BString {
+        bconcat!(self.get_pretty_name(), " ", self.get_pretty_version())
     }
 
     fn set_repository(&mut self, repository: RepositoryInterfaceHandle) -> anyhow::Result<()> {
@@ -435,19 +433,19 @@ impl BasePackage for AliasPackage {
         &mut self.id
     }
 
-    fn name(&self) -> &str {
-        &self.name
+    fn name(&self) -> &BStr {
+        self.name.as_bstr()
     }
 
-    fn name_mut(&mut self) -> &mut String {
+    fn name_mut(&mut self) -> &mut BString {
         &mut self.name
     }
 
-    fn pretty_name(&self) -> &str {
-        &self.pretty_name
+    fn pretty_name(&self) -> &BStr {
+        self.pretty_name.as_bstr()
     }
 
-    fn pretty_name_mut(&mut self) -> &mut String {
+    fn pretty_name_mut(&mut self) -> &mut BString {
         &mut self.pretty_name
     }
 

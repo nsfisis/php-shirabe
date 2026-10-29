@@ -49,11 +49,18 @@ impl Drop for TearDown {
 /// `[getSourceUrl()]`, which holds for every non-ignored case here.
 fn get_package(source_reference: Option<&str>, source_url: Option<&str>) -> PackageInterfaceHandle {
     let norm_version = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
-    let package =
-        CompletePackageHandle::new("dummy/pkg".to_string(), norm_version, "1.0.0".to_string());
-    package.__set_source_type(Some("fossil".to_string()));
-    package.set_source_reference(source_reference.map(|s| s.to_string()));
-    package.set_source_url(source_url.map(|s| s.to_string()));
+    let package = CompletePackageHandle::new(
+        bstr::BString::from("dummy/pkg".to_string()),
+        bstr::BString::from(norm_version),
+        bstr::BString::from("1.0.0".to_string()),
+    );
+    package.__set_source_type(Some(bstr::BString::from("fossil".to_string())));
+    package.set_source_reference(
+        source_reference
+            .map(|s| s.to_string())
+            .map(bstr::BString::from),
+    );
+    package.set_source_url(source_url.map(|s| s.to_string()).map(bstr::BString::from));
     package.into()
 }
 

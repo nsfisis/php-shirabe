@@ -1,6 +1,7 @@
 //! ref: composer/tests/Composer/Test/DependencyResolver/SolverTest.php
 
 use crate::test_case::{get_alias_package, get_package, get_version_constraint};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::dependency_resolver::PolicyInterface;
 use shirabe::dependency_resolver::default_policy::DefaultPolicy;
@@ -16,7 +17,7 @@ use shirabe::repository::array_repository::ArrayRepository;
 use shirabe::repository::handle::{LockArrayRepositoryHandle, RepositoryInterfaceHandle};
 use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_set::RepositorySet;
-use shirabe_php_shim::legacy_lossy;
+use shirabe_php_shim::{bconcat, legacy_lossy};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 
 #[allow(dead_code)]
@@ -57,11 +58,11 @@ fn set_up() -> Fixtures {
 fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &str) -> Link {
     let pretty = legacy_lossy(&constraint.get_pretty_string()).into_owned();
     Link::new(
-        source.to_string(),
-        target.to_string(),
+        bstr::BString::from(source.to_string()),
+        bstr::BString::from(target.to_string()),
         constraint,
-        Some(r#type.to_string()),
-        pretty,
+        Some(bstr::BString::from(r#type.to_string())),
+        bstr::BString::from(pretty),
     )
 }
 
@@ -74,11 +75,11 @@ fn link_pretty(
     pretty: &str,
 ) -> Link {
     Link::new(
-        source.to_string(),
-        target.to_string(),
+        bstr::BString::from(source.to_string()),
+        bstr::BString::from(target.to_string()),
         constraint,
-        Some(r#type.to_string()),
-        pretty.to_string(),
+        Some(bstr::BString::from(r#type.to_string())),
+        bstr::BString::from(pretty.to_string()),
     )
 }
 
@@ -147,7 +148,11 @@ fn check_solver_result_repo_set(
             let to = update.get_target_package();
             result_readable.push((
                 "update".to_string(),
-                format!("{} => {}", from.get_unique_name(), to.get_unique_name()),
+                format!(
+                    "{} => {}",
+                    legacy_lossy(&from.get_unique_name()),
+                    legacy_lossy(&to.get_unique_name())
+                ),
             ));
             result_ids.push(("update".to_string(), vec![from.ptr_id(), to.ptr_id()]));
         } else {
@@ -159,7 +164,10 @@ fn check_solver_result_repo_set(
                 other => panic!("Unexpected operation: {}", other),
             };
             let package = operation.get_target_package();
-            result_readable.push((job.to_string(), package.get_unique_name()));
+            result_readable.push((
+                job.to_string(),
+                legacy_lossy(&package.get_unique_name()).into_owned(),
+            ));
             result_ids.push((job.to_string(), vec![package.ptr_id()]));
         }
     }
@@ -169,13 +177,20 @@ fn check_solver_result_repo_set(
     for job in &expected {
         match job {
             ExpectedJob::Single { job, package } => {
-                expected_readable.push((job.to_string(), package.get_unique_name()));
+                expected_readable.push((
+                    job.to_string(),
+                    legacy_lossy(&package.get_unique_name()).into_owned(),
+                ));
                 expected_ids.push((job.to_string(), vec![package.ptr_id()]));
             }
             ExpectedJob::Update { from, to } => {
                 expected_readable.push((
                     "update".to_string(),
-                    format!("{} => {}", from.get_unique_name(), to.get_unique_name()),
+                    format!(
+                        "{} => {}",
+                        legacy_lossy(&from.get_unique_name()),
+                        legacy_lossy(&to.get_unique_name())
+                    ),
                 ));
                 expected_ids.push(("update".to_string(), vec![from.ptr_id(), to.ptr_id()]));
             }
@@ -247,7 +262,7 @@ fn test_solver_install_single() {
     fixtures.repo.add_package(package_a.clone()).unwrap();
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -286,7 +301,10 @@ fn test_install_non_existing_package_fails() {
 
     let mut request = fixtures.request;
     request
-        .require_name("B", Some(get_version_constraint("==", "1")))
+        .require_name(
+            bstr::BStr::new("B"),
+            Some(get_version_constraint("==", "1")),
+        )
         .unwrap();
 
     let SolveError {
@@ -340,7 +358,7 @@ fn test_solver_install_same_package_from_different_repositories() {
         .unwrap();
 
     let mut request = fixtures.request;
-    request.require_name("foo", None).unwrap();
+    request.require_name(bstr::BStr::new("foo"), None).unwrap();
 
     // The two repos are already added here; the helper adds the (empty) default repos too.
     check_solver_result(
@@ -365,10 +383,8 @@ fn test_solver_install_with_deps() {
     let new_package_b = get_package("B", "1.1");
     fixtures.repo.add_package(new_package_b).unwrap();
 
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -376,10 +392,14 @@ fn test_solver_install_with_deps() {
                 get_version_constraint("<", "1.1"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -413,10 +433,8 @@ fn test_solver_install_honours_not_equal_operator() {
     let new_package_b13 = get_package("B", "1.3");
     fixtures.repo.add_package(new_package_b13).unwrap();
 
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -428,10 +446,14 @@ fn test_solver_install_honours_not_equal_operator() {
                 ]),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -461,10 +483,8 @@ fn test_solver_install_with_deps_in_order() {
     let package_c = get_package("C", "1.0");
     fixtures.repo.add_package(package_c.clone()).unwrap();
 
-    package_b
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([
+    package_b.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([
             (
                 "a".to_string(),
                 link(
@@ -483,11 +503,13 @@ fn test_solver_install_with_deps_in_order() {
                     Link::TYPE_REQUIRE,
                 ),
             ),
-        ]));
-    package_c
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_c.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "a".to_string(),
             link(
                 "C",
@@ -495,12 +517,16 @@ fn test_solver_install_with_deps_in_order() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
-    request.require_name("B", None).unwrap();
-    request.require_name("C", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
+    request.require_name(bstr::BStr::new("B"), None).unwrap();
+    request.require_name(bstr::BStr::new("C"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -536,10 +562,8 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
     let ext_for_php80 = get_package("ourcustom/ext-foobar", "1.0");
     fixtures.repo.add_package(ext_for_php80.clone()).unwrap();
 
-    ext_for_php74
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    ext_for_php74.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "ourcustom/php".to_string(),
             link(
                 "ourcustom/ext-foobar",
@@ -550,11 +574,13 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
                 ]),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    ext_for_php80
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    ext_for_php80.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "ourcustom/php".to_string(),
             link(
                 "ourcustom/ext-foobar",
@@ -565,7 +591,11 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
                 ]),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     // reposComplete()
     let mut repo_set = fixtures.repo_set;
@@ -577,8 +607,12 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
         .unwrap();
 
     let mut request = fixtures.request;
-    request.require_name("ourcustom/PHP", None).unwrap();
-    request.require_name("ourcustom/ext-foobar", None).unwrap();
+    request
+        .require_name(bstr::BStr::new("ourcustom/PHP"), None)
+        .unwrap();
+    request
+        .require_name(bstr::BStr::new("ourcustom/ext-foobar"), None)
+        .unwrap();
 
     check_solver_result_repo_set(
         &mut repo_set,
@@ -597,8 +631,12 @@ fn test_solver_multi_package_name_version_resolution_depends_on_require_order() 
 
     // now we flip the requirements around: we request "ext-foobar" before "php"
     let mut request = Request::new(Some(fixtures.repo_locked));
-    request.require_name("ourcustom/ext-foobar", None).unwrap();
-    request.require_name("ourcustom/PHP", None).unwrap();
+    request
+        .require_name(bstr::BStr::new("ourcustom/ext-foobar"), None)
+        .unwrap();
+    request
+        .require_name(bstr::BStr::new("ourcustom/PHP"), None)
+        .unwrap();
 
     check_solver_result_repo_set(
         &mut repo_set,
@@ -630,10 +668,8 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
     let ext_for_php74 = get_package("ourcustom/ext-foobar", "1.0");
     fixtures.repo.add_package(ext_for_php74.clone()).unwrap();
 
-    ext_for_php80
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    ext_for_php80.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "ourcustom/php".to_string(),
             link(
                 "ourcustom/ext-foobar",
@@ -644,11 +680,13 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
                 ]),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    ext_for_php74
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    ext_for_php74.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "ourcustom/php".to_string(),
             link(
                 "ourcustom/ext-foobar",
@@ -659,7 +697,11 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
                 ]),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     // reposComplete()
     let mut repo_set = fixtures.repo_set;
@@ -671,8 +713,12 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
         .unwrap();
 
     let mut request = fixtures.request;
-    request.require_name("ourcustom/PHP", None).unwrap();
-    request.require_name("ourcustom/ext-foobar", None).unwrap();
+    request
+        .require_name(bstr::BStr::new("ourcustom/PHP"), None)
+        .unwrap();
+    request
+        .require_name(bstr::BStr::new("ourcustom/ext-foobar"), None)
+        .unwrap();
 
     check_solver_result_repo_set(
         &mut repo_set,
@@ -691,8 +737,12 @@ fn test_solver_multi_package_name_version_resolution_is_independent_of_require_o
 
     // unlike in the previous test, the order of requirements no longer matters now
     let mut request = Request::new(Some(fixtures.repo_locked));
-    request.require_name("ourcustom/ext-foobar", None).unwrap();
-    request.require_name("ourcustom/PHP", None).unwrap();
+    request
+        .require_name(bstr::BStr::new("ourcustom/ext-foobar"), None)
+        .unwrap();
+    request
+        .require_name(bstr::BStr::new("ourcustom/PHP"), None)
+        .unwrap();
 
     check_solver_result_repo_set(
         &mut repo_set,
@@ -757,10 +807,8 @@ fn test_solver_update_does_only_update() {
     let new_package_b = get_package("B", "1.1");
     fixtures.repo.add_package(new_package_b.clone()).unwrap();
 
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -768,12 +816,19 @@ fn test_solver_update_does_only_update() {
                 get_version_constraint(">=", "1.0.0.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
     request.fix_package(package_a);
     request
-        .require_name("B", Some(get_version_constraint("=", "1.1.0.0")))
+        .require_name(
+            bstr::BStr::new("B"),
+            Some(get_version_constraint("=", "1.1.0.0")),
+        )
         .unwrap();
 
     check_solver_result(
@@ -797,7 +852,7 @@ fn test_solver_update_single() {
     fixtures.repo.add_package(new_package_a.clone()).unwrap();
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -823,10 +878,8 @@ fn test_solver_update_all() {
     let new_package_b = get_package("B", "1.1");
     fixtures.repo.add_package(new_package_b.clone()).unwrap();
 
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -834,11 +887,13 @@ fn test_solver_update_all() {
                 MatchAllConstraint::new(None).into(),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    new_package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    new_package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -846,10 +901,14 @@ fn test_solver_update_all() {
                 MatchAllConstraint::new(None).into(),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -879,7 +938,7 @@ fn test_solver_update_current() {
     fixtures.repo.add_package(get_package("A", "1.0")).unwrap();
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -903,7 +962,7 @@ fn test_solver_update_only_updates_selected_package() {
     fixtures.repo.add_package(package_b_newer).unwrap();
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
     request.fix_package(package_b);
 
     check_solver_result(
@@ -929,7 +988,10 @@ fn test_solver_update_constrained() {
 
     let mut request = fixtures.request;
     request
-        .require_name("A", Some(get_version_constraint("<", "2.0.0.0")))
+        .require_name(
+            bstr::BStr::new("A"),
+            Some(get_version_constraint("<", "2.0.0.0")),
+        )
         .unwrap();
 
     check_solver_result(
@@ -955,7 +1017,10 @@ fn test_solver_update_fully_constrained() {
 
     let mut request = fixtures.request;
     request
-        .require_name("A", Some(get_version_constraint("<", "2.0.0.0")))
+        .require_name(
+            bstr::BStr::new("A"),
+            Some(get_version_constraint("<", "2.0.0.0")),
+        )
         .unwrap();
 
     check_solver_result(
@@ -983,7 +1048,10 @@ fn test_solver_update_fully_constrained_prunes_installed_packages() {
 
     let mut request = fixtures.request;
     request
-        .require_name("A", Some(get_version_constraint("<", "2.0.0.0")))
+        .require_name(
+            bstr::BStr::new("A"),
+            Some(get_version_constraint("<", "2.0.0.0")),
+        )
         .unwrap();
 
     check_solver_result(
@@ -1024,10 +1092,8 @@ fn test_solver_all_jobs() {
     let package_c = get_package("C", "1.1");
     fixtures.repo.add_package(package_c.clone()).unwrap();
     fixtures.repo.add_package(get_package("D", "1.0")).unwrap();
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1035,11 +1101,15 @@ fn test_solver_all_jobs() {
                 get_version_constraint("<", "1.1"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
-    request.require_name("C", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
+    request.require_name(bstr::BStr::new("C"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -1078,10 +1148,8 @@ fn test_solver_three_alternative_require_and_conflict() {
     fixtures.repo.add_package(new_package_b).unwrap();
     let old_package_b = get_package("B", "0.9");
     fixtures.repo.add_package(old_package_b).unwrap();
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1089,11 +1157,13 @@ fn test_solver_three_alternative_require_and_conflict() {
                 get_version_constraint("<", "1.1"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_conflicts(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_a.as_complete_package().unwrap().__set_conflicts(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1101,10 +1171,14 @@ fn test_solver_three_alternative_require_and_conflict() {
                 get_version_constraint("<", "1.0"),
                 Link::TYPE_CONFLICT,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -1131,10 +1205,8 @@ fn test_solver_obsolete() {
     fixtures.repo_locked.add_package(package_a.clone()).unwrap();
     let package_b = get_package("B", "1.0");
     fixtures.repo.add_package(package_b.clone()).unwrap();
-    package_b
-        .as_complete_package()
-        .unwrap()
-        .__set_replaces(IndexMap::from([(
+    package_b.as_complete_package().unwrap().__set_replaces(
+        IndexMap::from([(
             "a".to_string(),
             link(
                 "B",
@@ -1142,10 +1214,14 @@ fn test_solver_obsolete() {
                 MatchAllConstraint::new(None).into(),
                 Link::TYPE_REPLACE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("B", None).unwrap();
+    request.require_name(bstr::BStr::new("B"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -1174,7 +1250,7 @@ fn test_install_one_of_two_alternatives() {
     fixtures.repo.add_package(package_b).unwrap();
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -1195,10 +1271,8 @@ fn test_install_provider() {
     fixtures.repo.add_package(package_a.clone()).unwrap();
     let package_q = get_package("Q", "1.0");
     fixtures.repo.add_package(package_q.clone()).unwrap();
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1206,11 +1280,13 @@ fn test_install_provider() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_q
-        .as_complete_package()
-        .unwrap()
-        .__set_provides(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_q.as_complete_package().unwrap().__set_provides(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "Q",
@@ -1218,10 +1294,14 @@ fn test_install_provider() {
                 get_version_constraint("=", "1.0"),
                 Link::TYPE_PROVIDE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     // must explicitly pick the provider, so error in this case
     solve_expecting_error(
@@ -1241,10 +1321,8 @@ fn test_skip_replacer_of_existing_package() {
     fixtures.repo.add_package(package_q.clone()).unwrap();
     let package_b = get_package("B", "1.0");
     fixtures.repo.add_package(package_b.clone()).unwrap();
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1252,11 +1330,13 @@ fn test_skip_replacer_of_existing_package() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_q
-        .as_complete_package()
-        .unwrap()
-        .__set_replaces(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_q.as_complete_package().unwrap().__set_replaces(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "Q",
@@ -1264,10 +1344,14 @@ fn test_skip_replacer_of_existing_package() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REPLACE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -1294,10 +1378,8 @@ fn test_no_install_replacer_of_missing_package() {
     fixtures.repo.add_package(package_a.clone()).unwrap();
     let package_q = get_package("Q", "1.0");
     fixtures.repo.add_package(package_q.clone()).unwrap();
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1305,11 +1387,13 @@ fn test_no_install_replacer_of_missing_package() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_q
-        .as_complete_package()
-        .unwrap()
-        .__set_replaces(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_q.as_complete_package().unwrap().__set_replaces(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "Q",
@@ -1317,10 +1401,14 @@ fn test_no_install_replacer_of_missing_package() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REPLACE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     solve_expecting_error(
         fixtures.repo_set,
@@ -1339,10 +1427,8 @@ fn test_skip_replaced_package_if_replacer_is_selected() {
     fixtures.repo.add_package(package_q.clone()).unwrap();
     let package_b = get_package("B", "1.0");
     fixtures.repo.add_package(package_b).unwrap();
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1350,11 +1436,13 @@ fn test_skip_replaced_package_if_replacer_is_selected() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_q
-        .as_complete_package()
-        .unwrap()
-        .__set_replaces(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_q.as_complete_package().unwrap().__set_replaces(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "Q",
@@ -1362,11 +1450,15 @@ fn test_skip_replaced_package_if_replacer_is_selected() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REPLACE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
-    request.require_name("Q", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
+    request.require_name(bstr::BStr::new("Q"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -1391,10 +1483,8 @@ fn test_pick_older_if_newer_conflicts() {
     let fixtures = set_up();
     let package_x = get_package("X", "1.0");
     fixtures.repo.add_package(package_x.clone()).unwrap();
-    package_x
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([
+    package_x.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([
             (
                 "a".to_string(),
                 link(
@@ -1413,7 +1503,11 @@ fn test_pick_older_if_newer_conflicts() {
                     Link::TYPE_REQUIRE,
                 ),
             ),
-        ]));
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let package_a = get_package("A", "2.0.0");
     fixtures.repo.add_package(package_a.clone()).unwrap();
@@ -1422,10 +1516,8 @@ fn test_pick_older_if_newer_conflicts() {
     let new_package_b = get_package("B", "2.1.0");
     fixtures.repo.add_package(new_package_b.clone()).unwrap();
 
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1433,14 +1525,16 @@ fn test_pick_older_if_newer_conflicts() {
                 get_version_constraint(">=", "2.0.0.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     // new package A depends on version of package B that does not exist
     // => new package A is not installable
-    new_package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    new_package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1448,17 +1542,19 @@ fn test_pick_older_if_newer_conflicts() {
                 get_version_constraint(">=", "2.2.0.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     // add a package S replacing both A and B, so that S and B or S and A cannot be simultaneously installed
     // but an alternative option for A and B both exists
     // this creates a more difficult so solve conflict
     let package_s = get_package("S", "2.0.0");
     fixtures.repo.add_package(package_s.clone()).unwrap();
-    package_s
-        .as_complete_package()
-        .unwrap()
-        .__set_replaces(IndexMap::from([
+    package_s.as_complete_package().unwrap().__set_replaces(
+        IndexMap::from([
             (
                 "a".to_string(),
                 link(
@@ -1477,10 +1573,14 @@ fn test_pick_older_if_newer_conflicts() {
                     Link::TYPE_REPLACE,
                 ),
             ),
-        ]));
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("X", None).unwrap();
+    request.require_name(bstr::BStr::new("X"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -1513,10 +1613,8 @@ fn test_install_circular_require() {
     fixtures.repo.add_package(package_b1).unwrap();
     let package_b2 = get_package("B", "1.1");
     fixtures.repo.add_package(package_b2.clone()).unwrap();
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1524,11 +1622,13 @@ fn test_install_circular_require() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_b2
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_b2.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "a".to_string(),
             link(
                 "B",
@@ -1536,10 +1636,14 @@ fn test_install_circular_require() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -1570,10 +1674,8 @@ fn test_install_alternative_with_circular_require() {
     fixtures.repo.add_package(package_c.clone()).unwrap();
     let package_d = get_package("D", "1.0");
     fixtures.repo.add_package(package_d.clone()).unwrap();
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1581,11 +1683,13 @@ fn test_install_alternative_with_circular_require() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_b
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_b.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "virtual".to_string(),
             link(
                 "B",
@@ -1593,11 +1697,13 @@ fn test_install_alternative_with_circular_require() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_c
-        .as_complete_package()
-        .unwrap()
-        .__set_provides(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_c.as_complete_package().unwrap().__set_provides(
+        IndexMap::from([(
             "virtual".to_string(),
             link(
                 "C",
@@ -1605,11 +1711,13 @@ fn test_install_alternative_with_circular_require() {
                 get_version_constraint("==", "1.0"),
                 Link::TYPE_PROVIDE,
             ),
-        )]));
-    package_d
-        .as_complete_package()
-        .unwrap()
-        .__set_provides(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_d.as_complete_package().unwrap().__set_provides(
+        IndexMap::from([(
             "virtual".to_string(),
             link(
                 "D",
@@ -1617,12 +1725,14 @@ fn test_install_alternative_with_circular_require() {
                 get_version_constraint("==", "1.0"),
                 Link::TYPE_PROVIDE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
-    package_c
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_c.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "a".to_string(),
             link(
                 "C",
@@ -1630,11 +1740,13 @@ fn test_install_alternative_with_circular_require() {
                 get_version_constraint("==", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_d
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_d.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "a".to_string(),
             link(
                 "D",
@@ -1642,11 +1754,15 @@ fn test_install_alternative_with_circular_require() {
                 get_version_constraint("==", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
-    request.require_name("C", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
+    request.require_name(bstr::BStr::new("C"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -1682,10 +1798,8 @@ fn test_use_replacer_if_necessary() {
     let package_d2 = get_package("D", "1.1");
     fixtures.repo.add_package(package_d2.clone()).unwrap();
 
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([
             (
                 "b".to_string(),
                 link(
@@ -1704,12 +1818,14 @@ fn test_use_replacer_if_necessary() {
                     Link::TYPE_REQUIRE,
                 ),
             ),
-        ]));
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
-    package_d
-        .as_complete_package()
-        .unwrap()
-        .__set_replaces(IndexMap::from([
+    package_d.as_complete_package().unwrap().__set_replaces(
+        IndexMap::from([
             (
                 "b".to_string(),
                 link(
@@ -1728,12 +1844,14 @@ fn test_use_replacer_if_necessary() {
                     Link::TYPE_REPLACE,
                 ),
             ),
-        ]));
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
-    package_d2
-        .as_complete_package()
-        .unwrap()
-        .__set_replaces(IndexMap::from([
+    package_d2.as_complete_package().unwrap().__set_replaces(
+        IndexMap::from([
             (
                 "b".to_string(),
                 link(
@@ -1752,11 +1870,15 @@ fn test_use_replacer_if_necessary() {
                     Link::TYPE_REPLACE,
                 ),
             ),
-        ]));
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
-    request.require_name("D", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
+    request.require_name(bstr::BStr::new("D"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -1794,10 +1916,8 @@ fn test_issue265() {
     let package_d = get_package("D", "2.0.9");
     fixtures.repo.add_package(package_d.clone()).unwrap();
 
-    package_c
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([
+    package_c.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([
             (
                 "a".to_string(),
                 link(
@@ -1816,12 +1936,14 @@ fn test_issue265() {
                     Link::TYPE_REQUIRE,
                 ),
             ),
-        ]));
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
-    package_d
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([
+    package_d.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([
             (
                 "a".to_string(),
                 link(
@@ -1840,12 +1962,14 @@ fn test_issue265() {
                     Link::TYPE_REQUIRE,
                 ),
             ),
-        ]));
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
-    package_b1
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_b1.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "a".to_string(),
             link(
                 "B",
@@ -1853,11 +1977,13 @@ fn test_issue265() {
                 get_version_constraint("==", "2.1.0.0-dev"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_b2
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_b2.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "a".to_string(),
             link(
                 "B",
@@ -1865,12 +1991,14 @@ fn test_issue265() {
                 get_version_constraint("==", "2.1.0.0-dev"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
-    package_b2
-        .as_complete_package()
-        .unwrap()
-        .__set_replaces(IndexMap::from([(
+    package_b2.as_complete_package().unwrap().__set_replaces(
+        IndexMap::from([(
             "d".to_string(),
             link(
                 "B",
@@ -1878,11 +2006,18 @@ fn test_issue265() {
                 get_version_constraint("==", "2.0.9.0"),
                 Link::TYPE_REPLACE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
     request
-        .require_name("C", Some(get_version_constraint("==", "2.0.0.0-dev")))
+        .require_name(
+            bstr::BStr::new("C"),
+            Some(get_version_constraint("==", "2.0.0.0-dev")),
+        )
         .unwrap();
 
     solve_expecting_error(
@@ -1900,10 +2035,8 @@ fn test_conflict_result_empty() {
     fixtures.repo.add_package(package_a.clone()).unwrap();
     let package_b = get_package("B", "1.0");
     fixtures.repo.add_package(package_b).unwrap();
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_conflicts(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_conflicts(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1911,18 +2044,22 @@ fn test_conflict_result_empty() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_CONFLICT,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
     request
         .require_name(
-            "A",
+            bstr::BStr::new("A"),
             Some(MatchAllConstraint::new(Some(bstr::BString::from("*".to_string()))).into()),
         )
         .unwrap();
     request
         .require_name(
-            "B",
+            bstr::BStr::new("B"),
             Some(MatchAllConstraint::new(Some(bstr::BString::from("*".to_string()))).into()),
         )
         .unwrap();
@@ -1958,10 +2095,8 @@ fn test_unsatisfiable_requires() {
     let package_b = get_package("B", "1.0");
     fixtures.repo.add_package(package_b).unwrap();
 
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -1969,10 +2104,14 @@ fn test_unsatisfiable_requires() {
                 get_version_constraint(">=", "2.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     let SolveError {
         exception,
@@ -2010,10 +2149,8 @@ fn test_require_mismatch_exception() {
     let package_d = get_package("D", "1.0");
     fixtures.repo.add_package(package_d.clone()).unwrap();
 
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "A",
@@ -2021,11 +2158,13 @@ fn test_require_mismatch_exception() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_b
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_b.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "c".to_string(),
             link(
                 "B",
@@ -2033,11 +2172,13 @@ fn test_require_mismatch_exception() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_c
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_c.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "d".to_string(),
             link(
                 "C",
@@ -2045,11 +2186,13 @@ fn test_require_mismatch_exception() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_d
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_d.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link(
                 "D",
@@ -2057,12 +2200,16 @@ fn test_require_mismatch_exception() {
                 get_version_constraint("<", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let mut request = fixtures.request;
     request
         .require_name(
-            "A",
+            bstr::BStr::new("A"),
             Some(MatchAllConstraint::new(Some(bstr::BString::from("*".to_string()))).into()),
         )
         .unwrap();
@@ -2110,32 +2257,46 @@ fn test_learn_literals_with_sorted_rule_literals() {
     package_twig_bridge
         .as_complete_package()
         .unwrap()
-        .__set_requires(IndexMap::from([(
-            "twig/twig".to_string(),
-            link(
-                "symfony/twig-bridge",
-                "twig/twig",
-                get_version_constraint("<", "2.0"),
-                Link::TYPE_REQUIRE,
-            ),
-        )]));
+        .__set_requires(
+            IndexMap::from([(
+                "twig/twig".to_string(),
+                link(
+                    "symfony/twig-bridge",
+                    "twig/twig",
+                    get_version_constraint("<", "2.0"),
+                    Link::TYPE_REQUIRE,
+                ),
+            )])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        );
 
     package_symfony
         .as_complete_package()
         .unwrap()
-        .__set_replaces(IndexMap::from([(
-            "symfony/twig-bridge".to_string(),
-            link(
-                "symfony/symfony",
-                "symfony/twig-bridge",
-                get_version_constraint("==", "2.0"),
-                Link::TYPE_REPLACE,
-            ),
-        )]));
+        .__set_replaces(
+            IndexMap::from([(
+                "symfony/twig-bridge".to_string(),
+                link(
+                    "symfony/symfony",
+                    "symfony/twig-bridge",
+                    get_version_constraint("==", "2.0"),
+                    Link::TYPE_REPLACE,
+                ),
+            )])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        );
 
     let mut request = fixtures.request;
-    request.require_name("symfony/twig-bridge", None).unwrap();
-    request.require_name("twig/twig", None).unwrap();
+    request
+        .require_name(bstr::BStr::new("symfony/twig-bridge"), None)
+        .unwrap();
+    request
+        .require_name(bstr::BStr::new("twig/twig"), None)
+        .unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -2165,10 +2326,8 @@ fn test_install_recursive_alias_dependencies() {
     let package_a2 = get_package("A", "2.0");
     fixtures.repo.add_package(package_a2.clone()).unwrap();
 
-    package_a2
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_a2.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "b".to_string(),
             link_pretty(
                 "A",
@@ -2177,11 +2336,13 @@ fn test_install_recursive_alias_dependencies() {
                 Link::TYPE_REQUIRE,
                 "== 2.0",
             ),
-        )]));
-    package_b
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_b.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "a".to_string(),
             link(
                 "B",
@@ -2189,14 +2350,21 @@ fn test_install_recursive_alias_dependencies() {
                 get_version_constraint(">=", "2.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let package_a2_alias = get_alias_package(&package_a2, "1.1");
     fixtures.repo.add_package(package_a2_alias.clone()).unwrap();
 
     let mut request = fixtures.request;
     request
-        .require_name("A", Some(get_version_constraint("==", "1.1.0.0")))
+        .require_name(
+            bstr::BStr::new("A"),
+            Some(get_version_constraint("==", "1.1.0.0")),
+        )
         .unwrap();
 
     check_solver_result(
@@ -2229,10 +2397,8 @@ fn test_install_dev_alias() {
     let package_b = get_package("B", "1.0");
     fixtures.repo.add_package(package_b.clone()).unwrap();
 
-    package_b
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_b.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "a".to_string(),
             link(
                 "B",
@@ -2240,16 +2406,23 @@ fn test_install_dev_alias() {
                 get_version_constraint("<", "2.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let package_a_alias = get_alias_package(&package_a, "1.1");
     fixtures.repo.add_package(package_a_alias.clone()).unwrap();
 
     let mut request = fixtures.request;
     request
-        .require_name("A", Some(get_version_constraint("==", "2.0")))
+        .require_name(
+            bstr::BStr::new("A"),
+            Some(get_version_constraint("==", "2.0")),
+        )
         .unwrap();
-    request.require_name("B", None).unwrap();
+    request.require_name(bstr::BStr::new("B"), None).unwrap();
 
     check_solver_result(
         fixtures.repo_set,
@@ -2303,13 +2476,22 @@ fn test_install_root_aliases_if_alias_of_is_installed() {
 
     let mut request = fixtures.request;
     request
-        .require_name("A", Some(get_version_constraint("==", "1.1")))
+        .require_name(
+            bstr::BStr::new("A"),
+            Some(get_version_constraint("==", "1.1")),
+        )
         .unwrap();
     request
-        .require_name("B", Some(get_version_constraint("==", "1.0")))
+        .require_name(
+            bstr::BStr::new("B"),
+            Some(get_version_constraint("==", "1.0")),
+        )
         .unwrap();
     request
-        .require_name("C", Some(get_version_constraint("==", "1.0")))
+        .require_name(
+            bstr::BStr::new("C"),
+            Some(get_version_constraint("==", "1.0")),
+        )
         .unwrap();
 
     check_solver_result(
@@ -2372,10 +2554,8 @@ fn test_learn_positive_literal() {
     let package_g3 = get_package("G", "3.0");
     fixtures.repo.add_package(package_g3).unwrap();
 
-    package_a
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([
+    package_a.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([
             (
                 "b".to_string(),
                 link(
@@ -2403,12 +2583,14 @@ fn test_learn_positive_literal() {
                     Link::TYPE_REQUIRE,
                 ),
             ),
-        ]));
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
-    package_b
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_b.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "e".to_string(),
             link(
                 "B",
@@ -2416,12 +2598,14 @@ fn test_learn_positive_literal() {
                 get_version_constraint("==", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
-    package_c1
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_c1.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "f".to_string(),
             link(
                 "C",
@@ -2429,11 +2613,13 @@ fn test_learn_positive_literal() {
                 get_version_constraint("==", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
-    package_c2
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_c2.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([
             (
                 "f".to_string(),
                 link(
@@ -2452,12 +2638,14 @@ fn test_learn_positive_literal() {
                     Link::TYPE_REQUIRE,
                 ),
             ),
-        ]));
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
-    package_d
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_d.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "f".to_string(),
             link(
                 "D",
@@ -2465,12 +2653,14 @@ fn test_learn_positive_literal() {
                 get_version_constraint(">=", "1.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
-    package_e
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    package_e.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "g".to_string(),
             link(
                 "E",
@@ -2478,7 +2668,11 @@ fn test_learn_positive_literal() {
                 get_version_constraint("<=", "2.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     // reposComplete() + createSolver() inline so the testFlagLearnedPositiveLiteral flag can be
     // asserted on the same solver instance used to solve.
@@ -2491,7 +2685,7 @@ fn test_learn_positive_literal() {
         .unwrap();
 
     let mut request = fixtures.request;
-    request.require_name("A", None).unwrap();
+    request.require_name(bstr::BStr::new("A"), None).unwrap();
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
@@ -2520,14 +2714,14 @@ fn test_learn_positive_literal() {
         ("install".to_string(), package_b.get_unique_name()),
         ("install".to_string(), package_a.get_unique_name()),
     ];
-    let mut result: Vec<(String, String)> = Vec::new();
+    let mut result: Vec<(String, BString)> = Vec::new();
     for operation in transaction.get_operations() {
         if let AnyOperation::Update(update) = &**operation {
             result.push((
                 "update".to_string(),
-                format!(
-                    "{} => {}",
+                bconcat!(
                     update.get_initial_package().get_unique_name(),
+                    " => ",
                     update.get_target_package().get_unique_name()
                 ),
             ));

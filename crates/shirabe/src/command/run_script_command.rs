@@ -8,7 +8,7 @@ use crate::script::{Event as ScriptEvent, ScriptEvents};
 use crate::util::{Platform, ProcessExecutor};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class, legacy_lossy,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::exception::{CommandNotFoundException, NamespaceNotFoundException};
@@ -95,7 +95,7 @@ impl RunScriptCommand {
         for (name, _script) in scripts {
             let mut description = String::new();
             if let Some(application) = self.get_application() {
-                match application.borrow_mut().find(&name) {
+                match application.borrow_mut().find(&legacy_lossy(&name)) {
                     Ok(cmd) => description = cmd.borrow().get_description(),
                     Err(e)
                         if e.is_instanceof::<CommandNotFoundException>()
@@ -103,7 +103,7 @@ impl RunScriptCommand {
                     Err(e) => return Err(e),
                 }
             }
-            result.push((name, description));
+            result.push((legacy_lossy(&name).into_owned(), description));
         }
 
         Ok(result)

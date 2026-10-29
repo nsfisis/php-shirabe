@@ -4,18 +4,18 @@ use crate::package::version::VersionParser;
 use crate::package::{BasePackage, DisplayMode, Link, PackageInterface};
 use crate::repository::{RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle};
 use crate::util::ComposerMirror;
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, Utc};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, LogicException, PhpMixed, PregMatches, legacy_lossy, ltrim2, php_regex,
-    preg_is_match, preg_replace, preg_replace_callback, strpos, trigger_error,
+    E_USER_DEPRECATED, LogicException, PhpMixed, PregMatches, bconcat, ltrim2, php_regex,
+    preg_is_match, preg_replace, preg_replace_callback, strpos, strtolower, trigger_error,
 };
 
 /// Mirror entry, e.g. `['url' => 'https://...', 'preferred' => true]`.
 #[derive(Debug, Clone)]
 pub struct Mirror {
-    pub url: String,
+    pub url: BString,
     pub preferred: bool,
 }
 
@@ -23,43 +23,43 @@ pub struct Mirror {
 #[derive(Debug, Clone)]
 pub struct Package {
     id: i64,
-    name: String,
-    pretty_name: String,
+    name: BString,
+    pretty_name: BString,
     /// Back-reference to the owning repository. `Weak` breaks the repository -> packages cycle.
     repository: Option<RepositoryInterfaceWeakHandle>,
 
-    r#type: Option<String>,
-    target_dir: Option<String>,
+    r#type: Option<BString>,
+    target_dir: Option<BString>,
     /// `'source'` | `'dist'` | `null`
-    installation_source: Option<String>,
-    source_type: Option<String>,
-    source_url: Option<String>,
-    source_reference: Option<String>,
+    installation_source: Option<BString>,
+    source_type: Option<BString>,
+    source_url: Option<BString>,
+    source_reference: Option<BString>,
     source_mirrors: Option<Vec<Mirror>>,
-    dist_type: Option<String>,
-    dist_url: Option<String>,
-    dist_reference: Option<String>,
-    dist_sha1_checksum: Option<String>,
+    dist_type: Option<BString>,
+    dist_url: Option<BString>,
+    dist_reference: Option<BString>,
+    dist_sha1_checksum: Option<BString>,
     dist_mirrors: Option<Vec<Mirror>>,
-    version: String,
-    pretty_version: String,
+    version: BString,
+    pretty_version: BString,
     release_date: Option<chrono::DateTime<chrono::Utc>>,
     extra: IndexMap<BString, PhpMixed>,
-    binaries: Vec<String>,
+    binaries: Vec<BString>,
     dev: bool,
     /// `'stable'` | `'RC'` | `'beta'` | `'alpha'` | `'dev'`
-    stability: String,
-    notification_url: Option<String>,
+    stability: BString,
+    notification_url: Option<BString>,
 
-    requires: std::rc::Rc<IndexMap<String, Link>>,
-    conflicts: std::rc::Rc<IndexMap<String, Link>>,
-    provides: std::rc::Rc<IndexMap<String, Link>>,
-    replaces: std::rc::Rc<IndexMap<String, Link>>,
-    dev_requires: std::rc::Rc<IndexMap<String, Link>>,
-    suggests: IndexMap<String, String>,
+    requires: std::rc::Rc<IndexMap<BString, Link>>,
+    conflicts: std::rc::Rc<IndexMap<BString, Link>>,
+    provides: std::rc::Rc<IndexMap<BString, Link>>,
+    replaces: std::rc::Rc<IndexMap<BString, Link>>,
+    dev_requires: std::rc::Rc<IndexMap<BString, Link>>,
+    suggests: IndexMap<BString, BString>,
     autoload: IndexMap<BString, PhpMixed>,
     dev_autoload: IndexMap<BString, PhpMixed>,
-    include_paths: Vec<String>,
+    include_paths: Vec<BString>,
     is_default_branch: bool,
     transport_options: IndexMap<BString, PhpMixed>,
     php_ext: Option<IndexMap<BString, PhpMixed>>,
@@ -67,12 +67,12 @@ pub struct Package {
 
 impl Package {
     /// Creates a new in memory package.
-    pub fn new(name: String, version: String, pretty_version: String) -> Self {
+    pub fn new(name: BString, version: BString, pretty_version: BString) -> Self {
         let stability = VersionParser::parse_stability(&version);
         let dev = stability == "dev";
         Self {
             id: -1,
-            name: name.to_lowercase(),
+            name: strtolower(&name),
             pretty_name: name,
             repository: None,
             r#type: None,
@@ -114,26 +114,26 @@ impl Package {
         self.dev
     }
 
-    pub fn set_type(&mut self, r#type: String) {
+    pub fn set_type(&mut self, r#type: BString) {
         self.r#type = Some(r#type);
     }
 
-    pub fn get_type(&self) -> String {
+    pub fn get_type(&self) -> BString {
         self.r#type
             .clone()
             .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "library".to_string())
+            .unwrap_or_else(|| "library".into())
     }
 
-    pub fn get_stability(&self) -> &str {
-        &self.stability
+    pub fn get_stability(&self) -> &BStr {
+        self.stability.as_bstr()
     }
 
-    pub fn set_target_dir(&mut self, target_dir: Option<String>) {
+    pub fn set_target_dir(&mut self, target_dir: Option<BString>) {
         self.target_dir = target_dir;
     }
 
-    pub fn get_target_dir(&self) -> Option<String> {
+    pub fn get_target_dir(&self) -> Option<BString> {
         let target_dir = self.target_dir.as_ref()?;
 
         let replaced = preg_replace(
@@ -141,7 +141,7 @@ impl Package {
             "/",
             target_dir,
         );
-        Some(legacy_lossy(&ltrim2(&replaced, "/")).into_owned())
+        Some(ltrim2(&replaced, "/"))
     }
 
     pub fn set_extra(&mut self, extra: IndexMap<BString, PhpMixed>) {
@@ -152,43 +152,43 @@ impl Package {
         &self.extra
     }
 
-    pub fn set_binaries(&mut self, binaries: Vec<String>) {
+    pub fn set_binaries(&mut self, binaries: Vec<BString>) {
         self.binaries = binaries;
     }
 
-    pub fn get_binaries(&self) -> &Vec<String> {
+    pub fn get_binaries(&self) -> &Vec<BString> {
         &self.binaries
     }
 
-    pub fn set_installation_source(&mut self, r#type: Option<String>) {
+    pub fn set_installation_source(&mut self, r#type: Option<BString>) {
         self.installation_source = r#type;
     }
 
-    pub fn get_installation_source(&self) -> Option<String> {
+    pub fn get_installation_source(&self) -> Option<BString> {
         self.installation_source.clone()
     }
 
-    pub fn set_source_type(&mut self, r#type: Option<String>) {
+    pub fn set_source_type(&mut self, r#type: Option<BString>) {
         self.source_type = r#type;
     }
 
-    pub fn get_source_type(&self) -> Option<String> {
+    pub fn get_source_type(&self) -> Option<BString> {
         self.source_type.clone()
     }
 
-    pub fn set_source_url(&mut self, url: Option<String>) {
+    pub fn set_source_url(&mut self, url: Option<BString>) {
         self.source_url = url;
     }
 
-    pub fn get_source_url(&self) -> Option<String> {
+    pub fn get_source_url(&self) -> Option<BString> {
         self.source_url.clone()
     }
 
-    pub fn set_source_reference(&mut self, reference: Option<String>) {
+    pub fn set_source_reference(&mut self, reference: Option<BString>) {
         self.source_reference = reference;
     }
 
-    pub fn get_source_reference(&self) -> Option<String> {
+    pub fn get_source_reference(&self) -> Option<BString> {
         self.source_reference.clone()
     }
 
@@ -200,51 +200,45 @@ impl Package {
         self.source_mirrors.as_ref()
     }
 
-    pub fn get_source_urls(&self) -> Vec<String> {
+    pub fn get_source_urls(&self) -> Vec<BString> {
         self.get_urls(
-            self.source_url.as_deref(),
+            self.source_url.as_ref().map(|s| s.as_bstr()),
             self.source_mirrors.as_ref(),
-            self.source_reference.as_deref(),
-            self.source_type.as_deref(),
+            self.source_reference.as_ref().map(|s| s.as_bstr()),
+            self.source_type.as_ref().map(|s| s.as_bstr()),
             "source",
         )
     }
 
-    pub fn set_dist_type(&mut self, r#type: Option<String>) {
-        self.dist_type = match r#type.as_deref() {
-            Some("") => None,
-            _ => r#type,
-        };
+    pub fn set_dist_type(&mut self, r#type: Option<BString>) {
+        self.dist_type = r#type.filter(|t| !t.is_empty());
     }
 
-    pub fn get_dist_type(&self) -> Option<String> {
+    pub fn get_dist_type(&self) -> Option<BString> {
         self.dist_type.clone()
     }
 
-    pub fn set_dist_url(&mut self, url: Option<String>) {
-        self.dist_url = match url.as_deref() {
-            Some("") => None,
-            _ => url,
-        };
+    pub fn set_dist_url(&mut self, url: Option<BString>) {
+        self.dist_url = url.filter(|u| !u.is_empty());
     }
 
-    pub fn get_dist_url(&self) -> Option<String> {
+    pub fn get_dist_url(&self) -> Option<BString> {
         self.dist_url.clone()
     }
 
-    pub fn set_dist_reference(&mut self, reference: Option<String>) {
+    pub fn set_dist_reference(&mut self, reference: Option<BString>) {
         self.dist_reference = reference;
     }
 
-    pub fn get_dist_reference(&self) -> Option<String> {
+    pub fn get_dist_reference(&self) -> Option<BString> {
         self.dist_reference.clone()
     }
 
-    pub fn set_dist_sha1_checksum(&mut self, sha1checksum: Option<String>) {
+    pub fn set_dist_sha1_checksum(&mut self, sha1checksum: Option<BString>) {
         self.dist_sha1_checksum = sha1checksum;
     }
 
-    pub fn get_dist_sha1_checksum(&self) -> Option<String> {
+    pub fn get_dist_sha1_checksum(&self) -> Option<BString> {
         self.dist_sha1_checksum.clone()
     }
 
@@ -256,12 +250,12 @@ impl Package {
         self.dist_mirrors.as_ref()
     }
 
-    pub fn get_dist_urls(&self) -> Vec<String> {
+    pub fn get_dist_urls(&self) -> Vec<BString> {
         self.get_urls(
-            self.dist_url.as_deref(),
+            self.dist_url.as_ref().map(|s| s.as_bstr()),
             self.dist_mirrors.as_ref(),
-            self.dist_reference.as_deref(),
-            self.dist_type.as_deref(),
+            self.dist_reference.as_ref().map(|s| s.as_bstr()),
+            self.dist_type.as_ref().map(|s| s.as_bstr()),
             "dist",
         )
     }
@@ -274,12 +268,12 @@ impl Package {
         self.transport_options = options;
     }
 
-    pub fn get_version(&self) -> &str {
-        &self.version
+    pub fn get_version(&self) -> &BStr {
+        self.version.as_bstr()
     }
 
-    pub fn get_pretty_version(&self) -> &str {
-        &self.pretty_version
+    pub fn get_pretty_version(&self) -> &BStr {
+        self.pretty_version.as_bstr()
     }
 
     pub fn set_release_date(&mut self, release_date: Option<chrono::DateTime<chrono::Utc>>) {
@@ -291,71 +285,71 @@ impl Package {
     }
 
     /// Set the required packages
-    pub fn set_requires(&mut self, mut requires: IndexMap<String, Link>) {
-        if requires.contains_key("0") {
+    pub fn set_requires(&mut self, mut requires: IndexMap<BString, Link>) {
+        if requires.contains_key(b"0".as_slice()) {
             requires = self.convert_links_to_map(requires, "setRequires");
         }
 
         self.requires = std::rc::Rc::new(requires);
     }
 
-    pub fn get_requires(&self) -> &IndexMap<String, Link> {
+    pub fn get_requires(&self) -> &IndexMap<BString, Link> {
         &self.requires
     }
 
-    pub fn set_conflicts(&mut self, mut conflicts: IndexMap<String, Link>) {
-        if conflicts.contains_key("0") {
+    pub fn set_conflicts(&mut self, mut conflicts: IndexMap<BString, Link>) {
+        if conflicts.contains_key(b"0".as_slice()) {
             conflicts = self.convert_links_to_map(conflicts, "setConflicts");
         }
 
         self.conflicts = std::rc::Rc::new(conflicts);
     }
 
-    pub fn get_conflicts(&self) -> &IndexMap<String, Link> {
+    pub fn get_conflicts(&self) -> &IndexMap<BString, Link> {
         &self.conflicts
     }
 
-    pub fn set_provides(&mut self, mut provides: IndexMap<String, Link>) {
-        if provides.contains_key("0") {
+    pub fn set_provides(&mut self, mut provides: IndexMap<BString, Link>) {
+        if provides.contains_key(b"0".as_slice()) {
             provides = self.convert_links_to_map(provides, "setProvides");
         }
 
         self.provides = std::rc::Rc::new(provides);
     }
 
-    pub fn get_provides(&self) -> &IndexMap<String, Link> {
+    pub fn get_provides(&self) -> &IndexMap<BString, Link> {
         &self.provides
     }
 
-    pub fn set_replaces(&mut self, mut replaces: IndexMap<String, Link>) {
-        if replaces.contains_key("0") {
+    pub fn set_replaces(&mut self, mut replaces: IndexMap<BString, Link>) {
+        if replaces.contains_key(b"0".as_slice()) {
             replaces = self.convert_links_to_map(replaces, "setReplaces");
         }
 
         self.replaces = std::rc::Rc::new(replaces);
     }
 
-    pub fn get_replaces(&self) -> &IndexMap<String, Link> {
+    pub fn get_replaces(&self) -> &IndexMap<BString, Link> {
         &self.replaces
     }
 
-    pub fn set_dev_requires(&mut self, mut dev_requires: IndexMap<String, Link>) {
-        if dev_requires.contains_key("0") {
+    pub fn set_dev_requires(&mut self, mut dev_requires: IndexMap<BString, Link>) {
+        if dev_requires.contains_key(b"0".as_slice()) {
             dev_requires = self.convert_links_to_map(dev_requires, "setDevRequires");
         }
 
         self.dev_requires = std::rc::Rc::new(dev_requires);
     }
 
-    pub fn get_dev_requires(&self) -> &IndexMap<String, Link> {
+    pub fn get_dev_requires(&self) -> &IndexMap<BString, Link> {
         &self.dev_requires
     }
 
-    pub fn set_suggests(&mut self, suggests: IndexMap<String, String>) {
+    pub fn set_suggests(&mut self, suggests: IndexMap<BString, BString>) {
         self.suggests = suggests;
     }
 
-    pub fn get_suggests(&self) -> &IndexMap<String, String> {
+    pub fn get_suggests(&self) -> &IndexMap<BString, BString> {
         &self.suggests
     }
 
@@ -375,11 +369,11 @@ impl Package {
         &self.dev_autoload
     }
 
-    pub fn set_include_paths(&mut self, include_paths: Vec<String>) {
+    pub fn set_include_paths(&mut self, include_paths: Vec<BString>) {
         self.include_paths = include_paths;
     }
 
-    pub fn get_include_paths(&self) -> &Vec<String> {
+    pub fn get_include_paths(&self) -> &Vec<BString> {
         &self.include_paths
     }
 
@@ -391,11 +385,11 @@ impl Package {
         self.php_ext.as_ref()
     }
 
-    pub fn set_notification_url(&mut self, notification_url: String) {
+    pub fn set_notification_url(&mut self, notification_url: BString) {
         self.notification_url = Some(notification_url);
     }
 
-    pub fn get_notification_url(&self) -> Option<String> {
+    pub fn get_notification_url(&self) -> Option<BString> {
         self.notification_url.clone()
     }
 
@@ -407,7 +401,7 @@ impl Package {
         self.is_default_branch
     }
 
-    pub fn set_source_dist_references(&mut self, reference: String) {
+    pub fn set_source_dist_references(&mut self, reference: BString) {
         self.set_source_reference(Some(reference.clone()));
 
         // only bitbucket, github and gitlab have auto generated dist URLs that easily allow replacing the reference in the dist URL
@@ -429,20 +423,18 @@ impl Package {
             // SHAs sharing a single `/` between them would not both match; harmless here since a
             // dist URL never carries more than one SHA reference.
             self.set_dist_url(Some(
-                legacy_lossy(
-                    &preg_replace_callback(
-                        php_regex!("{(/|sha=)[a-f0-9]{40}(/|$)}i"),
-                        |m: &PregMatches| -> anyhow::Result<String> {
-                            let get = |i: usize| -> String {
-                                legacy_lossy(m.get(i).unwrap_or_default()).into_owned()
-                            };
-                            Ok(format!("{}{}{}", get(1), reference, get(2)))
-                        },
-                        &self.get_dist_url().unwrap_or_default(),
-                    )
-                    .expect("the replacement callback cannot fail"),
+                preg_replace_callback(
+                    php_regex!("{(/|sha=)[a-f0-9]{40}(/|$)}i"),
+                    |m: &PregMatches| -> anyhow::Result<BString> {
+                        Ok(bconcat!(
+                            m.get(1).unwrap_or_default(),
+                            reference,
+                            m.get(2).unwrap_or_default()
+                        ))
+                    },
+                    &self.get_dist_url().unwrap_or_default(),
                 )
-                .into_owned(),
+                .expect("the replacement callback cannot fail"),
             ));
         } else if self.get_dist_reference().is_some() {
             // update the dist reference if there was one, but if none was provided ignore it
@@ -452,7 +444,7 @@ impl Package {
 
     /// Replaces current version and pretty version with passed values.
     /// It also sets stability.
-    pub fn replace_version(&mut self, version: String, pretty_version: String) {
+    pub fn replace_version(&mut self, version: BString, pretty_version: BString) {
         self.version = version;
         self.pretty_version = pretty_version;
 
@@ -462,12 +454,12 @@ impl Package {
 
     fn get_urls(
         &self,
-        url: Option<&str>,
+        url: Option<&BStr>,
         mirrors: Option<&Vec<Mirror>>,
-        r#ref: Option<&str>,
-        r#type: Option<&str>,
+        r#ref: Option<&BStr>,
+        r#type: Option<&BStr>,
         url_type: &str,
-    ) -> Vec<String> {
+    ) -> Vec<BString> {
         let url = match url {
             Some(u) if !u.is_empty() => u,
             _ => return Vec::new(),
@@ -476,35 +468,40 @@ impl Package {
         let url = if url_type == "dist" && strpos(url, "%").is_some() {
             ComposerMirror::process_url(
                 url,
-                &self.name,
-                &self.version,
+                self.name.as_bstr(),
+                self.version.as_bstr(),
                 r#ref,
                 r#type,
-                Some(self.pretty_version.as_str()),
+                Some(self.pretty_version.as_bstr()),
             )
         } else {
-            url.to_string()
+            BString::from(url)
         };
 
-        let mut urls: Vec<String> = vec![url.clone()];
+        let mut urls: Vec<BString> = vec![url.clone()];
         if let Some(mirrors) = mirrors {
             for mirror in mirrors {
                 let mirror_url = if url_type == "dist" {
                     ComposerMirror::process_url(
-                        &mirror.url,
-                        &self.name,
-                        &self.version,
+                        mirror.url.as_bstr(),
+                        self.name.as_bstr(),
+                        self.version.as_bstr(),
                         r#ref,
                         r#type,
-                        Some(self.pretty_version.as_str()),
+                        Some(self.pretty_version.as_bstr()),
                     )
-                } else if url_type == "source" && r#type == Some("git") {
-                    ComposerMirror::process_git_url(&mirror.url, &self.name, &url, r#type)
-                } else if url_type == "source" && r#type == Some("hg") {
+                } else if url_type == "source" && r#type.is_some_and(|t| t == "git") {
+                    ComposerMirror::process_git_url(
+                        mirror.url.as_bstr(),
+                        self.name.as_bstr(),
+                        url.as_bstr(),
+                        r#type,
+                    )
+                } else if url_type == "source" && r#type.is_some_and(|t| t == "hg") {
                     ComposerMirror::process_hg_url(
-                        &mirror.url,
-                        &self.name,
-                        &url,
+                        mirror.url.as_bstr(),
+                        self.name.as_bstr(),
+                        url.as_bstr(),
                         r#type.unwrap_or_default(),
                     )
                 } else {
@@ -525,9 +522,9 @@ impl Package {
 
     fn convert_links_to_map(
         &self,
-        links: IndexMap<String, Link>,
+        links: IndexMap<BString, Link>,
         source: &str,
-    ) -> IndexMap<String, Link> {
+    ) -> IndexMap<BString, Link> {
         trigger_error(
             &format!(
                 "Package::{} must be called with a map of lowercased package name => Link object, got a indexed array, this is deprecated and you should fix your usage.",
@@ -535,9 +532,9 @@ impl Package {
             ),
             E_USER_DEPRECATED,
         );
-        let mut new_links: IndexMap<String, Link> = IndexMap::new();
+        let mut new_links: IndexMap<BString, Link> = IndexMap::new();
         for (_k, link) in links {
-            new_links.insert(link.get_target().to_string(), link);
+            new_links.insert(BString::from(link.get_target()), link);
         }
 
         new_links
@@ -553,19 +550,19 @@ impl BasePackage for Package {
         &mut self.id
     }
 
-    fn name(&self) -> &str {
-        &self.name
+    fn name(&self) -> &BStr {
+        self.name.as_bstr()
     }
 
-    fn name_mut(&mut self) -> &mut String {
+    fn name_mut(&mut self) -> &mut BString {
         &mut self.name
     }
 
-    fn pretty_name(&self) -> &str {
-        &self.pretty_name
+    fn pretty_name(&self) -> &BStr {
+        self.pretty_name.as_bstr()
     }
 
-    fn pretty_name_mut(&mut self) -> &mut String {
+    fn pretty_name_mut(&mut self) -> &mut BString {
         &mut self.pretty_name
     }
 
@@ -588,31 +585,25 @@ impl BasePackage for Package {
     }
 }
 
-impl std::fmt::Display for Package {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.get_unique_name())
-    }
-}
-
 impl PackageInterface for Package {
-    fn get_name(&self) -> &str {
-        &self.name
+    fn get_name(&self) -> &BStr {
+        self.name.as_bstr()
     }
-    fn get_pretty_name(&self) -> &str {
-        &self.pretty_name
+    fn get_pretty_name(&self) -> &BStr {
+        self.pretty_name.as_bstr()
     }
-    fn get_names(&self, provides: bool) -> Vec<String> {
-        let mut names: IndexSet<String> = IndexSet::new();
-        names.insert(self.get_name().to_string());
+    fn get_names(&self, provides: bool) -> Vec<BString> {
+        let mut names: IndexSet<BString> = IndexSet::new();
+        names.insert(BString::from(self.get_name()));
 
         if provides {
             for (_, link) in self.get_provides().iter() {
-                names.insert(link.get_target().to_string());
+                names.insert(BString::from(link.get_target()));
             }
         }
 
         for (_, link) in self.get_replaces().iter() {
-            names.insert(link.get_target().to_string());
+            names.insert(BString::from(link.get_target()));
         }
 
         names.into_iter().collect()
@@ -626,31 +617,31 @@ impl PackageInterface for Package {
     fn is_dev(&self) -> bool {
         self.dev
     }
-    fn get_type(&self) -> String {
+    fn get_type(&self) -> BString {
         Package::get_type(self)
     }
-    fn get_target_dir(&self) -> Option<String> {
+    fn get_target_dir(&self) -> Option<BString> {
         Package::get_target_dir(self)
     }
     fn get_extra(&self) -> IndexMap<BString, PhpMixed> {
         self.extra.clone()
     }
-    fn set_installation_source(&mut self, r#type: Option<String>) {
+    fn set_installation_source(&mut self, r#type: Option<BString>) {
         self.installation_source = r#type;
     }
-    fn get_installation_source(&self) -> Option<String> {
+    fn get_installation_source(&self) -> Option<BString> {
         self.installation_source.clone()
     }
-    fn get_source_type(&self) -> Option<String> {
+    fn get_source_type(&self) -> Option<BString> {
         self.source_type.clone()
     }
-    fn get_source_url(&self) -> Option<String> {
+    fn get_source_url(&self) -> Option<BString> {
         self.source_url.clone()
     }
-    fn get_source_urls(&self) -> Vec<String> {
+    fn get_source_urls(&self) -> Vec<BString> {
         Package::get_source_urls(self)
     }
-    fn get_source_reference(&self) -> Option<String> {
+    fn get_source_reference(&self) -> Option<BString> {
         self.source_reference.clone()
     }
     fn get_source_mirrors(&self) -> Option<Vec<Mirror>> {
@@ -659,19 +650,19 @@ impl PackageInterface for Package {
     fn set_source_mirrors(&mut self, mirrors: Option<Vec<Mirror>>) {
         self.source_mirrors = mirrors;
     }
-    fn get_dist_type(&self) -> Option<String> {
+    fn get_dist_type(&self) -> Option<BString> {
         self.dist_type.clone()
     }
-    fn get_dist_url(&self) -> Option<String> {
+    fn get_dist_url(&self) -> Option<BString> {
         self.dist_url.clone()
     }
-    fn get_dist_urls(&self) -> Vec<String> {
+    fn get_dist_urls(&self) -> Vec<BString> {
         Package::get_dist_urls(self)
     }
-    fn get_dist_reference(&self) -> Option<String> {
+    fn get_dist_reference(&self) -> Option<BString> {
         self.dist_reference.clone()
     }
-    fn get_dist_sha1_checksum(&self) -> Option<String> {
+    fn get_dist_sha1_checksum(&self) -> Option<BString> {
         self.dist_sha1_checksum.clone()
     }
     fn get_dist_mirrors(&self) -> Option<Vec<Mirror>> {
@@ -680,37 +671,37 @@ impl PackageInterface for Package {
     fn set_dist_mirrors(&mut self, mirrors: Option<Vec<Mirror>>) {
         self.dist_mirrors = mirrors;
     }
-    fn get_version(&self) -> &str {
-        &self.version
+    fn get_version(&self) -> &BStr {
+        self.version.as_bstr()
     }
-    fn get_pretty_version(&self) -> &str {
-        &self.pretty_version
+    fn get_pretty_version(&self) -> &BStr {
+        self.pretty_version.as_bstr()
     }
-    fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> String {
+    fn get_full_pretty_version(&self, truncate: bool, display_mode: DisplayMode) -> BString {
         BasePackage::get_full_pretty_version(self, truncate, display_mode)
     }
     fn get_release_date(&self) -> Option<DateTime<Utc>> {
         self.release_date
     }
-    fn get_stability(&self) -> &str {
-        &self.stability
+    fn get_stability(&self) -> &BStr {
+        self.stability.as_bstr()
     }
-    fn get_requires(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+    fn get_requires(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         std::rc::Rc::clone(&self.requires)
     }
-    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+    fn get_conflicts(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         std::rc::Rc::clone(&self.conflicts)
     }
-    fn get_provides(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+    fn get_provides(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         std::rc::Rc::clone(&self.provides)
     }
-    fn get_replaces(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+    fn get_replaces(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         std::rc::Rc::clone(&self.replaces)
     }
-    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<String, Link>> {
+    fn get_dev_requires(&self) -> std::rc::Rc<IndexMap<BString, Link>> {
         std::rc::Rc::clone(&self.dev_requires)
     }
-    fn get_suggests(&self) -> IndexMap<String, String> {
+    fn get_suggests(&self) -> IndexMap<BString, BString> {
         self.suggests.clone()
     }
     fn get_autoload(&self) -> IndexMap<BString, PhpMixed> {
@@ -719,7 +710,7 @@ impl PackageInterface for Package {
     fn get_dev_autoload(&self) -> IndexMap<BString, PhpMixed> {
         self.dev_autoload.clone()
     }
-    fn get_include_paths(&self) -> Vec<String> {
+    fn get_include_paths(&self) -> Vec<BString> {
         self.include_paths.clone()
     }
     fn get_php_ext(&self) -> Option<IndexMap<BString, PhpMixed>> {
@@ -743,17 +734,17 @@ impl PackageInterface for Package {
             .and_then(|w| w.upgrade())
             .map(RepositoryInterfaceHandle::from_rc)
     }
-    fn get_binaries(&self) -> Vec<String> {
+    fn get_binaries(&self) -> Vec<BString> {
         self.binaries.clone()
     }
-    fn get_unique_name(&self) -> String {
-        format!("{}-{}", self.get_name(), self.get_version())
+    fn get_unique_name(&self) -> BString {
+        bconcat!(self.get_name(), "-", self.get_version())
     }
-    fn get_notification_url(&self) -> Option<String> {
+    fn get_notification_url(&self) -> Option<BString> {
         self.notification_url.clone()
     }
-    fn get_pretty_string(&self) -> String {
-        format!("{} {}", self.get_pretty_name(), self.get_pretty_version())
+    fn get_pretty_string(&self) -> BString {
+        bconcat!(self.get_pretty_name(), " ", self.get_pretty_version())
     }
     fn is_default_branch(&self) -> bool {
         self.is_default_branch
@@ -764,28 +755,22 @@ impl PackageInterface for Package {
     fn set_transport_options(&mut self, options: IndexMap<BString, PhpMixed>) {
         self.transport_options = options;
     }
-    fn set_source_reference(&mut self, reference: Option<String>) {
+    fn set_source_reference(&mut self, reference: Option<BString>) {
         self.source_reference = reference;
     }
-    fn set_source_url(&mut self, url: Option<String>) {
+    fn set_source_url(&mut self, url: Option<BString>) {
         self.source_url = url;
     }
-    fn set_dist_url(&mut self, url: Option<String>) {
-        self.dist_url = match url.as_deref() {
-            Some("") => None,
-            _ => url,
-        };
+    fn set_dist_url(&mut self, url: Option<BString>) {
+        self.dist_url = url.filter(|u| !u.is_empty());
     }
-    fn set_dist_type(&mut self, r#type: Option<String>) {
-        self.dist_type = match r#type.as_deref() {
-            Some("") => None,
-            _ => r#type,
-        };
+    fn set_dist_type(&mut self, r#type: Option<BString>) {
+        self.dist_type = r#type.filter(|t| !t.is_empty());
     }
-    fn set_dist_reference(&mut self, reference: Option<String>) {
+    fn set_dist_reference(&mut self, reference: Option<BString>) {
         self.dist_reference = reference;
     }
-    fn set_source_dist_references(&mut self, reference: String) {
+    fn set_source_dist_references(&mut self, reference: BString) {
         Package::set_source_dist_references(self, reference);
     }
 }

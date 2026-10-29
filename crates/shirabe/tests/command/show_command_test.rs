@@ -58,7 +58,9 @@ fn run_show_case(
     let _tear_down = init_temp_composer(Some(&show_composer_json(requires)), None, None, true);
 
     let pkg = get_complete_package("vendor/package", "v1.0.0");
-    pkg.set_description("description of installed package".to_string());
+    pkg.set_description(bstr::BString::from(
+        "description of installed package".to_string(),
+    ));
     let major = get_complete_package("outdated/major", "v1.0.0");
     major.set_release_date(Some(chrono::Utc::now()));
     let minor = get_complete_package("outdated/minor", "1.0.0");
@@ -71,7 +73,9 @@ fn run_show_case(
     create_installed_json(&packages, &[], true);
 
     let locked = get_complete_package("vendor/locked", "3.0.0");
-    locked.set_description("description of locked package".to_string());
+    locked.set_description(bstr::BString::from(
+        "description of locked package".to_string(),
+    ));
     create_composer_lock(&[locked.into()], &[]);
 
     let mut app_tester = get_application_tester();
@@ -773,11 +777,15 @@ fn test_show_all_shows_all_sections() {
     );
 
     let pkg = get_complete_package("vendor/installed", "2.0.0");
-    pkg.set_description("description of installed package".to_string());
+    pkg.set_description(bstr::BString::from(
+        "description of installed package".to_string(),
+    ));
     create_installed_json(&[pkg.into()], &[], true);
 
     let locked = get_complete_package("vendor/locked", "3.0.0");
-    locked.set_description("description of locked package".to_string());
+    locked.set_description(bstr::BString::from(
+        "description of locked package".to_string(),
+    ));
     create_composer_lock(&[locked.into()], &[]);
 
     let mut app_tester = get_application_tester();
@@ -840,7 +848,9 @@ fn test_locked_shows_all_locked() {
     let _tear_down = init_temp_composer(None, None, None, true);
 
     let pkg = get_complete_package("vendor/locked", "3.0.0");
-    pkg.set_description("description of locked package".to_string());
+    pkg.set_description(bstr::BString::from(
+        "description of locked package".to_string(),
+    ));
     create_composer_lock(&[pkg.clone().into()], &[]);
 
     let mut app_tester = get_application_tester();
@@ -859,7 +869,9 @@ fn test_locked_shows_all_locked() {
     );
 
     let pkg2 = get_complete_package("vendor/locked2", "2.0.0");
-    pkg2.set_description("description of locked2 package".to_string());
+    pkg2.set_description(bstr::BString::from(
+        "description of locked2 package".to_string(),
+    ));
     create_composer_lock(&[pkg.into(), pkg2.into()], &[]);
 
     let mut app_tester = get_application_tester();
@@ -1375,14 +1387,19 @@ fn test_specific_package_and_tree_with_one_package_requirement() {
     requires.insert(
         "vendor/required-package".to_string(),
         Link::new(
-            "vendor/package".to_string(),
-            "vendor/required-package".to_string(),
+            bstr::BString::from("vendor/package".to_string()),
+            bstr::BString::from("vendor/required-package".to_string()),
             get_version_constraint("=", "1.0.0"),
-            Some(Link::TYPE_REQUIRE.to_string()),
-            "1.0.0".to_string(),
+            Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+            bstr::BString::from("1.0.0".to_string()),
         ),
     );
-    pkg.__set_requires(requires);
+    pkg.__set_requires(
+        requires
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     run_specific_package_and_tree_case(
         vec![pkg.into()],
         vec![],
@@ -1399,14 +1416,19 @@ fn test_specific_package_and_tree_with_platform_requirement() {
     requires.insert(
         "php".to_string(),
         Link::new(
-            "vendor/package".to_string(),
-            "php".to_string(),
+            bstr::BString::from("vendor/package".to_string()),
+            bstr::BString::from("php".to_string()),
             get_version_constraint("=", "8.2.0"),
-            Some(Link::TYPE_REQUIRE.to_string()),
-            "8.2.0".to_string(),
+            Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+            bstr::BString::from("8.2.0".to_string()),
         ),
     );
-    pkg.__set_requires(requires);
+    pkg.__set_requires(
+        requires
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     run_specific_package_and_tree_case(
         vec![pkg.into()],
         vec![],
@@ -1512,55 +1534,64 @@ fn package_with_every_link_type() -> PackageInterfaceHandle {
         indexmap::IndexMap::from([(
             target.to_string(),
             Link::new(
-                "vendor/package".to_string(),
-                target.to_string(),
+                bstr::BString::from("vendor/package".to_string()),
+                bstr::BString::from(target.to_string()),
                 get_version_constraint(operator, version),
-                Some(r#type.to_string()),
-                pretty.to_string(),
+                Some(bstr::BString::from(r#type.to_string())),
+                bstr::BString::from(pretty.to_string()),
             ),
         )])
     };
 
     let pkg = get_complete_package("vendor/package", "1.0.0");
-    pkg.__set_requires(link(
-        "vendor/required",
-        "=",
-        "1.0.0",
-        "1.0.0",
-        Link::TYPE_REQUIRE,
-    ));
-    pkg.__set_dev_requires(link(
-        "vendor/dev-required",
-        "=",
-        "2.0.0",
-        "2.0.0",
-        Link::TYPE_DEV_REQUIRE,
-    ));
-    pkg.__set_provides(link(
-        "vendor/provided",
-        "=",
-        "1.0.0",
-        "1.0.0",
-        Link::TYPE_PROVIDE,
-    ));
-    pkg.__set_conflicts(link(
-        "vendor/conflicted",
-        "<",
-        "1.0.0",
-        "<1.0.0",
-        Link::TYPE_CONFLICT,
-    ));
-    pkg.__set_replaces(link(
-        "vendor/replaced",
-        "=",
-        "3.0.0",
-        "3.0.0",
-        Link::TYPE_REPLACE,
-    ));
-    pkg.__set_suggests(indexmap::IndexMap::from([(
-        "vendor/suggested".to_string(),
-        "for testing".to_string(),
-    )]));
+    pkg.__set_requires(
+        link("vendor/required", "=", "1.0.0", "1.0.0", Link::TYPE_REQUIRE)
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    pkg.__set_dev_requires(
+        link(
+            "vendor/dev-required",
+            "=",
+            "2.0.0",
+            "2.0.0",
+            Link::TYPE_DEV_REQUIRE,
+        )
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    pkg.__set_provides(
+        link("vendor/provided", "=", "1.0.0", "1.0.0", Link::TYPE_PROVIDE)
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    pkg.__set_conflicts(
+        link(
+            "vendor/conflicted",
+            "<",
+            "1.0.0",
+            "<1.0.0",
+            Link::TYPE_CONFLICT,
+        )
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    pkg.__set_replaces(
+        link("vendor/replaced", "=", "3.0.0", "3.0.0", Link::TYPE_REPLACE)
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    pkg.__set_suggests(
+        indexmap::IndexMap::from([("vendor/suggested".to_string(), "for testing".to_string())])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     pkg.into()
 }
 

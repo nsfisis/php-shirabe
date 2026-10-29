@@ -16,10 +16,10 @@ use crate::repository::{
     RepositoryInterfaceWeakHandle, SearchResult, VersionCacheInterface, VersionCacheResult,
 };
 use crate::util::{HttpDownloader, Platform, ProcessExecutor, Url};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpClass, PhpMixed, legacy_lossy, php_regex,
+    Catch as _, InvalidArgumentException, PhpClass, PhpMixed, bconcat, legacy_lossy, php_regex,
     preg_is_match, preg_replace, str_replace, strpos,
 };
 use shirabe_semver::constraint::SimpleConstraint;
@@ -28,28 +28,28 @@ use shirabe_semver::constraint::SimpleConstraint;
 #[derive(Debug)]
 pub struct VcsRepository {
     inner: ArrayRepository,
-    url: String,
-    package_name: std::cell::RefCell<Option<String>>,
+    url: BString,
+    package_name: std::cell::RefCell<Option<BString>>,
     is_verbose: bool,
     is_very_verbose: bool,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     config: std::rc::Rc<std::cell::RefCell<Config>>,
     version_parser: std::cell::RefCell<Option<VersionParser>>,
-    r#type: String,
+    r#type: BString,
     loader: std::cell::RefCell<Option<Box<dyn LoaderInterface>>>,
     repo_config: IndexMap<BString, PhpMixed>,
     http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
     process_executor: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     branch_error_occurred: std::cell::Cell<bool>,
-    drivers: IndexMap<String, VcsDriverKind>,
+    drivers: IndexMap<BString, VcsDriverKind>,
     driver: std::cell::RefCell<Option<Box<dyn VcsDriverInterface>>>,
     /// Kind of the resolved `driver`, used by `get_repo_name` to recover the driver type
     /// (PHP `array_search(get_class($driver), $this->drivers)`).
     driver_kind: std::cell::Cell<Option<VcsDriverKind>>,
     version_cache: Option<Box<dyn VersionCacheInterface>>,
-    empty_references: std::cell::RefCell<Vec<String>>,
+    empty_references: std::cell::RefCell<Vec<BString>>,
     version_transport_exceptions:
-        std::cell::RefCell<IndexMap<String, IndexMap<String, TransportException>>>,
+        std::cell::RefCell<IndexMap<BString, IndexMap<BString, TransportException>>>,
     _dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
 }
 
@@ -68,23 +68,44 @@ impl VcsRepository {
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
         process: Option<std::rc::Rc<std::cell::RefCell<ProcessExecutor>>>,
-        drivers: Option<IndexMap<String, VcsDriverKind>>,
+        drivers: Option<IndexMap<BString, VcsDriverKind>>,
         version_cache: Option<Box<dyn VersionCacheInterface>>,
     ) -> anyhow::Result<Self> {
         let inner = ArrayRepository::new(vec![])?;
         let drivers = drivers.unwrap_or_else(|| {
-            let mut m: IndexMap<String, VcsDriverKind> = IndexMap::new();
-            m.insert("github".to_string(), VcsDriverKind::GitHub);
-            m.insert("gitlab".to_string(), VcsDriverKind::GitLab);
-            m.insert("bitbucket".to_string(), VcsDriverKind::GitBitbucket);
-            m.insert("git-bitbucket".to_string(), VcsDriverKind::GitBitbucket);
-            m.insert("forgejo".to_string(), VcsDriverKind::Forgejo);
-            m.insert("git".to_string(), VcsDriverKind::Git);
-            m.insert("hg".to_string(), VcsDriverKind::Hg);
-            m.insert("perforce".to_string(), VcsDriverKind::Perforce);
-            m.insert("fossil".to_string(), VcsDriverKind::Fossil);
+            let mut m: IndexMap<BString, VcsDriverKind> = IndexMap::new();
+            m.insert(
+                bstr::BString::from("github".to_string()),
+                VcsDriverKind::GitHub,
+            );
+            m.insert(
+                bstr::BString::from("gitlab".to_string()),
+                VcsDriverKind::GitLab,
+            );
+            m.insert(
+                bstr::BString::from("bitbucket".to_string()),
+                VcsDriverKind::GitBitbucket,
+            );
+            m.insert(
+                bstr::BString::from("git-bitbucket".to_string()),
+                VcsDriverKind::GitBitbucket,
+            );
+            m.insert(
+                bstr::BString::from("forgejo".to_string()),
+                VcsDriverKind::Forgejo,
+            );
+            m.insert(bstr::BString::from("git".to_string()), VcsDriverKind::Git);
+            m.insert(bstr::BString::from("hg".to_string()), VcsDriverKind::Hg);
+            m.insert(
+                bstr::BString::from("perforce".to_string()),
+                VcsDriverKind::Perforce,
+            );
+            m.insert(
+                bstr::BString::from("fossil".to_string()),
+                VcsDriverKind::Fossil,
+            );
             // svn must be last because identifying a subversion server for sure is practically impossible
-            m.insert("svn".to_string(), VcsDriverKind::Svn);
+            m.insert(bstr::BString::from("svn".to_string()), VcsDriverKind::Svn);
             m
         });
 
@@ -96,13 +117,12 @@ impl VcsRepository {
                 .to_str_lossy(),
         );
         repo_config.insert("url".into(), PhpMixed::string(url.clone()));
-        let r#type = legacy_lossy(
+        let r#type = BString::from(
             repo_config
                 .get(B("type"))
                 .and_then(|v| v.as_string())
                 .unwrap_or("vcs".into()),
-        )
-        .into_owned();
+        );
         let is_verbose = io.is_verbose();
         let is_very_verbose = io.is_very_verbose();
         let process_executor = process.unwrap_or_else(|| {
@@ -113,7 +133,7 @@ impl VcsRepository {
 
         Ok(Self {
             inner,
-            url,
+            url: bstr::BString::from(url),
             package_name: std::cell::RefCell::new(None),
             is_verbose,
             is_very_verbose,
@@ -136,7 +156,7 @@ impl VcsRepository {
         })
     }
 
-    pub fn get_repo_name(&self) -> String {
+    pub fn get_repo_name(&self) -> BString {
         // Ensure the driver is resolved so `driver_kind` is populated.
         self.ensure_driver();
         assert!(self.driver.borrow().is_some(), "driver should be available");
@@ -147,14 +167,16 @@ impl VcsRepository {
                 .iter()
                 .find(|(_, v)| **v == kind)
                 .map(|(name, _)| name.clone())
-                .unwrap_or_else(|| kind.php_class_name()),
-            None => String::new(),
+                .unwrap_or_else(|| BString::from(kind.php_class_name())),
+            None => BString::default(),
         };
 
-        format!(
-            "vcs repo ({} {})",
+        bconcat!(
+            "vcs repo (",
             driver_type,
-            Url::sanitize(self.url.clone())
+            " ",
+            Url::sanitize(&self.url),
+            ")"
         )
     }
 
@@ -191,7 +213,12 @@ impl VcsRepository {
 
         for kind in &kinds {
             if kind
-                .supports(self.io.clone(), self.config.clone(), &self.url, false)
+                .supports(
+                    self.io.clone(),
+                    self.config.clone(),
+                    self.url.as_bstr(),
+                    false,
+                )
                 .unwrap_or(false)
             {
                 let mut driver = kind.instantiate(
@@ -210,7 +237,12 @@ impl VcsRepository {
 
         for kind in &kinds {
             if kind
-                .supports(self.io.clone(), self.config.clone(), &self.url, true)
+                .supports(
+                    self.io.clone(),
+                    self.config.clone(),
+                    self.url.as_bstr(),
+                    true,
+                )
                 .unwrap_or(false)
             {
                 let mut driver = kind.instantiate(
@@ -232,13 +264,13 @@ impl VcsRepository {
         self.branch_error_occurred.get()
     }
 
-    pub fn get_empty_references(&self) -> Vec<String> {
+    pub fn get_empty_references(&self) -> Vec<BString> {
         self.empty_references.borrow().clone()
     }
 
     pub fn get_version_transport_exceptions(
         &self,
-    ) -> IndexMap<String, IndexMap<String, TransportException>> {
+    ) -> IndexMap<BString, IndexMap<BString, TransportException>> {
         self.version_transport_exceptions.borrow().clone()
     }
 
@@ -274,7 +306,7 @@ impl VcsRepository {
         if self.driver.borrow().is_none() {
             return Err(InvalidArgumentException::new(format!(
                 "No driver found to handle VCS repository {}",
-                driver_url
+                driver_url.display_lossy()
             ))
             .into());
         }
@@ -297,7 +329,7 @@ impl VcsRepository {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .has_composer_file(&root_identifier);
+                .has_composer_file(root_identifier.as_bstr());
             match has_composer_file {
                 Ok(b) => {
                     has_root_identifier_composer_json = b;
@@ -307,14 +339,14 @@ impl VcsRepository {
                             .borrow_mut()
                             .as_mut()
                             .unwrap()
-                            .get_composer_information(&root_identifier);
+                            .get_composer_information(root_identifier.as_bstr());
                         match composer_information {
                             Ok(Some(data)) => {
                                 *self.package_name.borrow_mut() = data
                                     .get(B("name"))
                                     .and_then(|v| v.as_string())
                                     .filter(|s| !s.is_empty())
-                                    .map(|s| s.to_str_lossy().into_owned());
+                                    .map(bstr::BString::from);
                             }
                             Ok(None) => {}
                             Err(e) => {
@@ -326,7 +358,8 @@ impl VcsRepository {
                                 if is_very_verbose {
                                     self.io.write_error(&format!(
                                         "<error>Skipped parsing {}, {}</error>",
-                                        root_identifier, e
+                                        root_identifier.display_lossy(),
+                                        e
                                     ));
                                 }
                             }
@@ -342,7 +375,8 @@ impl VcsRepository {
                     if is_very_verbose {
                         self.io.write_error(&format!(
                             "<error>Skipped parsing {}, {}</error>",
-                            root_identifier, e
+                            root_identifier.display_lossy(),
+                            e
                         ));
                     }
                 }
@@ -351,22 +385,25 @@ impl VcsRepository {
 
         let tags = self.driver.borrow_mut().as_mut().unwrap().get_tags()?;
         for (tag, identifier) in tags {
-            let mut tag = tag;
+            let mut tag = legacy_lossy(&tag).into_owned();
             let msg = format!(
                 "Reading composer.json of <info>{}</info> (<comment>{}</comment>)",
-                self.package_name
-                    .borrow()
-                    .clone()
-                    .unwrap_or_else(|| self.url.clone()),
+                legacy_lossy(
+                    &self
+                        .package_name
+                        .borrow()
+                        .clone()
+                        .unwrap_or_else(|| self.url.clone())
+                ),
                 tag
             );
 
             // strip the release- prefix from tags if present
-            tag = legacy_lossy(&str_replace("release-", "", &tag)).into_owned();
+            tag = legacy_lossy(&BString::from(&str_replace("release-", "", &tag)[..])).into_owned();
 
             let cached_package = self.get_cached_package_version(
                 &tag,
-                &identifier,
+                identifier.as_bstr(),
                 is_verbose,
                 is_very_verbose,
                 false,
@@ -408,7 +445,7 @@ impl VcsRepository {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .get_composer_information(&identifier)?;
+                    .get_composer_information(identifier.as_bstr())?;
                 if data_opt.is_none() {
                     if is_very_verbose {
                         self.io.write_error(&format!(
@@ -424,11 +461,9 @@ impl VcsRepository {
                 // manually versioned package
                 if data.contains_key(B("version")) {
                     let normalized = self.version_parser.borrow().as_ref().unwrap().normalize(
-                        &data
-                            .get(B("version"))
+                        data.get(B("version"))
                             .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_str_lossy(),
+                            .unwrap_or_default(),
                         None,
                     )?;
                     data.insert("version_normalized".into(), PhpMixed::string(normalized));
@@ -466,12 +501,11 @@ impl VcsRepository {
                 // make sure tag do not contain the default-branch marker
                 data.shift_remove(B("default-branch"));
 
-                let version_normalized = legacy_lossy(
+                let version_normalized = BString::from(
                     data.get(B("version_normalized"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default(),
-                )
-                .into_owned();
+                );
 
                 // broken package, version doesn't match tag
                 if version_normalized != parsed_tag {
@@ -484,7 +518,7 @@ impl VcsRepository {
                         } else {
                             self.io.write_error(&format!(
                                 "<warning>Skipped tag {}, tag ({}) does not match version ({}) in composer.json</warning>",
-                                tag, parsed_tag, version_normalized
+                                tag, parsed_tag.display_lossy(), version_normalized.display_lossy()
                             ));
                         }
                     }
@@ -497,37 +531,40 @@ impl VcsRepository {
                     .clone()
                     .filter(|s| !s.is_empty())
                     .unwrap_or_else(|| {
-                        legacy_lossy(
+                        BString::from(
                             data.get(B("name"))
                                 .and_then(|v| v.as_string())
                                 .unwrap_or_default(),
                         )
-                        .into_owned()
                     });
                 if let Some(existing_package) = self.inner.find_package_internal(
-                    &tag_package_name,
+                    tag_package_name.as_bstr(),
                     crate::repository::FindPackageConstraint::Constraint(
-                        SimpleConstraint::new("=", version_normalized.to_string(), None).into(),
+                        SimpleConstraint::new("=", BString::from(&version_normalized[..]), None)
+                            .into(),
                     ),
                 )? {
                     if is_very_verbose {
                         self.io.write_error(&format!(
                             "<warning>Skipped tag {}, it conflicts with an another tag ({}) as both resolve to {} internally</warning>",
-                            tag, existing_package.get_pretty_version(), version_normalized
+                            tag, existing_package.get_pretty_version().display_lossy(), version_normalized.display_lossy()
                         ));
                     }
                     return Ok(());
                 }
 
                 if is_very_verbose {
-                    self.io
-                        .write_error(&format!("Importing tag {} ({})", tag, version_normalized));
+                    self.io.write_error(&format!(
+                        "Importing tag {} ({})",
+                        tag,
+                        version_normalized.display_lossy()
+                    ));
                 }
 
                 let processed = {
                     let driver_ref = self.driver.borrow();
                     let driver = driver_ref.as_ref().unwrap();
-                    self.pre_process(&**driver, data, &identifier)?
+                    self.pre_process(&**driver, data, identifier.as_bstr())?
                 };
                 let loaded = self
                     .loader
@@ -542,9 +579,9 @@ impl VcsRepository {
                 if let Some(te) = e.catch::<TransportException>() {
                     self.version_transport_exceptions
                         .borrow_mut()
-                        .entry("tags".to_string())
+                        .entry(bstr::BString::from("tags".to_string()))
                         .or_default()
-                        .insert(tag.clone(), te.clone());
+                        .insert(bstr::BString::from(tag.clone()), te.clone());
                     if te.get_code() == 404 {
                         self.empty_references.borrow_mut().push(identifier.clone());
                     }
@@ -584,7 +621,7 @@ impl VcsRepository {
             .unwrap()
             .get_root_identifier()?;
         if has_root_identifier_composer_json && branches.contains_key(&root_identifier) {
-            let mut new_branches: IndexMap<String, String> = IndexMap::new();
+            let mut new_branches: IndexMap<BString, BString> = IndexMap::new();
             new_branches.insert(
                 root_identifier.clone(),
                 branches.get(&root_identifier).cloned().unwrap_or_default(),
@@ -600,11 +637,14 @@ impl VcsRepository {
         for (branch, identifier) in branches {
             let msg = format!(
                 "Reading composer.json of <info>{}</info> (<comment>{}</comment>)",
-                self.package_name
-                    .borrow()
-                    .clone()
-                    .unwrap_or_else(|| self.url.clone()),
-                branch
+                legacy_lossy(
+                    &self
+                        .package_name
+                        .borrow()
+                        .clone()
+                        .unwrap_or_else(|| self.url.clone())
+                ),
+                legacy_lossy(&branch)
             );
             if is_very_verbose {
                 self.io.write_error(&msg);
@@ -613,12 +653,12 @@ impl VcsRepository {
                     .overwrite_error4(&msg, false, None, io_interface::NORMAL);
             }
 
-            let parsed_branch_opt = self.validate_branch(&branch);
+            let parsed_branch_opt = self.validate_branch(branch.as_bstr());
             if parsed_branch_opt.is_none() {
                 if is_very_verbose {
                     self.io.write_error(&format!(
                         "<warning>Skipped branch {}, invalid name</warning>",
-                        branch
+                        branch.display_lossy()
                     ));
                 }
                 continue;
@@ -626,23 +666,19 @@ impl VcsRepository {
             let mut parsed_branch = parsed_branch_opt.unwrap();
 
             // make sure branch packages have a dev flag
-            let version: String;
+            let version: BString;
             if strpos(&parsed_branch, "dev-") == Some(0)
                 || VersionParser::DEFAULT_BRANCH_ALIAS == parsed_branch
             {
-                version = format!("dev-{}", legacy_lossy(&str_replace("#", "+", &branch)));
-                parsed_branch = legacy_lossy(&str_replace("#", "+", &parsed_branch)).into_owned();
+                version = bconcat!("dev-", str_replace("#", "+", &branch));
+                parsed_branch = BString::from(&str_replace("#", "+", &parsed_branch)[..]);
             } else {
                 let prefix = if strpos(&branch, "v") == Some(0) {
                     "v"
                 } else {
                     ""
                 };
-                version = format!(
-                    "{}{}",
-                    prefix,
-                    legacy_lossy(&preg_replace(r"{(\.9{7})+}", ".x", &parsed_branch))
-                );
+                version = bconcat!(prefix, preg_replace(r"{(\.9{7})+}", ".x", &parsed_branch));
             }
 
             let is_default_branch = self
@@ -653,8 +689,8 @@ impl VcsRepository {
                 .get_root_identifier()?
                 == branch;
             let cached_package = self.get_cached_package_version(
-                &version,
-                &identifier,
+                &legacy_lossy(&version),
+                identifier.as_bstr(),
                 is_verbose,
                 is_very_verbose,
                 is_default_branch,
@@ -677,12 +713,12 @@ impl VcsRepository {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .get_composer_information(&identifier)?;
+                    .get_composer_information(identifier.as_bstr())?;
                 if data_opt.is_none() {
                     if is_very_verbose {
                         self.io.write_error(&format!(
                             "<warning>Skipped branch {}, no composer file</warning>",
-                            branch
+                            branch.display_lossy()
                         ));
                     }
                     self.empty_references.borrow_mut().push(identifier.clone());
@@ -712,7 +748,7 @@ impl VcsRepository {
                 if is_very_verbose {
                     self.io.write_error(&format!(
                         "Importing branch {} ({})",
-                        branch,
+                        branch.display_lossy(),
                         data.get(B("version"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
@@ -723,7 +759,7 @@ impl VcsRepository {
                 let package_data = {
                     let driver_ref = self.driver.borrow();
                     let driver = driver_ref.as_ref().unwrap();
-                    self.pre_process(&**driver, data, &identifier)?
+                    self.pre_process(&**driver, data, identifier.as_bstr())?
                 };
                 let package = self
                     .loader
@@ -754,7 +790,7 @@ impl VcsRepository {
                 if let Some(te) = e.catch::<TransportException>() {
                     self.version_transport_exceptions
                         .borrow_mut()
-                        .entry("branches".to_string())
+                        .entry(bstr::BString::from("branches".to_string()))
                         .or_default()
                         .insert(branch.clone(), te.clone());
                     if te.get_code() == 404 {
@@ -766,7 +802,7 @@ impl VcsRepository {
                     if is_very_verbose {
                         self.io.write_error(&format!(
                             "<warning>Skipped branch {}, no composer file was found ({} HTTP status code)</warning>",
-                            branch, te.get_code()
+                            branch.display_lossy(), te.get_code()
                         ));
                     }
                     continue;
@@ -775,8 +811,11 @@ impl VcsRepository {
                     self.io.write_error("");
                 }
                 self.branch_error_occurred.set(true);
-                self.io
-                    .write_error(&format!("<error>Skipped branch {}, {}</error>", branch, e));
+                self.io.write_error(&format!(
+                    "<error>Skipped branch {}, {}</error>",
+                    branch.display_lossy(),
+                    e
+                ));
                 self.io.write_error("");
                 continue;
             }
@@ -791,7 +830,7 @@ impl VcsRepository {
         if self.inner.get_packages_internal().is_empty() {
             return Err(InvalidRepositoryException::new(format!(
                 "No valid composer.json was found in any branch or tag of {}, could not load a package from it.",
-                self.url
+                self.url.display_lossy()
             )).into());
         }
 
@@ -802,21 +841,18 @@ impl VcsRepository {
         &self,
         driver: &dyn VcsDriverInterface,
         mut data: IndexMap<BString, PhpMixed>,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
         // keep the name of the main identifier for all packages
         // this ensures that a package can be renamed in one place and that all old tags
         // will still be installable using that new name without requiring re-tagging
-        let data_package_name = data
-            .get(B("name"))
-            .and_then(|v| v.as_string())
-            .map(|s| s.to_str_lossy().into_owned());
+        let data_package_name = data.get(B("name")).and_then(|v| v.as_string());
         let name_value = self
             .package_name
             .borrow()
             .clone()
             .filter(|s| !s.is_empty())
-            .or(data_package_name);
+            .or(data_package_name.map(bstr::BString::from));
         data.insert(
             "name".into(),
             match name_value {
@@ -832,7 +868,7 @@ impl VcsRepository {
                 match dist {
                     Some(m) => PhpMixed::Array(
                         m.into_iter()
-                            .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                            .map(|(k, v)| (k, PhpMixed::string(v)))
                             .collect(),
                     ),
                     None => PhpMixed::Null,
@@ -846,7 +882,7 @@ impl VcsRepository {
                 PhpMixed::Array(
                     source
                         .into_iter()
-                        .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                        .map(|(k, v)| (k, PhpMixed::string(v)))
                         .collect(),
                 ),
             );
@@ -876,7 +912,7 @@ impl VcsRepository {
         Ok(data)
     }
 
-    fn validate_branch(&self, branch: &str) -> Option<String> {
+    fn validate_branch(&self, branch: &BStr) -> Option<BString> {
         let result = self
             .version_parser
             .borrow()
@@ -900,7 +936,7 @@ impl VcsRepository {
         None
     }
 
-    fn validate_tag(&self, version: &str) -> Option<String> {
+    fn validate_tag(&self, version: &str) -> Option<BString> {
         self.version_parser
             .borrow()
             .as_ref()
@@ -912,7 +948,7 @@ impl VcsRepository {
     fn get_cached_package_version(
         &self,
         version: &str,
-        identifier: &str,
+        identifier: &BStr,
         is_verbose: bool,
         is_very_verbose: bool,
         is_default_branch: bool,
@@ -930,7 +966,8 @@ impl VcsRepository {
             if is_very_verbose {
                 self.io.write_error(&format!(
                     "<warning>Skipped {}, no composer file (cached from ref {})</warning>",
-                    version, identifier
+                    version,
+                    identifier.display_lossy()
                 ));
             }
 
@@ -940,10 +977,13 @@ impl VcsRepository {
         if let VersionCacheResult::Package(ref mut data) = cached_package {
             let msg = format!(
                 "Found cached composer.json of <info>{}</info> (<comment>{}</comment>)",
-                self.package_name
-                    .borrow()
-                    .clone()
-                    .unwrap_or_else(|| self.url.clone()),
+                legacy_lossy(
+                    &self
+                        .package_name
+                        .borrow()
+                        .clone()
+                        .unwrap_or_else(|| self.url.clone())
+                ),
                 version
             );
             if is_very_verbose {
@@ -958,28 +998,26 @@ impl VcsRepository {
                 data.insert("default-branch".into(), PhpMixed::Bool(true));
             }
 
-            let name = legacy_lossy(
+            let name = BString::from(
                 data.get(B("name"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default(),
-            )
-            .into_owned();
-            let version_normalized = legacy_lossy(
+            );
+            let version_normalized = BString::from(
                 data.get(B("version_normalized"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default(),
-            )
-            .into_owned();
+            );
             if let Some(existing_package) = self.inner.find_package_internal(
-                &name,
+                name.as_bstr(),
                 crate::repository::FindPackageConstraint::Constraint(
-                    SimpleConstraint::new("=", version_normalized.to_string(), None).into(),
+                    SimpleConstraint::new("=", BString::from(&version_normalized[..]), None).into(),
                 ),
             )? {
                 if is_very_verbose {
                     self.io.write_error(&format!(
                         "<warning>Skipped cached version {}, it conflicts with an another tag ({}) as both resolve to {} internally</warning>",
-                        version, existing_package.get_pretty_version(), version_normalized
+                        version, existing_package.get_pretty_version().display_lossy(), version_normalized.display_lossy()
                     ));
                 }
                 cached_package = VersionCacheResult::None;
@@ -1015,7 +1053,7 @@ impl RepositoryInterface for VcsRepository {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.ensure_initialized()?;
@@ -1024,7 +1062,7 @@ impl RepositoryInterface for VcsRepository {
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.ensure_initialized()?;
@@ -1038,10 +1076,10 @@ impl RepositoryInterface for VcsRepository {
 
     fn load_packages(
         &mut self,
-        package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<shirabe_semver::constraint::AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         self.ensure_initialized()?;
         self.inner.load_packages(
@@ -1054,9 +1092,9 @@ impl RepositoryInterface for VcsRepository {
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         self.ensure_initialized()?;
         self.inner.search(query, mode, r#type)
@@ -1064,13 +1102,13 @@ impl RepositoryInterface for VcsRepository {
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         self.ensure_initialized()?;
         self.inner.get_providers(package_name)
     }
 
-    fn get_repo_name(&self) -> anyhow::Result<String> {
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
         Ok(VcsRepository::get_repo_name(self))
     }
 

@@ -8,7 +8,7 @@ use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::loader::ValidatingArrayLoader;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::util::{ConfigValidator, Filesystem};
-use shirabe_php_shim::impl_php_class;
+use shirabe_php_shim::{impl_php_class, legacy_lossy};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -360,7 +360,7 @@ impl Command for ValidateCommand {
 
                     self.output_result(
                         io.clone(),
-                        &package.get_pretty_name(),
+                        &legacy_lossy(&package.get_pretty_name()),
                         &mut dep_errors,
                         &mut dep_warnings,
                         check_publish,

@@ -7,13 +7,14 @@ use crate::repository::{
     PlatformRepository, ProviderInfo, RepositoryInterface, RepositoryInterfaceHandle,
     RootPackageRepository, SearchResult,
 };
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::array_merge_map;
+use shirabe_php_shim::{array_merge_map, bconcat, implode, legacy_lossy, strtolower};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, SimpleConstraint};
 
 pub enum NeedleInput {
-    Single(String),
-    Multiple(Vec<String>),
+    Single(BString),
+    Multiple(Vec<BString>),
 }
 
 pub struct DependentsEntry(
@@ -44,10 +45,10 @@ impl InstalledRepository {
 
     pub fn find_packages_with_replacers_and_providers(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
-        let name = name.to_lowercase();
+        let name = strtolower(name);
 
         let constraint: Option<AnyConstraint> = match constraint {
             None => None,
@@ -64,8 +65,12 @@ impl InstalledRepository {
                 if name == candidate.get_name() {
                     if constraint.is_none()
                         || constraint.as_ref().unwrap().matches(
-                            &SimpleConstraint::new("==", candidate.get_version().to_string(), None)
-                                .into(),
+                            &SimpleConstraint::new(
+                                "==",
+                                BString::from(&candidate.get_version()[..]),
+                                None,
+                            )
+                            .into(),
                         )
                     {
                         matches.push(candidate.clone());
@@ -98,11 +103,11 @@ impl InstalledRepository {
         constraint: Option<AnyConstraint>,
         invert: bool,
         recurse: bool,
-        packages_found: Option<Vec<String>>,
+        packages_found: Option<Vec<BString>>,
     ) -> anyhow::Result<Vec<DependentsEntry>> {
-        let mut needles: Vec<String> = match needle {
-            NeedleInput::Single(s) => vec![s.to_lowercase()],
-            NeedleInput::Multiple(v) => v.into_iter().map(|s| s.to_lowercase()).collect(),
+        let mut needles: Vec<BString> = match needle {
+            NeedleInput::Single(s) => vec![strtolower(&s)],
+            NeedleInput::Multiple(v) => v.into_iter().map(|s| strtolower(&s)).collect(),
         };
         let mut results: Vec<DependentsEntry> = vec![];
 
@@ -117,29 +122,32 @@ impl InstalledRepository {
         }
 
         for package in self.inner.get_packages()? {
-            let mut links: IndexMap<String, Link> = (*package.get_requires()).clone();
+            let mut links: IndexMap<BString, Link> = (*package.get_requires()).clone();
             let mut packages_in_tree = packages_found.clone();
 
             if !invert {
                 for (k, v) in package.get_replaces().iter() {
-                    links.entry(k.clone()).or_insert(v.clone());
+                    links
+                        .entry(bstr::BString::from(&k.clone()[..]))
+                        .or_insert(v.clone());
                 }
 
                 let needles_snapshot = needles.clone();
                 for link in package.get_replaces().values() {
                     for needle in &needles_snapshot {
-                        if link.get_source() == needle.as_str()
+                        if link.get_source() == needle.as_bstr()
                             && (constraint.is_none()
                                 || link.get_constraint().matches(constraint.as_ref().unwrap()))
                         {
-                            if packages_in_tree.contains(&link.get_target().to_string()) {
+                            if packages_in_tree.contains(&BString::from(link.get_target()).clone())
+                            {
                                 results.push(DependentsEntry(package.clone(), link.clone(), None));
                                 continue;
                             }
-                            packages_in_tree.push(link.get_target().to_string());
+                            packages_in_tree.push(bstr::BString::from(link.get_target()));
                             let dependents = if recurse {
                                 self.get_dependents(
-                                    NeedleInput::Single(link.get_target().to_string()),
+                                    NeedleInput::Single(bstr::BString::from(link.get_target())),
                                     None,
                                     false,
                                     true,
@@ -153,7 +161,7 @@ impl InstalledRepository {
                                 link.clone(),
                                 Some(dependents),
                             ));
-                            needles.push(link.get_target().to_string());
+                            needles.push(bstr::BString::from(link.get_target()));
                         }
                     }
                 }
@@ -161,25 +169,28 @@ impl InstalledRepository {
 
             if package.as_root().is_some() {
                 for (k, v) in package.get_dev_requires().iter() {
-                    links.entry(k.clone()).or_insert(v.clone());
+                    links
+                        .entry(bstr::BString::from(&k.clone()[..]))
+                        .or_insert(v.clone());
                 }
             }
 
             for link in links.values() {
                 for needle in &needles {
-                    if link.get_target() == needle.as_str() {
+                    if link.get_target() == needle.as_bstr() {
                         let matches_constraint = constraint
                             .as_ref()
                             .is_none_or(|c| link.get_constraint().matches(c) != invert);
                         if constraint.is_none() || matches_constraint {
-                            if packages_in_tree.contains(&link.get_source().to_string()) {
+                            if packages_in_tree.contains(&BString::from(link.get_source()).clone())
+                            {
                                 results.push(DependentsEntry(package.clone(), link.clone(), None));
                                 continue;
                             }
-                            packages_in_tree.push(link.get_source().to_string());
+                            packages_in_tree.push(bstr::BString::from(link.get_source()));
                             let dependents = if recurse {
                                 self.get_dependents(
-                                    NeedleInput::Single(link.get_source().to_string()),
+                                    NeedleInput::Single(bstr::BString::from(link.get_source())),
                                     None,
                                     false,
                                     true,
@@ -198,11 +209,13 @@ impl InstalledRepository {
                 }
             }
 
-            if invert && needles.contains(&package.get_name().to_string()) {
+            if invert && needles.contains(&BString::from(&package.get_name()[..]).clone()) {
                 for link in package.get_conflicts().values() {
-                    for pkg in self.find_packages(link.get_target(), None)? {
+                    for pkg in self
+                        .find_packages(bstr::BStr::new(&*legacy_lossy(link.get_target())), None)?
+                    {
                         let version =
-                            SimpleConstraint::new("=", pkg.get_version().to_string(), None);
+                            SimpleConstraint::new("=", BString::from(&pkg.get_version()[..]), None);
                         if link.get_constraint().matches(&version.into()) == invert {
                             results.push(DependentsEntry(package.clone(), link.clone(), None));
                         }
@@ -211,10 +224,12 @@ impl InstalledRepository {
             }
 
             for link in package.get_conflicts().values() {
-                if needles.contains(&link.get_target().to_string()) {
-                    for pkg in self.find_packages(link.get_target(), None)? {
+                if needles.contains(&BString::from(link.get_target()).clone()) {
+                    for pkg in self
+                        .find_packages(bstr::BStr::new(&*legacy_lossy(link.get_target())), None)?
+                    {
                         let version =
-                            SimpleConstraint::new("=", pkg.get_version().to_string(), None);
+                            SimpleConstraint::new("=", BString::from(&pkg.get_version()[..]), None);
                         if link.get_constraint().matches(&version.into()) == invert {
                             results.push(DependentsEntry(package.clone(), link.clone(), None));
                         }
@@ -224,16 +239,17 @@ impl InstalledRepository {
 
             if invert
                 && constraint.is_some()
-                && needles.contains(&package.get_name().to_string())
+                && needles.contains(&BString::from(&package.get_name()[..]).clone())
                 && constraint.as_ref().unwrap().matches(
-                    &SimpleConstraint::new("=", package.get_version().to_string(), None).into(),
+                    &SimpleConstraint::new("=", BString::from(&package.get_version()[..]), None)
+                        .into(),
                 )
             {
                 'requires: for link in package.get_requires().values() {
                     if PlatformRepository::is_platform_package(link.get_target()) {
                         if self
                             .find_package(
-                                link.get_target(),
+                                bstr::BStr::new(&*legacy_lossy(link.get_target())),
                                 FindPackageConstraint::Constraint(link.get_constraint().clone()),
                             )?
                             .is_some()
@@ -242,21 +258,23 @@ impl InstalledRepository {
                         }
 
                         let platform_pkg = self.find_package(
-                            link.get_target(),
-                            FindPackageConstraint::String("*".to_string()),
+                            bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                            FindPackageConstraint::String(bstr::BString::from("*".to_string())),
                         )?;
                         let description = platform_pkg
                             .as_ref()
-                            .map(|p| format!("but {} is installed", p.get_pretty_version()))
-                            .unwrap_or_else(|| "but it is missing".to_string());
+                            .map(|p| bconcat!("but ", p.get_pretty_version(), " is installed"))
+                            .unwrap_or_else(|| {
+                                bstr::BString::from("but it is missing".to_string())
+                            });
                         results.push(DependentsEntry(
                             package.clone(),
                             Link::new(
-                                package.get_name().to_string(),
-                                link.get_target().to_string(),
+                                bstr::BString::from(&package.get_name()[..]),
+                                bstr::BString::from(link.get_target()),
                                 MatchAllConstraint::new(None).into(),
-                                Some(Link::TYPE_REQUIRE.to_string()),
-                                format!("{} {}", link.get_pretty_constraint(), description),
+                                Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+                                bconcat!(link.get_pretty_constraint(), " ", description),
                             ),
                             None,
                         ));
@@ -265,14 +283,18 @@ impl InstalledRepository {
                     }
 
                     for pkg in self.get_packages()? {
-                        if !pkg.get_names(true).contains(&link.get_target().to_string()) {
+                        if !pkg
+                            .get_names(true)
+                            .contains(&BString::from(link.get_target()).clone())
+                        {
                             continue;
                         }
 
                         let mut version: AnyConstraint =
-                            SimpleConstraint::new("=", pkg.get_version().to_string(), None).into();
+                            SimpleConstraint::new("=", BString::from(&pkg.get_version()[..]), None)
+                                .into();
 
-                        if link.get_target() != pkg.get_name().as_str() {
+                        if link.get_target() != pkg.get_name().as_bstr() {
                             let replaces_and_provides = array_merge_map(
                                 (*pkg.get_replaces()).clone(),
                                 (*pkg.get_provides()).clone(),
@@ -287,15 +309,17 @@ impl InstalledRepository {
 
                         if !link.get_constraint().matches(&version) {
                             if let Some(root_pkg) = root_package.as_ref() {
-                                let mut root_reqs: IndexMap<String, Link> =
+                                let mut root_reqs: IndexMap<BString, Link> =
                                     (*root_pkg.get_requires()).clone();
                                 for (k, v) in root_pkg.get_dev_requires().iter() {
-                                    root_reqs.entry(k.clone()).or_insert(v.clone());
+                                    root_reqs
+                                        .entry(bstr::BString::from(&k.clone()[..]))
+                                        .or_insert(v.clone());
                                 }
                                 for root_req in root_reqs.values() {
                                     if pkg
                                         .get_names(true)
-                                        .contains(&root_req.get_target().to_string())
+                                        .contains(&BString::from(root_req.get_target()).clone())
                                         && !root_req.get_constraint().matches(link.get_constraint())
                                     {
                                         results.push(DependentsEntry(
@@ -316,11 +340,13 @@ impl InstalledRepository {
                                 results.push(DependentsEntry(
                                     root_pkg.clone(),
                                     Link::new(
-                                        root_pkg.get_name().to_string(),
-                                        link.get_target().to_string(),
+                                        bstr::BString::from(&root_pkg.get_name()[..]),
+                                        bstr::BString::from(link.get_target()),
                                         MatchAllConstraint::new(None).into(),
-                                        Some(Link::TYPE_DOES_NOT_REQUIRE.to_string()),
-                                        format!("but {} is installed", pkg.get_pretty_version()),
+                                        Some(bstr::BString::from(
+                                            Link::TYPE_DOES_NOT_REQUIRE.to_string(),
+                                        )),
+                                        bconcat!("but ", pkg.get_pretty_version(), " is installed"),
                                     ),
                                     None,
                                 ));
@@ -348,10 +374,12 @@ impl InstalledRepository {
             "An InstalledRepository can not contain a repository of type {} ({})",
             repository
                 .get_repo_name()
-                .expect("getRepoName failed while reporting an invalid repository"),
+                .expect("getRepoName failed while reporting an invalid repository")
+                .display_lossy(),
             repository
                 .get_repo_name()
                 .expect("getRepoName failed while reporting an invalid repository")
+                .display_lossy()
         );
 
         self.inner.add_repository(repository);
@@ -363,14 +391,14 @@ impl RepositoryInterface for InstalledRepository {
         self.inner.count()
     }
 
-    fn get_repo_name(&self) -> anyhow::Result<String> {
-        let names: Vec<String> = self
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
+        let names: Vec<BString> = self
             .inner
             .get_repositories()
             .iter()
             .map(|repo| repo.get_repo_name())
             .collect::<anyhow::Result<_>>()?;
-        Ok(format!("installed repo ({})", names.join(", ")))
+        Ok(bconcat!("installed repo (", implode(", ", &names), ")"))
     }
 
     fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
@@ -379,7 +407,7 @@ impl RepositoryInterface for InstalledRepository {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.inner.find_package(name, constraint)
@@ -387,7 +415,7 @@ impl RepositoryInterface for InstalledRepository {
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.inner.find_packages(name, constraint)
@@ -399,10 +427,10 @@ impl RepositoryInterface for InstalledRepository {
 
     fn load_packages(
         &mut self,
-        package_name_map: IndexMap<String, Option<AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         self.inner.load_packages(
             package_name_map,
@@ -414,17 +442,17 @@ impl RepositoryInterface for InstalledRepository {
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         self.inner.search(query, mode, r#type)
     }
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         self.inner.get_providers(package_name)
     }
 

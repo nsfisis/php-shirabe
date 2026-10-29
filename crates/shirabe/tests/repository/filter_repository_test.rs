@@ -8,7 +8,7 @@ use shirabe::repository::{
     AdvisoryProviderInterface, ArrayRepository, FilterRepository, RepositoryInterface,
     RepositoryInterfaceHandle,
 };
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
 
 fn set_up() -> RepositoryInterfaceHandle {
@@ -84,7 +84,11 @@ fn test_repo_matching() {
     for (expected, cfg) in cases {
         let mut repo = FilterRepository::new(set_up(), cfg).unwrap();
         let packages = repo.get_packages().unwrap();
-        let names: Vec<String> = packages.iter().map(|p| p.get_name()).collect();
+        let names: Vec<String> = packages
+            .iter()
+            .map(|p| p.get_name())
+            .map(|s| legacy_lossy(&s).into_owned())
+            .collect();
 
         let expected: Vec<String> = expected.iter().map(|s| s.to_string()).collect();
         assert_eq!(expected, names);
@@ -104,7 +108,14 @@ fn test_security_advisories_disabled_in_child() {
 
     let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
     map.insert("foo/aaa".to_string(), match_all());
-    let result = repo.get_security_advisories(map, true).unwrap();
+    let result = repo
+        .get_security_advisories(
+            map.into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), v))
+                .collect::<indexmap::IndexMap<_, _>>(),
+            true,
+        )
+        .unwrap();
 
     assert!(result.names_found.is_empty());
     assert!(result.advisories.is_empty());
@@ -114,10 +125,21 @@ fn test_security_advisories_disabled_in_child() {
 fn test_canonical_default_true() {
     let mut repo = FilterRepository::new(set_up(), config(None, None)).unwrap();
 
-    let mut map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
-    map.insert("foo/aaa".to_string(), Some(match_all()));
+    let mut map: IndexMap<BString, Option<AnyConstraint>> = IndexMap::new();
+    map.insert(
+        bstr::BString::from("foo/aaa".to_string()),
+        Some(match_all()),
+    );
     let result = repo
-        .load_packages(map, stabilities(), IndexMap::new(), IndexMap::new())
+        .load_packages(
+            map,
+            stabilities()
+                .into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), v))
+                .collect::<indexmap::IndexMap<_, _>>(),
+            IndexMap::new(),
+            IndexMap::new(),
+        )
         .unwrap();
 
     assert_eq!(1, result.packages.len());
@@ -130,10 +152,21 @@ fn test_non_canonical() {
     cfg.insert("canonical".into(), PhpMixed::Bool(false));
     let mut repo = FilterRepository::new(set_up(), cfg).unwrap();
 
-    let mut map: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
-    map.insert("foo/aaa".to_string(), Some(match_all()));
+    let mut map: IndexMap<BString, Option<AnyConstraint>> = IndexMap::new();
+    map.insert(
+        bstr::BString::from("foo/aaa".to_string()),
+        Some(match_all()),
+    );
     let result = repo
-        .load_packages(map, stabilities(), IndexMap::new(), IndexMap::new())
+        .load_packages(
+            map,
+            stabilities()
+                .into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), v))
+                .collect::<indexmap::IndexMap<_, _>>(),
+            IndexMap::new(),
+            IndexMap::new(),
+        )
         .unwrap();
 
     assert_eq!(1, result.packages.len());

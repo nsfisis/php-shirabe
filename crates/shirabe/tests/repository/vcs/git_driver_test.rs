@@ -98,7 +98,7 @@ fn test_get_root_identifier_from_remote_local_repository() {
     repo_config.insert("url".into(), PhpMixed::string(home_path.clone()));
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
-    driver.__set_repo_dir(home_path);
+    driver.__set_repo_dir(bstr::BString::from(home_path));
 
     assert_eq!("main", driver.get_root_identifier().unwrap());
 }
@@ -165,7 +165,7 @@ fn test_get_root_identifier_from_remote() {
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
-    driver.__set_repo_dir(home_path);
+    driver.__set_repo_dir(bstr::BString::from(home_path));
 
     assert_eq!("main", driver.get_root_identifier().unwrap());
 }
@@ -205,7 +205,7 @@ fn test_get_root_identifier_from_local_with_network_disabled() {
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
-    driver.__set_repo_dir(home_path);
+    driver.__set_repo_dir(bstr::BString::from(home_path));
 
     assert_eq!("main", driver.get_root_identifier().unwrap());
 }
@@ -249,7 +249,7 @@ fn test_get_branches_filter_invalid_branch_names() {
     );
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
-    driver.__set_repo_dir(home_path);
+    driver.__set_repo_dir(bstr::BString::from(home_path));
 
     let branches = driver.get_branches().unwrap();
     let mut expected: IndexMap<String, String> = IndexMap::new();
@@ -261,7 +261,16 @@ fn test_get_branches_filter_invalid_branch_names() {
         "2.2".to_string(),
         "12681446ba44d6d9004350192486f2ceb4eaa06".to_string(),
     );
-    assert_eq!(expected, branches);
+    assert_eq!(
+        expected
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_str()),
+                bstr::BString::from(v.as_str())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        branches
+    );
 }
 
 #[test]
@@ -291,9 +300,16 @@ fn test_file_get_content_invalid_identifier() {
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
 
-    assert_eq!(None, driver.get_file_content("file.txt", "h").unwrap());
+    assert_eq!(
+        None,
+        driver
+            .get_file_content(bstr::BStr::new("file.txt"), bstr::BStr::new("h"))
+            .unwrap()
+    );
 
-    let err = driver.get_file_content("file.txt", "-h").unwrap_err();
+    let err = driver
+        .get_file_content(bstr::BStr::new("file.txt"), bstr::BStr::new("-h"))
+        .unwrap_err();
     assert!(err.is_instanceof::<RuntimeException>());
 }
 
@@ -324,6 +340,8 @@ fn test_get_change_date_invalid_identifier() {
 
     let mut driver = GitDriver::new(repo_config, io, config, http_downloader, process);
 
-    let err = driver.get_change_date("-n1 --format=%at HEAD").unwrap_err();
+    let err = driver
+        .get_change_date(bstr::BStr::new("-n1 --format=%at HEAD"))
+        .unwrap_err();
     assert!(err.is_instanceof::<RuntimeException>());
 }

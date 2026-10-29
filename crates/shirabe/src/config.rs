@@ -560,8 +560,7 @@ impl Config {
                 let processed = self.process(raw_val, flags)?;
                 let mut val_str =
                     legacy_lossy(&rtrim2(php_to_string(&processed), "/\\")).into_owned();
-                val_str = legacy_lossy(&bstr::BString::from(Platform::expand_path(&val_str)))
-                    .into_owned();
+                val_str = legacy_lossy(&Platform::expand_path(&val_str)).into_owned();
 
                 if substr(key, -4, None) != "-dir" {
                     return Ok(PhpMixed::string(val_str));
@@ -571,7 +570,7 @@ impl Config {
                     if (flags & Self::RELATIVE_PATHS) == Self::RELATIVE_PATHS {
                         val_str
                     } else {
-                        legacy_lossy(&bstr::BString::from(self.realpath(&val_str))).into_owned()
+                        legacy_lossy(&self.realpath(&val_str)).into_owned()
                     },
                 ))
             }

@@ -257,7 +257,7 @@ impl HttpDownloader {
     pub(crate) fn canceled(url: &str) -> IrrecoverableDownloadException {
         IrrecoverableDownloadException::new(format!(
             "Download of {} canceled",
-            Url::sanitize(url.to_string())
+            Url::sanitize(url).display_lossy()
         ))
     }
 
@@ -412,7 +412,10 @@ impl HttpDownloader {
             }
 
             let mut e = TransportException::new(
-                format!("Network disabled, request canceled: {}", Url::sanitize(url)),
+                format!(
+                    "Network disabled, request canceled: {}",
+                    Url::sanitize(url).display_lossy()
+                ),
                 499,
             );
             e.set_status_code(Some(499));
@@ -518,17 +521,12 @@ impl HttpDownloader {
                 && !empty(versions_value)
             {
                 let version_parser: VersionParser = VersionParser::new();
-                let constraint = version_parser.parse_constraints(
-                    &versions_value
-                        .as_string()
-                        .unwrap_or_default()
-                        .to_str_lossy(),
-                )?;
+                let constraint = version_parser
+                    .parse_constraints(versions_value.as_string().unwrap_or_default())?;
                 let composer_constraint = SimpleConstraint::new(
                     "==",
-                    version_parser
-                        .normalize(&composer::get_version(), None)?
-                        .to_string(),
+                    legacy_lossy(&version_parser.normalize(composer::get_version(), None)?)
+                        .into_owned(),
                     None,
                 );
                 if !constraint.matches(&composer_constraint.into()) {
@@ -540,7 +538,7 @@ impl HttpDownloader {
                 "<{tp}>{capitalized} from {url}: {msg}</{tp}>",
                 tp = r#type,
                 capitalized = ucfirst(r#type).display_lossy(),
-                url = Url::sanitize(url.to_string()),
+                url = Url::sanitize(url).display_lossy(),
                 msg = clean_message(
                     &entry
                         .unwrap()
@@ -564,17 +562,15 @@ impl HttpDownloader {
                     let r#type = substr(key, 0, Some(-1));
                     if let PhpMixed::Array(spec_map) = spec {
                         let constraint = version_parser.parse_constraints(
-                            &spec_map
+                            spec_map
                                 .get(B("versions"))
                                 .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                                .to_str_lossy(),
+                                .unwrap_or_default(),
                         )?;
                         let composer_constraint = SimpleConstraint::new(
                             "==",
-                            version_parser
-                                .normalize(&composer::get_version(), None)?
-                                .to_string(),
+                            legacy_lossy(&version_parser.normalize(composer::get_version(), None)?)
+                                .into_owned(),
                             None,
                         );
                         if !constraint.matches(&composer_constraint.into()) {
@@ -585,7 +581,7 @@ impl HttpDownloader {
                             "<{tp}>{capitalized} from {url}: {msg}</{tp}>",
                             tp = r#type.display_lossy(),
                             capitalized = ucfirst(&r#type).display_lossy(),
-                            url = Url::sanitize(url.to_string()),
+                            url = Url::sanitize(url).display_lossy(),
                             msg = clean_message(
                                 &spec_map
                                     .get(B("message"))

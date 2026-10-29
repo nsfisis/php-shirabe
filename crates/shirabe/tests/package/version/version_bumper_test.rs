@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use shirabe::package::handle::{PackageHandle, PackageInterfaceHandle};
 use shirabe::package::package::Package;
 use shirabe::package::version::version_bumper::VersionBumper;
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::PhpMixed;
 use shirabe_semver::VersionParser;
 
 #[test]
@@ -17,9 +17,9 @@ fn test_bump_requirement() {
         let version_parser = VersionParser;
 
         let mut package = Package::new(
-            "foo/bar".to_string(),
-            legacy_lossy(&version_parser.normalize(pretty_version, None).unwrap()).into_owned(),
-            pretty_version.to_string(),
+            bstr::BString::from("foo/bar".to_string()),
+            bstr::BString::from(&version_parser.normalize(pretty_version, None).unwrap()[..]),
+            bstr::BString::from(pretty_version.to_string()),
         );
 
         if let Some(branch_alias) = branch_alias {

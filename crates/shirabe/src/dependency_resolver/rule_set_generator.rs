@@ -9,8 +9,9 @@ use crate::filter::platform_requirement_filter::{
     PlatformRequirementFilterInterface,
 };
 use crate::package::PackageInterfaceHandle;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::LogicException;
+use shirabe_php_shim::{LogicException, legacy_lossy};
 use std::collections::VecDeque;
 
 #[derive(Debug)]
@@ -19,7 +20,7 @@ pub struct RuleSetGenerator {
     pool: std::rc::Rc<std::cell::RefCell<Pool>>,
     rules: RuleSet,
     added_map: IndexMap<i64, PackageInterfaceHandle>,
-    added_packages_by_names: IndexMap<String, Vec<PackageInterfaceHandle>>,
+    added_packages_by_names: IndexMap<BString, Vec<PackageInterfaceHandle>>,
 }
 
 impl RuleSetGenerator {
@@ -150,7 +151,7 @@ impl RuleSetGenerator {
             if !is_alias {
                 for name in package.get_names(false) {
                     self.added_packages_by_names
-                        .entry(name)
+                        .entry(BString::from(&name[..]))
                         .or_default()
                         .push(package.clone());
                 }
@@ -185,7 +186,7 @@ impl RuleSetGenerator {
 
             for link in package.get_requires().values() {
                 let mut constraint = link.get_constraint().clone();
-                if platform_requirement_filter.is_ignored(link.get_target()) {
+                if platform_requirement_filter.is_ignored(&legacy_lossy(link.get_target())) {
                     continue;
                 } else if let Some(ignore_list_filter) = platform_requirement_filter
                     .as_any()
@@ -193,14 +194,17 @@ impl RuleSetGenerator {
                 ) {
                     let fallback = constraint.clone();
                     constraint = ignore_list_filter
-                        .filter_constraint(link.get_target(), constraint, true)
+                        .filter_constraint(&legacy_lossy(link.get_target()), constraint, true)
                         .unwrap_or(fallback);
                 }
 
                 let possible_requires: Vec<PackageInterfaceHandle> = self
                     .pool
                     .borrow_mut()
-                    .what_provides(link.get_target(), Some(&constraint))
+                    .what_provides(
+                        bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                        Some(&constraint),
+                    )
                     .into_iter()
                     .collect();
 
@@ -233,7 +237,7 @@ impl RuleSetGenerator {
                 }
 
                 let mut constraint = link.get_constraint().clone();
-                if platform_requirement_filter.is_ignored(link.get_target()) {
+                if platform_requirement_filter.is_ignored(&legacy_lossy(link.get_target())) {
                     continue;
                 } else if let Some(ignore_list_filter) = platform_requirement_filter
                     .as_any()
@@ -241,14 +245,17 @@ impl RuleSetGenerator {
                 ) {
                     let fallback = constraint.clone();
                     constraint = ignore_list_filter
-                        .filter_constraint(link.get_target(), constraint, false)
+                        .filter_constraint(&legacy_lossy(link.get_target()), constraint, false)
                         .unwrap_or(fallback);
                 }
 
                 let conflicts: Vec<PackageInterfaceHandle> = self
                     .pool
                     .borrow_mut()
-                    .what_provides(link.get_target(), Some(&constraint))
+                    .what_provides(
+                        bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                        Some(&constraint),
+                    )
                     .into_iter()
                     .collect();
 
@@ -271,7 +278,7 @@ impl RuleSetGenerator {
             }
         }
 
-        let names_packages: Vec<(String, Vec<PackageInterfaceHandle>)> = self
+        let names_packages: Vec<(BString, Vec<PackageInterfaceHandle>)> = self
             .added_packages_by_names
             .iter()
             .map(|(k, v)| (k.clone(), v.to_vec()))
@@ -283,7 +290,7 @@ impl RuleSetGenerator {
                 let rule = self.create_multi_conflict_rule(
                     &packages,
                     reason,
-                    rule::ReasonData::String(name),
+                    rule::ReasonData::String(legacy_lossy(&name).into_owned()),
                 );
                 self.add_rule(RuleSet::TYPE_PACKAGE, Some(rule));
             }
@@ -309,7 +316,7 @@ impl RuleSetGenerator {
                 // otherwise, looks like a bug
                 return Err(LogicException::new(format!(
                     "Fixed package {} was not added to solver pool.",
-                    package.get_pretty_string()
+                    package.get_pretty_string().display_lossy()
                 ))
                 .into());
             }
@@ -328,7 +335,7 @@ impl RuleSetGenerator {
 
         for (package_name, constraint) in request.get_requires().iter() {
             let mut constraint = constraint.clone();
-            if platform_requirement_filter.is_ignored(package_name) {
+            if platform_requirement_filter.is_ignored(&legacy_lossy(package_name)) {
                 continue;
             } else if let Some(ignore_list_filter) = platform_requirement_filter
                 .as_any()
@@ -336,14 +343,14 @@ impl RuleSetGenerator {
             ) {
                 let fallback = constraint.clone();
                 constraint = ignore_list_filter
-                    .filter_constraint(package_name, constraint, true)
+                    .filter_constraint(&legacy_lossy(package_name), constraint, true)
                     .unwrap_or(fallback);
             }
 
             let packages: Vec<PackageInterfaceHandle> = self
                 .pool
                 .borrow_mut()
-                .what_provides(package_name, Some(&constraint))
+                .what_provides(package_name.as_bstr(), Some(&constraint))
                 .into_iter()
                 .collect();
             if !packages.is_empty() {
@@ -356,7 +363,7 @@ impl RuleSetGenerator {
                     literals,
                     rule::RULE_ROOT_REQUIRE,
                     rule::ReasonData::RootRequire {
-                        package_name: package_name.clone(),
+                        package_name: legacy_lossy(&package_name.clone()).into_owned(),
                         constraint: constraint.clone(),
                     },
                 );

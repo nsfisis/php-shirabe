@@ -8,32 +8,33 @@ use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase, VcsDriverInterface};
 use crate::util::Bitbucket;
 use crate::util::http::Response;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException,
-    array_key_exists, array_search_mixed, date_create, empty, extension_loaded, http_build_query,
-    implode, is_array, legacy_lossy, php_regex, preg_is_match, preg_match, preg_replace, strpos,
+    array_key_exists, array_search_mixed, bconcat, date_create, empty, extension_loaded,
+    http_build_query, implode, is_array, legacy_lossy, path_from_bytes, php_regex, preg_is_match,
+    preg_match, preg_replace, strpos,
 };
 
 #[derive(Debug)]
 pub struct GitBitbucketDriver {
     inner: VcsDriverBase,
-    owner: String,
-    repository: String,
+    owner: BString,
+    repository: BString,
     has_issues: bool,
-    root_identifier: Option<String>,
-    tags: Option<IndexMap<String, String>>,
-    branches: Option<IndexMap<String, String>>,
-    branches_url: String,
-    tags_url: String,
-    home_url: String,
-    website: String,
-    clone_https_url: String,
+    root_identifier: Option<BString>,
+    tags: Option<IndexMap<BString, BString>>,
+    branches: Option<IndexMap<BString, BString>>,
+    branches_url: BString,
+    tags_url: BString,
+    home_url: BString,
+    website: BString,
+    clone_https_url: BString,
     repo_data: IndexMap<BString, PhpMixed>,
     fallback_driver: Option<Box<dyn VcsDriverInterface>>,
-    vcs_type: Option<String>,
+    vcs_type: Option<BString>,
 }
 
 impl GitBitbucketDriver {
@@ -46,17 +47,17 @@ impl GitBitbucketDriver {
     ) -> Self {
         Self {
             inner: VcsDriverBase::new(repo_config, io, config, http_downloader, process),
-            owner: String::new(),
-            repository: String::new(),
+            owner: BString::default(),
+            repository: BString::default(),
             has_issues: false,
             root_identifier: None,
             tags: None,
             branches: None,
-            branches_url: String::new(),
-            tags_url: String::new(),
-            home_url: String::new(),
-            website: String::new(),
-            clone_https_url: String::new(),
+            branches_url: BString::default(),
+            tags_url: BString::default(),
+            home_url: BString::default(),
+            website: BString::default(),
+            clone_https_url: BString::default(),
             repo_data: IndexMap::new(),
             fallback_driver: None,
             vcs_type: None,
@@ -70,28 +71,27 @@ impl GitBitbucketDriver {
         ) else {
             return Err(InvalidArgumentException::new(format!(
                 "The Bitbucket repository URL {} is invalid. It must be the HTTPS URL of a Bitbucket repository.",
-                self.inner.url.clone(),
+                self.inner.url.clone().display_lossy(),
             ))
             .into());
         };
 
-        self.owner = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
-        self.repository = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
-        self.inner.origin_url = "bitbucket.org".to_string();
+        self.owner = BString::from(m.get(1).unwrap_or_default());
+        self.repository = BString::from(m.get(2).unwrap_or_default());
+        self.inner.origin_url = bstr::BString::from("bitbucket.org".to_string());
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            &legacy_lossy(&implode(
+            path_from_bytes(&implode(
                 "/",
                 &[
-                    legacy_lossy(
+                    BString::from(
                         self.inner
                             .config
                             .borrow_mut()
-                            .get("cache-repo-dir")
+                            .get(&legacy_lossy(b"cache-repo-dir".as_slice()))
                             .as_string()
                             .unwrap_or_default(),
-                    )
-                    .into_owned(),
+                    ),
                     self.inner.origin_url.clone(),
                     self.owner.clone(),
                     self.repository.clone(),
@@ -105,7 +105,7 @@ impl GitBitbucketDriver {
             self.inner
                 .config
                 .borrow_mut()
-                .get("cache-read-only")
+                .get(&legacy_lossy(b"cache-read-only".as_slice()))
                 .as_bool()
                 .unwrap_or(false),
         );
@@ -113,7 +113,7 @@ impl GitBitbucketDriver {
         Ok(())
     }
 
-    pub fn get_url(&self) -> String {
+    pub fn get_url(&self) -> BString {
         if let Some(fallback) = self.fallback_driver.as_ref() {
             return fallback.get_url();
         }
@@ -126,19 +126,19 @@ impl GitBitbucketDriver {
     fn get_repo_data(&mut self) -> anyhow::Result<bool> {
         let resource = format!(
             "https://api.bitbucket.org/2.0/repositories/{}/{}?{}",
-            self.owner.clone(),
-            self.repository.clone(),
+            legacy_lossy(&self.owner.clone()),
+            legacy_lossy(&self.repository.clone()),
             legacy_lossy(&http_build_query(&[("fields", "-project,-owner")])),
         );
 
         let repo_data = self
-            .fetch_with_oauth_credentials(&resource, true)?
+            .fetch_with_oauth_credentials(bstr::BStr::new(&resource), true)?
             .decode_json()?;
         if self.fallback_driver.is_some() {
             return Ok(false);
         }
         let clone_links = repo_data
-            .get("links")
+            .get(&legacy_lossy(b"links".as_slice()))
             .and_then(|v| match v {
                 PhpMixed::Array(m) => m.get(B("clone")),
                 _ => None,
@@ -148,62 +148,60 @@ impl GitBitbucketDriver {
 
         self.has_issues = !empty(
             repo_data
-                .get("has_issues")
+                .get(&legacy_lossy(b"has_issues".as_slice()))
                 .cloned()
                 .as_ref()
                 .unwrap_or(&PhpMixed::Null),
         );
-        self.branches_url = repo_data
-            .get("links")
-            .and_then(|v| match v {
-                PhpMixed::Array(m) => m.get(B("branches")),
-                _ => None,
-            })
-            .and_then(|v| match v {
-                PhpMixed::Array(m) => m
-                    .get(B("href"))
-                    .and_then(|v| v.as_string())
-                    .map(|s| s.to_str_lossy().into_owned()),
-                _ => None,
-            })
-            .unwrap_or_default();
-        self.tags_url = repo_data
-            .get("links")
-            .and_then(|v| match v {
-                PhpMixed::Array(m) => m.get(B("tags")),
-                _ => None,
-            })
-            .and_then(|v| match v {
-                PhpMixed::Array(m) => m
-                    .get(B("href"))
-                    .and_then(|v| v.as_string())
-                    .map(|s| s.to_str_lossy().into_owned()),
-                _ => None,
-            })
-            .unwrap_or_default();
-        self.home_url = repo_data
-            .get("links")
-            .and_then(|v| match v {
-                PhpMixed::Array(m) => m.get(B("html")),
-                _ => None,
-            })
-            .and_then(|v| match v {
-                PhpMixed::Array(m) => m
-                    .get(B("href"))
-                    .and_then(|v| v.as_string())
-                    .map(|s| s.to_str_lossy().into_owned()),
-                _ => None,
-            })
-            .unwrap_or_default();
-        self.website = repo_data
-            .get("website")
-            .and_then(|v| v.as_string())
-            .map(|s| s.to_str_lossy().into_owned())
-            .unwrap_or_default();
+        self.branches_url = bstr::BString::from(
+            repo_data
+                .get(&legacy_lossy(b"links".as_slice()))
+                .and_then(|v| match v {
+                    PhpMixed::Array(m) => m.get(B("branches")),
+                    _ => None,
+                })
+                .and_then(|v| match v {
+                    PhpMixed::Array(m) => m.get(B("href")).and_then(|v| v.as_string()),
+                    _ => None,
+                })
+                .unwrap_or_default(),
+        );
+        self.tags_url = bstr::BString::from(
+            repo_data
+                .get(&legacy_lossy(b"links".as_slice()))
+                .and_then(|v| match v {
+                    PhpMixed::Array(m) => m.get(B("tags")),
+                    _ => None,
+                })
+                .and_then(|v| match v {
+                    PhpMixed::Array(m) => m.get(B("href")).and_then(|v| v.as_string()),
+                    _ => None,
+                })
+                .unwrap_or_default(),
+        );
+        self.home_url = bstr::BString::from(
+            repo_data
+                .get(&legacy_lossy(b"links".as_slice()))
+                .and_then(|v| match v {
+                    PhpMixed::Array(m) => m.get(B("html")),
+                    _ => None,
+                })
+                .and_then(|v| match v {
+                    PhpMixed::Array(m) => m.get(B("href")).and_then(|v| v.as_string()),
+                    _ => None,
+                })
+                .unwrap_or_default(),
+        );
+        self.website = bstr::BString::from(
+            repo_data
+                .get(&legacy_lossy(b"website".as_slice()))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        );
         self.vcs_type = repo_data
-            .get("scm")
+            .get(&legacy_lossy(b"scm".as_slice()))
             .and_then(|v| v.as_string())
-            .map(|s| s.to_str_lossy().into_owned());
+            .map(bstr::BString::from);
 
         self.repo_data = match repo_data {
             PhpMixed::Array(m) => m,
@@ -215,7 +213,7 @@ impl GitBitbucketDriver {
 
     pub fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_composer_information(identifier);
@@ -224,7 +222,11 @@ impl GitBitbucketDriver {
         if !self.inner.info_cache.contains_key(identifier) {
             let mut composer: Option<IndexMap<BString, PhpMixed>> = None;
             if self.inner.should_cache(identifier) && {
-                let res = self.inner.cache.as_mut().and_then(|c| c.read(identifier));
+                let res = self
+                    .inner
+                    .cache
+                    .as_mut()
+                    .and_then(|c| c.read(&*legacy_lossy(identifier)));
                 if let Some(res) = res {
                     composer = JsonFile::parse_json(Some(&res), None)?.as_array().cloned();
                     true
@@ -234,7 +236,8 @@ impl GitBitbucketDriver {
             } {
                 // composer already set above
             } else {
-                let file_content = self.get_file_content("composer.json", identifier)?;
+                let file_content =
+                    self.get_file_content(bstr::BStr::new("composer.json"), identifier)?;
                 composer = VcsDriverBase::finish_base_composer_information(
                     identifier,
                     file_content,
@@ -243,7 +246,7 @@ impl GitBitbucketDriver {
 
                 if self.inner.should_cache(identifier) {
                     self.inner.cache.as_mut().unwrap().write(
-                        identifier,
+                        &*legacy_lossy(identifier),
                         &JsonFile::encode_with_options(
                             &PhpMixed::Array(
                                 composer.clone().unwrap_or_default().into_iter().collect(),
@@ -275,32 +278,32 @@ impl GitBitbucketDriver {
                     let tags = self.get_tags()?;
                     let branches_for_search = self.get_branches()?;
                     let label = array_search_mixed(
-                        &PhpMixed::string(identifier.to_string()),
+                        &PhpMixed::string(BString::from(identifier)),
                         &PhpMixed::Array(
                             tags.iter()
-                                .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
+                                .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                                 .collect(),
                         ),
                         false,
                     )
                     .or_else(|| {
                         array_search_mixed(
-                            &PhpMixed::string(identifier.to_string()),
+                            &PhpMixed::string(BString::from(identifier)),
                             &PhpMixed::Array(
                                 branches_for_search
                                     .iter()
-                                    .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
+                                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                                     .collect(),
                             ),
                             false,
                         )
                     })
-                    .map(|v| legacy_lossy(v.as_string().unwrap_or_default()).into_owned())
-                    .unwrap_or_else(|| identifier.to_string());
+                    .map(|v| BString::from(v.as_string().unwrap_or_default()))
+                    .unwrap_or_else(|| bstr::BString::from(identifier));
 
                     let tags2 = self.get_tags()?;
                     let branches2 = self.get_branches()?;
-                    let mut hash: Option<String> = None;
+                    let mut hash: Option<BString> = None;
                     if array_key_exists(&label, &tags2) {
                         hash = tags2.get(&label).cloned();
                     } else if array_key_exists(&label, &branches2) {
@@ -315,11 +318,14 @@ impl GitBitbucketDriver {
                             if let PhpMixed::Array(support_map) = support_entry {
                                 support_map.insert(
                                     "source".into(),
-                                    PhpMixed::string(format!(
-                                        "https://{}/{}/{}/src",
+                                    PhpMixed::string(bconcat!(
+                                        "https://",
                                         self.inner.origin_url.clone(),
+                                        "/",
                                         self.owner.clone(),
+                                        "/",
                                         self.repository.clone(),
+                                        "/src"
                                     )),
                                 );
                             }
@@ -328,13 +334,17 @@ impl GitBitbucketDriver {
                             if let PhpMixed::Array(support_map) = support_entry {
                                 support_map.insert(
                                     "source".into(),
-                                    PhpMixed::string(format!(
-                                        "https://{}/{}/{}/src/{}/?at={}",
+                                    PhpMixed::string(bconcat!(
+                                        "https://",
                                         self.inner.origin_url.clone(),
+                                        "/",
                                         self.owner.clone(),
+                                        "/",
                                         self.repository.clone(),
+                                        "/src/",
                                         hash,
-                                        label,
+                                        "/?at=",
+                                        label
                                     )),
                                 );
                             }
@@ -355,11 +365,14 @@ impl GitBitbucketDriver {
                     if let PhpMixed::Array(support_map) = support_entry {
                         support_map.insert(
                             "issues".into(),
-                            PhpMixed::string(format!(
-                                "https://{}/{}/{}/issues",
+                            PhpMixed::string(bconcat!(
+                                "https://",
                                 self.inner.origin_url.clone(),
+                                "/",
                                 self.owner.clone(),
+                                "/",
                                 self.repository.clone(),
+                                "/issues"
                             )),
                         );
                     }
@@ -379,7 +392,7 @@ impl GitBitbucketDriver {
 
             self.inner
                 .info_cache
-                .insert(identifier.to_string(), composer);
+                .insert(bstr::BString::from(identifier), composer);
         }
 
         Ok(self.inner.info_cache.get(identifier).cloned().flatten())
@@ -387,114 +400,136 @@ impl GitBitbucketDriver {
 
     pub fn get_file_content(
         &mut self,
-        file: &str,
-        identifier: &str,
-    ) -> anyhow::Result<Option<String>> {
+        file: &BStr,
+        identifier: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_file_content(file, identifier);
         }
 
-        let mut identifier = identifier.to_string();
+        let mut identifier = BString::from(identifier);
         if strpos(&identifier, "/").is_some() {
             let branches = self.get_branches()?;
             if let Some(b) = branches.get(&identifier) {
-                identifier = b.clone();
+                identifier = BString::from(&b.clone()[..]);
             }
         }
 
-        let resource = format!(
-            "https://api.bitbucket.org/2.0/repositories/{}/{}/src/{}/{}",
+        let resource = bconcat!(
+            "https://api.bitbucket.org/2.0/repositories/",
             self.owner.clone(),
+            "/",
             self.repository.clone(),
+            "/src/",
             identifier,
-            file,
+            "/",
+            file
         );
 
         Ok(self
-            .fetch_with_oauth_credentials(&resource, false)?
+            .fetch_with_oauth_credentials(bstr::BStr::new(&resource), false)?
             .get_body()
-            .map(|s| s.to_string()))
+            .map(|s| s.to_string())
+            .map(bstr::BString::from))
     }
 
     pub fn get_change_date(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_change_date(identifier);
         }
 
-        let mut identifier = identifier.to_string();
+        let mut identifier = BString::from(identifier);
         if strpos(&identifier, "/").is_some() {
             let branches = self.get_branches()?;
             if let Some(b) = branches.get(&identifier) {
-                identifier = b.clone();
+                identifier = BString::from(&b.clone()[..]);
             }
         }
 
-        let resource = format!(
-            "https://api.bitbucket.org/2.0/repositories/{}/{}/commit/{}?fields=date",
+        let resource = bconcat!(
+            "https://api.bitbucket.org/2.0/repositories/",
             self.owner.clone(),
+            "/",
             self.repository.clone(),
+            "/commit/",
             identifier,
+            "?fields=date"
         );
         let commit = self
-            .fetch_with_oauth_credentials(&resource, false)?
+            .fetch_with_oauth_credentials(bstr::BStr::new(&resource), false)?
             .decode_json()?;
 
         let date_str = commit
-            .get("date")
+            .get(&legacy_lossy(b"date".as_slice()))
             .and_then(|v| v.as_string())
             .unwrap_or_default();
-        let date: DateTime<FixedOffset> = date_create(&date_str.to_str_lossy())?;
+        let date: DateTime<FixedOffset> = date_create(date_str)?;
         Ok(Some(date))
     }
 
-    pub fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+    pub fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {
         if let Some(fallback) = self.fallback_driver.as_ref() {
             return fallback.get_source(identifier);
         }
 
-        let mut m: IndexMap<String, String> = IndexMap::new();
+        let mut m: IndexMap<BString, BString> = IndexMap::new();
         m.insert(
-            "type".to_string(),
+            bstr::BString::from("type".to_string()),
             self.vcs_type.clone().unwrap_or_default(),
         );
-        m.insert("url".to_string(), self.get_url());
-        m.insert("reference".to_string(), identifier.to_string());
+        m.insert(bstr::BString::from("url".to_string()), self.get_url());
+        m.insert(
+            bstr::BString::from("reference".to_string()),
+            bstr::BString::from(identifier),
+        );
         m
     }
 
-    pub fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
+    pub fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
         if let Some(fallback) = self.fallback_driver.as_ref() {
             return fallback.get_dist(identifier);
         }
 
-        let url = format!(
-            "https://bitbucket.org/{}/{}/get/{}.zip",
+        let url = bconcat!(
+            "https://bitbucket.org/",
             self.owner.clone(),
+            "/",
             self.repository.clone(),
+            "/get/",
             identifier,
+            ".zip"
         );
 
-        let mut m: IndexMap<String, String> = IndexMap::new();
-        m.insert("type".to_string(), "zip".to_string());
-        m.insert("url".to_string(), url);
-        m.insert("reference".to_string(), identifier.to_string());
-        m.insert("shasum".to_string(), String::new());
+        let mut m: IndexMap<BString, BString> = IndexMap::new();
+        m.insert(
+            bstr::BString::from("type".to_string()),
+            bstr::BString::from("zip".to_string()),
+        );
+        m.insert(bstr::BString::from("url".to_string()), url);
+        m.insert(
+            bstr::BString::from("reference".to_string()),
+            bstr::BString::from(identifier),
+        );
+        m.insert(
+            bstr::BString::from("shasum".to_string()),
+            BString::default(),
+        );
         Some(m)
     }
 
-    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_tags();
         }
 
         if self.tags.is_none() {
-            let mut tags: IndexMap<String, String> = IndexMap::new();
+            let mut tags: IndexMap<BString, BString> = IndexMap::new();
             let mut resource = format!(
                 "{}?{}",
-                self.tags_url.clone(),
+                legacy_lossy(&self.tags_url.clone()),
                 legacy_lossy(&http_build_query(&[
                     ("pagelen", "100"),
                     ("fields", "values.name,values.target.hash,next"),
@@ -504,19 +539,18 @@ impl GitBitbucketDriver {
             let mut has_next = true;
             while has_next {
                 let tags_data = self
-                    .fetch_with_oauth_credentials(&resource, false)?
+                    .fetch_with_oauth_credentials(bstr::BStr::new(&resource), false)?
                     .decode_json()?;
-                let values = tags_data.get("values").cloned();
+                let values = tags_data.get(&legacy_lossy(b"values".as_slice())).cloned();
                 if let Some(PhpMixed::List(list)) = values {
                     for data in list {
                         if let PhpMixed::Array(m) = data {
-                            let name = legacy_lossy(
+                            let name = BString::from(
                                 m.get(B("name"))
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default(),
-                            )
-                            .into_owned();
-                            let hash = legacy_lossy(
+                            );
+                            let hash = BString::from(
                                 m.get(B("target"))
                                     .and_then(|v| match v {
                                         PhpMixed::Array(m) => m.get(B("hash")),
@@ -524,27 +558,26 @@ impl GitBitbucketDriver {
                                     })
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default(),
-                            )
-                            .into_owned();
+                            );
                             tags.insert(name, hash);
                         }
                     }
                 }
                 if empty(
                     tags_data
-                        .get("next")
+                        .get(&legacy_lossy(b"next".as_slice()))
                         .cloned()
                         .as_ref()
                         .unwrap_or(&PhpMixed::Null),
                 ) {
                     has_next = false;
                 } else {
-                    resource = legacy_lossy(
+                    resource = legacy_lossy(&BString::from(
                         tags_data
-                            .get("next")
+                            .get(&legacy_lossy(b"next".as_slice()))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
-                    )
+                    ))
                     .into_owned();
                 }
             }
@@ -555,16 +588,16 @@ impl GitBitbucketDriver {
         Ok(self.tags.clone().unwrap_or_default())
     }
 
-    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_branches();
         }
 
         if self.branches.is_none() {
-            let mut branches: IndexMap<String, String> = IndexMap::new();
+            let mut branches: IndexMap<BString, BString> = IndexMap::new();
             let mut resource = format!(
                 "{}?{}",
-                self.branches_url.clone(),
+                legacy_lossy(&self.branches_url.clone()),
                 legacy_lossy(&http_build_query(&[
                     ("pagelen", "100"),
                     ("fields", "values.name,values.target.hash,values.heads,next"),
@@ -574,19 +607,20 @@ impl GitBitbucketDriver {
             let mut has_next = true;
             while has_next {
                 let branch_data = self
-                    .fetch_with_oauth_credentials(&resource, false)?
+                    .fetch_with_oauth_credentials(bstr::BStr::new(&resource), false)?
                     .decode_json()?;
-                let values = branch_data.get("values").cloned();
+                let values = branch_data
+                    .get(&legacy_lossy(b"values".as_slice()))
+                    .cloned();
                 if let Some(PhpMixed::List(list)) = values {
                     for data in list {
                         if let PhpMixed::Array(m) = data {
-                            let name = legacy_lossy(
+                            let name = BString::from(
                                 m.get(B("name"))
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default(),
-                            )
-                            .into_owned();
-                            let hash = legacy_lossy(
+                            );
+                            let hash = BString::from(
                                 m.get(B("target"))
                                     .and_then(|v| match v {
                                         PhpMixed::Array(m) => m.get(B("hash")),
@@ -594,27 +628,26 @@ impl GitBitbucketDriver {
                                     })
                                     .and_then(|v| v.as_string())
                                     .unwrap_or_default(),
-                            )
-                            .into_owned();
+                            );
                             branches.insert(name, hash);
                         }
                     }
                 }
                 if empty(
                     branch_data
-                        .get("next")
+                        .get(&legacy_lossy(b"next".as_slice()))
                         .cloned()
                         .as_ref()
                         .unwrap_or(&PhpMixed::Null),
                 ) {
                     has_next = false;
                 } else {
-                    resource = legacy_lossy(
+                    resource = legacy_lossy(&BString::from(
                         branch_data
-                            .get("next")
+                            .get(&legacy_lossy(b"next".as_slice()))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
-                    )
+                    ))
                     .into_owned();
                 }
             }
@@ -628,7 +661,7 @@ impl GitBitbucketDriver {
     /// Get the remote content.
     fn fetch_with_oauth_credentials(
         &mut self,
-        url: &str,
+        url: &BStr,
         fetching_repo_data: bool,
     ) -> anyhow::Result<Response> {
         let e = match self.inner.get_contents(url)? {
@@ -649,8 +682,11 @@ impl GitBitbucketDriver {
         if in_set
             || (401 == code && strpos(e.get_message(), "Could not authenticate against") == Some(0))
         {
-            if !self.inner.io.has_authentication(&self.inner.origin_url)
-                && bitbucket_util.authorize_oauth(&self.inner.origin_url)?
+            if !self
+                .inner
+                .io
+                .has_authentication(&legacy_lossy(&self.inner.origin_url))
+                && bitbucket_util.authorize_oauth(&legacy_lossy(&self.inner.origin_url))?
             {
                 return Ok(self.inner.get_contents(url)??);
             }
@@ -671,15 +707,20 @@ impl GitBitbucketDriver {
     }
 
     /// Generate an SSH URL
-    fn generate_ssh_url(&self) -> String {
-        format!(
-            "git@{}:{}/{}.git",
-            self.inner.origin_url, self.owner, self.repository
+    fn generate_ssh_url(&self) -> BString {
+        bconcat!(
+            "git@",
+            self.inner.origin_url,
+            ":",
+            self.owner,
+            "/",
+            self.repository,
+            ".git"
         )
     }
 
     fn attempt_clone_fallback(&mut self) -> anyhow::Result<bool> {
-        match self.setup_fallback_driver(&self.generate_ssh_url()) {
+        match self.setup_fallback_driver(self.generate_ssh_url().as_bstr()) {
             Ok(()) => Ok(true),
             Err(e) => {
                 if e.is_instanceof::<RuntimeException>() {
@@ -687,7 +728,7 @@ impl GitBitbucketDriver {
 
                     self.inner.io.write_error(&format!(
                         "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your Bitbucket OAuth consumer credentials</error>",
-                        self.generate_ssh_url()
+                        self.generate_ssh_url().display_lossy()
                     ));
                 }
                 Err(e)
@@ -695,9 +736,9 @@ impl GitBitbucketDriver {
         }
     }
 
-    fn setup_fallback_driver(&mut self, url: &str) -> anyhow::Result<()> {
+    fn setup_fallback_driver(&mut self, url: &BStr) -> anyhow::Result<()> {
         let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
-        repo_config.insert("url".into(), PhpMixed::string(url.to_string()));
+        repo_config.insert("url".into(), PhpMixed::string(BString::from(url)));
         let mut driver = GitDriver::new(
             repo_config,
             self.inner.io.clone(),
@@ -721,19 +762,20 @@ impl GitBitbucketDriver {
             {
                 // Format: https://(user@)bitbucket.org/{user}/{repo}
                 // Strip username from URL (only present in clone URL's for private repositories)
-                self.clone_https_url = legacy_lossy(&preg_replace(
-                    php_regex!(r"/https:\/\/([^@]+@)?/"),
-                    "https://",
-                    m.get(B("href"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default(),
-                ))
-                .into_owned();
+                self.clone_https_url = BString::from(
+                    &preg_replace(
+                        php_regex!(r"/https:\/\/([^@]+@)?/"),
+                        "https://",
+                        m.get(B("href"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )[..],
+                );
             }
         }
     }
 
-    pub fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+    pub fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
         if let Some(fallback) = self.fallback_driver.as_mut() {
             return fallback.get_root_identifier();
         }
@@ -751,10 +793,10 @@ impl GitBitbucketDriver {
                 return self.fallback_driver.as_mut().unwrap().get_root_identifier();
             }
 
-            if self.vcs_type.as_deref() != Some("git") {
+            if self.vcs_type.as_ref().is_none_or(|t| t != "git") {
                 return Err(RuntimeException::new(format!(
                     "{} does not appear to be a git repository, use {} but remember that Bitbucket no longer supports the mercurial repositories. https://bitbucket.org/blog/sunsetting-mercurial-support-in-bitbucket",
-                    self.inner.url, self.clone_https_url
+                    self.inner.url.display_lossy(), self.clone_https_url.display_lossy()
                 ))
                 .into());
             }
@@ -767,8 +809,8 @@ impl GitBitbucketDriver {
                     _ => None,
                 })
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_str_lossy().into_owned())
-                .or_else(|| Some("master".to_string()));
+                .map(BString::from)
+                .or_else(|| Some("master".into()));
         }
 
         Ok(self.root_identifier.clone().unwrap_or_default())
@@ -777,7 +819,7 @@ impl GitBitbucketDriver {
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         _config: std::rc::Rc<std::cell::RefCell<Config>>,
-        url: &str,
+        url: &BStr,
         _deep: bool,
     ) -> anyhow::Result<bool> {
         if !preg_is_match(
@@ -791,7 +833,7 @@ impl GitBitbucketDriver {
             io.write_error3(
                 &format!(
                     "Skipping Bitbucket git driver for {} because the OpenSSL PHP extension is missing.",
-                    url
+                    url.display_lossy()
                 ),
                 true,
                 io_interface::VERBOSE,
@@ -811,47 +853,51 @@ impl crate::repository::vcs::VcsDriverInterface for GitBitbucketDriver {
 
     fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         GitBitbucketDriver::get_composer_information(self, identifier)
     }
 
-    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+    fn get_file_content(
+        &mut self,
+        file: &BStr,
+        identifier: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
         GitBitbucketDriver::get_file_content(self, file, identifier)
     }
 
     fn get_change_date(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         GitBitbucketDriver::get_change_date(self, identifier)
     }
 
-    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+    fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
         GitBitbucketDriver::get_root_identifier(self)
     }
 
-    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         GitBitbucketDriver::get_branches(self)
     }
 
-    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         GitBitbucketDriver::get_tags(self)
     }
 
-    fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
+    fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
         GitBitbucketDriver::get_dist(self, identifier)
     }
 
-    fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+    fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {
         GitBitbucketDriver::get_source(self, identifier)
     }
 
-    fn get_url(&self) -> String {
+    fn get_url(&self) -> BString {
         GitBitbucketDriver::get_url(self)
     }
 
-    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+    fn has_composer_file(&mut self, identifier: &BStr) -> anyhow::Result<bool> {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
@@ -871,7 +917,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitBitbucketDriver {
     fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        url: &str,
+        url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {
         GitBitbucketDriver::supports(io, config, url, deep)

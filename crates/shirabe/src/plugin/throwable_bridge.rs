@@ -168,10 +168,10 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
         .into(),
         r"Composer\Plugin\PluginBlockedException" => PluginBlockedException::new(message).into(),
         r"Composer\Repository\InvalidRepositoryException" => {
-            InvalidRepositoryException::new(message).into()
+            InvalidRepositoryException::new(legacy_lossy(&message).into_owned()).into()
         }
         r"Composer\Repository\RepositorySecurityException" => {
-            RepositorySecurityException::new(message).into()
+            RepositorySecurityException::new(legacy_lossy(&message).into_owned()).into()
         }
         r"Symfony\Component\Console\Exception\CommandNotFoundException" => {
             shirabe_symfony_console::exception::CommandNotFoundException::new(

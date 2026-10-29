@@ -208,7 +208,7 @@ impl NativeHttpDownloader {
         self.io.write_error3(
             &format!(
                 "Downloading {}{}{}",
-                Url::sanitize(url.to_string()),
+                Url::sanitize(url).display_lossy(),
                 using_proxy,
                 if_modified
             ),
@@ -309,7 +309,7 @@ impl NativeHttpDownloader {
                         &format!(
                             "Retrying ({}) {} due to connection error",
                             retries + 1,
-                            Url::sanitize(url.to_string())
+                            Url::sanitize(url).display_lossy()
                         ),
                         true,
                         crate::io::DEBUG,
@@ -337,7 +337,7 @@ impl NativeHttpDownloader {
                     TransportException::new(
                         format!(
                             "curl error while downloading {}: {}",
-                            Url::sanitize(url.to_string()),
+                            Url::sanitize(url).display_lossy(),
                             transport_err.message
                         ),
                         0,
@@ -351,7 +351,7 @@ impl NativeHttpDownloader {
         let native_response = response.into_native_http_response(url);
 
         self.io.write_error3(
-            &format!("[{}] {}", status_code, Url::sanitize(url.to_string())),
+            &format!("[{}] {}", status_code, Url::sanitize(url).display_lossy()),
             true,
             crate::io::DEBUG,
         );
@@ -446,7 +446,7 @@ impl NativeHttpDownloader {
                     &format!(
                         "Retrying ({}) {} due to status code {}",
                         retries + 1,
-                        Url::sanitize(url.to_string()),
+                        Url::sanitize(url).display_lossy(),
                         status_code
                     ),
                     true,
@@ -720,7 +720,7 @@ impl NativeHttpDownloader {
                         .and_then(|v| v.as_int())
                         .unwrap_or(0)
                         + 1,
-                    Url::sanitize(target_url.clone()),
+                    Url::sanitize(target_url.clone()).display_lossy(),
                 ),
                 true,
                 crate::io::DEBUG,

@@ -347,7 +347,7 @@ impl InstallerInterface for LibraryInstaller {
         if !repo.borrow_mut().has_package(initial.clone())? {
             return Err(InvalidArgumentException::new(format!(
                 "Package is not installed: {}",
-                initial
+                initial.to_php_string().display_lossy()
             ))
             .into());
         }
@@ -380,7 +380,7 @@ impl InstallerInterface for LibraryInstaller {
         if !repo.borrow_mut().has_package(package.clone())? {
             return Err(InvalidArgumentException::new(format!(
                 "Package is not installed: {}",
-                package
+                package.to_php_string().display_lossy()
             ))
             .into());
         }
@@ -416,13 +416,13 @@ impl InstallerInterface for LibraryInstaller {
             } else {
                 String::new()
             },
-            package.get_pretty_name(),
+            legacy_lossy(&package.get_pretty_name()),
         );
         let target_dir = package.get_target_dir();
 
         Some(if let Some(target_dir) = target_dir {
             if !target_dir.is_empty() {
-                format!("{}/{}", base_path, target_dir)
+                format!("{}/{}", base_path, legacy_lossy(&target_dir))
             } else {
                 base_path
             }

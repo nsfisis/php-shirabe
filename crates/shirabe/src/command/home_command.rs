@@ -7,7 +7,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::package::CompletePackageInterfaceHandle;
 use crate::repository::{RepositoryFactory, RootPackageRepository};
 use crate::util::{Platform, ProcessExecutor};
-use shirabe_php_shim::{filter_var_url, impl_php_class};
+use shirabe_php_shim::{filter_var_url, impl_php_class, legacy_lossy};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -44,11 +44,14 @@ impl HomeCommand {
     ) -> bool {
         let support = package.get_support();
         let mut url: Option<String> = support
-            .get("source")
+            .get(bstr::B("source"))
             .cloned()
-            .or_else(|| package.get_source_url());
+            .or_else(|| package.get_source_url())
+            .map(|s| legacy_lossy(&s).into_owned());
         if url.as_deref().is_none_or(|s| s.is_empty()) || show_homepage {
-            url = package.get_homepage();
+            url = package
+                .get_homepage()
+                .map(|s| legacy_lossy(&s).into_owned());
         }
 
         let url = match url {
@@ -189,6 +192,9 @@ impl Command for HomeCommand {
             vec![composer_ref.get_package().get_name()]
         } else {
             packages
+                .into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>()
         };
 
         let show_homepage = input
@@ -207,7 +213,9 @@ impl Command for HomeCommand {
             let mut package_exists = false;
 
             'repos: for repo in &repos {
-                for package in repo.find_packages(package_name, None)? {
+                for package in
+                    repo.find_packages(bstr::BStr::new(&*legacy_lossy(package_name)), None)?
+                {
                     package_exists = true;
                     if let Some(complete_pkg) = package.as_complete()
                         && self.handle_package(complete_pkg, show_homepage, show_only)
@@ -222,7 +230,7 @@ impl Command for HomeCommand {
                 return_code = 1;
                 io.write_error(&format!(
                     "<warning>Package {} not found</warning>",
-                    package_name
+                    package_name.display_lossy()
                 ));
             }
 
@@ -233,7 +241,11 @@ impl Command for HomeCommand {
                 } else {
                     "Invalid or missing repository URL"
                 };
-                io.write_error(&format!("<warning>{} for {}</warning>", msg, package_name));
+                io.write_error(&format!(
+                    "<warning>{} for {}</warning>",
+                    msg,
+                    package_name.display_lossy()
+                ));
             }
         }
 

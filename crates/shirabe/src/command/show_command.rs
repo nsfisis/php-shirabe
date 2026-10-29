@@ -23,9 +23,10 @@ use bstr::{BString, ByteSlice, ByteVec};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, DATE_ATOM, InvalidArgumentException, LogicException, PhpMixed, UnexpectedValueException,
-    array_search, date_format_to_strftime, date_local, extension_loaded, get_class, impl_php_class,
-    in_array_loose, in_array_strict, legacy_lossy, path_to_bytes, php_regex, preg_is_match,
-    preg_match, preg_quote, preg_replace, realpath, strtolower, version_compare,
+    array_search, bconcat, date_format_to_strftime, date_local, extension_loaded, get_class,
+    impl_php_class, implode, in_array_loose, in_array_strict, legacy_lossy, path_to_bytes,
+    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, realpath, strtolower,
+    version_compare,
 };
 use shirabe_semver::Semver;
 use shirabe_semver::constraint::AnyConstraint;
@@ -243,10 +244,10 @@ impl ShowCommand {
 
         let mut combined: IndexMap<String, Link> = IndexMap::new();
         for (k, v) in root_package.get_requires().iter() {
-            combined.insert(k.clone(), v.clone());
+            combined.insert(legacy_lossy(&k.clone()).into_owned(), v.clone());
         }
         for (k, v) in root_package.get_dev_requires().iter() {
-            combined.insert(k.clone(), v.clone());
+            combined.insert(legacy_lossy(&k.clone()).into_owned(), v.clone());
         }
         combined
             .keys()
@@ -281,11 +282,7 @@ impl ShowCommand {
     )> {
         let name = legacy_lossy(&strtolower(name)).into_owned();
         let constraint: Option<AnyConstraint> = match &version {
-            PhpMixed::String(s) => Some(
-                self.version_parser
-                    .borrow()
-                    .parse_constraints(&s.to_str_lossy())?,
-            ),
+            PhpMixed::String(s) => Some(self.version_parser.borrow().parse_constraints(s)?),
             PhpMixed::Null => None,
             _ => None, // already a ConstraintInterface
         };
@@ -307,9 +304,9 @@ impl ShowCommand {
         let mut pool = if PlatformRepository::is_platform_package(&name) {
             repository_set.create_pool_with_all_packages()?
         } else {
-            repository_set.create_pool_for_package(&name, None)?
+            repository_set.create_pool_for_package(bstr::BStr::new(&name), None)?
         };
-        let matches = pool.what_provides(&name, constraint.as_ref());
+        let matches = pool.what_provides(bstr::BStr::new(&name), constraint.as_ref());
         let mut literals: Vec<i64> = Vec::new();
         for package in matches.iter() {
             // avoid showing the 9999999-dev alias if the default branch has no branch-alias set
@@ -325,7 +322,10 @@ impl ShowCommand {
                 matched_package = Some(p.clone());
             }
 
-            versions.insert(p.get_pretty_version(), p.get_version());
+            versions.insert(
+                legacy_lossy(&p.get_pretty_version()).into_owned(),
+                legacy_lossy(&p.get_version()).into_owned(),
+            );
             literals.push(p.get_id());
         }
 
@@ -368,8 +368,11 @@ impl ShowCommand {
         if !package.get_suggests().is_empty() {
             self.get_io().write("\n<info>suggests</info>");
             for (suggested, reason) in package.get_suggests().iter() {
-                self.get_io()
-                    .write(&format!("{} <comment>{}</comment>", suggested, reason));
+                self.get_io().write(&format!(
+                    "{} <comment>{}</comment>",
+                    legacy_lossy(&suggested),
+                    legacy_lossy(&reason)
+                ));
             }
         }
 
@@ -387,20 +390,22 @@ impl ShowCommand {
         installed_repo: &mut dyn RepositoryInterface,
         latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
-        let is_installed_package = !PlatformRepository::is_platform_package(&package.get_name())
+        let is_installed_package = !PlatformRepository::is_platform_package(package.get_name())
             && installed_repo.has_package(package.clone().into())?;
 
         self.get_io().write(&format!(
             "<info>name</info>     : {}",
-            package.get_pretty_name()
+            legacy_lossy(&package.get_pretty_name())
         ));
         self.get_io().write(&format!(
             "<info>descrip.</info> : {}",
-            package.get_description().unwrap_or_default()
+            legacy_lossy(&package.get_description().unwrap_or_default())
         ));
         let keywords = package.get_keywords();
-        self.get_io()
-            .write(&format!("<info>keywords</info> : {}", keywords.join(", ")));
+        self.get_io().write(&format!(
+            "<info>keywords</info> : {}",
+            implode(", ", &keywords).display_lossy()
+        ));
         self.print_versions(package.clone(), versions, installed_repo)?;
         if is_installed_package && let Some(rd) = package.get_release_date() {
             let rel = self.get_relative_time(&rd);
@@ -426,7 +431,7 @@ impl ShowCommand {
             self.get_io().write(&format!(
                 "<info>latest</info>   : <{}>{}</{}>{}",
                 style,
-                latest.get_pretty_version(),
+                legacy_lossy(&latest.get_pretty_version()),
                 style,
                 released_time
             ));
@@ -434,24 +439,26 @@ impl ShowCommand {
         } else {
             package.clone().into()
         };
-        self.get_io()
-            .write(&format!("<info>type</info>     : {}", package.get_type()));
+        self.get_io().write(&format!(
+            "<info>type</info>     : {}",
+            legacy_lossy(&package.get_type())
+        ));
         self.print_licenses(package.clone());
         self.get_io().write(&format!(
             "<info>homepage</info> : {}",
-            package.get_homepage().unwrap_or_default()
+            legacy_lossy(&package.get_homepage().unwrap_or_default())
         ));
         self.get_io().write(&format!(
             "<info>source</info>   : [{}] <comment>{}</comment> {}",
-            package.get_source_type().unwrap_or_default(),
-            package.get_source_url().unwrap_or_default(),
-            package.get_source_reference().unwrap_or_default()
+            legacy_lossy(&package.get_source_type().unwrap_or_default()),
+            legacy_lossy(&package.get_source_url().unwrap_or_default()),
+            legacy_lossy(&package.get_source_reference().unwrap_or_default())
         ));
         self.get_io().write(&format!(
             "<info>dist</info>     : [{}] <comment>{}</comment> {}",
-            package.get_dist_type().unwrap_or_default(),
-            package.get_dist_url().unwrap_or_default(),
-            package.get_dist_reference().unwrap_or_default()
+            legacy_lossy(&package.get_dist_type().unwrap_or_default()),
+            legacy_lossy(&package.get_dist_url().unwrap_or_default()),
+            legacy_lossy(&package.get_dist_reference().unwrap_or_default())
         ));
         if is_installed_package {
             let path: Option<String> = self.require_composer(None, None).ok().and_then(|c| {
@@ -474,14 +481,17 @@ impl ShowCommand {
         }
         self.get_io().write(&format!(
             "<info>names</info>    : {}",
-            package.get_names(true).join(", ")
+            legacy_lossy(&implode(", ", &package.get_names(true))).into_owned()
         ));
 
         if let Some(c) = latest.as_complete()
             && c.is_abandoned()
         {
             let replacement = match c.get_replacement_package() {
-                Some(rp) => format!(" The author suggests using the {} package instead.", rp),
+                Some(rp) => format!(
+                    " The author suggests using the {} package instead.",
+                    legacy_lossy(&rp)
+                ),
                 None => String::new(),
             };
 
@@ -495,8 +505,11 @@ impl ShowCommand {
         if !support.is_empty() {
             self.get_io().write("\n<info>support</info>");
             for (r#type, value) in support.iter() {
-                self.get_io()
-                    .write(&format!("<comment>{}</comment> : {}", r#type, value));
+                self.get_io().write(&format!(
+                    "<comment>{}</comment> : {}",
+                    legacy_lossy(&r#type),
+                    legacy_lossy(&value)
+                ));
             }
         }
 
@@ -548,7 +561,8 @@ impl ShowCommand {
             let include_paths = package.get_include_paths();
             if !include_paths.is_empty() {
                 self.get_io().write("<comment>include-path</comment>");
-                self.get_io().write(&include_paths.join(", "));
+                self.get_io()
+                    .write(&legacy_lossy(&implode(", ", &include_paths)));
             }
         }
 
@@ -566,7 +580,8 @@ impl ShowCommand {
         versions_keys = Semver::rsort(versions_keys)?;
 
         // highlight installed version
-        let installed_packages = installed_repo.find_packages(&package.get_name(), None)?;
+        let installed_packages = installed_repo
+            .find_packages(bstr::BStr::new(&*legacy_lossy(&package.get_name())), None)?;
         if !installed_packages.is_empty() {
             for installed_package in installed_packages.iter() {
                 let installed_version = installed_package.get_pretty_version();
@@ -577,7 +592,8 @@ impl ShowCommand {
                 if let Some(found) = array_search(&installed_version, &key_map)
                     && let Some(idx) = versions_keys.iter().position(|v| v == &found)
                 {
-                    versions_keys[idx] = format!("<info>* {}</info>", installed_version);
+                    versions_keys[idx] =
+                        format!("<info>* {}</info>", legacy_lossy(&installed_version));
                 }
             }
         }
@@ -606,8 +622,8 @@ impl ShowCommand {
             for link in links.iter() {
                 io.write(&format!(
                     "{} <comment>{}</comment>",
-                    link.1.get_target(),
-                    link.1.get_pretty_constraint(),
+                    legacy_lossy(&link.1.get_target()),
+                    legacy_lossy(&link.1.get_pretty_constraint()),
                 ));
             }
         }
@@ -621,23 +637,28 @@ impl ShowCommand {
         let io = self.get_io();
 
         for license_id in licenses.iter() {
-            let license = spdx_licenses.get_license_by_identifier(license_id);
+            let license = spdx_licenses.get_license_by_identifier(&legacy_lossy(license_id));
 
             let out = match license {
                 None => license_id.clone(),
-                Some(license) => {
-                    if license.is_osi_approved {
-                        format!(
-                            "{} ({}) (OSI approved) {}",
-                            license.name, license_id, license.url
-                        )
-                    } else {
-                        format!("{} ({}) {}", license.name, license_id, license.url)
-                    }
-                }
+                Some(license) => bstr::BString::from(if license.is_osi_approved {
+                    format!(
+                        "{} ({}) (OSI approved) {}",
+                        license.name,
+                        legacy_lossy(&license_id),
+                        license.url
+                    )
+                } else {
+                    format!(
+                        "{} ({}) {}",
+                        license.name,
+                        legacy_lossy(&license_id),
+                        license.url
+                    )
+                }),
             };
 
-            io.write(&format!("<info>license</info>  : {}", out));
+            io.write(&format!("<info>license</info>  : {}", legacy_lossy(&out)));
         }
     }
 
@@ -650,12 +671,24 @@ impl ShowCommand {
         latest_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {
         let mut json = PackageInfoJson {
-            name: package.get_pretty_name(),
-            description: package.get_description(),
-            keywords: package.get_keywords(),
-            r#type: package.get_type(),
-            homepage: package.get_homepage(),
-            names: package.get_names(true),
+            name: legacy_lossy(&package.get_pretty_name()).into_owned(),
+            description: package
+                .get_description()
+                .map(|s| legacy_lossy(&s).into_owned()),
+            keywords: package
+                .get_keywords()
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<_>>(),
+            r#type: legacy_lossy(&package.get_type()).into_owned(),
+            homepage: package
+                .get_homepage()
+                .map(|s| legacy_lossy(&s).into_owned()),
+            names: package
+                .get_names(true)
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<_>>(),
             versions: Vec::new(),
             licenses: None,
             latest: None,
@@ -679,7 +712,7 @@ impl ShowCommand {
         Self::append_licenses(&mut json, package.clone());
 
         let latest: PackageInterfaceHandle = if let Some(latest) = latest_package {
-            json.latest = Some(latest.get_pretty_version());
+            json.latest = Some(legacy_lossy(&latest.get_pretty_version()).into_owned());
             latest
         } else {
             package.clone().into()
@@ -687,21 +720,29 @@ impl ShowCommand {
 
         if let Some(source_type) = package.get_source_type() {
             json.source = Some(PackageReferenceJson {
-                r#type: source_type,
-                url: package.get_source_url(),
-                reference: package.get_source_reference(),
+                r#type: legacy_lossy(&source_type).into_owned(),
+                url: package
+                    .get_source_url()
+                    .map(|s| legacy_lossy(&s).into_owned()),
+                reference: package
+                    .get_source_reference()
+                    .map(|s| legacy_lossy(&s).into_owned()),
             });
         }
 
         if let Some(dist_type) = package.get_dist_type() {
             json.dist = Some(PackageReferenceJson {
-                r#type: dist_type,
-                url: package.get_dist_url(),
-                reference: package.get_dist_reference(),
+                r#type: legacy_lossy(&dist_type).into_owned(),
+                url: package
+                    .get_dist_url()
+                    .map(|s| legacy_lossy(&s).into_owned()),
+                reference: package
+                    .get_dist_reference()
+                    .map(|s| legacy_lossy(&s).into_owned()),
             });
         }
 
-        if !PlatformRepository::is_platform_package(&package.get_name())
+        if !PlatformRepository::is_platform_package(package.get_name())
             && installed_repo.has_package(package.clone().into())?
         {
             let composer = self.require_composer(None, None)?;
@@ -730,21 +771,30 @@ impl ShowCommand {
         if let Some(c) = latest.as_complete()
             && c.is_abandoned()
         {
-            json.replacement = Some(c.get_replacement_package());
+            json.replacement = Some(
+                c.get_replacement_package()
+                    .map(|s| legacy_lossy(&s).into_owned()),
+            );
         }
 
         if !package.get_suggests().is_empty() {
-            json.suggests = Some(package.get_suggests());
+            json.suggests = Some(lossy_map(package.get_suggests()));
         }
 
         if !package.get_support().is_empty() {
-            json.support = Some(package.get_support());
+            json.support = Some(lossy_map(package.get_support()));
         }
 
         Self::append_autoload(&mut json, package.clone());
 
         if !package.get_include_paths().is_empty() {
-            json.include_path = Some(package.get_include_paths());
+            json.include_path = Some(
+                package
+                    .get_include_paths()
+                    .iter()
+                    .map(|s| legacy_lossy(s).into_owned())
+                    .collect::<Vec<_>>(),
+            );
         }
 
         Self::append_links(&mut json, package);
@@ -781,13 +831,14 @@ impl ShowCommand {
                 licenses
                     .into_iter()
                     .map(|license_id| {
-                        let license = spdx_licenses.get_license_by_identifier(&license_id);
+                        let license =
+                            spdx_licenses.get_license_by_identifier(&legacy_lossy(&license_id));
                         match license {
-                            None => LicenseJson::Id(license_id),
+                            None => LicenseJson::Id(legacy_lossy(&license_id).into_owned()),
                             // The 'osi' key holds the license id string, not the OSI-approved flag.
                             Some(l) => LicenseJson::Detail {
                                 name: l.name,
-                                osi: license_id,
+                                osi: legacy_lossy(&license_id).into_owned(),
                                 url: l.url,
                             },
                         }
@@ -854,8 +905,8 @@ impl ShowCommand {
             let mut m: IndexMap<String, String> = IndexMap::new();
             for link in links.iter() {
                 m.insert(
-                    link.1.get_target().to_string(),
-                    link.1.get_pretty_constraint().to_string(),
+                    legacy_lossy(link.1.get_target()).into_owned(),
+                    legacy_lossy(link.1.get_pretty_constraint()).into_owned(),
                 );
             }
             let slot = match link_type {
@@ -941,18 +992,24 @@ impl ShowCommand {
         remote_repos: &RepositoryInterfaceHandle,
     ) -> PackageTree {
         let requires = {
-            let mut r: IndexMap<String, Link> = (*package.get_requires()).clone();
+            let mut r: IndexMap<String, Link> = package
+                .get_requires()
+                .iter()
+                .map(|(k, v)| (legacy_lossy(k).into_owned(), v.clone()))
+                .collect();
             r.sort_keys();
             r
         };
         let mut children: Vec<PackageTreeChild> = Vec::new();
         for (require_name, require) in requires.iter() {
-            let packages_in_tree: Vec<String> =
-                vec![package.get_name().to_string(), require_name.clone()];
+            let packages_in_tree: Vec<String> = vec![
+                legacy_lossy(&package.get_name()).into_owned(),
+                require_name.clone(),
+            ];
 
             let mut tree_child_desc = PackageTreeChild {
                 name: require_name.clone(),
-                version: require.get_pretty_constraint().to_string(),
+                version: legacy_lossy(require.get_pretty_constraint()).into_owned(),
                 requires: None,
             };
 
@@ -973,10 +1030,10 @@ impl ShowCommand {
             children.push(tree_child_desc);
         }
         let mut tree = PackageTree {
-            name: package.get_pretty_name(),
-            version: package.get_pretty_version(),
+            name: legacy_lossy(&package.get_pretty_name()).into_owned(),
+            version: legacy_lossy(&package.get_pretty_version()).into_owned(),
             description: match package.as_complete() {
-                Some(c) => c.get_description(),
+                Some(c) => c.get_description().map(|s| legacy_lossy(&s).into_owned()),
                 None => Some(String::new()),
             },
             requires: None,
@@ -1053,7 +1110,7 @@ impl ShowCommand {
             // pass the ConstraintInterface object — signal via Null in this scalar shape
             PhpMixed::Null
         } else {
-            PhpMixed::string(link.get_pretty_constraint().to_string())
+            PhpMixed::string(legacy_lossy(link.get_pretty_constraint()).into_owned())
         };
         let (package, _) = self.get_package(installed_repo, remote_repos, name, version_arg)?;
         if let Some(package) = package {
@@ -1063,15 +1120,15 @@ impl ShowCommand {
                 let mut current_tree = packages_in_tree.to_vec();
 
                 let mut tree_child_desc = PackageTreeChild {
-                    name: require_name.clone(),
-                    version: require.get_pretty_constraint().to_string(),
+                    name: legacy_lossy(&require_name.clone()).into_owned(),
+                    version: legacy_lossy(require.get_pretty_constraint()).into_owned(),
                     requires: None,
                 };
 
-                if !current_tree.contains(require_name) {
-                    current_tree.push(require_name.clone());
+                if !current_tree.contains(&legacy_lossy(require_name).into_owned()) {
+                    current_tree.push(legacy_lossy(&require_name.clone()).into_owned());
                     let deep_children = self.add_tree(
-                        require_name,
+                        &legacy_lossy(require_name),
                         require,
                         installed_repo,
                         remote_repos,
@@ -1112,8 +1169,8 @@ impl ShowCommand {
         }
 
         let mut constraint = package.get_version();
-        if !constraint.starts_with("dev-") {
-            constraint = format!("^{}", constraint);
+        if !constraint.starts_with(b"dev-") {
+            constraint = bconcat!("^", constraint);
         }
         if !latest_package.get_version().is_empty()
             && Semver::satisfies(latest_package.get_version(), constraint)?
@@ -1153,32 +1210,32 @@ impl ShowCommand {
         platform_req_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     ) -> anyhow::Result<Option<crate::package::PackageInterfaceHandle>> {
         // find the latest version allowed in this repo set
-        let name = package.get_name();
+        let name = legacy_lossy(&package.get_name()).into_owned();
         let repo_set = self.get_repository_set(composer)?;
         let composer_ref = crate::composer::composer_full(composer);
         let mut version_selector =
             VersionSelector::new(repo_set, Some(&mut *platform_repo.borrow_mut()))?;
         let mut stability = composer_ref.get_package().get_minimum_stability();
         let flags = composer_ref.get_package().get_stability_flags();
-        if let Some(flag_value) = flags.get(&name) {
+        if let Some(flag_value) = flags.get(bstr::B(&name)) {
             let key_map: IndexMap<String, String> = base_package::STABILITIES
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect();
             let needle = flag_value.to_string();
             if let Some(found_key) = array_search(&needle, &key_map) {
-                stability = found_key;
+                stability = bstr::BString::from(found_key);
             }
         }
 
-        let mut best_stability = stability;
+        let mut best_stability = legacy_lossy(&stability).into_owned();
         if composer_ref.get_package().get_prefer_stable() {
-            best_stability = package.get_stability();
+            best_stability = legacy_lossy(&package.get_stability()).into_owned();
         }
 
         let mut target_version: Option<String> = None;
-        if package.get_version().starts_with("dev-") {
-            target_version = Some(package.get_version());
+        if package.get_version().starts_with(b"dev-") {
+            target_version = Some(legacy_lossy(&package.get_version()).into_owned());
 
             // dev-x branches are considered to be on the latest major version always, do not look up for a new commit as that is deemed a minor upgrade (albeit risky)
             if major_only {
@@ -1208,7 +1265,7 @@ impl ShowCommand {
             }
 
             if minor_only {
-                target_version = Some(format!("^{}", package.get_version()));
+                target_version = Some(format!("^{}", legacy_lossy(&package.get_version())));
             }
 
             if patch_only {
@@ -1233,8 +1290,8 @@ impl ShowCommand {
             let package_version = package.get_version();
             ShowWarnings::Predicate(Box::new(
                 move |candidate: &PackageInterfaceHandle| -> bool {
-                    if candidate.get_version().starts_with("dev-")
-                        || package_version.starts_with("dev-")
+                    if candidate.get_version().starts_with(b"dev-")
+                        || package_version.starts_with(b"dev-")
                     {
                         return false;
                     }
@@ -1270,7 +1327,7 @@ impl ShowCommand {
         let composer = crate::composer::composer_full(composer);
         if self.repository_set.borrow().is_none() {
             let mut rs = RepositorySet::new(
-                &composer.get_package().get_minimum_stability(),
+                &legacy_lossy(&composer.get_package().get_minimum_stability()),
                 composer.get_package().get_stability_flags(),
                 Vec::new(),
                 IndexMap::new(),
@@ -1615,7 +1672,7 @@ impl Command for ShowCommand {
                 composer.borrow_partial().get_package(),
             );
             if input.borrow().get_option("name-only")?.as_bool() == Some(true) {
-                self.get_io().write(&package.get_name());
+                self.get_io().write(&legacy_lossy(&package.get_name()));
 
                 return Ok(0);
             }
@@ -1665,7 +1722,10 @@ impl Command for ShowCommand {
             } else {
                 let default_repos =
                     RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
-                let names: Vec<String> = default_repos.keys().cloned().collect();
+                let names: Vec<String> = default_repos
+                    .keys()
+                    .map(|s| legacy_lossy(s).into_owned())
+                    .collect();
                 repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
                     default_repos.into_values().collect(),
                 ));
@@ -1718,7 +1778,10 @@ impl Command for ShowCommand {
         } else if input.borrow().get_option("all")?.as_bool() == Some(true) {
             let default_repos =
                 RepositoryFactory::default_repos_with_default_manager(self.get_io())?;
-            let names: Vec<String> = default_repos.keys().cloned().collect();
+            let names: Vec<String> = default_repos
+                .keys()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect();
             self.get_io().write_error(&format!(
                 "No composer.json found in the current directory, showing available packages from {}",
                 names.join(", ")
@@ -1823,7 +1886,7 @@ impl Command for ShowCommand {
             }
 
             if installed_repo.get_packages()?.is_empty() {
-                let has_non_platform_reqs = |reqs: &IndexMap<String, Link>| -> bool {
+                let has_non_platform_reqs = |reqs: &IndexMap<BString, Link>| -> bool {
                     reqs.keys()
                         .any(|name| !PlatformRepository::is_platform_package(name))
                 };
@@ -1871,7 +1934,10 @@ impl Command for ShowCommand {
 
         // show single package or single version
         if let Some(ref pkg) = single_package {
-            versions_map.insert(pkg.get_pretty_version(), pkg.get_version());
+            versions_map.insert(
+                legacy_lossy(&pkg.get_pretty_version()).into_owned(),
+                legacy_lossy(&pkg.get_version()).into_owned(),
+            );
         } else if let Some(ref pf) = package_filter
             && !pf.contains('*')
         {
@@ -1895,7 +1961,7 @@ impl Command for ShowCommand {
             {
                 return Err(InvalidArgumentException::new(format!(
                     "Package \"{}\" is installed but not a direct dependent of the root package.",
-                    pkg.get_name()
+                    pkg.get_name().display_lossy()
                 ))
                 .into());
             }
@@ -1994,7 +2060,8 @@ impl Command for ShowCommand {
                 exit_code = 1;
             }
             if input.borrow().get_option("path")?.as_bool() == Some(true) {
-                self.get_io().write_no_newline(&package.get_name());
+                self.get_io()
+                    .write_no_newline(&legacy_lossy(&package.get_name()));
                 let path = {
                     let composer_ref = composer.as_ref().unwrap();
                     composer_ref
@@ -2040,8 +2107,8 @@ impl Command for ShowCommand {
             let root_requires = self.get_root_requires();
             let mut packages = installed_repo.get_packages()?;
             packages.sort_by(|a, b| {
-                let sa: String = a.to_string();
-                let sb: String = b.to_string();
+                let sa = a.to_php_string();
+                let sb = b.to_php_string();
                 sa.cmp(&sb)
             });
             let mut array_tree: Vec<PackageTree> = Vec::new();
@@ -2119,16 +2186,16 @@ impl Command for ShowCommand {
                     .borrow_mut()
                     .get_package_names(package_filter.as_deref())?;
                 for name in names {
-                    packages
-                        .entry(type_owned.clone())
-                        .or_default()
-                        .insert(name.clone(), PackageOrName::Name(name));
+                    packages.entry(type_owned.clone()).or_default().insert(
+                        legacy_lossy(&name.clone()).into_owned(),
+                        PackageOrName::Name(legacy_lossy(&name).into_owned()),
+                    );
                 }
             } else {
                 for package in repo.get_packages()? {
                     let existing = packages
                         .get(&type_owned)
-                        .and_then(|m| m.get(&package.get_name()));
+                        .and_then(|m| m.get(&*legacy_lossy(&package.get_name())));
                     let need_replace = match existing {
                         None => true,
                         Some(PackageOrName::Name(_)) => true,
@@ -2159,20 +2226,20 @@ impl Command for ShowCommand {
                                 ),
                             };
                             if matches_list {
-                                packages
-                                    .entry(type_owned.clone())
-                                    .or_default()
-                                    .insert(p.get_name(), PackageOrName::Pkg(p));
+                                packages.entry(type_owned.clone()).or_default().insert(
+                                    legacy_lossy(&p.get_name()).into_owned(),
+                                    PackageOrName::Pkg(p),
+                                );
                             }
                         }
                     }
                 }
                 if Self::same_repository(&repo, &platform_repo) {
                     for (name, p) in platform_repo.borrow().get_disabled_packages() {
-                        packages
-                            .entry(type_owned.clone())
-                            .or_default()
-                            .insert(name.clone(), PackageOrName::Pkg(p.clone().into()));
+                        packages.entry(type_owned.clone()).or_default().insert(
+                            legacy_lossy(&name.clone()).into_owned(),
+                            PackageOrName::Pkg(p.clone().into()),
+                        );
                     }
                 }
             }
@@ -2238,7 +2305,10 @@ impl Command for ShowCommand {
                                 continue;
                             }
 
-                            latest_packages.insert(package.get_pretty_name(), latest.unwrap());
+                            latest_packages.insert(
+                                legacy_lossy(&package.get_pretty_name()).into_owned(),
+                                latest.unwrap(),
+                            );
                         }
                     }
                 }
@@ -2271,9 +2341,10 @@ impl Command for ShowCommand {
                     let mut package_view_data = PackageViewData::default();
                     if let PackageOrName::Pkg(package) = package_or_name {
                         let latest_package = if show_latest
-                            && latest_packages.contains_key(&package.get_pretty_name())
+                            && latest_packages
+                                .contains_key(&*legacy_lossy(&package.get_pretty_name()))
                         {
-                            latest_packages.get(&package.get_pretty_name())
+                            latest_packages.get(&*legacy_lossy(&package.get_pretty_name()))
                         } else {
                             None
                         };
@@ -2307,7 +2378,8 @@ impl Command for ShowCommand {
                             has_outdated_packages = true;
                         }
 
-                        package_view_data.name = package.get_pretty_name();
+                        package_view_data.name =
+                            legacy_lossy(&package.get_pretty_name()).into_owned();
                         package_view_data.direct_dependency = Some(in_array_strict(
                             package.get_name(),
                             &self
@@ -2319,17 +2391,22 @@ impl Command for ShowCommand {
                         if format != "json"
                             || input.borrow().get_option("name-only")?.as_bool() != Some(true)
                         {
-                            package_view_data.homepage =
-                                Some(package.as_complete().and_then(|c| c.get_homepage()));
+                            package_view_data.homepage = Some(
+                                package
+                                    .as_complete()
+                                    .and_then(|c| c.get_homepage())
+                                    .map(|s| legacy_lossy(&s).into_owned()),
+                            );
                             package_view_data.source =
                                 Some(PackageInfo::get_view_source_url(package.clone()));
                         }
                         name_length = name_length.max(package_view_data.name.len());
                         if write_version {
-                            let mut version_str = package.get_full_pretty_version(
+                            let mut version_str = legacy_lossy(&package.get_full_pretty_version(
                                 true,
                                 crate::package::DisplayMode::SourceRefIfDev,
-                            );
+                            ))
+                            .into_owned();
                             if format == "text" {
                                 version_str = version_str.trim_start_matches('v').to_string();
                             }
@@ -2354,10 +2431,12 @@ impl Command for ShowCommand {
                             }
                         }
                         if write_latest && let Some(latest) = latest_package {
-                            let mut latest_version_str = latest.get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev,
-                            );
+                            let mut latest_version_str =
+                                legacy_lossy(&latest.get_full_pretty_version(
+                                    true,
+                                    crate::package::DisplayMode::SourceRefIfDev,
+                                ))
+                                .into_owned();
                             if format == "text" {
                                 latest_version_str =
                                     latest_version_str.trim_start_matches('v').to_string();
@@ -2380,7 +2459,8 @@ impl Command for ShowCommand {
                             latest_length = latest_length.max("[none matched]".len());
                         }
                         if write_description && let Some(c) = package.as_complete() {
-                            package_view_data.description = Some(c.get_description());
+                            package_view_data.description =
+                                Some(c.get_description().map(|s| legacy_lossy(&s).into_owned()));
                         }
                         if write_path {
                             let installation_manager = composer
@@ -2409,18 +2489,20 @@ impl Command for ShowCommand {
                         {
                             let replacement_package_name = c.get_replacement_package();
                             let replacement = if let Some(ref rp) = replacement_package_name {
-                                format!("Use {} instead", rp)
+                                format!("Use {} instead", legacy_lossy(&rp))
                             } else {
                                 "No replacement was suggested".to_string()
                             };
                             let package_warning = format!(
                                 "Package {} is abandoned, you should avoid using it. {}.",
-                                package.get_pretty_name(),
+                                legacy_lossy(&package.get_pretty_name()),
                                 replacement
                             );
                             package_view_data.warning = Some(package_warning);
                             package_is_abandoned = match replacement_package_name {
-                                Some(rp) => AbandonedState::Replacement(rp),
+                                Some(rp) => {
+                                    AbandonedState::Replacement(legacy_lossy(&rp).into_owned())
+                                }
                                 None => AbandonedState::Flag(true),
                             };
                         }
@@ -2788,4 +2870,11 @@ struct ViewMetaData {
     release_date_length: usize,
     write_latest: bool,
     write_release_date: bool,
+}
+
+// TODO(bytes): the `--format=json` output is built from Strings.
+fn lossy_map(map: IndexMap<BString, BString>) -> IndexMap<String, String> {
+    map.iter()
+        .map(|(k, v)| (legacy_lossy(k).into_owned(), legacy_lossy(v).into_owned()))
+        .collect()
 }

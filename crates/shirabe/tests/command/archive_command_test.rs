@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Command/ArchiveCommandTest.php
 
 use crate::config_stub::ConfigStubBuilder;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::command::BaseCommand;
 use shirabe::command::archive_command::ArchiveCommand;
@@ -50,7 +50,7 @@ mockall::mock! {
         fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
         fn create_repository<'a>(
             &self,
-            r#type: &str,
+            r#type: &BStr,
             config: IndexMap<BString, PhpMixed>,
             name: Option<&'a str>,
         ) -> anyhow::Result<RepositoryInterfaceHandle>;
@@ -107,7 +107,11 @@ fn noop_event_dispatcher() -> MockEventDispatcher {
 
 fn root_package(name: &str, version: &str) -> RootPackageHandle {
     let normalized = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
-    RootPackageHandle::new(name.to_string(), normalized, version.to_string())
+    RootPackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from(normalized),
+        bstr::BString::from(version.to_string()),
+    )
 }
 
 fn full_composer(composer: Composer) -> PartialComposerHandle {

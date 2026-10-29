@@ -5,7 +5,7 @@ use crate::php_worker::{
     load_composer_php_runtime, php_eval, php_runtime_available, php_single_quote,
 };
 use crate::process_executor_mock::{ProcessExecutorMockGuard, cmd, get_process_executor_mock};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::autoload::{AutoloadGenerator, AutoloadGeneratorInterface, ClassLoader};
@@ -56,9 +56,9 @@ fn create_composer_instance() -> ComposerHandle {
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
     composer.borrow_mut().set_config(config);
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
-        "foo".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0.0".to_string(),
+        bstr::BString::from("foo".to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0.0".to_string()),
     )
     .into();
     composer.borrow_mut().set_package(package);
@@ -383,7 +383,17 @@ fn test_dispatcher_doesnt_return_skipped_scripts() {
     let composer = create_composer_instance();
     let mut scripts: IndexMap<String, Vec<String>> = IndexMap::new();
     scripts.insert("scriptName".to_string(), vec!["scriptName".to_string()]);
-    composer.borrow().get_package().set_scripts(scripts);
+    composer.borrow().get_package().set_scripts(
+        scripts
+            .into_iter()
+            .map(|(k, v)| {
+                (
+                    bstr::BString::from(k),
+                    v.into_iter().map(bstr::BString::from).collect::<Vec<_>>(),
+                )
+            })
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let (process, _process_guard) =
         get_process_executor_mock(vec![], false, MockHandler::default());
@@ -503,7 +513,7 @@ mockall::mock! {
         fn get_repositories(&self) -> &Vec<RepositoryInterfaceHandle>;
         fn create_repository<'a>(
             &self,
-            r#type: &str,
+            r#type: &BStr,
             config: IndexMap<BString, PhpMixed>,
             name: Option<&'a str>,
         ) -> anyhow::Result<RepositoryInterfaceHandle>;
@@ -583,9 +593,9 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
             .set_autoload_generator(std::rc::Rc::new(std::cell::RefCell::new(generator)));
 
         let package: RootPackageInterfaceHandle = RootPackageHandle::new(
-            "foo".to_string(),
-            "1.0.0.0".to_string(),
-            "1.0.0".to_string(),
+            bstr::BString::from("foo".to_string()),
+            bstr::BString::from("1.0.0.0".to_string()),
+            bstr::BString::from("1.0.0".to_string()),
         )
         .into();
         let mut scripts: IndexMap<String, Vec<String>> = IndexMap::new();
@@ -593,7 +603,17 @@ fn test_dispatcher_pass_dev_mode_to_autoload_generator_for_script_events() {
             "scriptName".to_string(),
             vec!["ClassName::testMethod".to_string()],
         );
-        package.set_scripts(scripts);
+        package.set_scripts(
+            scripts
+                .into_iter()
+                .map(|(k, v)| {
+                    (
+                        bstr::BString::from(k),
+                        v.into_iter().map(bstr::BString::from).collect::<Vec<_>>(),
+                    )
+                })
+                .collect::<indexmap::IndexMap<_, _>>(),
+        );
         composer.borrow_mut().set_package(package);
 
         let mut repository_manager = MockRepositoryManager::new();

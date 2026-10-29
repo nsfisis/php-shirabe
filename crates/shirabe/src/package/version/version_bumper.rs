@@ -27,13 +27,17 @@ impl VersionBumper {
         }
 
         let mut version = package.get_version();
-        if version.starts_with("dev-") {
+        if version.starts_with(b"dev-") {
             let loader = ArrayLoader::new(Some(parser.clone()), false);
             let dumper = ArrayDumper::new();
             let dumped = dumper.dump(package);
             let extra = loader.get_branch_alias(&dumped)?;
 
-            if extra.is_none() || extra.as_deref() == Some(VersionParser::DEFAULT_BRANCH_ALIAS) {
+            if extra.is_none()
+                || extra
+                    .as_ref()
+                    .is_some_and(|e| e == VersionParser::DEFAULT_BRANCH_ALIAS)
+            {
                 return Ok(pretty_constraint);
             }
 
@@ -120,8 +124,8 @@ impl VersionBumper {
                     } else {
                         format!("{}{}", new_pretty_constraint, suffix)
                     };
-                modified = legacy_lossy(&bstr::BString::from(
-                    String::from_utf8(
+                modified = legacy_lossy(
+                    &String::from_utf8(
                         substr_replace(
                             &modified,
                             &replacement,
@@ -133,7 +137,7 @@ impl VersionBumper {
                     .expect(
                         "the replaced range is a regex match, so it ends on character boundaries",
                     ),
-                ))
+                )
                 .into_owned();
             }
 

@@ -19,7 +19,12 @@ use tempfile::TempDir;
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
     let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
-    CompletePackageHandle::new(name.to_string(), norm_version, version.to_string()).into()
+    CompletePackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from(norm_version),
+        bstr::BString::from(version.to_string()),
+    )
+    .into()
 }
 
 /// ref: setUp markTestSkipped on Windows / 32bit, expressed as a compile-time
@@ -71,7 +76,7 @@ fn test_error_messages() {
 
     let package = get_package("dummy/pkg", "1.0.0");
     let dist_url = format!("file://{}", file!());
-    package.set_dist_url(Some(dist_url));
+    package.set_dist_url(Some(bstr::BString::from(dist_url)));
 
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));

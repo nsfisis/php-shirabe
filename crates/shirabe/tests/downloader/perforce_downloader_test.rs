@@ -62,9 +62,16 @@ fn get_config(test_path: &std::path::Path) -> Config {
 /// the PHPUnit PackageInterface mock; the source reference is returned by getSourceReference.
 fn make_package(source_reference: Option<&str>) -> PackageInterfaceHandle {
     let norm_version = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
-    let package =
-        CompletePackageHandle::new("test/pkg".to_string(), norm_version, "1.0.0".to_string());
-    package.set_source_reference(source_reference.map(|s| s.to_string()));
+    let package = CompletePackageHandle::new(
+        bstr::BString::from("test/pkg".to_string()),
+        bstr::BString::from(norm_version),
+        bstr::BString::from("1.0.0".to_string()),
+    );
+    package.set_source_reference(
+        source_reference
+            .map(|s| s.to_string())
+            .map(bstr::BString::from),
+    );
     package.into()
 }
 

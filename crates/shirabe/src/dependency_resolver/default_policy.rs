@@ -1,10 +1,11 @@
 //! ref: composer/src/Composer/DependencyResolver/DefaultPolicy.php
 
 use crate::dependency_resolver::{PolicyInterface, Pool};
-use crate::package::{BasePackageHandle, STABILITIES};
+use crate::package::{BasePackageHandle, stability_priority};
 use crate::util::Platform;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, PhpMixed};
+use shirabe_php_shim::{CmpOp, PhpMixed, bconcat};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -13,17 +14,17 @@ pub struct DefaultPolicy {
     prefer_stable: bool,
     prefer_lowest: bool,
     prefer_dev_over_prerelease: bool,
-    preferred_versions: Option<IndexMap<String, String>>,
+    preferred_versions: Option<IndexMap<BString, BString>>,
     preferred_package_result_cache_per_pool:
-        std::cell::RefCell<IndexMap<i64, IndexMap<String, Vec<i64>>>>,
-    sorting_cache_per_pool: std::cell::RefCell<IndexMap<i64, IndexMap<String, i64>>>,
+        std::cell::RefCell<IndexMap<i64, IndexMap<BString, Vec<i64>>>>,
+    sorting_cache_per_pool: std::cell::RefCell<IndexMap<i64, IndexMap<BString, i64>>>,
 }
 
 impl DefaultPolicy {
     pub fn new(
         prefer_stable: bool,
         prefer_lowest: bool,
-        preferred_versions: Option<IndexMap<String, String>>,
+        preferred_versions: Option<IndexMap<BString, BString>>,
     ) -> Self {
         Self {
             prefer_stable,
@@ -41,7 +42,7 @@ impl DefaultPolicy {
         pool: &Pool,
         a: BasePackageHandle,
         b: BasePackageHandle,
-        required_package: Option<String>,
+        required_package: Option<BString>,
         ignore_replace: bool,
     ) -> i64 {
         if a.get_name() == b.get_name() {
@@ -64,11 +65,11 @@ impl DefaultPolicy {
             }
 
             if let Some(ref required_package) = required_package
-                && let Some(pos) = required_package.find('/')
+                && let Some(pos) = required_package.find("/")
             {
                 let required_vendor = &required_package[..pos];
-                let a_is_same_vendor = a.get_name().starts_with(required_vendor);
-                let b_is_same_vendor = b.get_name().starts_with(required_vendor);
+                let a_is_same_vendor = a.get_name().starts_with(required_vendor.as_bytes());
+                let b_is_same_vendor = b.get_name().starts_with(required_vendor.as_bytes());
                 if b_is_same_vendor != a_is_same_vendor {
                     return if a_is_same_vendor { -1 } else { 1 };
                 }
@@ -82,10 +83,10 @@ impl DefaultPolicy {
         if a.id() < b.id() { -1 } else { 1 }
     }
 
-    fn group_literals_by_name(&self, pool: &Pool, literals: &[i64]) -> IndexMap<String, Vec<i64>> {
-        let mut packages: IndexMap<String, Vec<i64>> = IndexMap::new();
+    fn group_literals_by_name(&self, pool: &Pool, literals: &[i64]) -> IndexMap<BString, Vec<i64>> {
+        let mut packages: IndexMap<BString, Vec<i64>> = IndexMap::new();
         for &literal in literals {
-            let package_name = pool.literal_to_package(literal).get_name().to_string();
+            let package_name = BString::from(&pool.literal_to_package(literal).get_name()[..]);
             packages.entry(package_name).or_default().push(literal);
         }
         packages
@@ -93,7 +94,7 @@ impl DefaultPolicy {
 
     fn prune_to_best_version(&self, pool: &Pool, literals: Vec<i64>) -> Vec<i64> {
         if let Some(ref preferred_versions) = self.preferred_versions {
-            let name = pool.literal_to_package(literals[0]).get_name();
+            let name = BString::from(&pool.literal_to_package(literals[0]).get_name()[..]);
             if let Some(preferred_version) = preferred_versions.get(&name) {
                 let best_literals: Vec<i64> = literals
                     .iter()
@@ -157,7 +158,7 @@ impl DefaultPolicy {
 
     fn replaces(&self, source: BasePackageHandle, target: BasePackageHandle) -> bool {
         for link in source.get_replaces().values() {
-            if link.get_target() == target.get_name().as_str() {
+            if link.get_target() == target.get_name().as_bstr() {
                 return true;
             }
         }
@@ -178,19 +179,19 @@ impl PolicyInterface for DefaultPolicy {
                     && "stable" != stab_b
                 {
                     if stab_a == "dev" {
-                        stab_a = "stable".to_string();
+                        stab_a = bstr::BString::from("stable".to_string());
                     }
                     if stab_b == "dev" {
-                        stab_b = "stable".to_string();
+                        stab_b = bstr::BString::from("stable".to_string());
                     }
                 }
-                return STABILITIES.get(stab_a.as_str()).copied().unwrap_or(0)
-                    < STABILITIES.get(stab_b.as_str()).copied().unwrap_or(0);
+                return stability_priority(&stab_a).unwrap_or(0)
+                    < stability_priority(&stab_b).unwrap_or(0);
             }
         }
 
-        if (a.is_dev() && a.get_version().starts_with("dev-"))
-            || (b.is_dev() && b.get_version().starts_with("dev-"))
+        if (a.is_dev() && a.get_version().starts_with(b"dev-"))
+            || (b.is_dev() && b.get_version().starts_with(b"dev-"))
         {
             let constraint = SimpleConstraint::new(operator, b.get_version(), None);
             let version = SimpleConstraint::new("==", a.get_version(), None);
@@ -208,17 +209,16 @@ impl PolicyInterface for DefaultPolicy {
         &self,
         pool: &Pool,
         mut literals: Vec<i64>,
-        required_package: Option<String>,
+        required_package: Option<BString>,
     ) -> Vec<i64> {
         literals.sort();
-        let result_cache_key = format!(
-            "{}{}",
+        let result_cache_key = bconcat!(
             literals
                 .iter()
                 .map(|l| l.to_string())
                 .collect::<Vec<_>>()
                 .join(","),
-            required_package.as_deref().unwrap_or_default()
+            required_package.clone().unwrap_or_default()
         );
         let pool_id = pool as *const Pool as i64;
 
@@ -235,12 +235,8 @@ impl PolicyInterface for DefaultPolicy {
 
         for name_literals in packages.values_mut() {
             name_literals.sort_by(|&a, &b| {
-                let cache_key = format!(
-                    "i{}.{}{}",
-                    a,
-                    b,
-                    required_package.as_deref().unwrap_or_default()
-                );
+                let cache_key =
+                    bconcat!("i", a, ".", b, required_package.clone().unwrap_or_default());
                 {
                     let cache = self.sorting_cache_per_pool.borrow();
                     if let Some(pool_cache) = cache.get(&pool_id)
@@ -273,12 +269,7 @@ impl PolicyInterface for DefaultPolicy {
         let mut selected: Vec<i64> = packages.into_values().flatten().collect();
 
         selected.sort_by(|&a, &b| {
-            let cache_key = format!(
-                "{}.{}{}",
-                a,
-                b,
-                required_package.as_deref().unwrap_or_default()
-            );
+            let cache_key = bconcat!(a, ".", b, required_package.clone().unwrap_or_default());
             {
                 let cache = self.sorting_cache_per_pool.borrow();
                 if let Some(pool_cache) = cache.get(&pool_id)

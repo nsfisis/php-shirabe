@@ -7,7 +7,7 @@ use shirabe::io::IOInterface;
 use shirabe::io::null_io::NullIO;
 use shirabe::repository::RepositoryFactory;
 use shirabe::util::http_downloader::HttpDownloader;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 
 #[test]
 fn test_manager_with_all_repository_types() {
@@ -24,10 +24,10 @@ fn test_manager_with_all_repository_types() {
     let manager =
         RepositoryFactory::manager(io, &config, Some(http_downloader), None, None).unwrap();
 
-    let repository_classes: Vec<&str> = manager
+    let repository_classes: Vec<String> = manager
         .__repository_classes()
         .keys()
-        .map(|k| k.as_str())
+        .map(|k| legacy_lossy(k).into_owned())
         .collect();
 
     assert_eq!(

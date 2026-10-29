@@ -143,7 +143,7 @@ fn test_supports() {
 
         assert_eq!(
             expected,
-            GitHubDriver::supports(io, config, repo_url, false).unwrap()
+            GitHubDriver::supports(io, config, bstr::BStr::new(repo_url), false).unwrap()
         );
     }
 }
@@ -205,11 +205,15 @@ fn test_private_repository() {
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
     tags.insert(identifier.to_string(), sha.to_string());
-    git_hub_driver.__set_tags(Some(tags));
+    git_hub_driver.__set_tags(Some(
+        tags.into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    ));
 
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
 
-    let dist = git_hub_driver.get_dist(sha).unwrap();
+    let dist = git_hub_driver.get_dist(bstr::BStr::new(sha)).unwrap();
     assert_eq!(
         Some("zip".into()),
         dist.get(B("type")).and_then(|v| v.as_string())
@@ -223,7 +227,7 @@ fn test_private_repository() {
         dist.get(B("reference")).and_then(|v| v.as_string())
     );
 
-    let source = git_hub_driver.get_source(sha);
+    let source = git_hub_driver.get_source(bstr::BStr::new(sha));
     assert_eq!(
         Some("git".into()),
         source.get(B("type")).and_then(|v| v.as_string())
@@ -272,11 +276,15 @@ fn test_public_repository() {
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
     tags.insert(identifier.to_string(), sha.to_string());
-    git_hub_driver.__set_tags(Some(tags));
+    git_hub_driver.__set_tags(Some(
+        tags.into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    ));
 
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
 
-    let dist = git_hub_driver.get_dist(sha).unwrap();
+    let dist = git_hub_driver.get_dist(bstr::BStr::new(sha)).unwrap();
     assert_eq!(
         Some("zip".into()),
         dist.get(B("type")).and_then(|v| v.as_string())
@@ -290,7 +298,7 @@ fn test_public_repository() {
         dist.get(B("reference")).and_then(|v| v.as_string())
     );
 
-    let source = git_hub_driver.get_source(sha);
+    let source = git_hub_driver.get_source(bstr::BStr::new(sha));
     assert_eq!(
         Some("git".into()),
         source.get(B("type")).and_then(|v| v.as_string())
@@ -359,11 +367,15 @@ fn test_public_repository2() {
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
     tags.insert(identifier.to_string(), sha.to_string());
-    git_hub_driver.__set_tags(Some(tags));
+    git_hub_driver.__set_tags(Some(
+        tags.into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    ));
 
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
 
-    let dist = git_hub_driver.get_dist(sha).unwrap();
+    let dist = git_hub_driver.get_dist(bstr::BStr::new(sha)).unwrap();
     assert_eq!(
         Some("zip".into()),
         dist.get(B("type")).and_then(|v| v.as_string())
@@ -377,7 +389,7 @@ fn test_public_repository2() {
         dist.get(B("reference")).and_then(|v| v.as_string())
     );
 
-    let source = git_hub_driver.get_source(sha);
+    let source = git_hub_driver.get_source(bstr::BStr::new(sha));
     assert_eq!(
         Some("git".into()),
         source.get(B("type")).and_then(|v| v.as_string())
@@ -392,7 +404,7 @@ fn test_public_repository2() {
     );
 
     let data = git_hub_driver
-        .get_composer_information(identifier)
+        .get_composer_information(bstr::BStr::new(identifier))
         .unwrap()
         .unwrap();
     assert!(!data.contains_key(B("abandoned")));
@@ -451,13 +463,22 @@ fn test_invalid_support_data() {
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
     tags.insert(identifier.to_string(), sha.to_string());
-    git_hub_driver.__set_tags(Some(tags));
+    git_hub_driver.__set_tags(Some(
+        tags.into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    ));
     let mut branches = IndexMap::new();
     branches.insert("test_master".to_string(), sha.to_string());
-    git_hub_driver.__set_branches(Some(branches));
+    git_hub_driver.__set_branches(Some(
+        branches
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    ));
 
     let data = git_hub_driver
-        .get_composer_information(identifier)
+        .get_composer_information(bstr::BStr::new(identifier))
         .unwrap()
         .unwrap();
 
@@ -593,13 +614,22 @@ fn test_funding_format() {
         git_hub_driver.initialize().unwrap();
         let mut tags = IndexMap::new();
         tags.insert(identifier.to_string(), sha.to_string());
-        git_hub_driver.__set_tags(Some(tags));
+        git_hub_driver.__set_tags(Some(
+            tags.into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        ));
         let mut branches = IndexMap::new();
         branches.insert("test_master".to_string(), sha.to_string());
-        git_hub_driver.__set_branches(Some(branches));
+        git_hub_driver.__set_branches(Some(
+            branches
+                .into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        ));
 
         let data = git_hub_driver
-            .get_composer_information(identifier)
+            .get_composer_information(bstr::BStr::new(identifier))
             .unwrap()
             .unwrap();
 
@@ -701,10 +731,14 @@ fn test_public_repository_archived() {
     git_hub_driver.initialize().unwrap();
     let mut tags = IndexMap::new();
     tags.insert(identifier.to_string(), sha.to_string());
-    git_hub_driver.__set_tags(Some(tags));
+    git_hub_driver.__set_tags(Some(
+        tags.into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    ));
 
     let data = git_hub_driver
-        .get_composer_information(sha)
+        .get_composer_information(bstr::BStr::new(sha))
         .unwrap()
         .unwrap();
 
@@ -812,7 +846,7 @@ fn test_private_repository_no_interaction() {
 
     assert_eq!("test_master", git_hub_driver.get_root_identifier().unwrap());
 
-    let dist = git_hub_driver.get_dist(sha).unwrap();
+    let dist = git_hub_driver.get_dist(bstr::BStr::new(sha)).unwrap();
     assert_eq!(
         Some("zip".into()),
         dist.get(B("type")).and_then(|v| v.as_string())
@@ -826,7 +860,7 @@ fn test_private_repository_no_interaction() {
         dist.get(B("reference")).and_then(|v| v.as_string())
     );
 
-    let source = git_hub_driver.get_source(identifier);
+    let source = git_hub_driver.get_source(bstr::BStr::new(identifier));
     assert_eq!(
         Some("git".into()),
         source.get(B("type")).and_then(|v| v.as_string())
@@ -840,7 +874,7 @@ fn test_private_repository_no_interaction() {
         source.get(B("reference")).and_then(|v| v.as_string())
     );
 
-    let source = git_hub_driver.get_source(sha);
+    let source = git_hub_driver.get_source(bstr::BStr::new(sha));
     assert_eq!(
         Some("git".into()),
         source.get(B("type")).and_then(|v| v.as_string())
@@ -929,7 +963,8 @@ fn test_get_empty_file_content() {
     assert_eq!(
         Some(String::new()),
         git_hub_driver
-            .get_file_content("composer.json", "main")
+            .get_file_content(bstr::BStr::new("composer.json"), bstr::BStr::new("main"))
             .unwrap()
+            .map(|s| legacy_lossy(&s).into_owned())
     );
 }

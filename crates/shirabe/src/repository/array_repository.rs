@@ -9,9 +9,11 @@ use crate::repository::{
     AbandonedInfo, FindPackageConstraint, LoadPackagesResult, ProviderInfo, RepositoryInterface,
     RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle, SearchResult,
 };
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    implode, legacy_lossy, php_regex, preg_is_match, preg_quote, preg_split, strtolower,
+    bconcat, explode_with_limit, implode, legacy_lossy, php_regex, preg_is_match, preg_quote,
+    preg_split, strtolower,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use std::rc::Weak;
@@ -21,7 +23,7 @@ use std::rc::Weak;
 pub struct ArrayRepository {
     pub(crate) packages: std::cell::RefCell<Option<Vec<BasePackageHandle>>>,
 
-    pub(crate) package_map: std::cell::RefCell<Option<IndexMap<String, BasePackageHandle>>>,
+    pub(crate) package_map: std::cell::RefCell<Option<IndexMap<BString, BasePackageHandle>>>,
 
     /// Weak reference to the outermost repository handle wrapping this `ArrayRepository`,
     /// injected via `set_self_handle`. Used to wire package -> repository back-references.
@@ -43,7 +45,7 @@ impl ArrayRepository {
 
     pub(crate) fn find_package_internal(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         let name = strtolower(name);
@@ -59,7 +61,7 @@ impl ArrayRepository {
         for package in self.get_packages_internal() {
             if name == package.get_name() {
                 let pkg_constraint =
-                    SimpleConstraint::new("==", package.get_version().to_string(), None);
+                    SimpleConstraint::new("==", BString::from(&package.get_version()[..]), None);
                 if constraint.matches(&pkg_constraint.into()) {
                     return Ok(Some(package));
                 }
@@ -71,7 +73,7 @@ impl ArrayRepository {
 
     fn find_packages_internal(
         &self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         // normalize name
@@ -91,8 +93,12 @@ impl ArrayRepository {
             if name == package.get_name()
                 && (constraint.is_none()
                     || constraint.as_ref().unwrap().matches(
-                        &SimpleConstraint::new("==", package.get_version().to_string(), None)
-                            .into(),
+                        &SimpleConstraint::new(
+                            "==",
+                            BString::from(&package.get_version()[..]),
+                            None,
+                        )
+                        .into(),
                     ))
             {
                 packages.push(package);
@@ -146,8 +152,8 @@ impl ArrayRepository {
     fn create_alias_package(
         &self,
         package: BasePackageHandle,
-        alias: String,
-        pretty_alias: String,
+        alias: BString,
+        pretty_alias: BString,
     ) -> BasePackageHandle {
         let mut package = package;
         while let Some(alias_pkg) = package.as_alias() {
@@ -214,42 +220,48 @@ impl RepositoryInterface for ArrayRepository {
         Ok(self.base_count())
     }
 
-    fn get_repo_name(&self) -> anyhow::Result<String> {
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
         let count = self.base_count();
-        Ok(format!(
-            "array repo (defining {} package{})",
+        Ok(bconcat!(
+            "array repo (defining ",
             count,
+            " package",
             if count > 1 { "s" } else { "" },
+            ")"
         ))
     }
 
     fn load_packages(
         &mut self,
-        package_name_map: IndexMap<String, Option<AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         let packages = self.get_packages_internal();
 
-        let mut result: IndexMap<String, BasePackageHandle> = IndexMap::new();
-        let mut names_found: IndexMap<String, bool> = IndexMap::new();
+        let mut result: IndexMap<BString, BasePackageHandle> = IndexMap::new();
+        let mut names_found: IndexMap<BString, bool> = IndexMap::new();
         for package in &packages {
             if package_name_map.contains_key(&package.get_name()) {
                 let constraint_opt = package_name_map.get(&package.get_name()).unwrap();
                 let constraint_matches = match constraint_opt {
                     None => true,
                     Some(c) => c.matches(
-                        &SimpleConstraint::new("==", package.get_version().to_string(), None)
-                            .into(),
+                        &SimpleConstraint::new(
+                            "==",
+                            BString::from(&package.get_version()[..]),
+                            None,
+                        )
+                        .into(),
                     ),
                 };
                 if constraint_matches
                     && StabilityFilter::is_package_acceptable(
                         &acceptable_stabilities,
                         &stability_flags,
-                        &package.get_names(true),
-                        &package.get_stability(),
+                        &package.get_names(true).to_vec(),
+                        bstr::BStr::new(&*legacy_lossy(&package.get_stability())),
                     )
                     && !already_loaded
                         .get(&package.get_name())
@@ -257,17 +269,23 @@ impl RepositoryInterface for ArrayRepository {
                         .unwrap_or(false)
                 {
                     // add selected packages which match stability requirements
-                    result.insert(package.ptr_id().to_string(), package.clone());
+                    result.insert(
+                        bstr::BString::from(package.ptr_id().to_string()),
+                        package.clone(),
+                    );
                     // add the aliased package for packages where the alias matches
                     if let Some(alias) = package.as_alias() {
                         let aliased = alias.get_alias_of();
-                        if !result.contains_key(&aliased.ptr_id().to_string()) {
-                            result.insert(aliased.ptr_id().to_string(), aliased.into());
+                        if !result.contains_key(aliased.ptr_id().to_string().as_bytes()) {
+                            result.insert(
+                                bstr::BString::from(aliased.ptr_id().to_string()),
+                                aliased.into(),
+                            );
                         }
                     }
                 }
 
-                names_found.insert(package.get_name(), true);
+                names_found.insert(bstr::BString::from(&package.get_name()[..]), true);
             }
         }
 
@@ -275,8 +293,11 @@ impl RepositoryInterface for ArrayRepository {
         for package in &packages {
             if let Some(alias) = package.as_alias() {
                 let aliased = alias.get_alias_of();
-                if result.contains_key(&aliased.ptr_id().to_string()) {
-                    result.insert(package.ptr_id().to_string(), package.clone());
+                if result.contains_key(aliased.ptr_id().to_string().as_bytes()) {
+                    result.insert(
+                        bstr::BString::from(package.ptr_id().to_string()),
+                        package.clone(),
+                    );
                 }
             }
         }
@@ -289,7 +310,7 @@ impl RepositoryInterface for ArrayRepository {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         self.find_package_internal(name, constraint)
@@ -297,7 +318,7 @@ impl RepositoryInterface for ArrayRepository {
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         self.find_packages_internal(name, constraint)
@@ -305,9 +326,9 @@ impl RepositoryInterface for ArrayRepository {
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let regex = if mode == crate::repository::SEARCH_FULLTEXT {
             let parts = preg_split(php_regex!("{\\s+}"), preg_quote(&query, None));
@@ -318,13 +339,12 @@ impl RepositoryInterface for ArrayRepository {
             format!("{{(?:{})}}i", legacy_lossy(&implode("|", &parts)))
         };
 
-        let mut matches: IndexMap<String, SearchResult> = IndexMap::new();
+        let mut matches: IndexMap<BString, SearchResult> = IndexMap::new();
         for package in self.get_packages_internal() {
-            let mut name = package.get_name();
+            let mut name = BString::from(&package.get_name()[..]);
             if mode == crate::repository::SEARCH_VENDOR {
                 // PHP: [$name] = explode('/', $name);
-                let parts: Vec<&str> = name.splitn(2, '/').collect();
-                name = parts[0].to_string();
+                name = explode_with_limit("/", &name, 2).swap_remove(0);
             }
             if matches.contains_key(&name) {
                 continue;
@@ -344,11 +364,13 @@ impl RepositoryInterface for ArrayRepository {
                     format!(
                         "{} {}",
                         legacy_lossy(&implode(" ", &complete.as_ref().unwrap().get_keywords())),
-                        complete
-                            .as_ref()
-                            .unwrap()
-                            .get_description()
-                            .unwrap_or_default()
+                        legacy_lossy(
+                            &complete
+                                .as_ref()
+                                .unwrap()
+                                .get_description()
+                                .unwrap_or_default()
+                        )
                     ),
                 );
 
@@ -369,7 +391,9 @@ impl RepositoryInterface for ArrayRepository {
                         if c.is_abandoned() {
                             // PHP: $package->getReplacementPackage() ?: true
                             match c.get_replacement_package() {
-                                Some(s) if !s.is_empty() => Some(AbandonedInfo::Replacement(s)),
+                                Some(s) if !s.is_empty() => {
+                                    Some(AbandonedInfo::Replacement(bstr::BString::from(&s[..])))
+                                }
                                 _ => Some(AbandonedInfo::Abandoned),
                             }
                         } else {
@@ -381,7 +405,7 @@ impl RepositoryInterface for ArrayRepository {
                     matches.insert(
                         name.clone(),
                         SearchResult {
-                            name: package.get_pretty_name(),
+                            name: bstr::BString::from(&package.get_pretty_name()[..]),
                             description,
                             abandoned,
                             url: None,
@@ -396,9 +420,12 @@ impl RepositoryInterface for ArrayRepository {
 
     fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
         if self.package_map.borrow().is_none() {
-            let mut map: IndexMap<String, BasePackageHandle> = IndexMap::new();
+            let mut map: IndexMap<BString, BasePackageHandle> = IndexMap::new();
             for repo_package in self.get_packages_internal() {
-                map.insert(repo_package.get_unique_name(), repo_package);
+                map.insert(
+                    bstr::BString::from(&repo_package.get_unique_name()[..]),
+                    repo_package,
+                );
             }
             *self.package_map.borrow_mut() = Some(map);
         }
@@ -413,9 +440,9 @@ impl RepositoryInterface for ArrayRepository {
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
-        let mut result: IndexMap<String, ProviderInfo> = IndexMap::new();
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
+        let mut result: IndexMap<BString, ProviderInfo> = IndexMap::new();
 
         'candidates: for candidate in self.get_packages_internal() {
             if result.contains_key(&candidate.get_name()) {
@@ -426,11 +453,11 @@ impl RepositoryInterface for ArrayRepository {
                     let complete = candidate.as_complete();
                     let description = complete.and_then(|c| c.get_description());
                     result.insert(
-                        candidate.get_name(),
+                        bstr::BString::from(&candidate.get_name()[..]),
                         ProviderInfo {
-                            name: candidate.get_name(),
+                            name: bstr::BString::from(&candidate.get_name()[..]),
                             description,
-                            r#type: candidate.get_type(),
+                            r#type: bstr::BString::from(&candidate.get_type()[..]),
                         },
                     );
                     continue 'candidates;

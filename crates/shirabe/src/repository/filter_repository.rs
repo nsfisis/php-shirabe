@@ -5,9 +5,9 @@ use crate::repository::{
     AdvisoryProviderInterface, FindPackageConstraint, LoadPackagesResult, ProviderInfo,
     RepositoryInterface, RepositoryInterfaceHandle, SearchResult, SecurityAdvisoryResult,
 };
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, preg_is_match};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, legacy_lossy, preg_is_match};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -30,11 +30,11 @@ impl FilterRepository {
         if let Some(only_val) = options.get(B("only")) {
             match only_val {
                 PhpMixed::List(list) => {
-                    let names: Vec<String> = list
+                    let names: Vec<BString> = list
                         .iter()
                         .filter_map(|v| {
                             if let PhpMixed::String(s) = v {
-                                Some(s.to_str_lossy().into_owned())
+                                Some(s.clone())
                             } else {
                                 None
                             }
@@ -48,7 +48,7 @@ impl FilterRepository {
                 _ => {
                     return Err(InvalidArgumentException::new(format!(
                         r#""only" key for repository {} should be an array"#,
-                        repo.get_repo_name()?
+                        repo.get_repo_name()?.display_lossy()
                     ))
                     .into());
                 }
@@ -57,11 +57,11 @@ impl FilterRepository {
         if let Some(exclude_val) = options.get(B("exclude")) {
             match exclude_val {
                 PhpMixed::List(list) => {
-                    let names: Vec<String> = list
+                    let names: Vec<BString> = list
                         .iter()
                         .filter_map(|v| {
                             if let PhpMixed::String(s) = v {
-                                Some(s.to_str_lossy().into_owned())
+                                Some(s.clone())
                             } else {
                                 None
                             }
@@ -75,7 +75,7 @@ impl FilterRepository {
                 _ => {
                     return Err(InvalidArgumentException::new(format!(
                         r#""exclude" key for repository {} should be an array"#,
-                        repo.get_repo_name()?
+                        repo.get_repo_name()?.display_lossy()
                     ))
                     .into());
                 }
@@ -84,7 +84,7 @@ impl FilterRepository {
         if exclude.is_some() && only.is_some() {
             return Err(InvalidArgumentException::new(format!(
                 r#"Only one of "only" and "exclude" can be specified for repository {}"#,
-                repo.get_repo_name()?
+                repo.get_repo_name()?.display_lossy()
             ))
             .into());
         }
@@ -96,7 +96,7 @@ impl FilterRepository {
                 _ => {
                     return Err(InvalidArgumentException::new(format!(
                         r#""canonical" key for repository {} should be a boolean"#,
-                        repo.get_repo_name()?
+                        repo.get_repo_name()?.display_lossy()
                     ))
                     .into());
                 }
@@ -115,7 +115,7 @@ impl FilterRepository {
         self.repo.clone()
     }
 
-    fn is_allowed(&self, name: &str) -> bool {
+    fn is_allowed(&self, name: &BStr) -> bool {
         if self.only.is_none() && self.exclude.is_none() {
             return true;
         }
@@ -139,7 +139,7 @@ impl RepositoryInterface for FilterRepository {
                 .repo
                 .get_packages()?
                 .iter()
-                .filter(|p| self.is_allowed(&p.get_name()))
+                .filter(|p| self.is_allowed(bstr::BStr::new(&*legacy_lossy(&p.get_name()))))
                 .count())
         } else {
             Ok(0)
@@ -152,7 +152,7 @@ impl RepositoryInterface for FilterRepository {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         if !self.is_allowed(name) {
@@ -164,7 +164,7 @@ impl RepositoryInterface for FilterRepository {
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         if !self.is_allowed(name) {
@@ -176,12 +176,12 @@ impl RepositoryInterface for FilterRepository {
 
     fn load_packages(
         &mut self,
-        mut package_name_map: IndexMap<String, Option<AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        mut package_name_map: IndexMap<BString, Option<AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
-        package_name_map.retain(|name, _| self.is_allowed(name));
+        package_name_map.retain(|name, _| self.is_allowed(name.as_bstr()));
 
         if package_name_map.is_empty() {
             return Ok(LoadPackagesResult {
@@ -205,14 +205,14 @@ impl RepositoryInterface for FilterRepository {
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>> {
         let mut result = Vec::new();
 
         for package in self.repo.search(query, mode, r#type)? {
-            if self.is_allowed(&package.name) {
+            if self.is_allowed(package.name.as_bstr()) {
                 result.push(package);
             }
         }
@@ -223,7 +223,7 @@ impl RepositoryInterface for FilterRepository {
     fn get_packages(&mut self) -> anyhow::Result<Vec<BasePackageHandle>> {
         let mut result = Vec::new();
         for package in self.repo.get_packages()? {
-            if self.is_allowed(&package.get_name()) {
+            if self.is_allowed(bstr::BStr::new(&*legacy_lossy(&package.get_name()))) {
                 result.push(package);
             }
         }
@@ -233,11 +233,11 @@ impl RepositoryInterface for FilterRepository {
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>> {
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>> {
         let mut result = IndexMap::new();
         for (name, provider) in self.repo.get_providers(package_name)? {
-            if self.is_allowed(&provider.name) {
+            if self.is_allowed(provider.name.as_bstr()) {
                 result.insert(name, provider);
             }
         }
@@ -245,7 +245,7 @@ impl RepositoryInterface for FilterRepository {
         Ok(result)
     }
 
-    fn get_repo_name(&self) -> anyhow::Result<String> {
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
         self.repo.get_repo_name()
     }
 
@@ -284,10 +284,10 @@ impl AdvisoryProviderInterface for FilterRepository {
 
     fn get_security_advisories(
         &mut self,
-        mut package_constraint_map: IndexMap<String, AnyConstraint>,
+        mut package_constraint_map: IndexMap<BString, AnyConstraint>,
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult> {
-        package_constraint_map.retain(|name, _| self.is_allowed(name));
+        package_constraint_map.retain(|name, _| self.is_allowed(name.as_bstr()));
         let mut repo = self.repo.borrow_mut();
         if let Some(advisory_repo) = repo.as_advisory_provider_mut() {
             advisory_repo.get_security_advisories(package_constraint_map, allow_partial_advisories)

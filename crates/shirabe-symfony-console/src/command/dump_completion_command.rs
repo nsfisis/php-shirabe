@@ -281,10 +281,7 @@ impl Command for DumpCompletionCommand {
                         "{{ COMMAND_NAME }}".to_string(),
                         "{{ VERSION }}".to_string(),
                     ],
-                    &[
-                        command_name,
-                        legacy_lossy(&bstr::BString::from(version)).into_owned(),
-                    ],
+                    &[command_name, legacy_lossy(&version).into_owned()],
                     completion_file,
                 ))
                 .into_owned(),

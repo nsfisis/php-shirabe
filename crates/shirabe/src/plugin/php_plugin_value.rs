@@ -322,11 +322,17 @@ pub(crate) fn link_from_wire(value: &PluginValue) -> Result<Link, PhpThrow> {
     let pretty_constraint =
         optional_string(object.protected("prettyConstraint")).unwrap_or_default();
     Ok(Link::new(
-        required_string("a Link source", object.protected("source"))?,
-        required_string("a Link target", object.protected("target"))?,
+        bstr::BString::from(required_string(
+            "a Link source",
+            object.protected("source"),
+        )?),
+        bstr::BString::from(required_string(
+            "a Link target",
+            object.protected("target"),
+        )?),
         constraint,
-        optional_string(object.protected("description")),
-        pretty_constraint,
+        optional_string(object.protected("description")).map(bstr::BString::from),
+        bstr::BString::from(pretty_constraint),
     ))
 }
 
@@ -388,11 +394,11 @@ mod tests {
     #[test]
     fn a_link_is_written_as_php_writes_it() {
         let link = Link::new(
-            "a/b".to_string(),
-            "c/d".to_string(),
+            bstr::BString::from("a/b".to_string()),
+            bstr::BString::from("c/d".to_string()),
             simple(">=", "1.0.0", None),
-            Some("requires".to_string()),
-            "^1.0".to_string(),
+            Some(bstr::BString::from("requires".to_string())),
+            bstr::BString::from("^1.0".to_string()),
         );
         assert_eq!(
             String::from_utf8_lossy(&serialize(&link_to_wire(&link))),
@@ -487,14 +493,14 @@ mod tests {
         ];
         for constraint in constraints {
             let link = Link::new(
-                "Vendor/Root".to_string(),
-                "Vendor/Dep".to_string(),
+                bstr::BString::from("Vendor/Root".to_string()),
+                bstr::BString::from("Vendor/Dep".to_string()),
                 constraint,
-                Some(Link::TYPE_DEV_REQUIRE.to_string()),
-                "^1.0".to_string(),
+                Some(bstr::BString::from(Link::TYPE_DEV_REQUIRE.to_string())),
+                bstr::BString::from("^1.0".to_string()),
             );
             let decoded = link_from_wire(&link_to_wire(&link)).expect("decode failed");
-            assert_eq!(link.to_string(), decoded.to_string());
+            assert_eq!(link.to_php_string(), decoded.to_php_string());
             assert_eq!(link.get_description(), decoded.get_description());
             assert_eq!(
                 link.get_constraint().get_pretty_string(),

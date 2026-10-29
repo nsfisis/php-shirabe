@@ -99,7 +99,7 @@ impl VcsDownloader for HgDownloader {
             "hg".to_string(),
             "up".to_string(),
             "--".to_string(),
-            package.get_source_reference().unwrap_or_default(),
+            legacy_lossy(&package.get_source_reference().unwrap_or_default()).into_owned(),
         ];
         let mut ignored_output = String::new();
         if self.inner.process.borrow_mut().execute(
@@ -142,7 +142,10 @@ impl VcsDownloader for HgDownloader {
         let ref_ = target.get_source_reference().unwrap_or_default();
         self.inner.io.write_error(&format!(
             " Updating to {}",
-            target.get_source_reference().unwrap_or_default()
+            target
+                .get_source_reference()
+                .unwrap_or_default()
+                .display_lossy()
         ));
 
         if !self.has_metadata_repository(path) {
@@ -157,7 +160,7 @@ impl VcsDownloader for HgDownloader {
         };
         hg_utils.run_command(pull_command, url.to_string(), Some(path.to_string()));
 
-        let ref_clone = ref_;
+        let ref_clone = legacy_lossy(&ref_).into_owned();
         let up_command = move |_url: String| -> Vec<String> {
             vec![
                 "hg".to_string(),

@@ -13,10 +13,10 @@ pub struct PrePoolCreateEvent {
     inner: Event,
     repositories: Vec<RepositoryInterfaceHandle>,
     request: Request,
-    acceptable_stabilities: IndexMap<String, i64>,
-    stability_flags: IndexMap<String, i64>,
-    root_aliases: IndexMap<String, IndexMap<String, IndexMap<String, String>>>,
-    root_references: IndexMap<String, String>,
+    acceptable_stabilities: IndexMap<BString, i64>,
+    stability_flags: IndexMap<BString, i64>,
+    root_aliases: IndexMap<BString, IndexMap<BString, IndexMap<BString, BString>>>,
+    root_references: IndexMap<BString, BString>,
     // TODO(type-model): PoolBuilder's package array keeps the keys of the entries it unset, which
     // a listener sees in PHP; the list here is reindexed.
     packages: Vec<BasePackageHandle>,
@@ -33,10 +33,10 @@ impl PrePoolCreateEvent {
         name: String,
         repositories: Vec<RepositoryInterfaceHandle>,
         request: Request,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        root_aliases: IndexMap<String, IndexMap<String, IndexMap<String, String>>>,
-        root_references: IndexMap<String, String>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        root_aliases: IndexMap<BString, IndexMap<BString, IndexMap<BString, BString>>>,
+        root_references: IndexMap<BString, BString>,
         packages: Vec<BasePackageHandle>,
         unacceptable_fixed_packages: Vec<BasePackageHandle>,
     ) -> Self {
@@ -73,21 +73,21 @@ impl PrePoolCreateEvent {
         )
     }
 
-    pub fn get_acceptable_stabilities(&self) -> &IndexMap<String, i64> {
+    pub fn get_acceptable_stabilities(&self) -> &IndexMap<BString, i64> {
         &self.acceptable_stabilities
     }
 
-    pub fn get_stability_flags(&self) -> &IndexMap<String, i64> {
+    pub fn get_stability_flags(&self) -> &IndexMap<BString, i64> {
         &self.stability_flags
     }
 
     pub fn get_root_aliases(
         &self,
-    ) -> &IndexMap<String, IndexMap<String, IndexMap<String, String>>> {
+    ) -> &IndexMap<BString, IndexMap<BString, IndexMap<BString, BString>>> {
         &self.root_aliases
     }
 
-    pub fn get_root_references(&self) -> &IndexMap<String, String> {
+    pub fn get_root_references(&self) -> &IndexMap<BString, BString> {
         &self.root_references
     }
 

@@ -111,15 +111,39 @@ fn test_repo_creation() {
         "unknown",
     );
 
-    rm.set_repository_class("composer", "Composer\\Repository\\ComposerRepository");
-    rm.set_repository_class("vcs", "Composer\\Repository\\VcsRepository");
-    rm.set_repository_class("package", "Composer\\Repository\\PackageRepository");
-    rm.set_repository_class("pear", "Composer\\Repository\\PearRepository");
-    rm.set_repository_class("git", "Composer\\Repository\\VcsRepository");
-    rm.set_repository_class("svn", "Composer\\Repository\\VcsRepository");
-    rm.set_repository_class("perforce", "Composer\\Repository\\VcsRepository");
-    rm.set_repository_class("hg", "Composer\\Repository\\VcsRepository");
-    rm.set_repository_class("artifact", "Composer\\Repository\\ArtifactRepository");
+    rm.set_repository_class(
+        bstr::BStr::new("composer"),
+        "Composer\\Repository\\ComposerRepository",
+    );
+    rm.set_repository_class(
+        bstr::BStr::new("vcs"),
+        "Composer\\Repository\\VcsRepository",
+    );
+    rm.set_repository_class(
+        bstr::BStr::new("package"),
+        "Composer\\Repository\\PackageRepository",
+    );
+    rm.set_repository_class(
+        bstr::BStr::new("pear"),
+        "Composer\\Repository\\PearRepository",
+    );
+    rm.set_repository_class(
+        bstr::BStr::new("git"),
+        "Composer\\Repository\\VcsRepository",
+    );
+    rm.set_repository_class(
+        bstr::BStr::new("svn"),
+        "Composer\\Repository\\VcsRepository",
+    );
+    rm.set_repository_class(
+        bstr::BStr::new("perforce"),
+        "Composer\\Repository\\VcsRepository",
+    );
+    rm.set_repository_class(bstr::BStr::new("hg"), "Composer\\Repository\\VcsRepository");
+    rm.set_repository_class(
+        bstr::BStr::new("artifact"),
+        "Composer\\Repository\\ArtifactRepository",
+    );
 
     let cases: Vec<(&str, IndexMap<BString, PhpMixed>)> = vec![
         (
@@ -166,12 +190,13 @@ fn test_repo_creation() {
 
     for (r#type, options) in cases {
         rm.create_repository(
-            "composer",
+            bstr::BStr::new("composer"),
             str_config(&[("url", PhpMixed::string("http://example.org".to_string()))]),
             None,
         )
         .unwrap();
-        rm.create_repository(r#type, options, None).unwrap();
+        rm.create_repository(bstr::BStr::new(r#type), options, None)
+            .unwrap();
     }
 }
 
@@ -207,7 +232,10 @@ fn test_invalid_repo_creation_throws() {
     ];
 
     for (r#type, options) in cases {
-        assert!(rm.create_repository(r#type, options, None).is_err());
+        assert!(
+            rm.create_repository(bstr::BStr::new(r#type), options, None)
+                .is_err()
+        );
     }
 }
 
@@ -220,10 +248,13 @@ fn test_filter_repo_wrapping() {
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(false, None)));
     let mut rm = RepositoryManager::new(io.clone(), config, http_downloader(&io), None, None);
 
-    rm.set_repository_class("path", "Composer\\Repository\\PathRepository");
+    rm.set_repository_class(
+        bstr::BStr::new("path"),
+        "Composer\\Repository\\PathRepository",
+    );
     let repo = rm
         .create_repository(
-            "path",
+            bstr::BStr::new("path"),
             str_config(&[
                 ("type", PhpMixed::string("path".to_string())),
                 (

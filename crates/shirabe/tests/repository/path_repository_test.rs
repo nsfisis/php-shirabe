@@ -11,7 +11,8 @@ use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
 use shirabe::util::{Platform, ProcessExecutor};
 use shirabe_php_shim::{
-    PhpMixed, file_get_contents, hash, legacy_lossy, path_to_bytes, realpath, serialize,
+    PhpMixed, file_get_contents, hash, legacy_lossy, path_from_bytes, path_to_bytes, realpath,
+    serialize,
 };
 use std::path::Path;
 
@@ -122,10 +123,10 @@ fn test_load_package_from_file_system_with_wildcard() {
     assert!(repository.__count().unwrap() >= 2);
 
     let package = &packages[0];
-    names.push(package.get_name());
+    names.push(legacy_lossy(&package.get_name()).into_owned());
 
     let package = &packages[1];
-    names.push(package.get_name());
+    names.push(legacy_lossy(&package.get_name()).into_owned());
 
     names.sort();
     assert_eq!(
@@ -167,10 +168,16 @@ fn test_load_package_with_explicit_versions() {
     assert_eq!(2, repository.__count().unwrap());
 
     let package = &packages[0];
-    versions.insert(package.get_name(), package.get_version());
+    versions.insert(
+        legacy_lossy(&package.get_name()).into_owned(),
+        legacy_lossy(&package.get_version()).into_owned(),
+    );
 
     let package = &packages[1];
-    versions.insert(package.get_name(), package.get_version());
+    versions.insert(
+        legacy_lossy(&package.get_name()).into_owned(),
+        legacy_lossy(&package.get_version()).into_owned(),
+    );
 
     versions.sort_keys();
     let expected: IndexMap<String, String> = [
@@ -248,7 +255,12 @@ fn test_url_remains_relative() {
 
     // Convert platform specific separators back to generic URL slashes
     let relative_url = relative_url.replace(std::path::MAIN_SEPARATOR, "/");
-    assert_eq!(Some(relative_url), package.get_dist_url());
+    assert_eq!(
+        Some(relative_url),
+        package
+            .get_dist_url()
+            .map(|s| legacy_lossy(&s).into_owned())
+    );
 }
 
 #[test]
@@ -300,13 +312,12 @@ fn test_reference_config() {
             Some(hash(
                 "sha1",
                 [
-                    file_get_contents(std::path::Path::new(&dist_url).join("composer.json"))
+                    file_get_contents(path_from_bytes(&dist_url).join("composer.json"))
                         .unwrap_or_default(),
                     Vec::from(serialize(&PhpMixed::Array(options.clone()))),
                 ]
                 .concat()
             ))
-            .map(|s| legacy_lossy(&s).into_owned())
         );
     }
 }

@@ -86,7 +86,7 @@ impl InstallerInterface for MetapackageInstaller {
         if !repo.borrow_mut().has_package(initial.clone())? {
             return Err(InvalidArgumentException::new(format!(
                 "Package is not installed: {}",
-                initial
+                initial.to_php_string().display_lossy()
             ))
             .into());
         }
@@ -115,7 +115,7 @@ impl InstallerInterface for MetapackageInstaller {
         if !repo.borrow_mut().has_package(package.clone())? {
             return Err(InvalidArgumentException::new(format!(
                 "Package is not installed: {}",
-                package
+                package.to_php_string().display_lossy()
             ))
             .into());
         }

@@ -83,7 +83,12 @@ fn make_package(name: &str, is_dev: bool) -> PackageInterfaceHandle {
             "1.0.0".to_string(),
         )
     };
-    CompletePackageHandle::new(name.to_string(), version, pretty).into()
+    CompletePackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from(version),
+        bstr::BString::from(pretty),
+    )
+    .into()
 }
 
 /// ref: DownloadManagerTest::createDownloaderMock
@@ -143,7 +148,7 @@ fn test_get_downloader_for_incorrectly_installed_package() {
 #[test]
 fn test_get_downloader_for_metapackage() {
     let package = create_package_mock();
-    package.__set_type("metapackage".to_string());
+    package.__set_type(bstr::BString::from("metapackage".to_string()));
 
     let manager = create_manager();
 
@@ -158,8 +163,8 @@ fn test_get_downloader_for_metapackage() {
 #[test]
 fn test_get_downloader_for_correctly_installed_dist_package() {
     let package = create_package_mock();
-    package.set_installation_source(Some("dist".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.set_installation_source(Some(bstr::BString::from("dist".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let downloader = as_dyn(downloader_mock("dist"));
 
@@ -176,8 +181,8 @@ fn test_get_downloader_for_correctly_installed_dist_package() {
 #[test]
 fn test_get_downloader_for_incorrectly_installed_dist_package() {
     let package = create_package_mock();
-    package.set_installation_source(Some("dist".to_string()));
-    package.set_dist_type(Some("git".to_string()));
+    package.set_installation_source(Some(bstr::BString::from("dist".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("git".to_string())));
 
     let downloader = as_dyn(downloader_mock("source"));
 
@@ -191,8 +196,8 @@ fn test_get_downloader_for_incorrectly_installed_dist_package() {
 #[test]
 fn test_get_downloader_for_correctly_installed_source_package() {
     let package = create_package_mock();
-    package.set_installation_source(Some("source".to_string()));
-    package.__set_source_type(Some("git".to_string()));
+    package.set_installation_source(Some(bstr::BString::from("source".to_string())));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
 
     let downloader = as_dyn(downloader_mock("source"));
 
@@ -209,8 +214,8 @@ fn test_get_downloader_for_correctly_installed_source_package() {
 #[test]
 fn test_get_downloader_for_incorrectly_installed_source_package() {
     let package = create_package_mock();
-    package.set_installation_source(Some("source".to_string()));
-    package.__set_source_type(Some("pear".to_string()));
+    package.set_installation_source(Some(bstr::BString::from("source".to_string())));
+    package.__set_source_type(Some(bstr::BString::from("pear".to_string())));
 
     let downloader = as_dyn(downloader_mock("dist"));
 
@@ -223,8 +228,8 @@ fn test_get_downloader_for_incorrectly_installed_source_package() {
 #[test]
 fn test_full_package_download() {
     let package = create_package_mock();
-    package.__set_source_type(Some("git".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut downloader = downloader_mock("dist");
     downloader
@@ -238,14 +243,17 @@ fn test_full_package_download() {
 
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("dist"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("dist"))
+    );
 }
 
 #[test]
 fn test_full_package_download_failover() {
     let package = create_package_mock();
-    package.__set_source_type(Some("git".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     // dist downloader fails, source downloader (tried next) succeeds.
     let mut downloader_fail = downloader_mock("dist");
@@ -274,7 +282,10 @@ fn test_full_package_download_failover() {
     // both downloaders' expect_download().times(1): the 'dist' downloader is reached
     // and fails, then the 'source' downloader is reached and succeeds. A faithful
     // ordering check would need a src-side set-history hook on Package.
-    assert_eq!(package.get_installation_source().as_deref(), Some("source"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("source"))
+    );
 }
 
 #[test]
@@ -290,7 +301,7 @@ fn test_bad_package_download() {
 #[test]
 fn test_dist_only_package_download() {
     let package = create_package_mock();
-    package.set_dist_type(Some("pear".to_string()));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut downloader = downloader_mock("dist");
     downloader
@@ -304,13 +315,16 @@ fn test_dist_only_package_download() {
 
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("dist"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("dist"))
+    );
 }
 
 #[test]
 fn test_source_only_package_download() {
     let package = create_package_mock();
-    package.__set_source_type(Some("git".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
 
     let mut downloader = downloader_mock("source");
     downloader
@@ -324,28 +338,34 @@ fn test_source_only_package_download() {
 
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("source"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("source"))
+    );
 }
 
 #[test]
 fn test_metapackage_package_download() {
     // There is no downloader for metapackages, so getDownloaderForPackage yields none.
     let package = create_package_mock();
-    package.__set_source_type(Some("git".to_string()));
-    package.__set_type("metapackage".to_string());
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.__set_type(bstr::BString::from("metapackage".to_string()));
 
     let manager = create_manager();
 
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("source"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("source"))
+    );
 }
 
 #[test]
 fn test_full_package_download_with_source_preferred() {
     let package = create_package_mock();
-    package.__set_source_type(Some("git".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut downloader = downloader_mock("source");
     downloader
@@ -360,13 +380,16 @@ fn test_full_package_download_with_source_preferred() {
     manager.set_prefer_source(true);
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("source"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("source"))
+    );
 }
 
 #[test]
 fn test_dist_only_package_download_with_source_preferred() {
     let package = create_package_mock();
-    package.set_dist_type(Some("pear".to_string()));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut downloader = downloader_mock("dist");
     downloader
@@ -381,13 +404,16 @@ fn test_dist_only_package_download_with_source_preferred() {
     manager.set_prefer_source(true);
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("dist"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("dist"))
+    );
 }
 
 #[test]
 fn test_source_only_package_download_with_source_preferred() {
     let package = create_package_mock();
-    package.__set_source_type(Some("git".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
 
     let mut downloader = downloader_mock("source");
     downloader
@@ -402,7 +428,10 @@ fn test_source_only_package_download_with_source_preferred() {
     manager.set_prefer_source(true);
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("source"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("source"))
+    );
 }
 
 #[test]
@@ -419,12 +448,12 @@ fn test_bad_package_download_with_source_preferred() {
 #[test]
 fn test_update_dist_with_equal_types() {
     let initial = create_package_mock();
-    initial.set_installation_source(Some("dist".to_string()));
-    initial.set_dist_type(Some("zip".to_string()));
+    initial.set_installation_source(Some(bstr::BString::from("dist".to_string())));
+    initial.set_dist_type(Some(bstr::BString::from("zip".to_string())));
 
     let target = create_package_mock();
-    target.set_installation_source(Some("dist".to_string()));
-    target.set_dist_type(Some("zip".to_string()));
+    target.set_installation_source(Some(bstr::BString::from("dist".to_string())));
+    target.set_dist_type(Some(bstr::BString::from("zip".to_string())));
 
     let mut zip_downloader = downloader_mock("dist");
     zip_downloader
@@ -442,12 +471,12 @@ fn test_update_dist_with_equal_types() {
 #[test]
 fn test_update_dist_with_not_equal_types() {
     let initial = create_package_mock();
-    initial.set_installation_source(Some("dist".to_string()));
-    initial.set_dist_type(Some("xz".to_string()));
+    initial.set_installation_source(Some(bstr::BString::from("dist".to_string())));
+    initial.set_dist_type(Some(bstr::BString::from("xz".to_string())));
 
     let target = create_package_mock();
-    target.set_installation_source(Some("dist".to_string()));
-    target.set_dist_type(Some("zip".to_string()));
+    target.set_installation_source(Some(bstr::BString::from("dist".to_string())));
+    target.set_dist_type(Some(bstr::BString::from("zip".to_string())));
 
     let mut xz_downloader = downloader_mock("dist");
     xz_downloader
@@ -578,16 +607,16 @@ fn test_get_available_sources_update_sticks_to_same_source() {
     for case in cases {
         let initial = case.prev_pkg_source.map(|source| {
             let package = make_package("dummy/pkg", case.prev_pkg_is_dev);
-            package.set_installation_source(Some(source.to_string()));
+            package.set_installation_source(Some(bstr::BString::from(source.to_string())));
             package
         });
 
         let target = make_package("dummy/pkg", case.target_is_dev);
         if case.target_available.contains(&"source") {
-            target.__set_source_type(Some("git".to_string()));
+            target.__set_source_type(Some(bstr::BString::from("git".to_string())));
         }
         if case.target_available.contains(&"dist") {
-            target.set_dist_type(Some("zip".to_string()));
+            target.set_dist_type(Some(bstr::BString::from("zip".to_string())));
         }
 
         let result = manager.__get_available_sources(target, initial).unwrap();
@@ -600,9 +629,9 @@ fn test_get_available_sources_update_sticks_to_same_source() {
 fn test_update_metapackage() {
     // There is no downloader for metapackages.
     let initial = create_package_mock();
-    initial.__set_type("metapackage".to_string());
+    initial.__set_type(bstr::BString::from("metapackage".to_string()));
     let target = create_package_mock();
-    target.__set_type("metapackage".to_string());
+    target.__set_type(bstr::BString::from("metapackage".to_string()));
 
     let manager = create_manager();
 
@@ -616,8 +645,8 @@ fn test_update_metapackage() {
 #[test]
 fn test_remove() {
     let package = create_package_mock();
-    package.set_installation_source(Some("dist".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.set_installation_source(Some(bstr::BString::from("dist".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut pear_downloader = downloader_mock("dist");
     pear_downloader
@@ -636,7 +665,7 @@ fn test_remove() {
 fn test_metapackage_remove() {
     // There is no downloader for metapackages.
     let package = create_package_mock();
-    package.__set_type("metapackage".to_string());
+    package.__set_type(bstr::BString::from("metapackage".to_string()));
 
     let manager = create_manager();
 
@@ -650,8 +679,8 @@ fn test_metapackage_remove() {
 #[test]
 fn test_install_preference_without_preference_dev() {
     let package = make_package("dummy/pkg", true);
-    package.__set_source_type(Some("git".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut downloader = downloader_mock("source");
     downloader
@@ -665,14 +694,17 @@ fn test_install_preference_without_preference_dev() {
 
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("source"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("source"))
+    );
 }
 
 #[test]
 fn test_install_preference_without_preference_no_dev() {
     let package = make_package("dummy/pkg", false);
-    package.__set_source_type(Some("git".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut downloader = downloader_mock("dist");
     downloader
@@ -686,14 +718,17 @@ fn test_install_preference_without_preference_no_dev() {
 
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("dist"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("dist"))
+    );
 }
 
 #[test]
 fn test_install_preference_without_match_dev() {
     let package = make_package("bar/package", true);
-    package.__set_source_type(Some("git".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut downloader = downloader_mock("source");
     downloader
@@ -711,14 +746,17 @@ fn test_install_preference_without_match_dev() {
 
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("source"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("source"))
+    );
 }
 
 #[test]
 fn test_install_preference_without_match_no_dev() {
     let package = make_package("bar/package", false);
-    package.__set_source_type(Some("git".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut downloader = downloader_mock("dist");
     downloader
@@ -736,14 +774,17 @@ fn test_install_preference_without_match_no_dev() {
 
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("dist"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("dist"))
+    );
 }
 
 #[test]
 fn test_install_preference_with_match_auto_dev() {
     let package = make_package("foo/package", true);
-    package.__set_source_type(Some("git".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut downloader = downloader_mock("source");
     downloader
@@ -758,14 +799,17 @@ fn test_install_preference_with_match_auto_dev() {
 
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("source"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("source"))
+    );
 }
 
 #[test]
 fn test_install_preference_with_match_auto_no_dev() {
     let package = make_package("foo/package", false);
-    package.__set_source_type(Some("git".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut downloader = downloader_mock("dist");
     downloader
@@ -780,14 +824,17 @@ fn test_install_preference_with_match_auto_no_dev() {
 
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("dist"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("dist"))
+    );
 }
 
 #[test]
 fn test_install_preference_with_match_source() {
     let package = make_package("foo/package", false);
-    package.__set_source_type(Some("git".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut downloader = downloader_mock("source");
     downloader
@@ -805,14 +852,17 @@ fn test_install_preference_with_match_source() {
 
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("source"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("source"))
+    );
 }
 
 #[test]
 fn test_install_preference_with_match_dist() {
     let package = make_package("foo/package", false);
-    package.__set_source_type(Some("git".to_string()));
-    package.set_dist_type(Some("pear".to_string()));
+    package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+    package.set_dist_type(Some(bstr::BString::from("pear".to_string())));
 
     let mut downloader = downloader_mock("dist");
     downloader
@@ -827,5 +877,8 @@ fn test_install_preference_with_match_dist() {
 
     run(manager.download(package.clone(), "target_dir", None)).unwrap();
 
-    assert_eq!(package.get_installation_source().as_deref(), Some("dist"));
+    assert_eq!(
+        package.get_installation_source().as_ref(),
+        Some(&bstr::BString::from("dist"))
+    );
 }

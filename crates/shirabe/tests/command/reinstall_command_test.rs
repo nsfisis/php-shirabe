@@ -72,10 +72,10 @@ fn test_reinstall_command() {
         let another_req_package = get_package("root/anotherreq", "1.0.0");
         let another_req_package2 = get_package("root/anotherreq2", "1.0.0");
         let another_req_package3 = get_package("root/lala", "1.0.0");
-        root_req_package.__set_type("metapackage".to_string());
-        another_req_package.__set_type("metapackage".to_string());
-        another_req_package2.__set_type("metapackage".to_string());
-        another_req_package3.__set_type("metapackage".to_string());
+        root_req_package.__set_type(bstr::BString::from("metapackage".to_string()));
+        another_req_package.__set_type(bstr::BString::from("metapackage".to_string()));
+        another_req_package2.__set_type(bstr::BString::from("metapackage".to_string()));
+        another_req_package3.__set_type(bstr::BString::from("metapackage".to_string()));
 
         let dev = [
             another_req_package.clone(),

@@ -34,7 +34,7 @@ pub trait ArchiveDownloader {
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup_executed()
             .borrow_mut()
-            .shift_remove(&package.get_name());
+            .shift_remove(&*legacy_lossy(&package.get_name()));
         self.inner()
             .prepare(r#type, package, path, prev_package)
             .await
@@ -49,7 +49,7 @@ pub trait ArchiveDownloader {
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup_executed()
             .borrow_mut()
-            .insert(package.get_name(), true);
+            .insert(legacy_lossy(&package.get_name()).into_owned(), true);
         self.inner()
             .cleanup(r#type, package, path, prev_package)
             .await
@@ -282,7 +282,7 @@ fn rename_recursively(
             if !is_dir(file) {
                 return Err(RuntimeException::new(format!(
                     "Installing {} would lead to overwriting the {} directory with a file from the package, invalid operation.",
-                    package,
+                    package.to_php_string().display_lossy(),
                     target.display()
                 ))
                 .into());

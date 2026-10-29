@@ -2,7 +2,7 @@
 
 use crate::async_runtime::run;
 use crate::php_worker::{load_composer_php_runtime, lock_php_worker, php_runtime_available};
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::autoload::AutoloadGenerator;
 use shirabe::composer::{Composer, ComposerHandle, PartialOrFullComposer};
@@ -35,7 +35,7 @@ use shirabe::util::r#loop::Loop;
 use shirabe::util::process_executor::ProcessExecutor;
 use shirabe_php_rpc::PluginValue;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, UnexpectedValueException, legacy_lossy,
+    Catch as _, PhpMixed, RuntimeException, UnexpectedValueException, legacy_lossy, path_from_bytes,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::output::VERBOSITY_NORMAL;
@@ -127,7 +127,7 @@ impl RepositoryManagerInterface for MockRepositoryManager {
 
     fn create_repository(
         &self,
-        _type: &str,
+        _type: &BStr,
         _config: IndexMap<BString, PhpMixed>,
         _name: Option<&str>,
     ) -> anyhow::Result<RepositoryInterfaceHandle> {
@@ -181,14 +181,14 @@ impl InstallationManagerInterface for MockInstallationManager {
     }
 
     fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
-        let upstream = fixtures_dir().join(package.get_pretty_name());
+        let upstream = fixtures_dir().join(path_from_bytes(&package.get_pretty_name()));
         if upstream.exists() {
             return Some(upstream.to_str().unwrap().to_string());
         }
         // Shirabe-specific fixtures (subscriber_test) live next to this test binary.
         Some(
             shirabe_fixtures_dir()
-                .join(package.get_pretty_name())
+                .join(path_from_bytes(&package.get_pretty_name()))
                 .to_str()
                 .unwrap()
                 .to_string(),
@@ -349,9 +349,9 @@ pub(crate) fn set_up() -> SetUp {
     composer.borrow_mut().set_event_dispatcher(real_dispatcher);
     composer.borrow_mut().set_package(
         RootPackageHandle::new(
-            "dummy/root".to_string(),
-            "1.0.0.0".to_string(),
-            "1.0.0".to_string(),
+            bstr::BString::from("dummy/root".to_string()),
+            bstr::BString::from("1.0.0.0".to_string()),
+            bstr::BString::from("1.0.0".to_string()),
         )
         .into(),
     );
@@ -639,14 +639,16 @@ fn set_plugin_api_version_with_plugins(
     set_up.composer.borrow_mut().set_plugin_manager(pm.clone());
 
     let plug_api_internal_package: PackageInterfaceHandle = CompletePackageHandle::new(
-        "composer-plugin-api".to_string(),
-        legacy_lossy(
-            &VersionParser
-                .normalize(new_plugin_api_version, None)
-                .unwrap(),
-        )
-        .into_owned(),
-        new_plugin_api_version.to_string(),
+        bstr::BString::from("composer-plugin-api".to_string()),
+        bstr::BString::from(
+            legacy_lossy(
+                &VersionParser
+                    .normalize(new_plugin_api_version, None)
+                    .unwrap(),
+            )
+            .into_owned(),
+        ),
+        bstr::BString::from(new_plugin_api_version.to_string()),
     )
     .into();
     let repository =

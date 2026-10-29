@@ -20,7 +20,12 @@ use shirabe_semver::VersionParser;
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
     let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
-    CompletePackageHandle::new(name.to_string(), norm_version, version.to_string()).into()
+    CompletePackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from(norm_version),
+        bstr::BString::from(version.to_string()),
+    )
+    .into()
 }
 
 /// ref: ArchiveDownloaderTest::getArchiveDownloaderMock (the inherited getFileName/processUrl
@@ -55,7 +60,9 @@ fn get_archive_downloader(vendor_dir: Option<&str>) -> FileDownloader {
 #[test]
 fn test_get_file_name() {
     let package = get_package("dummy/pkg", "1.0.0");
-    package.set_dist_url(Some("http://example.com/script.js".to_string()));
+    package.set_dist_url(Some(bstr::BString::from(
+        "http://example.com/script.js".to_string(),
+    )));
 
     let downloader = get_archive_downloader(Some("/vendor"));
 
@@ -122,7 +129,7 @@ fn test_process_url_rewrite_dist() {
         );
 
         let package = get_package("dummy/pkg", "1.0.0");
-        package.set_dist_reference(Some("ref".to_string()));
+        package.set_dist_reference(Some(bstr::BString::from("ref".to_string())));
         let url = downloader.__process_url(package, url).unwrap();
 
         assert_eq!(expected, url);
@@ -159,7 +166,7 @@ fn test_process_url_rewrite_bitbucket_dist() {
         );
 
         let package = get_package("dummy/pkg", "1.0.0");
-        package.set_dist_reference(Some("ref".to_string()));
+        package.set_dist_reference(Some(bstr::BString::from("ref".to_string())));
         let url = downloader.__process_url(package, &url).unwrap();
 
         assert_eq!(expected, url);

@@ -3,13 +3,14 @@
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepository, RepositoryInterface};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{legacy_lossy, php_regex, preg_replace};
 use shirabe_symfony_console::formatter::OutputFormatter;
 
 #[derive(Debug)]
 pub struct SuggestedPackagesReporter {
-    suggested_packages: Vec<IndexMap<String, String>>,
+    suggested_packages: Vec<IndexMap<BString, BString>>,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
 }
 
@@ -25,15 +26,15 @@ impl SuggestedPackagesReporter {
         }
     }
 
-    pub fn get_packages(&self) -> &Vec<IndexMap<String, String>> {
+    pub fn get_packages(&self) -> &Vec<IndexMap<BString, BString>> {
         &self.suggested_packages
     }
 
-    pub fn add_package(&mut self, source: String, target: String, reason: String) -> &mut Self {
+    pub fn add_package(&mut self, source: BString, target: BString, reason: BString) -> &mut Self {
         let mut entry = IndexMap::new();
-        entry.insert("source".to_string(), source);
-        entry.insert("target".to_string(), target);
-        entry.insert("reason".to_string(), reason);
+        entry.insert(BString::from("source"), source);
+        entry.insert(BString::from("target"), target);
+        entry.insert(BString::from("reason"), reason);
         self.suggested_packages.push(entry);
 
         self
@@ -42,7 +43,7 @@ impl SuggestedPackagesReporter {
     pub fn add_suggestions_from_package(&mut self, package: PackageInterfaceHandle) -> &mut Self {
         let source = package.get_pretty_name();
         for (target, reason) in package.get_suggests() {
-            self.add_package(source.clone(), target.clone(), reason.clone());
+            self.add_package(source.clone(), target, reason);
         }
 
         self
@@ -57,17 +58,23 @@ impl SuggestedPackagesReporter {
         let suggested_packages = self
             .get_filtered_suggestions(installed_repo.as_deref_mut(), only_dependents_of.clone())?;
 
-        let mut suggesters: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
-        let mut suggested: IndexMap<String, IndexMap<String, String>> = IndexMap::new();
+        let mut suggesters: IndexMap<BString, IndexMap<BString, BString>> = IndexMap::new();
+        let mut suggested: IndexMap<BString, IndexMap<BString, BString>> = IndexMap::new();
         for suggestion in &suggested_packages {
             suggesters
-                .entry(suggestion["source"].clone())
+                .entry(suggestion[b"source".as_slice()].clone())
                 .or_default()
-                .insert(suggestion["target"].clone(), suggestion["reason"].clone());
+                .insert(
+                    suggestion[b"target".as_slice()].clone(),
+                    suggestion[b"reason".as_slice()].clone(),
+                );
             suggested
-                .entry(suggestion["target"].clone())
+                .entry(suggestion[b"target".as_slice()].clone())
                 .or_default()
-                .insert(suggestion["source"].clone(), suggestion["reason"].clone());
+                .insert(
+                    suggestion[b"source".as_slice()].clone(),
+                    suggestion[b"reason".as_slice()].clone(),
+                );
         }
         suggesters.sort_keys();
         suggested.sort_keys();
@@ -75,7 +82,8 @@ impl SuggestedPackagesReporter {
         // Simple mode
         if mode & Self::MODE_LIST != 0 {
             for name in suggested.keys() {
-                self.io.write(&format!("<info>{}</info>", name));
+                self.io
+                    .write(&format!("<info>{}</info>", legacy_lossy(&name)));
             }
 
             return Ok(());
@@ -84,15 +92,17 @@ impl SuggestedPackagesReporter {
         // Grouped by package
         if mode & Self::MODE_BY_PACKAGE != 0 {
             for (suggester, suggestions) in &suggesters {
-                self.io
-                    .write(&format!("<comment>{}</comment> suggests:", suggester));
+                self.io.write(&format!(
+                    "<comment>{}</comment> suggests:",
+                    legacy_lossy(&suggester)
+                ));
 
                 for (suggestion, reason) in suggestions {
                     self.io.write(&format!(
                         " - <info>{}</info>{}",
-                        suggestion,
+                        legacy_lossy(&suggestion),
                         if !reason.is_empty() {
-                            format!(": {}", self.escape_output(reason))
+                            format!(": {}", self.escape_output(&legacy_lossy(reason)))
                         } else {
                             String::new()
                         }
@@ -111,15 +121,15 @@ impl SuggestedPackagesReporter {
             for (suggestion, suggesters) in &suggested {
                 self.io.write(&format!(
                     "<comment>{}</comment> is suggested by:",
-                    suggestion
+                    legacy_lossy(&suggestion)
                 ));
 
                 for (suggester, reason) in suggesters {
                     self.io.write(&format!(
                         " - <info>{}</info>{}",
-                        suggester,
+                        legacy_lossy(&suggester),
                         if !reason.is_empty() {
-                            format!(": {}", self.escape_output(reason))
+                            format!(": {}", self.escape_output(&legacy_lossy(reason)))
                         } else {
                             String::new()
                         }
@@ -161,9 +171,9 @@ impl SuggestedPackagesReporter {
         &self,
         installed_repo: Option<&mut InstalledRepository>,
         only_dependents_of: Option<PackageInterfaceHandle>,
-    ) -> anyhow::Result<Vec<IndexMap<String, String>>> {
+    ) -> anyhow::Result<Vec<IndexMap<BString, BString>>> {
         let suggested_packages = self.get_packages();
-        let mut installed_names: Vec<String> = Vec::new();
+        let mut installed_names: Vec<BString> = Vec::new();
         if let Some(installed_repo) = installed_repo
             && !suggested_packages.is_empty()
         {
@@ -172,22 +182,23 @@ impl SuggestedPackagesReporter {
             }
         }
 
-        let mut source_filter: Vec<String> = Vec::new();
+        let mut source_filter: Vec<BString> = Vec::new();
         if let Some(only_dependents_of) = only_dependents_of {
             let requires = only_dependents_of.get_requires();
             let dev_requires = only_dependents_of.get_dev_requires();
             source_filter = requires
                 .values()
                 .chain(dev_requires.values())
-                .map(|link| link.get_target().to_string())
+                .map(|link| BString::from(link.get_target()))
                 .collect();
             source_filter.push(only_dependents_of.get_name());
         }
 
-        let mut suggestions: Vec<IndexMap<String, String>> = Vec::new();
+        let mut suggestions: Vec<IndexMap<BString, BString>> = Vec::new();
         for suggestion in suggested_packages {
-            if installed_names.contains(&suggestion["target"])
-                || (!source_filter.is_empty() && !source_filter.contains(&suggestion["source"]))
+            if installed_names.contains(&suggestion[b"target".as_slice()])
+                || (!source_filter.is_empty()
+                    && !source_filter.contains(&suggestion[b"source".as_slice()]))
             {
                 continue;
             }

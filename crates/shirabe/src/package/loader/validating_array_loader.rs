@@ -4,13 +4,14 @@ use crate::package::loader::{InvalidPackageException, LoaderInterface};
 use crate::package::version::VersionParser;
 use crate::package::{PackageInterfaceHandle, STABILITIES, SUPPORTED_LINK_TYPES};
 use crate::repository::PlatformRepository;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PHP_EOL, PhpMixed, array_intersect_key, array_values, date_create,
-    filter_var_email, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar, is_string,
-    json_encode, legacy_lossy, parse_url, php_regex, php_to_string, preg_is_match, preg_replace,
-    str_replace, strcasecmp, strtolower, strtotime, substr, trigger_error, trim2, var_export,
+    explode, filter_var_email, get_debug_type, is_array, is_bool, is_int, is_numeric, is_scalar,
+    is_string, json_encode, legacy_lossy, parse_url, php_regex, php_to_string, preg_is_match,
+    preg_replace, str_replace, strcasecmp, strtolower, strtotime, substr, trigger_error, trim2,
+    var_export,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
@@ -64,7 +65,7 @@ impl ValidatingArrayLoader {
         self.errors.borrow().clone()
     }
 
-    pub fn has_package_naming_error(name: &str, is_link: bool) -> Option<String> {
+    pub fn has_package_naming_error(name: &BStr, is_link: bool) -> Option<String> {
         if PlatformRepository::is_platform_package(name) {
             return None;
         }
@@ -77,7 +78,7 @@ impl ValidatingArrayLoader {
         ) {
             return Some(format!(
                 "{} is invalid, it should have a vendor name, a forward slash, and a package name. The vendor and package name can be words separated by -, . or _. The complete name should match \"^[a-z0-9]([_.-]?[a-z0-9]+)*/[a-z0-9](([_.]?|-{{0,2}})[a-z0-9]+)*$\".",
-                name
+                name.display_lossy()
             ));
         }
 
@@ -85,12 +86,15 @@ impl ValidatingArrayLoader {
             "nul", "con", "prn", "aux", "com1", "com2", "com3", "com4", "com5", "com6", "com7",
             "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
         ];
-        let lower = legacy_lossy(&strtolower(name)).into_owned();
-        let bits: Vec<&str> = lower.split('/').collect();
-        if reserved_names.contains(&bits[0]) || reserved_names.contains(&bits[1]) {
+        let lower = strtolower(name);
+        let bits = explode("/", &lower);
+        if reserved_names
+            .iter()
+            .any(|r| bits[0] == *r || bits[1] == *r)
+        {
             return Some(format!(
                 "{} is reserved, package and vendor names can not match any of: {}.",
-                name,
+                name.display_lossy(),
                 reserved_names.join(", ")
             ));
         }
@@ -98,7 +102,7 @@ impl ValidatingArrayLoader {
         if preg_is_match(php_regex!("{\\.json$}"), name) {
             return Some(format!(
                 "{} is invalid, package names can not end in .json, consider renaming it or perhaps using a -json suffix instead.",
-                name
+                name.display_lossy()
             ));
         }
 
@@ -106,7 +110,7 @@ impl ValidatingArrayLoader {
             if is_link {
                 return Some(format!(
                     "{} is invalid, it should not contain uppercase characters. Please use {} instead.",
-                    name,
+                    name.display_lossy(),
                     strtolower(name).display_lossy()
                 ));
             }
@@ -120,7 +124,7 @@ impl ValidatingArrayLoader {
 
             return Some(format!(
                 "{} is invalid, it should not contain uppercase characters. We suggest using {} instead.",
-                name,
+                name.display_lossy(),
                 suggest_name.display_lossy()
             ));
         }
@@ -356,7 +360,7 @@ impl LoaderInterface for ValidatingArrayLoader {
 
         self.validate_string("name", true);
         if let Some(name_val) = config.get(B("name")).and_then(|v| v.as_string())
-            && let Some(err) = Self::has_package_naming_error(&name_val.to_str_lossy(), false)
+            && let Some(err) = Self::has_package_naming_error(name_val, false)
         {
             self.errors.borrow_mut().push(format!("name : {}", err));
         }
@@ -1219,7 +1223,9 @@ impl LoaderInterface for ValidatingArrayLoader {
                         }
                         continue;
                     }
-                    if let Some(err) = Self::has_package_naming_error(&package, true) {
+                    if let Some(err) =
+                        Self::has_package_naming_error(bstr::BStr::new(&package), true)
+                    {
                         self.warnings
                             .borrow_mut()
                             .push(format!("{}.{}", link_type, err));
@@ -1607,7 +1613,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                         .version_parser
                         // TODO(bytes): branch names are parsed as UTF-8 text, so non-UTF-8 bytes
                         // are replaced.
-                        .parse_numeric_alias_prefix(&source_branch.to_str_lossy());
+                        .parse_numeric_alias_prefix(source_branch);
                     let target_prefix = self
                         .version_parser
                         .parse_numeric_alias_prefix(&target_branch_str);

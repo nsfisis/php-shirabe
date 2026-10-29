@@ -362,9 +362,9 @@ return array(
                 .is_some_and(|a| !a.is_empty())
         {
             let levels = substr_count(
-                path_to_bytes(
-                    &filesystem.normalize_path(root_package.get_target_dir().unwrap_or_default()),
-                ),
+                path_to_bytes(&filesystem.normalize_path(path_from_bytes(
+                    &root_package.get_target_dir().unwrap_or_default(),
+                ))),
                 "/",
             ) + 1;
             let psr0_keys = main_autoload
@@ -719,7 +719,10 @@ return array(
             platform_check_content = self.get_platform_check(
                 &package_map,
                 config.get("platform-check"),
-                &dev_package_names,
+                &dev_package_names
+                    .iter()
+                    .map(|s| legacy_lossy(s).into_owned())
+                    .collect::<Vec<_>>(),
             );
             if platform_check_content.is_none() {
                 check_platform = false;
@@ -886,7 +889,7 @@ return array(
         {
             let name = package.get_name();
             let _ = package.get_target_dir();
-            return Err(InvalidArgumentException::new(format!("PSR-4 autoloading is incompatible with the target-dir property, remove the target-dir in package '{}'.", name))
+            return Err(InvalidArgumentException::new(format!("PSR-4 autoloading is incompatible with the target-dir property, remove the target-dir in package '{}'.", name.display_lossy()))
             .into());
         }
         if let Some(psr4) = autoload.get(B("psr-4")).and_then(|v| v.as_array()) {
@@ -920,7 +923,7 @@ return array(
                 .unwrap_or_default();
             package_map
                 .into_iter()
-                .filter(|item| !dev_list.contains(&item.0.get_name()))
+                .filter(|item| !dev_list.contains(&legacy_lossy(&item.0.get_name()).into_owned()))
                 .collect()
         } else if filtered_dev_packages.as_bool() == Some(true) {
             self.filter_package_map(package_map, root_package.clone())
@@ -1081,7 +1084,7 @@ return array(
             if let Some(target_dir) = package.get_target_dir()
                 && !target_dir.is_empty()
             {
-                let suffix_to_remove = format!("/{}", target_dir);
+                let suffix_to_remove = format!("/{}", legacy_lossy(&target_dir));
                 install_path = legacy_lossy(&substr(
                     &install_path,
                     0,
@@ -1274,7 +1277,7 @@ return array(
         'outer: for item in package_map {
             let package = &item.0;
             // skip dev dependencies platform requirements as platform-check really should only be a production safeguard
-            if dev_package_names.contains(&package.get_name().to_string()) {
+            if dev_package_names.contains(&legacy_lossy(&package.get_name()).into_owned()) {
                 continue;
             }
 
@@ -1282,12 +1285,12 @@ return array(
                 if self
                     .platform_requirement_filter
                     .borrow()
-                    .is_ignored(link.get_target())
+                    .is_ignored(&legacy_lossy(link.get_target()))
                 {
                     continue;
                 }
 
-                if ["php", "php-64bit"].contains(&link.get_target()) {
+                if ["php", "php-64bit"].iter().any(|n| link.get_target() == *n) {
                     let constraint = link.get_constraint();
                     if constraint
                         .get_lower_bound()
@@ -1983,7 +1986,10 @@ class ComposerStaticInit{}
             }
             let mut install_path = install_path;
             if package.get_target_dir().is_some() && !is_root {
-                let suffix_to_remove = format!("/{}", package.get_target_dir().unwrap_or_default());
+                let suffix_to_remove = format!(
+                    "/{}",
+                    legacy_lossy(&package.get_target_dir().unwrap_or_default())
+                );
                 install_path = legacy_lossy(&substr(
                     &install_path,
                     0,
@@ -2042,7 +2048,7 @@ class ComposerStaticInit{}
                             let target_dir = package
                                 .get_target_dir()
                                 .unwrap_or_default()
-                                .split(['/', '\\'])
+                                .split(|b| *b == b'/' || *b == b'\\')
                                 .map(|segment| preg_quote(segment, None))
                                 .collect::<Vec<String>>()
                                 .join("[\\\\/]");
@@ -2059,7 +2065,7 @@ class ComposerStaticInit{}
                             // add target-dir from file paths that don't have it
                             path_str = format!(
                                 "{}/{}",
-                                package.get_target_dir().unwrap_or_default(),
+                                legacy_lossy(&package.get_target_dir().unwrap_or_default()),
                                 path_str
                             );
                         }
@@ -2178,7 +2184,11 @@ class ComposerStaticInit{}
 
     fn get_file_identifier(&self, package: PackageInterfaceHandle, path: &str) -> String {
         // TODO composer v3 change this to sha1 or xxh3? Possibly not worth the potential breakage though
-        legacy_lossy(&hash("md5", format!("{}:{}", package.get_name(), path))).into_owned()
+        legacy_lossy(&hash(
+            "md5",
+            format!("{}:{}", legacy_lossy(&package.get_name()), path),
+        ))
+        .into_owned()
     }
 
     /// Filters out dev-dependencies
@@ -2193,10 +2203,13 @@ class ComposerStaticInit{}
 
         for item in &package_map {
             let package = &item.0;
-            let name = package.get_name();
+            let name = legacy_lossy(&package.get_name()).into_owned();
             packages.insert(name.clone(), package.clone());
             for (_k, replace) in package.get_replaces().iter() {
-                replaced_by.insert(replace.get_target().to_string(), name.clone());
+                replaced_by.insert(
+                    legacy_lossy(replace.get_target()).into_owned(),
+                    name.clone(),
+                );
             }
         }
 
@@ -2208,7 +2221,7 @@ class ComposerStaticInit{}
             replaced_by: &IndexMap<String, String>,
         ) {
             for (_k, link) in package.get_requires().iter() {
-                let mut target = link.get_target().to_string();
+                let mut target = legacy_lossy(link.get_target()).into_owned();
                 if let Some(rep) = replaced_by.get(&target) {
                     target = rep.clone();
                 }
@@ -2227,7 +2240,7 @@ class ComposerStaticInit{}
             .filter(|item| {
                 let package = &item.0;
                 for name in package.get_names(true) {
-                    if include.contains_key(&name) {
+                    if include.contains_key(&*legacy_lossy(&name)) {
                         return true;
                     }
                 }
@@ -2248,7 +2261,7 @@ class ComposerStaticInit{}
 
         for item in &package_map {
             let (package, path) = item;
-            let name = package.get_name();
+            let name = legacy_lossy(&package.get_name()).into_owned();
             packages.insert(name.clone(), package.clone());
             paths.insert(name, path.clone());
         }
@@ -2259,7 +2272,7 @@ class ComposerStaticInit{}
         let mut sorted_package_map: Vec<(PackageInterfaceHandle, Option<String>)> = vec![];
 
         for package in sorted_packages {
-            let name = package.get_name();
+            let name = legacy_lossy(&package.get_name()).into_owned();
             sorted_package_map.push((
                 packages.get(&name).unwrap().clone(),
                 paths.get(&name).cloned().flatten(),

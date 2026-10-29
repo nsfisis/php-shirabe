@@ -56,10 +56,10 @@ pub fn http_build_query_mixed(
     encode_pairs(&pairs, arg_separator.as_ref())
 }
 
-pub fn http_build_query(data: &[(&str, &str)]) -> BString {
+pub fn http_build_query<K: AsRef<[u8]>, V: AsRef<[u8]>>(data: &[(K, V)]) -> BString {
     let pairs: Vec<(BString, BString)> = data
         .iter()
-        .map(|(key, value)| (BString::from(*key), BString::from(*value)))
+        .map(|(key, value)| (BString::from(key.as_ref()), BString::from(value.as_ref())))
         .collect();
     encode_pairs(&pairs, b"&")
 }

@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use shirabe::package::loader::{ArrayLoader, LoaderInterface};
 use shirabe::package::version::VersionParser;
 use shirabe::package::{ArrayDumper, Link};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 
 fn set_up() -> ArrayLoader {
     ArrayLoader::new(None, false)
@@ -125,7 +125,7 @@ fn test_self_version() {
     assert_eq!(
         "== 1.2.3.4",
         replaces
-            .get("foo")
+            .get(bstr::B("foo"))
             .unwrap()
             .get_constraint()
             .to_php_string()
@@ -353,7 +353,9 @@ fn test_abandoned() {
     assert!(package.is_abandoned());
     assert_eq!(
         Some("foo/bar".to_string()),
-        package.get_replacement_package()
+        package
+            .get_replacement_package()
+            .map(|s| legacy_lossy(&s).into_owned())
     );
 }
 
@@ -394,18 +396,18 @@ fn test_plugin_api_version_are_kept_as_declared() {
     for api_version in provide_plugin_api_versions() {
         let links = loader
             .parse_links(
-                "Plugin",
-                "9.9.9",
+                bstr::BStr::new("Plugin"),
+                bstr::BStr::new("9.9.9"),
                 Link::TYPE_REQUIRE,
                 make_config(vec![("composer-plugin-api", s(api_version))]),
             )
             .unwrap();
 
-        assert!(links.contains_key("composer-plugin-api"));
+        assert!(links.contains_key(bstr::B("composer-plugin-api")));
         assert_eq!(
             api_version,
             links
-                .get("composer-plugin-api")
+                .get(bstr::B("composer-plugin-api"))
                 .unwrap()
                 .get_constraint()
                 .get_pretty_string()
@@ -418,18 +420,18 @@ fn test_plugin_api_version_does_support_self_version() {
     let loader = set_up();
     let links = loader
         .parse_links(
-            "Plugin",
-            "6.6.6",
+            bstr::BStr::new("Plugin"),
+            bstr::BStr::new("6.6.6"),
             Link::TYPE_REQUIRE,
             make_config(vec![("composer-plugin-api", s("self.version"))]),
         )
         .unwrap();
 
-    assert!(links.contains_key("composer-plugin-api"));
+    assert!(links.contains_key(bstr::B("composer-plugin-api")));
     assert_eq!(
         "6.6.6",
         links
-            .get("composer-plugin-api")
+            .get(bstr::B("composer-plugin-api"))
             .unwrap()
             .get_constraint()
             .get_pretty_string()
@@ -441,14 +443,14 @@ fn test_parse_links_integer_target() {
     let loader = set_up();
     let links = loader
         .parse_links(
-            "Plugin",
-            "9.9.9",
+            bstr::BStr::new("Plugin"),
+            bstr::BStr::new("9.9.9"),
             Link::TYPE_REQUIRE,
             make_config(vec![("1", s("dev-main"))]),
         )
         .unwrap();
 
-    assert!(links.contains_key("1"));
+    assert!(links.contains_key(bstr::B("1")));
 }
 
 #[test]
@@ -456,8 +458,8 @@ fn test_parse_links_invalid_version() {
     let loader = set_up();
     let err = loader
         .parse_links(
-            "Plugin",
-            "9.9.9",
+            bstr::BStr::new("Plugin"),
+            bstr::BStr::new("9.9.9"),
             Link::TYPE_REQUIRE,
             make_config(vec![("composer-plugin-api", s("^^^"))]),
         )
@@ -505,8 +507,18 @@ fn test_none_string_source_dist_reference() {
     ]);
 
     let package = loader.load(config, None).unwrap();
-    assert_eq!(Some("2019".to_string()), package.get_source_reference());
-    assert_eq!(Some("2019".to_string()), package.get_dist_reference());
+    assert_eq!(
+        Some("2019".to_string()),
+        package
+            .get_source_reference()
+            .map(|s| legacy_lossy(&s).into_owned())
+    );
+    assert_eq!(
+        Some("2019".to_string()),
+        package
+            .get_dist_reference()
+            .map(|s| legacy_lossy(&s).into_owned())
+    );
 }
 
 #[test]
@@ -538,12 +550,12 @@ fn test_package_links_require() {
     ]);
 
     let package = loader.load(config, None).unwrap();
-    assert!(package.get_requires().contains_key("foo/bar"));
+    assert!(package.get_requires().contains_key(bstr::B("foo/bar")));
     assert_eq!(
         "1.0",
         package
             .get_requires()
-            .get("foo/bar")
+            .get(bstr::B("foo/bar"))
             .unwrap()
             .get_constraint()
             .get_pretty_string()
@@ -576,12 +588,16 @@ fn test_package_links_replace() {
     ]);
 
     let package = loader.load(config, None).unwrap();
-    assert!(package.get_replaces().contains_key("coyote/package"));
+    assert!(
+        package
+            .get_replaces()
+            .contains_key(bstr::B("coyote/package"))
+    );
     assert_eq!(
         "dev-1",
         package
             .get_replaces()
-            .get("coyote/package")
+            .get(bstr::B("coyote/package"))
             .unwrap()
             .get_constraint()
             .get_pretty_string()

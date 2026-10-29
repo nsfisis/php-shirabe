@@ -2,6 +2,7 @@
 
 use crate::package::PackageInterfaceHandle;
 use crate::repository::RepositoryInterface;
+use bstr::BString;
 use indexmap::IndexMap;
 
 /// Provides get_canonical_packages() to various repository implementations.
@@ -11,9 +12,9 @@ pub trait CanonicalPackagesTrait: RepositoryInterface {
         let packages = self.get_packages()?;
 
         // get at most one package of each name, preferring non-aliased ones
-        let mut packages_by_name: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
+        let mut packages_by_name: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
         for package in packages {
-            let name = package.get_name();
+            let name = BString::from(&package.get_name()[..]);
             let prefer_replace = packages_by_name
                 .get(&name)
                 .map(|existing| existing.as_alias().is_some())

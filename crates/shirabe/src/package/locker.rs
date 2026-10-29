@@ -21,8 +21,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, DATE_RFC3339, LogicException, PhpMixed, RuntimeException, array_intersect,
     array_keys, array_map, array_merge, empty, file_get_contents, filemtime, hash, in_array_loose,
-    is_int, ksort, legacy_lossy, path_to_bytes, php_regex, preg_is_match, preg_match, realpath,
-    strcmp, strtolower, touch2, trim, usort,
+    intval, is_int, ksort, legacy_lossy, php_regex, preg_is_match, preg_match, realpath, strcmp,
+    strtolower, touch2, trim, usort,
 };
 use shirabe_seld_json_lint::ParsingException;
 
@@ -31,8 +31,8 @@ use shirabe_seld_json_lint::ParsingException;
 pub struct Locker {
     lock_file: JsonFile,
     installation_manager: std::rc::Rc<std::cell::RefCell<InstallationManager>>,
-    hash: String,
-    content_hash: String,
+    hash: BString,
+    content_hash: BString,
     loader: ArrayLoader,
     dumper: ArrayDumper,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
@@ -53,7 +53,7 @@ impl Locker {
         Self {
             lock_file,
             installation_manager,
-            hash: legacy_lossy(&hash("md5", composer_file_contents)).into_owned(),
+            hash: bstr::BString::from(&hash("md5", composer_file_contents)[..]),
             content_hash: Self::get_content_hash(composer_file_contents).unwrap_or_default(),
             loader: ArrayLoader::new(None, true),
             dumper: ArrayDumper::new(),
@@ -68,7 +68,7 @@ impl Locker {
     }
 
     /// Returns the md5 hash of the sorted content of the composer file.
-    pub fn get_content_hash(composer_file_contents: impl AsRef<[u8]>) -> anyhow::Result<String> {
+    pub fn get_content_hash(composer_file_contents: impl AsRef<[u8]>) -> anyhow::Result<BString> {
         let content = JsonFile::parse_json(Some(composer_file_contents), Some("composer.json"))?;
         let content_map: IndexMap<BString, PhpMixed> = match &content {
             PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
@@ -112,14 +112,16 @@ impl Locker {
 
         ksort(&mut relevant_content);
 
-        Ok(legacy_lossy(&hash(
-            "md5",
-            &JsonFile::encode_with_options(
-                &PhpMixed::Array(relevant_content.into_iter().collect()),
-                JsonEncodeOptions::none(),
-            )?,
+        Ok(bstr::BString::from(
+            legacy_lossy(&hash(
+                "md5",
+                &JsonFile::encode_with_options(
+                    &PhpMixed::Array(relevant_content.into_iter().collect()),
+                    JsonEncodeOptions::none(),
+                )?,
+            ))
+            .into_owned(),
         ))
-        .into_owned())
     }
 
     /// Checks whether locker has been locked (lockfile found).
@@ -200,7 +202,7 @@ impl Locker {
             false
         };
         if has_name {
-            let mut package_by_name: IndexMap<String, BasePackageHandle> = IndexMap::new();
+            let mut package_by_name: IndexMap<BString, BasePackageHandle> = IndexMap::new();
             if let PhpMixed::List(list) = locked_packages {
                 for info in list {
                     if let PhpMixed::Array(m) = info {
@@ -223,30 +225,32 @@ impl Locker {
             {
                 for alias in alias_list {
                     if let PhpMixed::Array(m) = alias {
-                        let alias_pkg_name = legacy_lossy(
-                            m.get(B("package"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default(),
-                        )
-                        .into_owned();
-                        if let Some(base_pkg) = package_by_name.get(&alias_pkg_name) {
+                        let alias_pkg_name = m
+                            .get(B("package"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default();
+                        if let Some(base_pkg) = package_by_name.get(alias_pkg_name) {
                             let alias_of = base_pkg.as_complete_package().expect(
                                     "CompleteAliasPackage requires aliasOf to be a real CompletePackage",
                                 );
                             let alias_pkg = CompleteAliasPackageHandle::new(
                                 alias_of,
-                                legacy_lossy(
-                                    m.get(B("alias_normalized"))
-                                        .and_then(|v| v.as_string())
-                                        .unwrap_or_default(),
-                                )
-                                .into_owned(),
-                                legacy_lossy(
-                                    m.get(B("alias"))
-                                        .and_then(|v| v.as_string())
-                                        .unwrap_or_default(),
-                                )
-                                .into_owned(),
+                                bstr::BString::from(
+                                    legacy_lossy(
+                                        m.get(B("alias_normalized"))
+                                            .and_then(|v| v.as_string())
+                                            .unwrap_or_default(),
+                                    )
+                                    .into_owned(),
+                                ),
+                                bstr::BString::from(
+                                    legacy_lossy(
+                                        m.get(B("alias"))
+                                            .and_then(|v| v.as_string())
+                                            .unwrap_or_default(),
+                                    )
+                                    .into_owned(),
+                                ),
                             );
                             alias_pkg.set_root_package_alias(true);
                             packages.add_package(alias_pkg.into())?;
@@ -265,20 +269,20 @@ impl Locker {
         .into())
     }
 
-    pub fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<String>> {
-        let mut names: Vec<String> = vec![];
+    pub fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<BString>> {
+        let mut names: Vec<BString> = vec![];
         let lock_data = self.get_lock_data()?;
         if let Some(PhpMixed::List(list)) = lock_data.get(B("packages-dev")) {
             for package in list {
                 if let PhpMixed::Array(m) = package {
-                    names.push(
+                    names.push(bstr::BString::from(
                         legacy_lossy(&strtolower(
                             m.get(B("name"))
                                 .and_then(|v| v.as_string())
                                 .unwrap_or_default(),
                         ))
                         .into_owned(),
-                    );
+                    ));
                 }
             }
         }
@@ -290,17 +294,17 @@ impl Locker {
     pub fn get_platform_requirements(
         &mut self,
         with_dev_reqs: bool,
-    ) -> anyhow::Result<IndexMap<String, Link>> {
+    ) -> anyhow::Result<IndexMap<BString, Link>> {
         let lock_data = self.get_lock_data()?;
-        let mut requirements: IndexMap<String, Link> = IndexMap::new();
+        let mut requirements: IndexMap<BString, Link> = IndexMap::new();
 
         let platform_value = lock_data.get(B("platform"));
         if let Some(platform_value) = platform_value
             && !empty(platform_value)
         {
             requirements = self.loader.parse_links(
-                "__root__",
-                "1.0.0",
+                bstr::BStr::new("__root__"),
+                bstr::BStr::new("1.0.0"),
                 Link::TYPE_REQUIRE,
                 match platform_value {
                     PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
@@ -315,8 +319,8 @@ impl Locker {
             && !empty(platform_dev_value)
         {
             let dev_requirements = self.loader.parse_links(
-                "__root__",
-                "1.0.0",
+                bstr::BStr::new("__root__"),
+                bstr::BStr::new("1.0.0"),
                 Link::TYPE_REQUIRE,
                 match platform_dev_value {
                     PhpMixed::Array(m) => m.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
@@ -332,21 +336,23 @@ impl Locker {
         Ok(requirements)
     }
 
-    pub fn get_minimum_stability(&mut self) -> anyhow::Result<String> {
+    pub fn get_minimum_stability(&mut self) -> anyhow::Result<BString> {
         let lock_data = self.get_lock_data()?;
 
-        Ok(legacy_lossy(
-            lock_data
-                .get(B("minimum-stability"))
-                .and_then(|v| v.as_string())
-                .unwrap_or("stable".into()),
-        )
-        .into_owned())
+        Ok(bstr::BString::from(
+            legacy_lossy(
+                lock_data
+                    .get(B("minimum-stability"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("stable".into()),
+            )
+            .into_owned(),
+        ))
     }
 
     /// The values are BasePackage::STABILITIES ints, written verbatim by set_lock_data,
     /// despite the upstream `@return array<string, string>` docblock.
-    pub fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, i64>> {
+    pub fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<BString, i64>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
@@ -354,8 +360,7 @@ impl Locker {
             .and_then(|v| match v {
                 PhpMixed::Array(m) => Some(
                     m.iter()
-                        // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
-                        .map(|(k, v)| (k.to_str_lossy().into_owned(), v.as_int().unwrap_or(0)))
+                        .map(|(k, v)| (k.clone(), v.as_int().unwrap_or(0)))
                         .collect(),
                 ),
                 _ => None,
@@ -377,7 +382,7 @@ impl Locker {
         Ok(lock_data.get(B("prefer-lowest")).and_then(|v| v.as_bool()))
     }
 
-    pub fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    pub fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
@@ -385,13 +390,7 @@ impl Locker {
             .and_then(|v| match v {
                 PhpMixed::Array(m) => Some(
                     m.iter()
-                        // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
-                        .map(|(k, v)| {
-                            (
-                                k.to_str_lossy().into_owned(),
-                                legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
-                            )
-                        })
+                        .map(|(k, v)| (k.clone(), BString::from(v.as_string().unwrap_or_default())))
                         .collect(),
                 ),
                 _ => None,
@@ -399,7 +398,7 @@ impl Locker {
             .unwrap_or_default())
     }
 
-    pub fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<String, String>>> {
+    pub fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<BString, BString>>> {
         let lock_data = self.get_lock_data()?;
 
         Ok(lock_data
@@ -410,12 +409,10 @@ impl Locker {
                         .filter_map(|v| match v {
                             PhpMixed::Array(m) => Some(
                                 m.iter()
-                                    // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
                                     .map(|(k, v)| {
                                         (
-                                            k.to_str_lossy().into_owned(),
-                                            legacy_lossy(v.as_string().unwrap_or_default())
-                                                .into_owned(),
+                                            k.clone(),
+                                            BString::from(v.as_string().unwrap_or_default()),
                                         )
                                     })
                                     .collect(),
@@ -429,16 +426,18 @@ impl Locker {
             .unwrap_or_default())
     }
 
-    pub fn get_plugin_api(&mut self) -> anyhow::Result<String> {
+    pub fn get_plugin_api(&mut self) -> anyhow::Result<BString> {
         let lock_data = self.get_lock_data()?;
 
-        Ok(legacy_lossy(
-            lock_data
-                .get(B("plugin-api-version"))
-                .and_then(|v| v.as_string())
-                .unwrap_or("1.1.0".into()),
-        )
-        .into_owned())
+        Ok(bstr::BString::from(
+            legacy_lossy(
+                lock_data
+                    .get(B("plugin-api-version"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("1.1.0".into()),
+            )
+            .into_owned(),
+        ))
     }
 
     pub fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
@@ -469,11 +468,11 @@ impl Locker {
         &mut self,
         packages: Vec<PackageInterfaceHandle>,
         dev_packages: Option<Vec<PackageInterfaceHandle>>,
-        platform_reqs: IndexMap<String, String>,
-        platform_dev_reqs: IndexMap<String, String>,
+        platform_reqs: IndexMap<BString, BString>,
+        platform_dev_reqs: IndexMap<BString, BString>,
         aliases: Vec<IndexMap<BString, PhpMixed>>,
         minimum_stability: &str,
-        stability_flags: IndexMap<String, i64>,
+        stability_flags: IndexMap<BString, i64>,
         prefer_stable: bool,
         prefer_lowest: bool,
         platform_overrides: IndexMap<BString, PhpMixed>,
@@ -543,7 +542,7 @@ impl Locker {
             PhpMixed::Array(
                 stability_flags
                     .iter()
-                    .map(|(k, v)| (k.as_str().into(), PhpMixed::Int(*v)))
+                    .map(|(k, v)| (k.clone(), PhpMixed::Int(*v)))
                     .collect(),
             ),
         );
@@ -559,7 +558,7 @@ impl Locker {
             PhpMixed::Array(
                 platform_reqs
                     .iter()
-                    .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
+                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                     .collect(),
             ),
         );
@@ -568,7 +567,7 @@ impl Locker {
             PhpMixed::Array(
                 platform_dev_reqs
                     .iter()
-                    .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
+                    .map(|(k, v)| (k.clone(), PhpMixed::string(v.clone())))
                     .collect(),
             ),
         );
@@ -724,7 +723,7 @@ impl Locker {
             if name.is_empty() || version.is_empty() {
                 return Err(LogicException::new(format!(
                     "Package \"{}\" has no version or name and can not be locked",
-                    package,
+                    package.to_php_string().display_lossy(),
                 ))
                 .into());
             }
@@ -736,7 +735,9 @@ impl Locker {
             let time = spec.get(B("time")).cloned();
             spec.shift_remove(B("time"));
             let time = if package.is_dev()
-                && package.get_installation_source() == Some("source".to_string())
+                && package
+                    .get_installation_source()
+                    .is_some_and(|s| s == "source")
             {
                 // use the exact commit time of the current reference if it's a dev package
                 let pkg_time = self.get_package_time(package.clone())?;
@@ -790,7 +791,7 @@ impl Locker {
     fn get_package_time(
         &mut self,
         package: PackageInterfaceHandle,
-    ) -> anyhow::Result<Option<String>> {
+    ) -> anyhow::Result<Option<BString>> {
         let path = self
             .installation_manager
             .borrow_mut()
@@ -798,7 +799,7 @@ impl Locker {
         if path.is_none() {
             return Ok(None);
         }
-        let path = realpath(path.unwrap()).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
+        let path = realpath(path.unwrap());
         let source_type = package.get_source_type();
         let mut datetime: Option<chrono::DateTime<chrono::Utc>> = None;
 
@@ -815,54 +816,50 @@ impl Locker {
                 .get_source_reference()
                 .or_else(|| package.get_dist_reference())
                 .unwrap_or_default();
-            match source_type.as_deref().unwrap_or_default() {
-                "git" => {
+            match source_type.unwrap_or_default().as_slice() {
+                b"git" => {
                     GitUtil::clean_env(&self.process)?;
 
                     let no_show_signature_flags =
                         GitUtil::get_no_show_signature_flags(&self.process)?;
-                    let mut args: Vec<String> =
-                        vec!["-n1".to_string(), "--format=%ct".to_string(), source_ref];
+                    let mut args: Vec<BString> =
+                        vec!["-n1".into(), "--format=%ct".into(), source_ref];
                     args.extend(no_show_signature_flags);
                     let command = GitUtil::build_rev_list_command(&self.process, args)?;
                     let mut output = PhpMixed::Null;
                     if 0 == self.process.borrow_mut().execute(
                         command,
                         &mut output,
-                        path.as_deref().map(std::path::Path::new),
+                        path.as_deref(),
                     )? {
-                        let output_str = legacy_lossy(&trim(&GitUtil::parse_rev_list_output(
+                        let output_str = trim(&GitUtil::parse_rev_list_output(
                             output.as_string().unwrap_or_default(),
                             &self.process,
-                        )?))
-                        .into_owned();
+                        )?);
                         if preg_is_match(php_regex!(r"{^\s*\d+\s*$}"), &output_str) {
-                            let ts = legacy_lossy(&trim(&output_str)).parse::<i64>().unwrap_or(0);
+                            let ts = intval(&PhpMixed::string(trim(&output_str)));
                             datetime = chrono::DateTime::from_timestamp(ts, 0);
                         }
                     }
                 }
-                "hg" => {
+                b"hg" => {
                     let mut output = PhpMixed::Null;
                     if 0 == self.process.borrow_mut().execute(
                         vec![
-                            "hg".to_string(),
-                            "log".to_string(),
-                            "--template".to_string(),
-                            "{date|hgdate}".to_string(),
-                            "-r".to_string(),
+                            BString::from("hg"),
+                            "log".into(),
+                            "--template".into(),
+                            "{date|hgdate}".into(),
+                            "-r".into(),
                             source_ref,
                         ],
                         &mut output,
-                        path.as_deref().map(std::path::Path::new),
+                        path.as_deref(),
                     )? && let Some(m) = preg_match(
                         php_regex!(r"{^\s*(\d+)\s*}"),
-                        &output.as_string().unwrap_or_default(),
+                        output.as_string().unwrap_or_default(),
                     ) {
-                        let ts = legacy_lossy(m.get(1).unwrap_or_default())
-                            .into_owned()
-                            .parse::<i64>()
-                            .unwrap_or(0);
+                        let ts = intval(&PhpMixed::string(m.get(1).unwrap_or_default()));
                         datetime = chrono::DateTime::from_timestamp(ts, 0);
                     }
                 }
@@ -870,7 +867,7 @@ impl Locker {
             }
         }
 
-        Ok(datetime.map(|d| d.format(DATE_RFC3339).to_string()))
+        Ok(datetime.map(|d| BString::from(d.format(DATE_RFC3339).to_string())))
     }
 
     pub fn get_missing_requirement_info(
@@ -882,14 +879,14 @@ impl Locker {
         let mut missing_requirements = false;
         let mut sets: Vec<SetEntry> = vec![SetEntry {
             repo: self.get_locked_repository(false)?,
-            method: "getRequires".to_string(),
-            description: "Required".to_string(),
+            method: "getRequires",
+            description: "Required",
         }];
         if include_dev {
             sets.push(SetEntry {
                 repo: self.get_locked_repository(true)?,
-                method: "getDevRequires".to_string(),
-                description: "Required (in require-dev)".to_string(),
+                method: "getDevRequires",
+                description: "Required (in require-dev)",
             });
         }
         let root_repo: RepositoryInterfaceHandle = RepositoryInterfaceHandle::new(
@@ -901,7 +898,7 @@ impl Locker {
                 InstalledRepository::new(vec![set.repo.clone().into(), root_repo.clone()]);
 
             // PHP: call_user_func([$package, $set['method']])
-            let links = match set.method.as_str() {
+            let links = match set.method {
                 "getRequires" => package.get_requires(),
                 "getDevRequires" => package.get_dev_requires(),
                 _ => unreachable!(),
@@ -929,7 +926,8 @@ impl Locker {
                         // PHP `reset($results)` returns the first shared package; clone the handle.
                         let provider: BasePackageHandle = results.first().unwrap().clone();
                         let _ = &results;
-                        let mut description = provider.get_pretty_version();
+                        let mut description =
+                            provider.get_pretty_version().display_lossy().to_string();
                         if provider.get_name() != link.get_target() {
                             'outer: for (method, verb) in
                                 [("getReplaces", "replaced"), ("getProvides", "provided")].iter()
@@ -944,9 +942,9 @@ impl Locker {
                                         description = format!(
                                             "{} as {} by {} {}",
                                             verb,
-                                            provider_link.get_pretty_constraint(),
-                                            provider.get_pretty_name(),
-                                            provider.get_pretty_version(),
+                                            provider_link.get_pretty_constraint().display_lossy(),
+                                            provider.get_pretty_name().display_lossy(),
+                                            provider.get_pretty_version().display_lossy(),
                                         );
                                         break 'outer;
                                     }
@@ -956,15 +954,15 @@ impl Locker {
                         missing_requirement_info.push(format!(
                             "- {} package \"{}\" is in the lock file as \"{}\" but that does not satisfy your constraint \"{}\".",
                             set.description,
-                            link.get_target(),
+                            link.get_target().display_lossy(),
                             description,
-                            link.get_pretty_constraint(),
+                            link.get_pretty_constraint().display_lossy(),
                         ));
                     } else {
                         missing_requirement_info.push(format!(
                             "- {} package \"{}\" is not present in the lock file.",
                             set.description,
-                            link.get_target()
+                            link.get_target().display_lossy()
                         ));
                     }
                     missing_requirements = true;
@@ -993,29 +991,29 @@ pub trait LockerInterface: std::fmt::Debug {
         &mut self,
         with_dev_reqs: bool,
     ) -> anyhow::Result<LockArrayRepositoryHandle>;
-    fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<String>>;
+    fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<BString>>;
     fn get_platform_requirements(
         &mut self,
         with_dev_reqs: bool,
-    ) -> anyhow::Result<IndexMap<String, Link>>;
-    fn get_minimum_stability(&mut self) -> anyhow::Result<String>;
-    fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, i64>>;
+    ) -> anyhow::Result<IndexMap<BString, Link>>;
+    fn get_minimum_stability(&mut self) -> anyhow::Result<BString>;
+    fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<BString, i64>>;
     fn get_prefer_stable(&mut self) -> anyhow::Result<Option<bool>>;
     fn get_prefer_lowest(&mut self) -> anyhow::Result<Option<bool>>;
-    fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<String, String>>;
-    fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<String, String>>>;
-    fn get_plugin_api(&mut self) -> anyhow::Result<String>;
+    fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<BString, BString>>;
+    fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<BString, BString>>>;
+    fn get_plugin_api(&mut self) -> anyhow::Result<BString>;
     fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<BString, PhpMixed>>;
     #[allow(clippy::too_many_arguments, reason = "to keep PHP signature")]
     fn set_lock_data(
         &mut self,
         packages: Vec<PackageInterfaceHandle>,
         dev_packages: Option<Vec<PackageInterfaceHandle>>,
-        platform_reqs: IndexMap<String, String>,
-        platform_dev_reqs: IndexMap<String, String>,
+        platform_reqs: IndexMap<BString, BString>,
+        platform_dev_reqs: IndexMap<BString, BString>,
         aliases: Vec<IndexMap<BString, PhpMixed>>,
         minimum_stability: &str,
-        stability_flags: IndexMap<String, i64>,
+        stability_flags: IndexMap<BString, i64>,
         prefer_stable: bool,
         prefer_lowest: bool,
         platform_overrides: IndexMap<BString, PhpMixed>,
@@ -1055,22 +1053,22 @@ impl LockerInterface for Locker {
         self.get_locked_repository(with_dev_reqs)
     }
 
-    fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<String>> {
+    fn get_dev_package_names(&mut self) -> anyhow::Result<Vec<BString>> {
         self.get_dev_package_names()
     }
 
     fn get_platform_requirements(
         &mut self,
         with_dev_reqs: bool,
-    ) -> anyhow::Result<IndexMap<String, Link>> {
+    ) -> anyhow::Result<IndexMap<BString, Link>> {
         self.get_platform_requirements(with_dev_reqs)
     }
 
-    fn get_minimum_stability(&mut self) -> anyhow::Result<String> {
+    fn get_minimum_stability(&mut self) -> anyhow::Result<BString> {
         self.get_minimum_stability()
     }
 
-    fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<String, i64>> {
+    fn get_stability_flags(&mut self) -> anyhow::Result<IndexMap<BString, i64>> {
         self.get_stability_flags()
     }
 
@@ -1082,15 +1080,15 @@ impl LockerInterface for Locker {
         self.get_prefer_lowest()
     }
 
-    fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_platform_overrides(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         self.get_platform_overrides()
     }
 
-    fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<String, String>>> {
+    fn get_aliases(&mut self) -> anyhow::Result<Vec<IndexMap<BString, BString>>> {
         self.get_aliases()
     }
 
-    fn get_plugin_api(&mut self) -> anyhow::Result<String> {
+    fn get_plugin_api(&mut self) -> anyhow::Result<BString> {
         self.get_plugin_api()
     }
 
@@ -1103,11 +1101,11 @@ impl LockerInterface for Locker {
         &mut self,
         packages: Vec<PackageInterfaceHandle>,
         dev_packages: Option<Vec<PackageInterfaceHandle>>,
-        platform_reqs: IndexMap<String, String>,
-        platform_dev_reqs: IndexMap<String, String>,
+        platform_reqs: IndexMap<BString, BString>,
+        platform_dev_reqs: IndexMap<BString, BString>,
         aliases: Vec<IndexMap<BString, PhpMixed>>,
         minimum_stability: &str,
-        stability_flags: IndexMap<String, i64>,
+        stability_flags: IndexMap<BString, i64>,
         prefer_stable: bool,
         prefer_lowest: bool,
         platform_overrides: IndexMap<BString, PhpMixed>,
@@ -1149,6 +1147,6 @@ impl LockerInterface for Locker {
 
 struct SetEntry {
     repo: LockArrayRepositoryHandle,
-    method: String,
-    description: String,
+    method: &'static str,
+    description: &'static str,
 }

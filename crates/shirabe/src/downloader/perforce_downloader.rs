@@ -11,7 +11,7 @@ use crate::repository::VcsRepository;
 use crate::util::{Filesystem, Perforce, PerforceInterface, ProcessExecutor};
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, impl_php_class};
+use shirabe_php_shim::{PhpMixed, impl_php_class, legacy_lossy};
 
 #[derive(Debug)]
 pub struct PerforceDownloader {
@@ -118,17 +118,19 @@ impl VcsDownloader for PerforceDownloader {
         url: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let source_ref = package.get_source_reference();
-        let label = self.get_label_from_source_reference(source_ref.clone().unwrap_or_default());
+        let label = self.get_label_from_source_reference(
+            legacy_lossy(&source_ref.clone().unwrap_or_default()).into_owned(),
+        );
 
         self.inner.io.write_error(&format!(
             "Cloning {}",
-            source_ref.clone().unwrap_or_default()
+            source_ref.clone().unwrap_or_default().display_lossy()
         ));
         self.init_perforce(package, path.to_string(), url.to_string());
         {
             let mut perforce = self.perforce.borrow_mut();
             let perforce = perforce.as_mut().unwrap();
-            perforce.set_stream(&source_ref.unwrap_or_default());
+            perforce.set_stream(&legacy_lossy(&source_ref.unwrap_or_default()));
             perforce.p4_login();
             perforce.write_p4_client_spec();
             perforce.connect_client();

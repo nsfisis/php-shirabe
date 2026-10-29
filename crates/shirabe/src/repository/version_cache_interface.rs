@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Repository/VersionCacheInterface.php
 
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -19,5 +19,5 @@ pub enum VersionCacheResult {
 }
 
 pub trait VersionCacheInterface: std::fmt::Debug {
-    fn get_version_package(&self, version: &str, identifier: &str) -> VersionCacheResult;
+    fn get_version_package(&self, version: &str, identifier: &BStr) -> VersionCacheResult;
 }

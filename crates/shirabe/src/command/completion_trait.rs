@@ -10,7 +10,9 @@ use crate::repository::{
 };
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, legacy_lossy, php_regex, preg_is_match, preg_quote, substr};
+use shirabe_php_shim::{
+    PhpMixed, bconcat, legacy_lossy, php_regex, preg_is_match, preg_quote, substr,
+};
 
 /// Adds completion to arguments and options.
 ///
@@ -34,8 +36,17 @@ pub trait CompletionTrait: BaseCommand {
             let composer = crate::composer::composer_full(&composer);
 
             let package = composer.get_package();
-            let mut names: Vec<String> = package.get_requires().keys().cloned().collect();
-            names.extend(package.get_dev_requires().keys().cloned());
+            let mut names: Vec<String> = package
+                .get_requires()
+                .keys()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect();
+            names.extend(
+                package
+                    .get_dev_requires()
+                    .keys()
+                    .map(|s| legacy_lossy(s).into_owned()),
+            );
             Ok(names)
         }))
     }
@@ -76,7 +87,7 @@ pub trait CompletionTrait: BaseCommand {
                         .borrow_mut()
                         .get_platform_overrides()?
                         .into_iter()
-                        .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                        .map(|(k, v)| (k, PhpMixed::string(v)))
                         .collect();
                     PlatformRepository::new(vec![], overrides, None, None)?
                 } else {
@@ -100,9 +111,9 @@ pub trait CompletionTrait: BaseCommand {
                         // PHP's inner foreach iterates a by-value copy of $hintsToFind while
                         // mutating the original.
                         for (hint_prefix, hint_count) in hints_to_find.clone() {
-                            if pkg.get_name().starts_with(&hint_prefix) {
+                            if pkg.get_name().starts_with(hint_prefix.as_bytes()) {
                                 if hint_count == 0 || hint_count >= 99 {
-                                    platform_hint.push(pkg.get_name());
+                                    platform_hint.push(legacy_lossy(&pkg.get_name()).into_owned());
                                     *hints_to_find.get_mut(&hint_prefix).unwrap() += 1;
                                 } else if hint_count == 1 {
                                     hints_to_find.shift_remove(&hint_prefix);
@@ -131,6 +142,7 @@ pub trait CompletionTrait: BaseCommand {
                 .get_packages()?
                 .into_iter()
                 .map(|package| package.get_name())
+                .map(|s| legacy_lossy(&s).into_owned())
                 .collect();
             names.extend(platform_hint);
             Ok(names)
@@ -169,8 +181,8 @@ pub trait CompletionTrait: BaseCommand {
             let mut types: Vec<String> = vec![];
             for package in installed_repo.get_packages()? {
                 let r#type = package.get_type();
-                if !types.contains(&r#type) {
-                    types.push(r#type);
+                if !types.contains(&legacy_lossy(&r#type).into_owned()) {
+                    types.push(legacy_lossy(&r#type).into_owned());
                 }
             }
             Ok(types)
@@ -196,7 +208,7 @@ pub trait CompletionTrait: BaseCommand {
             let mut show_vendors = false;
             if !input.get_completion_value().contains('/') {
                 results = repos.search(
-                    format!("^{}", preg_quote(input.get_completion_value(), None)),
+                    bconcat!("^", preg_quote(input.get_completion_value(), None)),
                     SEARCH_VENDOR,
                     None,
                 )?;
@@ -206,7 +218,7 @@ pub trait CompletionTrait: BaseCommand {
             // if we get a single vendor, we expand it into its contents already
             if results.len() <= 1 {
                 results = repos.search(
-                    format!("^{}", preg_quote(input.get_completion_value(), None)),
+                    bconcat!("^", preg_quote(input.get_completion_value(), None)),
                     SEARCH_NAME,
                     None,
                 )?;
@@ -214,7 +226,11 @@ pub trait CompletionTrait: BaseCommand {
             }
 
             // array_column($results, 'name')
-            let results: Vec<String> = results.into_iter().map(|result| result.name).collect();
+            let results: Vec<String> = results
+                .into_iter()
+                .map(|result| result.name)
+                .map(|s| legacy_lossy(&s).into_owned())
+                .collect();
 
             if show_vendors {
                 let mut results: Vec<String> = results
@@ -287,12 +303,12 @@ pub trait CompletionTrait: BaseCommand {
             let mut repos = PlatformRepository::new(vec![], overrides, None, None)?;
 
             let pattern =
-                base_package::package_name_to_regexp(&format!("{}*", input.get_completion_value()));
+                base_package::package_name_to_regexp(format!("{}*", input.get_completion_value()));
 
             // array_filter(array_map(getName, ...), isMatch)
             let mut names: Vec<String> = vec![];
             for package in repos.get_packages()? {
-                let name = package.get_name();
+                let name = legacy_lossy(&package.get_name()).into_owned();
                 if preg_is_match(pattern.clone(), &name) {
                     names.push(name);
                 }

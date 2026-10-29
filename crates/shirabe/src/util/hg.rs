@@ -130,11 +130,11 @@ impl Hg {
                     "Failed to clone {}, hg was not found, check that it is installed and in your PATH env.\n\n{}",
                     url,
                     self.process.borrow().get_error_output().display_lossy()
-                ))
+                )).display_lossy()
             );
         }
 
-        anyhow::bail!("{}", Url::sanitize(message.to_string()));
+        anyhow::bail!("{}", Url::sanitize(message).display_lossy());
     }
 
     pub fn get_version(

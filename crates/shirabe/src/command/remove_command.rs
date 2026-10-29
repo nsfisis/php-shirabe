@@ -12,7 +12,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::base_package;
 use crate::repository::RepositoryInterface;
-use bstr::{B, ByteSlice};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, UnexpectedValueException, impl_php_class, legacy_lossy, preg_grep, strtolower,
@@ -235,14 +235,14 @@ impl Command for RemoveCommand {
                 .get_locked_repository(true)?;
             let locked_packages = locked_repo.borrow_mut().get_packages()?;
 
-            let mut required: IndexMap<String, bool> = IndexMap::new();
+            let mut required: IndexMap<BString, bool> = IndexMap::new();
             for link in composer
                 .get_package()
                 .get_requires()
                 .values()
                 .chain(composer.get_package().get_dev_requires().values())
             {
-                required.insert(link.get_target().to_string(), true);
+                required.insert(BString::from(link.get_target()), true);
             }
 
             let mut locked_packages = locked_packages;
@@ -251,9 +251,9 @@ impl Command for RemoveCommand {
                 let mut to_remove = vec![];
                 for (index, package) in locked_packages.iter().enumerate() {
                     for name in package.get_names(true) {
-                        if required.contains_key(name.as_str()) {
+                        if required.contains_key(name.as_bstr()) {
                             for link in package.get_requires().values() {
-                                required.insert(link.get_target().to_string(), true);
+                                required.insert(BString::from(link.get_target()), true);
                             }
                             found = true;
                             to_remove.push(index);
@@ -269,7 +269,11 @@ impl Command for RemoveCommand {
                 }
             }
 
-            let unused: Vec<String> = locked_packages.iter().map(|p| p.get_name()).collect();
+            let unused: Vec<String> = locked_packages
+                .iter()
+                .map(|p| p.get_name())
+                .map(|s| legacy_lossy(&s).into_owned())
+                .collect();
             packages.extend(unused);
 
             if packages.is_empty() {
@@ -491,7 +495,7 @@ impl Command for RemoveCommand {
 
         if dry_run {
             let root_package = composer.get_package();
-            let mut links: IndexMap<String, IndexMap<String, _>> = IndexMap::new();
+            let mut links: IndexMap<String, IndexMap<BString, _>> = IndexMap::new();
             links.insert(
                 "require".to_string(),
                 (*root_package.get_requires()).clone(),
@@ -503,7 +507,7 @@ impl Command for RemoveCommand {
             for (link_type, names) in &to_remove {
                 for name in names {
                     if let Some(section) = links.get_mut(link_type.as_str()) {
-                        section.shift_remove(name.as_str());
+                        section.shift_remove(name.as_bytes());
                     }
                 }
             }
@@ -704,7 +708,7 @@ impl Command for RemoveCommand {
                     .get_repository_manager()
                     .borrow()
                     .get_local_repository()
-                    .find_packages(package, None)?
+                    .find_packages(bstr::BStr::new(package), None)?
                     .is_empty()
                 {
                     io.write_error(&format!(

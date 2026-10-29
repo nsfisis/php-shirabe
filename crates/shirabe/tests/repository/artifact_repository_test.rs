@@ -1,10 +1,10 @@
 //! ref: composer/tests/Composer/Test/Repository/ArtifactRepositoryTest.php
 
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::repository::ArtifactRepository;
-use shirabe_php_shim::{PhpMixed, extension_loaded};
+use shirabe_php_shim::{PhpMixed, extension_loaded, legacy_lossy};
 
 /// Returns true when the test should be skipped because the zip extension is
 /// unavailable, mirroring PHP's markTestSkipped in setUp.
@@ -61,8 +61,8 @@ fn test_extracts_configs_from_zip_archives() {
         .map(|package| {
             format!(
                 "{}-{}",
-                package.get_pretty_name(),
-                package.get_pretty_version()
+                legacy_lossy(&package.get_pretty_name()),
+                legacy_lossy(&package.get_pretty_version())
             )
         })
         .collect();
@@ -80,7 +80,12 @@ fn test_extracts_configs_from_zip_archives() {
         .collect();
     assert_eq!(1, tar_package.len());
     let tar_package = tar_package.into_iter().next_back().unwrap();
-    assert_eq!(Some("tar".to_string()), tar_package.get_dist_type());
+    assert_eq!(
+        Some("tar".to_string()),
+        tar_package
+            .get_dist_type()
+            .map(|s| legacy_lossy(&s).into_owned())
+    );
 }
 
 #[test]
@@ -97,7 +102,7 @@ fn test_absolute_repo_url_creates_absolute_url_packages() {
             package
                 .get_dist_url()
                 .unwrap_or_default()
-                .find(&absolute_path.replace('\\', "/")),
+                .find(absolute_path.replace('\\', "/")),
             Some(0)
         );
     }

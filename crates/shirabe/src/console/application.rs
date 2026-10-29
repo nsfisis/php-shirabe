@@ -1026,7 +1026,7 @@ impl Application {
                 self.find_namespace(&name[..pos])?;
             }
 
-            let mut message = format!("SymfonyCommand \"{}\" is not defined.", name,);
+            let mut message = format!("SymfonyCommand \"{}\" is not defined.", name);
 
             let mut alternatives = self.find_alternatives(name, &all_commands);
             if !alternatives.is_empty() {

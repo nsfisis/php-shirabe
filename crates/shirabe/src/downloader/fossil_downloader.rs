@@ -108,7 +108,10 @@ impl VcsDownloader for FossilDownloader {
 
         self.inner.io.write_error(&format!(
             "Cloning {}",
-            package.get_source_reference().unwrap_or_default()
+            package
+                .get_source_reference()
+                .unwrap_or_default()
+                .display_lossy()
         ));
 
         let mut output = String::new();
@@ -139,7 +142,7 @@ impl VcsDownloader for FossilDownloader {
                 "fossil".to_string(),
                 "update".to_string(),
                 "--".to_string(),
-                package.get_source_reference().unwrap_or_default(),
+                legacy_lossy(&package.get_source_reference().unwrap_or_default()).into_owned(),
             ],
             real_path,
             &mut output,
@@ -163,7 +166,10 @@ impl VcsDownloader for FossilDownloader {
 
         self.inner.io.write_error(&format!(
             " Updating to {}",
-            target.get_source_reference().unwrap_or_default()
+            target
+                .get_source_reference()
+                .unwrap_or_default()
+                .display_lossy()
         ));
 
         if !self.has_metadata_repository(path) {
@@ -185,7 +191,7 @@ impl VcsDownloader for FossilDownloader {
                 "fossil".to_string(),
                 "up".to_string(),
                 "--".to_string(),
-                target.get_source_reference().unwrap_or_default(),
+                legacy_lossy(&target.get_source_reference().unwrap_or_default()).into_owned(),
             ],
             real_path,
             &mut output,

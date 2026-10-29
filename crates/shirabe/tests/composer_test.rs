@@ -48,9 +48,9 @@ fn installation_manager(
 fn test_set_get_package() {
     let mut composer = Composer::new();
     let package: RootPackageInterfaceHandle = RootPackageHandle::new(
-        "foo".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0.0".to_string(),
+        bstr::BString::from("foo".to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0.0".to_string()),
     )
     .into();
     composer.set_package(package.clone());

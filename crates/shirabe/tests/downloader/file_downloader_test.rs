@@ -26,7 +26,12 @@ use tempfile::TempDir;
 /// ref: TestCase::getPackage (default class CompletePackage)
 fn get_package(name: &str, version: &str) -> PackageInterfaceHandle {
     let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
-    CompletePackageHandle::new(name.to_string(), norm_version, version.to_string()).into()
+    CompletePackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from(norm_version),
+        bstr::BString::from(version.to_string()),
+    )
+    .into()
 }
 
 /// ref: TestCase::getConfig
@@ -93,7 +98,7 @@ fn test_download_for_package_without_dist_reference() {
 #[serial]
 fn test_download_to_existing_file() {
     let package = get_package("dummy/pkg", "1.0.0");
-    package.set_dist_url(Some("url".to_string()));
+    package.set_dist_url(Some(bstr::BString::from("url".to_string())));
 
     // createTempFile(getUniqueTmpDirectory()): a regular file used as the download target path.
     let tmp_dir = TempDir::new().unwrap();
@@ -120,7 +125,9 @@ fn test_download_to_existing_file() {
 #[serial]
 fn test_get_file_name() {
     let package = get_package("dummy/pkg", "1.0.0");
-    package.set_dist_url(Some("http://example.com/script.js".to_string()));
+    package.set_dist_url(Some(bstr::BString::from(
+        "http://example.com/script.js".to_string(),
+    )));
 
     let mut config_options: IndexMap<BString, PhpMixed> = IndexMap::new();
     config_options.insert("vendor-dir".into(), PhpMixed::string("/vendor".to_string()));
@@ -137,7 +144,9 @@ fn test_get_file_name() {
 #[serial]
 fn test_download_but_file_is_unsaved() {
     let package = get_package("dummy/pkg", "1.0.0");
-    package.set_dist_url(Some("http://example.com/script.js".to_string()));
+    package.set_dist_url(Some(bstr::BString::from(
+        "http://example.com/script.js".to_string(),
+    )));
 
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_str().unwrap().to_string();
@@ -258,8 +267,10 @@ fn test_cache_garbage_collection_is_called() {
 #[serial]
 fn test_download_file_with_invalid_checksum() {
     let package = get_package("dummy/pkg", "1.0.0");
-    package.set_dist_url(Some("http://example.com/script.js".to_string()));
-    package.__set_dist_sha1_checksum(Some("invalid".to_string()));
+    package.set_dist_url(Some(bstr::BString::from(
+        "http://example.com/script.js".to_string(),
+    )));
+    package.__set_dist_sha1_checksum(Some(bstr::BString::from("invalid".to_string())));
 
     let tmp_dir = TempDir::new().unwrap();
     let path = tmp_dir.path().to_str().unwrap().to_string();
@@ -305,7 +316,9 @@ fn test_download_file_with_invalid_checksum() {
 fn test_downgrade_shows_appropriate_message() {
     let old_package = get_package("dummy/pkg", "1.2.0");
     let new_package = get_package("dummy/pkg", "1.0.0");
-    new_package.set_dist_url(Some("http://example.com/script.js".to_string()));
+    new_package.set_dist_url(Some(bstr::BString::from(
+        "http://example.com/script.js".to_string(),
+    )));
 
     let (io_mock, _io_guard) = get_io_mock(io_interface::DEBUG).unwrap();
     io_mock

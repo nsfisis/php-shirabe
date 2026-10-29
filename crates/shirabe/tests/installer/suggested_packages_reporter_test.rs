@@ -2,6 +2,7 @@
 
 use crate::io_mock::{Expectation, IOMock, IOMockGuard, get_io_mock};
 use crate::test_case::get_package;
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::installer::SuggestedPackagesReporter;
 use shirabe::io::null_io::NullIO;
@@ -24,11 +25,11 @@ fn set_up() -> (
 }
 
 /// ref: SuggestedPackagesReporterTest::getSuggestedPackageArray
-fn get_suggested_package_array() -> IndexMap<String, String> {
+fn get_suggested_package_array() -> IndexMap<BString, BString> {
     let mut entry = IndexMap::new();
-    entry.insert("source".to_string(), "a".to_string());
-    entry.insert("target".to_string(), "b".to_string());
-    entry.insert("reason".to_string(), "c".to_string());
+    entry.insert(BString::from("source"), BString::from("a"));
+    entry.insert(BString::from("target"), BString::from("b"));
+    entry.insert(BString::from("reason"), BString::from("c"));
     entry
 }
 
@@ -45,7 +46,11 @@ fn test_constructor() {
         .expects(vec![Expectation::text("b")], true)
         .unwrap();
 
-    reporter.add_package("a".to_string(), "b".to_string(), "c".to_string());
+    reporter.add_package(
+        bstr::BString::from("a".to_string()),
+        bstr::BString::from("b".to_string()),
+        bstr::BString::from("c".to_string()),
+    );
     reporter
         .output(SuggestedPackagesReporter::MODE_LIST, None, None)
         .unwrap();
@@ -62,9 +67,9 @@ fn test_get_packages() {
     let suggested_package = get_suggested_package_array();
     let mut reporter = reporter();
     reporter.add_package(
-        suggested_package["source"].clone(),
-        suggested_package["target"].clone(),
-        suggested_package["reason"].clone(),
+        suggested_package[b"source".as_slice()].clone(),
+        suggested_package[b"target".as_slice()].clone(),
+        suggested_package[b"reason".as_slice()].clone(),
     );
     assert_eq!(&vec![suggested_package], reporter.get_packages());
 }
@@ -73,18 +78,18 @@ fn test_get_packages() {
 fn test_add_package_appends() {
     let suggested_package_a = get_suggested_package_array();
     let mut suggested_package_b = get_suggested_package_array();
-    suggested_package_b.insert("source".to_string(), "different source".to_string());
-    suggested_package_b.insert("reason".to_string(), "different reason".to_string());
+    suggested_package_b.insert(BString::from("source"), BString::from("different source"));
+    suggested_package_b.insert(BString::from("reason"), BString::from("different reason"));
     let mut reporter = reporter();
     reporter.add_package(
-        suggested_package_a["source"].clone(),
-        suggested_package_a["target"].clone(),
-        suggested_package_a["reason"].clone(),
+        suggested_package_a[b"source".as_slice()].clone(),
+        suggested_package_a[b"target".as_slice()].clone(),
+        suggested_package_a[b"reason".as_slice()].clone(),
     );
     reporter.add_package(
-        suggested_package_b["source"].clone(),
-        suggested_package_b["target"].clone(),
-        suggested_package_b["reason"].clone(),
+        suggested_package_b[b"source".as_slice()].clone(),
+        suggested_package_b[b"target".as_slice()].clone(),
+        suggested_package_b[b"reason".as_slice()].clone(),
     );
     assert_eq!(
         &vec![suggested_package_a, suggested_package_b],
@@ -101,25 +106,40 @@ fn test_add_suggestions_from_package() {
     let mut suggests = IndexMap::new();
     suggests.insert("target-a".to_string(), "reason-a".to_string());
     suggests.insert("target-b".to_string(), "reason-b".to_string());
-    package.__set_suggests(suggests);
+    package.__set_suggests(
+        suggests
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     reporter.add_suggestions_from_package(package);
 
     let mut expected_a = IndexMap::new();
-    expected_a.insert("source".to_string(), "package-pretty-name".to_string());
-    expected_a.insert("target".to_string(), "target-a".to_string());
-    expected_a.insert("reason".to_string(), "reason-a".to_string());
+    expected_a.insert(
+        BString::from("source"),
+        BString::from("package-pretty-name"),
+    );
+    expected_a.insert(BString::from("target"), BString::from("target-a"));
+    expected_a.insert(BString::from("reason"), BString::from("reason-a"));
     let mut expected_b = IndexMap::new();
-    expected_b.insert("source".to_string(), "package-pretty-name".to_string());
-    expected_b.insert("target".to_string(), "target-b".to_string());
-    expected_b.insert("reason".to_string(), "reason-b".to_string());
+    expected_b.insert(
+        BString::from("source"),
+        BString::from("package-pretty-name"),
+    );
+    expected_b.insert(BString::from("target"), BString::from("target-b"));
+    expected_b.insert(BString::from("reason"), BString::from("reason-b"));
     assert_eq!(&vec![expected_a, expected_b], reporter.get_packages());
 }
 
 #[test]
 fn test_output() {
     let (mock, mut reporter, _guard) = set_up();
-    reporter.add_package("a".to_string(), "b".to_string(), "c".to_string());
+    reporter.add_package(
+        bstr::BString::from("a".to_string()),
+        bstr::BString::from("b".to_string()),
+        bstr::BString::from("c".to_string()),
+    );
 
     mock.borrow_mut()
         .expects(
@@ -140,7 +160,11 @@ fn test_output() {
 #[test]
 fn test_output_with_no_suggestion_reason() {
     let (mock, mut reporter, _guard) = set_up();
-    reporter.add_package("a".to_string(), "b".to_string(), "".to_string());
+    reporter.add_package(
+        bstr::BString::from("a".to_string()),
+        bstr::BString::from("b".to_string()),
+        bstr::BString::from("".to_string()),
+    );
 
     mock.borrow_mut()
         .expects(
@@ -162,14 +186,14 @@ fn test_output_with_no_suggestion_reason() {
 fn test_output_ignores_formatting() {
     let (mock, mut reporter, _guard) = set_up();
     reporter.add_package(
-        "source".to_string(),
-        "target1".to_string(),
-        "\x1b[1;37;42m Like us\r\non Facebook \x1b[0m".to_string(),
+        bstr::BString::from("source".to_string()),
+        bstr::BString::from("target1".to_string()),
+        bstr::BString::from("\x1b[1;37;42m Like us\r\non Facebook \x1b[0m".to_string()),
     );
     reporter.add_package(
-        "source".to_string(),
-        "target2".to_string(),
-        "<bg=green>Like us on Facebook</>".to_string(),
+        bstr::BString::from("source".to_string()),
+        bstr::BString::from("target2".to_string()),
+        bstr::BString::from("<bg=green>Like us on Facebook</>".to_string()),
     );
 
     mock.borrow_mut()
@@ -192,11 +216,15 @@ fn test_output_ignores_formatting() {
 #[test]
 fn test_output_multiple_packages() {
     let (mock, mut reporter, _guard) = set_up();
-    reporter.add_package("a".to_string(), "b".to_string(), "c".to_string());
     reporter.add_package(
-        "source package".to_string(),
-        "target".to_string(),
-        "because reasons".to_string(),
+        bstr::BString::from("a".to_string()),
+        bstr::BString::from("b".to_string()),
+        bstr::BString::from("c".to_string()),
+    );
+    reporter.add_package(
+        bstr::BString::from("source package".to_string()),
+        bstr::BString::from("target".to_string()),
+        bstr::BString::from("because reasons".to_string()),
     );
 
     mock.borrow_mut()
@@ -230,11 +258,15 @@ fn test_output_skip_installed_packages() {
     let installed = LockArrayRepository::new(vec![package1, package2]).unwrap();
     let mut repository = InstalledRepository::new(vec![RepositoryInterfaceHandle::new(installed)]);
 
-    reporter.add_package("a".to_string(), "b".to_string(), "c".to_string());
     reporter.add_package(
-        "source package".to_string(),
-        "target".to_string(),
-        "because reasons".to_string(),
+        bstr::BString::from("a".to_string()),
+        bstr::BString::from("b".to_string()),
+        bstr::BString::from("c".to_string()),
+    );
+    reporter.add_package(
+        bstr::BString::from("source package".to_string()),
+        bstr::BString::from("target".to_string()),
+        bstr::BString::from("because reasons".to_string()),
     );
 
     mock.borrow_mut()

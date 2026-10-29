@@ -8,7 +8,7 @@ use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use crate::util::{Filesystem, Platform};
 use bstr::B;
-use shirabe_php_shim::{PhpMixed, UnexpectedValueException, empty};
+use shirabe_php_shim::{PhpMixed, UnexpectedValueException, empty, legacy_lossy};
 
 #[derive(Debug)]
 pub struct PluginInstaller {
@@ -100,7 +100,7 @@ impl InstallerInterface for PluginInstaller {
                 .map(|v| matches!(v, PhpMixed::Bool(true)))
                 .unwrap_or(false);
             self.get_plugin_manager().borrow_mut().is_plugin_allowed(
-                &package.get_name(),
+                &legacy_lossy(&package.get_name()),
                 false,
                 plugin_optional,
                 true,
@@ -120,7 +120,7 @@ impl InstallerInterface for PluginInstaller {
         if empty(&class) {
             return Err(UnexpectedValueException::new(format!(
                 "Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.",
-                package.get_pretty_name()
+                package.get_pretty_name().display_lossy()
             )).into());
         }
 

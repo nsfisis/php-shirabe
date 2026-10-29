@@ -30,17 +30,17 @@ impl ArchiverTestCase {
 
     fn setup_package(&self) -> CompletePackageHandle {
         let package = CompletePackageHandle::new(
-            "archivertest/archivertest".to_string(),
-            "master".to_string(),
-            "master".to_string(),
+            bstr::BString::from("archivertest/archivertest".to_string()),
+            bstr::BString::from("master".to_string()),
+            bstr::BString::from("master".to_string()),
         );
-        package.set_source_url(Some(
+        package.set_source_url(Some(bstr::BString::from(
             realpath(&self.test_dir)
                 .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                 .unwrap_or_default(),
-        ));
-        package.set_source_reference(Some("master".to_string()));
-        package.__set_source_type(Some("git".to_string()));
+        )));
+        package.set_source_reference(Some(bstr::BString::from("master".to_string())));
+        package.__set_source_type(Some(bstr::BString::from("git".to_string())));
 
         package
     }
@@ -109,7 +109,7 @@ fn test_tar_archive() {
     let archiver = PharArchiver::new();
     archiver
         .archive(
-            package.get_source_url().unwrap(),
+            legacy_lossy(&package.get_source_url().unwrap()).into_owned(),
             target.clone(),
             "tar".to_string(),
             vec![
@@ -146,7 +146,7 @@ fn test_zip_archive() {
     let archiver = PharArchiver::new();
     archiver
         .archive(
-            package.get_source_url().unwrap(),
+            legacy_lossy(&package.get_source_url().unwrap()).into_owned(),
             target.clone(),
             "zip".to_string(),
             vec![],

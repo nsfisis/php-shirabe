@@ -10,7 +10,9 @@ use crate::repository::{
     InstalledRepository, PlatformRepository, RepositoryInterface, RootPackageRepository,
 };
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, array_merge_map, impl_php_class, legacy_lossy, strip_tags};
+use shirabe_php_shim::{
+    PhpMixed, array_merge_map, bconcat, impl_php_class, legacy_lossy, strip_tags,
+};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -85,10 +87,10 @@ impl CheckPlatformReqsCommand {
                     version: result.version.clone(),
                     status: legacy_lossy(&strip_tags(&result.status)).into_owned(),
                     failed_requirement: result.link.as_ref().map(|link| FailedRequirementJson {
-                        source: link.get_source().to_string(),
-                        r#type: link.get_description().to_string(),
-                        target: link.get_target().to_string(),
-                        constraint: link.get_pretty_constraint().to_string(),
+                        source: legacy_lossy(link.get_source()).into_owned(),
+                        r#type: legacy_lossy(link.get_description()).into_owned(),
+                        target: legacy_lossy(link.get_target()).into_owned(),
+                        constraint: legacy_lossy(link.get_pretty_constraint()).into_owned(),
                     }),
                     provider: if result.provider.is_empty() {
                         None
@@ -107,16 +109,19 @@ impl CheckPlatformReqsCommand {
                         PhpMixed::string(result.platform_package.clone()),
                         PhpMixed::string(result.version.clone()),
                         match &result.link {
-                            Some(link) => PhpMixed::string(link.to_string()),
+                            Some(link) => PhpMixed::string(link.to_php_string()),
                             None => PhpMixed::string(String::new()),
                         },
                         if let Some(link) = &result.link {
-                            PhpMixed::string(format!(
-                                "{} {} {} ({})",
+                            PhpMixed::string(bconcat!(
                                 link.get_source(),
+                                " ",
                                 link.get_description(),
+                                " ",
                                 link.get_target(),
+                                " (",
                                 link.get_pretty_constraint(),
+                                ")"
                             ))
                         } else {
                             PhpMixed::string(String::new())
@@ -229,7 +234,11 @@ impl Command for CheckPlatformReqsCommand {
                     .into()
             } else {
                 if no_dev {
-                    remove_packages = local_repo.get_dev_package_names();
+                    remove_packages = local_repo
+                        .get_dev_package_names()
+                        .iter()
+                        .map(|s| legacy_lossy(s).into_owned())
+                        .collect::<Vec<_>>();
                 }
                 io.write_error(&format!(
                     "<info>Checking {}platform requirements for packages in the vendor dir</info>",
@@ -242,7 +251,7 @@ impl Command for CheckPlatformReqsCommand {
         if !no_dev {
             for (require, link) in composer.get_package().get_dev_requires().iter() {
                 requires
-                    .entry(require.to_string())
+                    .entry(legacy_lossy(require).into_owned())
                     .or_default()
                     .push(link.clone());
             }
@@ -257,12 +266,12 @@ impl Command for CheckPlatformReqsCommand {
         ]);
 
         for package in installed_repo.get_packages()? {
-            if remove_packages.contains(&package.get_name().to_string()) {
+            if remove_packages.contains(&legacy_lossy(&package.get_name()).into_owned()) {
                 continue;
             }
             for (require, link) in package.get_requires().iter() {
                 requires
-                    .entry(require.to_string())
+                    .entry(legacy_lossy(require).into_owned())
                     .or_default()
                     .push(link.clone());
             }
@@ -282,7 +291,7 @@ impl Command for CheckPlatformReqsCommand {
         'requirements: for (require, links) in &requires_sorted {
             if PlatformRepository::is_platform_package(require) {
                 let candidates = installed_repo_with_platform
-                    .find_packages_with_replacers_and_providers(require, None)?;
+                    .find_packages_with_replacers_and_providers(bstr::BStr::new(require), None)?;
                 if !candidates.is_empty() {
                     let mut req_results: Vec<CheckResult> = vec![];
                     'candidates: for candidate in &candidates {
@@ -290,9 +299,9 @@ impl Command for CheckPlatformReqsCommand {
                             if candidate.get_name() == *require {
                                 let c = SimpleConstraint::new(
                                     "=",
-                                    candidate.get_version().to_string(),
+                                    legacy_lossy(&candidate.get_version()).into_owned(),
                                     Some(bstr::BString::from(
-                                        candidate.get_pretty_version().to_string(),
+                                        legacy_lossy(&candidate.get_pretty_version()).into_owned(),
                                     )),
                                 );
                                 Some(c.into())
@@ -320,7 +329,7 @@ impl Command for CheckPlatformReqsCommand {
                             if !link.get_constraint().matches(&candidate_constraint) {
                                 req_results.push(CheckResult {
                                     platform_package: if candidate.get_name() == *require {
-                                        candidate.get_pretty_name().to_string()
+                                        legacy_lossy(&candidate.get_pretty_name()).into_owned()
                                     } else {
                                         require.clone()
                                     },
@@ -335,7 +344,7 @@ impl Command for CheckPlatformReqsCommand {
                                     } else {
                                         format!(
                                             "<comment>provided by {}</comment>",
-                                            candidate.get_pretty_name()
+                                            legacy_lossy(&candidate.get_pretty_name())
                                         )
                                     },
                                 });
@@ -345,7 +354,7 @@ impl Command for CheckPlatformReqsCommand {
 
                         results.push(CheckResult {
                             platform_package: if candidate.get_name() == *require {
-                                candidate.get_pretty_name().to_string()
+                                legacy_lossy(&candidate.get_pretty_name()).into_owned()
                             } else {
                                 require.clone()
                             },
@@ -358,7 +367,7 @@ impl Command for CheckPlatformReqsCommand {
                             } else {
                                 format!(
                                     "<comment>provided by {}</comment>",
-                                    candidate.get_pretty_name()
+                                    legacy_lossy(&candidate.get_pretty_name())
                                 )
                             },
                         });

@@ -9,7 +9,7 @@ use crate::repository::{
     FilesystemRepository, RepositoryInterfaceHandle, RepositoryManager, RepositoryManagerInterface,
 };
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::{B, BString};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, get_debug_type, json_encode,
@@ -46,9 +46,15 @@ impl RepositoryFactory {
                 Some(io.clone()),
             )?;
             let data = json.read()?;
-            let has_packages = data.get("packages").is_some_and(|v| !v.is_null());
-            let has_includes = data.get("includes").is_some_and(|v| !v.is_null());
-            let has_provider_includes = data.get("provider-includes").is_some_and(|v| !v.is_null());
+            let has_packages = data
+                .get(&legacy_lossy(b"packages".as_slice()))
+                .is_some_and(|v| !v.is_null());
+            let has_includes = data
+                .get(&legacy_lossy(b"includes".as_slice()))
+                .is_some_and(|v| !v.is_null());
+            let has_provider_includes = data
+                .get(&legacy_lossy(b"provider-includes".as_slice()))
+                .is_some_and(|v| !v.is_null());
             if has_packages || has_includes || has_provider_includes {
                 let real_path = std::fs::canonicalize(repository)
                     .ok()
@@ -72,7 +78,7 @@ impl RepositoryFactory {
             }
         }
 
-        if repository.starts_with('{') {
+        if repository.starts_with("{") {
             let parsed = JsonFile::parse_json(Some(repository), None)?;
             let repo_config: IndexMap<BString, PhpMixed> =
                 parsed.as_array().cloned().unwrap_or_default();
@@ -120,7 +126,7 @@ impl RepositoryFactory {
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         config: Option<std::rc::Rc<std::cell::RefCell<Config>>>,
         rm: Option<&mut dyn RepositoryManagerInterface>,
-    ) -> anyhow::Result<IndexMap<String, RepositoryInterfaceHandle>> {
+    ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
         let config = match config {
             Some(c) => c,
             None => std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(None, None)?)),
@@ -188,28 +194,70 @@ impl RepositoryFactory {
             event_dispatcher,
             Some(process),
         );
-        rm.set_repository_class("composer", "Composer\\Repository\\ComposerRepository");
-        rm.set_repository_class("vcs", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("package", "Composer\\Repository\\PackageRepository");
-        rm.set_repository_class("pear", "Composer\\Repository\\PearRepository");
-        rm.set_repository_class("git", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("bitbucket", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("git-bitbucket", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("github", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("gitlab", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("svn", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("fossil", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("perforce", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("hg", "Composer\\Repository\\VcsRepository");
-        rm.set_repository_class("artifact", "Composer\\Repository\\ArtifactRepository");
-        rm.set_repository_class("path", "Composer\\Repository\\PathRepository");
+        rm.set_repository_class(
+            bstr::BStr::new("composer"),
+            "Composer\\Repository\\ComposerRepository",
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("vcs"),
+            "Composer\\Repository\\VcsRepository",
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("package"),
+            "Composer\\Repository\\PackageRepository",
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("pear"),
+            "Composer\\Repository\\PearRepository",
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("git"),
+            "Composer\\Repository\\VcsRepository",
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("bitbucket"),
+            "Composer\\Repository\\VcsRepository",
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("git-bitbucket"),
+            "Composer\\Repository\\VcsRepository",
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("github"),
+            "Composer\\Repository\\VcsRepository",
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("gitlab"),
+            "Composer\\Repository\\VcsRepository",
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("svn"),
+            "Composer\\Repository\\VcsRepository",
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("fossil"),
+            "Composer\\Repository\\VcsRepository",
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("perforce"),
+            "Composer\\Repository\\VcsRepository",
+        );
+        rm.set_repository_class(bstr::BStr::new("hg"), "Composer\\Repository\\VcsRepository");
+        rm.set_repository_class(
+            bstr::BStr::new("artifact"),
+            "Composer\\Repository\\ArtifactRepository",
+        );
+        rm.set_repository_class(
+            bstr::BStr::new("path"),
+            "Composer\\Repository\\PathRepository",
+        );
 
         Ok(rm)
     }
 
     pub fn default_repos_with_default_manager(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
-    ) -> anyhow::Result<IndexMap<String, RepositoryInterfaceHandle>> {
+    ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
         let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
             Some(io.clone()),
             None,
@@ -223,8 +271,8 @@ impl RepositoryFactory {
     fn create_repos(
         rm: &mut dyn RepositoryManagerInterface,
         repo_configs: Vec<PhpMixed>,
-    ) -> anyhow::Result<IndexMap<String, RepositoryInterfaceHandle>> {
-        let mut repo_map: IndexMap<String, RepositoryInterfaceHandle> = IndexMap::new();
+    ) -> anyhow::Result<IndexMap<BString, RepositoryInterfaceHandle>> {
+        let mut repo_map: IndexMap<BString, RepositoryInterfaceHandle> = IndexMap::new();
 
         for (index, repo) in repo_configs.into_iter().enumerate() {
             match &repo {
@@ -240,13 +288,12 @@ impl RepositoryFactory {
                         ))
                         .into());
                     }
-                    let repo_type = legacy_lossy(
+                    let repo_type = BString::from(
                         repo_arr
                             .get(B("type"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
-                    )
-                    .into_owned();
+                    );
                     let repo_config_map: IndexMap<BString, PhpMixed> = repo_arr
                         .iter()
                         .map(|(k, v)| (k.clone(), v.clone()))
@@ -255,12 +302,12 @@ impl RepositoryFactory {
                         Self::generate_repository_name_indexed(index, &repo_config_map, &repo_map);
 
                     if repo_type == "filesystem" {
-                        let json_path = legacy_lossy(
+                        let json_path = legacy_lossy(&BString::from(
                             repo_arr
                                 .get(B("json"))
                                 .and_then(|v| v.as_string())
                                 .unwrap_or_default(),
-                        )
+                        ))
                         .into_owned();
                         let created: RepositoryInterfaceHandle =
                             RepositoryInterfaceHandle::new(FilesystemRepository::new(
@@ -272,7 +319,7 @@ impl RepositoryFactory {
                         repo_map.insert(name, created);
                     } else {
                         let created = rm.create_repository(
-                            &repo_type,
+                            repo_type.as_bstr(),
                             repo_config_map,
                             Some(&index.to_string()),
                         )?;
@@ -298,24 +345,23 @@ impl RepositoryFactory {
         index: &PhpMixed,
         repo: &IndexMap<BString, PhpMixed>,
         existing_repos: &IndexMap<K, T>,
-    ) -> String {
-        let mut name = legacy_lossy(&if matches!(index, PhpMixed::Int(_))
-            && repo.contains_key(B("url"))
-        {
-            let url = repo
-                .get(B("url"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default();
-            preg_replace(php_regex!("{^https?://}i"), "", url)
-        } else {
-            php_to_string(index)
-        })
-        .into_owned();
+    ) -> BString {
+        let mut name = BString::from(
+            &if matches!(index, PhpMixed::Int(_)) && repo.contains_key(B("url")) {
+                let url = repo
+                    .get(B("url"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default();
+                preg_replace(php_regex!("{^https?://}i"), "", url)
+            } else {
+                php_to_string(index)
+            }[..],
+        );
         while existing_repos
             .keys()
             .any(|key| key.as_ref() == name.as_bytes())
         {
-            name.push('2');
+            name.push(b'2');
         }
         name
     }
@@ -323,18 +369,17 @@ impl RepositoryFactory {
     fn generate_repository_name_indexed(
         index: usize,
         repo: &IndexMap<BString, PhpMixed>,
-        existing_repos: &IndexMap<String, RepositoryInterfaceHandle>,
-    ) -> String {
-        let mut name = legacy_lossy(&if let Some(url) =
-            repo.get(B("url")).and_then(|v| v.as_string())
-        {
-            preg_replace(php_regex!("{^https?://}i"), "", url)
-        } else {
-            bstr::BString::from(index.to_string())
-        })
-        .into_owned();
+        existing_repos: &IndexMap<BString, RepositoryInterfaceHandle>,
+    ) -> BString {
+        let mut name = BString::from(
+            &if let Some(url) = repo.get(B("url")).and_then(|v| v.as_string()) {
+                preg_replace(php_regex!("{^https?://}i"), "", url)
+            } else {
+                bstr::BString::from(index.to_string())
+            }[..],
+        );
         while existing_repos.contains_key(&name) {
-            name.push('2');
+            name.push(b'2');
         }
         name
     }

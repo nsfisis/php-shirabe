@@ -17,7 +17,7 @@ mod suggested_packages_reporter;
 
 pub use binary_installer::*;
 pub use binary_presence_interface::*;
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 pub use installation_manager::*;
 pub use installer_event::*;
 pub use installer_events::*;
@@ -109,15 +109,15 @@ pub struct Installer {
     error_on_audit: bool,
     audit_format: String,
     audit_config: Option<AuditConfig>,
-    ignored_types: Vec<String>,
-    allowed_types: Option<Vec<String>>,
+    ignored_types: Vec<BString>,
+    allowed_types: Option<Vec<BString>>,
     update_mirrors: bool,
     update_allow_list: Option<Vec<String>>,
     update_allow_transitive_dependencies: UpdateAllowTransitiveDeps,
     suggested_packages_reporter: std::rc::Rc<std::cell::RefCell<SuggestedPackagesReporter>>,
     platform_requirement_filter: std::rc::Rc<dyn PlatformRequirementFilterInterface>,
     additional_fixed_repository: Option<crate::repository::RepositoryInterfaceHandle>,
-    temporary_constraints: IndexMap<String, AnyConstraint>,
+    temporary_constraints: IndexMap<BString, AnyConstraint>,
 }
 
 impl Installer {
@@ -183,7 +183,7 @@ impl Installer {
             error_on_audit: false,
             audit_format: Auditor::FORMAT_SUMMARY.to_string(),
             audit_config: None,
-            ignored_types: vec!["php-ext".to_string(), "php-ext-zend".to_string()],
+            ignored_types: vec!["php-ext".into(), "php-ext-zend".into()],
             allowed_types: None,
             update_mirrors: false,
             update_allow_list: None,
@@ -348,14 +348,14 @@ impl Installer {
             };
 
             let replacement = if let Some(repl) = complete.get_replacement_package() {
-                format!("Use {} instead", repl)
+                format!("Use {} instead", legacy_lossy(&repl))
             } else {
                 "No replacement was suggested".to_string()
             };
 
             self.io.write_error(&format!(
                 "<warning>Package {} is abandoned, you should avoid using it. {}.</warning>",
-                complete.get_pretty_name(),
+                complete.get_pretty_name().display_lossy(),
                 replacement,
             ));
         }
@@ -492,10 +492,10 @@ impl Installer {
                     &self.io,
                     &repo_set,
                     packages,
-                    &audit_config.audit_format,
+                    audit_config.audit_format.as_bstr(),
                     true,
                     audit_config.ignore_list_for_audit.clone(),
-                    &audit_config.audit_abandoned,
+                    audit_config.audit_abandoned.as_bstr(),
                     audit_config.ignore_severity_for_audit.clone(),
                     audit_config.ignore_unreachable,
                     audit_config.ignore_abandoned_for_audit.clone(),
@@ -615,7 +615,11 @@ impl Installer {
         // pass the allow list into the request, so the pool builder can apply it
         if let Some(ref allow_list) = self.update_allow_list {
             request.set_update_allow_list(
-                allow_list.clone(),
+                allow_list
+                    .clone()
+                    .into_iter()
+                    .map(bstr::BString::from)
+                    .collect::<Vec<_>>(),
                 self.update_allow_transitive_dependencies,
             );
         }
@@ -736,11 +740,11 @@ impl Installer {
                     installs_updates.push(operation.clone());
                     install_names.push(format!(
                         "{}:{}",
-                        io.get_package().get_pretty_name(),
-                        io.get_package().get_full_pretty_version(
+                        legacy_lossy(&io.get_package().get_pretty_name()),
+                        legacy_lossy(&io.get_package().get_full_pretty_version(
                             true,
                             crate::package::DisplayMode::SourceRefIfDev
-                        )
+                        ))
                     ));
                 } else if let AnyOperation::Update(uo) = &**operation {
                     // when mirrors/metadata from a package gets updated we do not want to list it as an
@@ -756,15 +760,16 @@ impl Installer {
                     installs_updates.push(operation.clone());
                     update_names.push(format!(
                         "{}:{}",
-                        uo.get_target_package().get_pretty_name(),
-                        uo.get_target_package().get_full_pretty_version(
+                        legacy_lossy(&uo.get_target_package().get_pretty_name()),
+                        legacy_lossy(&uo.get_target_package().get_full_pretty_version(
                             true,
                             crate::package::DisplayMode::SourceRefIfDev
-                        )
+                        ))
                     ));
                 } else if let AnyOperation::Uninstall(uo) = &**operation {
                     uninstalls.push(operation.clone());
-                    uninstall_names.push(uo.get_package().get_pretty_name().to_string());
+                    uninstall_names
+                        .push(legacy_lossy(&uo.get_package().get_pretty_name()).into_owned());
                 }
             }
 
@@ -848,7 +853,7 @@ impl Installer {
                 {
                     let operation_pkg = operation.get_target_package();
                     if let Some(repo) = operation_pkg.get_repository() {
-                        source_repo = format!(" from {}", repo.get_repo_name()?);
+                        source_repo = format!(" from {}", legacy_lossy(&repo.get_repo_name()?));
                     }
                 }
                 self.io
@@ -856,13 +861,13 @@ impl Installer {
             }
         }
 
-        // Convert aliases (Vec<IndexMap<String, String>>) into Vec<IndexMap<BString, PhpMixed>>
+        // Convert aliases (Vec<IndexMap<BString, BString>>) into Vec<IndexMap<BString, PhpMixed>>
         let aliases_php_mixed: Vec<IndexMap<BString, PhpMixed>> = lock_transaction
             .get_aliases(aliases.clone())
             .into_iter()
             .map(|m| {
                 m.into_iter()
-                    .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                    .map(|(k, v)| (k, PhpMixed::string(v)))
                     .collect::<IndexMap<BString, PhpMixed>>()
             })
             .collect();
@@ -881,7 +886,7 @@ impl Installer {
             platform_reqs,
             platform_dev_reqs,
             aliases_php_mixed,
-            &self.package.get_minimum_stability(),
+            &legacy_lossy(&self.package.get_minimum_stability()),
             self.package.get_stability_flags(),
             self.prefer_stable || self.package.get_prefer_stable(),
             self.prefer_lowest,
@@ -906,7 +911,7 @@ impl Installer {
         &mut self,
         lock_transaction: &mut LockTransaction,
         platform_repo: &PlatformRepositoryHandle,
-        aliases: &[IndexMap<String, String>],
+        aliases: &[IndexMap<BString, BString>],
         policy: std::rc::Rc<dyn PolicyInterface>,
         locked_repository: Option<&crate::repository::LockArrayRepositoryHandle>,
     ) -> anyhow::Result<i64> {
@@ -1079,7 +1084,10 @@ impl Installer {
             }
             for (_key, link) in root_requires.iter() {
                 if PlatformRepository::is_platform_package(link.get_target()) {
-                    request.require_name(link.get_target(), Some(link.get_constraint().clone()))?;
+                    request.require_name(
+                        bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                        Some(link.get_constraint().clone()),
+                    )?;
                 }
             }
 
@@ -1090,7 +1098,10 @@ impl Installer {
                 .into_values()
             {
                 if !root_requires.contains_key(link.get_target()) {
-                    request.require_name(link.get_target(), Some(link.get_constraint().clone()))?;
+                    request.require_name(
+                        bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                        Some(link.get_constraint().clone()),
+                    )?;
                 }
             }
             drop(root_requires);
@@ -1182,19 +1193,23 @@ impl Installer {
             if let AnyOperation::Install(io) = &**operation {
                 installs.push(format!(
                     "{}:{}",
-                    io.get_package().get_pretty_name(),
-                    io.get_package()
-                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                    legacy_lossy(&io.get_package().get_pretty_name()),
+                    legacy_lossy(&io.get_package().get_full_pretty_version(
+                        true,
+                        crate::package::DisplayMode::SourceRefIfDev
+                    ))
                 ));
             } else if let AnyOperation::Update(uo) = &**operation {
                 updates.push(format!(
                     "{}:{}",
-                    uo.get_target_package().get_pretty_name(),
-                    uo.get_target_package()
-                        .get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                    legacy_lossy(&uo.get_target_package().get_pretty_name()),
+                    legacy_lossy(&uo.get_target_package().get_full_pretty_version(
+                        true,
+                        crate::package::DisplayMode::SourceRefIfDev
+                    ))
                 ));
             } else if let AnyOperation::Uninstall(uo) = &**operation {
-                uninstalls.push(uo.get_package().get_pretty_name().to_string());
+                uninstalls.push(legacy_lossy(&uo.get_package().get_pretty_name()).into_owned());
             }
         }
 
@@ -1296,7 +1311,7 @@ impl Installer {
                 .get_platform_overrides()
                 .unwrap_or_default()
                 .into_iter()
-                .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                .map(|(k, v)| (k, PhpMixed::string(v)))
                 .collect()
         };
 
@@ -1312,61 +1327,70 @@ impl Installer {
         &mut self,
         for_update: bool,
         platform_repo: &PlatformRepositoryHandle,
-        root_aliases: &[IndexMap<String, String>],
+        root_aliases: &[IndexMap<BString, BString>],
         locked_repository: Option<&mut dyn RepositoryInterface>,
     ) -> anyhow::Result<RepositorySet> {
         let minimum_stability: String;
-        let mut stability_flags: IndexMap<String, i64>;
+        let mut stability_flags: IndexMap<BString, i64>;
 
-        let requires: IndexMap<String, AnyConstraint>;
+        let requires: IndexMap<BString, AnyConstraint>;
         if for_update {
-            minimum_stability = self.package.get_minimum_stability();
+            minimum_stability = legacy_lossy(&self.package.get_minimum_stability()).into_owned();
             stability_flags = self.package.get_stability_flags();
 
             // Convert Link map merge into ConstraintInterface map for use later
-            let mut req_links: IndexMap<String, Link> = IndexMap::new();
+            let mut req_links: IndexMap<BString, Link> = IndexMap::new();
             for (k, v) in self.package.get_requires().iter() {
-                req_links.insert(k.clone(), v.clone());
+                req_links.insert(bstr::BString::from(&k.clone()[..]), v.clone());
             }
             for (k, v) in self.package.get_dev_requires().iter() {
-                req_links.insert(k.clone(), v.clone());
+                req_links.insert(bstr::BString::from(&k.clone()[..]), v.clone());
             }
             // Translate to constraint map for downstream uniform handling.
-            let mut tmp: IndexMap<String, AnyConstraint> = IndexMap::new();
+            let mut tmp: IndexMap<BString, AnyConstraint> = IndexMap::new();
             for (k, link) in req_links {
                 tmp.insert(k, link.get_constraint().clone());
             }
             requires = tmp;
         } else {
-            minimum_stability = self
-                .locker
-                .borrow_mut()
-                .get_minimum_stability()
-                .unwrap_or_else(|_| String::new());
+            minimum_stability = legacy_lossy(
+                &self
+                    .locker
+                    .borrow_mut()
+                    .get_minimum_stability()
+                    .unwrap_or_else(|_| bstr::BString::from(String::new())),
+            )
+            .into_owned();
             stability_flags = self
                 .locker
                 .borrow_mut()
                 .get_stability_flags()
                 .unwrap_or_default();
 
-            let mut tmp: IndexMap<String, AnyConstraint> = IndexMap::new();
+            let mut tmp: IndexMap<BString, AnyConstraint> = IndexMap::new();
             for package in locked_repository.unwrap().get_packages()? {
                 let constraint = SimpleConstraint::new(
                     "=",
-                    package.get_version().to_string(),
+                    legacy_lossy(&package.get_version()).into_owned(),
                     Some(bstr::BString::from(
-                        package.get_pretty_version().to_string(),
+                        legacy_lossy(&package.get_pretty_version()).into_owned(),
                     )),
                 );
-                tmp.insert(package.get_name().to_string(), constraint.into());
+                tmp.insert(
+                    bstr::BString::from(&package.get_name()[..]),
+                    constraint.into(),
+                );
             }
             requires = tmp;
         }
 
-        let mut root_requires: IndexMap<String, AnyConstraint> = IndexMap::new();
+        let mut root_requires: IndexMap<BString, AnyConstraint> = IndexMap::new();
         for (req, mut constraint) in requires {
             // skip platform requirements from the root package to avoid filtering out existing platform packages
-            if self.platform_requirement_filter.is_ignored(&req) {
+            if self
+                .platform_requirement_filter
+                .is_ignored(&legacy_lossy(&req))
+            {
                 continue;
             } else if let Some(filter) = self
                 .platform_requirement_filter
@@ -1374,7 +1398,7 @@ impl Installer {
                 .downcast_ref::<IgnoreListPlatformRequirementFilter>()
             {
                 constraint = filter
-                    .filter_constraint(&req, constraint, false)
+                    .filter_constraint(&legacy_lossy(&req), constraint, false)
                     .unwrap_or_else(|_| SimpleConstraint::new("=", String::new(), None).into());
             }
             root_requires.insert(req, constraint);
@@ -1385,18 +1409,23 @@ impl Installer {
         self.fixed_root_package.set_dev_requires(IndexMap::new());
 
         stability_flags.insert(
-            self.package.get_name(),
-            base_package::STABILITIES
-                [VersionParser::parse_stability(&self.package.get_version()).as_str()],
+            bstr::BString::from(&self.package.get_name()[..]),
+            base_package::stability_priority(VersionParser::parse_stability(
+                self.package.get_version(),
+            ))
+            .expect("parse_stability returns a known stability"),
         );
 
         let root_aliases_input: Vec<crate::repository::RootAliasInput> = root_aliases
             .iter()
             .map(|alias| crate::repository::RootAliasInput {
-                package: alias.get("package").cloned().unwrap_or_default(),
-                version: alias.get("version").cloned().unwrap_or_default(),
-                alias: alias.get("alias").cloned().unwrap_or_default(),
-                alias_normalized: alias.get("alias_normalized").cloned().unwrap_or_default(),
+                package: alias.get(bstr::B("package")).cloned().unwrap_or_default(),
+                version: alias.get(bstr::B("version")).cloned().unwrap_or_default(),
+                alias: alias.get(bstr::B("alias")).cloned().unwrap_or_default(),
+                alias_normalized: alias
+                    .get(bstr::B("alias_normalized"))
+                    .cloned()
+                    .unwrap_or_default(),
             })
             .collect();
         let mut repository_set = RepositorySet::new(
@@ -1456,12 +1485,12 @@ impl Installer {
             prefer_lowest = Some(self.prefer_lowest);
         }
 
-        let mut preferred_versions: Option<IndexMap<String, String>> = None;
+        let mut preferred_versions: Option<IndexMap<BString, BString>> = None;
         if for_update
             && self.minimal_update
             && let Some(locked_repo) = locked_repo
         {
-            let mut versions: IndexMap<String, String> = IndexMap::new();
+            let mut versions: IndexMap<BString, BString> = IndexMap::new();
             let pkgs = locked_repo.borrow_mut().get_canonical_packages()?;
             for pkg in pkgs {
                 if pkg.as_alias().is_some()
@@ -1475,7 +1504,10 @@ impl Installer {
                 {
                     continue;
                 }
-                versions.insert(pkg.get_name(), pkg.get_version());
+                versions.insert(
+                    bstr::BString::from(&pkg.get_name()[..]),
+                    bstr::BString::from(&pkg.get_version()[..]),
+                );
             }
             preferred_versions = Some(versions);
         }
@@ -1519,7 +1551,12 @@ impl Installer {
             if !pkg_repo_is_platform
                 || !provided.contains_key(&name)
                 || !provided.get(&name).unwrap().get_constraint().matches(
-                    &SimpleConstraint::new("=", package.get_version().to_string(), None).into(),
+                    &SimpleConstraint::new(
+                        "=",
+                        legacy_lossy(&package.get_version()).into_owned(),
+                        None,
+                    )
+                    .into(),
                 )
             {
                 request.fix_package(package);
@@ -1537,7 +1574,7 @@ impl Installer {
     ) -> anyhow::Result<()> {
         // if we're updating mirrors we want to keep exactly the same versions installed which are in the lock file, but we want current remote metadata
         if self.update_mirrors {
-            let excluded_packages: indexmap::IndexSet<String> = if !include_dev_requires {
+            let excluded_packages: indexmap::IndexSet<BString> = if !include_dev_requires {
                 let names = self.locker.borrow_mut().get_dev_package_names()?;
                 names.into_iter().collect()
             } else {
@@ -1552,10 +1589,11 @@ impl Installer {
                 // exclude alias packages here as for root aliases, both alias and aliased are
                 // present in the lock repo and we only want to require the aliased version
                 if locked_package.as_alias().is_none()
-                    && !excluded_packages.contains(&locked_package.get_name())
+                    && !excluded_packages
+                        .contains(bstr::B(&*legacy_lossy(&locked_package.get_name())))
                 {
                     request.require_name(
-                        &locked_package.get_name(),
+                        bstr::BStr::new(&*legacy_lossy(&locked_package.get_name())),
                         Some(
                             SimpleConstraint::new("==", locked_package.get_version(), None).into(),
                         ),
@@ -1570,13 +1608,16 @@ impl Installer {
                 }
             }
             for (_key, link) in links.iter() {
-                request.require_name(link.get_target(), Some(link.get_constraint().clone()))?;
+                request.require_name(
+                    bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                    Some(link.get_constraint().clone()),
+                )?;
             }
         }
         Ok(())
     }
 
-    fn get_root_aliases(&mut self, for_update: bool) -> Vec<IndexMap<String, String>> {
+    fn get_root_aliases(&mut self, for_update: bool) -> Vec<IndexMap<BString, BString>> {
         if for_update {
             self.package.get_aliases().to_vec()
         } else {
@@ -1586,14 +1627,14 @@ impl Installer {
 
     fn extract_platform_requirements(
         &self,
-        links: &IndexMap<String, Link>,
-    ) -> IndexMap<String, String> {
-        let mut platform_reqs: IndexMap<String, String> = IndexMap::new();
+        links: &IndexMap<BString, Link>,
+    ) -> IndexMap<BString, BString> {
+        let mut platform_reqs: IndexMap<BString, BString> = IndexMap::new();
         for (_key, link) in links {
             if PlatformRepository::is_platform_package(link.get_target()) {
                 platform_reqs.insert(
-                    link.get_target().to_string(),
-                    link.get_pretty_constraint().to_string(),
+                    bstr::BString::from(link.get_target()),
+                    bstr::BString::from(link.get_pretty_constraint()),
                 );
             }
         }
@@ -1608,15 +1649,18 @@ impl Installer {
         &self,
         rm: &mut dyn RepositoryManagerInterface,
     ) -> anyhow::Result<()> {
-        let mut packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
+        let mut packages: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
         for package in rm.get_local_repository().get_packages()? {
-            packages.insert(package.to_string(), PackageInterfaceHandle::dup(&package));
+            packages.insert(
+                package.to_php_string(),
+                PackageInterfaceHandle::dup(&package),
+            );
         }
-        let keys: Vec<String> = packages.keys().cloned().collect();
+        let keys: Vec<BString> = packages.keys().cloned().collect();
         for key in keys {
             let package_clone = packages.get(&key).unwrap().clone();
             if let Some(alias_pkg) = package_clone.as_alias() {
-                let alias_key = alias_pkg.get_alias_of().to_string();
+                let alias_key = alias_pkg.get_alias_of().to_php_string();
                 let aliased = packages.get(&alias_key).unwrap().clone();
                 let version = alias_pkg.get_version();
                 let pretty_version = alias_pkg.get_pretty_version();
@@ -1712,14 +1756,14 @@ impl Installer {
     }
 
     /// Packages of those types are ignored, by default php-ext and php-ext-zend are ignored
-    pub fn set_ignored_types(&mut self, types: Vec<String>) -> &mut Self {
+    pub fn set_ignored_types(&mut self, types: Vec<BString>) -> &mut Self {
         self.ignored_types = types;
 
         self
     }
 
     /// Only packages of those types are allowed if set to non-null
-    pub fn set_allowed_types(&mut self, types: Option<Vec<String>>) -> &mut Self {
+    pub fn set_allowed_types(&mut self, types: Option<Vec<BString>>) -> &mut Self {
         self.allowed_types = types;
 
         self
@@ -1736,7 +1780,7 @@ impl Installer {
 
     pub fn set_temporary_constraints(
         &mut self,
-        constraints: IndexMap<String, AnyConstraint>,
+        constraints: IndexMap<BString, AnyConstraint>,
     ) -> &mut Self {
         self.temporary_constraints = constraints;
 

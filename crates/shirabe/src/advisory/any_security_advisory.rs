@@ -1,4 +1,5 @@
 use crate::advisory::{IgnoredSecurityAdvisory, PartialSecurityAdvisory, SecurityAdvisory};
+use bstr::{BStr, ByteSlice};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -10,17 +11,17 @@ pub enum AnySecurityAdvisory {
 }
 
 impl AnySecurityAdvisory {
-    pub fn advisory_id(&self) -> &str {
+    pub fn advisory_id(&self) -> &BStr {
         match self {
-            AnySecurityAdvisory::Partial(p) => &p.advisory_id,
+            AnySecurityAdvisory::Partial(p) => p.advisory_id.as_bstr(),
             AnySecurityAdvisory::Full(s) => s.advisory_id(),
             AnySecurityAdvisory::Ignored(i) => i.as_security_advisory().advisory_id(),
         }
     }
 
-    pub fn package_name(&self) -> &str {
+    pub fn package_name(&self) -> &BStr {
         match self {
-            AnySecurityAdvisory::Partial(p) => &p.package_name,
+            AnySecurityAdvisory::Partial(p) => p.package_name.as_bstr(),
             AnySecurityAdvisory::Full(s) => s.package_name(),
             AnySecurityAdvisory::Ignored(i) => i.as_security_advisory().package_name(),
         }

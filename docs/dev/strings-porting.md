@@ -36,7 +36,9 @@ Boundaries with Rust APIs that take text:
 
 * Regular expressions: `regex::bytes`.
 * JSON: `serde_json::from_slice()`. bstr's `serde` feature is disabled, so a `BString` field cannot
-  be (de)serialized by accident: bstr would serialize it as an array of numbers.
+  be (de)serialized by accident: bstr would serialize it as an array of numbers. To serialize one,
+  use the adapters in `shirabe_php_shim::json_bytes` with `#[serde(serialize_with = "...")]`; they
+  fail on invalid UTF-8 the way `json_encode()` does.
 * Process arguments and environment variables: `OsStr`/`OsString`, which hold bytes on Unix.
 * HTTP header values: `HeaderValue::from_bytes()`.
 

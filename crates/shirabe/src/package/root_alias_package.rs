@@ -5,7 +5,7 @@ use crate::package::{
     CompleteAliasPackage, CompletePackageHandle, CompletePackageInterface, Link, RootPackageHandle,
     RootPackageInterface,
 };
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -17,7 +17,7 @@ pub struct RootAliasPackage {
 }
 
 impl RootAliasPackage {
-    pub fn new(alias_of: RootPackageHandle, version: String, pretty_version: String) -> Self {
+    pub fn new(alias_of: RootPackageHandle, version: BString, pretty_version: BString) -> Self {
         let inner = CompleteAliasPackage::new(
             CompletePackageHandle::from(alias_of.clone()),
             version,
@@ -45,26 +45,20 @@ impl RootAliasPackage {
 
 delegate_package_interface_to_inner!(RootAliasPackage, inner);
 
-impl std::fmt::Display for RootAliasPackage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.inner, f)
-    }
-}
-
 impl RootPackageInterface for RootAliasPackage {
-    fn get_aliases(&self) -> Vec<IndexMap<String, String>> {
+    fn get_aliases(&self) -> Vec<IndexMap<BString, BString>> {
         self.alias_of.get_aliases()
     }
 
-    fn get_minimum_stability(&self) -> String {
+    fn get_minimum_stability(&self) -> BString {
         self.alias_of.get_minimum_stability()
     }
 
-    fn get_stability_flags(&self) -> IndexMap<String, i64> {
+    fn get_stability_flags(&self) -> IndexMap<BString, i64> {
         self.alias_of.get_stability_flags()
     }
 
-    fn get_references(&self) -> IndexMap<String, String> {
+    fn get_references(&self) -> IndexMap<BString, BString> {
         self.alias_of.get_references()
     }
 
@@ -76,7 +70,7 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.get_config()
     }
 
-    fn set_requires(&mut self, requires: IndexMap<String, Link>) {
+    fn set_requires(&mut self, requires: IndexMap<BString, Link>) {
         self.inner.inner.requires = std::rc::Rc::new(
             self.inner
                 .inner
@@ -86,7 +80,7 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.set_requires(requires);
     }
 
-    fn set_dev_requires(&mut self, dev_requires: IndexMap<String, Link>) {
+    fn set_dev_requires(&mut self, dev_requires: IndexMap<BString, Link>) {
         self.inner.inner.dev_requires = std::rc::Rc::new(
             self.inner
                 .inner
@@ -96,7 +90,7 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.set_dev_requires(dev_requires);
     }
 
-    fn set_conflicts(&mut self, conflicts: IndexMap<String, Link>) {
+    fn set_conflicts(&mut self, conflicts: IndexMap<BString, Link>) {
         self.inner.inner.conflicts = std::rc::Rc::new(
             self.inner
                 .inner
@@ -105,7 +99,7 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.set_conflicts(conflicts);
     }
 
-    fn set_provides(&mut self, provides: IndexMap<String, Link>) {
+    fn set_provides(&mut self, provides: IndexMap<BString, Link>) {
         self.inner.inner.provides = std::rc::Rc::new(
             self.inner
                 .inner
@@ -114,7 +108,7 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.set_provides(provides);
     }
 
-    fn set_replaces(&mut self, replaces: IndexMap<String, Link>) {
+    fn set_replaces(&mut self, replaces: IndexMap<BString, Link>) {
         self.inner.inner.replaces = std::rc::Rc::new(
             self.inner
                 .inner
@@ -131,11 +125,11 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.set_dev_autoload(dev_autoload);
     }
 
-    fn set_stability_flags(&mut self, stability_flags: IndexMap<String, i64>) {
+    fn set_stability_flags(&mut self, stability_flags: IndexMap<BString, i64>) {
         self.alias_of.set_stability_flags(stability_flags);
     }
 
-    fn set_minimum_stability(&mut self, minimum_stability: String) {
+    fn set_minimum_stability(&mut self, minimum_stability: BString) {
         self.alias_of.set_minimum_stability(minimum_stability);
     }
 
@@ -147,15 +141,15 @@ impl RootPackageInterface for RootAliasPackage {
         self.alias_of.set_config(config);
     }
 
-    fn set_references(&mut self, references: IndexMap<String, String>) {
+    fn set_references(&mut self, references: IndexMap<BString, BString>) {
         self.alias_of.set_references(references);
     }
 
-    fn set_aliases(&mut self, aliases: Vec<IndexMap<String, String>>) {
+    fn set_aliases(&mut self, aliases: Vec<IndexMap<BString, BString>>) {
         self.alias_of.set_aliases(aliases);
     }
 
-    fn set_suggests(&mut self, suggests: IndexMap<String, String>) {
+    fn set_suggests(&mut self, suggests: IndexMap<BString, BString>) {
         self.alias_of.set_suggests(suggests);
     }
 
@@ -169,11 +163,11 @@ impl RootPackageInterface for RootAliasPackage {
 }
 
 impl CompletePackageInterface for RootAliasPackage {
-    fn get_scripts(&self) -> IndexMap<String, Vec<String>> {
+    fn get_scripts(&self) -> IndexMap<BString, Vec<BString>> {
         self.inner.get_scripts()
     }
 
-    fn set_scripts(&mut self, scripts: IndexMap<String, Vec<String>>) {
+    fn set_scripts(&mut self, scripts: IndexMap<BString, Vec<BString>>) {
         self.inner.set_scripts(scripts);
     }
 
@@ -185,51 +179,51 @@ impl CompletePackageInterface for RootAliasPackage {
         self.inner.set_repositories(repositories);
     }
 
-    fn get_license(&self) -> Vec<String> {
+    fn get_license(&self) -> Vec<BString> {
         self.inner.get_license()
     }
 
-    fn set_license(&mut self, license: Vec<String>) {
+    fn set_license(&mut self, license: Vec<BString>) {
         self.inner.set_license(license);
     }
 
-    fn get_keywords(&self) -> Vec<String> {
+    fn get_keywords(&self) -> Vec<BString> {
         self.inner.get_keywords()
     }
 
-    fn set_keywords(&mut self, keywords: Vec<String>) {
+    fn set_keywords(&mut self, keywords: Vec<BString>) {
         self.inner.set_keywords(keywords);
     }
 
-    fn get_description(&self) -> Option<String> {
+    fn get_description(&self) -> Option<BString> {
         self.inner.get_description()
     }
 
-    fn set_description(&mut self, description: String) {
+    fn set_description(&mut self, description: BString) {
         self.inner.set_description(description);
     }
 
-    fn get_homepage(&self) -> Option<String> {
+    fn get_homepage(&self) -> Option<BString> {
         self.inner.get_homepage()
     }
 
-    fn set_homepage(&mut self, homepage: String) {
+    fn set_homepage(&mut self, homepage: BString) {
         self.inner.set_homepage(homepage);
     }
 
-    fn get_authors(&self) -> Vec<IndexMap<String, String>> {
+    fn get_authors(&self) -> Vec<IndexMap<BString, BString>> {
         self.inner.get_authors()
     }
 
-    fn set_authors(&mut self, authors: Vec<IndexMap<String, String>>) {
+    fn set_authors(&mut self, authors: Vec<IndexMap<BString, BString>>) {
         self.inner.set_authors(authors);
     }
 
-    fn get_support(&self) -> IndexMap<String, String> {
+    fn get_support(&self) -> IndexMap<BString, BString> {
         self.inner.get_support()
     }
 
-    fn set_support(&mut self, support: IndexMap<String, String>) {
+    fn set_support(&mut self, support: IndexMap<BString, BString>) {
         self.inner.set_support(support);
     }
 
@@ -245,7 +239,7 @@ impl CompletePackageInterface for RootAliasPackage {
         self.inner.is_abandoned()
     }
 
-    fn get_replacement_package(&self) -> Option<String> {
+    fn get_replacement_package(&self) -> Option<BString> {
         self.inner.get_replacement_package()
     }
 
@@ -253,19 +247,19 @@ impl CompletePackageInterface for RootAliasPackage {
         self.inner.set_abandoned(abandoned);
     }
 
-    fn get_archive_name(&self) -> Option<String> {
+    fn get_archive_name(&self) -> Option<BString> {
         self.inner.get_archive_name()
     }
 
-    fn set_archive_name(&mut self, name: String) {
+    fn set_archive_name(&mut self, name: BString) {
         self.inner.set_archive_name(name);
     }
 
-    fn get_archive_excludes(&self) -> Vec<String> {
+    fn get_archive_excludes(&self) -> Vec<BString> {
         self.inner.get_archive_excludes()
     }
 
-    fn set_archive_excludes(&mut self, excludes: Vec<String>) {
+    fn set_archive_excludes(&mut self, excludes: Vec<BString>) {
         self.inner.set_archive_excludes(excludes);
     }
 

@@ -4,7 +4,9 @@ use crate::advisory::{AnySecurityAdvisory, AuditConfig, Auditor};
 use crate::dependency_resolver::{Pool, Request};
 use crate::package::BasePackageHandle;
 use crate::repository::{PlatformRepository, RepositoryInterfaceHandle, RepositorySet};
+use bstr::BString;
 use indexmap::IndexMap;
+use shirabe_php_shim::legacy_lossy;
 use shirabe_semver::constraint::SimpleConstraint;
 
 #[derive(Debug)]
@@ -47,7 +49,7 @@ impl SecurityAdvisoryPoolFilter {
         let mut packages_for_advisories: Vec<BasePackageHandle> = vec![];
         for package in pool.get_packages() {
             if package.as_root().is_none()
-                && !PlatformRepository::is_platform_package(&package.get_name())
+                && !PlatformRepository::is_platform_package(package.get_name())
                 && !request.is_locked_package(package.clone())
             {
                 packages_for_advisories.push(package.clone());
@@ -81,10 +83,10 @@ impl SecurityAdvisoryPoolFilter {
 
         let mut packages: Vec<BasePackageHandle> = vec![];
         let mut security_removed_versions: IndexMap<
-            String,
-            IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+            BString,
+            IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
         > = IndexMap::new();
-        let mut abandoned_removed_versions: IndexMap<String, IndexMap<String, String>> =
+        let mut abandoned_removed_versions: IndexMap<BString, IndexMap<BString, BString>> =
             IndexMap::new();
         for package in pool.get_packages() {
             if self.audit_config.block_abandoned
@@ -101,8 +103,8 @@ impl SecurityAdvisoryPoolFilter {
                         .entry(package_name)
                         .or_default()
                         .insert(
-                            package.get_version().to_string(),
-                            package.get_pretty_version().to_string(),
+                            bstr::BString::from(&package.get_version()[..]),
+                            bstr::BString::from(&package.get_pretty_version()[..]),
                         );
                 }
                 continue;
@@ -115,7 +117,7 @@ impl SecurityAdvisoryPoolFilter {
                         .entry(package_name)
                         .or_default()
                         .insert(
-                            package.get_version().to_string(),
+                            bstr::BString::from(&package.get_version()[..]),
                             matching_advisories.clone(),
                         );
                 }
@@ -139,7 +141,7 @@ impl SecurityAdvisoryPoolFilter {
     fn get_matching_advisories(
         &self,
         package: BasePackageHandle,
-        advisory_map: &IndexMap<String, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
+        advisory_map: &IndexMap<BString, Vec<std::rc::Rc<AnySecurityAdvisory>>>,
     ) -> Vec<std::rc::Rc<AnySecurityAdvisory>> {
         if package.is_dev() {
             return vec![];
@@ -151,8 +153,12 @@ impl SecurityAdvisoryPoolFilter {
                 continue;
             }
 
-            let package_constraint =
-                SimpleConstraint::new("==", package.get_version().to_string(), None).into();
+            let package_constraint = SimpleConstraint::new(
+                "==",
+                legacy_lossy(&package.get_version()).into_owned(),
+                None,
+            )
+            .into();
             for advisory in &advisory_map[&package_name] {
                 if advisory.affected_versions().matches(&package_constraint) {
                     matching_advisories.push(advisory.clone());

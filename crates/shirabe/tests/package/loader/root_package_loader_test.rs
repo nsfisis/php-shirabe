@@ -174,13 +174,13 @@ fn test_stability_flags_parsing() {
     assert_eq!("alpha", package.get_minimum_stability());
 
     let mut expected = IndexMap::new();
-    expected.insert("bar/baz".to_string(), STABILITY_DEV);
-    expected.insert("qux/quux".to_string(), STABILITY_RC);
-    expected.insert("zux/complex".to_string(), STABILITY_DEV);
-    expected.insert("or/op".to_string(), STABILITY_DEV);
-    expected.insert("multi/lowest-wins".to_string(), STABILITY_DEV);
-    expected.insert("or/op-without-flags".to_string(), STABILITY_DEV);
-    expected.insert("or/op-without-flags2".to_string(), STABILITY_ALPHA);
+    expected.insert(BString::from("bar/baz"), STABILITY_DEV);
+    expected.insert(BString::from("qux/quux"), STABILITY_RC);
+    expected.insert(BString::from("zux/complex"), STABILITY_DEV);
+    expected.insert(BString::from("or/op"), STABILITY_DEV);
+    expected.insert(BString::from("multi/lowest-wins"), STABILITY_DEV);
+    expected.insert(BString::from("or/op-without-flags"), STABILITY_DEV);
+    expected.insert(BString::from("or/op-without-flags2"), STABILITY_ALPHA);
     assert_eq!(expected, package.get_stability_flags());
 }
 

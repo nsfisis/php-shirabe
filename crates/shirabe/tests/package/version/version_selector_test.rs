@@ -1,7 +1,7 @@
 //! ref: composer/tests/Composer/Test/Package/Version/VersionSelectorTest.php
 
 use crate::test_case::get_package;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe::filter::platform_requirement_filter::PlatformRequirementFilterFactory;
 use shirabe::io::{BufferIO, IOInterface};
@@ -22,7 +22,7 @@ mockall::mock! {
     impl RepositorySetInterface for RepositorySet {
         fn find_packages(
             &self,
-            name: &str,
+            name: &BStr,
             constraint: Option<AnyConstraint>,
             flags: i64,
         ) -> anyhow::Result<Vec<BasePackageHandle>>;
@@ -57,11 +57,11 @@ fn assert_same(
 fn require_link(package_name: &str, target: &str, pretty_constraint: &str) -> Link {
     let parser = VersionParser::new();
     Link::new(
-        package_name.to_string(),
-        target.to_string(),
+        bstr::BString::from(package_name.to_string()),
+        bstr::BString::from(target.to_string()),
         parser.parse_constraints(pretty_constraint).unwrap(),
-        Some(Link::TYPE_REQUIRE.to_string()),
-        pretty_constraint.to_string(),
+        Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+        bstr::BString::from(pretty_constraint.to_string()),
     )
 }
 
@@ -120,25 +120,45 @@ fn test_latest_version_is_returned_that_matches_php_requirements() {
     let mut platform = PlatformRepository::new(vec![], overrides, None, None).unwrap();
 
     let package0 = get_package("foo/bar", "0.9.0");
-    package0.__set_requires(IndexMap::from([(
-        "php".to_string(),
-        require_link(package_name, "php", ">=5.6"),
-    )]));
+    package0.__set_requires(
+        IndexMap::from([(
+            "php".to_string(),
+            require_link(package_name, "php", ">=5.6"),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let package1 = get_package("foo/bar", "1.0.0");
-    package1.__set_requires(IndexMap::from([(
-        "php".to_string(),
-        require_link(package_name, "php", ">=5.4"),
-    )]));
+    package1.__set_requires(
+        IndexMap::from([(
+            "php".to_string(),
+            require_link(package_name, "php", ">=5.4"),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let package2 = get_package("foo/bar", "2.0.0");
-    package2.__set_requires(IndexMap::from([(
-        "php".to_string(),
-        require_link(package_name, "php", ">=5.6"),
-    )]));
+    package2.__set_requires(
+        IndexMap::from([(
+            "php".to_string(),
+            require_link(package_name, "php", ">=5.6"),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let package3 = get_package("foo/bar", "2.1.0");
-    package3.__set_requires(IndexMap::from([(
-        "php".to_string(),
-        require_link(package_name, "php", ">=5.6"),
-    )]));
+    package3.__set_requires(
+        IndexMap::from([(
+            "php".to_string(),
+            require_link(package_name, "php", ">=5.6"),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let packages = vec![package0, package1.clone(), package2, package3.clone()];
 
     let mut repository_set = MockRepositorySet::new();
@@ -216,15 +236,25 @@ fn test_latest_version_is_returned_that_matches_ext_requirements() {
     let mut platform = PlatformRepository::new(vec![], overrides, None, None).unwrap();
 
     let package1 = get_package("foo/bar", "1.0.0");
-    package1.__set_requires(IndexMap::from([(
-        "ext-zip".to_string(),
-        require_link(package_name, "ext-zip", "^5.2"),
-    )]));
+    package1.__set_requires(
+        IndexMap::from([(
+            "ext-zip".to_string(),
+            require_link(package_name, "ext-zip", "^5.2"),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let package2 = get_package("foo/bar", "2.0.0");
-    package2.__set_requires(IndexMap::from([(
-        "ext-zip".to_string(),
-        require_link(package_name, "ext-zip", "^5.4"),
-    )]));
+    package2.__set_requires(
+        IndexMap::from([(
+            "ext-zip".to_string(),
+            require_link(package_name, "ext-zip", "^5.4"),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let packages = vec![package1.clone(), package2.clone()];
 
     let mut repository_set = MockRepositorySet::new();
@@ -264,10 +294,15 @@ fn test_latest_version_is_returned_that_matches_platform_ext() {
 
     let package1 = get_package("foo/bar", "1.0.0");
     let package2 = get_package("foo/bar", "2.0.0");
-    package2.__set_requires(IndexMap::from([(
-        "ext-barfoo".to_string(),
-        require_link(package_name, "ext-barfoo", "*"),
-    )]));
+    package2.__set_requires(
+        IndexMap::from([(
+            "ext-barfoo".to_string(),
+            require_link(package_name, "ext-barfoo", "*"),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let packages = vec![package1.clone(), package2.clone()];
 
     let mut repository_set = MockRepositorySet::new();
@@ -311,15 +346,25 @@ fn test_latest_version_is_returned_that_matches_composer_requirements() {
     let mut platform = PlatformRepository::new(vec![], overrides, None, None).unwrap();
 
     let package1 = get_package("foo/bar", "1.0.0");
-    package1.__set_requires(IndexMap::from([(
-        "composer-runtime-api".to_string(),
-        require_link(package_name, "composer-runtime-api", "^1.0"),
-    )]));
+    package1.__set_requires(
+        IndexMap::from([(
+            "composer-runtime-api".to_string(),
+            require_link(package_name, "composer-runtime-api", "^1.0"),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let package2 = get_package("foo/bar", "1.1.0");
-    package2.__set_requires(IndexMap::from([(
-        "composer-runtime-api".to_string(),
-        require_link(package_name, "composer-runtime-api", "^2.0"),
-    )]));
+    package2.__set_requires(
+        IndexMap::from([(
+            "composer-runtime-api".to_string(),
+            require_link(package_name, "composer-runtime-api", "^2.0"),
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let packages = vec![package1.clone(), package2.clone()];
 
     let mut repository_set = MockRepositorySet::new();
@@ -495,8 +540,8 @@ fn test_default_branch_alias_is_never_returned() {
     let package2_complete = CompletePackageHandle::from_rc_unchecked(package2.as_rc().clone());
     let package2_alias: PackageInterfaceHandle = CompleteAliasPackageHandle::new(
         package2_complete,
-        VersionParser::DEFAULT_BRANCH_ALIAS.to_string(),
-        VersionParser::DEFAULT_BRANCH_ALIAS.to_string(),
+        bstr::BString::from(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()),
+        bstr::BString::from(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()),
     )
     .into();
     let packages = vec![package, package2_alias];
@@ -625,9 +670,9 @@ fn test_find_recommended_require_version() {
         let mut version_selector = VersionSelector::new(into_seam(repository_set), None).unwrap();
 
         let package = PackageHandle::new(
-            package_name.to_string(),
+            bstr::BString::from(package_name.to_string()),
             version_parser.normalize(pretty_version, None).unwrap(),
-            pretty_version.clone(),
+            bstr::BString::from(pretty_version.clone()),
         );
 
         if let Some(branch_alias) = branch_alias {

@@ -17,14 +17,14 @@ use crate::plugin::{
     FileDownloadContext, PluginEvents, PostFileDownloadEvent, PreFileDownloadEvent,
 };
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor, Url as UrlUtil};
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed,
-    RuntimeException, UnexpectedValueException, chmod, dirname, extension_loaded, file_exists,
-    filesize, get_class, hash, hash_file, impl_php_class, is_dir, is_executable, legacy_lossy,
-    parse_url, path_to_bytes, pathinfo, realpath, rtrim2, spl_object_hash, strlen, strpos, strtr,
-    trim, umask, usleep,
+    RuntimeException, UnexpectedValueException, chmod, dirname, explode, extension_loaded,
+    file_exists, filesize, get_class, hash, hash_file, impl_php_class, is_dir, is_executable,
+    legacy_lossy, parse_url, path_to_bytes, pathinfo, realpath, rtrim2, spl_object_hash, strlen,
+    strpos, strtr, trim, umask, usleep,
 };
 use std::sync::{LazyLock, Mutex};
 
@@ -244,18 +244,21 @@ impl FileDownloader {
     pub(crate) fn clear_last_cache_write(&self, package: PackageInterfaceHandle) {
         let mut last_cache_writes = self.last_cache_writes.lock().unwrap();
         if let Some(cache) = &self.cache
-            && last_cache_writes.contains_key(&package.get_name())
+            && last_cache_writes.contains_key(&*legacy_lossy(&package.get_name()))
         {
-            let key = last_cache_writes.get(&package.get_name()).unwrap().clone();
+            let key = last_cache_writes
+                .get(&*legacy_lossy(&package.get_name()))
+                .unwrap()
+                .clone();
             cache.borrow_mut().remove(&key);
-            last_cache_writes.shift_remove(&package.get_name());
+            last_cache_writes.shift_remove(&*legacy_lossy(&package.get_name()));
         }
     }
 
     pub(crate) fn add_cleanup_path(&self, package: PackageInterfaceHandle, path: &str) {
         self.additional_cleanup_paths
             .borrow_mut()
-            .entry(package.get_name())
+            .entry(legacy_lossy(&package.get_name()).into_owned())
             .or_default()
             .push(path.to_string());
     }
@@ -264,7 +267,7 @@ impl FileDownloader {
         if let Some(paths) = self
             .additional_cleanup_paths
             .borrow_mut()
-            .get_mut(&package.get_name())
+            .get_mut(&*legacy_lossy(&package.get_name()))
         {
             // PHP: array_search($path, ..., true)
             let idx = paths.iter().position(|p| p == path);
@@ -280,7 +283,7 @@ impl FileDownloader {
         let extension = if extension.is_empty() {
             package.get_dist_type().unwrap_or_default()
         } else {
-            extension
+            bstr::BString::from(extension)
         };
 
         legacy_lossy(&rtrim2(
@@ -296,9 +299,13 @@ impl FileDownloader {
                 ),
                 legacy_lossy(&hash(
                     "md5",
-                    format!("{}{}", package, spl_object_hash(&PhpMixed::Null))
+                    format!(
+                        "{}{}",
+                        legacy_lossy(&package.to_php_string()),
+                        spl_object_hash(&PhpMixed::Null)
+                    )
                 )),
-                extension
+                legacy_lossy(&extension)
             ),
             ".",
         ))
@@ -341,12 +348,12 @@ impl FileDownloader {
             .into());
         }
 
-        let mut url = url.to_string();
+        let mut url = legacy_lossy(&url.to_string()).into_owned();
         if package.get_dist_reference().is_some() {
             url = UrlUtil::update_dist_reference(
                 &self.config.borrow(),
                 url,
-                &package.get_dist_reference().unwrap(),
+                &legacy_lossy(&package.get_dist_reference().unwrap()),
             );
         }
 
@@ -383,9 +390,9 @@ impl DownloaderInterface for FileDownloader {
 
             format!(
                 "{}/{}.{}",
-                package.get_name(),
+                legacy_lossy(&package.get_name()),
                 legacy_lossy(&cache_key),
-                package.get_dist_type().unwrap_or_default()
+                legacy_lossy(&package.get_dist_type().unwrap_or_default())
             )
         };
 
@@ -394,10 +401,10 @@ impl DownloaderInterface for FileDownloader {
         // @var array<array{base: non-empty-string, processed: non-empty-string, cacheKey: string}> $urls
         let mut urls: Vec<UrlEntry> = vec![];
         for url in dist_urls {
-            let processed_url = self.process_url(package.clone(), &url)?;
+            let processed_url = self.process_url(package.clone(), &legacy_lossy(&url))?;
             let cache_key = cache_key_generator(package.clone(), &processed_url);
             urls.push(UrlEntry {
-                base: url,
+                base: legacy_lossy(&url).into_owned(),
                 processed: processed_url,
                 // we use the complete download url here to avoid conflicting entries
                 // from different packages, which would potentially allow a given package
@@ -454,9 +461,10 @@ impl DownloaderInterface for FileDownloader {
             // use from cache if it is present and has a valid checksum or we have no checksum to check against
             let mut from_cache = false;
             if let Some(cache) = self.cache.clone() {
-                let checksum_matches = match checksum.as_deref() {
-                    None | Some("") => true,
-                    Some(c) => Some(c) == cache.borrow_mut().sha1(&cache_key).as_deref(),
+                let checksum_matches = match checksum.as_ref() {
+                    None => true,
+                    Some(c) if c.is_empty() => true,
+                    Some(c) => cache.borrow_mut().sha1(&cache_key).as_ref() == Some(c),
                 };
                 if checksum_matches && cache.borrow_mut().copy_to(&cache_key, &file_name)? {
                     from_cache = true;
@@ -468,11 +476,13 @@ impl DownloaderInterface for FileDownloader {
                     self.io.borrow().write_error3(
                         &format!(
                             "  - Loading <info>{}</info> (<comment>{}</comment>) from cache",
-                            package.get_name(),
-                            package.get_full_pretty_version(
-                                true,
-                                crate::package::DisplayMode::SourceRefIfDev
-                            )
+                            package.get_name().display_lossy(),
+                            package
+                                .get_full_pretty_version(
+                                    true,
+                                    crate::package::DisplayMode::SourceRefIfDev
+                                )
+                                .display_lossy()
                         ),
                         true,
                         io_interface::VERY_VERBOSE,
@@ -484,20 +494,22 @@ impl DownloaderInterface for FileDownloader {
                 if let Some(cache) = self.cache.as_ref()
                     && !cache.borrow().is_read_only()
                 {
-                    self.last_cache_writes
-                        .lock()
-                        .unwrap()
-                        .insert(package.get_name(), cache_key.clone());
+                    self.last_cache_writes.lock().unwrap().insert(
+                        legacy_lossy(&package.get_name()).into_owned(),
+                        cache_key.clone(),
+                    );
                 }
             } else {
                 if output {
                     self.io.borrow().write_error(&format!(
                         "  - Downloading <info>{}</info> (<comment>{}</comment>)",
-                        package.get_name(),
-                        package.get_full_pretty_version(
-                            true,
-                            crate::package::DisplayMode::SourceRefIfDev
-                        )
+                        package.get_name().display_lossy(),
+                        package
+                            .get_full_pretty_version(
+                                true,
+                                crate::package::DisplayMode::SourceRefIfDev
+                            )
+                            .display_lossy()
                     ));
                 }
 
@@ -521,24 +533,24 @@ impl DownloaderInterface for FileDownloader {
                         DOWNLOAD_METADATA
                             .lock()
                             .unwrap()
-                            .insert(package.get_name().into(), file_size);
+                            .insert(package.get_name(), file_size);
 
                         if Platform::get_env("GITHUB_ACTIONS").is_some()
                             && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()
                         {
-                            RESPONSE_HEADERS
-                                .lock()
-                                .unwrap()
-                                .insert(package.get_name(), response.get_headers().clone());
+                            RESPONSE_HEADERS.lock().unwrap().insert(
+                                legacy_lossy(&package.get_name()).into_owned(),
+                                response.get_headers().clone(),
+                            );
                         }
 
                         if let Some(cache) = self.cache.as_ref()
                             && !cache.borrow().is_read_only()
                         {
-                            self.last_cache_writes
-                                .lock()
-                                .unwrap()
-                                .insert(package.get_name(), cache_key.clone());
+                            self.last_cache_writes.lock().unwrap().insert(
+                                legacy_lossy(&package.get_name()).into_owned(),
+                                cache_key.clone(),
+                            );
                             cache.borrow_mut().copy_from(&cache_key, &file_name);
                         }
 
@@ -591,19 +603,19 @@ impl DownloaderInterface for FileDownloader {
                             if self.io.borrow().is_debug() {
                                 self.io.borrow().write_error(&format!(
                                     "    Failed downloading {}: [{}] {}: {}",
-                                    package.get_name(),
+                                    package.get_name().display_lossy(),
                                     get_class(&PhpMixed::Null).display_lossy(),
                                     code,
                                     e
                                 ));
                                 self.io.borrow().write_error(&format!(
                                     "    Trying the next URL for {}",
-                                    package.get_name()
+                                    package.get_name().display_lossy()
                                 ));
                             } else {
                                 self.io.borrow().write_error(&format!(
                                     "    Failed downloading {}, trying the next URL ({}: {})",
-                                    package.get_name(),
+                                    package.get_name().display_lossy(),
                                     code,
                                     e
                                 ));
@@ -645,7 +657,7 @@ impl DownloaderInterface for FileDownloader {
                 let mut post_file_download_event = PostFileDownloadEvent::new(
                     PluginEvents::POST_FILE_DOWNLOAD.to_string(),
                     Some(file_name.clone()),
-                    checksum.clone(),
+                    checksum.clone().map(|s| legacy_lossy(&s).into_owned()),
                     url.processed.clone(),
                     "package".to_string(),
                     Some(FileDownloadContext::Package(package.clone())),
@@ -691,12 +703,13 @@ impl DownloaderInterface for FileDownloader {
                 .unwrap_or_default(),
         )
         .into_owned();
-        let first_segment = package
-            .get_pretty_name()
-            .split('/')
-            .next()
-            .unwrap_or_default()
-            .to_string();
+        let first_segment = legacy_lossy(
+            explode("/", package.get_pretty_name())
+                .first()
+                .map(|s| s.as_slice())
+                .unwrap_or_default(),
+        )
+        .into_owned();
         let dirs_to_clean_up: Vec<String> = vec![
             path.to_string(),
             format!("{}/{}", vendor_dir, first_segment),
@@ -707,7 +720,7 @@ impl DownloaderInterface for FileDownloader {
         if let Some(paths) = self
             .additional_cleanup_paths
             .borrow()
-            .get(&package.get_name())
+            .get(&*legacy_lossy(&package.get_name()))
             .cloned()
         {
             for path_to_clean in &paths {
@@ -785,7 +798,7 @@ impl DownloaderInterface for FileDownloader {
         // Single files can not have a mode set like files in archives
         // so we make sure if the file is a binary that it is executable
         for bin in package.get_binaries() {
-            let bin_path = format!("{}/{}", path, bin);
+            let bin_path = format!("{}/{}", path, legacy_lossy(&bin));
             if file_exists(&bin_path) && !is_executable(&bin_path) {
                 chmod(&bin_path, 0o777 & !umask());
             }

@@ -4,15 +4,15 @@ use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::loader::{ArrayLoader, LoaderInterface, ValidatingArrayLoader};
 use crate::package::version::{VersionGuesser, VersionGuesserInterface, VersionParser};
-use crate::package::{RootPackage, STABILITIES, SUPPORTED_LINK_TYPES};
+use crate::package::{RootPackage, STABILITIES, SUPPORTED_LINK_TYPES, stability_priority};
 use crate::repository::{RepositoryFactory, RepositoryManager};
 use crate::util::{Platform, ProcessExecutor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, legacy_lossy,
     path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, preg_split, strtolower,
-    trigger_error,
+    trigger_error, trim,
 };
 
 #[derive(Debug)]
@@ -70,10 +70,7 @@ impl RootPackageLoader {
         if !config.contains_key(B("name")) {
             config.insert("name".into(), PhpMixed::string("__root__".to_string()));
         } else if let Some(err) = ValidatingArrayLoader::has_package_naming_error(
-            &config[B("name")]
-                .as_string()
-                .unwrap_or_default()
-                .to_str_lossy(),
+            config[B("name")].as_string().unwrap_or_default(),
             false,
         ) {
             return Err(RuntimeException::new(format!("Your package name {}", err)).into());
@@ -154,7 +151,7 @@ impl RootPackageLoader {
         if auto_versioned {
             real_package.replace_version(
                 real_package.get_version(),
-                RootPackage::DEFAULT_PRETTY_VERSION.to_string(),
+                BString::from(RootPackage::DEFAULT_PRETTY_VERSION),
             );
         }
 
@@ -163,14 +160,13 @@ impl RootPackageLoader {
             .and_then(|v| v.as_string())
         {
             real_package.set_minimum_stability(
-                VersionParser::normalize_stability(&min_stability.to_str_lossy())
-                    .unwrap_or_default(),
+                VersionParser::normalize_stability(min_stability).unwrap_or_default(),
             );
         }
 
-        let mut aliases: Vec<IndexMap<String, String>> = vec![];
-        let mut stability_flags: IndexMap<String, i64> = IndexMap::new();
-        let mut references: IndexMap<String, String> = IndexMap::new();
+        let mut aliases: Vec<IndexMap<BString, BString>> = vec![];
+        let mut stability_flags: IndexMap<BString, i64> = IndexMap::new();
+        let mut references: IndexMap<BString, BString> = IndexMap::new();
 
         for link_type in ["require", "require-dev"] {
             if config.contains_key(B(link_type)) {
@@ -180,27 +176,26 @@ impl RootPackageLoader {
                     "require-dev" => real_package.get_dev_requires(),
                     _ => unreachable!(),
                 };
-                let mut links: IndexMap<String, String> = IndexMap::new();
+                let mut links: IndexMap<BString, BString> = IndexMap::new();
                 for link in parsed_links.values() {
                     links.insert(
-                        link.get_target().to_string(),
-                        legacy_lossy(&link.get_constraint().get_pretty_string()).into_owned(),
+                        BString::from(link.get_target()),
+                        link.get_constraint().get_pretty_string(),
                     );
                 }
                 aliases = self.extract_aliases(&links, aliases);
                 stability_flags = Self::extract_stability_flags(
                     &links,
-                    &real_package.get_minimum_stability(),
+                    real_package.get_minimum_stability().as_bstr(),
                     stability_flags,
                 );
                 references = Self::extract_references(&links, references);
 
-                let package_name =
-                    legacy_lossy(config[B("name")].as_string().unwrap_or_default()).into_owned();
-                if links.contains_key(&package_name) {
+                let package_name = config[B("name")].as_string().unwrap_or_default();
+                if links.contains_key(package_name) {
                     return Err(RuntimeException::new(format!(
                         "Root package '{}' cannot require itself in its composer.json\nDid you accidentally name your root package after an external package?",
-                        package_name
+                        package_name.display_lossy()
                     )).into());
                 }
             }
@@ -212,12 +207,7 @@ impl RootPackageLoader {
             {
                 for (link_name, _constraint) in section_map {
                     if let Some(err) =
-                        // TODO(bytes): package names are validated as UTF-8 text, so non-UTF-8
-                        // bytes are replaced.
-                        ValidatingArrayLoader::has_package_naming_error(
-                            &link_name.to_str_lossy(),
-                            true,
-                        )
+                        ValidatingArrayLoader::has_package_naming_error(link_name.as_bstr(), true)
                     {
                         return Err(RuntimeException::new(format!("{}.{}", link_type, err)).into());
                     }
@@ -257,44 +247,41 @@ impl RootPackageLoader {
 
     fn extract_aliases(
         &self,
-        requires: &IndexMap<String, String>,
-        mut aliases: Vec<IndexMap<String, String>>,
-    ) -> Vec<IndexMap<String, String>> {
+        requires: &IndexMap<BString, BString>,
+        mut aliases: Vec<IndexMap<BString, BString>>,
+    ) -> Vec<IndexMap<BString, BString>> {
         for (req_name, req_version) in requires {
             if let Some(m) = preg_match(
                 php_regex!(r"{(?:^|\| *|, *)([^,\s#|]+)(?:#[^ ]+)? +as +([^,\s|]+)(?:$| *\|| *,)}"),
                 req_version,
             ) {
-                let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
-                let m2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
+                let m1 = m.get(1).unwrap_or_default();
+                let m2 = m.get(2).unwrap_or_default();
                 let mut alias = IndexMap::new();
+                alias.insert(BString::from("package"), strtolower(req_name));
                 alias.insert(
-                    "package".to_string(),
-                    legacy_lossy(&strtolower(req_name)).into_owned(),
-                );
-                alias.insert(
-                    "version".to_string(),
+                    BString::from("version"),
                     self.inner
                         .version_parser
-                        .normalize(&m1, Some(req_version))
+                        .normalize(m1, Some(req_version.as_slice()))
                         .unwrap_or_default(),
                 );
-                alias.insert("alias".to_string(), m2.clone());
+                alias.insert(BString::from("alias"), BString::from(m2));
                 alias.insert(
-                    "alias_normalized".to_string(),
+                    BString::from("alias_normalized"),
                     self.inner
                         .version_parser
-                        .normalize(&m2, Some(req_version))
+                        .normalize(m2, Some(req_version.as_slice()))
                         .unwrap_or_default(),
                 );
                 aliases.push(alias);
-            } else if req_version.contains(" as ") {
+            } else if req_version.contains_str(" as ") {
                 return {
                     panic!(
                         "{}",
                         UnexpectedValueException::new(format!(
                                 "Invalid alias definition in \"{}\": \"{}\". Aliases should be in the form \"exact-version as other-exact-version\".",
-                                req_name, req_version
+                                req_name.display_lossy(), req_version.display_lossy()
                             ))
                         .get_message()
                     )
@@ -305,21 +292,22 @@ impl RootPackageLoader {
     }
 
     pub fn extract_stability_flags(
-        requires: &IndexMap<String, String>,
-        minimum_stability: &str,
-        mut stability_flags: IndexMap<String, i64>,
-    ) -> IndexMap<String, i64> {
+        requires: &IndexMap<BString, BString>,
+        minimum_stability: &BStr,
+        mut stability_flags: IndexMap<BString, i64>,
+    ) -> IndexMap<BString, i64> {
         let stabilities = &*STABILITIES;
-        let minimum_stability_val = stabilities[minimum_stability];
+        let minimum_stability_val =
+            stability_priority(minimum_stability).expect("minimum-stability is a known stability");
 
         for (req_name, req_version) in requires {
-            let mut constraints: Vec<String> = vec![];
+            let mut constraints: Vec<BString> = vec![];
 
-            let or_split = preg_split(php_regex!(r"{\s*\|\|?\s*}"), req_version.trim());
+            let or_split = preg_split(php_regex!(r"{\s*\|\|?\s*}"), trim(req_version));
             for or_constraint in &or_split {
                 let and_split = shirabe_semver::split_and_constraints(or_constraint);
                 for and_constraint in and_split {
-                    constraints.push(legacy_lossy(&and_constraint).into_owned());
+                    constraints.push(and_constraint);
                 }
             }
 
@@ -329,10 +317,12 @@ impl RootPackageLoader {
             let mut matched = false;
             for constraint in &constraints {
                 if let Some(m) = preg_match(&pattern, constraint) {
-                    let name = legacy_lossy(&strtolower(req_name)).into_owned();
-                    let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
-                    let normalized_m1 = VersionParser::normalize_stability(&m1).unwrap_or_default();
-                    let stability = stabilities[normalized_m1.as_str()];
+                    let name = strtolower(req_name);
+                    let normalized_m1 =
+                        VersionParser::normalize_stability(m.get(1).unwrap_or_default())
+                            .unwrap_or_default();
+                    let stability = stability_priority(&normalized_m1)
+                        .expect("the pattern only matches known stabilities");
 
                     if stability_flags.get(&name).is_some_and(|&f| f > stability) {
                         continue;
@@ -350,11 +340,11 @@ impl RootPackageLoader {
                 let req_version_stripped =
                     preg_replace(php_regex!(r"{^([^,\s@]+) as .+$}"), "$1", constraint);
                 if preg_is_match(php_regex!(r"{^[^,\s@]+$}"), &req_version_stripped) {
-                    let stability_name =
-                        VersionParser::parse_stability(&legacy_lossy(&req_version_stripped));
+                    let stability_name = VersionParser::parse_stability(&req_version_stripped);
                     if stability_name != "stable" {
-                        let name = legacy_lossy(&strtolower(req_name)).into_owned();
-                        let stability = stabilities[stability_name.as_str()];
+                        let name = strtolower(req_name);
+                        let stability = stability_priority(&stability_name)
+                            .expect("parse_stability returns a known stability");
                         if stability_flags.get(&name).is_some_and(|&f| f > stability)
                             || minimum_stability_val > stability
                         {
@@ -370,24 +360,16 @@ impl RootPackageLoader {
     }
 
     pub fn extract_references(
-        requires: &IndexMap<String, String>,
-        mut references: IndexMap<String, String>,
-    ) -> IndexMap<String, String> {
+        requires: &IndexMap<BString, BString>,
+        mut references: IndexMap<BString, BString>,
+    ) -> IndexMap<BString, BString> {
         for (req_name, req_version) in requires {
-            let req_version = legacy_lossy(&preg_replace(
-                php_regex!(r"{^([^,\s@]+) as .+$}"),
-                "$1",
-                req_version,
-            ))
-            .into_owned();
+            let req_version = preg_replace(php_regex!(r"{^([^,\s@]+) as .+$}"), "$1", req_version);
             if let Some(m) = preg_match(php_regex!(r"{^[^,\s@]+?#([a-f0-9]+)$}"), &req_version)
                 && VersionParser::parse_stability(&req_version) == "dev"
             {
-                let name = legacy_lossy(&strtolower(req_name)).into_owned();
-                references.insert(
-                    name,
-                    legacy_lossy(m.get(1).unwrap_or_default()).into_owned(),
-                );
+                let name = strtolower(req_name);
+                references.insert(name, BString::from(m.get(1).unwrap_or_default()));
             }
         }
         references

@@ -7,9 +7,10 @@ use crate::composer::PartialComposerHandle;
 use crate::console::input::{InputOption, SuggestedValues};
 use crate::io::IOInterfaceImmutable;
 use crate::repository::{InstalledRepository, RepositoryInterface, RepositorySet, RepositoryUtils};
+use bstr::BString;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, UnexpectedValueException, impl_php_class, implode,
-    in_array_strict,
+    in_array_strict, legacy_lossy,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -234,13 +235,14 @@ impl Command for AuditCommand {
             .into());
         }
 
-        let abandoned = abandoned.unwrap_or_else(|| audit_config.audit_abandoned.clone());
+        let abandoned = abandoned
+            .unwrap_or_else(|| legacy_lossy(&audit_config.audit_abandoned.clone()).into_owned());
 
-        let mut ignore_severities: indexmap::IndexMap<String, Option<String>> =
+        let mut ignore_severities: indexmap::IndexMap<BString, Option<BString>> =
             indexmap::IndexMap::new();
         let cli_severities = input.borrow().get_option("ignore-severity")?;
         for severity in cli_severities.as_array().unwrap_or_default() {
-            ignore_severities.insert(severity.clone(), None);
+            ignore_severities.insert(BString::from(severity.as_str()), None);
         }
         for (k, v) in audit_config.ignore_severity_for_audit.clone() {
             ignore_severities.insert(k, v);
@@ -258,10 +260,10 @@ impl Command for AuditCommand {
                 &self.get_io(),
                 &repo_set,
                 packages,
-                &audit_format,
+                bstr::BStr::new(&audit_format),
                 false,
                 audit_config.ignore_list_for_audit.clone(),
-                &abandoned,
+                bstr::BStr::new(&abandoned),
                 ignore_severities,
                 ignore_unreachable,
                 audit_config.ignore_abandoned_for_audit,

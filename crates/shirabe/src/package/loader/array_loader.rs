@@ -7,13 +7,13 @@ use crate::package::{
     Link, Mirror, Package, PackageInterface, PackageInterfaceHandle, RootAliasPackageHandle,
     RootPackage, RootPackageHandle, SUPPORTED_LINK_TYPES,
 };
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use chrono::Utc;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AnyThrowable, E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, date_create, empty,
-    is_scalar, is_string, json_encode, legacy_lossy, ltrim2, php_regex, preg_is_match,
-    preg_replace, stripos, strpos, strtolower, strval, substr, trigger_error, trim,
+    AnyThrowable, E_USER_DEPRECATED, PhpMixed, UnexpectedValueException, bconcat, date_create,
+    empty, is_scalar, is_string, json_encode, ltrim2, php_regex, preg_is_match, preg_replace,
+    stripos, strpos, strtolower, strval, substr, trigger_error, trim,
 };
 
 /// The fields of one package version, read without regard for how they are stored. A version
@@ -59,8 +59,8 @@ impl ArrayLoader {
     ) -> anyhow::Result<Vec<PackageInterfaceHandle>> {
         let mut packages: Vec<PackageInterfaceHandle> = vec![];
         let mut link_cache: IndexMap<
-            String,
-            IndexMap<String, IndexMap<String, IndexMap<String, (String, Link)>>>,
+            BString,
+            IndexMap<BString, IndexMap<BString, IndexMap<BString, (BString, Link)>>>,
         > = IndexMap::new();
 
         for mut version in versions {
@@ -104,47 +104,38 @@ impl ArrayLoader {
         }
 
         // handle already normalized versions
-        let version: String;
+        let version: BString;
         if config.contains_key(B("version_normalized"))
             && is_string(config.get(B("version_normalized")).unwrap())
         {
-            let mut v = legacy_lossy(
+            let mut v = BString::from(
                 config
                     .get(B("version_normalized"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default(),
-            )
-            .into_owned();
+            );
 
             // handling of existing repos which need to remain composer v1 compatible, in case the version_normalized contained VersionParser::DEFAULT_BRANCH_ALIAS, we renormalize it
             if v == VersionParser::DEFAULT_BRANCH_ALIAS {
-                v = self.version_parser.normalize(
-                    &config_version
-                        .as_string()
-                        .unwrap_or_default()
-                        .to_str_lossy(),
-                    None,
-                )?;
+                v = self
+                    .version_parser
+                    .normalize(config_version.as_string().unwrap_or_default(), None)?;
             }
             version = v;
         } else {
-            match self.version_parser.normalize(
-                &config_version
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_str_lossy(),
-                None,
-            ) {
+            match self
+                .version_parser
+                .normalize(config_version.as_string().unwrap_or_default(), None)
+            {
                 Ok(v) => version = v,
                 Err(e) => {
                     let message = format!(
                         "Failed to normalize version for package \"{}\": {}",
-                        legacy_lossy(
-                            &config
-                                .get(B("name"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                        ),
+                        config
+                            .get(B("name"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default()
+                            .display_lossy(),
                         e
                     );
                     let code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code);
@@ -158,15 +149,13 @@ impl ArrayLoader {
             }
         }
 
-        let name = legacy_lossy(
+        let name = BString::from(
             config
                 .get(B("name"))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default(),
-        )
-        .into_owned();
-        let pretty_version =
-            legacy_lossy(config_version.as_string().unwrap_or_default()).into_owned();
+        );
+        let pretty_version = BString::from(config_version.as_string().unwrap_or_default());
 
         if class == "Composer\\Package\\RootPackage" {
             Ok(CompleteOrRootPackage::Root(RootPackage::new(
@@ -191,15 +180,15 @@ impl ArrayLoader {
         package
             .package_mut()
             .set_type(if let Some(t) = config.get(B("type")) {
-                legacy_lossy(&strtolower(t.as_string().unwrap_or_default())).into_owned()
+                strtolower(t.as_string().unwrap_or_default())
             } else {
-                "library".to_string()
+                BString::from("library")
             });
 
         if let Some(target_dir) = config.get(B("target-dir")) {
             package
                 .package_mut()
-                .set_target_dir(target_dir.as_string().map(|s| legacy_lossy(s).into_owned()));
+                .set_target_dir(target_dir.as_string().map(bstr::BString::from));
         }
 
         if let Some(extra) = config.get(B("extra"))
@@ -233,11 +222,9 @@ impl ArrayLoader {
         }
 
         if let Some(installation_source) = config.get(B("installation-source")) {
-            package.package_mut().set_installation_source(
-                installation_source
-                    .as_string()
-                    .map(|s| legacy_lossy(s).into_owned()),
-            );
+            package
+                .package_mut()
+                .set_installation_source(installation_source.as_string().map(bstr::BString::from));
         }
 
         if let Some(default_branch) = config.get(B("default-branch"))
@@ -271,24 +258,17 @@ impl ArrayLoader {
                 .into());
             }
             let source_map = source_map.unwrap();
-            package.package_mut().set_source_type(
-                source_map
-                    .get(B("type"))
-                    .map(strval)
-                    .map(|s| legacy_lossy(&s).into_owned()),
-            );
-            package.package_mut().set_source_url(
-                source_map
-                    .get(B("url"))
-                    .map(strval)
-                    .map(|s| legacy_lossy(&s).into_owned()),
-            );
+            package
+                .package_mut()
+                .set_source_type(source_map.get(B("type")).map(strval));
+            package
+                .package_mut()
+                .set_source_url(source_map.get(B("url")).map(strval));
             package.package_mut().set_source_reference(
                 source_map
                     .get(B("reference"))
                     .filter(|v| !v.is_null())
-                    .map(strval)
-                    .map(|s| legacy_lossy(&s).into_owned()),
+                    .map(strval),
             );
             if let Some(mirrors) = source_map.get(B("mirrors")) {
                 package
@@ -318,31 +298,21 @@ impl ArrayLoader {
                 .into());
             }
             let dist_map = dist_map.unwrap();
-            package.package_mut().set_dist_type(
-                dist_map
-                    .get(B("type"))
-                    .map(strval)
-                    .map(|s| legacy_lossy(&s).into_owned()),
-            );
-            package.package_mut().set_dist_url(
-                dist_map
-                    .get(B("url"))
-                    .map(strval)
-                    .map(|s| legacy_lossy(&s).into_owned()),
-            );
+            package
+                .package_mut()
+                .set_dist_type(dist_map.get(B("type")).map(strval));
+            package
+                .package_mut()
+                .set_dist_url(dist_map.get(B("url")).map(strval));
             package.package_mut().set_dist_reference(
                 dist_map
                     .get(B("reference"))
                     .filter(|v| !v.is_null())
-                    .map(strval)
-                    .map(|s| legacy_lossy(&s).into_owned()),
+                    .map(strval),
             );
-            package.package_mut().set_dist_sha1_checksum(
-                dist_map
-                    .get(B("shasum"))
-                    .map(strval)
-                    .map(|s| legacy_lossy(&s).into_owned()),
-            );
+            package
+                .package_mut()
+                .set_dist_sha1_checksum(dist_map.get(B("shasum")).map(strval));
             if let Some(mirrors) = dist_map.get(B("mirrors")) {
                 package
                     .package_mut()
@@ -357,19 +327,13 @@ impl ArrayLoader {
                 if let Some(r) = reason.as_string()
                     && trim(r) == "self.version"
                 {
-                    *reason = PhpMixed::string(package.get_pretty_version().to_string());
+                    *reason = PhpMixed::string(package.package().get_pretty_version());
                     let _ = target;
                 }
             }
-            let suggests: IndexMap<String, String> = suggest_map
+            let suggests: IndexMap<BString, BString> = suggest_map
                 .iter()
-                // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
-                .map(|(k, v)| {
-                    (
-                        k.to_str_lossy().into_owned(),
-                        legacy_lossy(&strval(v)).into_owned(),
-                    )
-                })
+                .map(|(k, v)| (k.clone(), strval(v)))
                 .collect();
             config.insert("suggest".into(), PhpMixed::Array(suggest_map));
             package.package_mut().set_suggests(suggests);
@@ -400,9 +364,9 @@ impl ArrayLoader {
         {
             let time_str = time_value.as_string().unwrap_or_default();
             let time = if preg_is_match(php_regex!(r"/^\d++$/D"), time_str) {
-                format!("@{}", legacy_lossy(&time_str))
+                bconcat!("@", time_str)
             } else {
-                legacy_lossy(time_str).into_owned()
+                BString::from(time_str)
             };
 
             if let Ok(date) = date_create::<Utc>(&time) {
@@ -415,7 +379,7 @@ impl ArrayLoader {
         {
             package
                 .package_mut()
-                .set_notification_url(legacy_lossy(&strval(notification_url)).into_owned());
+                .set_notification_url(strval(notification_url));
         }
 
         if let Some(archive) = config.get(B("archive")).cloned()
@@ -424,9 +388,7 @@ impl ArrayLoader {
             if let Some(name) = archive_map.get(B("name"))
                 && !empty(name)
             {
-                package
-                    .complete_mut()
-                    .set_archive_name(legacy_lossy(&strval(name)).into_owned());
+                package.complete_mut().set_archive_name(strval(name));
             }
             if let Some(exclude) = archive_map.get(B("exclude"))
                 && !empty(exclude)
@@ -459,10 +421,9 @@ impl ArrayLoader {
                     );
                 }
             }
-            let scripts: IndexMap<String, Vec<String>> = scripts_map
+            let scripts: IndexMap<BString, Vec<BString>> = scripts_map
                 .iter()
-                // TODO(bytes): script names are Strings, so non-UTF-8 bytes are replaced.
-                .map(|(k, v)| (k.to_str_lossy().into_owned(), php_to_string_vec(v)))
+                .map(|(k, v)| (k.clone(), php_to_string_vec(v)))
                 .collect();
             config.insert("scripts".into(), PhpMixed::Array(scripts_map));
             package.complete_mut().set_scripts(scripts);
@@ -472,35 +433,27 @@ impl ArrayLoader {
             && !empty(description)
             && is_string(description)
         {
-            package.complete_mut().set_description(
-                legacy_lossy(description.as_string().unwrap_or_default()).into_owned(),
-            );
+            package.complete_mut().set_description(bstr::BString::from(
+                description.as_string().unwrap_or_default(),
+            ));
         }
 
         if let Some(homepage) = config.get(B("homepage"))
             && !empty(homepage)
             && is_string(homepage)
         {
-            package
-                .complete_mut()
-                .set_homepage(legacy_lossy(homepage.as_string().unwrap_or_default()).into_owned());
+            package.complete_mut().set_homepage(bstr::BString::from(
+                homepage.as_string().unwrap_or_default(),
+            ));
         }
 
         if let Some(keywords) = config.get(B("keywords"))
             && !empty(keywords)
             && matches!(keywords, PhpMixed::Array(_) | PhpMixed::List(_))
         {
-            let keywords_vec: Vec<String> = match keywords {
-                PhpMixed::List(list) => list
-                    .iter()
-                    .map(strval)
-                    .map(|s| legacy_lossy(&s).into_owned())
-                    .collect(),
-                PhpMixed::Array(map) => map
-                    .values()
-                    .map(strval)
-                    .map(|s| legacy_lossy(&s).into_owned())
-                    .collect(),
+            let keywords_vec: Vec<BString> = match keywords {
+                PhpMixed::List(list) => list.iter().map(strval).collect(),
+                PhpMixed::Array(map) => map.values().map(strval).collect(),
                 _ => vec![],
             };
             package.complete_mut().set_keywords(keywords_vec);
@@ -509,16 +462,16 @@ impl ArrayLoader {
         if let Some(license) = config.get(B("license"))
             && !empty(license)
         {
-            let license_vec: Vec<String> = match license {
+            let license_vec: Vec<BString> = match license {
                 PhpMixed::Array(map) => map
                     .values()
-                    .map(|v| legacy_lossy(v.as_string().unwrap_or_default()).into_owned())
+                    .map(|v| BString::from(v.as_string().unwrap_or_default()))
                     .collect(),
                 PhpMixed::List(list) => list
                     .iter()
-                    .map(|v| legacy_lossy(v.as_string().unwrap_or_default()).into_owned())
+                    .map(|v| BString::from(v.as_string().unwrap_or_default()))
                     .collect(),
-                other => vec![legacy_lossy(other.as_string().unwrap_or_default()).into_owned()],
+                other => vec![BString::from(other.as_string().unwrap_or_default())],
             };
             package.complete_mut().set_license(license_vec);
         }
@@ -527,18 +480,13 @@ impl ArrayLoader {
             && !empty(authors)
             && let PhpMixed::List(list) = authors
         {
-            let authors_vec: Vec<IndexMap<String, String>> = list
+            let authors_vec: Vec<IndexMap<BString, BString>> = list
                 .iter()
                 .filter_map(|v| match v {
                     PhpMixed::Array(m) => Some(
                         m.iter()
-                            // TODO(bytes): author keys are Strings, so non-UTF-8 bytes are
-                            // replaced.
                             .map(|(k, v)| {
-                                (
-                                    k.to_str_lossy().into_owned(),
-                                    legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
-                                )
+                                (k.clone(), BString::from(v.as_string().unwrap_or_default()))
                             })
                             .collect(),
                     ),
@@ -551,15 +499,9 @@ impl ArrayLoader {
         if let Some(support) = config.get(B("support"))
             && let PhpMixed::Array(map) = support
         {
-            let support_map: IndexMap<String, String> = map
+            let support_map: IndexMap<BString, BString> = map
                 .iter()
-                // TODO(bytes): support keys are Strings, so non-UTF-8 bytes are replaced.
-                .map(|(k, v)| {
-                    (
-                        k.to_str_lossy().into_owned(),
-                        legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
-                    )
-                })
+                .map(|(k, v)| (k.clone(), BString::from(v.as_string().unwrap_or_default())))
                 .collect();
             package.complete_mut().set_support(support_map);
         }
@@ -593,12 +535,7 @@ impl ArrayLoader {
         if let Some(alias_normalized) = alias_normalized
             && !alias_normalized.is_empty()
         {
-            let pretty_alias = legacy_lossy(&preg_replace(
-                php_regex!(r"{(\.9{7})+}"),
-                ".x",
-                &alias_normalized,
-            ))
-            .into_owned();
+            let pretty_alias = preg_replace(php_regex!(r"{(\.9{7})+}"), ".x", &alias_normalized);
 
             return Ok(match package {
                 CompleteOrRootPackage::Root(root) => RootAliasPackageHandle::new(
@@ -622,47 +559,44 @@ impl ArrayLoader {
     fn configure_cached_links(
         &self,
         link_cache: &mut IndexMap<
-            String,
-            IndexMap<String, IndexMap<String, IndexMap<String, (String, Link)>>>,
+            BString,
+            IndexMap<BString, IndexMap<BString, IndexMap<BString, (BString, Link)>>>,
         >,
         package: &mut CompleteOrRootPackage,
         config: &IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
-        let name = package.get_name().to_string();
-        let pretty_version = package.get_pretty_version().to_string();
+        let name = BString::from(package.package().get_name());
+        let pretty_version = BString::from(package.package().get_pretty_version());
 
         for (r#type, opts) in SUPPORTED_LINK_TYPES.iter() {
             if let Some(entry) = config.get(B(r#type)) {
-                let mut links: IndexMap<String, Link> = IndexMap::new();
+                let mut links: IndexMap<BString, Link> = IndexMap::new();
                 let entries: IndexMap<BString, PhpMixed> = match entry {
                     PhpMixed::Array(m) => m.clone(),
                     _ => continue,
                 };
                 for (pretty_target, constraint) in entries {
-                    // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
-                    let pretty_target = pretty_target.to_str_lossy().into_owned();
-                    let target = legacy_lossy(&strtolower(&pretty_target)).into_owned();
+                    let target = strtolower(&pretty_target);
 
                     // recursive links are not supported
                     if target == name {
                         continue;
                     }
 
-                    let constraint_str =
-                        legacy_lossy(constraint.as_string().unwrap_or_default()).into_owned();
+                    let constraint_str = BString::from(constraint.as_string().unwrap_or_default());
                     if constraint_str == "self.version" {
                         let link = self.create_link(
-                            &name,
-                            &pretty_version,
+                            name.as_bstr(),
+                            pretty_version.as_bstr(),
                             opts.method,
-                            &target,
-                            &constraint_str,
+                            target.as_bstr(),
+                            constraint_str.as_bstr(),
                         )?;
                         links.insert(target, link);
                     } else {
                         let cached = link_cache
                             .get(&name)
-                            .and_then(|m| m.get(*r#type))
+                            .and_then(|m| m.get(r#type.as_bytes()))
                             .and_then(|m| m.get(&target))
                             .and_then(|m| m.get(&constraint_str))
                             .cloned();
@@ -670,17 +604,17 @@ impl ArrayLoader {
                             cached
                         } else {
                             let link = self.create_link(
-                                &name,
-                                &pretty_version,
+                                name.as_bstr(),
+                                pretty_version.as_bstr(),
                                 opts.method,
-                                &target,
-                                &constraint_str,
+                                target.as_bstr(),
+                                constraint_str.as_bstr(),
                             )?;
                             let entry = (target.clone(), link);
                             link_cache
                                 .entry(name.clone())
                                 .or_default()
-                                .entry(r#type.to_string())
+                                .entry(BString::from(*r#type))
                                 .or_default()
                                 .entry(target.clone())
                                 .or_default()
@@ -700,25 +634,23 @@ impl ArrayLoader {
 
     pub fn parse_links(
         &self,
-        source: &str,
-        source_version: &str,
+        source: &BStr,
+        source_version: &BStr,
         description: &str,
         links: IndexMap<BString, PhpMixed>,
-    ) -> anyhow::Result<IndexMap<String, Link>> {
-        let mut res: IndexMap<String, Link> = IndexMap::new();
+    ) -> anyhow::Result<IndexMap<BString, Link>> {
+        let mut res: IndexMap<BString, Link> = IndexMap::new();
         for (target, constraint) in links {
-            // TODO(bytes): package names are Strings, so non-UTF-8 bytes are replaced.
-            let target = target.to_str_lossy().into_owned();
             if !is_string(&constraint) {
                 continue;
             }
-            let target = legacy_lossy(&strtolower(&target)).into_owned();
+            let target = strtolower(&target);
             let link = self.create_link(
                 source,
                 source_version,
                 description,
-                &target,
-                &constraint.as_string().unwrap_or_default().to_str_lossy(),
+                target.as_bstr(),
+                constraint.as_string().unwrap_or_default(),
             )?;
             res.insert(target, link);
         }
@@ -728,27 +660,30 @@ impl ArrayLoader {
 
     fn create_link(
         &self,
-        source: &str,
-        source_version: &str,
+        source: &BStr,
+        source_version: &BStr,
         description: &str,
-        target: &str,
-        pretty_constraint: &str,
+        target: &BStr,
+        pretty_constraint: &BStr,
     ) -> anyhow::Result<Link> {
         // PHP: if (!\is_string($prettyConstraint)) — always true in Rust signature, kept for parity
         let _ = pretty_constraint;
 
         let constraint = if pretty_constraint == "self.version" {
-            source_version.to_string()
+            source_version
         } else {
-            pretty_constraint.to_string()
+            pretty_constraint
         };
 
-        let parsed_constraint = match self.version_parser.parse_constraints(&constraint) {
+        let parsed_constraint = match self.version_parser.parse_constraints(constraint) {
             Ok(c) => c,
             Err(e) => {
                 let message = format!(
                     "Link constraint in {} {} > {} should be a valid version constraint, got \"{}\"",
-                    source, description, target, constraint
+                    source.display_lossy(),
+                    description,
+                    target.display_lossy(),
+                    constraint.display_lossy()
                 );
                 let code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code);
                 return Err(UnexpectedValueException::with_code_and_previous(
@@ -761,16 +696,16 @@ impl ArrayLoader {
         };
 
         Ok(Link::new(
-            source.to_string(),
-            target.to_string(),
+            BString::from(source),
+            BString::from(target),
             parsed_constraint,
-            Some(description.to_string()),
-            pretty_constraint.to_string(),
+            Some(BString::from(description)),
+            BString::from(pretty_constraint),
         ))
     }
 
     /// Retrieves a branch alias (dev-master => 1.0.x-dev for example) if it exists
-    pub fn get_branch_alias(&self, config: &impl VersionFields) -> anyhow::Result<Option<String>> {
+    pub fn get_branch_alias(&self, config: &impl VersionFields) -> anyhow::Result<Option<BString>> {
         if !config.contains_key("version") || !is_scalar(config.get("version").unwrap()) {
             return Err(
                 UnexpectedValueException::new("no/invalid version defined".to_string()).into(),
@@ -781,7 +716,7 @@ impl ArrayLoader {
             config_version = PhpMixed::string(strval(&config_version));
         }
 
-        let version_str = legacy_lossy(config_version.as_string().unwrap_or_default()).into_owned();
+        let version_str = BString::from(config_version.as_string().unwrap_or_default());
         if strpos(&version_str, "dev-") != Some(0) && "-dev" != substr(&version_str, -4, None) {
             return Ok(None);
         }
@@ -799,10 +734,9 @@ impl ArrayLoader {
 
         if let Some(branch_alias_map) = extra_branch_alias {
             for (source_branch, target_branch_value) in branch_alias_map {
-                let source_branch =
-                    legacy_lossy(&strval(&PhpMixed::String(source_branch))).into_owned();
+                let source_branch = strval(&PhpMixed::String(source_branch));
                 let target_branch =
-                    legacy_lossy(target_branch_value.as_string().unwrap_or_default()).into_owned();
+                    BString::from(target_branch_value.as_string().unwrap_or_default());
 
                 // ensure it is an alias to a -dev package
                 if "-dev" != substr(&target_branch, -4, None) {
@@ -812,13 +746,10 @@ impl ArrayLoader {
                 // normalize without -dev and ensure it's a numeric branch that is parseable
                 let validated_target_branch =
                     if target_branch == VersionParser::DEFAULT_BRANCH_ALIAS {
-                        VersionParser::DEFAULT_BRANCH_ALIAS.to_string()
+                        BString::from(VersionParser::DEFAULT_BRANCH_ALIAS)
                     } else {
-                        self.version_parser.normalize_branch(&legacy_lossy(&substr(
-                            &target_branch,
-                            0,
-                            Some(-4),
-                        )))?
+                        self.version_parser
+                            .normalize_branch(substr(&target_branch, 0, Some(-4)))?
                     };
                 if "-dev" != substr(&validated_target_branch, -4, None) {
                     continue;
@@ -852,14 +783,10 @@ impl ArrayLoader {
             && default_branch_is_true
             && self
                 .version_parser
-                .parse_numeric_alias_prefix(&legacy_lossy(&preg_replace(
-                    php_regex!(r"{^v}"),
-                    "",
-                    &version_str,
-                )))
+                .parse_numeric_alias_prefix(preg_replace(php_regex!(r"{^v}"), "", &version_str))
                 .is_none()
         {
-            return Ok(Some(VersionParser::DEFAULT_BRANCH_ALIAS.to_string()));
+            return Ok(Some(VersionParser::DEFAULT_BRANCH_ALIAS.into()));
         }
 
         Ok(None)
@@ -897,14 +824,6 @@ impl CompleteOrRootPackage {
         matches!(self, Self::Root(_))
     }
 
-    fn get_name(&self) -> &str {
-        self.package().get_name()
-    }
-
-    fn get_pretty_version(&self) -> &str {
-        self.package().get_pretty_version()
-    }
-
     fn into_handle(self) -> PackageInterfaceHandle {
         match self {
             Self::Complete(p) => CompletePackageHandle::from_complete_package(p).into(),
@@ -920,23 +839,15 @@ fn php_to_map(value: &PhpMixed) -> IndexMap<BString, PhpMixed> {
     }
 }
 
-fn php_to_string_vec(value: &PhpMixed) -> Vec<String> {
+fn php_to_string_vec(value: &PhpMixed) -> Vec<BString> {
     match value {
-        PhpMixed::List(l) => l
-            .iter()
-            .map(strval)
-            .map(|s| legacy_lossy(&s).into_owned())
-            .collect(),
-        PhpMixed::Array(m) => m
-            .values()
-            .map(strval)
-            .map(|s| legacy_lossy(&s).into_owned())
-            .collect(),
+        PhpMixed::List(l) => l.iter().map(strval).collect(),
+        PhpMixed::Array(m) => m.values().map(strval).collect(),
         _ => Vec::new(),
     }
 }
 
-fn apply_link_setter(package: &mut Package, method: &str, links: IndexMap<String, Link>) {
+fn apply_link_setter(package: &mut Package, method: &str, links: IndexMap<BString, Link>) {
     if method == Link::TYPE_REQUIRE {
         package.set_requires(links);
     } else if method == Link::TYPE_DEV_REQUIRE {
@@ -960,12 +871,11 @@ fn php_to_mirrors(value: &PhpMixed) -> Vec<Mirror> {
         .into_iter()
         .filter_map(|entry| match entry {
             PhpMixed::Array(m) => Some(Mirror {
-                url: legacy_lossy(
+                url: BString::from(
                     m.get(B("url"))
                         .and_then(|v| v.as_string())
                         .unwrap_or_default(),
-                )
-                .into_owned(),
+                ),
                 preferred: m.get(B("preferred")).is_some_and(|v| v.to_bool()),
             }),
             _ => None,
@@ -1005,8 +915,8 @@ impl LoaderInterface for ArrayLoader {
                 continue;
             }
             let links = self.parse_links(
-                package.get_name(),
-                package.get_pretty_version(),
+                package.package().get_name(),
+                package.package().get_pretty_version(),
                 opts.method,
                 match entry.unwrap() {
                     PhpMixed::Array(arr) => arr.clone(),

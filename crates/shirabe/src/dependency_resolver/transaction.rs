@@ -6,11 +6,11 @@ use crate::dependency_resolver::operation::{
 };
 use crate::package::{AliasPackageHandle, Link, PackageInterfaceHandle};
 use crate::repository::PlatformRepository;
-use bstr::B;
+use bstr::{B, BString};
 use indexmap::{IndexMap, IndexSet};
 use shirabe_php_shim::{
-    PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, strcmp, uasort,
-    uasort_map,
+    PhpMixed, array_filter, array_intersect, array_keys, array_pop, array_unshift, bconcat, strcmp,
+    uasort, uasort_map,
 };
 
 #[derive(Debug, Clone)]
@@ -21,9 +21,9 @@ pub struct Transaction {
     present_packages: Vec<PackageInterfaceHandle>,
 
     /// Package set resulting from this transaction
-    result_package_map: IndexMap<String, PackageInterfaceHandle>,
+    result_package_map: IndexMap<BString, PackageInterfaceHandle>,
 
-    result_packages_by_name: IndexMap<String, Vec<PackageInterfaceHandle>>,
+    result_packages_by_name: IndexMap<BString, Vec<PackageInterfaceHandle>>,
 }
 
 impl Default for Transaction {
@@ -78,16 +78,16 @@ impl Transaction {
         for package in result_packages {
             for name in package.get_names(true) {
                 self.result_packages_by_name
-                    .entry(name)
+                    .entry(BString::from(&name[..]))
                     .or_default()
                     .push(package.clone());
             }
             self.result_package_map
-                .insert(package.ptr_id().to_string(), package);
+                .insert(bstr::BString::from(package.ptr_id().to_string()), package);
         }
 
         uasort_map(&mut self.result_package_map, package_sort);
-        let names: Vec<String> = self.result_packages_by_name.keys().cloned().collect();
+        let names: Vec<BString> = self.result_packages_by_name.keys().cloned().collect();
         for name in &names {
             if let Some(packages) = self.result_packages_by_name.get_mut(name) {
                 uasort(packages, package_sort);
@@ -98,18 +98,18 @@ impl Transaction {
     fn calculate_operations(&mut self) -> Vec<std::rc::Rc<AnyOperation>> {
         let mut operations: Vec<AnyOperation> = vec![];
 
-        let mut present_package_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
-        let mut remove_map: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
-        let mut present_alias_map: IndexSet<String> = IndexSet::new();
-        let mut remove_alias_map: IndexMap<String, AliasPackageHandle> = IndexMap::new();
+        let mut present_package_map: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
+        let mut remove_map: IndexMap<BString, PackageInterfaceHandle> = IndexMap::new();
+        let mut present_alias_map: IndexSet<BString> = IndexSet::new();
+        let mut remove_alias_map: IndexMap<BString, AliasPackageHandle> = IndexMap::new();
         for package in &self.present_packages {
             if let Some(alias) = package.as_alias() {
-                let key = format!("{}::{}", package.get_name(), package.get_version());
+                let key = bconcat!(package.get_name(), "::", package.get_version());
                 present_alias_map.insert(key.clone());
                 remove_alias_map.insert(key, alias);
             } else {
-                present_package_map.insert(package.get_name().to_string(), package.clone());
-                remove_map.insert(package.get_name().to_string(), package.clone());
+                present_package_map.insert(BString::from(&package.get_name()[..]), package.clone());
+                remove_map.insert(BString::from(&package.get_name()[..]), package.clone());
             }
         }
 
@@ -117,18 +117,18 @@ impl Transaction {
         let mut stack: Vec<PackageInterfaceHandle> =
             self.get_root_packages().into_values().collect();
 
-        let mut visited: IndexMap<String, bool> = IndexMap::new();
-        let mut processed: IndexMap<String, bool> = IndexMap::new();
+        let mut visited: IndexMap<BString, bool> = IndexMap::new();
+        let mut processed: IndexMap<BString, bool> = IndexMap::new();
 
         while !stack.is_empty() {
             let package = array_pop(&mut stack).unwrap();
 
-            if processed.contains_key(&package.ptr_id().to_string()) {
+            if processed.contains_key(package.ptr_id().to_string().as_bytes()) {
                 continue;
             }
 
-            if !visited.contains_key(&package.ptr_id().to_string()) {
-                visited.insert(package.ptr_id().to_string(), true);
+            if !visited.contains_key(package.ptr_id().to_string().as_bytes()) {
+                visited.insert(bstr::BString::from(package.ptr_id().to_string()), true);
 
                 stack.push(package.clone());
                 if let Some(alias) = package.as_alias() {
@@ -142,11 +142,11 @@ impl Transaction {
                         }
                     }
                 }
-            } else if !processed.contains_key(&package.ptr_id().to_string()) {
-                processed.insert(package.ptr_id().to_string(), true);
+            } else if !processed.contains_key(package.ptr_id().to_string().as_bytes()) {
+                processed.insert(bstr::BString::from(package.ptr_id().to_string()), true);
 
                 if let Some(alias) = package.as_alias() {
-                    let alias_key = format!("{}::{}", package.get_name(), package.get_version());
+                    let alias_key = bconcat!(package.get_name(), "::", package.get_version());
                     if present_alias_map.contains(&alias_key) {
                         remove_alias_map.shift_remove(&alias_key);
                     } else {
@@ -209,8 +209,8 @@ impl Transaction {
     ///
     /// These serve as a starting point to enumerate packages in a topological order despite potential cycles.
     /// If there are packages with a cycle on the top level the package with the lowest name gets picked
-    fn get_root_packages(&self) -> IndexMap<String, PackageInterfaceHandle> {
-        let mut roots: IndexMap<String, PackageInterfaceHandle> = self
+    fn get_root_packages(&self) -> IndexMap<BString, PackageInterfaceHandle> {
+        let mut roots: IndexMap<BString, PackageInterfaceHandle> = self
             .result_package_map
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
@@ -227,7 +227,7 @@ impl Transaction {
                 for require in possible_requires {
                     // PHP: if ($require !== $package) — strict reference inequality
                     if require.ptr_id().to_string() != package.ptr_id().to_string() {
-                        roots.shift_remove(&require.ptr_id().to_string());
+                        roots.shift_remove(require.ptr_id().to_string().as_bytes());
                     }
                 }
             }
@@ -255,10 +255,10 @@ impl Transaction {
     fn move_plugins_to_front(&self, mut operations: Vec<AnyOperation>) -> Vec<AnyOperation> {
         let mut dl_modifying_plugins_no_deps: Vec<AnyOperation> = vec![];
         let mut dl_modifying_plugins_with_deps: Vec<AnyOperation> = vec![];
-        let mut dl_modifying_plugin_requires: Vec<String> = vec![];
+        let mut dl_modifying_plugin_requires: Vec<BString> = vec![];
         let mut plugins_no_deps: Vec<AnyOperation> = vec![];
         let mut plugins_with_deps: Vec<AnyOperation> = vec![];
-        let mut plugin_requires: Vec<String> = vec![];
+        let mut plugin_requires: Vec<BString> = vec![];
 
         let mut to_remove: Vec<usize> = vec![];
         for idx in (0..operations.len()).rev() {
@@ -280,13 +280,16 @@ impl Transaction {
 
             // is this a downloads modifying plugin or a dependency of one?
             if is_downloads_modifying_plugin
-                || !array_intersect(&package.get_names(true), &dl_modifying_plugin_requires)
-                    .is_empty()
+                || !array_intersect(
+                    &package.get_names(true),
+                    &dl_modifying_plugin_requires.to_vec(),
+                )
+                .is_empty()
             {
                 // get the package's requires, but filter out any platform requirements
-                let requires: Vec<String> = array_filter(
-                    &array_keys(&package.get_requires()),
-                    |req: &String| -> bool { !PlatformRepository::is_platform_package(req) },
+                let requires: Vec<BString> = array_filter(
+                    &array_keys(&package.get_requires()).to_vec(),
+                    |req: &BString| -> bool { !PlatformRepository::is_platform_package(req) },
                 );
 
                 // is this a plugin with no meaningful dependencies?
@@ -309,12 +312,13 @@ impl Transaction {
                 || package.get_type() == "composer-installer";
 
             // is this a plugin or a dependency of a plugin?
-            if is_plugin || !array_intersect(&package.get_names(true), &plugin_requires).is_empty()
+            if is_plugin
+                || !array_intersect(&package.get_names(true), &plugin_requires.to_vec()).is_empty()
             {
                 // get the package's requires, but filter out any platform requirements
-                let requires: Vec<String> = array_filter(
-                    &array_keys(&package.get_requires()),
-                    |req: &String| -> bool { !PlatformRepository::is_platform_package(req) },
+                let requires: Vec<BString> = array_filter(
+                    &array_keys(&package.get_requires()).to_vec(),
+                    |req: &BString| -> bool { !PlatformRepository::is_platform_package(req) },
                 );
 
                 // is this a plugin with no meaningful dependencies?

@@ -53,15 +53,18 @@ impl ArchiveManager {
         &self,
         package: CompletePackageInterfaceHandle,
     ) -> anyhow::Result<IndexMap<String, String>> {
-        let base_name = match package.get_archive_name() {
+        let base_name = legacy_lossy(&match package.get_archive_name() {
             Some(name) => name,
-            None => legacy_lossy(&preg_replace(
-                php_regex!("#[^a-z0-9-_]#i"),
-                "-",
-                package.get_name(),
-            ))
-            .into_owned(),
-        };
+            None => bstr::BString::from(
+                legacy_lossy(&preg_replace(
+                    php_regex!("#[^a-z0-9-_]#i"),
+                    "-",
+                    package.get_name(),
+                ))
+                .into_owned(),
+            ),
+        })
+        .into_owned();
 
         let mut parts: IndexMap<String, String> = IndexMap::new();
         parts.insert("base".to_string(), base_name);
@@ -69,16 +72,31 @@ impl ArchiveManager {
         let dist_reference = package.get_dist_reference();
         if let Some(ref dist_ref) = dist_reference {
             if preg_is_match(php_regex!("{^[a-f0-9]{40}$}"), dist_ref) {
-                parts.insert("dist_reference".to_string(), dist_ref.to_string());
+                parts.insert(
+                    "dist_reference".to_string(),
+                    legacy_lossy(dist_ref).into_owned(),
+                );
                 if let Some(dist_type) = package.get_dist_type() {
-                    parts.insert("dist_type".to_string(), dist_type);
+                    parts.insert(
+                        "dist_type".to_string(),
+                        legacy_lossy(&dist_type).into_owned(),
+                    );
                 }
             } else {
-                parts.insert("version".to_string(), package.get_pretty_version());
-                parts.insert("dist_reference".to_string(), dist_ref.to_string());
+                parts.insert(
+                    "version".to_string(),
+                    legacy_lossy(&package.get_pretty_version()).into_owned(),
+                );
+                parts.insert(
+                    "dist_reference".to_string(),
+                    legacy_lossy(dist_ref).into_owned(),
+                );
             }
         } else {
-            parts.insert("version".to_string(), package.get_pretty_version());
+            parts.insert(
+                "version".to_string(),
+                legacy_lossy(&package.get_pretty_version()).into_owned(),
+            );
         }
 
         if let Some(source_reference) = package.get_source_reference() {
@@ -126,7 +144,12 @@ impl ArchiveManager {
 
         let mut usable_archiver_idx: Option<usize> = None;
         for (i, archiver) in self.archivers.iter().enumerate() {
-            if archiver.supports(format.clone(), package.get_source_type()) {
+            if archiver.supports(
+                format.clone(),
+                package
+                    .get_source_type()
+                    .map(|s| legacy_lossy(&s).into_owned()),
+            ) {
                 usable_archiver_idx = Some(i);
                 break;
             }
@@ -206,7 +229,7 @@ impl ArchiveManager {
                     if let Some(name) = archive.get("name").and_then(|v| v.as_string())
                         && !name.is_empty()
                     {
-                        package.set_archive_name(legacy_lossy(name).into_owned());
+                        package.set_archive_name(bstr::BString::from(name));
                     }
                     if let Some(exclude) = archive.get("exclude")
                         && let Some(excludes) = exclude.as_array()
@@ -216,7 +239,12 @@ impl ArchiveManager {
                             .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                             .collect();
                         if !excludes.is_empty() {
-                            package.set_archive_excludes(excludes);
+                            package.set_archive_excludes(
+                                excludes
+                                    .into_iter()
+                                    .map(bstr::BString::from)
+                                    .collect::<Vec<_>>(),
+                            );
                         }
                     }
                 }
@@ -269,7 +297,12 @@ impl ArchiveManager {
         }
 
         let mut all_excludes = exclude_patterns;
-        all_excludes.extend(package.get_archive_excludes());
+        all_excludes.extend(
+            package
+                .get_archive_excludes()
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned()),
+        );
         let archive_path = self.archivers[usable_archiver_idx].archive(
             source_path.clone(),
             temp_target.clone(),

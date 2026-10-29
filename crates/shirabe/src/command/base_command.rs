@@ -603,7 +603,21 @@ impl BaseCommand for BaseCommandData {
     ) -> anyhow::Result<Vec<IndexMap<String, String>>> {
         let parser: VersionParser = VersionParser::new();
 
-        parser.parse_name_version_pairs(requirements)
+        // TODO(bytes): requirements from the command line are Strings.
+        Ok(parser
+            .parse_name_version_pairs(
+                requirements
+                    .into_iter()
+                    .map(bstr::BString::from)
+                    .collect::<Vec<_>>(),
+            )?
+            .into_iter()
+            .map(|pair| {
+                pair.into_iter()
+                    .map(|(k, v)| (legacy_lossy(&k).into_owned(), legacy_lossy(&v).into_owned()))
+                    .collect()
+            })
+            .collect())
     }
 
     fn render_table(

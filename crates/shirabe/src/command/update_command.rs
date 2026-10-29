@@ -16,11 +16,12 @@ use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{
     CanonicalPackagesTrait, CompositeRepository, PlatformRepository, RepositorySet,
 };
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_filter, array_intersect,
-    array_keys, array_merge_map, array_search_in_vec, impl_php_class, legacy_lossy, php_regex,
-    preg_is_match, preg_match, preg_replace, strtolower,
+    array_merge_map, array_search_in_vec, impl_php_class, legacy_lossy, php_regex, preg_is_match,
+    preg_match, preg_replace, strtolower,
 };
 use shirabe_semver::Intervals;
 use shirabe_semver::constraint::MultiConstraint;
@@ -119,11 +120,13 @@ impl UpdateCommand {
                     .find(|&(_, v)| v == flag)
                     .map(|(k, _)| k.to_string())
                     .unwrap_or_default(),
-                None => composer_ref.get_package().get_minimum_stability(),
+                None => {
+                    legacy_lossy(&composer_ref.get_package().get_minimum_stability()).into_owned()
+                }
             };
             let latest_version = version_selector.find_best_candidate(
-                &package.get_name(),
-                constraint,
+                &legacy_lossy(&package.get_name()),
+                constraint.map(legacy_lossy).as_deref(),
                 &stability,
                 None,
                 0,
@@ -135,11 +138,11 @@ impl UpdateCommand {
                 && (package.get_version() != latest.get_version() || latest.is_dev())
             {
                 autocompleter_values.insert(
-                    package.get_name(),
+                    legacy_lossy(&package.get_name()).into_owned(),
                     format!(
                         "<comment>{}</comment> => <comment>{}</comment>",
-                        current_version,
-                        latest.get_pretty_version(),
+                        legacy_lossy(&current_version),
+                        legacy_lossy(&latest.get_pretty_version()),
                     ),
                 );
             }
@@ -149,7 +152,7 @@ impl UpdateCommand {
                 if PlatformRepository::is_platform_package(req) {
                     continue;
                 }
-                autocompleter_values.insert(req.to_string(), String::new());
+                autocompleter_values.insert(legacy_lossy(req).into_owned(), String::new());
             }
         }
 
@@ -211,14 +214,30 @@ impl UpdateCommand {
             .get_aliases()
             .into_iter()
             .map(|alias| crate::repository::RootAliasInput {
-                package: alias.get("package").cloned().unwrap_or_default(),
-                version: alias.get("version").cloned().unwrap_or_default(),
-                alias: alias.get("alias").cloned().unwrap_or_default(),
-                alias_normalized: alias.get("alias_normalized").cloned().unwrap_or_default(),
+                package: bstr::BString::from(
+                    legacy_lossy(&alias.get(bstr::B("package")).cloned().unwrap_or_default())
+                        .into_owned(),
+                ),
+                version: bstr::BString::from(
+                    legacy_lossy(&alias.get(bstr::B("version")).cloned().unwrap_or_default())
+                        .into_owned(),
+                ),
+                alias: bstr::BString::from(
+                    &alias.get(bstr::B("alias")).cloned().unwrap_or_default()[..],
+                ),
+                alias_normalized: bstr::BString::from(
+                    legacy_lossy(
+                        &alias
+                            .get(bstr::B("alias_normalized"))
+                            .cloned()
+                            .unwrap_or_default(),
+                    )
+                    .into_owned(),
+                ),
             })
             .collect();
         let mut repository_set = RepositorySet::new(
-            &composer.get_package().get_minimum_stability(),
+            &legacy_lossy(&composer.get_package().get_minimum_stability()),
             composer.get_package().get_stability_flags(),
             root_aliases,
             composer.get_package().get_references(),
@@ -380,17 +399,17 @@ impl Command for UpdateCommand {
 
         let root_package = composer.get_package();
         root_package.set_references(RootPackageLoader::extract_references(
-            &reqs,
+            &bytes_map(&reqs),
             root_package.get_references(),
         ));
         root_package.set_stability_flags(RootPackageLoader::extract_stability_flags(
-            &reqs,
-            &root_package.get_minimum_stability(),
+            &bytes_map(&reqs),
+            bstr::BStr::new(&*legacy_lossy(&root_package.get_minimum_stability())),
             root_package.get_stability_flags(),
         ));
 
         let parser = VersionParser::new();
-        let mut temporary_constraints: IndexMap<String, _> = IndexMap::new();
+        let mut temporary_constraints: IndexMap<BString, _> = IndexMap::new();
         let root_requirements = array_merge_map(
             (*root_package.get_requires()).clone(),
             (*root_package.get_dev_requires()).clone(),
@@ -398,8 +417,9 @@ impl Command for UpdateCommand {
         for (package, constraint) in reqs.iter() {
             let package = legacy_lossy(&strtolower(package)).into_owned();
             let parsed_constraint = parser.parse_constraints(constraint)?;
-            temporary_constraints.insert(package.clone(), parsed_constraint.clone());
-            if let Some(root_req) = root_requirements.get(&package)
+            temporary_constraints
+                .insert(BString::from(package.as_str()), parsed_constraint.clone());
+            if let Some(root_req) = root_requirements.get(bstr::B(&package))
                 && !Intervals::have_intersections(&parsed_constraint, root_req.get_constraint())?
             {
                 io.write_error3(
@@ -407,7 +427,7 @@ impl Command for UpdateCommand {
                             "<error>The temporary constraint \"{}\" for \"{}\" must be a subset of the constraint in your composer.json ({})</error>",
                             constraint,
                             package,
-                            root_req.get_pretty_constraint(),
+                            root_req.get_pretty_constraint().display_lossy(),
                         ),
                         true,
                         io_interface::NORMAL,
@@ -448,7 +468,7 @@ impl Command for UpdateCommand {
                 let Some(matches) = matches else {
                     continue;
                 };
-                let constraint = parser.parse_constraints(&format!(
+                let constraint = parser.parse_constraints(format!(
                     "~{}",
                     legacy_lossy(&matches.get(1).unwrap_or_default())
                 ))?;
@@ -484,14 +504,23 @@ impl Command for UpdateCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            let mut requires: Vec<String> = array_keys(&root_package.get_requires());
+            let mut requires: Vec<String> = root_package
+                .get_requires()
+                .keys()
+                .map(|k| legacy_lossy(k).into_owned())
+                .collect();
             if !input
                 .borrow()
                 .get_option("no-dev")?
                 .as_bool()
                 .unwrap_or(false)
             {
-                requires.extend(array_keys(&root_package.get_dev_requires()));
+                requires.extend(
+                    root_package
+                        .get_dev_requires()
+                        .keys()
+                        .map(|k| legacy_lossy(k).into_owned()),
+                );
             }
 
             if !packages.is_empty() {
@@ -758,4 +787,11 @@ impl BaseCommand for UpdateCommand {
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+// TODO(bytes): requirements from the command line are Strings.
+fn bytes_map(map: &IndexMap<String, String>) -> IndexMap<BString, BString> {
+    map.iter()
+        .map(|(k, v)| (BString::from(k.as_str()), BString::from(v.as_str())))
+        .collect()
 }

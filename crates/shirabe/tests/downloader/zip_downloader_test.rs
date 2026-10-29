@@ -46,9 +46,12 @@ fn set_up() -> SetUp {
     )));
 
     let norm_version = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
-    let package: PackageInterfaceHandle =
-        CompletePackageHandle::new("test/pkg".to_string(), norm_version, "1.0.0".to_string())
-            .into();
+    let package: PackageInterfaceHandle = CompletePackageHandle::new(
+        bstr::BString::from("test/pkg".to_string()),
+        bstr::BString::from(norm_version),
+        bstr::BString::from("1.0.0".to_string()),
+    )
+    .into();
 
     let filename = test_dir.path().join("composer-test.zip");
     std::fs::write(&filename, "zip").unwrap();
@@ -144,10 +147,13 @@ fn test_error_messages() {
     // $distUrl = 'file://'.__FILE__: an existing, non-zip file referenced by a file:// URL.
     let dist_url = format!("file://{}/Cargo.toml", env!("CARGO_MANIFEST_DIR"));
     let norm_version = legacy_lossy(&VersionParser.normalize("1.0.0", None).unwrap()).into_owned();
-    let package: PackageInterfaceHandle =
-        CompletePackageHandle::new("test/pkg".to_string(), norm_version, "1.0.0".to_string())
-            .into();
-    package.set_dist_url(Some(dist_url));
+    let package: PackageInterfaceHandle = CompletePackageHandle::new(
+        bstr::BString::from("test/pkg".to_string()),
+        bstr::BString::from(norm_version),
+        bstr::BString::from("1.0.0".to_string()),
+    )
+    .into();
+    package.set_dist_url(Some(bstr::BString::from(dist_url)));
 
     let filesystem = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(

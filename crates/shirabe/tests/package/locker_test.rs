@@ -102,16 +102,19 @@ fn test_get_locked_packages() {
 
     assert!(
         repo.find_package(
-            "pkg1",
-            FindPackageConstraint::String("1.0.0-beta".to_string())
+            bstr::BStr::new("pkg1"),
+            FindPackageConstraint::String(bstr::BString::from("1.0.0-beta".to_string()))
         )
         .unwrap()
         .is_some()
     );
     assert!(
-        repo.find_package("pkg2", FindPackageConstraint::String("0.1.10".to_string()))
-            .unwrap()
-            .is_some()
+        repo.find_package(
+            bstr::BStr::new("pkg2"),
+            FindPackageConstraint::String(bstr::BString::from("0.1.10".to_string()))
+        )
+        .unwrap()
+        .is_some()
     );
 }
 
@@ -121,15 +124,15 @@ fn test_set_lock_data() {
     let (mut locker, temp_dir, _io) = make_locker(&json_content, None);
 
     let package1: PackageInterfaceHandle = CompletePackageHandle::new(
-        "pkg1".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0.0-beta".to_string(),
+        bstr::BString::from("pkg1".to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0.0-beta".to_string()),
     )
     .into();
     let package2: PackageInterfaceHandle = CompletePackageHandle::new(
-        "pkg2".to_string(),
-        "0.1.10.0".to_string(),
-        "0.1.10".to_string(),
+        bstr::BString::from("pkg2".to_string()),
+        bstr::BString::from("0.1.10.0".to_string()),
+        bstr::BString::from("0.1.10".to_string()),
     )
     .into();
 
@@ -204,8 +207,12 @@ fn test_lock_bad_packages() {
     // PHP mocks a PackageInterface with only getPrettyName()='pkg1' (and an empty pretty version),
     // which makes lockPackages throw a LogicException. A real package with an empty pretty version
     // reproduces that branch.
-    let package1: PackageInterfaceHandle =
-        CompletePackageHandle::new("pkg1".to_string(), String::new(), String::new()).into();
+    let package1: PackageInterfaceHandle = CompletePackageHandle::new(
+        bstr::BString::from("pkg1".to_string()),
+        bstr::BString::from(String::new()),
+        bstr::BString::from(String::new()),
+    )
+    .into();
 
     let err = locker
         .set_lock_data(

@@ -2,7 +2,7 @@
 
 use crate::http_downloader_mock::{HttpDownloaderMockGuard, expect_full, get_http_downloader_mock};
 use crate::io_stub::IOStub;
-use bstr::{B, BString};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe::config::Config;
 use shirabe::io::IOInterface;
@@ -180,16 +180,37 @@ fn test_driver() {
         "1.0.0".to_string(),
         "d3393d514318a9267d2f8ebbf463a9aaa389f8eb".to_string(),
     );
-    assert_eq!(expected_tags, driver.get_tags().unwrap());
+    assert_eq!(
+        expected_tags
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_str()),
+                bstr::BString::from(v.as_str())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        driver.get_tags().unwrap()
+    );
 
     let mut expected_branches: IndexMap<String, String> = IndexMap::new();
     expected_branches.insert(
         "main".to_string(),
         "937992d19d72b5116c3e8c4a04f960e5fa270b22".to_string(),
     );
-    assert_eq!(expected_branches, driver.get_branches().unwrap());
+    assert_eq!(
+        expected_branches
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_str()),
+                bstr::BString::from(v.as_str())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        driver.get_branches().unwrap()
+    );
 
-    let data = driver.get_composer_information("main").unwrap().unwrap();
+    let data = driver
+        .get_composer_information(bstr::BStr::new("main"))
+        .unwrap()
+        .unwrap();
     assert_eq!(
         Some("user/repo".into()),
         data.get(B("name")).and_then(|v| v.as_string())
@@ -219,21 +240,38 @@ fn test_driver() {
     let url = "https://bitbucket.org/user/repo.git";
     assert_eq!(url, driver.get_url());
 
-    let dist = driver.get_dist("reference").unwrap();
-    assert_eq!(Some("zip"), dist.get("type").map(String::as_str));
+    let dist = driver.get_dist(bstr::BStr::new("reference")).unwrap();
     assert_eq!(
-        Some("https://bitbucket.org/user/repo/get/reference.zip"),
-        dist.get("url").map(String::as_str)
+        Some(bstr::BStr::new("zip")),
+        dist.get(bstr::B("type")).map(|v| v.as_bstr())
     );
-    assert_eq!(Some("reference"), dist.get("reference").map(String::as_str));
-    assert_eq!(Some(""), dist.get("shasum").map(String::as_str));
-
-    let source = driver.get_source("reference");
-    assert_eq!(Some("git"), source.get("type").map(String::as_str));
-    assert_eq!(Some(url), source.get("url").map(String::as_str));
     assert_eq!(
-        Some("reference"),
-        source.get("reference").map(String::as_str)
+        Some(bstr::BStr::new(
+            "https://bitbucket.org/user/repo/get/reference.zip"
+        )),
+        dist.get(bstr::B("url")).map(|v| v.as_bstr())
+    );
+    assert_eq!(
+        Some(bstr::BStr::new("reference")),
+        dist.get(bstr::B("reference")).map(|v| v.as_bstr())
+    );
+    assert_eq!(
+        Some(bstr::BStr::new("")),
+        dist.get(bstr::B("shasum")).map(|v| v.as_bstr())
+    );
+
+    let source = driver.get_source(bstr::BStr::new("reference"));
+    assert_eq!(
+        Some(bstr::BStr::new("git")),
+        source.get(bstr::B("type")).map(|v| v.as_bstr())
+    );
+    assert_eq!(
+        Some(bstr::BStr::new(url)),
+        source.get(bstr::B("url")).map(|v| v.as_bstr())
+    );
+    assert_eq!(
+        Some(bstr::BStr::new("reference")),
+        source.get(bstr::B("reference")).map(|v| v.as_bstr())
     );
 }
 
@@ -299,7 +337,10 @@ fn test_invalid_support_data() {
     let mut driver = get_driver(repo_url, io, config, http_downloader).unwrap();
 
     driver.get_root_identifier().unwrap();
-    let data = driver.get_composer_information("main").unwrap().unwrap();
+    let data = driver
+        .get_composer_information(bstr::BStr::new("main"))
+        .unwrap()
+        .unwrap();
 
     let support = data.get(B("support")).and_then(|v| v.as_array()).unwrap();
     assert_eq!(
@@ -321,7 +362,7 @@ fn test_supports() {
         GitBitbucketDriver::supports(
             io.clone(),
             config.clone(),
-            "https://bitbucket.org/user/repo.git",
+            bstr::BStr::new("https://bitbucket.org/user/repo.git"),
             false
         )
         .unwrap()
@@ -332,14 +373,19 @@ fn test_supports() {
         !GitBitbucketDriver::supports(
             io.clone(),
             config.clone(),
-            "git@bitbucket.org:user/repo.git",
+            bstr::BStr::new("git@bitbucket.org:user/repo.git"),
             false
         )
         .unwrap()
     );
 
     assert!(
-        !GitBitbucketDriver::supports(io, config, "https://github.com/user/repo.git", false)
-            .unwrap()
+        !GitBitbucketDriver::supports(
+            io,
+            config,
+            bstr::BStr::new("https://github.com/user/repo.git"),
+            false
+        )
+        .unwrap()
     );
 }

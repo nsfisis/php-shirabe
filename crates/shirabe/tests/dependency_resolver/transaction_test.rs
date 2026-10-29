@@ -18,11 +18,11 @@ fn mk_link(
 ) -> Link {
     let pretty = legacy_lossy(&constraint.get_pretty_string()).into_owned();
     Link::new(
-        source.to_string(),
-        target.to_string(),
+        bstr::BString::from(source.to_string()),
+        bstr::BString::from(target.to_string()),
         constraint,
-        Some(r#type.to_string()),
-        pretty,
+        Some(bstr::BString::from(r#type.to_string())),
+        bstr::BString::from(pretty),
     )
 }
 
@@ -130,18 +130,16 @@ fn test_transaction_generation_and_sorting() {
     plugin
         .as_complete_package()
         .unwrap()
-        .__set_type("composer-installer".to_string());
+        .__set_type(bstr::BString::from("composer-installer".to_string()));
     for plugin_package in [&plugin2, &dl_modifying_plugin, &dl_modifying_plugin2] {
         plugin_package
             .as_complete_package()
             .unwrap()
-            .__set_type("composer-plugin".to_string());
+            .__set_type(bstr::BString::from("composer-plugin".to_string()));
     }
 
-    plugin2
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([(
+    plugin2.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([(
             "x/plugin2-dep".to_string(),
             mk_link(
                 "x/plugin2",
@@ -149,19 +147,28 @@ fn test_transaction_generation_and_sorting() {
                 get_version_constraint("=", "1.0.0"),
                 Link::TYPE_REQUIRE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
     dl_modifying_plugin2
         .as_complete_package()
         .unwrap()
-        .__set_requires(IndexMap::from([(
-            "x/downloads-modifying2-dep".to_string(),
-            mk_link(
-                "x/downloads-modifying2",
-                "x/downloads-modifying2-dep",
-                get_version_constraint("=", "1.0.0"),
-                Link::TYPE_REQUIRE,
-            ),
-        )]));
+        .__set_requires(
+            IndexMap::from([(
+                "x/downloads-modifying2-dep".to_string(),
+                mk_link(
+                    "x/downloads-modifying2",
+                    "x/downloads-modifying2-dep",
+                    get_version_constraint("=", "1.0.0"),
+                    Link::TYPE_REQUIRE,
+                ),
+            )])
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        );
     dl_modifying_plugin
         .as_complete_package()
         .unwrap()
@@ -177,10 +184,8 @@ fn test_transaction_generation_and_sorting() {
             PhpMixed::Bool(true),
         )]));
 
-    package_d
-        .as_complete_package()
-        .unwrap()
-        .__set_requires(IndexMap::from([
+    package_d.as_complete_package().unwrap().__set_requires(
+        IndexMap::from([
             (
                 "f/f".to_string(),
                 mk_link(
@@ -199,11 +204,13 @@ fn test_transaction_generation_and_sorting() {
                     Link::TYPE_REQUIRE,
                 ),
             ),
-        ]));
-    package_g
-        .as_complete_package()
-        .unwrap()
-        .__set_provides(IndexMap::from([(
+        ])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
+    package_g.as_complete_package().unwrap().__set_provides(
+        IndexMap::from([(
             "g/provider".to_string(),
             mk_link(
                 "g/g",
@@ -211,7 +218,11 @@ fn test_transaction_generation_and_sorting() {
                 get_version_constraint("==", "1.0.0"),
                 Link::TYPE_PROVIDE,
             ),
-        )]));
+        )])
+        .into_iter()
+        .map(|(k, v)| (bstr::BString::from(k), v))
+        .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let expected_operations = vec![
         OperationEntry::Job {

@@ -123,7 +123,7 @@ impl LocalFilesystem {
                 } else {
                     "Reading "
                 },
-                Url::sanitize(orig_file_url.clone()),
+                Url::sanitize(orig_file_url.clone()).display_lossy(),
                 using_proxy
             ),
             true,

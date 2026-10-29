@@ -21,8 +21,8 @@ use crate::util::{Filesystem, PackageSorter};
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_fill_keys, array_intersect, array_keys, array_map,
-    array_merge, array_unique, empty, file_exists, file_get_contents, file_put_contents, filesize,
+    PhpMixed, RuntimeException, array_fill_keys, array_intersect, array_keys, array_merge,
+    array_unique, empty, file_exists, file_get_contents, file_put_contents, filesize,
     impl_php_class, implode, is_writable, legacy_lossy, strtolower, unlink,
 };
 use shirabe_symfony_console::command::Command;
@@ -187,7 +187,7 @@ impl RequireCommand {
             .unwrap_or(false)
         {
             let root_package = composer.get_package();
-            let mut links: IndexMap<String, IndexMap<String, crate::package::Link>> =
+            let mut links: IndexMap<String, IndexMap<BString, crate::package::Link>> =
                 IndexMap::new();
             links.insert(
                 "require".to_string(),
@@ -203,8 +203,8 @@ impl RequireCommand {
                 .map(|(k, v)| (k.as_str().into(), PhpMixed::string(v.clone())))
                 .collect();
             let new_links = loader.parse_links(
-                &root_package.get_name(),
-                &root_package.get_pretty_version(),
+                bstr::BStr::new(&*legacy_lossy(&root_package.get_name())),
+                bstr::BStr::new(&*legacy_lossy(&root_package.get_pretty_version())),
                 base_package::SUPPORTED_LINK_TYPES
                     .get(require_key)
                     .map(|t| t.method)
@@ -218,19 +218,21 @@ impl RequireCommand {
             }
             for (package, _constraint) in requirements {
                 if let Some(section) = links.get_mut(_remove_key) {
-                    section.shift_remove(package);
+                    section.shift_remove(package.as_bytes());
                 }
             }
             root_package.set_requires(links["require"].clone());
             root_package.set_dev_requires(links["require-dev"].clone());
 
             // extract stability flags & references as they weren't present when loading the unmodified composer.json
-            let references =
-                RootPackageLoader::extract_references(requirements, root_package.get_references());
+            let references = RootPackageLoader::extract_references(
+                &bytes_map(requirements),
+                root_package.get_references(),
+            );
             root_package.set_references(references);
             let stability_flags = RootPackageLoader::extract_stability_flags(
-                requirements,
-                &root_package.get_minimum_stability(),
+                &bytes_map(requirements),
+                bstr::BStr::new(&*legacy_lossy(&root_package.get_minimum_stability())),
                 root_package.get_stability_flags(),
             );
             root_package.set_stability_flags(stability_flags);
@@ -496,8 +498,10 @@ impl RequireCommand {
         };
         for package_name in requirements_to_update {
             let mut package = repo.find_package(
-                package_name,
-                crate::repository::FindPackageConstraint::String("*".to_string()),
+                bstr::BStr::new(package_name),
+                crate::repository::FindPackageConstraint::String(bstr::BString::from(
+                    "*".to_string(),
+                )),
             )?;
             while let Some(alias) = package.as_ref().and_then(|p| p.as_alias()) {
                 package = Some(alias.get_alias_of().into());
@@ -509,7 +513,10 @@ impl RequireCommand {
             };
 
             if fixed {
-                requirements.insert(package_name.clone(), package.get_pretty_version());
+                requirements.insert(
+                    package_name.clone(),
+                    legacy_lossy(&package.get_pretty_version()).into_owned(),
+                );
             } else {
                 requirements.insert(
                     package_name.clone(),
@@ -572,8 +579,10 @@ impl RequireCommand {
                     .unwrap_or(false)
             {
                 let stability_flags = RootPackageLoader::extract_stability_flags(
-                    &requirements,
-                    &composer.get_package().get_minimum_stability(),
+                    &bytes_map(&requirements),
+                    bstr::BStr::new(&*legacy_lossy(
+                        &composer.get_package().get_minimum_stability(),
+                    )),
                     IndexMap::new(),
                 );
                 composer.get_locker().borrow_mut().update_hash(
@@ -584,7 +593,7 @@ impl RequireCommand {
                             .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
                         if let Some(section) = section.as_array_mut() {
                             for (package_name, flag) in &stability_flags {
-                                section.insert(package_name.as_str().into(), PhpMixed::Int(*flag));
+                                section.insert(package_name.as_bstr().into(), PhpMixed::Int(*flag));
                             }
                         }
                         lock_data
@@ -914,7 +923,7 @@ impl Command for RequireCommand {
         let preferred_stability = if composer.get_package().get_prefer_stable() {
             "stable".to_string()
         } else {
-            composer.get_package().get_minimum_stability()
+            legacy_lossy(&composer.get_package().get_minimum_stability()).into_owned()
         };
 
         let packages: Vec<String> = input
@@ -990,7 +999,7 @@ impl Command for RequireCommand {
 
                 let found_packages: Vec<crate::package::PackageInterfaceHandle> = self
                     .get_repos()
-                    .find_packages(name, None)?
+                    .find_packages(bstr::BStr::new(name), None)?
                     .into_iter()
                     .collect();
                 let pkg: Option<crate::package::PackageInterfaceHandle> =
@@ -998,11 +1007,11 @@ impl Command for RequireCommand {
                 let pkg_as_complete: Option<crate::package::CompletePackageInterfaceHandle> =
                     pkg.as_ref().and_then(|p| p.as_complete());
                 if let Some(pkg_complete) = pkg_as_complete {
-                    let lowered: Vec<String> =
-                        array_map(|s: &String| strtolower(s), &pkg_complete.get_keywords())
-                            .iter()
-                            .map(|s| legacy_lossy(s).into_owned())
-                            .collect::<Vec<_>>();
+                    let lowered: Vec<String> = pkg_complete
+                        .get_keywords()
+                        .iter()
+                        .map(|s| legacy_lossy(&strtolower(s)).into_owned())
+                        .collect::<Vec<_>>();
                     let pkg_dev_tags: Vec<String> = array_intersect(&dev_tags, &lowered);
                     if (pkg_dev_tags.len() as i64) > 0 {
                         dev_packages.push(pkg_dev_tags);
@@ -1300,4 +1309,11 @@ impl BaseCommand for RequireCommand {
     }
 
     crate::delegate_base_command_trait_impls_to_inner!(base_command_data);
+}
+
+// TODO(bytes): requirements from the command line are Strings.
+fn bytes_map(map: &IndexMap<String, String>) -> IndexMap<BString, BString> {
+    map.iter()
+        .map(|(k, v)| (BString::from(k.as_str()), BString::from(v.as_str())))
+        .collect()
 }

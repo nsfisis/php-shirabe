@@ -149,7 +149,7 @@ fn test_global_show() {
     let composer_home_str = tear_down.working_dir().to_str().unwrap().to_string();
 
     let pkg = get_complete_package("vendor/global-tool", "1.0.0");
-    pkg.set_description("A globally installed tool".to_string());
+    pkg.set_description(bstr::BString::from("A globally installed tool".to_string()));
     create_installed_json(&[pkg.into()], &[], true);
 
     Platform::put_env("COMPOSER_HOME", &composer_home_str);

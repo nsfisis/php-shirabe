@@ -10,9 +10,9 @@ use crate::util::{
 use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, array_keys, array_map, array_merge, empty, implode, is_string,
-    json_encode, legacy_lossy, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
-    str_replace, strlen, strnatcasecmp, strpos, substr, trim, usort,
+    PhpMixed, RuntimeException, array_map, array_merge, empty, implode, is_string, json_encode,
+    legacy_lossy, php_regex, preg_is_match, preg_match, preg_quote, preg_replace, str_replace,
+    strlen, strnatcasecmp, strpos, substr, trim, usort,
 };
 
 /// Seam over the parts of [`VersionGuesser`] that consumers depend on, so they can be exercised
@@ -242,7 +242,9 @@ impl VersionGuesser {
                         is_feature_branch = true;
                         is_detached = true;
                     } else {
-                        version = Some(self.version_parser.normalize_branch(&g1)?);
+                        version = Some(
+                            legacy_lossy(&self.version_parser.normalize_branch(&g1)?).into_owned(),
+                        );
                         pretty_version = Some(format!("dev-{}", g1));
                         is_feature_branch = self.is_feature_branch(package_config, Some(&g1));
                     }
@@ -318,7 +320,7 @@ impl VersionGuesser {
                 .as_list()
                 .map(|l| {
                     l.iter()
-                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                        .filter_map(|v| v.as_string().map(BString::from))
                         .collect()
                 })
                 .unwrap_or_default(),
@@ -364,12 +366,12 @@ impl VersionGuesser {
             &mut output,
             Some(std::path::Path::new(path)),
         )? {
-            match self
-                .version_parser
-                .normalize(&legacy_lossy(&trim(&output)), None)
-            {
+            match self.version_parser.normalize(trim(&output), None) {
                 Ok(version) => {
-                    return Ok(Some((version, legacy_lossy(&trim(&output)).into_owned())));
+                    return Ok(Some((
+                        legacy_lossy(&version).into_owned(),
+                        legacy_lossy(&trim(&output)).into_owned(),
+                    )));
                 }
                 Err(_e) => {}
             }
@@ -391,7 +393,8 @@ impl VersionGuesser {
             Some(std::path::Path::new(path)),
         )? {
             let branch = legacy_lossy(&trim(&output)).into_owned();
-            let version = self.version_parser.normalize_branch(&branch)?;
+            let version =
+                legacy_lossy(&self.version_parser.normalize_branch(&branch)?).into_owned();
             let is_feature_branch = strpos(&version, "dev-") == Some(0);
 
             if VersionParser::DEFAULT_BRANCH_ALIAS == version {
@@ -434,8 +437,11 @@ impl VersionGuesser {
                 http_downloader,
                 std::rc::Rc::clone(&self.process),
             );
-            let branches: Vec<String> =
-                array_map(|k: &String| k.clone(), &array_keys(&driver.get_branches()?));
+            let branches: Vec<String> = driver
+                .get_branches()?
+                .keys()
+                .map(|k| legacy_lossy(k).into_owned())
+                .collect();
 
             // try to find the best (nearest) version branch to assume this feature's version
             let result = self.guess_feature_version(
@@ -460,8 +466,9 @@ impl VersionGuesser {
                 version: result.version,
                 commit,
                 pretty_version: result.pretty_version,
-                feature_version,
-                feature_pretty_version,
+                feature_version: feature_version.map(|s| legacy_lossy(&s).into_owned()),
+                feature_pretty_version: feature_pretty_version
+                    .map(|s| legacy_lossy(&s).into_owned()),
             }));
         }
 
@@ -578,8 +585,10 @@ impl VersionGuesser {
                         last_index = index;
                         length = strlen(&output);
                         version = Some(
-                            self.version_parser
-                                .normalize_branch(&legacy_lossy(&candidate_version))?,
+                            legacy_lossy(
+                                &self.version_parser.normalize_branch(&candidate_version)?,
+                            )
+                            .into_owned(),
                         );
                         pretty_version = Some(format!("dev-{}", legacy_lossy(&candidate_version)));
                         if length == 0 {
@@ -608,11 +617,11 @@ impl VersionGuesser {
         let mut non_feature_branches = String::new();
         let nf_value = package_config.get(B("non-feature-branches"));
         if !empty(&nf_value.cloned().unwrap_or(PhpMixed::Null)) {
-            let names: Vec<String> = nf_value
+            let names: Vec<BString> = nf_value
                 .and_then(|v| v.as_list())
                 .map(|l| {
                     l.iter()
-                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                        .filter_map(|v| v.as_string().map(BString::from))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -644,7 +653,8 @@ impl VersionGuesser {
             Some(std::path::Path::new(path)),
         )? {
             let branch = legacy_lossy(&trim(&output)).into_owned();
-            version = Some(self.version_parser.normalize_branch(&branch)?);
+            version =
+                Some(legacy_lossy(&self.version_parser.normalize_branch(&branch)?).into_owned());
             pretty_version = Some(format!("dev-{}", branch));
         }
 
@@ -655,12 +665,9 @@ impl VersionGuesser {
             &mut output,
             Some(std::path::Path::new(path)),
         )? {
-            match self
-                .version_parser
-                .normalize(&legacy_lossy(&trim(&output)), None)
-            {
+            match self.version_parser.normalize(trim(&output), None) {
                 Ok(v) => {
-                    version = Some(v);
+                    version = Some(legacy_lossy(&v).into_owned());
                     pretty_version = Some(legacy_lossy(&trim(&output)).into_owned());
                 }
                 Err(_e) => {}
@@ -721,7 +728,8 @@ impl VersionGuesser {
                 {
                     let m3: &str = &legacy_lossy(m3);
                     // we are in a branches path
-                    let version = self.version_parser.normalize_branch(m3)?;
+                    let version =
+                        legacy_lossy(&self.version_parser.normalize_branch(m3)?).into_owned();
                     let pretty_version = format!("dev-{}", m3);
 
                     return Ok(Some(VersionData {
@@ -738,7 +746,8 @@ impl VersionGuesser {
                 let version = if pretty_version == "trunk" {
                     "dev-trunk".to_string()
                 } else {
-                    self.version_parser.normalize(&pretty_version, None)?
+                    legacy_lossy(&self.version_parser.normalize(&pretty_version, None)?)
+                        .into_owned()
                 };
 
                 return Ok(Some(VersionData {

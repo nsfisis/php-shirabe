@@ -253,8 +253,12 @@ impl BinaryPresenceInterface for BinaryInstaller {
 /// type set via `__set_type` (PackageInterfaceHandle does not expose the setter).
 fn typed_package(name: &str, version: &str, r#type: &str) -> PackageInterfaceHandle {
     let norm_version = legacy_lossy(&VersionParser.normalize(version, None).unwrap()).into_owned();
-    let handle = CompletePackageHandle::new(name.to_string(), norm_version, version.to_string());
-    handle.__set_type(r#type.to_string());
+    let handle = CompletePackageHandle::new(
+        bstr::BString::from(name.to_string()),
+        bstr::BString::from(norm_version),
+        bstr::BString::from(version.to_string()),
+    );
+    handle.__set_type(bstr::BString::from(r#type.to_string()));
     handle.into()
 }
 

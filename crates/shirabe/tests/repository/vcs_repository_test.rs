@@ -11,7 +11,7 @@ use shirabe::util::ProcessExecutor;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::http_downloader::HttpDownloader;
 use shirabe::util::r#loop::Loop;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 use tempfile::TempDir;
 
 struct SetUp {
@@ -236,7 +236,7 @@ fn test_load_versions() {
     let packages = repo.__get_packages().unwrap();
 
     for package in &packages {
-        let pretty = package.get_pretty_version();
+        let pretty = legacy_lossy(&package.get_pretty_version()).into_owned();
         assert!(
             expected.shift_remove(&pretty),
             "Unexpected version {}",

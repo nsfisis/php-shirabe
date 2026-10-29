@@ -5,7 +5,6 @@ use shirabe::package::DisplayMode;
 use shirabe::package::base_package::package_names_to_regexp;
 use shirabe::package::handle::PackageHandle;
 use shirabe::repository::{ArrayRepository, RepositoryInterfaceHandle};
-use shirabe_php_shim::legacy_lossy;
 use shirabe_semver::VersionParser;
 
 fn empty_repository() -> RepositoryInterfaceHandle {
@@ -56,12 +55,12 @@ fn test_format_version_for_dev_package() {
 
     for (source_reference, truncate, expected) in cases {
         let package = PackageHandle::new(
-            "dummy/pkg".to_string(),
-            legacy_lossy(&VersionParser.normalize("dev-master", None).unwrap()).into_owned(),
-            "PrettyVersion".to_string(),
+            bstr::BString::from("dummy/pkg".to_string()),
+            bstr::BString::from(&VersionParser.normalize("dev-master", None).unwrap()[..]),
+            bstr::BString::from("PrettyVersion".to_string()),
         );
-        package.__set_source_type(Some("git".to_string()));
-        package.set_source_reference(Some(source_reference.to_string()));
+        package.__set_source_type(Some(bstr::BString::from("git".to_string())));
+        package.set_source_reference(Some(bstr::BString::from(source_reference.to_string())));
 
         assert_eq!(
             expected,

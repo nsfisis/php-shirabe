@@ -20,8 +20,8 @@ use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 fn test_filter_packages_by_advisories() {
     let audit_config = AuditConfig::new(
         true,
-        Auditor::FORMAT_SUMMARY.to_string(),
-        Auditor::ABANDONED_FAIL.to_string(),
+        bstr::BString::from(Auditor::FORMAT_SUMMARY.to_string()),
+        bstr::BString::from(Auditor::ABANDONED_FAIL.to_string()),
         true,
         true,
         false,
@@ -55,21 +55,21 @@ fn test_filter_packages_by_advisories() {
     let repository = RepositoryInterfaceHandle::new(PackageRepository::new(config));
 
     let package: PackageInterfaceHandle = PackageHandle::new(
-        "acme/package".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0".to_string(),
+        bstr::BString::from("acme/package".to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0".to_string()),
     )
     .into();
     let expected_package1: PackageInterfaceHandle = PackageHandle::new(
-        "acme/package".to_string(),
-        "2.0.0.0".to_string(),
-        "2.0".to_string(),
+        bstr::BString::from("acme/package".to_string()),
+        bstr::BString::from("2.0.0.0".to_string()),
+        bstr::BString::from("2.0".to_string()),
     )
     .into();
     let expected_package2: PackageInterfaceHandle = PackageHandle::new(
-        "acme/other".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0".to_string(),
+        bstr::BString::from("acme/other".to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0".to_string()),
     )
     .into();
 
@@ -95,7 +95,12 @@ fn test_filter_packages_by_advisories() {
     assert!(packages[1].ptr_eq(&expected_package2));
 
     let constraint: AnyConstraint = SimpleConstraint::new("==", "1.0.0.0".to_string(), None).into();
-    assert!(filtered_pool.is_security_removed_package_version("acme/package", Some(&constraint)));
+    assert!(
+        filtered_pool.is_security_removed_package_version(
+            bstr::BStr::new("acme/package"),
+            Some(&constraint)
+        )
+    );
     assert_eq!(
         filtered_pool
             .get_all_abandoned_removed_package_versions()
@@ -104,15 +109,15 @@ fn test_filter_packages_by_advisories() {
     );
 
     let advisory_map = filtered_pool.get_all_security_removed_package_versions();
-    assert!(advisory_map.contains_key("acme/package"));
-    assert!(advisory_map["acme/package"].contains_key("1.0.0.0"));
+    assert!(advisory_map.contains_key(bstr::B("acme/package")));
+    assert!(advisory_map[bstr::B("acme/package")].contains_key(bstr::B("1.0.0.0")));
     assert_eq!(
         vec![
             legacy_lossy(advisory1[B("advisoryId")].as_string().unwrap()).into_owned(),
             legacy_lossy(advisory2[B("advisoryId")].as_string().unwrap()).into_owned(),
         ],
         filtered_pool.get_security_advisory_identifiers_for_package_version(
-            "acme/package",
+            bstr::BStr::new("acme/package"),
             Some(&constraint)
         ),
     );
@@ -120,12 +125,12 @@ fn test_filter_packages_by_advisories() {
 
 #[test]
 fn test_dont_filter_packages_by_ignored_advisories() {
-    let mut ignore_list: IndexMap<String, Option<String>> = IndexMap::new();
-    ignore_list.insert("CVE-2024-1234".to_string(), None);
+    let mut ignore_list: IndexMap<BString, Option<BString>> = IndexMap::new();
+    ignore_list.insert(BString::from("CVE-2024-1234"), None);
     let audit_config = AuditConfig::new(
         true,
-        Auditor::FORMAT_SUMMARY.to_string(),
-        Auditor::ABANDONED_FAIL.to_string(),
+        bstr::BString::from(Auditor::FORMAT_SUMMARY.to_string()),
+        bstr::BString::from(Auditor::ABANDONED_FAIL.to_string()),
         true,
         true,
         false,
@@ -156,15 +161,15 @@ fn test_dont_filter_packages_by_ignored_advisories() {
     let repository = RepositoryInterfaceHandle::new(PackageRepository::new(config));
 
     let expected_package1: PackageInterfaceHandle = PackageHandle::new(
-        "acme/package".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0".to_string(),
+        bstr::BString::from("acme/package".to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0".to_string()),
     )
     .into();
     let expected_package2: PackageInterfaceHandle = PackageHandle::new(
-        "acme/package".to_string(),
-        "1.1.0.0".to_string(),
-        "1.1".to_string(),
+        bstr::BString::from("acme/package".to_string()),
+        bstr::BString::from("1.1.0.0".to_string()),
+        bstr::BString::from("1.1".to_string()),
     )
     .into();
 
@@ -202,8 +207,8 @@ fn test_dont_filter_packages_by_ignored_advisories() {
 fn test_dont_filter_packages_with_block_insecure_disabled() {
     let audit_config = AuditConfig::new(
         true,
-        Auditor::FORMAT_SUMMARY.to_string(),
-        Auditor::ABANDONED_FAIL.to_string(),
+        bstr::BString::from(Auditor::FORMAT_SUMMARY.to_string()),
+        bstr::BString::from(Auditor::ABANDONED_FAIL.to_string()),
         false,
         true,
         false,
@@ -234,15 +239,15 @@ fn test_dont_filter_packages_with_block_insecure_disabled() {
     let repository = RepositoryInterfaceHandle::new(PackageRepository::new(config));
 
     let expected_package1: PackageInterfaceHandle = PackageHandle::new(
-        "acme/package".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0".to_string(),
+        bstr::BString::from("acme/package".to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0".to_string()),
     )
     .into();
     let expected_package2: PackageInterfaceHandle = PackageHandle::new(
-        "acme/package".to_string(),
-        "1.1.0.0".to_string(),
-        "1.1".to_string(),
+        bstr::BString::from("acme/package".to_string()),
+        bstr::BString::from("1.1.0.0".to_string()),
+        bstr::BString::from("1.1".to_string()),
     )
     .into();
 
@@ -279,12 +284,12 @@ fn test_dont_filter_packages_with_block_insecure_disabled() {
 #[test]
 fn test_dont_filter_packages_with_abandoned_package() {
     let package_name_ignore_abandoned = "acme/ignore-abandoned";
-    let mut ignore_abandoned: IndexMap<String, Option<String>> = IndexMap::new();
-    ignore_abandoned.insert(package_name_ignore_abandoned.to_string(), None);
+    let mut ignore_abandoned: IndexMap<BString, Option<BString>> = IndexMap::new();
+    ignore_abandoned.insert(BString::from(package_name_ignore_abandoned), None);
     let audit_config = AuditConfig::new(
         true,
-        Auditor::FORMAT_SUMMARY.to_string(),
-        Auditor::ABANDONED_FAIL.to_string(),
+        bstr::BString::from(Auditor::FORMAT_SUMMARY.to_string()),
+        bstr::BString::from(Auditor::ABANDONED_FAIL.to_string()),
         true,
         true,
         false,
@@ -298,21 +303,21 @@ fn test_dont_filter_packages_with_abandoned_package() {
     let filter = SecurityAdvisoryPoolFilter::new(Auditor, audit_config);
 
     let abandoned_package = CompletePackageHandle::new(
-        "acme/package".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0".to_string(),
+        bstr::BString::from("acme/package".to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0".to_string()),
     );
     abandoned_package.set_abandoned(PhpMixed::Bool(true));
     let ignore_abandoned_package = CompletePackageHandle::new(
-        package_name_ignore_abandoned.to_string(),
-        "1.0.0.0".to_string(),
-        "1.0".to_string(),
+        bstr::BString::from(package_name_ignore_abandoned.to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0".to_string()),
     );
     ignore_abandoned_package.set_abandoned(PhpMixed::Bool(true));
     let expected_package = PackageHandle::new(
-        "acme/other".to_string(),
-        "1.1.0.0".to_string(),
-        "1.1".to_string(),
+        bstr::BString::from("acme/other".to_string()),
+        bstr::BString::from("1.1.0.0".to_string()),
+        bstr::BString::from("1.1".to_string()),
     );
 
     let expected_package: PackageInterfaceHandle = expected_package.into();

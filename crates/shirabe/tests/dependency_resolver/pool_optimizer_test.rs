@@ -43,14 +43,17 @@ fn reduce_packages_info_for_comparison(packages: &[BasePackageHandle]) -> Vec<St
 
     for package in packages {
         let suffix = if let Some(alias) = package.as_alias() {
-            format!(" (alias of {})", alias.get_alias_of().get_version())
+            format!(
+                " (alias of {})",
+                legacy_lossy(&alias.get_alias_of().get_version())
+            )
         } else {
             String::new()
         };
         packages_info.push(format!(
             "{}@{}{}",
-            package.get_name(),
-            package.get_version(),
+            legacy_lossy(&package.get_name()),
+            legacy_lossy(&package.get_version()),
             suffix
         ));
     }
@@ -206,10 +209,10 @@ fn run_test_pool_optimizer(
     for (package, constraint) in request_data[B("require")].as_array().unwrap() {
         request
             .require_name(
-                &package.to_str_lossy(),
+                package.as_bstr(),
                 Some(
                     parser
-                        .parse_constraints(&constraint.as_string().unwrap().to_str_lossy())
+                        .parse_constraints(constraint.as_string().unwrap())
                         .unwrap(),
                 ),
             )

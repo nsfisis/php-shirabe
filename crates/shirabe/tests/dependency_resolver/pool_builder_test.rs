@@ -20,7 +20,8 @@ use shirabe::repository::lock_array_repository::LockArrayRepository;
 use shirabe::repository::repository_factory::RepositoryFactory;
 use shirabe::repository::repository_set::{RepositorySet, RootAliasInput};
 use shirabe_php_shim::{
-    PhpMixed, file_get_contents, legacy_lossy, php_regex, preg_is_match, preg_split_delim_capture,
+    PhpMixed, bconcat, file_get_contents, legacy_lossy, php_regex, preg_is_match,
+    preg_split_delim_capture,
 };
 use std::path::PathBuf;
 
@@ -260,7 +261,7 @@ fn get_package_result_set(
 
             let mut suffix = String::new();
             if let Some(source_reference) = package.get_source_reference() {
-                suffix = format!("#{}", source_reference);
+                suffix = format!("#{}", legacy_lossy(&source_reference));
             }
             if let Some(repo) = package.get_repository()
                 && repo.is::<LockArrayRepository>()
@@ -279,27 +280,31 @@ fn get_package_result_set(
                     }
                 }
                 if let Some(id) = matched {
-                    return PhpMixed::string(format!(
-                        "{}-{}{} (alias of {})",
+                    return PhpMixed::string(bconcat!(
                         package.get_name(),
+                        "-",
                         package.get_version(),
                         suffix,
-                        id
+                        " (alias of ",
+                        id,
+                        ")"
                     ));
                 }
 
-                return PhpMixed::string(format!(
-                    "{}-{}{} (alias of {})",
+                return PhpMixed::string(bconcat!(
                     package.get_name(),
+                    "-",
                     package.get_version(),
                     suffix,
-                    alias_of.get_version()
+                    " (alias of ",
+                    alias_of.get_version(),
+                    ")"
                 ));
             }
 
-            PhpMixed::string(format!(
-                "{}-{}{}",
+            PhpMixed::string(bconcat!(
                 package.get_name(),
+                "-",
                 package.get_version(),
                 suffix
             ))
@@ -396,12 +401,12 @@ fn run_test_pool_builder(
     };
 
     // PHP: array_map over stability flags, mapping to BasePackage::STABILITIES[$stability].
-    let mut stability_flags: IndexMap<String, i64> = IndexMap::new();
+    let mut stability_flags: IndexMap<BString, i64> = IndexMap::new();
     for (name, stability) in &stability_flags_data {
         let Some(value) = STABILITIES.get(stability.as_str()) else {
             panic!("Invalid stability given: {}", stability);
         };
-        stability_flags.insert(name.clone(), *value);
+        stability_flags.insert(bstr::BString::from(name.clone()), *value);
     }
 
     let parser = VersionParser::new();
@@ -417,11 +422,10 @@ fn run_test_pool_builder(
         .into_owned();
         let version = parser
             .normalize(
-                &alias
+                alias
                     .get(B("version"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_str_lossy(),
+                    .unwrap_or_default(),
                 None,
             )
             .unwrap();
@@ -434,18 +438,17 @@ fn run_test_pool_builder(
         .into_owned();
         let alias_normalized = parser
             .normalize(
-                &alias
+                alias
                     .get(B("alias"))
                     .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_str_lossy(),
+                    .unwrap_or_default(),
                 None,
             )
             .unwrap();
         root_aliases.push(RootAliasInput {
-            package,
+            package: bstr::BString::from(package),
             version,
-            alias: alias_str,
+            alias: bstr::BString::from(alias_str),
             alias_normalized,
         });
     }
@@ -461,7 +464,10 @@ fn run_test_pool_builder(
         &minimum_stability,
         stability_flags,
         root_aliases,
-        root_references,
+        root_references
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+            .collect::<indexmap::IndexMap<_, _>>(),
         IndexMap::new(),
         IndexMap::new(),
     );
@@ -559,10 +565,10 @@ fn run_test_pool_builder(
     for (package, constraint) in request_map[B("require")].as_array().unwrap() {
         request
             .require_name(
-                &package.to_str_lossy(),
+                package.as_bstr(),
                 Some(
                     parser
-                        .parse_constraints(&constraint.as_string().unwrap().to_str_lossy())
+                        .parse_constraints(constraint.as_string().unwrap())
                         .unwrap(),
                 ),
             )
@@ -593,7 +599,13 @@ fn run_test_pool_builder(
             .iter()
             .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
             .collect();
-        request.set_update_allow_list(allow_list_names, transitive_deps);
+        request.set_update_allow_list(
+            allow_list_names
+                .into_iter()
+                .map(bstr::BString::from)
+                .collect::<Vec<_>>(),
+            transitive_deps,
+        );
     }
 
     // PHP: foreach ($fixed as $fixedPackage)

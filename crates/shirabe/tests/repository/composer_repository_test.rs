@@ -176,8 +176,8 @@ fn test_load_data() {
                 format!("{} {}", name, version),
                 format!(
                     "{} {}",
-                    packages[index].get_name(),
-                    packages[index].get_pretty_version()
+                    legacy_lossy(&packages[index].get_name()),
+                    legacy_lossy(&packages[index].get_pretty_version())
                 )
             );
         }
@@ -747,7 +747,7 @@ fn test_get_security_advisories_assert_repository_advisories_is_zero_indexed_arr
 
     let result = repository.get_security_advisories(map, false).unwrap();
 
-    let actual = result.advisories.get(package_name).unwrap();
+    let actual = result.advisories.get(bstr::B(package_name)).unwrap();
     assert_eq!(expected_advisory_ids.len(), actual.len());
     for (i, expected_id) in expected_advisory_ids.iter().enumerate() {
         assert_eq!(expected_id, actual[i].advisory_id());

@@ -1,93 +1,95 @@
 //! ref: composer/src/Composer/Util/ComposerMirror.php
 
-use shirabe_php_shim::{hash, legacy_lossy, php_regex, preg_is_match, preg_match, preg_replace};
+use bstr::{BStr, BString};
+use shirabe_php_shim::{
+    bconcat, hash, php_regex, preg_is_match, preg_match, preg_replace, str_replace_array, trim2,
+};
 
 pub struct ComposerMirror;
 
 impl ComposerMirror {
     pub fn process_url(
-        mirror_url: &str,
-        package_name: &str,
-        version: &str,
-        reference: Option<&str>,
-        r#type: Option<&str>,
-        pretty_version: Option<&str>,
-    ) -> String {
+        mirror_url: &BStr,
+        package_name: &BStr,
+        version: &BStr,
+        reference: Option<&BStr>,
+        r#type: Option<&BStr>,
+        pretty_version: Option<&BStr>,
+    ) -> BString {
         let reference = reference.map(|r| {
-            if preg_is_match(php_regex!(r"{^([a-f0-9]*|%reference%)$}"), r) {
-                r.to_string()
+            let truthy = !r.is_empty() && r != "0";
+            if !truthy || preg_is_match(php_regex!(r"{^([a-f0-9]*|%reference%)$}"), r) {
+                BString::from(r)
             } else {
-                legacy_lossy(&hash("md5", r)).into_owned()
+                hash("md5", r)
             }
         });
-        let version = if !version.contains('/') {
-            version.to_string()
+        let version = if !version.contains(&b'/') {
+            BString::from(version)
         } else {
-            legacy_lossy(&hash("md5", version)).into_owned()
+            hash("md5", version)
         };
 
-        let mut from = vec!["%package%", "%version%", "%reference%", "%type%"];
-        let mut to: Vec<&str> = vec![
+        let mut from: Vec<&[u8]> = vec![b"%package%", b"%version%", b"%reference%", b"%type%"];
+        let mut to: Vec<&[u8]> = vec![
             package_name,
             &version,
-            reference.as_deref().unwrap_or_default(),
-            r#type.unwrap_or_default(),
+            reference.as_ref().map_or(b"".as_slice(), |r| r.as_slice()),
+            &**r#type.unwrap_or_default(),
         ];
         if let Some(pv) = pretty_version {
-            from.push("%prettyVersion%");
+            from.push(b"%prettyVersion%");
             to.push(pv);
         }
 
-        let url = from
-            .iter()
-            .zip(to.iter())
-            .fold(mirror_url.to_string(), |acc, (f, t)| acc.replace(f, t));
+        let url = str_replace_array(&from, &to, mirror_url);
         assert!(!url.is_empty());
         url
     }
 
     pub fn process_git_url(
-        mirror_url: &str,
-        package_name: &str,
-        url: &str,
-        r#type: Option<&str>,
-    ) -> String {
+        mirror_url: &BStr,
+        package_name: &BStr,
+        url: &BStr,
+        r#type: Option<&BStr>,
+    ) -> BString {
         let normalized_url = if let Some(gh_matches) = preg_match(
             php_regex!(
                 r"#^(?:(?:https?|git)://github\.com/|git@github\.com:)([^/]+)/(.+?)(?:\.git)?$#"
             ),
             url,
         ) {
-            format!(
-                "gh-{}/{}",
-                legacy_lossy(&gh_matches.get(1).unwrap_or_default()),
-                legacy_lossy(&gh_matches.get(2).unwrap_or_default()),
+            bconcat!(
+                "gh-",
+                gh_matches.get(1).unwrap_or_default(),
+                "/",
+                gh_matches.get(2).unwrap_or_default(),
             )
         } else if let Some(bb_matches) = preg_match(
             php_regex!(r"#^https://bitbucket\.org/([^/]+)/(.+?)(?:\.git)?/?$#"),
             url,
         ) {
-            format!(
-                "bb-{}/{}",
-                legacy_lossy(&bb_matches.get(1).unwrap_or_default()),
-                legacy_lossy(&bb_matches.get(2).unwrap_or_default()),
+            bconcat!(
+                "bb-",
+                bb_matches.get(1).unwrap_or_default(),
+                "/",
+                bb_matches.get(2).unwrap_or_default(),
             )
         } else {
-            legacy_lossy(&preg_replace(
-                php_regex!(r"{[^a-z0-9_.-]}i"),
-                "-",
-                url.trim_matches('/'),
-            ))
-            .into_owned()
+            preg_replace(php_regex!(r"{[^a-z0-9_.-]}i"), "-", trim2(url, "/"))
         };
 
-        ["%package%", "%normalizedUrl%", "%type%"]
-            .iter()
-            .zip([package_name, &normalized_url, r#type.unwrap_or_default()])
-            .fold(mirror_url.to_string(), |acc, (f, t)| acc.replace(f, t))
+        let from: [&[u8]; 3] = [b"%package%", b"%normalizedUrl%", b"%type%"];
+        let to: [&[u8]; 3] = [package_name, &normalized_url, &**r#type.unwrap_or_default()];
+        str_replace_array(&from, &to, mirror_url)
     }
 
-    pub fn process_hg_url(mirror_url: &str, package_name: &str, url: &str, r#type: &str) -> String {
+    pub fn process_hg_url(
+        mirror_url: &BStr,
+        package_name: &BStr,
+        url: &BStr,
+        r#type: &BStr,
+    ) -> BString {
         Self::process_git_url(mirror_url, package_name, url, Some(r#type))
     }
 }

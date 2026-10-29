@@ -25,7 +25,7 @@ pub use vcs_driver_interface::*;
 use crate::config::Config;
 use crate::io::IOInterface;
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpClass, PhpMixed};
 
@@ -122,7 +122,7 @@ impl VcsDriverKind {
         self,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        url: &str,
+        url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {
         match self {
@@ -142,7 +142,7 @@ impl VcsDriverKind {
 impl PhpClass for VcsDriverKind {
     /// Used as the fallback driver name in `getRepoName()`.
     fn php_class_name(&self) -> String {
-        match self {
+        String::from(match self {
             VcsDriverKind::GitHub => r"Composer\Repository\Vcs\GitHubDriver",
             VcsDriverKind::GitLab => r"Composer\Repository\Vcs\GitLabDriver",
             VcsDriverKind::GitBitbucket => r"Composer\Repository\Vcs\GitBitbucketDriver",
@@ -152,7 +152,6 @@ impl PhpClass for VcsDriverKind {
             VcsDriverKind::Perforce => r"Composer\Repository\Vcs\PerforceDriver",
             VcsDriverKind::Fossil => r"Composer\Repository\Vcs\FossilDriver",
             VcsDriverKind::Svn => r"Composer\Repository\Vcs\SvnDriver",
-        }
-        .to_string()
+        })
     }
 }

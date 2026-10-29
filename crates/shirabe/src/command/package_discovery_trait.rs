@@ -14,7 +14,7 @@ use crate::repository::{
     RepositoryInterface, RepositorySet, SearchResult,
 };
 use crate::util::Filesystem;
-use bstr::{B, ByteSlice};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
@@ -91,8 +91,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     ) -> String {
         if input.borrow().has_option("stability") {
-            return VersionParser::normalize_stability(
-                &input
+            return legacy_lossy(&VersionParser::normalize_stability(
+                input
                     .borrow()
                     .get_option("stability")
                     .expect("get_minimum_stability returns String, not anyhow::Result; stability option is guaranteed present by the has_option guard above")
@@ -100,7 +100,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| "stable".to_string()),
             )
-            .unwrap_or_default();
+            .unwrap_or_default()).into_owned();
         }
 
         let file = Factory::get_composer_file().unwrap_or_default();
@@ -112,7 +112,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 && let Some(ms) = arr.get(B("minimum-stability"))
                 && let Some(s) = ms.as_string()
             {
-                return VersionParser::normalize_stability(&s.to_str_lossy()).unwrap_or_default();
+                return legacy_lossy(&VersionParser::normalize_stability(s).unwrap_or_default())
+                    .into_owned();
             }
         }
 
@@ -219,7 +220,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         let mut existing_packages: Vec<String> = vec![];
         if let Some(repo) = &installed_repo {
             for package in repo.get_packages()? {
-                existing_packages.push(package.get_name().to_string());
+                existing_packages.push(legacy_lossy(&package.get_name()).into_owned());
             }
         }
         // PHP: unset($composer, $installedRepo);
@@ -237,7 +238,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 None => break,
             };
             let mut matches: Vec<SearchResult> = self.get_repos().search(
-                package.clone(),
+                bstr::BString::from(package.clone()),
                 crate::repository::repository_interface::SEARCH_FULLTEXT,
                 None,
             )?;
@@ -264,15 +265,16 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                 // no match, prompt which to pick
                 if !exact_match {
-                    let providers: IndexMap<String, crate::repository::ProviderInfo> =
-                        self.get_repos().get_providers(package.clone())?;
+                    let providers: IndexMap<BString, crate::repository::ProviderInfo> = self
+                        .get_repos()
+                        .get_providers(bstr::BString::from(package.clone()))?;
                     if !providers.is_empty() {
                         // PHP: array_unshift($matches, ['name' => $package, 'description' => '']);
                         matches.insert(
                             0,
                             SearchResult {
-                                name: package.clone(),
-                                description: Some(String::new()),
+                                name: bstr::BString::from(package.clone()),
+                                description: Some(bstr::BString::from(String::new())),
                                 abandoned: None,
                                 url: None,
                             },
@@ -285,7 +287,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         if let Some(ai) = &found_package.abandoned {
                             let replacement = match ai {
                                 crate::repository::AbandonedInfo::Replacement(r) => {
-                                    format!("Use {} instead", r.clone())
+                                    format!("Use {} instead", legacy_lossy(&r.clone()))
                                 }
                                 crate::repository::AbandonedInfo::Abandoned => {
                                     "No replacement was suggested".to_string()
@@ -297,7 +299,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                         choices.push(format!(
                             " <info>{:>5}</info> {} {}",
                             format!("[{}]", position),
-                            found_package.name.clone(),
+                            legacy_lossy(&found_package.name.clone()),
                             abandoned,
                         ));
                     }
@@ -487,7 +489,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
             }
 
             // Check if it is a virtual package provided by others
-            let providers = repo_set.borrow().get_providers(name)?;
+            let providers = repo_set.borrow().get_providers(bstr::BStr::new(name))?;
             if !providers.is_empty() {
                 let mut constraint = "*".to_string();
                 if input.borrow().is_interactive() {
@@ -578,12 +580,12 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             .get_repository()
                             .map(|r| r.get_repo_name())
                             .transpose()?
-                            .unwrap_or_default(),
+                            .unwrap_or_default().display_lossy(),
                         package
                             .get_repository()
                             .map(|r| r.get_repo_name())
                             .transpose()?
-                            .unwrap_or_default(),
+                            .unwrap_or_default().display_lossy(),
                     ))
                     .into());
                 }
@@ -622,7 +624,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             "{}{}Additionally, the package was only found with a stability of \"{}\" while your minimum stability is \"{}\".",
                             PHP_EOL,
                             PHP_EOL,
-                            candidate.get_stability(),
+                            legacy_lossy(&candidate.get_stability()),
                             effective_minimum_stability,
                         );
                     }
@@ -709,9 +711,9 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
         let package = package.unwrap();
         Ok((
-            package.get_pretty_name(),
+            legacy_lossy(&package.get_pretty_name()).into_owned(),
             if fixed {
-                package.get_pretty_version()
+                legacy_lossy(&package.get_pretty_version()).into_owned()
             } else {
                 version_selector.find_recommended_require_version(package)?
             },
@@ -726,10 +728,11 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 )
                 .into());
             }
-            self.get_repos_mut()
-                .as_ref()
-                .unwrap()
-                .search(package.to_string(), 0, None)
+            self.get_repos_mut().as_ref().unwrap().search(
+                bstr::BString::from(package.to_string()),
+                0,
+                None,
+            )
         })() {
             Ok(r) => r,
             Err(e) => {
@@ -753,15 +756,20 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         for result in &results {
             if installed_repo
                 .find_package(
-                    &result.name,
-                    crate::repository::FindPackageConstraint::String("*".to_string()),
+                    result.name.as_bstr(),
+                    crate::repository::FindPackageConstraint::String(bstr::BString::from(
+                        "*".to_string(),
+                    )),
                 )?
                 .is_some()
             {
                 // Ignore installed package
                 continue;
             }
-            similar_packages.insert(result.name.clone(), levenshtein(package, &result.name));
+            similar_packages.insert(
+                legacy_lossy(&result.name.clone()).into_owned(),
+                levenshtein(package, &result.name),
+            );
         }
         asort(&mut similar_packages);
 
@@ -785,27 +793,31 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 continue;
             }
             let platform_pkg = platform_repo.find_package(
-                link.get_target(),
-                crate::repository::FindPackageConstraint::String("*".to_string()),
+                bstr::BStr::new(&*legacy_lossy(link.get_target())),
+                crate::repository::FindPackageConstraint::String(bstr::BString::from(
+                    "*".to_string(),
+                )),
             )?;
             let platform_pkg = match platform_pkg {
                 None => {
-                    if platform_repo.is_platform_package_disabled(link.get_target()) {
+                    if platform_repo.is_platform_package_disabled(bstr::BStr::new(&*legacy_lossy(
+                        link.get_target(),
+                    ))) {
                         details.push(format!(
                             "{} {} requires {} {} but it is disabled by your platform config. Enable it again with \"shirabe config platform.{} --unset\".",
-                            candidate.get_pretty_name(),
-                            candidate.get_pretty_version(),
-                            link.get_target(),
-                            link.get_pretty_constraint(),
-                            link.get_target(),
+                            legacy_lossy(&candidate.get_pretty_name()),
+                            legacy_lossy(&candidate.get_pretty_version()),
+                            legacy_lossy(&link.get_target()),
+                            legacy_lossy(&link.get_pretty_constraint()),
+                            legacy_lossy(&link.get_target()),
                         ));
                     } else {
                         details.push(format!(
                             "{} {} requires {} {} but it is not present.",
-                            candidate.get_pretty_name(),
-                            candidate.get_pretty_version(),
-                            link.get_target(),
-                            link.get_pretty_constraint(),
+                            legacy_lossy(&candidate.get_pretty_name()),
+                            legacy_lossy(&candidate.get_pretty_version()),
+                            legacy_lossy(&link.get_target()),
+                            legacy_lossy(&link.get_pretty_constraint()),
                         ));
                     }
                     continue;
@@ -817,12 +829,13 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                 .matches(&shirabe_semver::constraint::AnyConstraint::Simple(
                     shirabe_semver::constraint::SimpleConstraint::new(
                         "==",
-                        platform_pkg.get_version().to_string(),
+                        legacy_lossy(&platform_pkg.get_version()).into_owned(),
                         None,
                     ),
                 ))
             {
-                let mut platform_pkg_version = platform_pkg.get_pretty_version().to_string();
+                let mut platform_pkg_version =
+                    legacy_lossy(&platform_pkg.get_pretty_version()).into_owned();
                 let platform_extra = platform_pkg.get_extra();
                 let has_config_platform = platform_extra.contains_key(B("config.platform"));
                 let is_complete = platform_pkg.as_complete().is_some();
@@ -830,19 +843,21 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     platform_pkg_version = format!(
                         "{} ({})",
                         platform_pkg_version,
-                        platform_pkg
-                            .as_complete()
-                            .unwrap()
-                            .get_description()
-                            .unwrap_or_default()
+                        legacy_lossy(
+                            &platform_pkg
+                                .as_complete()
+                                .unwrap()
+                                .get_description()
+                                .unwrap_or_default()
+                        )
                     );
                 }
                 details.push(format!(
                     "{} {} requires {} {} which does not match your installed version {}.",
-                    candidate.get_pretty_name(),
-                    candidate.get_pretty_version(),
-                    link.get_target(),
-                    link.get_pretty_constraint(),
+                    legacy_lossy(&candidate.get_pretty_name()),
+                    legacy_lossy(&candidate.get_pretty_version()),
+                    legacy_lossy(&link.get_target()),
+                    legacy_lossy(&link.get_pretty_constraint()),
                     platform_pkg_version,
                 ));
             }

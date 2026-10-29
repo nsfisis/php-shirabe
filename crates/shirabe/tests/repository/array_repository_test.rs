@@ -8,7 +8,7 @@ use shirabe::package::loader::array_loader::ArrayLoader;
 use shirabe::repository::{
     AbandonedInfo, ArrayRepository, RepositoryInterface, SEARCH_FULLTEXT, SearchResult,
 };
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 
 /// PHP `setType`/`setAbandoned` operate on non-root packages; the public handle API only allows
 /// such setters on root packages, so packages carrying extra config are built via ArrayLoader.
@@ -40,9 +40,15 @@ fn reprs(results: &[SearchResult]) -> Vec<(String, Option<String>, Abandoned)> {
             let abandoned = match &r.abandoned {
                 None => Abandoned::No,
                 Some(AbandonedInfo::Abandoned) => Abandoned::Yes,
-                Some(AbandonedInfo::Replacement(s)) => Abandoned::Replacement(s.clone()),
+                Some(AbandonedInfo::Replacement(s)) => {
+                    Abandoned::Replacement(legacy_lossy(&s.clone()).into_owned())
+                }
             };
-            (r.name.clone(), r.description.clone(), abandoned)
+            (
+                legacy_lossy(&r.name).into_owned(),
+                r.description.as_ref().map(|d| legacy_lossy(d).into_owned()),
+                abandoned,
+            )
         })
         .collect()
 }
@@ -90,11 +96,11 @@ fn test_find_packages() {
     repo.add_package(get_package("bar", "2")).unwrap();
     repo.add_package(get_package("bar", "3")).unwrap();
 
-    let foo = repo.find_packages("foo", None).unwrap();
+    let foo = repo.find_packages(bstr::BStr::new("foo"), None).unwrap();
     assert_eq!(1, foo.len());
     assert_eq!(foo[0].get_name(), "foo");
 
-    let bar = repo.find_packages("bar", None).unwrap();
+    let bar = repo.find_packages(bstr::BStr::new("bar"), None).unwrap();
     assert_eq!(2, bar.len());
     assert_eq!(bar[0].get_name(), "bar");
 }
@@ -128,7 +134,11 @@ fn test_search() {
         vec![("foo".to_string(), None, Abandoned::No)],
         reprs(
             &repo
-                .search("foo".to_string(), SEARCH_FULLTEXT, None)
+                .search(
+                    bstr::BString::from("foo".to_string()),
+                    SEARCH_FULLTEXT,
+                    None
+                )
                 .unwrap()
         )
     );
@@ -137,15 +147,23 @@ fn test_search() {
         vec![("bar".to_string(), None, Abandoned::No)],
         reprs(
             &repo
-                .search("bar".to_string(), SEARCH_FULLTEXT, None)
+                .search(
+                    bstr::BString::from("bar".to_string()),
+                    SEARCH_FULLTEXT,
+                    None
+                )
                 .unwrap()
         )
     );
 
     assert!(
-        repo.search("foobar".to_string(), SEARCH_FULLTEXT, None)
-            .unwrap()
-            .is_empty()
+        repo.search(
+            bstr::BString::from("foobar".to_string()),
+            SEARCH_FULLTEXT,
+            None
+        )
+        .unwrap()
+        .is_empty()
     );
 }
 
@@ -168,9 +186,9 @@ fn test_search_with_package_type() {
         reprs(
             &repo
                 .search(
-                    "foo".to_string(),
+                    bstr::BString::from("foo".to_string()),
                     SEARCH_FULLTEXT,
-                    Some("library".to_string())
+                    Some(bstr::BString::from("library".to_string()))
                 )
                 .unwrap()
         )
@@ -178,9 +196,9 @@ fn test_search_with_package_type() {
 
     assert!(
         repo.search(
-            "bar".to_string(),
+            bstr::BString::from("bar".to_string()),
             SEARCH_FULLTEXT,
-            Some("package".to_string())
+            Some(bstr::BString::from("package".to_string()))
         )
         .unwrap()
         .is_empty()
@@ -190,7 +208,11 @@ fn test_search_with_package_type() {
         vec![("foobar".to_string(), None, Abandoned::No)],
         reprs(
             &repo
-                .search("foo".to_string(), 0, Some("composer-plugin".to_string()))
+                .search(
+                    bstr::BString::from("foo".to_string()),
+                    0,
+                    Some(bstr::BString::from("composer-plugin".to_string()))
+                )
                 .unwrap()
         )
     );
@@ -220,7 +242,11 @@ fn test_search_with_abandoned_packages() {
         ],
         reprs(
             &repo
-                .search("foo".to_string(), SEARCH_FULLTEXT, None)
+                .search(
+                    bstr::BString::from("foo".to_string()),
+                    SEARCH_FULLTEXT,
+                    None
+                )
                 .unwrap()
         )
     );

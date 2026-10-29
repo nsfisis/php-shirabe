@@ -88,7 +88,7 @@ impl BinaryInstaller {
                     &format!(
                         "    <warning>Skipped installation of bin {} for package {}: file not found in package</warning>",
                         bin,
-                        package.get_name(),
+                        package.get_name().display_lossy(),
                     ),
                     true,
                     io_interface::NORMAL,
@@ -100,7 +100,7 @@ impl BinaryInstaller {
                     &format!(
                         "    <warning>Skipped installation of bin {} for package {}: found a directory at that path</warning>",
                         bin,
-                        package.get_name(),
+                        package.get_name().display_lossy(),
                     ),
                     true,
                     io_interface::NORMAL,
@@ -125,7 +125,7 @@ impl BinaryInstaller {
                             &format!(
                                 "    Skipped installation of bin {} for package {}: name conflicts with an existing file",
                                 bin,
-                                package.get_name(),
+                                package.get_name().display_lossy(),
                             ),
                             true,
                             io_interface::NORMAL,
@@ -208,7 +208,11 @@ impl BinaryInstaller {
     }
 
     fn get_binaries(&self, package: PackageInterfaceHandle) -> Vec<String> {
-        package.get_binaries()
+        package
+            .get_binaries()
+            .iter()
+            .map(|s| legacy_lossy(s).into_owned())
+            .collect::<Vec<_>>()
     }
 
     fn install_full_binaries(
@@ -228,7 +232,7 @@ impl BinaryInstaller {
                     &format!(
                         "    Skipped installation of bin {}.bat proxy for package {}: a .bat proxy was already installed",
                         bin,
-                        package.get_name(),
+                        package.get_name().display_lossy(),
                     ),
                     true,
                     io_interface::NORMAL,

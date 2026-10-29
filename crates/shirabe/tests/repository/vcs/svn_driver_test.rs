@@ -74,7 +74,7 @@ fn test_support() {
 
         assert_eq!(
             assertion,
-            SvnDriver::supports(io, config, url, false).unwrap()
+            SvnDriver::supports(io, config, bstr::BStr::new(url), false).unwrap()
         );
     }
 }

@@ -127,11 +127,11 @@ fn test_pretty_string() {
         vec![p1.get_id(), -p2.get_id()],
         RULE_PACKAGE_REQUIRES,
         ReasonData::Link(Link::new(
-            "baz".to_string(),
-            "foo".to_string(),
+            bstr::BString::from("baz".to_string()),
+            bstr::BString::from("foo".to_string()),
             empty_constraint.into(),
             None,
-            "*".to_string(),
+            bstr::BString::from("*".to_string()),
         )),
     ));
 

@@ -80,17 +80,17 @@ impl TestCase {
     // ref: ArchiverTestCase::setupPackage.
     fn setup_package(&self) -> CompletePackageInterfaceHandle {
         let package = CompletePackageHandle::new(
-            "archivertest/archivertest".to_string(),
-            "master".to_string(),
-            "master".to_string(),
+            bstr::BString::from("archivertest/archivertest".to_string()),
+            bstr::BString::from("master".to_string()),
+            bstr::BString::from("master".to_string()),
         );
-        package.set_source_url(Some(
+        package.set_source_url(Some(bstr::BString::from(
             realpath(&self.test_dir)
                 .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                 .unwrap_or_default(),
-        ));
-        package.set_source_reference(Some("master".to_string()));
-        package.__set_source_type(Some("git".to_string()));
+        )));
+        package.set_source_reference(Some(bstr::BString::from("master".to_string())));
+        package.__set_source_type(Some(bstr::BString::from("git".to_string())));
 
         package.into()
     }

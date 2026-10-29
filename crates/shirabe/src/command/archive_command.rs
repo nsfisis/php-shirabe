@@ -214,13 +214,16 @@ impl ArchiveCommand {
             min_stability = composer.get_package().get_minimum_stability();
         } else {
             let default_repos = RepositoryFactory::default_repos_with_default_manager(io.clone())?;
-            let repo_names: Vec<String> = default_repos.keys().cloned().collect();
+            let repo_names: Vec<String> = default_repos
+                .keys()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect();
             io.write_error(&format!(
                 "No composer.json found in the current directory, searching packages from {}",
                 repo_names.join(", ")
             ));
             repo = CompositeRepository::new(default_repos.into_values().collect());
-            min_stability = "stable".to_string();
+            min_stability = bstr::BString::from("stable".to_string());
         }
 
         if let Some(version_str) = &version
@@ -235,7 +238,7 @@ impl ArchiveCommand {
         }
 
         let mut repo_set = RepositorySet::new(
-            &min_stability,
+            &legacy_lossy(&min_stability),
             IndexMap::new(),
             Vec::new(),
             IndexMap::new(),
@@ -249,7 +252,8 @@ impl ArchiveCommand {
             Some(v) => Some(parser.parse_constraints(v)?),
             None => None,
         };
-        let packages = repo_set.find_packages(&package_name.to_lowercase(), constraint, 0)?;
+        let packages =
+            repo_set.find_packages(bstr::BStr::new(&package_name.to_lowercase()), constraint, 0)?;
 
         let package = if packages.len() > 1 {
             let mut version_selector =
@@ -257,7 +261,7 @@ impl ArchiveCommand {
             let best = version_selector.find_best_candidate(
                 &package_name.to_lowercase(),
                 version.as_deref(),
-                &min_stability,
+                &legacy_lossy(&min_stability),
                 None,
                 0,
                 None,
@@ -267,7 +271,7 @@ impl ArchiveCommand {
 
             io.write_error(&format!(
                 "<info>Found multiple matches, selected {}.</info>",
-                p.get_pretty_string()
+                p.get_pretty_string().display_lossy()
             ));
             // alternatives message omitted for brevity (already logged via p being selected)
             io.write_error("<comment>Please use a more specific constraint to pick a different package.</comment>");
@@ -276,7 +280,7 @@ impl ArchiveCommand {
             let p: crate::package::PackageInterfaceHandle = packages.into_iter().next().unwrap();
             io.write_error(&format!(
                 "<info>Found an exact match {}.</info>",
-                p.get_pretty_string()
+                p.get_pretty_string().display_lossy()
             ));
             p
         } else {

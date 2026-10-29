@@ -11,8 +11,9 @@ use crate::filter::platform_requirement_filter::{
 };
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::package::BasePackageHandle;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{array_shift, array_unshift, microtime, spl_object_hash};
+use shirabe_php_shim::{array_shift, array_unshift, legacy_lossy, microtime, spl_object_hash};
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Debug)]
@@ -31,7 +32,7 @@ pub struct Solver {
     branches: Vec<(Vec<i64>, i64)>,
     problems: Vec<Problem>,
     learned_pool: Vec<Vec<std::rc::Rc<std::cell::RefCell<Rule>>>>,
-    learned_why: IndexMap<String, i64>,
+    learned_why: IndexMap<BString, i64>,
 
     pub test_flag_learned_positive_literal: bool,
 
@@ -172,14 +173,14 @@ impl Solver {
         for (package_name, constraint) in request.get_requires().iter() {
             let mut filtered: Option<AnyConstraint> = None;
             let constraint_ref: &AnyConstraint = constraint;
-            if platform_requirement_filter.is_ignored(package_name) {
+            if platform_requirement_filter.is_ignored(&legacy_lossy(package_name)) {
                 continue;
             } else if let Some(ignore_filter) = platform_requirement_filter
                 .as_any()
                 .downcast_ref::<IgnoreListPlatformRequirementFilter>(
             ) {
                 filtered = Some(ignore_filter.filter_constraint(
-                    package_name,
+                    &legacy_lossy(package_name),
                     constraint.clone(),
                     true,
                 )?);
@@ -190,7 +191,7 @@ impl Solver {
             if self
                 .pool
                 .borrow_mut()
-                .what_provides(package_name, Some(active_constraint))
+                .what_provides(package_name.as_bstr(), Some(active_constraint))
                 .is_empty()
             {
                 let mut problem = Problem::new();
@@ -199,7 +200,7 @@ impl Solver {
                         Vec::new(),
                         rule::RULE_ROOT_REQUIRE,
                         rule::ReasonData::RootRequire {
-                            package_name: package_name.clone(),
+                            package_name: legacy_lossy(&package_name.clone()).into_owned(),
                             constraint: active_constraint.clone(),
                         },
                     ),
@@ -386,7 +387,7 @@ impl Solver {
             self.rules.add(new_rule.clone(), RuleSet::TYPE_LEARNED)?;
 
             self.learned_why
-                .insert(spl_object_hash(new_rule.clone()), why);
+                .insert(bstr::BString::from(spl_object_hash(new_rule.clone())), why);
 
             let rule_node = std::rc::Rc::new(std::cell::RefCell::new(RuleWatchNode::new(
                 new_rule.clone(),
@@ -410,7 +411,9 @@ impl Solver {
         let mut literals = self.policy.select_preferred_packages(
             &self.pool.borrow(),
             decision_queue,
-            rule.borrow().get_required_package(),
+            rule.borrow()
+                .get_required_package()
+                .map(bstr::BString::from),
         );
 
         let selected_literal = array_shift::<i64>(&mut literals)
@@ -598,17 +601,17 @@ impl Solver {
         &self,
         problem: &mut Problem,
         conflict_rule: std::rc::Rc<std::cell::RefCell<Rule>>,
-        rule_seen: &mut IndexMap<String, bool>,
+        rule_seen: &mut IndexMap<BString, bool>,
     ) {
         let why = spl_object_hash(conflict_rule.clone());
-        rule_seen.insert(why.clone(), true);
+        rule_seen.insert(bstr::BString::from(why.clone()), true);
 
         if conflict_rule.borrow().get_type() == RuleSet::TYPE_LEARNED {
-            let learned_why = self.learned_why[&why];
+            let learned_why = self.learned_why[why.as_bytes()];
             let problem_rules = self.learned_pool[learned_why as usize].clone();
 
             for problem_rule in problem_rules {
-                if !rule_seen.contains_key(&spl_object_hash(problem_rule.clone())) {
+                if !rule_seen.contains_key(bstr::B(&spl_object_hash(problem_rule.clone()))) {
                     self.analyze_unsolvable_rule(problem, problem_rule, rule_seen);
                 }
             }
@@ -629,7 +632,7 @@ impl Solver {
         let mut problem = Problem::new();
         problem.add_rule(conflict_rule.clone());
 
-        let mut rule_seen: IndexMap<String, bool> = IndexMap::new();
+        let mut rule_seen: IndexMap<BString, bool> = IndexMap::new();
 
         self.analyze_unsolvable_rule(&mut problem, conflict_rule.clone(), &mut rule_seen);
 

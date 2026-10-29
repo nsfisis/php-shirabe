@@ -6,6 +6,7 @@
 use crate::async_runtime::run;
 use crate::php_worker::{lock_php_worker, php_runtime_available};
 use crate::plugin_installer_test::{new_installer, set_up};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe::installer::InstallerInterface;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
@@ -36,11 +37,11 @@ fn simple(operator: &str, version: &str, pretty_string: Option<&str>) -> AnyCons
 
 fn link(target: &str, constraint: AnyConstraint, pretty_constraint: &str) -> Link {
     Link::new(
-        "dummy/root".to_string(),
-        target.to_string(),
+        bstr::BString::from("dummy/root".to_string()),
+        bstr::BString::from(target.to_string()),
         constraint,
-        Some(Link::TYPE_REQUIRE.to_string()),
-        pretty_constraint.to_string(),
+        Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+        bstr::BString::from(pretty_constraint.to_string()),
     )
 }
 
@@ -115,16 +116,17 @@ fn describe(constraint: &AnyConstraint) -> String {
     )
 }
 
-fn describe_links(links: &IndexMap<String, Link>) -> Vec<String> {
+fn describe_links(links: &IndexMap<BString, Link>) -> Vec<String> {
     links
         .iter()
         .map(|(name, link)| {
             format!(
-                "{name} | {} | {} | {} | {} | {}",
-                link.get_source(),
-                link.get_target(),
-                link.get_description(),
-                link.get_pretty_constraint(),
+                "{} | {} | {} | {} | {} | {}",
+                legacy_lossy(name),
+                legacy_lossy(&link.get_source()),
+                legacy_lossy(&link.get_target()),
+                legacy_lossy(&link.get_description()),
+                legacy_lossy(&link.get_pretty_constraint()),
                 describe(link.get_constraint())
             )
         })
@@ -139,7 +141,12 @@ fn test_links_and_release_date_round_trip_through_the_plugin() {
     let _worker = lock_php_worker();
     let set_up = set_up();
     let package = set_up.composer.borrow().get_package().clone();
-    package.set_requires(seeded_requires());
+    package.set_requires(
+        seeded_requires()
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     let installer = new_installer(&set_up);
     set_up.pm.borrow_mut().load_installed_plugins().unwrap();

@@ -220,14 +220,19 @@ fn test_message_output_when_no_unused_packages_to_remove() {
     requires.insert(
         "nested/req".to_string(),
         Link::new(
-            "root/req".to_string(),
-            "nested/req".to_string(),
+            bstr::BString::from("root/req".to_string()),
+            bstr::BString::from("nested/req".to_string()),
             AnyConstraint::MatchAll(MatchAllConstraint::new(None)),
-            Some(Link::TYPE_REQUIRE.to_string()),
-            "^1".to_string(),
+            Some(bstr::BString::from(Link::TYPE_REQUIRE.to_string())),
+            bstr::BString::from("^1".to_string()),
         ),
     );
-    required_package.__set_requires(requires);
+    required_package.__set_requires(
+        requires
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let nested_package = get_package("nested/req", "1.1.0");
 
     let packages: Vec<PackageInterfaceHandle> = vec![required_package, nested_package];
@@ -344,8 +349,8 @@ fn test_remove_package_by_name() {
     let root_another_package = get_package("root/another", "1.0.0");
     // Set as a metapackage so that we can do the whole post-remove update & install process without
     // Composer trying to download them (DownloadManager::getDownloaderForPackage).
-    root_req_package.__set_type("metapackage".to_string());
-    root_another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(bstr::BString::from("metapackage".to_string()));
+    root_another_package.__set_type(bstr::BString::from("metapackage".to_string()));
 
     let packages: Vec<PackageInterfaceHandle> = vec![root_req_package, root_another_package];
     create_installed_json(&packages, &[], true);
@@ -425,8 +430,8 @@ fn test_remove_package_by_name_with_dry_run() {
     );
     let root_req_package = get_package("root/req", "1.0.0");
     let root_another_package = get_package("root/another", "1.0.0");
-    root_req_package.__set_type("metapackage".to_string());
-    root_another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(bstr::BString::from("metapackage".to_string()));
+    root_another_package.__set_type(bstr::BString::from("metapackage".to_string()));
 
     let packages: Vec<PackageInterfaceHandle> = vec![root_req_package, root_another_package];
     create_installed_json(&packages, &[], true);
@@ -511,8 +516,8 @@ fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
     );
     let root_req_package = get_package("root/req", "1.0.0");
     let root_another_package = get_package("root/another", "1.0.0");
-    root_req_package.__set_type("metapackage".to_string());
-    root_another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(bstr::BString::from("metapackage".to_string()));
+    root_another_package.__set_type(bstr::BString::from("metapackage".to_string()));
 
     let packages: Vec<PackageInterfaceHandle> = vec![root_req_package, root_another_package];
     create_installed_json(&packages, &[], true);
@@ -567,8 +572,8 @@ fn test_remove_allowed_plugin_package_with_other_allowed_plugins() {
     );
     let root_req_package = get_package("root/req", "1.0.0");
     let root_another_package = get_package("root/another", "1.0.0");
-    root_req_package.__set_type("metapackage".to_string());
-    root_another_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(bstr::BString::from("metapackage".to_string()));
+    root_another_package.__set_type(bstr::BString::from("metapackage".to_string()));
 
     let mut app_tester = get_application_tester();
     let status_code = app_tester
@@ -894,7 +899,7 @@ fn run_update_inherited_dependencies_flag_case(
         true,
     );
     let root_req_package = get_package("root/req", "1.0.0");
-    root_req_package.__set_type("metapackage".to_string());
+    root_req_package.__set_type(bstr::BString::from("metapackage".to_string()));
 
     create_installed_json(std::slice::from_ref(&root_req_package), &[], true);
     create_composer_lock(std::slice::from_ref(&root_req_package), &[]);

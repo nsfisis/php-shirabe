@@ -3,7 +3,7 @@
 use crate::package::{Mirror, PackageInterfaceHandle, SUPPORTED_LINK_TYPES};
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{DATE_RFC3339, PhpMixed};
+use shirabe_php_shim::{DATE_RFC3339, PhpMixed, legacy_lossy};
 
 /// Serializes a Mirror back into the PHP array shape `{url, preferred}`.
 fn mirror_to_php(mirror: Mirror) -> PhpMixed {
@@ -96,8 +96,8 @@ impl ArrayDumper {
             let mut link_map: IndexMap<BString, PhpMixed> = IndexMap::new();
             for link in links.values() {
                 link_map.insert(
-                    link.get_target().to_string().into(),
-                    PhpMixed::string(link.get_pretty_constraint().to_string()),
+                    legacy_lossy(link.get_target()).into_owned().into(),
+                    PhpMixed::string(legacy_lossy(link.get_pretty_constraint()).into_owned()),
                 );
             }
             link_map.sort_keys();
@@ -113,7 +113,7 @@ impl ArrayDumper {
                 PhpMixed::Array(
                     sorted_suggests
                         .into_iter()
-                        .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                        .map(|(k, v)| (k, PhpMixed::string(v)))
                         .collect(),
                 ),
             );
@@ -226,7 +226,7 @@ impl ArrayDumper {
                             .into_iter()
                             .map(|(k, v)| {
                                 (
-                                    k.into(),
+                                    k,
                                     PhpMixed::List(v.into_iter().map(PhpMixed::string).collect()),
                                 )
                             })
@@ -251,7 +251,7 @@ impl ArrayDumper {
                             .map(|a| {
                                 PhpMixed::Array(
                                     a.into_iter()
-                                        .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                                        .map(|(k, v)| (k, PhpMixed::string(v)))
                                         .collect(),
                                 )
                             })
@@ -287,7 +287,7 @@ impl ArrayDumper {
                     PhpMixed::Array(
                         support
                             .into_iter()
-                            .map(|(k, v)| (k.into(), PhpMixed::string(v)))
+                            .map(|(k, v)| (k, PhpMixed::string(v)))
                             .collect(),
                     ),
                 );

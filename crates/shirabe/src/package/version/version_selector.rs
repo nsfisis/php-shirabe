@@ -10,10 +10,11 @@ use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
 use crate::package::{PackageInterfaceHandle, base_package};
 use crate::repository::{PlatformRepository, RepositoryInterface, RepositorySetInterface};
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, UnexpectedValueException, legacy_lossy, php_regex, preg_is_match, preg_replace,
-    str_replace, strtolower, version_compare,
+    CmpOp, UnexpectedValueException, explode_with_limit, implode, legacy_lossy, php_regex,
+    preg_is_match, preg_replace, str_replace, strtolower, version_compare,
 };
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
@@ -39,10 +40,13 @@ impl VersionSelector {
         let mut platform_constraints: IndexMap<String, Vec<AnyConstraint>> = IndexMap::new();
         if let Some(platform_repo) = platform_repo {
             for package in platform_repo.get_packages()? {
-                let constraint =
-                    SimpleConstraint::new("==", package.get_version().to_string(), None);
+                let constraint = SimpleConstraint::new(
+                    "==",
+                    legacy_lossy(&package.get_version()).into_owned(),
+                    None,
+                );
                 platform_constraints
-                    .entry(package.get_name().to_string())
+                    .entry(legacy_lossy(&package.get_name()).into_owned())
                     .or_default()
                     .push(constraint.into());
             }
@@ -84,7 +88,7 @@ impl VersionSelector {
             None => None,
         };
         let mut candidates = self.repository_set.borrow().find_packages(
-            &legacy_lossy(&strtolower(package_name)),
+            strtolower(package_name).as_bstr(),
             constraint,
             repo_set_flags,
         )?;
@@ -93,12 +97,8 @@ impl VersionSelector {
         candidates.sort_by(|a, b| {
             // BasePackage::get_stability_priority() is not forwarded by the handle; compute it
             // directly from the stability name.
-            let a_priority = *base_package::STABILITIES
-                .get(a.get_stability().as_str())
-                .unwrap();
-            let b_priority = *base_package::STABILITIES
-                .get(b.get_stability().as_str())
-                .unwrap();
+            let a_priority = base_package::stability_priority(a.get_stability()).unwrap();
+            let b_priority = base_package::stability_priority(b.get_stability()).unwrap();
 
             if min_priority < a_priority && b_priority < a_priority {
                 return std::cmp::Ordering::Greater;
@@ -136,12 +136,14 @@ impl VersionSelector {
                 let mut skip = false;
                 'reqs: for (name, link) in reqs.iter() {
                     if !PlatformRepository::is_platform_package(name)
-                        || platform_requirement_filter.is_ignored(name)
+                        || platform_requirement_filter.is_ignored(&legacy_lossy(name))
                     {
                         continue;
                     }
                     let reason;
-                    if let Some(provided_constraints) = self.platform_constraints.get(name) {
+                    if let Some(provided_constraints) =
+                        self.platform_constraints.get(&*legacy_lossy(name))
+                    {
                         for provided_constraint in provided_constraints {
                             if link.get_constraint().matches(provided_constraint) {
                                 continue 'reqs;
@@ -152,10 +154,10 @@ impl VersionSelector {
                                 .downcast_ref::<IgnoreListPlatformRequirementFilter>(
                             );
                             if let Some(list_filter) = list_filter_opt
-                                && list_filter.is_upper_bound_ignored(name)
+                                && list_filter.is_upper_bound_ignored(&legacy_lossy(name))
                             {
                                 let filtered_constraint = list_filter.filter_constraint(
-                                    name,
+                                    &legacy_lossy(name),
                                     link.get_constraint().clone(),
                                     false,
                                 )?;
@@ -169,15 +171,20 @@ impl VersionSelector {
                         reason = "is missing from your platform";
                     }
 
-                    let is_latest_version = !already_seen_names.contains_key(&pkg.get_name());
-                    already_seen_names.insert(pkg.get_name().to_string(), true);
+                    let is_latest_version =
+                        !already_seen_names.contains_key(&*legacy_lossy(&pkg.get_name()));
+                    already_seen_names.insert(legacy_lossy(&pkg.get_name()).into_owned(), true);
                     if let Some(ref io) = io {
                         let should_warn = match &show_warnings {
                             ShowWarnings::Always => true,
                             ShowWarnings::Predicate(f) => f(pkg),
                         };
                         if should_warn {
-                            let warn_key = format!("{}/{}", pkg.get_name(), link.get_target());
+                            let warn_key = format!(
+                                "{}/{}",
+                                legacy_lossy(&pkg.get_name()),
+                                legacy_lossy(&link.get_target())
+                            );
                             let is_first_warning = !already_warned_names.contains_key(&warn_key);
                             already_warned_names.insert(warn_key, true);
                             let latest = if is_latest_version {
@@ -188,12 +195,12 @@ impl VersionSelector {
                             io.write_error3(
                                 &format!(
                                     "<warning>Cannot use {}{} {} as it {} {} {} which {}.</>",
-                                    pkg.get_pretty_name(),
+                                    pkg.get_pretty_name().display_lossy(),
                                     latest,
-                                    pkg.get_pretty_version(),
-                                    link.get_description(),
-                                    link.get_target(),
-                                    link.get_pretty_constraint(),
+                                    pkg.get_pretty_version().display_lossy(),
+                                    link.get_description().display_lossy(),
+                                    link.get_target().display_lossy(),
+                                    link.get_pretty_constraint().display_lossy(),
                                     reason
                                 ),
                                 true,
@@ -247,23 +254,24 @@ impl VersionSelector {
         &mut self,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<String> {
-        if package.get_name().starts_with("ext-") {
+        if package.get_name().starts_with(b"ext-") {
             let php = shirabe_php_rpc::get_php_version();
             let php_version = format!("{}.{}.{}", php.major, php.minor, php.release);
             let package_version = package.get_version();
-            let ext_parts: Vec<&str> = package_version.splitn(4, '.').collect();
-            let ext_version = ext_parts[..3.min(ext_parts.len())].join(".");
+            let ext_parts = explode_with_limit(".", package_version, 4);
+            let ext_version =
+                legacy_lossy(&implode(".", &ext_parts[..3.min(ext_parts.len())])).into_owned();
             if php_version == ext_version {
                 return Ok("*".to_string());
             }
         }
 
-        let version = package.get_version();
+        let version = legacy_lossy(&package.get_version()).into_owned();
         if !package.is_dev() {
             return self.transform_version(
                 &version,
-                &package.get_pretty_version(),
-                &package.get_stability(),
+                &legacy_lossy(&package.get_pretty_version()),
+                &legacy_lossy(&package.get_stability()),
             );
         }
 
@@ -285,7 +293,7 @@ impl VersionSelector {
             }
         }
 
-        Ok(package.get_pretty_version())
+        Ok(legacy_lossy(&package.get_pretty_version()).into_owned())
     }
 
     fn transform_version(

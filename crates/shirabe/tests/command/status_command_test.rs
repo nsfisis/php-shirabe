@@ -26,7 +26,7 @@ fn test_no_local_changes() {
     );
 
     let package = get_complete_package("root/req", "1.0.0");
-    package.__set_type("metapackage".to_string());
+    package.__set_type(bstr::BString::from("metapackage".to_string()));
 
     let packages: Vec<PackageInterfaceHandle> = vec![package.into()];
 
@@ -65,18 +65,30 @@ fn run_locally_modified_packages_case(
     let _tear_down = init_temp_composer(Some(&composer_json), None, None, true);
 
     let package = get_package(package_data.name, package_data.version);
-    package.set_installation_source(Some(package_data.installation_source.to_string()));
+    package.set_installation_source(Some(bstr::BString::from(
+        package_data.installation_source.to_string(),
+    )));
 
     if package_data.installation_source == "source" {
-        package.__set_source_type(Some(package_data.r#type.to_string()));
-        package.set_source_url(Some(package_data.url.to_string()));
-        package.set_source_reference(package_data.reference.map(str::to_string));
+        package.__set_source_type(Some(bstr::BString::from(package_data.r#type.to_string())));
+        package.set_source_url(Some(bstr::BString::from(package_data.url.to_string())));
+        package.set_source_reference(
+            package_data
+                .reference
+                .map(str::to_string)
+                .map(bstr::BString::from),
+        );
     }
 
     if package_data.installation_source == "dist" {
-        package.set_dist_type(Some(package_data.r#type.to_string()));
-        package.set_dist_url(Some(package_data.url.to_string()));
-        package.set_dist_reference(package_data.reference.map(str::to_string));
+        package.set_dist_type(Some(bstr::BString::from(package_data.r#type.to_string())));
+        package.set_dist_url(Some(bstr::BString::from(package_data.url.to_string())));
+        package.set_dist_reference(
+            package_data
+                .reference
+                .map(str::to_string)
+                .map(bstr::BString::from),
+        );
     }
 
     create_composer_lock(&[package], &[]);

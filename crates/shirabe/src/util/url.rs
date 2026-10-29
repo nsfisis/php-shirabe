@@ -2,9 +2,10 @@
 
 use crate::config::Config;
 use crate::util::GitHub;
+use bstr::BString;
 use shirabe_php_shim::{
-    PhpMixed, in_array_strict, legacy_lossy, parse_url, php_regex, preg_is_match, preg_match,
-    preg_replace, preg_replace_callback,
+    PhpMixed, bconcat, in_array_strict, legacy_lossy, parse_url, php_regex, preg_is_match,
+    preg_match, preg_replace, preg_replace_callback,
 };
 
 pub struct Url;
@@ -158,30 +159,25 @@ impl Url {
         origin
     }
 
-    pub fn sanitize(url: String) -> String {
+    pub fn sanitize(url: impl AsRef<[u8]>) -> BString {
         // GitHub repository rename result in redirect locations containing the access_token as GET parameter
         // e.g. https://api.github.com/repositories/9999999999?access_token=github_token
-        let url = preg_replace(php_regex!(r"{([&?]access_token=)[^&]+}"), "$1***", &url);
+        let url = preg_replace(php_regex!(r"{([&?]access_token=)[^&]+}"), "$1***", url);
 
-        legacy_lossy(
-            &preg_replace_callback(
-                php_regex!(
-                    r"{^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@}i"
-                ),
-                |m| {
-                    let user = legacy_lossy(m.name("user").unwrap_or_default()).into_owned();
-                    let prefix = legacy_lossy(m.name("prefix").unwrap_or_default()).into_owned();
-                    // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
-                    Ok(if preg_is_match(GitHub::GITHUB_TOKEN_REGEX, &user) {
-                        format!("{}***:***@", prefix)
-                    } else {
-                        format!("{}{}:***@", prefix, user)
-                    })
-                },
-                &url,
-            )
-            .expect("the replacement callback cannot fail"),
+        preg_replace_callback(
+            php_regex!(r"{^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@}i"),
+            |m| {
+                let user = m.name("user").unwrap_or_default();
+                let prefix = m.name("prefix").unwrap_or_default();
+                // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
+                Ok(if preg_is_match(GitHub::GITHUB_TOKEN_REGEX, user) {
+                    bconcat!(prefix, "***:***@")
+                } else {
+                    bconcat!(prefix, user, ":***@")
+                })
+            },
+            &url,
         )
-        .into_owned()
+        .expect("the replacement callback cannot fail")
     }
 }

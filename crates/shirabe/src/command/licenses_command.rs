@@ -11,7 +11,7 @@ use crate::util::{PackageInfo, PackageSorter};
 use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, impl_php_class, legacy_lossy,
+    PhpMixed, RuntimeException, UnexpectedValueException, impl_php_class, implode, legacy_lossy,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -172,15 +172,18 @@ impl Command for LicensesCommand {
                 let licenses_str = if root_licenses.is_empty() {
                     "none".to_string()
                 } else {
-                    root_licenses.join(", ")
+                    legacy_lossy(&implode(", ", &root_licenses)).into_owned()
                 };
                 io.write(&format!(
                     "Name: <comment>{}</comment>",
-                    root.get_pretty_name()
+                    legacy_lossy(&root.get_pretty_name())
                 ));
                 io.write(&format!(
                     "Version: <comment>{}</comment>",
-                    root.get_full_pretty_version(true, crate::package::DisplayMode::SourceRefIfDev)
+                    legacy_lossy(&root.get_full_pretty_version(
+                        true,
+                        crate::package::DisplayMode::SourceRefIfDev
+                    ))
                 ));
                 io.write(&format!("Licenses: <comment>{}</comment>", licenses_str));
                 io.write("Dependencies:");
@@ -195,10 +198,10 @@ impl Command for LicensesCommand {
                         format!(
                             "<href={}>{}</>",
                             legacy_lossy(&OutputFormatter::escape(&link)?),
-                            package.get_pretty_name()
+                            legacy_lossy(&package.get_pretty_name())
                         )
                     } else {
-                        package.get_pretty_name().to_string()
+                        legacy_lossy(&package.get_pretty_name()).into_owned()
                     };
                     let pkg_licenses = if let Some(complete_pkg) = package.as_complete_package() {
                         complete_pkg.get_license()
@@ -208,7 +211,7 @@ impl Command for LicensesCommand {
                     let licenses_str = if pkg_licenses.is_empty() {
                         "none".to_string()
                     } else {
-                        pkg_licenses.join(", ")
+                        legacy_lossy(&implode(", ", &pkg_licenses)).into_owned()
                     };
                     table.add_row(
                         PhpMixed::List(vec![
@@ -245,7 +248,7 @@ impl Command for LicensesCommand {
                         PhpMixed::List(pkg_licenses.into_iter().map(PhpMixed::string).collect()),
                     );
                     dependencies.insert(
-                        package.get_pretty_name().to_string().into(),
+                        legacy_lossy(&package.get_pretty_name()).into_owned().into(),
                         PhpMixed::Array(dep_info),
                     );
                 }
@@ -278,10 +281,12 @@ impl Command for LicensesCommand {
                         vec![]
                     };
                     if licenses.is_empty() {
-                        licenses.push("none".to_string());
+                        licenses.push(bstr::BString::from("none".to_string()));
                     }
                     for license_name in licenses {
-                        *used_licenses.entry(license_name).or_insert(0) += 1;
+                        *used_licenses
+                            .entry(legacy_lossy(&license_name).into_owned())
+                            .or_insert(0) += 1;
                     }
                 }
 

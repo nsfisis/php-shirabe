@@ -33,15 +33,15 @@ fn test_alias_packages_cross_the_plugin_boundary() {
     let set_up = set_up();
 
     let aliased = CompletePackageHandle::new(
-        "vendor/aliased".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0.0".to_string(),
+        bstr::BString::from("vendor/aliased".to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0.0".to_string()),
     );
-    aliased.set_description("an aliased package".to_string());
+    aliased.set_description(bstr::BString::from("an aliased package".to_string()));
     let alias = CompleteAliasPackageHandle::new(
         aliased.clone(),
-        "2.0.0.0".to_string(),
-        "2.0.0".to_string(),
+        bstr::BString::from("2.0.0.0".to_string()),
+        bstr::BString::from("2.0.0".to_string()),
     );
     set_up
         .repository
@@ -50,14 +50,14 @@ fn test_alias_packages_cross_the_plugin_boundary() {
         .unwrap();
 
     let real_root = RootPackageHandle::new(
-        "dummy/root".to_string(),
-        "1.0.0.0".to_string(),
-        "1.0.0".to_string(),
+        bstr::BString::from("dummy/root".to_string()),
+        bstr::BString::from("1.0.0.0".to_string()),
+        bstr::BString::from("1.0.0".to_string()),
     );
     let root_alias = shirabe::package::RootAliasPackageHandle::new(
         real_root.clone(),
-        "1.1.0.0".to_string(),
-        "1.1.0".to_string(),
+        bstr::BString::from("1.1.0.0".to_string()),
+        bstr::BString::from("1.1.0".to_string()),
     );
     set_up.composer.borrow_mut().set_package(root_alias.into());
 

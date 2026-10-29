@@ -73,7 +73,7 @@ fn test_supports() {
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
         let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
 
-        assert!(HgDriver::supports(io, config, repository_url, false).unwrap());
+        assert!(HgDriver::supports(io, config, bstr::BStr::new(repository_url), false).unwrap());
     }
 }
 
@@ -113,7 +113,16 @@ fn test_get_branches_filter_invalid_branch_names() {
     let mut expected: IndexMap<String, String> = IndexMap::new();
     expected.insert("help".to_string(), "dbf6c8acb641".to_string());
     expected.insert("default".to_string(), "dbf6c8acb640".to_string());
-    assert_eq!(expected, branches);
+    assert_eq!(
+        expected
+            .iter()
+            .map(|(k, v)| (
+                bstr::BString::from(k.as_str()),
+                bstr::BString::from(v.as_str())
+            ))
+            .collect::<indexmap::IndexMap<_, _>>(),
+        branches
+    );
 }
 
 #[test]
@@ -139,9 +148,16 @@ fn test_file_get_content_invalid_identifier() {
 
     let driver = HgDriver::new(repo_config, io, config, http_downloader, process);
 
-    assert_eq!(None, driver.get_file_content("file.txt", "h").unwrap());
+    assert_eq!(
+        None,
+        driver
+            .get_file_content(bstr::BStr::new("file.txt"), bstr::BStr::new("h"))
+            .unwrap()
+    );
 
-    let err = driver.get_file_content("file.txt", "-h").unwrap_err();
+    let err = driver
+        .get_file_content(bstr::BStr::new("file.txt"), bstr::BStr::new("-h"))
+        .unwrap_err();
     assert!(err.is_instanceof::<RuntimeException>());
 }
 
@@ -168,6 +184,8 @@ fn test_get_change_date_invalid_identifier() {
 
     let driver = HgDriver::new(repo_config, io, config, http_downloader, process);
 
-    let err = driver.get_change_date("-r foo").unwrap_err();
+    let err = driver
+        .get_change_date(bstr::BStr::new("-r foo"))
+        .unwrap_err();
     assert!(err.is_instanceof::<RuntimeException>());
 }

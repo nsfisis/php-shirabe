@@ -6,22 +6,22 @@ use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::{Filesystem, Git as GitUtil, ProcessExecutor, Url};
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use chrono::{DateTime, FixedOffset, TimeZone, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, dirname, is_dir, is_writable,
-    legacy_lossy, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
-    preg_replace, realpath, sys_get_temp_dir, trim, utf8_text,
+    Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, bconcat, dirname, is_dir,
+    is_writable, legacy_lossy, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_replace, realpath, sys_get_temp_dir, trim, utf8_text,
 };
 
 #[derive(Debug)]
 pub struct GitDriver {
     pub(crate) inner: VcsDriverBase,
-    pub(crate) tags: Option<IndexMap<String, String>>,
-    pub(crate) branches: Option<IndexMap<String, String>>,
-    pub(crate) root_identifier: Option<String>,
-    pub(crate) repo_dir: String,
+    pub(crate) tags: Option<IndexMap<BString, BString>>,
+    pub(crate) branches: Option<IndexMap<BString, BString>>,
+    pub(crate) root_identifier: Option<BString>,
+    pub(crate) repo_dir: BString,
 }
 
 impl GitDriver {
@@ -37,53 +37,48 @@ impl GitDriver {
             tags: None,
             branches: None,
             root_identifier: None,
-            repo_dir: String::new(),
+            repo_dir: BString::default(),
         }
     }
 
     pub fn initialize(&mut self) -> anyhow::Result<()> {
         let cache_url;
         if Filesystem::is_local_path(&self.inner.url) {
-            self.inner.url = legacy_lossy(&preg_replace(
-                php_regex!(r"{[\\/]\.git/?$}"),
-                "",
-                &self.inner.url,
-            ))
-            .into_owned();
-            if !is_dir(&self.inner.url) {
+            self.inner.url = BString::from(
+                &preg_replace(php_regex!(r"{[\\/]\.git/?$}"), "", &self.inner.url)[..],
+            );
+            if !is_dir(path_from_bytes(&self.inner.url)) {
                 return Err(RuntimeException::new(format!(
                     "Failed to read package information from {} as the path does not exist",
-                    self.inner.url
+                    self.inner.url.display_lossy()
                 ))
                 .into());
             }
             self.repo_dir = self.inner.url.clone();
-            cache_url = realpath(&self.inner.url)
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+            cache_url = realpath(path_from_bytes(&self.inner.url))
+                .map(|p| BString::from(path_to_bytes(&p)))
                 .unwrap_or_else(|| self.inner.url.clone());
         } else {
-            let cache_vcs_dir = legacy_lossy(
-                self.inner
-                    .config
-                    .borrow_mut()
-                    .get("cache-vcs-dir")
-                    .as_string()
-                    .unwrap_or_default(),
-            )
-            .into_owned();
-            if !Cache::is_usable(&cache_vcs_dir) {
+            let cache_vcs_dir = BString::from(
+                &BString::from(
+                    self.inner
+                        .config
+                        .borrow_mut()
+                        .get(&legacy_lossy(b"cache-vcs-dir".as_slice()))
+                        .as_string()
+                        .unwrap_or_default(),
+                )[..],
+            );
+            if !Cache::is_usable(path_from_bytes(&cache_vcs_dir)) {
                 return Err(RuntimeException::new("GitDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string())
                 .into());
             }
 
-            self.repo_dir = format!(
-                "{}/{}/",
+            self.repo_dir = bconcat!(
                 cache_vcs_dir,
-                legacy_lossy(&preg_replace(
-                    r"{[^a-z0-9.]}i",
-                    "-",
-                    Url::sanitize(self.inner.url.clone())
-                ))
+                "/",
+                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(&self.inner.url)),
+                "/"
             );
 
             GitUtil::clean_env(&self.inner.process);
@@ -94,7 +89,7 @@ impl GitDriver {
             if !is_writable(path_from_bytes(&dirname(&self.repo_dir))) {
                 return Err(RuntimeException::new(format!(
                     "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
-                    self.inner.url,
+                    self.inner.url.display_lossy(),
                     dirname(&self.repo_dir).display_lossy()
                 ))
                 .into());
@@ -103,7 +98,7 @@ impl GitDriver {
             if preg_is_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), &self.inner.url) {
                 return Err(InvalidArgumentException::new(format!(
                     "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
-                    self.inner.url
+                    self.inner.url.display_lossy()
                 ))
                 .into());
             }
@@ -114,17 +109,20 @@ impl GitDriver {
                 self.inner.process.clone(),
                 std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
             );
-            if !git_util.sync_mirror(&self.inner.url, &self.repo_dir)? {
-                if !is_dir(&self.repo_dir) {
+            if !git_util.sync_mirror(
+                &legacy_lossy(&self.inner.url),
+                &legacy_lossy(&self.repo_dir),
+            )? {
+                if !is_dir(path_from_bytes(&self.repo_dir)) {
                     return Err(RuntimeException::new(format!(
                         "Failed to clone {} to read package information from it",
-                        self.inner.url
+                        self.inner.url.display_lossy()
                     ))
                     .into());
                 }
                 self.inner.io.write_error3(&format!(
                     "<error>Failed to update {}, package information from this repository may be outdated</error>",
-                    self.inner.url
+                    self.inner.url.display_lossy()
                 ), true, io_interface::NORMAL);
             }
 
@@ -134,24 +132,23 @@ impl GitDriver {
         self.get_tags()?;
         self.get_branches()?;
 
-        let cache_repo_dir = legacy_lossy(
+        let cache_repo_dir = BString::from(
             self.inner
                 .config
                 .borrow_mut()
-                .get("cache-repo-dir")
+                .get(&legacy_lossy(b"cache-repo-dir".as_slice()))
                 .as_string()
                 .unwrap_or_default(),
-        )
-        .into_owned();
+        );
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            &format!(
+            format!(
                 "{}/{}",
-                cache_repo_dir,
+                legacy_lossy(&cache_repo_dir),
                 legacy_lossy(&preg_replace(
                     r"{[^a-z0-9.]}i",
                     "-",
-                    Url::sanitize(cache_url)
+                    Url::sanitize(BString::from(&cache_url[..]))
                 ))
             ),
             None,
@@ -163,7 +160,7 @@ impl GitDriver {
                 self.inner
                     .config
                     .borrow_mut()
-                    .get("cache-read-only")
+                    .get(&legacy_lossy(b"cache-read-only".as_slice()))
                     .as_bool()
                     .unwrap_or(false),
             )
@@ -172,9 +169,9 @@ impl GitDriver {
         Ok(())
     }
 
-    pub fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+    pub fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
         if self.root_identifier.is_none() {
-            self.root_identifier = Some("master".to_string());
+            self.root_identifier = Some(bstr::BString::from("master".to_string()));
 
             let mut git_util = GitUtil::new(
                 self.inner.io.clone(),
@@ -183,15 +180,18 @@ impl GitDriver {
                 std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
             );
             if !Filesystem::is_local_path(&self.inner.url) {
-                let default_branch =
-                    git_util.get_mirror_default_branch(&self.inner.url, &self.repo_dir, false);
+                let default_branch = git_util.get_mirror_default_branch(
+                    &legacy_lossy(&self.inner.url),
+                    &legacy_lossy(&self.repo_dir),
+                    false,
+                );
                 if let Some(branch) = default_branch {
-                    self.root_identifier = Some(branch.clone());
-                    return Ok(branch);
+                    self.root_identifier = Some(bstr::BString::from(branch.clone()));
+                    return Ok(bstr::BString::from(branch));
                 }
             }
 
-            let mut output = String::new();
+            let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
                 &[
                     "git".to_string(),
@@ -199,7 +199,7 @@ impl GitDriver {
                     "--no-color".to_string(),
                 ],
                 &mut output,
-                Some(std::path::Path::new(&self.repo_dir)),
+                Some(path_from_bytes(&self.repo_dir)),
             )?;
             let branches = self.inner.process.borrow().split_lines(&output);
             if !branches.contains(&bstr::BString::from("* master".to_string().clone())) {
@@ -208,7 +208,7 @@ impl GitDriver {
                         && let Some(caps) = preg_match(php_regex!(r"{^\* +(\S+)}"), branch)
                         && let Some(name) = caps.get(1)
                     {
-                        self.root_identifier = Some(legacy_lossy(name).into_owned());
+                        self.root_identifier = Some(BString::from(name));
                         break;
                     }
                 }
@@ -218,44 +218,44 @@ impl GitDriver {
         Ok(self.root_identifier.clone().unwrap_or_default())
     }
 
-    pub fn get_url(&self) -> String {
+    pub fn get_url(&self) -> BString {
         self.inner.url.clone()
     }
 
-    pub fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+    pub fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {
         let mut map = IndexMap::new();
-        map.insert("type".to_string(), "git".to_string());
-        map.insert("url".to_string(), self.get_url());
-        map.insert("reference".to_string(), identifier.to_string());
+        map.insert(BString::from("type"), BString::from("git"));
+        map.insert(BString::from("url"), BString::from(&self.get_url()[..]));
+        map.insert(BString::from("reference"), BString::from(identifier));
         map
     }
 
-    pub fn get_dist(&self, _identifier: &str) -> Option<IndexMap<String, String>> {
+    pub fn get_dist(&self, _identifier: &str) -> Option<IndexMap<BString, BString>> {
         None
     }
 
     pub fn get_file_content(
         &mut self,
-        file: &str,
-        identifier: &str,
-    ) -> anyhow::Result<Option<String>> {
-        if identifier.starts_with('-') {
+        file: &BStr,
+        identifier: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
+        if identifier.starts_with(b"-") {
             return Err(RuntimeException::new(format!(
                 "Invalid git identifier detected. Identifier must not start with a -, given: {}",
-                identifier
+                identifier.display_lossy()
             ))
             .into());
         }
 
-        let mut content = String::new();
+        let mut content = BString::default();
         self.inner.process.borrow_mut().execute(
             &[
-                "git".to_string(),
-                "show".to_string(),
-                format!("{}:{}", identifier, file),
+                BString::from("git"),
+                BString::from("show"),
+                bconcat!(identifier, ":", file),
             ],
             &mut content,
-            Some(std::path::Path::new(&self.repo_dir)),
+            Some(path_from_bytes(&self.repo_dir)),
         )?;
 
         if content.trim().is_empty() {
@@ -267,12 +267,12 @@ impl GitDriver {
 
     pub fn get_change_date(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
-        if identifier.starts_with('-') {
+        if identifier.starts_with(b"-") {
             return Err(RuntimeException::new(format!(
                 "Invalid git identifier detected. Identifier must not start with a -, given: {}",
-                identifier
+                identifier.display_lossy()
             ))
             .into());
         }
@@ -280,16 +280,16 @@ impl GitDriver {
         let command = GitUtil::build_rev_list_command(
             &self.inner.process,
             vec![
-                "-n1".to_string(),
-                "--format=%at".to_string(),
-                identifier.to_string(),
+                bstr::BString::from("-n1".to_string()),
+                bstr::BString::from("--format=%at".to_string()),
+                bstr::BString::from(identifier),
             ],
         )?;
         let mut output = bstr::BString::default();
         self.inner.process.borrow_mut().execute(
             &command,
             &mut output,
-            Some(std::path::Path::new(&self.repo_dir)),
+            Some(path_from_bytes(&self.repo_dir)),
         )?;
 
         let timestamp_str = trim(GitUtil::parse_rev_list_output(
@@ -304,11 +304,11 @@ impl GitDriver {
         ))
     }
 
-    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         if self.tags.is_none() {
             self.tags = Some(IndexMap::new());
 
-            let mut output = String::new();
+            let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
                 &[
                     "git".to_string(),
@@ -317,7 +317,7 @@ impl GitDriver {
                     "--dereference".to_string(),
                 ],
                 &mut output,
-                Some(std::path::Path::new(&self.repo_dir)),
+                Some(path_from_bytes(&self.repo_dir)),
             )?;
             for tag in self.inner.process.borrow().split_lines(&output) {
                 if !tag.is_empty()
@@ -327,10 +327,10 @@ impl GitDriver {
                     )
                     && let (Some(hash), Some(name)) = (caps.get(1), caps.get(2))
                 {
-                    self.tags.as_mut().unwrap().insert(
-                        legacy_lossy(name).into_owned(),
-                        legacy_lossy(hash).into_owned(),
-                    );
+                    self.tags
+                        .as_mut()
+                        .unwrap()
+                        .insert(BString::from(name), BString::from(hash));
                 }
             }
         }
@@ -338,11 +338,11 @@ impl GitDriver {
         Ok(self.tags.clone().unwrap_or_default())
     }
 
-    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         if self.branches.is_none() {
             let mut branches = IndexMap::new();
 
-            let mut output = String::new();
+            let mut output = BString::default();
             self.inner.process.borrow_mut().execute(
                 &[
                     "git".to_string(),
@@ -352,7 +352,7 @@ impl GitDriver {
                     "-v".to_string(),
                 ],
                 &mut output,
-                Some(std::path::Path::new(&self.repo_dir)),
+                Some(path_from_bytes(&self.repo_dir)),
             )?;
             for branch in self.inner.process.borrow().split_lines(&output) {
                 if !branch.is_empty()
@@ -364,10 +364,7 @@ impl GitDriver {
                     && let (Some(name), Some(hash)) = (caps.get(1), caps.get(2))
                     && !name.starts_with(b"-")
                 {
-                    branches.insert(
-                        legacy_lossy(name).into_owned(),
-                        legacy_lossy(hash).into_owned(),
-                    );
+                    branches.insert(BString::from(name), BString::from(hash));
                 }
             }
 
@@ -380,7 +377,7 @@ impl GitDriver {
     pub fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        url: &str,
+        url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {
         if preg_is_match(
@@ -391,26 +388,28 @@ impl GitDriver {
         }
 
         if Filesystem::is_local_path(url) {
-            let url = Filesystem::get_platform_path(url);
-            if !is_dir(&url) {
+            let url = BString::from(path_to_bytes(&Filesystem::get_platform_path(url)));
+            if !is_dir(path_from_bytes(&url)) {
                 return Ok(false);
             }
 
             let process = std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
                 io.clone(),
             ))));
-            let mut output = String::new();
+            let mut output = BString::default();
             if process.borrow_mut().execute(
                 &["git".to_string(), "tag".to_string()],
                 &mut output,
-                Some(std::path::Path::new(&*legacy_lossy(path_to_bytes(&url)))),
+                Some(std::path::Path::new(&*legacy_lossy(path_to_bytes(
+                    path_from_bytes(&url),
+                )))),
             )? == 0
             {
                 return Ok(true);
             }
             GitUtil::check_for_repo_ownership_error(
                 &legacy_lossy(&process.borrow().get_error_output()),
-                &legacy_lossy(path_to_bytes(&url)),
+                &legacy_lossy(path_to_bytes(path_from_bytes(&url))),
                 Some(io.clone()),
             )?;
         }
@@ -443,7 +442,7 @@ impl GitDriver {
                 "--".to_string(),
                 "%url%".to_string(),
             ]],
-            url,
+            &legacy_lossy(url),
             Some(&tmp_dir),
             false,
             (),
@@ -461,13 +460,13 @@ impl GitDriver {
 
     pub fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         if let Some(cached) = self.inner.read_cached_composer(identifier)? {
             return Ok(cached);
         }
 
-        let file_content = self.get_file_content("composer.json", identifier)?;
+        let file_content = self.get_file_content(bstr::BStr::new("composer.json"), identifier)?;
         let composer =
             VcsDriverBase::finish_base_composer_information(identifier, file_content, || {
                 self.get_change_date(identifier)
@@ -478,7 +477,7 @@ impl GitDriver {
 
     /// For testing only. Mirrors GitDriverTest::setRepoDir, which uses reflection to
     /// set the private `repoDir` property.
-    pub fn __set_repo_dir(&mut self, repo_dir: String) {
+    pub fn __set_repo_dir(&mut self, repo_dir: BString) {
         self.repo_dir = repo_dir;
     }
 }
@@ -490,47 +489,51 @@ impl crate::repository::vcs::VcsDriverInterface for GitDriver {
 
     fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         GitDriver::get_composer_information(self, identifier)
     }
 
-    fn get_file_content(&mut self, file: &str, identifier: &str) -> anyhow::Result<Option<String>> {
+    fn get_file_content(
+        &mut self,
+        file: &BStr,
+        identifier: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
         GitDriver::get_file_content(self, file, identifier)
     }
 
     fn get_change_date(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
         GitDriver::get_change_date(self, identifier)
     }
 
-    fn get_root_identifier(&mut self) -> anyhow::Result<String> {
+    fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
         GitDriver::get_root_identifier(self)
     }
 
-    fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         GitDriver::get_branches(self)
     }
 
-    fn get_tags(&mut self) -> anyhow::Result<IndexMap<String, String>> {
+    fn get_tags(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
         GitDriver::get_tags(self)
     }
 
-    fn get_dist(&self, identifier: &str) -> Option<IndexMap<String, String>> {
-        GitDriver::get_dist(self, identifier)
+    fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
+        GitDriver::get_dist(self, &legacy_lossy(identifier))
     }
 
-    fn get_source(&self, identifier: &str) -> IndexMap<String, String> {
+    fn get_source(&self, identifier: &BStr) -> IndexMap<BString, BString> {
         GitDriver::get_source(self, identifier)
     }
 
-    fn get_url(&self) -> String {
+    fn get_url(&self) -> BString {
         GitDriver::get_url(self)
     }
 
-    fn has_composer_file(&mut self, identifier: &str) -> anyhow::Result<bool> {
+    fn has_composer_file(&mut self, identifier: &BStr) -> anyhow::Result<bool> {
         match self.get_composer_information(identifier) {
             Ok(info) => Ok(info.is_some()),
             Err(e) => {
@@ -550,7 +553,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitDriver {
     fn supports(
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
         config: std::rc::Rc<std::cell::RefCell<Config>>,
-        url: &str,
+        url: &BStr,
         deep: bool,
     ) -> anyhow::Result<bool> {
         GitDriver::supports(io, config, url, deep)

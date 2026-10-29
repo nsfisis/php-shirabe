@@ -128,7 +128,7 @@ fn test_supports_returns_false_no_deep_check() {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
 
-    assert!(!PerforceDriver::supports(io, config, "existing.url", false).unwrap());
+    assert!(!PerforceDriver::supports(io, config, bstr::BStr::new("existing.url"), false).unwrap());
 }
 
 #[test]
@@ -198,7 +198,7 @@ fn test_has_composer_file_returns_false_on_no_composer_file() {
     driver.__override_perforce(Box::new(perforce));
 
     driver.initialize().unwrap();
-    let result = driver.has_composer_file(identifier);
+    let result = driver.has_composer_file(bstr::BStr::new(identifier));
     assert!(!result);
 }
 
@@ -232,7 +232,7 @@ fn test_has_composer_file_returns_true_with_one_or_more_composer_files() {
     driver.__override_perforce(Box::new(perforce));
 
     driver.initialize().unwrap();
-    let result = driver.has_composer_file(identifier);
+    let result = driver.has_composer_file(bstr::BStr::new(identifier));
     assert!(result);
 }
 

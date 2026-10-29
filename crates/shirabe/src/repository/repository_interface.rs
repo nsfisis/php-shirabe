@@ -2,11 +2,12 @@
 
 use crate::package::{BasePackageHandle, PackageInterfaceHandle};
 use crate::repository::AdvisoryProviderInterface;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_semver::constraint::AnyConstraint;
 
 pub enum FindPackageConstraint {
-    String(String),
+    String(BString),
     Constraint(AnyConstraint),
 }
 
@@ -21,29 +22,29 @@ impl Clone for FindPackageConstraint {
 
 #[derive(Debug)]
 pub struct LoadPackagesResult {
-    pub names_found: Vec<String>,
-    pub packages: IndexMap<String, BasePackageHandle>,
+    pub names_found: Vec<BString>,
+    pub packages: IndexMap<BString, BasePackageHandle>,
 }
 
 #[derive(Debug, Clone)]
 pub enum AbandonedInfo {
-    Replacement(String),
+    Replacement(BString),
     Abandoned,
 }
 
 #[derive(Debug, Clone)]
 pub struct SearchResult {
-    pub name: String,
-    pub description: Option<String>,
+    pub name: BString,
+    pub description: Option<BString>,
     pub abandoned: Option<AbandonedInfo>,
-    pub url: Option<String>,
+    pub url: Option<BString>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ProviderInfo {
-    pub name: String,
-    pub description: Option<String>,
-    pub r#type: String,
+    pub name: BString,
+    pub description: Option<BString>,
+    pub r#type: BString,
 }
 
 pub const SEARCH_FULLTEXT: i64 = 0;
@@ -61,13 +62,13 @@ pub trait RepositoryInterface: std::fmt::Debug {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>>;
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>>;
 
@@ -75,28 +76,28 @@ pub trait RepositoryInterface: std::fmt::Debug {
 
     fn load_packages(
         &mut self,
-        package_name_map: IndexMap<String, Option<AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult>;
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<SearchResult>>;
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, ProviderInfo>>;
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, ProviderInfo>>;
 
     // PHP's getRepoName() can throw: ArrayRepository::getRepoName() counts through the
     // late-bound $this->initialize(), which is fallible in subclasses that read files
     // (FilesystemRepository, PackageRepository).
-    fn get_repo_name(&self) -> anyhow::Result<String>;
+    fn get_repo_name(&self) -> anyhow::Result<BString>;
 
     fn as_advisory_provider(&self) -> Option<&dyn AdvisoryProviderInterface> {
         None

@@ -22,7 +22,7 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, CmpOp, Exception, InvalidArgumentException, PHP_EOL, PhpClass as _,
-    PhpMixed, RuntimeException, disk_free_space, file_exists, filter_var_boolean, hash,
+    PhpMixed, RuntimeException, bconcat, disk_free_space, file_exists, filter_var_boolean, hash,
     impl_php_class, implode, legacy_lossy, php_regex, preg_match, rtrim2, str_replace, strpos,
     strstr, strstr3, strtolower, trim2, version_compare,
 };
@@ -640,8 +640,11 @@ impl DiagnoseCommand {
         if version != "@package_version@" {
             let version_parser = VersionParser::new();
             let normalized_version = version_parser.normalize(&version, None)?;
-            let root_pkg =
-                RootPackage::new("composer/composer".to_string(), normalized_version, version);
+            let root_pkg = RootPackage::new(
+                bstr::BString::from("composer/composer".to_string()),
+                normalized_version,
+                bstr::BString::from(version),
+            );
             packages.push(crate::package::RootPackageHandle::from_root_package(root_pkg).into());
         }
         let mut repo_config: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -670,10 +673,10 @@ impl DiagnoseCommand {
             &io,
             &repo_set,
             packages,
-            Auditor::FORMAT_TABLE,
+            bstr::BStr::new(Auditor::FORMAT_TABLE),
             true,
             IndexMap::new(),
-            Auditor::ABANDONED_IGNORE,
+            bstr::BStr::new(Auditor::ABANDONED_IGNORE),
             IndexMap::new(),
             false,
             IndexMap::new(),
@@ -1252,8 +1255,8 @@ impl Command for DiagnoseCommand {
             PlatformRepository::new(vec![], platform_overrides_unboxed, None, None).unwrap();
         let php_pkg = <PlatformRepository as crate::repository::RepositoryInterface>::find_package(
             &mut platform_repo,
-            "php",
-            crate::repository::FindPackageConstraint::String("*".to_string()),
+            bstr::BStr::new("php"),
+            crate::repository::FindPackageConstraint::String(bstr::BString::from("*".to_string())),
         )?
         .unwrap();
         let mut php_version = php_pkg.get_pretty_version();
@@ -1261,16 +1264,15 @@ impl Command for DiagnoseCommand {
             && cp
                 .get_description()
                 .unwrap_or_default()
-                .contains("overridden")
+                .contains_str("overridden")
         {
-            php_version = format!(
-                "{} - {}",
-                php_version,
-                cp.get_description().unwrap_or_default()
-            );
+            php_version = bconcat!(php_version, " - ", cp.get_description().unwrap_or_default());
         }
 
-        io.write(&format!("PHP version: <comment>{}</comment>", php_version));
+        io.write(&format!(
+            "PHP version: <comment>{}</comment>",
+            legacy_lossy(&php_version)
+        ));
 
         let diagnostics = shirabe_php_rpc::get_diagnostics();
 
@@ -1393,7 +1395,7 @@ impl Command for DiagnoseCommand {
                 // PHP: ReflectionMethod($composerRepo, 'getPackagesJsonUrl')
                 // We surface the same internal call by directly invoking the equivalent method.
                 // TODO(plugin): support reflection-based access if plugin code requires it.
-                let url = composer_repo.get_packages_json_url();
+                let url = legacy_lossy(&composer_repo.get_packages_json_url()).into_owned();
                 if !url.starts_with("http") {
                     continue;
                 }

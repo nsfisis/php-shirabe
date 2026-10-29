@@ -7,7 +7,7 @@ use crate::io::IOInterfaceImmutable;
 use crate::json::JsonFile;
 use crate::package::base_package::{self};
 use crate::repository::{CompositeRepository, RepositoryInterface};
-use bstr::B;
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{PhpMixed, impl_php_class, legacy_lossy, php_regex, preg_match};
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint};
@@ -45,9 +45,13 @@ impl FundCommand {
         package: &crate::package::CompletePackageInterfaceHandle,
     ) -> anyhow::Result<()> {
         let pretty_name = package.get_pretty_name();
-        let (vendor, package_name) = pretty_name
-            .split_once('/')
-            .unwrap_or(("", pretty_name.as_str()));
+        let (vendor, package_name) = match pretty_name.find("/") {
+            Some(pos) => (
+                pretty_name[..pos].as_bstr(),
+                pretty_name[pos + 1..].as_bstr(),
+            ),
+            None => (b"".as_bstr(), pretty_name.as_bstr()),
+        };
 
         for funding_option in package.get_funding() {
             let url_val = funding_option.get(B("url")).and_then(|v| v.as_string());
@@ -67,11 +71,11 @@ impl FundCommand {
                 url = format!("https://github.com/sponsors/{}", sponsor);
             }
             fundings
-                .entry(vendor.to_string())
+                .entry(legacy_lossy(vendor).into_owned())
                 .or_default()
                 .entry(url)
                 .or_default()
-                .push(package_name.to_string());
+                .push(legacy_lossy(package_name).into_owned());
         }
         Ok(())
     }
@@ -110,7 +114,7 @@ impl Command for FundCommand {
             CompositeRepository::new(repository_manager.get_repositories().to_vec());
         let mut fundings: IndexMap<String, IndexMap<String, Vec<String>>> = IndexMap::new();
 
-        let mut packages_to_load: IndexMap<String, Option<AnyConstraint>> = IndexMap::new();
+        let mut packages_to_load: IndexMap<BString, Option<AnyConstraint>> = IndexMap::new();
         let mut packages_to_load_names: indexmap::IndexSet<String> = indexmap::IndexSet::new();
         for package in repo.get_packages()? {
             if package.as_alias().is_some() {
@@ -120,13 +124,13 @@ impl Command for FundCommand {
                 package.get_name(),
                 Some(MatchAllConstraint::new(None).into()),
             );
-            packages_to_load_names.insert(package.get_name());
+            packages_to_load_names.insert(legacy_lossy(&package.get_name()).into_owned());
         }
 
         // load all packages dev versions in parallel
         let result = remote_repos.load_packages(
             packages_to_load,
-            IndexMap::from([("dev".to_string(), base_package::STABILITY_DEV)]),
+            IndexMap::from([(BString::from("dev"), base_package::STABILITY_DEV)]),
             IndexMap::new(),
             IndexMap::new(),
         )?;
@@ -137,16 +141,17 @@ impl Command for FundCommand {
                 && let Some(complete_pkg) = package.as_complete()
                 && complete_pkg.is_default_branch()
                 && !complete_pkg.get_funding().is_empty()
-                && packages_to_load_names.contains(&complete_pkg.get_name())
+                && packages_to_load_names.contains(&*legacy_lossy(&complete_pkg.get_name()))
             {
                 Self::insert_funding_data(&mut fundings, &complete_pkg)?;
-                packages_to_load_names.shift_remove(&complete_pkg.get_name());
+                packages_to_load_names.shift_remove(&*legacy_lossy(&complete_pkg.get_name()));
             }
         }
 
         // collect funding from installed packages if none was found in the default branch above
         for package in repo.get_packages()? {
-            if package.as_alias().is_some() || !packages_to_load_names.contains(&package.get_name())
+            if package.as_alias().is_some()
+                || !packages_to_load_names.contains(&*legacy_lossy(&package.get_name()))
             {
                 continue;
             }

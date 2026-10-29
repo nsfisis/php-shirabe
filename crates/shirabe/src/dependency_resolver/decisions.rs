@@ -1,8 +1,9 @@
 //! ref: composer/src/Composer/DependencyResolver/Decisions.php
 
 use crate::dependency_resolver::{Pool, Rule, SolverBugException};
+use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::LogicException;
+use shirabe_php_shim::{LogicException, legacy_lossy};
 use std::fmt;
 
 pub struct Decisions {
@@ -163,7 +164,10 @@ impl Decisions {
                 "{}",
                 SolverBugException::new(format!(
                     "Trying to decide {} on level {}, even though {} was previously decided as {}.",
-                    literal_string, level, package, previous_decision
+                    literal_string.display_lossy(),
+                    level,
+                    package.to_php_string().display_lossy(),
+                    previous_decision
                 ))
                 .0
                 .get_message()
@@ -177,13 +181,16 @@ impl Decisions {
         }
     }
 
-    pub fn to_string_with_pool(&self, pool: Option<&Pool>) -> String {
+    pub fn to_string_with_pool(&self, pool: Option<&Pool>) -> BString {
         let mut decision_map = self.decision_map.clone();
         decision_map.sort_keys();
         let mut str = "[".to_string();
         for (package_id, level) in &decision_map {
             let key = if let Some(pool) = pool {
-                pool.literal_to_package(*package_id).to_string()
+                pool.literal_to_package(*package_id)
+                    .to_php_string()
+                    .display_lossy()
+                    .to_string()
             } else {
                 package_id.to_string()
             };
@@ -191,7 +198,7 @@ impl Decisions {
         }
         str.push(']');
 
-        str
+        bstr::BString::from(str)
     }
 
     // Reverse iteration: newest-first.
@@ -202,6 +209,6 @@ impl Decisions {
 
 impl fmt::Display for Decisions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string_with_pool(None))
+        write!(f, "{}", legacy_lossy(&self.to_string_with_pool(None)))
     }
 }

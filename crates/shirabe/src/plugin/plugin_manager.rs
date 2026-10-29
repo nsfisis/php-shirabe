@@ -208,7 +208,7 @@ impl PluginManager {
         if self.are_plugins_disabled(if is_global_plugin { "global" } else { "local" }) {
             self.io.write_error(&format!(
                 "<warning>The \"{}\" plugin was not loaded as plugins are disabled.</warning>",
-                package.get_name()
+                package.get_name().display_lossy()
             ));
 
             return Ok(());
@@ -227,7 +227,7 @@ impl PluginManager {
             let requires_composer = match requires_composer {
                 Some(r) => r,
                 None => {
-                    return Err(RuntimeException::new(format!("Plugin {} is missing a require statement for a version of the composer-plugin-api package.", package.get_name())).into());
+                    return Err(RuntimeException::new(format!("Plugin {} is missing a require statement for a version of the composer-plugin-api package.", package.get_name().display_lossy())).into());
                 }
             };
 
@@ -240,10 +240,10 @@ impl PluginManager {
             );
 
             if requires_composer.get_pretty_string() == self.get_plugin_api_version() {
-                self.io.write_error(&format!("<warning>The \"{}\" plugin requires composer-plugin-api {}, this *WILL* break in the future and it should be fixed ASAP (require ^{} instead for example).</warning>", package.get_name(), self.get_plugin_api_version(), self.get_plugin_api_version()));
+                self.io.write_error(&format!("<warning>The \"{}\" plugin requires composer-plugin-api {}, this *WILL* break in the future and it should be fixed ASAP (require ^{} instead for example).</warning>", package.get_name().display_lossy(), self.get_plugin_api_version(), self.get_plugin_api_version()));
             } else if !requires_composer.matches(&current_plugin_api_constraint.into()) {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it requires a Plugin API version (\"{}\") that does not match your Shirabe installation (\"{}\"). You may need to run shirabe update with the \"--no-plugins\" option.</warning>",
-                    package.get_name(),
+                    package.get_name().display_lossy(),
                     if is_global_plugin || self.running_in_global_dir { "(installed globally) " } else { "" },
                     requires_composer.get_pretty_string().display_lossy(),
                     current_plugin_api_version
@@ -256,7 +256,7 @@ impl PluginManager {
                 && version_compare(package.get_version(), "1.9.8", CmpOp::Lt)
             {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it is not compatible with Composer 2+. Make sure to update it to version 1.9.8 or greater.</warning>",
-                    package.get_name(),
+                    package.get_name().display_lossy(),
                     if is_global_plugin || self.running_in_global_dir { "(installed globally) " } else { "" }
                 ));
                 return Ok(());
@@ -268,11 +268,16 @@ impl PluginManager {
             .get(B("plugin-optional"))
             .map(|v| v.as_bool() == Some(true))
             .unwrap_or(false);
-        if !self.is_plugin_allowed(&package.get_name(), is_global_plugin, plugin_optional, true)? {
+        if !self.is_plugin_allowed(
+            &legacy_lossy(&package.get_name()),
+            is_global_plugin,
+            plugin_optional,
+            true,
+        )? {
             self.io.write_error3(
                 &format!(
                     "Skipped loading \"{}\" {}as it is not in config.allow-plugins",
-                    package.get_name(),
+                    package.get_name().display_lossy(),
                     if is_global_plugin || self.running_in_global_dir {
                         "(installed globally) "
                     } else {
@@ -287,7 +292,10 @@ impl PluginManager {
 
         let old_installer_plugin = package.get_type() == "composer-installer";
 
-        if self.registered_plugins.contains_key(&package.get_name()) {
+        if self
+            .registered_plugins
+            .contains_key(&*legacy_lossy(&package.get_name()))
+        {
             return Ok(());
         }
 
@@ -306,7 +314,7 @@ impl PluginManager {
             _ => false,
         };
         if class_is_empty {
-            return Err(UnexpectedValueException::new(format!("Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.", package.get_pretty_name())).into());
+            return Err(UnexpectedValueException::new(format!("Error while installing {}, composer-plugin packages should have a class defined in their extra key to be usable.", package.get_pretty_name().display_lossy())).into());
         }
         // PHP: is_array($extra['class']) ? $extra['class'] : [$extra['class']] — an associative
         // array iterates its values too, and a non-string entry reaches class_exists() where it
@@ -357,7 +365,10 @@ impl PluginManager {
         }
 
         let mut autoload_packages: IndexMap<String, PackageInterfaceHandle> = IndexMap::new();
-        autoload_packages.insert(package.get_name().to_string(), package.clone());
+        autoload_packages.insert(
+            legacy_lossy(&package.get_name()).into_owned(),
+            package.clone(),
+        );
         let autoload_packages =
             self.collect_dependencies(&installed_repo, autoload_packages, package.clone())?;
 
@@ -484,14 +495,14 @@ impl PluginManager {
                 if !self.php_runtime_is_a(&class, "Composer\\Installer\\InstallerInterface")? {
                     return Err(RuntimeException::new(format!(
                         "Could not activate plugin \"{}\" as \"{}\" does not implement Composer\\Installer\\InstallerInterface",
-                        package.get_name(),
+                        package.get_name().display_lossy(),
                         class
                     ))
                     .into());
                 }
                 self.io.write_error(&format!(
                     "<warning>Loading \"{}\" {}which is a legacy composer-installer built for Composer 1.x, it is likely to cause issues as you are running Composer 2.x.</warning>",
-                    package.get_name(),
+                    package.get_name().display_lossy(),
                     if is_global_plugin || self.running_in_global_dir {
                         "(installed globally) "
                     } else {
@@ -513,14 +524,14 @@ impl PluginManager {
                     .borrow()
                     .add_installer(installer.clone());
                 self.registered_plugins
-                    .entry(package.get_name().to_string())
+                    .entry(legacy_lossy(&package.get_name()).into_owned())
                     .or_default()
                     .push(PluginOrInstaller::Installer(installer));
             } else if self.php_runtime_class_exists(&class, true)? {
                 if !self.php_runtime_is_a(&class, "Composer\\Plugin\\PluginInterface")? {
                     return Err(RuntimeException::new(format!(
                         "Could not activate plugin \"{}\" as \"{}\" does not implement Composer\\Plugin\\PluginInterface",
-                        package.get_name(),
+                        package.get_name().display_lossy(),
                         class
                     ))
                     .into());
@@ -534,13 +545,13 @@ impl PluginManager {
                     )));
                 self.add_plugin(plugin.clone(), is_global_plugin, Some(package.clone()))?;
                 self.registered_plugins
-                    .entry(package.get_name().to_string())
+                    .entry(legacy_lossy(&package.get_name()).into_owned())
                     .or_default()
                     .push(PluginOrInstaller::Plugin(plugin));
             } else if fail_on_missing_classes {
                 return Err(UnexpectedValueException::new(format!(
                     "Plugin {} could not be initialized, class not found: {}",
-                    package.get_name(),
+                    package.get_name().display_lossy(),
                     class
                 ))
                 .into());
@@ -632,13 +643,16 @@ impl PluginManager {
 
     /// Deactivates a plugin package
     pub fn deactivate_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
-        if !self.registered_plugins.contains_key(&package.get_name()) {
+        if !self
+            .registered_plugins
+            .contains_key(&*legacy_lossy(&package.get_name()))
+        {
             return Ok(());
         }
 
         // PHP unsets registeredPlugins only after the loop; a deactivate() throw must leave the
         // entry observable, so removal happens last here too.
-        let name = package.get_name();
+        let name = legacy_lossy(&package.get_name()).into_owned();
         let count = self
             .registered_plugins
             .get(&name)
@@ -668,12 +682,15 @@ impl PluginManager {
 
     /// Uninstall a plugin package
     pub fn uninstall_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
-        if !self.registered_plugins.contains_key(&package.get_name()) {
+        if !self
+            .registered_plugins
+            .contains_key(&*legacy_lossy(&package.get_name()))
+        {
             return Ok(());
         }
 
         // PHP unsets registeredPlugins only after the loop, as in deactivate_package.
-        let name = package.get_name();
+        let name = legacy_lossy(&package.get_name()).into_owned();
         let count = self
             .registered_plugins
             .get(&name)
@@ -737,7 +754,7 @@ impl PluginManager {
                     .map(|v| v.as_bool() == Some(true))
                     .unwrap_or(false);
                 if !self.is_plugin_allowed(
-                    &sp.get_name(),
+                    &legacy_lossy(&sp.get_name()),
                     is_global_plugin,
                     plugin_optional,
                     true,
@@ -746,7 +763,7 @@ impl PluginManager {
                         &format!(
                             "Skipped loading \"{} from {}\" {} as it is not in config.allow-plugins",
                             plugin.borrow().get_class_name(),
-                            sp.get_name(),
+                            sp.get_name().display_lossy(),
                             if is_global_plugin || self.running_in_global_dir {
                                 "(installed globally) "
                             } else {
@@ -763,7 +780,7 @@ impl PluginManager {
 
         let mut details: Vec<String> = vec![];
         if let Some(sp) = source_package.as_ref() {
-            details.push(format!("from {}", sp.get_name()));
+            details.push(format!("from {}", legacy_lossy(&sp.get_name())));
         }
         if is_global_plugin || self.running_in_global_dir {
             details.push("installed globally".to_string());
@@ -870,7 +887,7 @@ impl PluginManager {
                         .map(|v| v.as_bool() == Some(true))
                         .unwrap_or(false)
                 {
-                    weights.insert(package.get_name().to_string(), -10000);
+                    weights.insert(legacy_lossy(&package.get_name()).into_owned(), -10000);
                 }
             }
         }
@@ -909,9 +926,14 @@ impl PluginManager {
                 .any(|rp| rp.ptr_id() == package_addr);
             if !is_global_repo
                 && !in_required
-                && !self.is_plugin_allowed(&package.get_name(), false, true, false)?
+                && !self.is_plugin_allowed(
+                    &legacy_lossy(&package.get_name()),
+                    false,
+                    true,
+                    false,
+                )?
             {
-                self.io.write_error(&format!("<warning>The \"{}\" plugin was not loaded as it is not listed in allow-plugins and is not required by the root package anymore.</warning>", package.get_name()));
+                self.io.write_error(&format!("<warning>The \"{}\" plugin was not loaded as it is not listed in allow-plugins and is not required by the root package anymore.</warning>", package.get_name().display_lossy()));
                 continue;
             }
 
@@ -959,11 +981,15 @@ impl PluginManager {
     ) -> anyhow::Result<IndexMap<String, PackageInterfaceHandle>> {
         // TODO(plugin): used by registerPackage to assemble plugin dependency autoload map
         for (_k, require_link) in package.get_requires().iter() {
-            for required_package in installed_repo
-                .find_packages_with_replacers_and_providers(require_link.get_target(), None)?
-            {
-                if !collected.contains_key(&required_package.get_name()) {
-                    collected.insert(required_package.get_name(), required_package.clone());
+            for required_package in installed_repo.find_packages_with_replacers_and_providers(
+                bstr::BStr::new(&*legacy_lossy(require_link.get_target())),
+                None,
+            )? {
+                if !collected.contains_key(&*legacy_lossy(&required_package.get_name())) {
+                    collected.insert(
+                        legacy_lossy(&required_package.get_name()).into_owned(),
+                        required_package.clone(),
+                    );
                     collected = self.collect_dependencies(
                         installed_repo,
                         collected,
@@ -1183,7 +1209,7 @@ impl PluginManager {
                 rules.insert(
                     // TODO(bytes): patterns are compiled from UTF-8 text, so non-UTF-8 bytes are
                     // replaced.
-                    base_package::package_name_to_regexp(&pattern.to_str_lossy()),
+                    base_package::package_name_to_regexp(pattern),
                     allow.as_bool().unwrap_or(false),
                 );
             }

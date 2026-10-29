@@ -71,7 +71,7 @@ fn test_select_single() {
 
     let pool = fixtures
         .repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let literals = vec![package_a.get_id()];
@@ -101,7 +101,7 @@ fn test_select_newest() {
 
     let pool = fixtures
         .repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let literals = vec![package_a1.get_id(), package_a2.get_id()];
@@ -131,7 +131,7 @@ fn test_select_newest_picks_latest() {
 
     let pool = fixtures
         .repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let literals = vec![package_a1.get_id(), package_a2.get_id()];
@@ -161,7 +161,7 @@ fn test_select_newest_picks_latest_stable_with_prefer_stable() {
 
     let pool = fixtures
         .repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let literals = vec![package_a1.get_id(), package_a2.get_id()];
@@ -196,7 +196,7 @@ fn test_select_lowest_with_prefer_dev_over_prerelease() {
 
         let pool = fixtures
             .repository_set
-            .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+            .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
             .unwrap();
 
         let literals = vec![dev_package.get_id(), prerelease_package.get_id()];
@@ -231,7 +231,7 @@ fn test_select_lowest_prefers_prerelease_over_dev() {
 
         let pool = fixtures
             .repository_set
-            .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+            .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
             .unwrap();
 
         let literals = vec![prerelease_package.get_id(), dev_package.get_id()];
@@ -262,7 +262,7 @@ fn test_select_lowest_with_prefer_stable_still_prefers_stable() {
 
     let pool = fixtures
         .repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let literals = vec![stable_package.get_id(), dev_package.get_id()];
@@ -291,7 +291,7 @@ fn test_select_newest_with_dev_picks_non_dev() {
 
     let pool = fixtures
         .repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let literals = vec![package_a1.get_id(), package_a2.get_id()];
@@ -325,7 +325,7 @@ fn test_select_newest_with_preferred_version_picks_preferred_version_if_availabl
 
     let pool = fixtures
         .repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let literals = vec![
@@ -338,7 +338,16 @@ fn test_select_newest_with_preferred_version_picks_preferred_version_if_availabl
 
     let mut preferred = IndexMap::new();
     preferred.insert("a".to_string(), "1.1.0.0".to_string());
-    let policy = DefaultPolicy::new(false, false, Some(preferred));
+    let policy = DefaultPolicy::new(
+        false,
+        false,
+        Some(
+            preferred
+                .into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        ),
+    );
     let selected = policy.select_preferred_packages(&pool, literals, None);
 
     assert_eq!(expected, selected);
@@ -361,7 +370,7 @@ fn test_select_newest_with_preferred_version_picks_newest_otherwise() {
 
     let pool = fixtures
         .repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let literals = vec![package_a1.get_id(), package_a2.get_id()];
@@ -369,7 +378,16 @@ fn test_select_newest_with_preferred_version_picks_newest_otherwise() {
 
     let mut preferred = IndexMap::new();
     preferred.insert("a".to_string(), "1.1.0.0".to_string());
-    let policy = DefaultPolicy::new(false, false, Some(preferred));
+    let policy = DefaultPolicy::new(
+        false,
+        false,
+        Some(
+            preferred
+                .into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        ),
+    );
     let selected = policy.select_preferred_packages(&pool, literals, None);
 
     assert_eq!(expected, selected);
@@ -392,7 +410,7 @@ fn test_select_newest_with_preferred_version_picks_lowest_if_prefer_lowest() {
 
     let pool = fixtures
         .repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let literals = vec![package_a1.get_id(), package_a2.get_id()];
@@ -400,7 +418,16 @@ fn test_select_newest_with_preferred_version_picks_lowest_if_prefer_lowest() {
 
     let mut preferred = IndexMap::new();
     preferred.insert("a".to_string(), "1.1.0.0".to_string());
-    let policy = DefaultPolicy::new(false, true, Some(preferred));
+    let policy = DefaultPolicy::new(
+        false,
+        true,
+        Some(
+            preferred
+                .into_iter()
+                .map(|(k, v)| (bstr::BString::from(k), bstr::BString::from(v)))
+                .collect::<indexmap::IndexMap<_, _>>(),
+        ),
+    );
     let selected = policy.select_preferred_packages(&pool, literals, None);
 
     assert_eq!(expected, selected);
@@ -438,7 +465,7 @@ fn test_repository_ordering_affects_priority() {
 
     let pool = fixtures
         .repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let literals = vec![
@@ -466,7 +493,7 @@ fn test_repository_ordering_affects_priority() {
     repository_set.add_repository(repo1_handle).unwrap();
 
     let pool = repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let expected = vec![package4.get_id()];
@@ -488,20 +515,20 @@ fn test_select_local_repos_first() {
     let package_a = get_package("A", "dev-master");
     let package_a_alias = CompleteAliasPackageHandle::new(
         CompletePackageHandle::from_rc_unchecked(package_a.as_rc().clone()),
-        "2.1.9999999.9999999-dev".to_string(),
-        "2.1.x-dev".to_string(),
+        bstr::BString::from("2.1.9999999.9999999-dev".to_string()),
+        bstr::BString::from("2.1.x-dev".to_string()),
     );
     let package_a_important = get_package("A", "dev-feature-a");
     let package_a_alias_important = CompleteAliasPackageHandle::new(
         CompletePackageHandle::from_rc_unchecked(package_a_important.as_rc().clone()),
-        "2.1.9999999.9999999-dev".to_string(),
-        "2.1.x-dev".to_string(),
+        bstr::BString::from("2.1.9999999.9999999-dev".to_string()),
+        bstr::BString::from("2.1.x-dev".to_string()),
     );
     let package_a2_important = get_package("A", "dev-master");
     let package_a2_alias_important = CompleteAliasPackageHandle::new(
         CompletePackageHandle::from_rc_unchecked(package_a2_important.as_rc().clone()),
-        "2.1.9999999.9999999-dev".to_string(),
-        "2.1.x-dev".to_string(),
+        bstr::BString::from("2.1.9999999.9999999-dev".to_string()),
+        bstr::BString::from("2.1.x-dev".to_string()),
     );
     package_a_alias_important.set_root_package_alias(true);
 
@@ -531,7 +558,7 @@ fn test_select_local_repos_first() {
 
     let mut pool = fixtures
         .repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let constraint = AnyConstraint::Simple(SimpleConstraint::new(
@@ -539,7 +566,7 @@ fn test_select_local_repos_first() {
         "2.1.9999999.9999999-dev".to_string(),
         None,
     ));
-    let packages = pool.what_provides("a", Some(&constraint));
+    let packages = pool.what_provides(bstr::BStr::new("a"), Some(&constraint));
     assert!(!packages.is_empty());
     let mut literals = vec![];
     for package in &packages {
@@ -560,11 +587,11 @@ fn test_select_local_repos_first() {
 fn link(source: &str, target: &str, constraint: AnyConstraint, r#type: &str) -> Link {
     let pretty = legacy_lossy(&constraint.get_pretty_string()).into_owned();
     Link::new(
-        source.to_string(),
-        target.to_string(),
+        bstr::BString::from(source.to_string()),
+        bstr::BString::from(target.to_string()),
         constraint,
-        Some(r#type.to_string()),
-        pretty,
+        Some(bstr::BString::from(r#type.to_string())),
+        bstr::BString::from(pretty),
     )
 }
 
@@ -594,13 +621,23 @@ fn test_select_all_providers() {
         "x".to_string(),
         link("A", "X", constraint("==", "1.0"), Link::TYPE_PROVIDE),
     );
-    as_complete(&package_a).__set_provides(provides_a);
+    as_complete(&package_a).__set_provides(
+        provides_a
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let mut provides_b: IndexMap<String, Link> = IndexMap::new();
     provides_b.insert(
         "x".to_string(),
         link("B", "X", constraint("==", "1.0"), Link::TYPE_PROVIDE),
     );
-    as_complete(&package_b).__set_provides(provides_b);
+    as_complete(&package_b).__set_provides(
+        provides_b
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     fixtures
         .repository_set
@@ -610,7 +647,10 @@ fn test_select_all_providers() {
     let pool = fixtures
         .repository_set
         .create_pool_for_packages(
-            vec!["A".to_string(), "B".to_string()],
+            vec![
+                bstr::BString::from("A".to_string()),
+                bstr::BString::from("B".to_string()),
+            ],
             Some(fixtures.repo_locked.clone()),
         )
         .unwrap();
@@ -641,7 +681,12 @@ fn test_prefer_non_replacing_from_same_repo() {
         "a".to_string(),
         link("B", "A", constraint("==", "1.0"), Link::TYPE_REPLACE),
     );
-    as_complete(&package_b).__set_replaces(replaces_b);
+    as_complete(&package_b).__set_replaces(
+        replaces_b
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     fixtures
         .repository_set
@@ -651,7 +696,10 @@ fn test_prefer_non_replacing_from_same_repo() {
     let pool = fixtures
         .repository_set
         .create_pool_for_packages(
-            vec!["A".to_string(), "B".to_string()],
+            vec![
+                bstr::BString::from("A".to_string()),
+                bstr::BString::from("B".to_string()),
+            ],
             Some(fixtures.repo_locked.clone()),
         )
         .unwrap();
@@ -688,7 +736,12 @@ fn test_prefer_replacing_package_from_same_vendor() {
             Link::TYPE_REPLACE,
         ),
     );
-    as_complete(&package_a).__set_replaces(replaces_a);
+    as_complete(&package_a).__set_replaces(
+        replaces_a
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
     let mut replaces_b: IndexMap<String, Link> = IndexMap::new();
     replaces_b.insert(
         "vendor-a/package".to_string(),
@@ -699,7 +752,12 @@ fn test_prefer_replacing_package_from_same_vendor() {
             Link::TYPE_REPLACE,
         ),
     );
-    as_complete(&package_b).__set_replaces(replaces_b);
+    as_complete(&package_b).__set_replaces(
+        replaces_b
+            .into_iter()
+            .map(|(k, v)| (bstr::BString::from(k), v))
+            .collect::<indexmap::IndexMap<_, _>>(),
+    );
 
     fixtures
         .repository_set
@@ -710,8 +768,8 @@ fn test_prefer_replacing_package_from_same_vendor() {
         .repository_set
         .create_pool_for_packages(
             vec![
-                "vendor-a/replacer".to_string(),
-                "vendor-b/replacer".to_string(),
+                bstr::BString::from("vendor-a/replacer".to_string()),
+                bstr::BString::from("vendor-b/replacer".to_string()),
             ],
             Some(fixtures.repo_locked.clone()),
         )
@@ -723,7 +781,7 @@ fn test_prefer_replacing_package_from_same_vendor() {
     let selected = fixtures.policy.select_preferred_packages(
         &pool,
         literals,
-        Some("vendor-a/package".to_string()),
+        Some(bstr::BString::from("vendor-a/package".to_string())),
     );
     assert_eq!(expected, selected);
 
@@ -750,8 +808,8 @@ fn test_prefer_replacing_package_from_same_vendor() {
         .repository_set
         .create_pool_for_packages(
             vec![
-                "vendor-a/replacer".to_string(),
-                "vendor-b/replacer".to_string(),
+                bstr::BString::from("vendor-a/replacer".to_string()),
+                bstr::BString::from("vendor-b/replacer".to_string()),
             ],
             Some(fixtures.repo_locked.clone()),
         )
@@ -763,7 +821,7 @@ fn test_prefer_replacing_package_from_same_vendor() {
     let selected = fixtures.policy.select_preferred_packages(
         &pool,
         literals,
-        Some("vendor-a/package".to_string()),
+        Some(bstr::BString::from("vendor-a/package".to_string())),
     );
     assert_eq!(expected, selected);
 }
@@ -787,7 +845,7 @@ fn test_select_lowest() {
 
     let pool = fixtures
         .repository_set
-        .create_pool_for_package("A", Some(fixtures.repo_locked.clone()))
+        .create_pool_for_package(bstr::BStr::new("A"), Some(fixtures.repo_locked.clone()))
         .unwrap();
 
     let literals = vec![package_a1.get_id(), package_a2.get_id()];

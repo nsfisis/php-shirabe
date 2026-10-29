@@ -104,6 +104,12 @@ impl PhpConcat for i64 {
     }
 }
 
+impl PhpConcat for usize {
+    fn php_concat_to(&self, out: &mut BString) {
+        out.extend_from_slice(self.to_string().as_bytes());
+    }
+}
+
 impl<T: PhpConcat + ?Sized> PhpConcat for &T {
     fn php_concat_to(&self, out: &mut BString) {
         (**self).php_concat_to(out);

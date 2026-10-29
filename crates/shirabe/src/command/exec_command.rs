@@ -52,7 +52,12 @@ impl ExecCommand {
             .iter()
             .map(|bin| legacy_lossy(bin).into_owned())
             .collect();
-        let local_bins_raw: Vec<String> = composer_ref.get_package().get_binaries();
+        let local_bins_raw: Vec<String> = composer_ref
+            .get_package()
+            .get_binaries()
+            .iter()
+            .map(|s| legacy_lossy(s).into_owned())
+            .collect::<Vec<_>>();
         let local_bins: Vec<String> = if for_display {
             local_bins_raw
                 .into_iter()

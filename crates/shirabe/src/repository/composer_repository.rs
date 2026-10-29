@@ -21,7 +21,7 @@ use crate::repository::{
 use crate::util::http::Response;
 use crate::util::r#loop::Loop;
 use crate::util::{HttpDownloader, Url, sync_executor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use futures::StreamExt;
 use futures::stream::FuturesOrdered;
 use indexmap::IndexMap;
@@ -393,7 +393,10 @@ impl ComposerRepository {
     }
 
     pub fn get_repo_name(&self) -> String {
-        format!("composer repo ({})", Url::sanitize(self.url.clone()))
+        format!(
+            "composer repo ({})",
+            legacy_lossy(&Url::sanitize(self.url.clone()))
+        )
     }
 
     pub fn get_repo_config_pub(&self) -> IndexMap<BString, PhpMixed> {
@@ -421,8 +424,11 @@ impl ComposerRepository {
         let mut filtered_packages: Vec<BasePackageHandle> = Vec::new();
 
         for package in packages.into_iter() {
-            let pkg_constraint =
-                SimpleConstraint::new("==", package.get_version().to_string(), None);
+            let pkg_constraint = SimpleConstraint::new(
+                "==",
+                legacy_lossy(&package.get_version()).into_owned(),
+                None,
+            );
 
             if constraint.matches(&pkg_constraint.into()) {
                 if return_first_match {
@@ -538,7 +544,7 @@ impl ComposerRepository {
 
         let mut names: Vec<String> = Vec::new();
         for package in self.get_packages()? {
-            names.push(package.get_pretty_name().to_string());
+            names.push(legacy_lossy(&package.get_pretty_name()).into_owned());
         }
 
         filter_results(names)
@@ -551,7 +557,10 @@ impl ComposerRepository {
             && age < 600
             && let Some(cached_data) = self.cache.borrow_mut().read(cache_key)
         {
-            let cached_data: Vec<String> = cached_data.split('\n').map(|s| s.to_string()).collect();
+            let cached_data: Vec<String> = legacy_lossy(&cached_data)
+                .split('\n')
+                .map(|s| s.to_string())
+                .collect();
             return Ok(cached_data);
         }
 
@@ -566,9 +575,7 @@ impl ComposerRepository {
         let vendors: Vec<String> = uniques.keys().cloned().collect();
 
         if !self.cache.borrow().is_read_only() {
-            self.cache
-                .borrow_mut()
-                .write(cache_key, &vendors.join("\n"));
+            self.cache.borrow_mut().write(cache_key, vendors.join("\n"));
         }
 
         Ok(vendors)
@@ -612,7 +619,10 @@ impl ComposerRepository {
             && age < 600
             && let Some(cached_data) = self.cache.borrow_mut().read(cache_key)
         {
-            let cached_data: Vec<String> = cached_data.split('\n').map(|s| s.to_string()).collect();
+            let cached_data: Vec<String> = legacy_lossy(&cached_data)
+                .split('\n')
+                .map(|s| s.to_string())
+                .collect();
             return Ok(cached_data);
         }
 
@@ -634,7 +644,7 @@ impl ComposerRepository {
         if !self.cache.borrow().is_read_only() {
             self.cache
                 .borrow_mut()
-                .write(cache_key, &package_names.join("\n"));
+                .write(cache_key, package_names.join("\n"));
         }
 
         Ok(package_names)
@@ -659,10 +669,15 @@ impl ComposerRepository {
                 self.initialize()?;
             }
             let inner_result = self.inner.load_packages(
-                package_name_map,
-                acceptable_stabilities,
-                stability_flags,
-                already_loaded,
+                bytes_keys(package_name_map),
+                bytes_keys(acceptable_stabilities),
+                bytes_keys(stability_flags),
+                bytes_keys(
+                    already_loaded
+                        .into_iter()
+                        .map(|(k, v)| (k, bytes_keys(v)))
+                        .collect(),
+                ),
             )?;
             return Ok(inner_result);
         }
@@ -704,7 +719,7 @@ impl ComposerRepository {
                         Some(c) => {
                             let pkg_c = SimpleConstraint::new(
                                 "==",
-                                candidate.get_version().to_string(),
+                                legacy_lossy(&candidate.get_version()).into_owned(),
                                 None,
                             );
                             c.matches(&pkg_c.into())
@@ -767,8 +782,14 @@ impl ComposerRepository {
         }
 
         Ok(LoadPackagesResult {
-            names_found: names_found.keys().cloned().collect(),
-            packages,
+            names_found: names_found
+                .keys()
+                .map(|k| BString::from(k.as_str()))
+                .collect(),
+            packages: packages
+                .into_iter()
+                .map(|(k, v)| (BString::from(k), v))
+                .collect(),
         })
     }
 
@@ -914,7 +935,7 @@ impl ComposerRepository {
         if !self.inner.is_initialized() {
             self.initialize()?;
         }
-        let inner_results = self.inner.search(query, mode, None)?;
+        let inner_results = self.inner.search(bstr::BString::from(query), mode, None)?;
         let converted: Vec<IndexMap<BString, PhpMixed>> = inner_results
             .into_iter()
             .map(|sr| {
@@ -988,7 +1009,7 @@ impl ComposerRepository {
                       name: &str,
                       package_constraint_map: &IndexMap<String, AnyConstraint>|
          -> anyhow::Result<Option<std::rc::Rc<AnySecurityAdvisory>>> {
-            let advisory = PartialSecurityAdvisory::create(name, data, &parser)?;
+            let advisory = PartialSecurityAdvisory::create(bstr::BStr::new(name), data, &parser)?;
             let is_full = matches!(advisory, AnySecurityAdvisory::Full(_));
             if !allow_partial_advisories && !is_full {
                 let data_mixed =
@@ -1173,8 +1194,14 @@ impl ComposerRepository {
                 .collect();
 
         Ok(SecurityAdvisoryResult {
-            names_found: names_found.keys().cloned().collect(),
-            advisories: advisories_filtered,
+            names_found: names_found
+                .keys()
+                .map(|k| BString::from(k.as_str()))
+                .collect(),
+            advisories: advisories_filtered
+                .into_iter()
+                .map(|(k, v)| (BString::from(k), v))
+                .collect(),
         })
     }
 
@@ -1278,7 +1305,10 @@ impl ComposerRepository {
             .as_ref()
             .is_some_and(|p| !p.is_empty())
         {
-            for (k, v) in self.inner.get_providers(package_name.to_string())? {
+            for (k, v) in self
+                .inner
+                .get_providers(bstr::BString::from(package_name.to_string()))?
+            {
                 let mut entry: IndexMap<BString, PhpMixed> = IndexMap::new();
                 entry.insert("name".into(), PhpMixed::string(v.name));
                 entry.insert(
@@ -1289,7 +1319,7 @@ impl ComposerRepository {
                     },
                 );
                 entry.insert("type".into(), PhpMixed::string(v.r#type));
-                result.insert(k, entry);
+                result.insert(legacy_lossy(&k).into_owned(), entry);
             }
         }
 
@@ -1323,7 +1353,7 @@ impl ComposerRepository {
 
     fn configure_package_transport_options(&self, package: PackageInterfaceHandle) {
         for url in package.get_dist_urls() {
-            if url.starts_with(&self.base_url) {
+            if url.starts_with(self.base_url.as_bytes()) {
                 package.set_transport_options(self.options.clone());
 
                 return;
@@ -1404,7 +1434,13 @@ impl ComposerRepository {
             let mut packages_opt: Option<IndexMap<BString, PhpMixed>> = None;
             if !use_last_modified_check
                 && hash_opt.is_some()
-                && self.cache.borrow_mut().sha256(&cache_key).as_deref() == hash_opt.as_deref()
+                && self
+                    .cache
+                    .borrow_mut()
+                    .sha256(&cache_key)
+                    .as_deref()
+                    .map(|h| h.as_slice())
+                    == hash_opt.as_deref().map(str::as_bytes)
             {
                 if let Some(raw) = self.cache.borrow_mut().read(&cache_key)
                     && let PhpMixed::Array(map) = json_decode_assoc(&raw)?
@@ -1413,7 +1449,7 @@ impl ComposerRepository {
                     packages_source = Some(format!(
                         "cached file ({} originating from {})",
                         cache_key,
-                        Url::sanitize(url.clone())
+                        legacy_lossy(&Url::sanitize(url.clone()))
                     ));
                 }
             } else if use_last_modified_check {
@@ -1427,7 +1463,7 @@ impl ComposerRepository {
                         packages_source = Some(format!(
                             "cached file ({} originating from {})",
                             cache_key,
-                            Url::sanitize(url.clone())
+                            legacy_lossy(&Url::sanitize(url.clone()))
                         ));
                     } else if let Some(last_modified) = contents
                         .get(B("last-modified"))
@@ -1442,14 +1478,14 @@ impl ComposerRepository {
                                 packages_source = Some(format!(
                                     "cached file ({} originating from {})",
                                     cache_key,
-                                    Url::sanitize(url.clone())
+                                    legacy_lossy(&Url::sanitize(url.clone()))
                                 ));
                             }
                             FetchFileIfLastModifiedResult::Data(data) => {
                                 packages_opt = Some(data);
                                 packages_source = Some(format!(
                                     "downloaded file ({})",
-                                    Url::sanitize(url.clone())
+                                    legacy_lossy(&Url::sanitize(url.clone()))
                                 ));
                             }
                         }
@@ -1466,8 +1502,10 @@ impl ComposerRepository {
                 ) {
                     Ok(p) => {
                         packages_opt = Some(p);
-                        packages_source =
-                            Some(format!("downloaded file ({})", Url::sanitize(url.clone())));
+                        packages_source = Some(format!(
+                            "downloaded file ({})",
+                            legacy_lossy(&Url::sanitize(url.clone()))
+                        ));
                     }
                     Err(e) => {
                         // 404s are acceptable for lazy provider repos
@@ -1481,7 +1519,7 @@ impl ComposerRepository {
                                 packages_opt = Some(p);
                                 packages_source = Some(format!(
                                     "not-found file ({})",
-                                    Url::sanitize(url.clone())
+                                    legacy_lossy(&Url::sanitize(url.clone()))
                                 ));
                                 if status_code == Some(499) {
                                     self.io.error(
@@ -1523,7 +1561,7 @@ impl ComposerRepository {
             packages = packages_inner;
             packages_source = Some(format!(
                 "root file ({})",
-                Url::sanitize(self.get_packages_json_url())
+                legacy_lossy(&Url::sanitize(self.get_packages_json_url()))
             ));
             loading_partial_package = true;
         }
@@ -1674,7 +1712,7 @@ impl ComposerRepository {
 
         let source = format!(
             "root file ({})",
-            Url::sanitize(self.get_packages_json_url())
+            legacy_lossy(&Url::sanitize(self.get_packages_json_url()))
         );
         for package in self.create_packages(repo_data, Some(source))? {
             self.add_package(package)?;
@@ -1772,10 +1810,10 @@ impl ComposerRepository {
             if acceptable_stabilities.is_none()
                 || stability_flags.is_none()
                 || StabilityFilter::is_package_acceptable(
-                    acceptable_stabilities.unwrap(),
-                    stability_flags.unwrap(),
-                    std::slice::from_ref(&name),
-                    "dev",
+                    &bytes_keys(acceptable_stabilities.unwrap().clone()),
+                    &bytes_keys(stability_flags.unwrap().clone()),
+                    std::slice::from_ref(&bstr::BString::from(name.clone())),
+                    bstr::BStr::new("dev"),
                 )
             {
                 package_names.insert(format!("{}~dev", name), constraint);
@@ -2027,13 +2065,16 @@ impl ComposerRepository {
             .async_fetch_file(&url, &cache_key, last_modified.as_deref())
             .await?;
 
-        let mut packages_source = format!("downloaded file ({})", Url::sanitize(url.clone()));
+        let mut packages_source = format!(
+            "downloaded file ({})",
+            legacy_lossy(&Url::sanitize(url.clone()))
+        );
 
         let response_data = if response.as_bool() == Some(true) {
             packages_source = format!(
                 "cached file ({} originating from {})",
                 cache_key,
-                Url::sanitize(url.clone())
+                legacy_lossy(&Url::sanitize(url.clone()))
             );
             contents_opt.map(PhpMixed::Array).unwrap_or(PhpMixed::Null)
         } else {
@@ -2113,17 +2154,17 @@ impl ComposerRepository {
         ];
 
         if let Some(alias) = loader.get_branch_alias(version_data)? {
-            versions.push(alias);
+            versions.push(legacy_lossy(&alias).into_owned());
         }
 
         for version in versions.iter() {
             if acceptable_stabilities.is_some()
                 && stability_flags.is_some()
                 && !StabilityFilter::is_package_acceptable(
-                    acceptable_stabilities.unwrap(),
-                    stability_flags.unwrap(),
-                    &[name.to_string()],
-                    &VersionParser::parse_stability(version),
+                    &bytes_keys(acceptable_stabilities.unwrap().clone()),
+                    &bytes_keys(stability_flags.unwrap().clone()),
+                    &[bstr::BString::from(name.to_string())],
+                    VersionParser::parse_stability(version).as_bstr(),
                 )
             {
                 continue;
@@ -2367,7 +2408,7 @@ impl ComposerRepository {
                 let mapped: Vec<String> = patterns
                     .iter()
                     .filter_map(|v| v.as_string())
-                    .map(|s| base_package::package_name_to_regexp(&s.to_str_lossy()))
+                    .map(base_package::package_name_to_regexp)
                     .collect();
                 self.available_package_patterns = Some(mapped);
                 self.has_available_package_list = true;
@@ -2557,18 +2598,22 @@ impl ComposerRepository {
                 .into_owned();
                 let url = format!("{}/{}", self.base_url, include.replace("%hash%", &sha256));
                 let cache_key = include.replace("%hash%", "").replace("$", "");
-                let included_data: IndexMap<BString, PhpMixed> =
-                    if self.cache.borrow_mut().sha256(&cache_key).as_deref()
-                        == Some(sha256.as_str())
-                    {
-                        let raw = self.cache.borrow_mut().read(&cache_key).unwrap_or_default();
-                        match json_decode_assoc(&raw)? {
-                            PhpMixed::Array(a) => a,
-                            _ => IndexMap::new(),
-                        }
-                    } else {
-                        self.fetch_file(&url, Some(&cache_key), Some(&sha256), false)?
-                    };
+                let included_data: IndexMap<BString, PhpMixed> = if self
+                    .cache
+                    .borrow_mut()
+                    .sha256(&cache_key)
+                    .as_deref()
+                    .map(|h| h.as_slice())
+                    == Some(sha256.as_bytes())
+                {
+                    let raw = self.cache.borrow_mut().read(&cache_key).unwrap_or_default();
+                    match json_decode_assoc(&raw)? {
+                        PhpMixed::Array(a) => a,
+                        _ => IndexMap::new(),
+                    }
+                } else {
+                    self.fetch_file(&url, Some(&cache_key), Some(&sha256), false)?
+                };
 
                 self.load_provider_listings(&included_data)?;
             }
@@ -2655,7 +2700,14 @@ impl ComposerRepository {
                     .and_then(|v| v.as_string())
                     .map(|s| legacy_lossy(s).into_owned());
                 let included_data: IndexMap<BString, PhpMixed> = if let Some(ref sha1) = sha1 {
-                    if self.cache.borrow_mut().sha1(include).as_deref() == Some(sha1.as_str()) {
+                    if self
+                        .cache
+                        .borrow_mut()
+                        .sha1(include)
+                        .as_deref()
+                        .map(|h| h.as_slice())
+                        == Some(sha1.as_bytes())
+                    {
                         let raw = self.cache.borrow_mut().read(include).unwrap_or_default();
                         match json_decode_assoc(&raw)? {
                             PhpMixed::Array(a) => a,
@@ -2706,13 +2758,15 @@ impl ComposerRepository {
             let mut results: Vec<BasePackageHandle> = Vec::new();
             for package in package_instances.into_iter() {
                 if let Some(src_type) = package.get_source_type()
-                    && let Some(mirrors) =
-                        self.source_mirrors.as_ref().and_then(|m| m.get(&src_type))
+                    && let Some(mirrors) = self
+                        .source_mirrors
+                        .as_ref()
+                        .and_then(|m| m.get(&*legacy_lossy(&src_type)))
                 {
                     let converted: Vec<crate::package::Mirror> = mirrors
                         .iter()
                         .map(|m| crate::package::Mirror {
-                            url: m.url.clone(),
+                            url: bstr::BString::from(m.url.clone()),
                             preferred: m.preferred,
                         })
                         .collect();
@@ -2722,7 +2776,7 @@ impl ComposerRepository {
                     let converted: Vec<crate::package::Mirror> = dist_mirrors
                         .iter()
                         .map(|m| crate::package::Mirror {
-                            url: m.url.clone(),
+                            url: bstr::BString::from(m.url.clone()),
                             preferred: m.preferred,
                         })
                         .collect();
@@ -2923,7 +2977,11 @@ impl ComposerRepository {
                         self.degraded_mode.set(true);
                         let parsed = JsonFile::parse_json(
                             Some(&contents),
-                            Some(&format!("{}{}", self.cache.borrow().get_root(), ck)),
+                            Some(&format!(
+                                "{}{}",
+                                self.cache.borrow().get_root().display(),
+                                ck
+                            )),
                         )?;
                         let map: IndexMap<BString, PhpMixed> = parsed
                             .as_array()
@@ -3416,7 +3474,7 @@ impl RepositoryInterface for ComposerRepository {
     // LogicException on lazy/provider repos and loading everything on available-packages repos.
     fn has_package(&mut self, package: PackageInterfaceHandle) -> anyhow::Result<bool> {
         if self.inner.package_map.borrow().is_none() {
-            let mut map: IndexMap<String, BasePackageHandle> = IndexMap::new();
+            let mut map: IndexMap<BString, BasePackageHandle> = IndexMap::new();
             for repo_package in ComposerRepository::get_packages(self)? {
                 map.insert(repo_package.get_unique_name(), repo_package);
             }
@@ -3434,7 +3492,7 @@ impl RepositoryInterface for ComposerRepository {
 
     fn find_package(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: crate::repository::FindPackageConstraint,
     ) -> anyhow::Result<Option<BasePackageHandle>> {
         // this call initializes loadRootServerFile which is needed for the rest below to work
@@ -3505,14 +3563,14 @@ impl RepositoryInterface for ComposerRepository {
             self.initialize()?;
         }
         self.inner.find_package(
-            &name,
+            bstr::BStr::new(&name),
             crate::repository::FindPackageConstraint::Constraint(constraint),
         )
     }
 
     fn find_packages(
         &mut self,
-        name: &str,
+        name: &BStr,
         constraint: Option<crate::repository::FindPackageConstraint>,
     ) -> anyhow::Result<Vec<BasePackageHandle>> {
         // this call initializes loadRootServerFile which is needed for the rest below to work
@@ -3580,7 +3638,7 @@ impl RepositoryInterface for ComposerRepository {
             self.initialize()?;
         }
         self.inner.find_packages(
-            &name,
+            bstr::BStr::new(&name),
             constraint.map(crate::repository::FindPackageConstraint::Constraint),
         )
     }
@@ -3591,91 +3649,107 @@ impl RepositoryInterface for ComposerRepository {
 
     fn load_packages(
         &mut self,
-        package_name_map: IndexMap<String, Option<shirabe_semver::constraint::AnyConstraint>>,
-        acceptable_stabilities: IndexMap<String, i64>,
-        stability_flags: IndexMap<String, i64>,
-        already_loaded: IndexMap<String, IndexMap<String, PackageInterfaceHandle>>,
+        package_name_map: IndexMap<BString, Option<shirabe_semver::constraint::AnyConstraint>>,
+        acceptable_stabilities: IndexMap<BString, i64>,
+        stability_flags: IndexMap<BString, i64>,
+        already_loaded: IndexMap<BString, IndexMap<BString, PackageInterfaceHandle>>,
     ) -> anyhow::Result<LoadPackagesResult> {
         ComposerRepository::load_packages(
             self,
-            package_name_map,
-            acceptable_stabilities,
-            stability_flags,
-            already_loaded,
+            legacy_lossy_keys(package_name_map),
+            legacy_lossy_keys(acceptable_stabilities),
+            legacy_lossy_keys(stability_flags),
+            legacy_lossy_keys(
+                already_loaded
+                    .into_iter()
+                    .map(|(k, v)| (k, legacy_lossy_keys(v)))
+                    .collect(),
+            ),
         )
     }
 
     fn search(
         &mut self,
-        query: String,
+        query: BString,
         mode: i64,
-        r#type: Option<String>,
+        r#type: Option<BString>,
     ) -> anyhow::Result<Vec<crate::repository::SearchResult>> {
-        let raw = ComposerRepository::search(self, query, mode, r#type)?;
+        let raw = ComposerRepository::search(
+            self,
+            legacy_lossy(&query).into_owned(),
+            mode,
+            r#type.map(|t| legacy_lossy(&t).into_owned()),
+        )?;
         Ok(raw
             .into_iter()
             .map(|m| crate::repository::SearchResult {
-                name: legacy_lossy(
-                    m.get(B("name"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default(),
-                )
-                .into_owned(),
+                name: bstr::BString::from(
+                    legacy_lossy(
+                        m.get(B("name"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned(),
+                ),
                 description: m
                     .get(B("description"))
                     .and_then(|v| v.as_string())
-                    .map(|s| legacy_lossy(s).into_owned()),
+                    .map(bstr::BString::from),
                 abandoned: m.get(B("abandoned")).filter(|v| v.to_bool()).map(|v| {
                     match v.as_string() {
-                        Some(s) => crate::repository::AbandonedInfo::Replacement(
-                            legacy_lossy(s).into_owned(),
-                        ),
+                        Some(s) => {
+                            crate::repository::AbandonedInfo::Replacement(bstr::BString::from(s))
+                        }
                         None => crate::repository::AbandonedInfo::Abandoned,
                     }
                 }),
                 url: m
                     .get(B("url"))
                     .and_then(|v| v.as_string())
-                    .map(|s| legacy_lossy(s).into_owned()),
+                    .map(bstr::BString::from),
             })
             .collect())
     }
 
     fn get_providers(
         &mut self,
-        package_name: String,
-    ) -> anyhow::Result<IndexMap<String, crate::repository::ProviderInfo>> {
-        let raw = ComposerRepository::get_providers(self, &package_name)?;
+        package_name: BString,
+    ) -> anyhow::Result<IndexMap<BString, crate::repository::ProviderInfo>> {
+        let raw = ComposerRepository::get_providers(self, &legacy_lossy(&package_name))?;
         Ok(raw
             .into_iter()
             .map(|(k, m)| {
                 (
-                    k,
+                    BString::from(k),
                     crate::repository::ProviderInfo {
-                        name: legacy_lossy(
-                            m.get(B("name"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default(),
-                        )
-                        .into_owned(),
+                        name: bstr::BString::from(
+                            legacy_lossy(
+                                m.get(B("name"))
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default(),
+                            )
+                            .into_owned(),
+                        ),
                         description: m
                             .get(B("description"))
                             .and_then(|v| v.as_string())
-                            .map(|s| legacy_lossy(s).into_owned()),
-                        r#type: legacy_lossy(
-                            m.get(B("type"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default(),
-                        )
-                        .into_owned(),
+                            .map(bstr::BString::from),
+                        r#type: bstr::BString::from(
+                            legacy_lossy(
+                                m.get(B("type"))
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default(),
+                            )
+                            .into_owned(),
+                        ),
                     },
                 )
             })
             .collect())
     }
 
-    fn get_repo_name(&self) -> anyhow::Result<String> {
-        Ok(ComposerRepository::get_repo_name(self))
+    fn get_repo_name(&self) -> anyhow::Result<BString> {
+        Ok(BString::from(ComposerRepository::get_repo_name(self)))
     }
 
     fn as_advisory_provider(&self) -> Option<&dyn crate::repository::AdvisoryProviderInterface> {
@@ -3704,13 +3778,29 @@ impl crate::repository::AdvisoryProviderInterface for ComposerRepository {
 
     fn get_security_advisories(
         &mut self,
-        package_constraint_map: IndexMap<String, shirabe_semver::constraint::AnyConstraint>,
+        package_constraint_map: IndexMap<BString, shirabe_semver::constraint::AnyConstraint>,
         allow_partial_advisories: bool,
     ) -> anyhow::Result<SecurityAdvisoryResult> {
         ComposerRepository::get_security_advisories(
             self,
-            package_constraint_map,
+            legacy_lossy_keys(package_constraint_map),
             allow_partial_advisories,
         )
     }
+}
+
+/// Re-keys a map from the byte-string keys of the repository interface onto the `String` keys
+/// `ComposerRepository` still holds internally.
+// TODO(bytes): remove once ComposerRepository holds package names as bytes.
+fn legacy_lossy_keys<V>(map: IndexMap<BString, V>) -> IndexMap<String, V> {
+    map.into_iter()
+        .map(|(k, v)| (legacy_lossy(&k).into_owned(), v))
+        .collect()
+}
+
+/// Re-keys a map from `ComposerRepository`'s internal `String` keys onto byte strings.
+fn bytes_keys<V>(map: IndexMap<String, V>) -> IndexMap<BString, V> {
+    map.into_iter()
+        .map(|(k, v)| (BString::from(k), v))
+        .collect()
 }
