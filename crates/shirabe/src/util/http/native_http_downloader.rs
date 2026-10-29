@@ -177,7 +177,7 @@ impl NativeHttpDownloader {
             || (strpos(url, "$").is_none() && strpos(url, "%24").is_none())
         {
             self.config.borrow_mut().prohibit_url_by_config(
-                url,
+                url.into(),
                 Some(self.io.clone()),
                 &options,
             )?;

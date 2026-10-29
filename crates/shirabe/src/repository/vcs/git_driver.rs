@@ -109,10 +109,7 @@ impl GitDriver {
                 self.inner.process.clone(),
                 std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None))),
             );
-            if !git_util.sync_mirror(
-                &legacy_lossy(&self.inner.url),
-                &legacy_lossy(&self.repo_dir),
-            )? {
+            if !git_util.sync_mirror(self.inner.url.as_bstr(), path_from_bytes(&self.repo_dir))? {
                 if !is_dir(path_from_bytes(&self.repo_dir)) {
                     return Err(RuntimeException::new(format!(
                         "Failed to clone {} to read package information from it",
@@ -181,13 +178,13 @@ impl GitDriver {
             );
             if !Filesystem::is_local_path(&self.inner.url) {
                 let default_branch = git_util.get_mirror_default_branch(
-                    &legacy_lossy(&self.inner.url),
-                    &legacy_lossy(&self.repo_dir),
+                    self.inner.url.as_bstr(),
+                    path_from_bytes(&self.repo_dir),
                     false,
                 );
                 if let Some(branch) = default_branch {
-                    self.root_identifier = Some(bstr::BString::from(branch.clone()));
-                    return Ok(bstr::BString::from(branch));
+                    self.root_identifier = Some(branch.clone());
+                    return Ok(branch);
                 }
             }
 
@@ -408,8 +405,8 @@ impl GitDriver {
                 return Ok(true);
             }
             GitUtil::check_for_repo_ownership_error(
-                &legacy_lossy(&process.borrow().get_error_output()),
-                &legacy_lossy(path_to_bytes(path_from_bytes(&url))),
+                process.borrow().get_error_output().as_bstr(),
+                path_from_bytes(&url),
                 Some(io.clone()),
             )?;
         }
@@ -429,21 +426,16 @@ impl GitDriver {
         );
         GitUtil::clean_env(&process);
 
-        // TODO(bytes): run_commands takes the cwd as a &str.
-        let tmp_dir = sys_get_temp_dir()
-            .into_os_string()
-            .into_string()
-            .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
         match git_util.run_commands(
             vec![vec![
-                "git".to_string(),
-                "ls-remote".to_string(),
-                "--heads".to_string(),
-                "--".to_string(),
-                "%url%".to_string(),
+                "git".into(),
+                "ls-remote".into(),
+                "--heads".into(),
+                "--".into(),
+                "%url%".into(),
             ]],
-            &legacy_lossy(url),
-            Some(&tmp_dir),
+            url.as_bstr(),
+            Some(&sys_get_temp_dir()),
             false,
             (),
         ) {

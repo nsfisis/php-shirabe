@@ -254,7 +254,7 @@ fn test_pretty_version_for_root_package_in_version_branch() {
 #[serial]
 fn test_feature_branch_pretty_version() {
     // proc_open() is always available; the PHP markTestSkipped guard does not apply here.
-    GitUtil::__set_version(Some("2.52.0".to_string()));
+    GitUtil::__set_version(Some("2.52.0".into()));
     let _git_guard = GitVersionGuard;
 
     let io = null_io();
@@ -295,7 +295,7 @@ fn test_feature_branch_pretty_version() {
 #[serial]
 fn test_non_feature_branch_pretty_version() {
     // proc_open() is always available; the PHP markTestSkipped guard does not apply here.
-    GitUtil::__set_version(Some("2.52.0".to_string()));
+    GitUtil::__set_version(Some("2.52.0".into()));
     let _git_guard = GitVersionGuard;
 
     let io = null_io();

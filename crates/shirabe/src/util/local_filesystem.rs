@@ -136,7 +136,7 @@ impl LocalFilesystem {
         ) || (strpos(&file_url, "$").is_none() && strpos(&file_url, "%24").is_none())
         {
             self.config.borrow_mut().prohibit_url_by_config(
-                &file_url,
+                file_url.as_str().into(),
                 Some(self.io.clone()),
                 &IndexMap::new(),
             )?;

@@ -181,5 +181,6 @@ fn do_install_workflow(source_ref: &'static str, expected_label: Option<String>)
     downloader.set_perforce(Box::new(perforce));
 
     let package = make_package(Some(source_ref));
-    run(downloader.do_install(package, std::path::Path::new(&test_path_str), "url")).unwrap();
+    run(downloader.do_install(package, std::path::Path::new(&test_path_str), "url".into()))
+        .unwrap();
 }

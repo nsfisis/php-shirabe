@@ -48,7 +48,7 @@ fn test_credentials() {
         let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
         let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
-        let mut svn = Svn::new(url.to_string(), io, config, None);
+        let mut svn = Svn::new(url.into(), io, config, None);
 
         let expect: Vec<String> = expect.iter().map(|s| s.to_string()).collect();
         assert_eq!(expect, svn.__get_credential_args());
@@ -62,7 +62,7 @@ fn test_interactive_string() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let config = std::rc::Rc::new(std::cell::RefCell::new(Config::new(true, None)));
-    let mut svn = Svn::new(url.to_string(), io, config, None);
+    let mut svn = Svn::new(url.into(), io, config, None);
 
     assert_eq!(
         vec![
@@ -72,7 +72,7 @@ fn test_interactive_string() {
             "--".to_string(),
             "http://svn.example.org".to_string(),
         ],
-        svn.__get_command(vec!["svn".to_string(), "ls".to_string()], url, None)
+        svn.__get_command(vec!["svn".into(), "ls".into()], url.into(), None)
     );
 }
 
@@ -86,7 +86,7 @@ fn test_credentials_from_config() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut svn = Svn::new(
-        url.to_string(),
+        url.into(),
         io,
         std::rc::Rc::new(std::cell::RefCell::new(config)),
         None,
@@ -113,7 +113,7 @@ fn test_credentials_from_config_with_cache_credentials_true() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut svn = Svn::new(
-        url.to_string(),
+        url.into(),
         io,
         std::rc::Rc::new(std::cell::RefCell::new(config)),
         None,
@@ -141,7 +141,7 @@ fn test_credentials_from_config_with_cache_credentials_false() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut svn = Svn::new(
-        url.to_string(),
+        url.into(),
         io,
         std::rc::Rc::new(std::cell::RefCell::new(config)),
         None,

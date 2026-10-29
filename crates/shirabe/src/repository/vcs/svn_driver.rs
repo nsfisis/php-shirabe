@@ -527,7 +527,7 @@ impl SvnDriver {
     fn execute(&mut self, command: Vec<BString>, url: &BStr) -> anyhow::Result<BString> {
         if self.util.is_none() {
             self.util = Some(SvnUtil::new(
-                legacy_lossy(&self.base_url.clone()).into_owned(),
+                self.base_url.clone(),
                 self.inner.io.clone(),
                 self.inner.config.clone(),
                 Some(self.inner.process.clone()),
@@ -538,18 +538,13 @@ impl SvnDriver {
                 .set_cache_credentials(self.cache_credentials);
         }
 
-        match self.util.as_mut().unwrap().execute(
-            command
-                .to_vec()
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<_>>(),
-            &legacy_lossy(url),
-            None,
-            None,
-            false,
-        ) {
-            Ok(o) => Ok(bstr::BString::from(o)),
+        match self
+            .util
+            .as_mut()
+            .unwrap()
+            .execute(command, url, None, None, false)
+        {
+            Ok(o) => Ok(o),
             Err(e) => {
                 if self.util.as_mut().unwrap().binary_version()?.is_none() {
                     return Err(RuntimeException::new(format!(

@@ -49,7 +49,7 @@ impl FossilDriver {
 
         // Ensure we are allowed to use this URL by config.
         self.inner.config.borrow_mut().prohibit_url_by_config(
-            &legacy_lossy(&self.inner.url),
+            self.inner.url.as_bstr(),
             Some(self.inner.io.clone()),
             &indexmap::IndexMap::new(),
         )?;

@@ -9,12 +9,11 @@ use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, PhpMixed, RuntimeException, bconcat, impl_php_class, implode, is_dir, legacy_lossy,
-    path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, preg_split,
-    version_compare,
+    CmpOp, PhpMixed, RuntimeException, bconcat, impl_php_class, implode, is_dir, path_from_bytes,
+    path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, preg_split, version_compare,
 };
 use std::path::Path;
 
@@ -42,36 +41,27 @@ impl SvnDownloader {
     fn execute(
         &self,
         package: PackageInterfaceHandle,
-        base_url: &str,
-        command: Vec<String>,
-        url: &str,
+        base_url: &BStr,
+        command: Vec<BString>,
+        url: &BStr,
         cwd: Option<&Path>,
         path: Option<&Path>,
-    ) -> anyhow::Result<String> {
-        // TODO(bytes): the Svn utility holds commands, URLs and paths as Strings.
-        let cwd = cwd.map(|p| legacy_lossy(path_to_bytes(p)).into_owned());
-        let path = path.map(|p| legacy_lossy(path_to_bytes(p)).into_owned());
+    ) -> anyhow::Result<BString> {
         let mut util = SvnUtil::new(
-            base_url.to_string(),
+            base_url.to_owned(),
             self.inner.io.clone(),
             self.inner.config.clone(),
             Some(self.inner.process.clone()),
         );
         util.set_cache_credentials(self.cache_credentials.get());
-        util.execute(
-            command,
-            url,
-            cwd.as_deref(),
-            path.as_deref(),
-            self.inner.io.is_verbose(),
-        )
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "{} could not be downloaded, {}",
-                package.get_pretty_name().display_lossy(),
-                e
-            )
-        })
+        util.execute(command, url, cwd, path, self.inner.io.is_verbose())
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "{} could not be downloaded, {}",
+                    package.get_pretty_name().display_lossy(),
+                    e
+                )
+            })
     }
 
     async fn discard_changes(&self, path: &Path) -> anyhow::Result<Option<PhpMixed>> {
@@ -140,12 +130,12 @@ impl VcsDownloader for SvnDownloader {
         &self,
         _package: PackageInterfaceHandle,
         _path: &Path,
-        url: &str,
+        url: &bstr::BStr,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env();
         let mut util = SvnUtil::new(
-            url.to_string(),
+            url.to_owned(),
             self.inner.io.clone(),
             self.inner.config.clone(),
             Some(self.inner.process.clone()),
@@ -164,7 +154,7 @@ impl VcsDownloader for SvnDownloader {
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env();
         let r#ref = package.get_source_reference();
@@ -196,8 +186,8 @@ impl VcsDownloader for SvnDownloader {
         self.execute(
             package,
             url,
-            vec!["svn".to_string(), "co".to_string()],
-            &format!("{}/{}", url, legacy_lossy(&r#ref.unwrap_or_default())),
+            vec!["svn".into(), "co".into()],
+            bconcat!(url, "/", r#ref.unwrap_or_default()).as_bstr(),
             None,
             Some(path),
         )?;
@@ -210,7 +200,7 @@ impl VcsDownloader for SvnDownloader {
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         SvnUtil::clean_env();
         let r#ref = target.get_source_reference();
@@ -224,18 +214,18 @@ impl VcsDownloader for SvnDownloader {
         }
 
         let mut util = SvnUtil::new(
-            url.to_string(),
+            url.to_owned(),
             self.inner.io.clone(),
             self.inner.config.clone(),
             Some(self.inner.process.clone()),
         );
-        let mut flags: Vec<String> = vec![];
+        let mut flags: Vec<BString> = vec![];
         if version_compare(
             util.binary_version()?.unwrap_or_default(),
             "1.7.0",
             CmpOp::Ge,
         ) {
-            flags.push("--ignore-ancestry".to_string());
+            flags.push("--ignore-ancestry".into());
         }
 
         self.inner.io.write_error3(
@@ -246,13 +236,13 @@ impl VcsDownloader for SvnDownloader {
             true,
             io_interface::NORMAL,
         );
-        let mut command = vec!["svn".to_string(), "switch".to_string()];
+        let mut command: Vec<BString> = vec!["svn".into(), "switch".into()];
         command.extend(flags);
         self.execute(
             target,
             url,
             command,
-            &format!("{}/{}", url, legacy_lossy(&r#ref.unwrap_or_default())),
+            bconcat!(url, "/", r#ref.unwrap_or_default()).as_bstr(),
             Some(path),
             None,
         )?;
@@ -406,7 +396,7 @@ impl VcsDownloader for SvnDownloader {
 
             let url_pattern = "#<url>(.*)</url>#";
             let base_url = if let Some(matches) = preg_match(url_pattern, &output) {
-                legacy_lossy(matches.get(1).unwrap_or_default()).into_owned()
+                matches.get(1).unwrap_or_default().to_owned()
             } else {
                 return Err(RuntimeException::new(format!(
                     "Unable to determine svn url for path {}",
@@ -419,12 +409,11 @@ impl VcsDownloader for SvnDownloader {
             let from_revision = preg_replace(php_regex!(r"{.*@(\d+)$}"), "$1", from_reference);
             let to_revision = preg_replace(php_regex!(r"{.*@(\d+)$}"), "$1", to_reference);
 
-            // TODO(bytes): the Svn utility holds commands as Strings.
-            let command: Vec<String> = vec![
+            let command: Vec<BString> = vec![
                 "svn".into(),
                 "log".into(),
                 "-r".into(),
-                legacy_lossy(&bconcat!(from_revision, ":", to_revision)).into_owned(),
+                bconcat!(from_revision, ":", to_revision),
                 "--incremental".into(),
             ];
 
@@ -435,17 +424,15 @@ impl VcsDownloader for SvnDownloader {
                 Some(self.inner.process.clone()),
             );
             util.set_cache_credentials(self.cache_credentials.get());
-            util.execute_local(
-                command.clone(),
-                &legacy_lossy(path_to_bytes(path)),
-                None,
-                self.inner.io.is_verbose(),
-            )
-            .map(BString::from)
-            .map_err(|e| {
-                RuntimeException::new(format!("Failed to execute {}\n\n{}", command.join(" "), e))
+            util.execute_local(command.clone(), path, None, self.inner.io.is_verbose())
+                .map_err(|e| {
+                    RuntimeException::new(format!(
+                        "Failed to execute {}\n\n{}",
+                        implode(" ", &command).display_lossy(),
+                        e
+                    ))
                     .into()
-            })
+                })
         } else {
             Ok(bconcat!(
                 "Could not retrieve changes between ",

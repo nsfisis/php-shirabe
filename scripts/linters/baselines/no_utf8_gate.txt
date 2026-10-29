@@ -70,7 +70,6 @@
 9 crates/shirabe/src/repository/composer_repository.rs
 2 crates/shirabe/src/repository/repository_factory.rs
 2 crates/shirabe/src/repository/vcs/forgejo_driver.rs
-1 crates/shirabe/src/repository/vcs/git_driver.rs
 2 crates/shirabe/src/repository/vcs/github_driver.rs
 1 crates/shirabe/src/repository/vcs/gitlab_driver.rs
 1 crates/shirabe/src/repository/vcs_repository.rs

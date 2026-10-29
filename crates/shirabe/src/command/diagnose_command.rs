@@ -168,13 +168,13 @@ impl DiagnoseCommand {
         if version_compare("2.24.0", &git_version, CmpOp::Gt) {
             return Ok(format!(
                 "<warning>Your git version ({}) is too old and possibly will cause issues. Please upgrade to git 2.24 or above</>",
-                git_version
+                git_version.display_lossy()
             ));
         }
 
         Ok(format!(
             "<info>OK</> <comment>git version {}</>",
-            git_version
+            git_version.display_lossy()
         ))
     }
 
@@ -1211,7 +1211,7 @@ impl Command for DiagnoseCommand {
             .borrow_mut()
             .merge(&secure_http_wrap, Config::SOURCE_COMMAND);
         let _ = config.borrow_mut().prohibit_url_by_config(
-            "http://repo.packagist.org",
+            "http://repo.packagist.org".into(),
             Some(std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()))),
             &IndexMap::new(),
         );

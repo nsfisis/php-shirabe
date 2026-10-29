@@ -756,7 +756,7 @@ fn test_public_repository_archived() {
 #[test]
 #[serial]
 fn test_private_repository_no_interaction() {
-    GitUtil::__set_version(Some("2.52.0".to_string()));
+    GitUtil::__set_version(Some("2.52.0".into()));
     let _git_guard = GitVersionGuard;
 
     let SetUp { home, config } = set_up();

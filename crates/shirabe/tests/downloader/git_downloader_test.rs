@@ -24,7 +24,7 @@ fn set_up() -> TempDir {
     // skipIfNotExecutable('git') is irrelevant because every git invocation is mocked.
 
     // initGitVersion('1.0.0'): seed the Composer\Util\Git static version cache.
-    GitUtil::__set_version(Some("1.0.0".to_string()));
+    GitUtil::__set_version(Some("1.0.0".into()));
 
     TempDir::new().unwrap()
 }
@@ -249,7 +249,7 @@ fn test_download_with_cache() {
     );
 
     // initGitVersion('2.17.0'): enables the cache (`--dissociate`) code path.
-    GitUtil::__set_version(Some("2.17.0".to_string()));
+    GitUtil::__set_version(Some("2.17.0".into()));
 
     let config = setup_config(Config::new(false, None));
     let cache_vcs_dir =

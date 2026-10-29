@@ -108,7 +108,7 @@ impl VcsDownloader for PerforceDownloader {
         &self,
         _package: PackageInterfaceHandle,
         _path: &Path,
-        _url: &str,
+        _url: &bstr::BStr,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -118,7 +118,7 @@ impl VcsDownloader for PerforceDownloader {
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let source_ref = package.get_source_reference();
         let label =
@@ -128,7 +128,7 @@ impl VcsDownloader for PerforceDownloader {
             "Cloning {}",
             source_ref.clone().unwrap_or_default().display_lossy()
         ));
-        self.init_perforce(package, path, url.to_string());
+        self.init_perforce(package, path, legacy_lossy(url).into_owned());
         {
             let mut perforce = self.perforce.borrow_mut();
             let perforce = perforce.as_mut().unwrap();
@@ -148,7 +148,7 @@ impl VcsDownloader for PerforceDownloader {
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.do_install(target, path, url).await
     }

@@ -6,14 +6,16 @@ use crate::util::{
     AuthHelper, Bitbucket, CommandLine, Filesystem, GitHub, GitLab, HttpDownloader, Platform,
     ProcessExecutor, StoreAuth, Url,
 };
-use bstr::BString;
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
-    RuntimeException, array_map, clearstatcache, explode, implode, in_array_loose, in_array_strict,
-    is_dir, legacy_lossy, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
-    rawurldecode, rawurlencode, str_replace_array, strlen, strpos, substr, trim, version_compare,
+    RuntimeException, array_map, bconcat, clearstatcache, explode, explode_with_limit, implode,
+    in_array_loose, in_array_strict, is_dir, legacy_lossy, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_quote, preg_replace, rawurldecode, rawurlencode, str_replace_array, strlen,
+    strpos, substr, trim, version_compare,
 };
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 #[derive(Debug)]
@@ -25,7 +27,7 @@ pub struct Git {
     http_downloader: Option<std::rc::Rc<std::cell::RefCell<HttpDownloader>>>,
 }
 
-static VERSION: Mutex<Option<Option<String>>> = Mutex::new(None);
+static VERSION: Mutex<Option<Option<BString>>> = Mutex::new(None);
 
 impl Git {
     pub fn new(
@@ -44,14 +46,17 @@ impl Git {
     }
 
     pub fn check_for_repo_ownership_error(
-        output: &str,
-        path: &str,
+        output: &BStr,
+        path: &Path,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
     ) -> anyhow::Result<()> {
-        if output.contains("fatal: detected dubious ownership") {
+        if output.contains_str("fatal: detected dubious ownership") {
             let msg = format!(
                 "The repository at \"{}\" does not have the correct ownership and git refuses to use it:{}{}{}",
-                path, PHP_EOL, PHP_EOL, output
+                path.display(),
+                PHP_EOL,
+                PHP_EOL,
+                output.display_lossy()
             );
             match io {
                 None => {
@@ -84,37 +89,26 @@ impl Git {
     /// As soon as a single command fails it will halt, so assume the commands are run as && in bash
     pub fn run_commands(
         &mut self,
-        commands: Vec<Vec<String>>,
-        url: &str,
-        cwd: Option<&str>,
+        commands: Vec<Vec<BString>>,
+        url: &BStr,
+        cwd: Option<&Path>,
         initial_clone: bool,
         command_output: impl RunCommandOutput,
     ) -> anyhow::Result<()> {
-        let mut callables: Vec<Box<dyn Fn(&str) -> CommandLine>> = vec![];
+        let mut callables: Vec<Box<dyn Fn(&BStr) -> CommandLine>> = vec![];
         for cmd in commands {
-            let cmd_clone = cmd.clone();
-            callables.push(Box::new(move |url: &str| -> CommandLine {
-                let mut map: IndexMap<String, String> = IndexMap::new();
-                map.insert("%url%".to_string(), url.to_string());
+            callables.push(Box::new(move |url: &BStr| -> CommandLine {
+                let mut map: IndexMap<BString, BString> = IndexMap::new();
+                map.insert("%url%".into(), url.to_owned());
                 map.insert(
-                    "%sanitizedUrl%".to_string(),
-                    legacy_lossy(&preg_replace(
-                        php_regex!(r"{://([^@]+?):(.+?)@}"),
-                        "://",
-                        url,
-                    ))
-                    .into_owned(),
+                    "%sanitizedUrl%".into(),
+                    preg_replace(php_regex!(r"{://([^@]+?):(.+?)@}"), "://", url),
                 );
 
-                CommandLine::Args(
-                    array_map(
-                        |value: &String| map.get(value).cloned().unwrap_or_else(|| value.clone()),
-                        &cmd_clone,
-                    )
-                    .into_iter()
-                    .map(bstr::BString::from)
-                    .collect::<Vec<_>>(),
-                )
+                CommandLine::Args(array_map(
+                    |value: &BString| map.get(value).cloned().unwrap_or_else(|| value.clone()),
+                    &cmd,
+                ))
             }));
         }
 
@@ -125,9 +119,9 @@ impl Git {
     /// mirroring `Git::runCommand` as exercised by `GitTest`.
     pub fn __run_command(
         &mut self,
-        command_callable: Vec<Box<dyn Fn(&str) -> CommandLine>>,
-        url: &str,
-        cwd: Option<&str>,
+        command_callable: Vec<Box<dyn Fn(&BStr) -> CommandLine>>,
+        url: &BStr,
+        cwd: Option<&Path>,
         initial_clone: bool,
         command_output: impl RunCommandOutput,
     ) -> anyhow::Result<()> {
@@ -136,14 +130,14 @@ impl Git {
 
     fn run_command(
         &mut self,
-        command_callable: Vec<Box<dyn Fn(&str) -> CommandLine>>,
-        url: &str,
-        cwd: Option<&str>,
+        command_callable: Vec<Box<dyn Fn(&BStr) -> CommandLine>>,
+        url: &BStr,
+        cwd: Option<&Path>,
         initial_clone: bool,
         mut command_output: impl RunCommandOutput,
     ) -> anyhow::Result<()> {
         let command_callables = command_callable;
-        let mut last_command = CommandLine::Shell(bstr::BString::from(String::new()));
+        let mut last_command = CommandLine::Shell(BString::default());
 
         // Ensure we are allowed to use this URL by config
         self.config.borrow_mut().prohibit_url_by_config(
@@ -152,22 +146,20 @@ impl Git {
             &IndexMap::new(),
         )?;
 
-        let orig_cwd: Option<String> = if initial_clone {
-            cwd.map(|s| s.to_string())
+        let orig_cwd: Option<PathBuf> = if initial_clone {
+            cwd.map(Path::to_path_buf)
         } else {
             None
         };
 
-        let cwd_string = cwd.map(|s| s.to_string());
-
         // PHP closure: $runCommands = function ($url) use (...) { ... };
-        let run_commands_inline = |url_arg: &str,
+        let run_commands_inline = |url_arg: &BStr,
                                    this_process: &mut ProcessExecutor,
                                    last_cmd: &mut CommandLine,
                                    output: &mut dyn RunCommandOutput|
          -> i64 {
             let collect_outputs = output.collect_outputs();
-            let mut outputs: Vec<bstr::BString> = vec![];
+            let mut outputs: Vec<BString> = vec![];
 
             let mut status: i64 = 0;
             for (counter, callable) in command_callables.iter().enumerate() {
@@ -176,25 +168,17 @@ impl Git {
                 let exec_cwd = if initial_clone && counter == 0 {
                     None
                 } else {
-                    cwd_string.clone()
+                    cwd
                 };
                 if collect_outputs {
-                    let mut local_output = bstr::BString::default();
+                    let mut local_output = BString::default();
                     status = this_process
-                        .execute(
-                            cmd,
-                            &mut local_output,
-                            exec_cwd.as_deref().map(std::path::Path::new),
-                        )
+                        .execute(cmd, &mut local_output, exec_cwd)
                         .unwrap_or(1);
                     outputs.push(local_output);
                 } else {
                     status = this_process
-                        .execute(
-                            cmd,
-                            output.make_handler().unwrap(),
-                            exec_cwd.as_deref().map(std::path::Path::new),
-                        )
+                        .execute(cmd, output.make_handler().unwrap(), exec_cwd)
                         .unwrap_or(1);
                 }
                 if status != 0 {
@@ -212,18 +196,18 @@ impl Git {
         if preg_is_match(php_regex!(r"{^ssh://[^@]+@[^:]+:[^0-9]+}"), url) {
             return Err(InvalidArgumentException::new(format!(
                 "The source URL {} is invalid, ssh URLs should have a port number after \":\".\nUse ssh://git@example.com:22/path or just git@example.com:path if you do not want to provide a password or custom port.",
-                url
+                url.display_lossy()
             ))
             .into());
         }
 
         if !initial_clone {
             // capture username/password from URL if there is one and we have no auth configured yet
-            let mut output = String::new();
+            let mut output = BString::default();
             self.process.borrow_mut().execute(
-                &["git".to_string(), "remote".to_string(), "-v".to_string()][..],
+                &[BString::from("git"), "remote".into(), "-v".into()][..],
                 &mut output,
-                cwd.map(std::path::Path::new),
+                cwd,
             )?;
             if let Some(m) = preg_match(
                 php_regex!(r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im"),
@@ -251,25 +235,25 @@ impl Git {
             ),
             url,
         ) {
-            let mut messages: Vec<String> = vec![];
-            let protocols_list: Vec<String> = match &protocols {
+            let mut messages: Vec<BString> = vec![];
+            let protocols_list: Vec<BString> = match &protocols {
                 PhpMixed::List(l) => l
                     .iter()
-                    .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                    .filter_map(|v| v.as_string().map(BStr::to_owned))
                     .collect(),
                 _ => vec![],
             };
             for protocol in &protocols_list {
-                let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
-                let m2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
+                let m1 = m.get(1).unwrap_or_default();
+                let m2 = m.get(2).unwrap_or_default();
                 let proto_url = if protocol == "ssh" {
-                    format!("git@{}:{}", m1, m2)
+                    bconcat!("git@", m1, ":", m2)
                 } else {
-                    format!("{}://{}/{}", protocol, m1, m2)
+                    bconcat!(protocol, "://", m1, "/", m2)
                 };
 
                 if run_commands_inline(
-                    &proto_url,
+                    proto_url.as_bstr(),
                     &mut self.process.borrow_mut(),
                     &mut last_command,
                     &mut command_output,
@@ -277,14 +261,11 @@ impl Git {
                 {
                     return Ok(());
                 }
-                messages.push(format!(
-                    "- {}\n{}",
+                messages.push(bconcat!(
+                    "- ",
                     proto_url,
-                    legacy_lossy(&preg_replace(
-                        r"#^#m",
-                        "  ",
-                        self.process.borrow().get_error_output()
-                    ))
+                    "\n",
+                    preg_replace(r"#^#m", "  ", self.process.borrow().get_error_output())
                 ));
 
                 if initial_clone && let Some(ref orig) = orig_cwd {
@@ -296,41 +277,32 @@ impl Git {
             let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
             if !self.io.has_authentication(&m1) && !self.io.is_interactive() {
                 self.throw_exception(
-                    &format!(
-                        "Failed to clone {} via {} protocols, aborting.\n\n{}",
+                    bconcat!(
+                        "Failed to clone ",
                         url,
-                        legacy_lossy(&implode(", ", &protocols_list)),
-                        legacy_lossy(&implode("\n", &messages))
-                    ),
+                        " via ",
+                        implode(", ", &protocols_list),
+                        " protocols, aborting.\n\n",
+                        implode("\n", &messages)
+                    )
+                    .as_bstr(),
                     url,
                 )?;
             }
         }
 
         // if we have a private github url and the ssh protocol is disabled then we skip it and directly fallback to https
-        let protocols_list: Vec<String> = match self.config.borrow_mut().get("github-protocols") {
-            PhpMixed::List(l) => l
-                .iter()
-                .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
-                .collect(),
-            _ => vec![],
-        };
+        let protocols = self.config.borrow_mut().get("github-protocols");
         let bypass_ssh_for_github = preg_is_match(
             format!(
                 "{{^git@{}:(.+?)\\.git$}}i",
                 Self::get_github_domains_regex(&self.config.borrow())
             ),
             url,
-        ) && !in_array_strict(
-            "ssh".to_string(),
-            &protocols_list
-                .iter()
-                .map(|s| PhpMixed::string(s.clone()))
-                .collect::<Vec<_>>(),
-        );
+        ) && !in_array_strict("ssh".to_string(), protocols.values());
 
         let mut auth: Option<IndexMap<String, Option<String>>> = None;
-        let mut credentials: Vec<String> = vec![];
+        let mut credentials: Vec<BString> = vec![];
         if bypass_ssh_for_github
             || 0 != run_commands_inline(
                 url,
@@ -339,8 +311,7 @@ impl Git {
                 &mut command_output,
             )
         {
-            let mut error_msg =
-                legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
+            let mut error_msg = self.process.borrow().get_error_output();
             // private github repository without ssh key access, try https with auth
             let github_matched = preg_match(
                 format!(
@@ -359,9 +330,10 @@ impl Git {
                 )
             });
             if let Some(m) = github_matched {
-                let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
-                let m2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
-                if !self.io.has_authentication(&m1) {
+                let m1 = m.get(1).unwrap_or_default();
+                let m2 = m.get(2).unwrap_or_default();
+                let origin = legacy_lossy(m1).into_owned();
+                if !self.io.has_authentication(&origin) {
                     let mut git_hub_util = GitHub::new(
                         self.io.clone(),
                         self.config.clone(),
@@ -370,13 +342,13 @@ impl Git {
                     )?;
                     let message = "Cloning failed using an ssh key for authentication, enter your GitHub credentials to access private repos";
 
-                    if !git_hub_util.authorize_oauth(&m1)? && self.io.is_interactive() {
-                        git_hub_util.authorize_oauth_interactively(&m1, Some(message))?;
+                    if !git_hub_util.authorize_oauth(&origin)? && self.io.is_interactive() {
+                        git_hub_util.authorize_oauth_interactively(&origin, Some(message))?;
                     }
                 }
 
-                if self.io.has_authentication(&m1) {
-                    auth = Some(self.io.get_authentication(&m1));
+                if self.io.has_authentication(&origin) {
+                    auth = Some(self.io.get_authentication(&origin));
                     let auth_inner = auth.as_ref().unwrap();
                     let username = auth_inner
                         .get("username")
@@ -388,15 +360,19 @@ impl Git {
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
-                    let auth_url = format!(
-                        "https://{}:{}@{}/{}.git",
-                        legacy_lossy(&rawurlencode(&username)),
-                        legacy_lossy(&rawurlencode(&password)),
+                    let auth_url = bconcat!(
+                        "https://",
+                        rawurlencode(&username),
+                        ":",
+                        rawurlencode(&password),
+                        "@",
                         m1,
-                        m2
+                        "/",
+                        m2,
+                        ".git"
                     );
                     if run_commands_inline(
-                        &auth_url,
+                        auth_url.as_bstr(),
                         &mut self.process.borrow_mut(),
                         &mut last_command,
                         &mut command_output,
@@ -405,12 +381,8 @@ impl Git {
                         return Ok(());
                     }
 
-                    credentials = vec![
-                        legacy_lossy(&rawurlencode(&username)).into_owned(),
-                        legacy_lossy(&rawurlencode(&password)).into_owned(),
-                    ];
-                    error_msg =
-                        legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
+                    credentials = vec![rawurlencode(&username), rawurlencode(&password)];
+                    error_msg = self.process.borrow().get_error_output();
                 }
             } else if let Some(m) = preg_match(
                 php_regex!(r"{^(https?)://(bitbucket\.org)/(.*?)(?:\.git)?$}i"),
@@ -427,11 +399,11 @@ impl Git {
                     None,
                 )?;
 
-                let domain = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
-                let mut repo_with_git_part =
-                    legacy_lossy(m.get(3).unwrap_or_default()).into_owned();
-                if !repo_with_git_part.ends_with(".git") {
-                    repo_with_git_part.push_str(".git");
+                let domain_bytes = m.get(2).unwrap_or_default();
+                let domain = legacy_lossy(domain_bytes).into_owned();
+                let mut repo_with_git_part = m.get(3).unwrap_or_default().to_owned();
+                if !repo_with_git_part.ends_with(b".git") {
+                    repo_with_git_part.extend_from_slice(b".git");
                 }
                 if !self.io.has_authentication(&domain) {
                     let message = "Enter your Bitbucket credentials to access private repos";
@@ -470,16 +442,19 @@ impl Git {
                         username = "x-bitbucket-api-token-auth".to_string();
                     }
 
-                    let auth_url = format!(
-                        "https://{}:{}@{}/{}",
-                        legacy_lossy(&rawurlencode(&username)),
-                        legacy_lossy(&rawurlencode(&password)),
-                        domain,
+                    let auth_url = bconcat!(
+                        "https://",
+                        rawurlencode(&username),
+                        ":",
+                        rawurlencode(&password),
+                        "@",
+                        domain_bytes,
+                        "/",
                         repo_with_git_part
                     );
 
                     if run_commands_inline(
-                        &auth_url,
+                        auth_url.as_bstr(),
                         &mut self.process.borrow_mut(),
                         &mut last_command,
                         &mut command_output,
@@ -518,15 +493,18 @@ impl Git {
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
-                    let auth_url = format!(
-                        "https://{}:{}@{}/{}",
-                        legacy_lossy(&rawurlencode(&username)),
-                        legacy_lossy(&rawurlencode(&password)),
-                        domain,
+                    let auth_url = bconcat!(
+                        "https://",
+                        rawurlencode(&username),
+                        ":",
+                        rawurlencode(&password),
+                        "@",
+                        domain_bytes,
+                        "/",
                         repo_with_git_part
                     );
                     if run_commands_inline(
-                        &auth_url,
+                        auth_url.as_bstr(),
                         &mut self.process.borrow_mut(),
                         &mut last_command,
                         &mut command_output,
@@ -535,20 +513,17 @@ impl Git {
                         return Ok(());
                     }
 
-                    credentials = vec![
-                        legacy_lossy(&rawurlencode(&username)).into_owned(),
-                        legacy_lossy(&rawurlencode(&password)).into_owned(),
-                    ];
+                    credentials = vec![rawurlencode(&username), rawurlencode(&password)];
                 }
                 // Falling back to ssh
-                let ssh_url = format!("git@bitbucket.org:{}", repo_with_git_part);
+                let ssh_url = bconcat!("git@bitbucket.org:", repo_with_git_part);
                 self.io.write_error3(
                     "    No bitbucket authentication configured. Falling back to ssh.",
                     true,
                     io_interface::NORMAL,
                 );
                 if run_commands_inline(
-                    &ssh_url,
+                    ssh_url.as_bstr(),
                     &mut self.process.borrow_mut(),
                     &mut last_command,
                     &mut command_output,
@@ -557,7 +532,7 @@ impl Git {
                     return Ok(());
                 }
 
-                error_msg = legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
+                error_msg = self.process.borrow().get_error_output();
             } else if let Some(m) = preg_match(
                 format!(
                     "{{^(git)@{}:(.+?\\.git)$}}i",
@@ -574,14 +549,15 @@ impl Git {
                     url,
                 )
             }) {
-                let mut m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
-                let m2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
-                let m3 = legacy_lossy(m.get(3).unwrap_or_default()).into_owned();
+                let mut m1 = m.get(1).unwrap_or_default().to_owned();
+                let m2 = m.get(2).unwrap_or_default();
+                let m3 = m.get(3).unwrap_or_default();
                 if m1 == "git" {
-                    m1 = "https".to_string();
+                    m1 = "https".into();
                 }
 
-                if !self.io.has_authentication(&m2) {
+                let origin = legacy_lossy(m2).into_owned();
+                if !self.io.has_authentication(&origin) {
                     let mut git_lab_util = GitLab::new(
                         self.io.clone(),
                         self.config.clone(),
@@ -591,13 +567,17 @@ impl Git {
                     let message =
                         "Cloning failed, enter your GitLab credentials to access private repos";
 
-                    if !git_lab_util.authorize_oauth(&m2)? && self.io.is_interactive() {
-                        git_lab_util.authorize_oauth_interactively(&m1, &m2, Some(message))?;
+                    if !git_lab_util.authorize_oauth(&origin)? && self.io.is_interactive() {
+                        git_lab_util.authorize_oauth_interactively(
+                            &legacy_lossy(&m1),
+                            &origin,
+                            Some(message),
+                        )?;
                     }
                 }
 
-                if self.io.has_authentication(&m2) {
-                    auth = Some(self.io.get_authentication(&m2));
+                if self.io.has_authentication(&origin) {
+                    auth = Some(self.io.get_authentication(&origin));
                     let username = auth
                         .as_ref()
                         .unwrap()
@@ -616,27 +596,33 @@ impl Git {
                         || password == "oauth2"
                         || password == "gitlab-ci-token"
                     {
-                        format!(
-                            "{}://{}:{}@{}/{}",
+                        bconcat!(
                             m1,
-                            legacy_lossy(&rawurlencode(&password)),
-                            legacy_lossy(&rawurlencode(&username)),
+                            "://",
+                            rawurlencode(&password),
+                            ":",
+                            rawurlencode(&username),
+                            "@",
                             m2,
+                            "/",
                             m3
                         ) // swap username and password
                     } else {
-                        format!(
-                            "{}://{}:{}@{}/{}",
+                        bconcat!(
                             m1,
-                            legacy_lossy(&rawurlencode(&username)),
-                            legacy_lossy(&rawurlencode(&password)),
+                            "://",
+                            rawurlencode(&username),
+                            ":",
+                            rawurlencode(&password),
+                            "@",
                             m2,
+                            "/",
                             m3
                         )
                     };
 
                     if run_commands_inline(
-                        &auth_url,
+                        auth_url.as_bstr(),
                         &mut self.process.borrow_mut(),
                         &mut last_command,
                         &mut command_output,
@@ -645,43 +631,42 @@ impl Git {
                         return Ok(());
                     }
 
-                    credentials = vec![
-                        legacy_lossy(&rawurlencode(&username)).into_owned(),
-                        legacy_lossy(&rawurlencode(&password)).into_owned(),
-                    ];
-                    error_msg =
-                        legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
+                    credentials = vec![rawurlencode(&username), rawurlencode(&password)];
+                    error_msg = self.process.borrow().get_error_output();
                 }
             } else if let Some(m) = self.get_authentication_failure(url) {
                 // private non-github/gitlab/bitbucket repo that failed to authenticate
-                let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
-                let mut m2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
-                let m3 = legacy_lossy(m.get(3).unwrap_or_default()).into_owned();
-                let mut auth_parts: Option<String> = None;
-                if m2.contains("@") {
-                    let parts = explode("@", &m2);
-                    auth_parts = parts.first().map(|s| legacy_lossy(s).into_owned());
-                    m2 = legacy_lossy(&parts.get(1).cloned().unwrap_or_default()).into_owned();
+                let m1 = m.get(1).unwrap_or_default();
+                let mut m2 = m.get(2).unwrap_or_default().to_owned();
+                let m3 = m.get(3).unwrap_or_default();
+                let mut auth_parts: Option<BString> = None;
+                if m2.contains_str("@") {
+                    let mut parts = explode_with_limit("@", &m2, 2).into_iter();
+                    auth_parts = parts.next();
+                    m2 = parts.next().unwrap_or_default();
                 }
 
+                let origin = legacy_lossy(&m2).into_owned();
                 let mut store_auth: PhpMixed = PhpMixed::Bool(false);
-                if self.io.has_authentication(&m2) {
-                    auth = Some(self.io.get_authentication(&m2));
+                if self.io.has_authentication(&origin) {
+                    auth = Some(self.io.get_authentication(&origin));
                 } else if self.io.is_interactive() {
-                    let mut default_username: Option<String> = None;
+                    let mut default_username: Option<BString> = None;
                     if let Some(ref parts) = auth_parts
                         && !parts.is_empty()
                     {
-                        if parts.contains(":") {
-                            let split = explode(":", parts);
-                            default_username = split.first().map(|s| legacy_lossy(s).into_owned());
+                        if parts.contains_str(":") {
+                            default_username = explode_with_limit(":", parts, 2).into_iter().next();
                         } else {
                             default_username = Some(parts.clone());
                         }
                     }
 
                     self.io.write_error3(
-                        &format!("    Authentication required (<info>{}</info>):", m2),
+                        &format!(
+                            "    Authentication required (<info>{}</info>):",
+                            m2.display_lossy()
+                        ),
                         true,
                         io_interface::NORMAL,
                     );
@@ -723,24 +708,25 @@ impl Git {
                         .cloned()
                         .unwrap_or(None)
                         .unwrap_or_default();
-                    let auth_url = format!(
-                        "{}{}:{}@{}{}",
+                    let auth_url = bconcat!(
                         m1,
-                        legacy_lossy(&rawurlencode(&username)),
-                        legacy_lossy(&rawurlencode(&password)),
+                        rawurlencode(&username),
+                        ":",
+                        rawurlencode(&password),
+                        "@",
                         m2,
                         m3
                     );
 
                     if run_commands_inline(
-                        &auth_url,
+                        auth_url.as_bstr(),
                         &mut self.process.borrow_mut(),
                         &mut last_command,
                         &mut command_output,
                     ) == 0
                     {
                         self.io.borrow_mut().set_authentication(
-                            m2.clone(),
+                            origin.clone(),
                             username,
                             Some(password),
                         );
@@ -750,17 +736,13 @@ impl Git {
                             PhpMixed::Bool(b) => StoreAuth::Bool(*b),
                             _ => StoreAuth::Bool(false),
                         };
-                        auth_helper.store_auth(&m2, store_auth_enum)?;
+                        auth_helper.store_auth(&origin, store_auth_enum)?;
 
                         return Ok(());
                     }
 
-                    credentials = vec![
-                        legacy_lossy(&rawurlencode(&username)).into_owned(),
-                        legacy_lossy(&rawurlencode(&password)).into_owned(),
-                    ];
-                    error_msg =
-                        legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
+                    credentials = vec![rawurlencode(&username), rawurlencode(&password)];
+                    error_msg = self.process.borrow().get_error_output();
                 }
             }
 
@@ -768,19 +750,16 @@ impl Git {
                 self.filesystem.borrow_mut().remove_directory(orig);
             }
 
-            let mut last_command_str = legacy_lossy(&match &last_command {
+            let mut last_command_str = match &last_command {
                 CommandLine::Args(args) => implode(" ", args),
                 CommandLine::Shell(command) => command.clone(),
-            })
-            .into_owned();
-            if (credentials.len() as i64) > 0 {
-                last_command_str =
-                    legacy_lossy(&self.mask_credentials(&last_command_str, &credentials))
-                        .into_owned();
-                error_msg = self.mask_credentials(&error_msg, &credentials);
+            };
+            if !credentials.is_empty() {
+                last_command_str = self.mask_credentials(last_command_str.as_bstr(), &credentials);
+                error_msg = self.mask_credentials(error_msg.as_bstr(), &credentials);
             }
             self.throw_exception(
-                &format!("Failed to execute {}\n\n{}", last_command_str, error_msg),
+                bconcat!("Failed to execute ", last_command_str, "\n\n", error_msg).as_bstr(),
                 url,
             )?;
         }
@@ -788,7 +767,7 @@ impl Git {
         Ok(())
     }
 
-    pub fn sync_mirror(&mut self, url: &str, dir: &str) -> anyhow::Result<bool> {
+    pub fn sync_mirror(&mut self, url: &BStr, dir: &Path) -> anyhow::Result<bool> {
         let composer_disable_network = Platform::get_env("COMPOSER_DISABLE_NETWORK");
         if composer_disable_network
             .as_ref()
@@ -799,7 +778,7 @@ impl Git {
             self.io.write_error3(
                 &format!(
                     "<warning>Aborting git mirror sync of {} as network is disabled</warning>",
-                    url
+                    url.display_lossy()
                 ),
                 true,
                 io_interface::NORMAL,
@@ -809,38 +788,34 @@ impl Git {
         }
 
         // update the repo if it is a valid git repository
-        let mut output = String::new();
+        let mut output = BString::default();
         if is_dir(dir)
             && self.process.borrow_mut().execute(
-                &[
-                    "git".to_string(),
-                    "rev-parse".to_string(),
-                    "--git-dir".to_string(),
-                ],
+                &[BString::from("git"), "rev-parse".into(), "--git-dir".into()],
                 &mut output,
-                Some(std::path::Path::new(dir)),
+                Some(dir),
             )? == 0
             && trim(&output) == "."
         {
             // PHP try/finally
             let try_result: anyhow::Result<()> = (|| -> anyhow::Result<()> {
-                let commands = vec![
+                let commands: Vec<Vec<BString>> = vec![
                     vec![
-                        "git".to_string(),
-                        "remote".to_string(),
-                        "set-url".to_string(),
-                        "origin".to_string(),
-                        "--".to_string(),
-                        "%url%".to_string(),
+                        "git".into(),
+                        "remote".into(),
+                        "set-url".into(),
+                        "origin".into(),
+                        "--".into(),
+                        "%url%".into(),
                     ],
                     vec![
-                        "git".to_string(),
-                        "remote".to_string(),
-                        "update".to_string(),
-                        "--prune".to_string(),
-                        "origin".to_string(),
+                        "git".into(),
+                        "remote".into(),
+                        "update".into(),
+                        "--prune".into(),
+                        "origin".into(),
                     ],
-                    vec!["git".to_string(), "gc".to_string(), "--auto".to_string()],
+                    vec!["git".into(), "gc".into(), "--auto".into()],
                 ];
 
                 self.run_commands(commands, url, Some(dir), false, ())?;
@@ -850,12 +825,12 @@ impl Git {
             // finally
             let finally_result = self.run_commands(
                 vec![vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "set-url".to_string(),
-                    "origin".to_string(),
-                    "--".to_string(),
-                    "%sanitizedUrl%".to_string(),
+                    "git".into(),
+                    "remote".into(),
+                    "set-url".into(),
+                    "origin".into(),
+                    "--".into(),
+                    "%sanitizedUrl%".into(),
                 ]],
                 url,
                 Some(dir),
@@ -887,7 +862,7 @@ impl Git {
             return Ok(true);
         }
         Self::check_for_repo_ownership_error(
-            &legacy_lossy(&self.process.borrow().get_error_output()),
+            self.process.borrow().get_error_output().as_bstr(),
             dir,
             None,
         )?;
@@ -897,12 +872,12 @@ impl Git {
 
         self.run_commands(
             vec![vec![
-                "git".to_string(),
-                "clone".to_string(),
-                "--mirror".to_string(),
-                "--".to_string(),
-                "%url%".to_string(),
-                dir.to_string(),
+                "git".into(),
+                "clone".into(),
+                "--mirror".into(),
+                "--".into(),
+                "%url%".into(),
+                BString::from(path_to_bytes(dir)),
             ]],
             url,
             Some(dir),
@@ -912,12 +887,12 @@ impl Git {
 
         self.run_commands(
             vec![vec![
-                "git".to_string(),
-                "remote".to_string(),
-                "set-url".to_string(),
-                "origin".to_string(),
-                "--".to_string(),
-                "%sanitizedUrl%".to_string(),
+                "git".into(),
+                "remote".into(),
+                "set-url".into(),
+                "origin".into(),
+                "--".into(),
+                "%sanitizedUrl%".into(),
             ]],
             url,
             Some(dir),
@@ -930,10 +905,10 @@ impl Git {
 
     pub fn fetch_ref_or_sync_mirror(
         &mut self,
-        url: &str,
-        dir: &str,
-        r#ref: &str,
-        pretty_version: Option<&str>,
+        url: &BStr,
+        dir: &Path,
+        r#ref: &BStr,
+        pretty_version: Option<&BStr>,
     ) -> anyhow::Result<bool> {
         if self.check_ref_is_in_mirror(dir, r#ref)? {
             if preg_is_match(php_regex!(r"{^[a-f0-9]{40}$}"), r#ref)
@@ -944,22 +919,22 @@ impl Git {
                     "",
                     pretty_version,
                 );
-                let mut branches: Option<String> = None;
-                let mut tags: Option<String> = None;
-                let mut output = String::new();
+                let mut branches: Option<BString> = None;
+                let mut tags: Option<BString> = None;
+                let mut output = BString::default();
                 if self.process.borrow_mut().execute(
-                    &["git".to_string(), "branch".to_string()],
+                    &[BString::from("git"), "branch".into()],
                     &mut output,
-                    Some(std::path::Path::new(dir)),
+                    Some(dir),
                 )? == 0
                 {
                     branches = Some(output);
                 }
-                let mut output = String::new();
+                let mut output = BString::default();
                 if self.process.borrow_mut().execute(
-                    &["git".to_string(), "tag".to_string()],
+                    &[BString::from("git"), "tag".into()],
                     &mut output,
-                    Some(std::path::Path::new(dir)),
+                    Some(dir),
                 )? == 0
                 {
                     tags = Some(output);
@@ -972,12 +947,12 @@ impl Git {
                 if branches.is_some()
                     && !preg_is_match(
                         format!(r"{{^[\s*]*v?{}$}}m", preg_quote(&branch, None)),
-                        branches.as_deref().unwrap_or_default(),
+                        branches.as_deref().map(Vec::as_slice).unwrap_or_default(),
                     )
                     && tags.is_some()
                     && !preg_is_match(
                         format!(r"{{^[\s*]*{}$}}m", preg_quote(&branch, None)),
-                        tags.as_deref().unwrap_or_default(),
+                        tags.as_deref().map(Vec::as_slice).unwrap_or_default(),
                     )
                 {
                     self.sync_mirror(url, dir)?;
@@ -1050,7 +1025,7 @@ impl Git {
     pub fn parse_rev_list_output(
         output: impl AsRef<[u8]>,
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> anyhow::Result<bstr::BString> {
+    ) -> anyhow::Result<BString> {
         let output = output.as_ref();
         // If git supports --no-commit-header, output is already clean
         if Self::supports_no_commit_header_flag(process)? {
@@ -1065,38 +1040,34 @@ impl Git {
         ))
     }
 
-    fn check_ref_is_in_mirror(&mut self, dir: &str, r#ref: &str) -> anyhow::Result<bool> {
-        let mut output = String::new();
+    fn check_ref_is_in_mirror(&mut self, dir: &Path, r#ref: &BStr) -> anyhow::Result<bool> {
+        let mut output = BString::default();
         if is_dir(dir)
             && self.process.borrow_mut().execute(
-                &[
-                    "git".to_string(),
-                    "rev-parse".to_string(),
-                    "--git-dir".to_string(),
-                ],
+                &[BString::from("git"), "rev-parse".into(), "--git-dir".into()],
                 &mut output,
-                Some(std::path::Path::new(dir)),
+                Some(dir),
             )? == 0
             && trim(&output) == "."
         {
-            let mut ignored_output = String::new();
+            let mut ignored_output = BString::default();
             let exit_code = self.process.borrow_mut().execute(
                 &[
-                    "git".to_string(),
-                    "rev-parse".to_string(),
-                    "--quiet".to_string(),
-                    "--verify".to_string(),
-                    format!("{}^{{commit}}", r#ref),
+                    BString::from("git"),
+                    "rev-parse".into(),
+                    "--quiet".into(),
+                    "--verify".into(),
+                    bconcat!(r#ref, "^{commit}"),
                 ],
                 &mut ignored_output,
-                Some(std::path::Path::new(dir)),
+                Some(dir),
             )?;
             if exit_code == 0 {
                 return Ok(true);
             }
         }
         Self::check_for_repo_ownership_error(
-            &legacy_lossy(&self.process.borrow().get_error_output()),
+            self.process.borrow().get_error_output().as_bstr(),
             dir,
             None,
         )?;
@@ -1104,7 +1075,7 @@ impl Git {
         Ok(false)
     }
 
-    fn get_authentication_failure<'u>(&self, url: &'u str) -> Option<PregMatches<'u>> {
+    fn get_authentication_failure<'u>(&self, url: &'u BStr) -> Option<PregMatches<'u>> {
         let m = preg_match(php_regex!(r"{^(https?://)([^/]+)(.*)$}i"), url)?;
 
         let auth_failures = [
@@ -1115,7 +1086,7 @@ impl Git {
             "fatal: could not read Username",
         ];
 
-        let error_output = legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
+        let error_output = self.process.borrow().get_error_output();
         for auth_failure in &auth_failures {
             if strpos(&error_output, auth_failure).is_some() {
                 return Some(m);
@@ -1127,10 +1098,10 @@ impl Git {
 
     pub fn get_mirror_default_branch(
         &mut self,
-        url: &str,
-        dir: &str,
+        url: &BStr,
+        dir: &Path,
         is_local_path_repository: bool,
-    ) -> Option<String> {
+    ) -> Option<BString> {
         if Platform::get_env("COMPOSER_DISABLE_NETWORK")
             .map(|v| !v.is_empty() && v != "0")
             .unwrap_or(false)
@@ -1138,44 +1109,44 @@ impl Git {
             return None;
         }
 
-        let result: anyhow::Result<Option<String>> = (|| -> anyhow::Result<Option<String>> {
+        let result: anyhow::Result<Option<BString>> = (|| -> anyhow::Result<Option<BString>> {
             let mut output_mixed = PhpMixed::Null;
             if is_local_path_repository {
-                let mut output = String::new();
+                let mut output = BString::default();
                 self.process.borrow_mut().execute(
                     &[
-                        "git".to_string(),
-                        "remote".to_string(),
-                        "show".to_string(),
-                        "origin".to_string(),
+                        BString::from("git"),
+                        "remote".into(),
+                        "show".into(),
+                        "origin".into(),
                     ],
                     &mut output,
-                    Some(std::path::Path::new(dir)),
+                    Some(dir),
                 )?;
                 output_mixed = PhpMixed::string(output);
             } else {
-                let commands = vec![
+                let commands: Vec<Vec<BString>> = vec![
                     vec![
-                        "git".to_string(),
-                        "remote".to_string(),
-                        "set-url".to_string(),
-                        "origin".to_string(),
-                        "--".to_string(),
-                        "%url%".to_string(),
+                        "git".into(),
+                        "remote".into(),
+                        "set-url".into(),
+                        "origin".into(),
+                        "--".into(),
+                        "%url%".into(),
                     ],
                     vec![
-                        "git".to_string(),
-                        "remote".to_string(),
-                        "show".to_string(),
-                        "origin".to_string(),
+                        "git".into(),
+                        "remote".into(),
+                        "show".into(),
+                        "origin".into(),
                     ],
                     vec![
-                        "git".to_string(),
-                        "remote".to_string(),
-                        "set-url".to_string(),
-                        "origin".to_string(),
-                        "--".to_string(),
-                        "%sanitizedUrl%".to_string(),
+                        "git".into(),
+                        "remote".into(),
+                        "set-url".into(),
+                        "origin".into(),
+                        "--".into(),
+                        "%sanitizedUrl%".into(),
                     ],
                 ];
 
@@ -1190,9 +1161,7 @@ impl Git {
                 if let Some(matches) =
                     preg_match(php_regex!(r"{^\s*HEAD branch:\s(.+)\s*$}m"), &line)
                 {
-                    return Ok(Some(
-                        legacy_lossy(matches.get(1).unwrap_or_default()).into_owned(),
-                    ));
+                    return Ok(Some(matches.get(1).unwrap_or_default().to_owned()));
                 }
             }
 
@@ -1253,69 +1222,70 @@ impl Git {
     }
 
     pub fn get_github_domains_regex(config: &Config) -> String {
-        let domains: Vec<String> = match config.get("github-domains") {
-            PhpMixed::List(l) => l
-                .iter()
-                .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
-                .collect(),
-            _ => vec![],
-        };
-        let escaped: Vec<String> = array_map(|s: &String| preg_quote(s, None), &domains);
-        format!("({})", legacy_lossy(&implode("|", &escaped)))
+        Self::get_domains_regex(config, "github-domains")
     }
 
     pub fn get_gitlab_domains_regex(config: &Config) -> String {
-        let domains: Vec<String> = match config.get("gitlab-domains") {
+        Self::get_domains_regex(config, "gitlab-domains")
+    }
+
+    fn get_domains_regex(config: &Config, key: &str) -> String {
+        let domains: Vec<BString> = match config.get(key) {
             PhpMixed::List(l) => l
                 .iter()
-                .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
+                .filter_map(|v| v.as_string().map(BStr::to_owned))
                 .collect(),
             _ => vec![],
         };
-        let escaped: Vec<String> = array_map(|s: &String| preg_quote(s, None), &domains);
-        format!("({})", legacy_lossy(&implode("|", &escaped)))
+        let escaped: Vec<String> = array_map(|s: &BString| preg_quote(s, None), &domains);
+        format!("({})", escaped.join("|"))
     }
 
-    fn throw_exception(&mut self, message: &str, url: &str) -> anyhow::Result<()> {
+    fn throw_exception(&mut self, message: &BStr, url: &BStr) -> anyhow::Result<()> {
         // git might delete a directory when it fails and php will not know
         clearstatcache();
 
-        let mut ignored_output = String::new();
+        let mut ignored_output = BString::default();
         if self.process.borrow_mut().execute(
-            &["git".to_string(), "--version".to_string()],
+            &[BString::from("git"), "--version".into()],
             &mut ignored_output,
-            Option::<&str>::None.map(std::path::Path::new),
+            None,
         )? != 0
         {
-            return Err(RuntimeException::new(legacy_lossy(&Url::sanitize(format!(
-                "Failed to clone {}, git was not found, check that it is installed and in your PATH env.\n\n{}",
-                url,
-                self.process.borrow().get_error_output().display_lossy()
-            ))).into_owned())
+            return Err(RuntimeException::new(
+                Url::sanitize(bconcat!(
+                    "Failed to clone ",
+                    url,
+                    ", git was not found, check that it is installed and in your PATH env.\n\n",
+                    self.process.borrow().get_error_output()
+                ))
+                .display_lossy()
+                .to_string(),
+            )
             .into());
         }
 
-        Err(RuntimeException::new(legacy_lossy(&Url::sanitize(message)).into_owned()).into())
+        Err(RuntimeException::new(Url::sanitize(message).display_lossy().to_string()).into())
     }
 
     /// Retrieves the current git version.
     pub fn get_version(
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> anyhow::Result<Option<String>> {
+    ) -> anyhow::Result<Option<BString>> {
         let mut version = VERSION.lock().unwrap();
         if version.is_none() {
             *version = Some(None);
-            let mut output = String::new();
+            let mut output = BString::default();
             let exit_code: i64 = process.borrow_mut().execute(
-                &["git".to_string(), "--version".to_string()],
+                &[BString::from("git"), "--version".into()],
                 &mut output,
-                Option::<&str>::None.map(std::path::Path::new),
+                None,
             )?;
             if exit_code == 0
                 && let Some(matches) =
                     preg_match(php_regex!(r"/^git version (\d+(?:\.\d+)+)/m"), &output)
             {
-                *version = Some(matches.get(1).map(|s| legacy_lossy(s).into_owned()));
+                *version = Some(matches.get(1).map(BStr::to_owned));
             }
         }
         Ok(version.clone().unwrap_or(None))
@@ -1333,42 +1303,39 @@ impl Git {
     /// `ReflectionProperty(GitUtil::class, 'version')->setValue(null, $version)`
     /// done in GitDownloaderTest's `initGitVersion`. `Some(v)` records a detected
     /// version; `None` records that git is unavailable, both without shelling out.
-    pub fn __set_version(version: Option<String>) {
+    pub fn __set_version(version: Option<BString>) {
         *VERSION.lock().unwrap() = Some(version);
     }
 
-    fn mask_credentials(&self, error: &str, credentials: &[String]) -> String {
-        let mut masked_credentials: Vec<String> = vec![];
+    fn mask_credentials(&self, error: &BStr, credentials: &[BString]) -> BString {
+        let mut masked_credentials: Vec<BString> = vec![];
 
         for credential in credentials {
             if in_array_loose(
-                credential.clone(),
+                PhpMixed::string(credential.clone()),
                 &[
-                    PhpMixed::string("private-token".to_string()),
-                    PhpMixed::string("x-token-auth".to_string()),
-                    PhpMixed::string("oauth2".to_string()),
-                    PhpMixed::string("gitlab-ci-token".to_string()),
-                    PhpMixed::string("x-oauth-basic".to_string()),
+                    PhpMixed::string("private-token"),
+                    PhpMixed::string("x-token-auth"),
+                    PhpMixed::string("oauth2"),
+                    PhpMixed::string("gitlab-ci-token"),
+                    PhpMixed::string("x-oauth-basic"),
                 ],
             ) {
                 masked_credentials.push(credential.clone());
             } else if strlen(credential) > 6 {
-                masked_credentials.push(format!(
-                    "{}...{}",
-                    legacy_lossy(&substr(credential, 0, Some(3))),
-                    legacy_lossy(&substr(credential, -3, None))
+                masked_credentials.push(bconcat!(
+                    substr(credential, 0, Some(3)),
+                    "...",
+                    substr(credential, -3, None)
                 ));
             } else if strlen(credential) > 3 {
-                masked_credentials.push(format!(
-                    "{}...",
-                    legacy_lossy(&substr(credential, 0, Some(3)))
-                ));
+                masked_credentials.push(bconcat!(substr(credential, 0, Some(3)), "..."));
             } else {
-                masked_credentials.push("XXX".to_string());
+                masked_credentials.push("XXX".into());
             }
         }
 
-        legacy_lossy(&str_replace_array(credentials, &masked_credentials, error)).into_owned()
+        str_replace_array(credentials, &masked_credentials, error)
     }
 }
 

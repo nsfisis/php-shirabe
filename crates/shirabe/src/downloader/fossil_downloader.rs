@@ -88,7 +88,7 @@ impl VcsDownloader for FossilDownloader {
         &self,
         _package: PackageInterfaceHandle,
         _path: &Path,
-        _url: &str,
+        _url: &bstr::BStr,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -98,7 +98,7 @@ impl VcsDownloader for FossilDownloader {
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             url,
@@ -159,7 +159,7 @@ impl VcsDownloader for FossilDownloader {
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.config.borrow_mut().prohibit_url_by_config(
             url,

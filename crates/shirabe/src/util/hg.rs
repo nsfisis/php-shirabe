@@ -36,9 +36,8 @@ impl Hg {
         url: &BStr,
         cwd: Option<&Path>,
     ) -> anyhow::Result<()> {
-        // TODO(bytes): Config::prohibit_url_by_config() takes a &str.
         self.config.borrow_mut().prohibit_url_by_config(
-            &legacy_lossy(url),
+            url,
             Some(self.io.clone()),
             &indexmap::IndexMap::new(),
         )?;

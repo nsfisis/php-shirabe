@@ -7,7 +7,7 @@ use crate::repository::vcs::HgDriver;
 use crate::util::{
     Git as GitUtil, HttpDownloader, Platform, ProcessExecutor, Svn as SvnUtil, sync_executor,
 };
-use bstr::{B, BString};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, array_map, array_merge, empty, implode, is_string, json_encode,
@@ -286,8 +286,8 @@ impl VersionGuesser {
             }
         }
         GitUtil::check_for_repo_ownership_error(
-            &legacy_lossy(&self.process.borrow().get_error_output()),
-            path,
+            self.process.borrow().get_error_output().as_bstr(),
+            std::path::Path::new(path),
             self.io.clone(),
         );
 

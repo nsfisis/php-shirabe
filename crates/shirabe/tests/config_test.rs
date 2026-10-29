@@ -463,7 +463,7 @@ fn test_allowed_urls_pass() {
     for url in urls {
         let mut config = Config::new(false, None);
         config
-            .prohibit_url_by_config(url, None, &IndexMap::new())
+            .prohibit_url_by_config(url.into(), None, &IndexMap::new())
             .unwrap();
     }
 }
@@ -484,7 +484,7 @@ fn test_prohibited_urls_throw_exception() {
     for url in urls {
         let mut config = Config::new(false, None);
         let err = config
-            .prohibit_url_by_config(url, None, &IndexMap::new())
+            .prohibit_url_by_config(url.into(), None, &IndexMap::new())
             .unwrap_err();
         assert!(
             err.to_string().contains(&format!(
@@ -519,7 +519,7 @@ fn test_prohibited_urls_warning_verify_peer() {
         ])),
     );
     config
-        .prohibit_url_by_config("https://example.org", Some(io), &repo_options)
+        .prohibit_url_by_config("https://example.org".into(), Some(io), &repo_options)
         .unwrap();
 }
 

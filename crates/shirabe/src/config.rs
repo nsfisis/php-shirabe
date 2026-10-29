@@ -7,7 +7,7 @@ pub use config_source_interface::*;
 pub use json_config_source::*;
 
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, PregMatches, RuntimeException, array_key_exists, array_merge,
@@ -991,7 +991,7 @@ impl Config {
     /// Validates that the passed URL is allowed to be used by current config, or throws an exception.
     pub fn prohibit_url_by_config(
         &mut self,
-        url: &str,
+        url: &BStr,
         io: Option<std::rc::Rc<std::cell::RefCell<dyn IOInterface>>>,
         repo_options: &IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
@@ -1001,7 +1001,7 @@ impl Config {
         }
 
         // Extract scheme and throw exception on known insecure protocols
-        let parsed = parse_url(url);
+        let parsed = parse_url(&legacy_lossy(url));
         let scheme = parsed.as_ref().and_then(|parsed| parsed.scheme.clone());
         let hostname = parsed.and_then(|parsed| parsed.host);
         if matches!(scheme.as_deref(), Some("http" | "git" | "ftp" | "svn")) {
@@ -1017,7 +1017,7 @@ impl Config {
                     return Err(TransportException::new(
                         format!(
                             "Your configuration does not allow connections to {}. See https://getcomposer.org/doc/06-config.md#secure-svn-domains for details.",
-                            url
+                            url.display_lossy()
                         ),
                         0,
                     )
@@ -1027,7 +1027,7 @@ impl Config {
                 return Err(TransportException::new(
                     format!(
                         "Your configuration does not allow connections to {}. See https://getcomposer.org/doc/06-config.md#secure-http for details.",
-                        url
+                        url.display_lossy()
                     ),
                     0,
                 )

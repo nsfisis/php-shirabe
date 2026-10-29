@@ -61,7 +61,7 @@ impl VcsDownloader for HgDownloader {
         &self,
         _package: PackageInterfaceHandle,
         _path: &Path,
-        _url: &str,
+        _url: &bstr::BStr,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if HgUtils::get_version(&self.inner.process)?.is_none() {
@@ -78,7 +78,7 @@ impl VcsDownloader for HgDownloader {
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let hg_utils = HgUtils::new(
             self.inner.io.clone(),
@@ -131,7 +131,7 @@ impl VcsDownloader for HgDownloader {
         _initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let hg_utils = HgUtils::new(
             self.inner.io.clone(),

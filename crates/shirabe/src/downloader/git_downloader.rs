@@ -674,30 +674,16 @@ impl GitDownloader {
         reference.to_owned()
     }
 
-    // TODO(bytes): the Git utility holds commands, URLs and paths as Strings.
     fn run_git_commands(
         &self,
         commands: Vec<Vec<BString>>,
-        url: &str,
+        url: &BStr,
         cwd: &Path,
         initial_clone: bool,
     ) -> anyhow::Result<()> {
-        let commands: Vec<Vec<String>> = commands
-            .iter()
-            .map(|command| {
-                command
-                    .iter()
-                    .map(|arg| legacy_lossy(arg).into_owned())
-                    .collect()
-            })
-            .collect();
-        self.git_util.borrow_mut().run_commands(
-            commands,
-            url,
-            Some(&legacy_lossy(path_to_bytes(cwd))),
-            initial_clone,
-            (),
-        )
+        self.git_util
+            .borrow_mut()
+            .run_commands(commands, url, Some(cwd), initial_clone, ())
     }
 
     /// The default `VcsDownloader::clean_changes()` behavior: fail if the working copy has
@@ -812,7 +798,7 @@ impl VcsDownloader for GitDownloader {
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         // Do not create an extra local cache when repository is already local
@@ -838,7 +824,10 @@ impl VcsDownloader for GitDownloader {
         // --dissociate option is only available since git 2.3.0-rc0
         if git_version.is_some()
             && version_compare(
-                git_version.as_deref().unwrap_or_default(),
+                git_version
+                    .as_deref()
+                    .map(Vec::as_slice)
+                    .unwrap_or_default(),
                 "2.3.0-rc0",
                 CmpOp::Ge,
             )
@@ -861,12 +850,11 @@ impl VcsDownloader for GitDownloader {
                 io_interface::DEBUG,
             );
             let r#ref = package.get_source_reference().unwrap_or_default();
-            // TODO(bytes): the Git utility holds URLs, paths and refs as Strings.
             if self.git_util.borrow_mut().fetch_ref_or_sync_mirror(
                 url,
-                &legacy_lossy(path_to_bytes(&cache_path)),
-                &legacy_lossy(&r#ref),
-                Some(&legacy_lossy(&package.get_pretty_version())),
+                &cache_path,
+                r#ref.as_bstr(),
+                Some(package.get_pretty_version().as_bstr()),
             )? && is_dir(&cache_path)
             {
                 self.cached_packages
@@ -889,7 +877,7 @@ impl VcsDownloader for GitDownloader {
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
@@ -1044,7 +1032,7 @@ impl VcsDownloader for GitDownloader {
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);

@@ -16,8 +16,8 @@ use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, PhpClass as _, PhpMixed, RuntimeException, array_map,
-    array_shift, bconcat, explode, implode, legacy_lossy, path_to_bytes, rawurldecode, realpath,
-    str_replace, strlen, strpos, substr, trim,
+    array_shift, bconcat, explode, implode, legacy_lossy, path_from_bytes, path_to_bytes,
+    rawurldecode, realpath, str_replace, strlen, strpos, substr, trim,
 };
 use std::path::Path;
 
@@ -90,7 +90,7 @@ pub trait VcsDownloader:
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
@@ -99,7 +99,7 @@ pub trait VcsDownloader:
         &self,
         package: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     /// Updates specific package in specific folder from initial to target version.
@@ -108,7 +108,7 @@ pub trait VcsDownloader:
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
         path: &Path,
-        url: &str,
+        url: &bstr::BStr,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     /// Fetches the commit logs between two commits
@@ -141,17 +141,11 @@ pub trait VcsDownloader:
             .into());
         }
 
-        let mut urls = self.prepare_urls(
-            package
-                .get_source_urls()
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<_>>(),
-        );
+        let mut urls = self.prepare_urls(package.get_source_urls());
 
         while let Some(url) = array_shift(&mut urls) {
             let attempt: anyhow::Result<Option<PhpMixed>> = self
-                .do_download(package.clone(), path, &url, prev_package.clone())
+                .do_download(package.clone(), path, url.as_bstr(), prev_package.clone())
                 .await;
             match attempt {
                 Ok(promise) => return Ok(promise),
@@ -259,16 +253,10 @@ pub trait VcsDownloader:
             io_interface::NORMAL,
         );
 
-        let mut urls = self.prepare_urls(
-            package
-                .get_source_urls()
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<_>>(),
-        );
+        let mut urls = self.prepare_urls(package.get_source_urls());
         while let Some(url) = array_shift(&mut urls) {
             let attempt: anyhow::Result<Option<PhpMixed>> =
-                self.do_install(package.clone(), path, &url).await;
+                self.do_install(package.clone(), path, url.as_bstr()).await;
             match attempt {
                 Ok(_) => break,
                 Err(e) => {
@@ -331,18 +319,12 @@ pub trait VcsDownloader:
             io_interface::NORMAL,
         );
 
-        let mut urls = self.prepare_urls(
-            target
-                .get_source_urls()
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned())
-                .collect::<Vec<_>>(),
-        );
+        let mut urls = self.prepare_urls(target.get_source_urls());
 
         let mut exception: Option<anyhow::Error> = None;
         while let Some(url) = array_shift(&mut urls) {
             let attempt: anyhow::Result<Option<PhpMixed>> = self
-                .do_update(initial.clone(), target.clone(), path, &url)
+                .do_update(initial.clone(), target.clone(), path, url.as_bstr())
                 .await;
             match attempt {
                 Ok(_) => {
@@ -496,7 +478,7 @@ pub trait VcsDownloader:
         Ok(())
     }
 
-    fn prepare_urls(&self, mut urls: Vec<String>) -> Vec<String> {
+    fn prepare_urls(&self, mut urls: Vec<BString>) -> Vec<BString> {
         for url_entry in &mut urls {
             let mut url = url_entry.clone();
             if Filesystem::is_local_path(&url) {
@@ -505,21 +487,21 @@ pub trait VcsDownloader:
                 let file_protocol = "file://";
                 let mut is_file_protocol = false;
                 if strpos(&url, file_protocol) == Some(0) {
-                    url = legacy_lossy(&substr(&url, strlen(file_protocol), None)).into_owned();
+                    url = substr(&url, strlen(file_protocol), None);
                     is_file_protocol = true;
                 }
 
                 // realpath() below will not understand %20 spaces etc.
                 if strpos(&url, "%").is_some() {
-                    url = legacy_lossy(&rawurldecode(&url)).into_owned();
+                    url = rawurldecode(&url);
                 }
 
-                *url_entry = realpath(&url)
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                *url_entry = realpath(path_from_bytes(&url))
+                    .map(|p| BString::from(path_to_bytes(&p)))
                     .unwrap_or_default();
 
                 if is_file_protocol {
-                    *url_entry = format!("{}{}", file_protocol, url_entry);
+                    *url_entry = bconcat!(file_protocol, &*url_entry);
                 }
             }
         }
