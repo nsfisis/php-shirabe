@@ -1315,7 +1315,7 @@ impl VcsDownloader for GitDownloader {
         args.extend(GitUtil::get_no_show_signature_flags(&self.inner.process)?);
         let command = GitUtil::build_rev_list_command(&self.inner.process, args)?;
 
-        let mut output = String::new();
+        let mut output = bstr::BString::default();
         if self.inner.process.borrow_mut().execute(
             &command,
             &mut output,
@@ -1330,7 +1330,12 @@ impl VcsDownloader for GitDownloader {
             .into());
         }
 
-        GitUtil::parse_rev_list_output(&output, &self.inner.process)
+        // TODO(bytes): VcsDownloader takes the commit logs as a String.
+        Ok(legacy_lossy(&GitUtil::parse_rev_list_output(
+            &output,
+            &self.inner.process,
+        )?)
+        .into_owned())
     }
 
     fn has_metadata_repository(&self, path: &str) -> bool {

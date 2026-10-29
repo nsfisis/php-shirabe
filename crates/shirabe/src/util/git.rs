@@ -166,7 +166,7 @@ impl Git {
                                    output: &mut dyn RunCommandOutput|
          -> i64 {
             let collect_outputs = output.collect_outputs();
-            let mut outputs: Vec<String> = vec![];
+            let mut outputs: Vec<bstr::BString> = vec![];
 
             let mut status: i64 = 0;
             for (counter, callable) in command_callables.iter().enumerate() {
@@ -178,7 +178,7 @@ impl Git {
                     cwd_string.clone()
                 };
                 if collect_outputs {
-                    let mut local_output = String::new();
+                    let mut local_output = bstr::BString::default();
                     status = this_process
                         .execute(
                             cmd,
@@ -202,7 +202,7 @@ impl Git {
             }
 
             if collect_outputs {
-                output.write_back(legacy_lossy(&implode("", &outputs)).into_owned());
+                output.write_back(implode("", &outputs));
             }
 
             status
@@ -1012,6 +1012,7 @@ impl Git {
             return Ok(vec![]);
         }
 
+        // TODO(bytes): Git commands are built as Strings.
         Ok(explode(" ", substr(&flags, 1, None))
             .iter()
             .map(|s| legacy_lossy(s).into_owned())
@@ -1048,21 +1049,21 @@ impl Git {
     /// When --no-commit-header is not available (git < 2.33), git rev-list --format outputs
     /// "commit <hash>" before formatted output. This removes those lines.
     pub fn parse_rev_list_output(
-        output: &str,
+        output: impl AsRef<[u8]>,
         process: &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<bstr::BString> {
+        let output = output.as_ref();
         // If git supports --no-commit-header, output is already clean
         if Self::supports_no_commit_header_flag(process)? {
-            return Ok(output.to_string());
+            return Ok(output.into());
         }
 
         // Filter out "commit <hash>" lines for older git versions
-        Ok(legacy_lossy(&preg_replace(
+        Ok(preg_replace(
             php_regex!(r"{^commit [a-f0-9]{40}\n?}m"),
             "",
             output,
         ))
-        .into_owned())
     }
 
     fn check_ref_is_in_mirror(&mut self, dir: &str, r#ref: &str) -> anyhow::Result<bool> {
@@ -1387,7 +1388,7 @@ pub trait RunCommandOutput {
 
     /// PHP: `$commandOutput = implode('', $outputs);` — only meaningful in the accumulate-and-assign
     /// mode; a no-op for the discard and callable variants.
-    fn write_back(&mut self, value: String);
+    fn write_back(&mut self, value: bstr::BString);
 }
 
 /// `runCommands(..., $commandOutput)` where the caller never reads `$commandOutput` (PHP default
@@ -1401,7 +1402,7 @@ impl RunCommandOutput for () {
         None
     }
 
-    fn write_back(&mut self, _value: String) {}
+    fn write_back(&mut self, _value: bstr::BString) {}
 }
 
 /// `runCommands(..., $var)` by-ref: outputs are accumulated and assigned back as a
@@ -1415,7 +1416,7 @@ impl RunCommandOutput for &mut PhpMixed {
         None
     }
 
-    fn write_back(&mut self, value: String) {
+    fn write_back(&mut self, value: bstr::BString) {
         **self = PhpMixed::string(value);
     }
 }
@@ -1453,5 +1454,5 @@ impl RunCommandOutput for GitRunCommandOutputHandler {
         }))
     }
 
-    fn write_back(&mut self, _value: String) {}
+    fn write_back(&mut self, _value: bstr::BString) {}
 }

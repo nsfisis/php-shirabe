@@ -12,7 +12,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, dirname, is_dir, is_writable,
     legacy_lossy, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
-    preg_replace, realpath, sys_get_temp_dir,
+    preg_replace, realpath, sys_get_temp_dir, trim, utf8_text,
 };
 
 #[derive(Debug)]
@@ -275,15 +275,20 @@ impl GitDriver {
                 identifier.to_string(),
             ],
         )?;
-        let mut output = String::new();
+        let mut output = bstr::BString::default();
         self.inner.process.borrow_mut().execute(
             &command,
             &mut output,
             Some(std::path::Path::new(&self.repo_dir)),
         )?;
 
-        let timestamp_str = GitUtil::parse_rev_list_output(&output, &self.inner.process)?;
-        let timestamp: i64 = timestamp_str.trim().parse().unwrap_or(0);
+        let timestamp_str = trim(GitUtil::parse_rev_list_output(
+            &output,
+            &self.inner.process,
+        )?);
+        let timestamp: i64 = utf8_text(&timestamp_str)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
         Ok(Some(
             Utc.timestamp_opt(timestamp, 0).unwrap().fixed_offset(),
         ))

@@ -74,7 +74,7 @@
 9 crates/shirabe/src/package/loader/array_loader.rs
 3 crates/shirabe/src/package/loader/root_package_loader.rs
 5 crates/shirabe/src/package/loader/validating_array_loader.rs
-5 crates/shirabe/src/package/locker.rs
+4 crates/shirabe/src/package/locker.rs
 1 crates/shirabe/src/package/version/version_bumper.rs
 17 crates/shirabe/src/plugin/php_plugin_proxy.rs
 6 crates/shirabe/src/plugin/php_plugin_value.rs

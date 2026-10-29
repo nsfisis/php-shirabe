@@ -822,7 +822,7 @@ impl Locker {
                         path.as_deref().map(std::path::Path::new),
                     )? {
                         let output_str = legacy_lossy(&trim(&GitUtil::parse_rev_list_output(
-                            &output.as_string().unwrap_or_default().to_str_lossy(),
+                            output.as_string().unwrap_or_default(),
                             &self.process,
                         )?))
                         .into_owned();

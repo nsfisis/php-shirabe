@@ -17,7 +17,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     GLOB_BRACE, GLOB_MARK, GLOB_ONLYDIR, PhpMixed, RuntimeException, defined, dirname, file_exists,
     file_get_contents, glob_with_flags, hash, is_dir, legacy_lossy, path_to_bytes, php_regex,
-    preg_is_match, realpath, rtrim2, serialize, str_replace,
+    preg_is_match, realpath, rtrim2, serialize, str_replace, trim,
 };
 
 #[derive(Debug)]
@@ -300,10 +300,10 @@ impl PathRepository {
                     .unwrap_or(1)
                     == 0
             {
-                let output_str = output.as_string().unwrap_or_default().to_string();
-                let ref_val = GitUtil::parse_rev_list_output(&output_str, &self.process)?
-                    .trim()
-                    .to_string();
+                let ref_val = trim(GitUtil::parse_rev_list_output(
+                    output.as_string().unwrap_or_default(),
+                    &self.process,
+                )?);
                 if let Some(PhpMixed::Array(dist)) = package.get_mut(B("dist")) {
                     dist.insert("reference".into(), PhpMixed::string(ref_val));
                 }
