@@ -14,9 +14,9 @@ use bstr::{B, BString};
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, SEEK_SET, bconcat, copy, dir, explode, feof, fgetc,
     fgets, fopen, fread, fseek, ftell, function_exists, legacy_lossy, mb_detect_encoding,
-    mb_strlen, ord, php_fopen_resource, php_to_string, rewind, rtrim, sapi_windows_cp_conv,
-    sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand, str_repeat,
-    stream_copy_to_stream, stream_get_meta_data, stream_isatty_resource, stream_select,
+    mb_strlen, ord, path_from_bytes, php_fopen_resource, php_to_string, rewind, rtrim,
+    sapi_windows_cp_conv, sapi_windows_cp_get, sapi_windows_cp_set, shell_exec, stdin, str_bitand,
+    str_repeat, stream_copy_to_stream, stream_get_meta_data, stream_isatty_resource, stream_select,
     stream_set_blocking, strlen, substr, sys_get_temp_dir, trim, unlink,
 };
 use shirabe_symfony_string::s;
@@ -430,7 +430,9 @@ impl QuestionHelper {
         let mut num_matches = matches.len() as i64;
 
         let stty_mode = shell_exec("stty -g").unwrap_or_default();
-        let is_stdin = stream_get_meta_data(input_stream).uri.as_deref() == Some("php://stdin");
+        let is_stdin = stream_get_meta_data(input_stream)
+            .uri
+            .is_some_and(|uri| uri == "php://stdin");
         let mut r = vec![input_stream.clone()];
         let w: Vec<PhpResource> = vec![];
 
@@ -720,7 +722,7 @@ impl QuestionHelper {
 
     fn is_interactive_input(&self, input_stream: &PhpResource) -> bool {
         let uri = stream_get_meta_data(input_stream).uri;
-        if uri.as_deref() != Some("php://stdin") {
+        if uri.is_none_or(|uri| uri != "php://stdin") {
             return false;
         }
 
@@ -813,7 +815,7 @@ impl QuestionHelper {
 
         let uri = uri?;
 
-        let clone_stream = fopen(&uri, &mode).ok()?;
+        let clone_stream = fopen(path_from_bytes(&uri), &mode).ok()?;
 
         // For seekable and writable streams, add all the same data to the
         // cloned stream and then seek to the same offset.

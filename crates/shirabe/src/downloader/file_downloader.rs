@@ -145,30 +145,34 @@ impl FileDownloader {
         // httpDownloader->wait() / process->wait(); awaiting the download/install futures
         // surfaces a rejection directly as the Err captured below.
         let result: anyhow::Result<String> = async {
-            if is_dir(format!("{}_compare", target_dir)) {
+            if is_dir(format!("{}_compare", target_dir.display())) {
                 self.filesystem
                     .borrow_mut()
-                    .remove_directory(format!("{}_compare", target_dir))?;
+                    .remove_directory(format!("{}_compare", target_dir.display()))?;
             }
 
             this.download(
                 package.clone(),
-                &format!("{}_compare", target_dir),
+                &format!("{}_compare", target_dir.display()),
                 None,
                 false,
             )
             .await?;
-            this.install(package.clone(), &format!("{}_compare", target_dir), false)
-                .await?;
+            this.install(
+                package.clone(),
+                &format!("{}_compare", target_dir.display()),
+                false,
+            )
+            .await?;
 
             let mut comparer = Comparer::new();
-            comparer.set_source(format!("{}_compare", target_dir));
-            comparer.set_update(target_dir.clone());
+            comparer.set_source(format!("{}_compare", target_dir.display()));
+            comparer.set_update(legacy_lossy(path_to_bytes(&target_dir.clone())).into_owned());
             comparer.do_compare();
             let output = comparer.get_changed_as_string(true, false);
             self.filesystem
                 .borrow_mut()
-                .remove_directory(format!("{}_compare", target_dir))?;
+                .remove_directory(format!("{}_compare", target_dir.display()))?;
             Ok(output)
         }
         .await;
@@ -713,7 +717,9 @@ impl DownloaderInterface for FileDownloader {
                 && realpath(dir)
                     .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                     .as_deref()
-                    != Some(&Platform::get_cwd(false).unwrap_or_default())
+                    != Some(&*legacy_lossy(path_to_bytes(
+                        &Platform::get_cwd(false).unwrap_or_default(),
+                    )))
             {
                 self.filesystem.borrow_mut().remove_directory_php(dir)?;
             }
@@ -748,12 +754,16 @@ impl DownloaderInterface for FileDownloader {
         // but in that case we ensure the directory is empty already in ProjectInstaller so no need to empty it here.
         if !{
             let normalized_vendor = self.filesystem.borrow_mut().normalize_path(&vendor_dir);
-            let normalized_path = self.filesystem.borrow().normalize_path(&format!(
+            let normalized_path = self.filesystem.borrow().normalize_path(format!(
                 "{}{}",
                 path,
                 std::path::MAIN_SEPARATOR
             ));
-            strpos(&normalized_vendor, &normalized_path).is_some()
+            strpos(
+                path_to_bytes(&normalized_vendor),
+                path_to_bytes(&normalized_path),
+            )
+            .is_some()
         } {
             self.filesystem.borrow_mut().empty_directory(path, true)?;
         }

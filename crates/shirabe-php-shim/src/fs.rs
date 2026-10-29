@@ -315,11 +315,13 @@ pub fn directory_iterator(
 
 /// PHP `fopen()`. Returns a stream resource, or an error mirroring PHP's `false`-on-failure
 /// (the I/O error carries the reason so callers that surface the warning text can use it).
-pub fn fopen(file: &str, mode: &str) -> Result<PhpResource, std::io::Error> {
+pub fn fopen(file: impl AsRef<std::path::Path>, mode: &str) -> Result<PhpResource, std::io::Error> {
+    let path = file.as_ref();
+    let file = crate::path_to_bytes(path);
     match file {
-        "php://output" | "php://stdout" => return Ok(PhpResource::Stdout),
-        "php://stderr" => return Ok(PhpResource::Stderr),
-        "php://stdin" | "php://input" => return Ok(PhpResource::Stdin),
+        b"php://output" | b"php://stdout" => return Ok(PhpResource::Stdout),
+        b"php://stderr" => return Ok(PhpResource::Stderr),
+        b"php://stdin" | b"php://input" => return Ok(PhpResource::Stdin),
         _ => {}
     }
     // Strip the binary/text flags PHP accepts as part of the mode.
@@ -333,18 +335,18 @@ pub fn fopen(file: &str, mode: &str) -> Result<PhpResource, std::io::Error> {
     // write restrictions implied by the mode: a memory stream opened with "w" is still readable
     // (this is what Symfony's ApplicationTester relies on -- it opens "php://memory" with "w" and
     // then rewinds + reads it back). So memory streams are always both readable and writable.
-    if file == "php://memory" || file.starts_with("php://temp") {
+    if file == b"php://memory" || file.starts_with(b"php://temp") {
         return Ok(PhpResource::Stream(std::rc::Rc::new(
             std::cell::RefCell::new(StreamState::new(
                 StreamBacking::Memory(std::io::Cursor::new(Vec::new())),
                 true,
                 true,
                 mode.to_string(),
-                file.to_string(),
+                BString::from(file),
             )),
         )));
     }
-    let uri = file.to_string();
+    let uri = BString::from(file);
     let mut options = std::fs::OpenOptions::new();
     match base_mode.as_str() {
         "r" => options.read(true),
@@ -360,7 +362,7 @@ pub fn fopen(file: &str, mode: &str) -> Result<PhpResource, std::io::Error> {
         "c+" => options.read(true).write(true).create(true),
         _ => options.read(true),
     };
-    let file = options.open(file)?;
+    let file = options.open(path)?;
     Ok(PhpResource::Stream(std::rc::Rc::new(
         std::cell::RefCell::new(StreamState::new(
             StreamBacking::File(file),

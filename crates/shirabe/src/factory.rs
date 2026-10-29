@@ -206,7 +206,7 @@ impl Factory {
     ) -> anyhow::Result<Config> {
         let cwd = match cwd {
             Some(s) => s.to_string(),
-            None => Platform::get_cwd(true)?,
+            None => legacy_lossy(path_to_bytes(&Platform::get_cwd(true)?)).into_owned(),
         };
 
         let mut config = Config::new(true, Some(cwd));
@@ -404,7 +404,7 @@ impl Factory {
 
         let cwd = match cwd {
             Some(s) => s,
-            None => Platform::get_cwd(true)?,
+            None => legacy_lossy(path_to_bytes(&Platform::get_cwd(true)?)).into_owned(),
         };
 
         // load Composer configuration

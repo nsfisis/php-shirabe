@@ -5,7 +5,9 @@
 // place of TestCase::getUniqueTmpDirectory, which is not ported.
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::platform::Platform;
-use shirabe_php_shim::{file_exists, file_put_contents, is_dir, mkdir, symlink, touch};
+use shirabe_php_shim::{
+    file_exists, file_put_contents, is_dir, mkdir, path_to_bytes, symlink, touch,
+};
 
 // PHP's setUp/tearDown build workingDir/testFile under TestCase::getUniqueTmpDirectory; the
 // on-disk tests below instead create their own tempfile::TempDir inline, so no shared fixture
@@ -423,9 +425,11 @@ fn test_find_shortest_path() {
     let fs = Filesystem::new(None);
     for (a, b, expected, directory, prefer_relative) in provide_path_couples() {
         assert_eq!(
-            expected,
-            fs.find_shortest_path(a, b, directory, prefer_relative)
-                .unwrap()
+            bstr::BStr::new(expected),
+            bstr::BStr::new(path_to_bytes(
+                &fs.find_shortest_path(a, b, directory, prefer_relative)
+                    .unwrap()
+            ))
         );
     }
 }
@@ -506,7 +510,10 @@ fn provide_normalized_paths() -> Vec<(&'static str, &'static str)> {
 fn test_normalize_path() {
     let fs = Filesystem::new(None);
     for (expected, actual) in provide_normalized_paths() {
-        assert_eq!(expected, fs.normalize_path(actual));
+        assert_eq!(
+            bstr::BStr::new(expected),
+            bstr::BStr::new(path_to_bytes(&fs.normalize_path(actual)))
+        );
     }
 }
 

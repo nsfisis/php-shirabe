@@ -17,7 +17,8 @@ use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, Platform, ProcessExecutor};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    LogicException, PhpMixed, get_debug_type, impl_php_class, php_regex, preg_match,
+    LogicException, PhpMixed, get_debug_type, impl_php_class, legacy_lossy, path_to_bytes,
+    php_regex, preg_match,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -179,6 +180,7 @@ impl ArchiveCommand {
             fs.find_shortest_path(&Platform::get_cwd(false)?, &package_path, true, false)?;
 
         io.write_error_no_newline("Created: ");
+        let short_path = legacy_lossy(path_to_bytes(&short_path)).into_owned();
         let display = if short_path.len() < package_path.len() {
             &short_path
         } else {

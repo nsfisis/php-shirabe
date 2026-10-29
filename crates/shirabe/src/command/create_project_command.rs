@@ -493,6 +493,7 @@ impl CreateProjectCommand {
             package_name,
             fs.borrow()
                 .find_shortest_path(&Platform::get_cwd(false)?, &directory, true, false)?
+                .display()
         ));
 
         if file_exists(&directory) {

@@ -34,14 +34,19 @@ impl ArchivableFilesFinder {
             ))
             .into());
         }
-        let sources = fs.normalize_path(&sources_real_path.unwrap());
+        let sources = fs.normalize_path(sources_real_path.unwrap());
 
         let filters: Vec<Box<dyn BaseExcludeFilter>> = if ignore_filters {
             vec![]
         } else {
             vec![
-                Box::new(GitExcludeFilter::new(sources.clone())),
-                Box::new(ComposerExcludeFilter::new(sources.clone(), excludes)),
+                Box::new(GitExcludeFilter::new(
+                    legacy_lossy(path_to_bytes(&sources.clone())).into_owned(),
+                )),
+                Box::new(ComposerExcludeFilter::new(
+                    legacy_lossy(path_to_bytes(&sources.clone())).into_owned(),
+                    excludes,
+                )),
             ]
         };
 
@@ -62,9 +67,12 @@ impl ArchivableFilesFinder {
                 .into_string()
                 .unwrap_or_else(|realpath| panic!("path is not valid UTF-8: {realpath:?}"));
             let relative_path = legacy_lossy(&preg_replace(
-                format!("#^{}#", preg_quote(&sources_clone, Some('#'))),
+                format!(
+                    "#^{}#",
+                    preg_quote(path_to_bytes(&sources_clone), Some('#'))
+                ),
                 "",
-                fs.normalize_path(&realpath),
+                path_to_bytes(&fs.normalize_path(&realpath)),
             ))
             .into_owned();
 

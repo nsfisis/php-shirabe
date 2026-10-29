@@ -11,7 +11,8 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, legacy_lossy,
-    php_regex, preg_is_match, preg_match, preg_replace, preg_split, strtolower, trigger_error,
+    path_to_bytes, php_regex, preg_is_match, preg_match, preg_replace, preg_split, strtolower,
+    trigger_error,
 };
 
 #[derive(Debug)]
@@ -86,9 +87,10 @@ impl RootPackageLoader {
                 let version = self.version_guesser.get_root_version_from_env()?;
                 config.insert("version".into(), PhpMixed::string(version));
             } else {
-                let cwd_str = cwd
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| Platform::get_cwd(true).unwrap_or_default());
+                let cwd_str = cwd.map(|s| s.to_string()).unwrap_or_else(|| {
+                    legacy_lossy(path_to_bytes(&Platform::get_cwd(true).unwrap_or_default()))
+                        .into_owned()
+                });
                 let version_data = self.version_guesser.guess_version(&config, &cwd_str)?;
                 if let Some(data) = version_data {
                     config.insert(

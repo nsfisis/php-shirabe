@@ -194,7 +194,7 @@ impl LibraryInstaller {
     fn initialize_vendor_dir(&self) {
         self.filesystem
             .borrow_mut()
-            .ensure_directory_exists(&self.vendor_dir.borrow());
+            .ensure_directory_exists(&*self.vendor_dir.borrow());
         let realpath = realpath(self.vendor_dir.borrow().as_str())
             .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
             .unwrap_or_default();

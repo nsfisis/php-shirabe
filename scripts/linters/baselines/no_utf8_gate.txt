@@ -28,7 +28,6 @@
 2 crates/shirabe-symfony-console/src/question/choice_question.rs
 1 crates/shirabe-symfony-console/src/question/question.rs
 4 crates/shirabe-symfony-console/src/terminal.rs
-2 crates/shirabe-symfony-filesystem/src/filesystem.rs
 2 crates/shirabe-symfony-finder/src/finder.rs
 3 crates/shirabe-symfony-process/src/executable_finder.rs
 3 crates/shirabe-symfony-process/src/php_executable_finder.rs
@@ -38,13 +37,13 @@
 1 crates/shirabe/build.rs
 5 crates/shirabe/src/advisory/audit_config.rs
 3 crates/shirabe/src/advisory/partial_security_advisory.rs
-17 crates/shirabe/src/autoload/autoload_generator.rs
+16 crates/shirabe/src/autoload/autoload_generator.rs
 4 crates/shirabe/src/autoload/class_loader.rs
 1 crates/shirabe/src/cache.rs
 1 crates/shirabe/src/command/base_command.rs
 1 crates/shirabe/src/command/base_config_command.rs
 1 crates/shirabe/src/command/bump_command.rs
-17 crates/shirabe/src/command/config_command.rs
+15 crates/shirabe/src/command/config_command.rs
 2 crates/shirabe/src/command/create_project_command.rs
 3 crates/shirabe/src/command/diagnose_command.rs
 9 crates/shirabe/src/command/init_command.rs
@@ -58,7 +57,6 @@
 4 crates/shirabe/src/console/application.rs
 1 crates/shirabe/src/dependency_resolver/pool_builder.rs
 1 crates/shirabe/src/downloader/gzip_downloader.rs
-2 crates/shirabe/src/downloader/path_downloader.rs
 1 crates/shirabe/src/downloader/svn_downloader.rs
 6 crates/shirabe/src/event_dispatcher/event_dispatcher.rs
 4 crates/shirabe/src/factory.rs
@@ -100,7 +98,6 @@
 4 crates/shirabe/src/repository/vcs_repository.rs
 1 crates/shirabe/src/util/bitbucket.rs
 3 crates/shirabe/src/util/config_validator.rs
-4 crates/shirabe/src/util/filesystem.rs
 1 crates/shirabe/src/util/forgejo.rs
 1 crates/shirabe/src/util/forgejo_repository_data.rs
 1 crates/shirabe/src/util/git.rs
@@ -111,7 +108,7 @@
 1 crates/shirabe/src/util/local_filesystem.rs
 5 crates/shirabe/src/util/no_proxy_pattern.rs
 1 crates/shirabe/src/util/perforce.rs
-3 crates/shirabe/src/util/platform.rs
+2 crates/shirabe/src/util/platform.rs
 1 crates/shirabe/src/util/process_executor.rs
 3 crates/shirabe/src/util/remote_filesystem.rs
 3 crates/shirabe/src/util/stream_context_factory.rs
@@ -140,7 +137,7 @@
 7 crates/shirabe/tests/installer/library_installer_test.rs
 6 crates/shirabe/tests/installer_test.rs
 10 crates/shirabe/tests/json/json_file_test.rs
-5 crates/shirabe/tests/package/archiver/archivable_files_finder_test.rs
+4 crates/shirabe/tests/package/archiver/archivable_files_finder_test.rs
 5 crates/shirabe/tests/package/archiver/archive_manager_test.rs
 2 crates/shirabe/tests/package/archiver/phar_archiver_test.rs
 1 crates/shirabe/tests/package/archiver/zip_archiver_test.rs

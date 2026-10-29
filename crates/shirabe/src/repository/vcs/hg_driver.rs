@@ -11,7 +11,8 @@ use chrono::{DateTime, FixedOffset, Utc};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, date_create, dirname, is_dir, is_writable,
-    path_from_bytes, php_regex, preg_is_match, preg_match, preg_replace,
+    legacy_lossy, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match,
+    preg_replace,
 };
 
 #[derive(Debug)]
@@ -323,7 +324,7 @@ impl HgDriver {
             if process.execute(
                 ["hg", "summary"].map(|s| s.to_string()).as_ref(),
                 &mut output,
-                Some(&url),
+                Some(&*legacy_lossy(path_to_bytes(&url))),
             )? == 0
             {
                 return Ok(true);

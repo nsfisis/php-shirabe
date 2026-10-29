@@ -45,7 +45,7 @@ use shirabe_php_rpc::{
 };
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException,
+    UnexpectedValueException, path_to_bytes,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -1532,6 +1532,8 @@ fn dispatch_filesystem_method(
                     arg::<bool>(method_name, args, 2)?,
                     arg::<bool>(method_name, args, 3)?,
                 )
+                .map_err(failed)?
+                .to_plugin_value()
             } else {
                 fs.find_shortest_path_code(
                     &from,
@@ -1540,9 +1542,9 @@ fn dispatch_filesystem_method(
                     arg::<bool>(method_name, args, 3)?,
                     arg::<bool>(method_name, args, 4)?,
                 )
-            }
-            .map_err(failed)?
-            .to_plugin_value())
+                .map_err(failed)?
+                .to_plugin_value()
+            })
         }
         "isAbsolutePath" => Ok(fs
             .borrow()
@@ -1964,7 +1966,7 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
             Ok(crate::util::Filesystem::is_local_path(&string_arg(0)?).to_plugin_value())
         }
         (b"Composer\\Util\\Filesystem", b"getPlatformPath") => Ok(PluginValue::string(
-            crate::util::Filesystem::get_platform_path(&string_arg(0)?),
+            path_to_bytes(&crate::util::Filesystem::get_platform_path(&string_arg(0)?)),
         )),
         (b"Composer\\Package\\Locker", b"getContentHash") => {
             crate::package::Locker::get_content_hash(string_arg(0)?)
@@ -2700,6 +2702,12 @@ impl ToPluginValue for String {
 impl ToPluginValue for BString {
     fn to_plugin_value(self) -> PluginValue {
         PluginValue::String(self)
+    }
+}
+
+impl ToPluginValue for std::path::PathBuf {
+    fn to_plugin_value(self) -> PluginValue {
+        PluginValue::string(path_to_bytes(&self))
     }
 }
 

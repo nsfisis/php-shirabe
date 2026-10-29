@@ -49,11 +49,31 @@ impl ArchiverTestCase {
         let current_work_dir = Platform::get_cwd(false).unwrap();
         std::env::set_current_dir(&self.test_dir).unwrap();
 
-        self.write_file("file.txt", "content", &current_work_dir);
-        self.write_file("foo/bar/baz", "content", &current_work_dir);
-        self.write_file("foo/bar/ignoreme", "content", &current_work_dir);
-        self.write_file("x/baz", "content", &current_work_dir);
-        self.write_file("x/includeme", "content", &current_work_dir);
+        self.write_file(
+            "file.txt",
+            "content",
+            &legacy_lossy(path_to_bytes(&current_work_dir)),
+        );
+        self.write_file(
+            "foo/bar/baz",
+            "content",
+            &legacy_lossy(path_to_bytes(&current_work_dir)),
+        );
+        self.write_file(
+            "foo/bar/ignoreme",
+            "content",
+            &legacy_lossy(path_to_bytes(&current_work_dir)),
+        );
+        self.write_file(
+            "x/baz",
+            "content",
+            &legacy_lossy(path_to_bytes(&current_work_dir)),
+        );
+        self.write_file(
+            "x/includeme",
+            "content",
+            &legacy_lossy(path_to_bytes(&current_work_dir)),
+        );
 
         std::env::set_current_dir(&current_work_dir).unwrap();
     }

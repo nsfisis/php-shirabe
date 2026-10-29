@@ -5,6 +5,7 @@ use crate::downloader::{DownloaderInterface, FileDownloader};
 use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Platform};
+use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, bin2hex, file_exists, is_dir, legacy_lossy,
@@ -80,16 +81,14 @@ pub trait ArchiveDownloader {
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the archive to be extracted. This is the case when installing with create-project in the current directory
         // but in that case we ensure the directory is empty already in ProjectInstaller so no need to empty it here.
-        if !self
-            .inner()
-            .filesystem
-            .borrow()
-            .normalize_path(&vendor_dir)
-            .contains(&self.inner().filesystem.borrow().normalize_path(&format!(
-                "{}{}",
-                path,
-                std::path::MAIN_SEPARATOR
-            )))
+        if !path_to_bytes(&self.inner().filesystem.borrow().normalize_path(&vendor_dir))
+            .contains_str(path_to_bytes(
+                &self.inner().filesystem.borrow().normalize_path(format!(
+                    "{}{}",
+                    path,
+                    std::path::MAIN_SEPARATOR
+                )),
+            ))
         {
             self.inner()
                 .filesystem
@@ -110,7 +109,10 @@ pub trait ArchiveDownloader {
         // delete the directory we are currently in on windows
         if !is_dir(path)
             || realpath(path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                != Some(Platform::get_cwd(false).unwrap_or_default())
+                != Some(
+                    legacy_lossy(path_to_bytes(&Platform::get_cwd(false).unwrap_or_default()))
+                        .into_owned(),
+                )
         {
             self.inner().add_cleanup_path(package.clone(), path);
         }
@@ -223,7 +225,10 @@ fn install_cleanup(
         .remove_directory(temporary_dir)?;
     if is_dir(path)
         && realpath(path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            != Some(Platform::get_cwd(false).unwrap_or_default())
+            != Some(
+                legacy_lossy(path_to_bytes(&Platform::get_cwd(false).unwrap_or_default()))
+                    .into_owned(),
+            )
     {
         inner.filesystem.borrow_mut().remove_directory(path)?;
     }

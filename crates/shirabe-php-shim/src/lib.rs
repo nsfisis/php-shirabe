@@ -563,7 +563,7 @@ pub struct StreamState {
     /// The mode string passed to `fopen`, reported back by `stream_get_meta_data`.
     mode: String,
     /// The path/URI the stream was opened from, reported back by `stream_get_meta_data`.
-    uri: String,
+    uri: BString,
 }
 
 impl StreamState {
@@ -572,7 +572,7 @@ impl StreamState {
         readable: bool,
         writable: bool,
         mode: String,
-        uri: String,
+        uri: BString,
     ) -> StreamState {
         StreamState {
             backing,

@@ -22,11 +22,11 @@ use shirabe_class_map_generator::class_map_generator::ClassMapGenerator;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PHP_SERVER, PhpMixed, PregMatches, RuntimeException,
     array_keys, array_map, array_merge_map, array_merge_recursive, array_shift, array_slice_strs,
-    array_unique, bin2hex, empty, explode, file_exists, file_get_contents, hash, implode, intval,
-    is_array, is_dir, ksort, legacy_lossy, ltrim, ltrim2, path_to_bytes, php_regex, preg_is_match,
-    preg_match, preg_quote, preg_replace, preg_replace_callback, random_bytes, realpath, rtrim2,
-    str_replace, strlen, strpos, strtr, strtr_array, substr, substr_count, trim2, unlink,
-    var_export,
+    array_unique, bconcat, bin2hex, empty, explode, file_exists, file_get_contents, hash, implode,
+    intval, is_array, is_dir, ksort, legacy_lossy, ltrim, ltrim2, path_from_bytes, path_to_bytes,
+    php_regex, preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback,
+    random_bytes, realpath, rtrim2, str_replace, strlen, strpos, strtr, strtr_array, substr,
+    substr_count, trim2, unlink, var_export,
 };
 use shirabe_semver::constraint::Bound;
 use shirabe_symfony_console::formatter::OutputFormatter;
@@ -178,23 +178,19 @@ impl AutoloadGenerator {
         class_map_generator.avoid_duplicate_scans(None);
 
         let mut filesystem = Filesystem::new(None);
-        filesystem.ensure_directory_exists(
-            &config
-                .get("vendor-dir")
-                .as_string()
-                .unwrap_or_default()
-                .to_str_lossy(),
-        )?;
+        filesystem.ensure_directory_exists(path_from_bytes(
+            config.get("vendor-dir").as_string().unwrap_or_default(),
+        ))?;
         // Do not remove double realpath() calls.
         // Fixes failing Windows realpath() implementation.
         // See https://bugs.php.net/bug.php?id=72738
         let base_path = filesystem.normalize_path(
-            &realpath(realpath(Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default())
+            realpath(realpath(Platform::get_cwd(false).unwrap_or_default()).unwrap_or_default())
                 .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                 .unwrap_or_default(),
         );
         let vendor_path = filesystem.normalize_path(
-            &realpath(
+            realpath(
                 realpath(
                     &*config
                         .get("vendor-dir")
@@ -213,27 +209,33 @@ impl AutoloadGenerator {
         } else {
             "true"
         };
-        let target_dir = format!("{}/{}", vendor_path, target_dir);
+        let target_dir = format!("{}/{}", vendor_path.display(), target_dir);
         filesystem.ensure_directory_exists(&target_dir)?;
 
-        let vendor_path_code = filesystem.find_shortest_path_code(
-            &realpath(&target_dir)
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                .unwrap_or_default(),
-            &vendor_path,
-            true,
-            false,
-            false,
-        )?;
-        let vendor_path_to_target_dir_code = filesystem.find_shortest_path_code(
-            &vendor_path,
-            &realpath(&target_dir)
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                .unwrap_or_default(),
-            true,
-            false,
-            false,
-        )?;
+        let vendor_path_code = legacy_lossy(
+            &filesystem.find_shortest_path_code(
+                realpath(&target_dir)
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .unwrap_or_default(),
+                &vendor_path,
+                true,
+                false,
+                false,
+            )?,
+        )
+        .into_owned();
+        let vendor_path_to_target_dir_code = legacy_lossy(
+            &filesystem.find_shortest_path_code(
+                &vendor_path,
+                realpath(&target_dir)
+                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                    .unwrap_or_default(),
+                true,
+                false,
+                false,
+            )?,
+        )
+        .into_owned();
 
         let app_base_dir_code =
             filesystem.find_shortest_path_code(&vendor_path, &base_path, true, false, false)?;
@@ -309,8 +311,8 @@ return array(
                 for path in p_list {
                     exported_paths.push(self.get_path_code(
                         &filesystem,
-                        &base_path,
-                        &vendor_path,
+                        &legacy_lossy(path_to_bytes(&base_path)),
+                        &legacy_lossy(path_to_bytes(&vendor_path)),
                         &path.as_string().unwrap_or_default().to_str_lossy(),
                     )?);
                 }
@@ -332,8 +334,8 @@ return array(
                 for path in p_list {
                     exported_paths.push(self.get_path_code(
                         &filesystem,
-                        &base_path,
-                        &vendor_path,
+                        &legacy_lossy(path_to_bytes(&base_path)),
+                        &legacy_lossy(path_to_bytes(&vendor_path)),
                         &path.as_string().unwrap_or_default().to_str_lossy(),
                     )?);
                 }
@@ -354,7 +356,9 @@ return array(
                 .is_some_and(|a| !a.is_empty())
         {
             let levels = substr_count(
-                filesystem.normalize_path(&root_package.get_target_dir().unwrap_or_default()),
+                path_to_bytes(
+                    &filesystem.normalize_path(root_package.get_target_dir().unwrap_or_default()),
+                ),
                 "/",
             ) + 1;
             let psr0_keys = main_autoload
@@ -464,7 +468,7 @@ return array(
                         .to_string();
                     for dir in &paths {
                         let dir_str = dir.as_string().unwrap_or_default().to_string();
-                        let joined = format!("{}/{}", base_path, dir_str);
+                        let joined = format!("{}/{}", base_path.display(), dir_str);
                         let dir_str =
                             filesystem.normalize_path(if filesystem.is_absolute_path(&dir_str) {
                                 &dir_str
@@ -476,16 +480,24 @@ return array(
                         }
 
                         // if the vendor dir is contained within a psr-0/psr-4 dir being scanned we exclude it
-                        let exclusion_regex = if vendor_path.contains(&format!("{}/", dir_str)) {
+                        let exclusion_regex = if path_to_bytes(&vendor_path)
+                            .contains_str(bconcat!(path_to_bytes(&dir_str), "/"))
+                        {
                             let mut combined = excluded.clone();
-                            combined.push(format!("{}/", vendor_path));
-                            self.build_exclusion_regex(&dir_str, combined)
+                            combined.push(format!("{}/", vendor_path.display()));
+                            self.build_exclusion_regex(
+                                &legacy_lossy(path_to_bytes(&dir_str)),
+                                combined,
+                            )
                         } else {
-                            self.build_exclusion_regex(&dir_str, excluded.clone())
+                            self.build_exclusion_regex(
+                                &legacy_lossy(path_to_bytes(&dir_str)),
+                                excluded.clone(),
+                            )
                         };
 
                         class_map_generator.scan_paths(
-                            &dir_str,
+                            path_to_bytes(&dir_str),
                             exclusion_regex,
                             &group_type,
                             Some(bstr::BString::from(namespace.clone())),
@@ -528,14 +540,14 @@ return array(
         }
 
         // output PSR violations which are not coming from the vendor dir
-        class_map.clear_psr_violations_by_path(&vendor_path);
+        class_map.clear_psr_violations_by_path(path_to_bytes(&vendor_path));
         for msg in class_map.get_psr_violations() {
             self.io.write_error(&format!("<warning>{}</warning>", msg));
         }
 
         class_map.add_class(
             "Composer\\InstalledVersions".to_string(),
-            format!("{}/composer/InstalledVersions.php", vendor_path),
+            format!("{}/composer/InstalledVersions.php", vendor_path.display()),
         );
         class_map.sort();
 
@@ -554,7 +566,12 @@ return array(
         for (class_name, path) in class_map.get_map() {
             let path_code = format!(
                 "{},\n",
-                self.get_path_code(&filesystem, &base_path, &vendor_path, &legacy_lossy(path))?
+                self.get_path_code(
+                    &filesystem,
+                    &legacy_lossy(path_to_bytes(&base_path)),
+                    &legacy_lossy(path_to_bytes(&vendor_path)),
+                    &legacy_lossy(path)
+                )?
             );
             classmap_file.push_str(&format!(
                 "    {} => {}",
@@ -575,11 +592,13 @@ return array(
                 .map(|s| s.to_string());
 
             // carry over existing autoload.php's suffix if possible and none is configured
-            if suffix.is_none() && Filesystem::is_readable(&format!("{}/autoload.php", vendor_path))
+            if suffix.is_none()
+                && Filesystem::is_readable(format!("{}/autoload.php", vendor_path.display()))
             {
                 // TODO(bytes): preg_match matches over a &str.
                 let content = String::from_utf8_lossy(
-                    &file_get_contents(format!("{}/autoload.php", vendor_path)).unwrap_or_default(),
+                    &file_get_contents(format!("{}/autoload.php", vendor_path.display()))
+                        .unwrap_or_default(),
                 )
                 .into_owned();
                 if let Some(matches) =
@@ -614,23 +633,23 @@ return array(
         }
 
         filesystem.file_put_contents_if_modified(
-            &format!("{}/autoload_namespaces.php", target_dir),
+            format!("{}/autoload_namespaces.php", target_dir),
             &namespaces_file,
         )?;
         filesystem.file_put_contents_if_modified(
-            &format!("{}/autoload_psr4.php", target_dir),
+            format!("{}/autoload_psr4.php", target_dir),
             &psr4_file,
         )?;
         filesystem.file_put_contents_if_modified(
-            &format!("{}/autoload_classmap.php", target_dir),
+            format!("{}/autoload_classmap.php", target_dir),
             &classmap_file,
         )?;
         let include_path_file_path = format!("{}/include_paths.php", target_dir);
         let include_path_file_contents = self.get_include_paths_file(
             &package_map,
             &filesystem,
-            &base_path,
-            &vendor_path,
+            &legacy_lossy(path_to_bytes(&base_path)),
+            &legacy_lossy(path_to_bytes(&vendor_path)),
             &vendor_path_code,
             &app_base_dir_code,
         )?;
@@ -656,8 +675,8 @@ return array(
         let include_files_file_contents = self.get_include_files_file(
             &files_str_map,
             &filesystem,
-            &base_path,
-            &vendor_path,
+            &legacy_lossy(path_to_bytes(&base_path)),
+            &legacy_lossy(path_to_bytes(&vendor_path)),
             &vendor_path_code,
             &app_base_dir_code,
         )?;
@@ -667,8 +686,13 @@ return array(
             unlink(&include_files_file_path);
         }
         filesystem.file_put_contents_if_modified(
-            &format!("{}/autoload_static.php", target_dir),
-            &self.get_static_file(&suffix, &target_dir, &vendor_path, &base_path)?,
+            format!("{}/autoload_static.php", target_dir),
+            &self.get_static_file(
+                &suffix,
+                &target_dir,
+                &legacy_lossy(path_to_bytes(&vendor_path)),
+                &legacy_lossy(path_to_bytes(&base_path)),
+            )?,
         )?;
         let mut check_platform = config.get("platform-check").as_bool() != Some(false)
             && self
@@ -690,19 +714,19 @@ return array(
         }
         if check_platform {
             filesystem.file_put_contents_if_modified(
-                &format!("{}/platform_check.php", target_dir),
+                format!("{}/platform_check.php", target_dir),
                 platform_check_content.as_ref().unwrap(),
             )?;
         } else if file_exists(format!("{}/platform_check.php", target_dir)) {
             unlink(format!("{}/platform_check.php", target_dir));
         }
         filesystem.file_put_contents_if_modified(
-            &format!("{}/autoload.php", vendor_path),
-            &self.get_autoload_file(&vendor_path_to_target_dir_code, &suffix),
+            format!("{}/autoload.php", vendor_path.display()),
+            self.get_autoload_file(&vendor_path_to_target_dir_code, &suffix),
         )?;
         filesystem.file_put_contents_if_modified(
-            &format!("{}/autoload_real.php", target_dir),
-            &self.get_autoload_real_file(
+            format!("{}/autoload_real.php", target_dir),
+            self.get_autoload_real_file(
                 true,
                 include_path_file_contents.is_some(),
                 target_dir_loader,
@@ -720,11 +744,11 @@ return array(
         // tree at run time, so they are embedded at build time, as InstalledVersions.php is in
         // FilesystemRepository.
         filesystem.file_put_contents_if_modified(
-            &format!("{}/ClassLoader.php", target_dir),
+            format!("{}/ClassLoader.php", target_dir),
             include_str!("../../../../composer/src/Composer/Autoload/ClassLoader.php"),
         )?;
         filesystem.file_put_contents_if_modified(
-            &format!("{}/LICENSE", target_dir),
+            format!("{}/LICENSE", target_dir),
             include_str!("../../../../composer/LICENSE"),
         )?;
 
@@ -776,8 +800,10 @@ return array(
                     dir
                 )
             };
-            let dir_match_normalized =
-                preg_quote(strtr(fs.normalize_path(&abs_dir), "\\", "/"), None);
+            let dir_match_normalized = preg_quote(
+                strtr(path_to_bytes(&fs.normalize_path(&abs_dir)), "\\", "/"),
+                None,
+            );
             let is_symlink = dir_match != dir_match_normalized;
 
             let mut new_excluded: Vec<String> = vec![];
@@ -1169,15 +1195,17 @@ return array(
         } else {
             path.to_string()
         };
-        path = filesystem.normalize_path(&path);
+        path = legacy_lossy(path_to_bytes(&filesystem.normalize_path(&path))).into_owned();
 
         let mut base_dir = String::new();
         if strpos(format!("{}/", path), format!("{}/", vendor_path)) == Some(0) {
             path = legacy_lossy(&substr(&path, vendor_path.len() as i64, None)).into_owned();
             base_dir = "$vendorDir . ".to_string();
         } else {
-            path = filesystem
-                .normalize_path(&filesystem.find_shortest_path(base_path, &path, true, false)?);
+            path = legacy_lossy(path_to_bytes(&filesystem.normalize_path(
+                &filesystem.find_shortest_path(base_path, &path, true, false)?,
+            )))
+            .into_owned();
             if !filesystem.is_absolute_path(&path) {
                 base_dir = "$baseDir . ".to_string();
                 path = format!("/{}", path);
@@ -1716,7 +1744,7 @@ class ComposerStaticInit{}
         let vendor_path_code = format!(
             " => {} . '/",
             filesystem.find_shortest_path_code(
-                &realpath(target_dir)
+                realpath(target_dir)
                     .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                     .unwrap_or_default(),
                 vendor_path,
@@ -1728,7 +1756,7 @@ class ComposerStaticInit{}
         let vendor_phar_path_code = format!(
             " => 'phar://' . {} . '/",
             filesystem.find_shortest_path_code(
-                &realpath(target_dir)
+                realpath(target_dir)
                     .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                     .unwrap_or_default(),
                 vendor_path,
@@ -1740,7 +1768,7 @@ class ComposerStaticInit{}
         let app_base_dir_code = format!(
             " => {} . '/",
             filesystem.find_shortest_path_code(
-                &realpath(target_dir)
+                realpath(target_dir)
                     .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                     .unwrap_or_default(),
                 base_path,
@@ -1752,7 +1780,7 @@ class ComposerStaticInit{}
         let app_base_dir_phar_code = format!(
             " => 'phar://' . {} . '/",
             filesystem.find_shortest_path_code(
-                &realpath(target_dir)
+                realpath(target_dir)
                     .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                     .unwrap_or_default(),
                 base_path,
@@ -1972,7 +2000,7 @@ class ComposerStaticInit{}
                         || r#type == "classmap"
                         || r#type == "exclude-from-classmap")
                         && package.get_target_dir().is_some()
-                        && !Filesystem::is_readable(&format!("{}/{}", install_path, path_str))
+                        && !Filesystem::is_readable(format!("{}/{}", install_path, path_str))
                     {
                         // remove target-dir from file paths of the root package
                         if is_root {
@@ -2052,7 +2080,11 @@ class ComposerStaticInit{}
                         .into_owned();
                         let updir: Option<String> = updir_cell.into_inner();
                         let install_path_for_resolve = if install_path.is_empty() {
-                            strtr(Platform::get_cwd(false).unwrap_or_default(), "\\", "/")
+                            strtr(
+                                path_to_bytes(&Platform::get_cwd(false).unwrap_or_default()),
+                                "\\",
+                                "/",
+                            )
                         } else {
                             bstr::BString::from(install_path.clone())
                         };

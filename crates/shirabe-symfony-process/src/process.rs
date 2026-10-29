@@ -909,8 +909,8 @@ impl Process {
         self.exitcode = None;
         self.process_information = None;
         // php://temp is an in-memory stream; fopen never fails for it.
-        self.stdout = Some(fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
-        self.stderr = Some(fopen(&format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
+        self.stdout = Some(fopen(format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
+        self.stderr = Some(fopen(format!("php://temp/maxmemory:{}", 1024 * 1024), "w+").unwrap());
         self.process = None;
         self.latest_signal = None;
         self.status = Self::STATUS_READY.to_string();

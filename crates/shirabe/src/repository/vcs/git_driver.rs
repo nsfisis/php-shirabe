@@ -84,7 +84,7 @@ impl GitDriver {
             GitUtil::clean_env(&self.inner.process);
 
             let mut fs = Filesystem::new(None);
-            fs.ensure_directory_exists(&legacy_lossy(&dirname(&self.repo_dir)))?;
+            fs.ensure_directory_exists(path_from_bytes(&dirname(&self.repo_dir)))?;
 
             if !is_writable(path_from_bytes(&dirname(&self.repo_dir))) {
                 return Err(RuntimeException::new(format!(
@@ -384,14 +384,14 @@ impl GitDriver {
             if process.borrow_mut().execute(
                 &["git".to_string(), "tag".to_string()],
                 &mut output,
-                Some(&url),
+                Some(&*legacy_lossy(path_to_bytes(&url))),
             )? == 0
             {
                 return Ok(true);
             }
             GitUtil::check_for_repo_ownership_error(
                 &process.borrow().get_error_output(),
-                &url,
+                &legacy_lossy(path_to_bytes(&url)),
                 Some(io.clone()),
             )?;
         }

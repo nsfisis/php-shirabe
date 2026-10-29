@@ -14,8 +14,8 @@ use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
 use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, file_exists, impl_php_class, is_dir, legacy_lossy, path_to_bytes,
-    realpath,
+    PhpMixed, RuntimeException, bconcat, file_exists, impl_php_class, is_dir, legacy_lossy,
+    path_from_bytes, path_to_bytes, realpath,
 };
 use shirabe_symfony_filesystem::Filesystem as SymfonyFilesystem;
 
@@ -64,7 +64,8 @@ impl PathDownloader {
         let dumper = ArrayDumper::new();
 
         let package_config = dumper.dump(package);
-        let package_version = guesser.guess_version(&package_config, &path);
+        let package_version =
+            guesser.guess_version(&package_config, &legacy_lossy(path_to_bytes(&path)));
         if let Ok(Some(version)) = package_version {
             return version.commit;
         }
@@ -303,7 +304,10 @@ impl DownloaderInterface for PathDownloader {
             == Some(&real_url)
         {
             if output {
-                let appendix = self.get_install_operation_appendix(package.clone(), &path)?;
+                let appendix = self.get_install_operation_appendix(
+                    package.clone(),
+                    &legacy_lossy(path_to_bytes(&path)),
+                )?;
                 self.inner.io.borrow().write_error3(
                     &format!(
                         "  - {}{}",
@@ -356,7 +360,7 @@ impl DownloaderInterface for PathDownloader {
                         .borrow_mut()
                         .junction(&real_url, &path))
                 } else {
-                    let path = path.trim_end_matches('/').to_string();
+                    let path = Filesystem::trim_trailing_slash(&path);
                     if output {
                         self.inner.io.borrow().write_error3(
                             &format!("Symlinking from {}", url),
@@ -371,11 +375,7 @@ impl DownloaderInterface for PathDownloader {
                     {
                         let absolute_path =
                             if !self.inner.filesystem.borrow_mut().is_absolute_path(&path) {
-                                std::path::Path::new(&Platform::get_cwd(false)?)
-                                    .join(&path)
-                                    .into_os_string()
-                                    .into_string()
-                                    .unwrap()
+                                Platform::get_cwd(false)?.join(&path)
                             } else {
                                 path.clone()
                             };
@@ -385,9 +385,15 @@ impl DownloaderInterface for PathDownloader {
                             false,
                             true,
                         )?;
-                        Ok(symfony_filesystem.symlink(&format!("{}/", shortest_path), &path))
+                        Ok(symfony_filesystem.symlink(
+                            path_from_bytes(&bconcat!(path_to_bytes(&shortest_path), "/")),
+                            &path,
+                        ))
                     } else {
-                        Ok(symfony_filesystem.symlink(&format!("{}/", real_url), &path))
+                        Ok(symfony_filesystem.symlink(
+                            path_from_bytes(&bconcat!(path_to_bytes(&real_url), "/")),
+                            &path,
+                        ))
                     }
                 }
             })();
@@ -412,7 +418,8 @@ impl DownloaderInterface for PathDownloader {
                     } else {
                         return Err(RuntimeException::new(format!(
                             "Symlink from \"{}\" to \"{}\" failed!",
-                            real_url, path
+                            real_url,
+                            path.display()
                         ))
                         .into());
                     }
@@ -435,20 +442,9 @@ impl DownloaderInterface for PathDownloader {
                     io_interface::NORMAL,
                 );
             }
-            let iterator = ArchivableFilesFinder::new(&real_url, vec![], false)?;
-            // TODO(bytes): mirror takes the paths as Strings.
-            symfony_filesystem.mirror(
-                &real_url,
-                &path,
-                iterator
-                    .map(|entry| {
-                        entry
-                            .into_os_string()
-                            .into_string()
-                            .unwrap_or_else(|entry| panic!("path is not valid UTF-8: {entry:?}"))
-                    })
-                    .collect(),
-            )?;
+            let iterator =
+                ArchivableFilesFinder::new(&legacy_lossy(path_to_bytes(&real_url)), vec![], false)?;
+            symfony_filesystem.mirror(&real_url, &path, iterator.collect())?;
         }
 
         if output {
@@ -494,7 +490,7 @@ impl DownloaderInterface for PathDownloader {
                     &format!(
                         "  - {}, source is still present in {}",
                         UninstallOperation::format(package.clone(), false),
-                        path
+                        path.display()
                     ),
                     true,
                     io_interface::NORMAL,
@@ -504,7 +500,7 @@ impl DownloaderInterface for PathDownloader {
                 self.inner.io.borrow().write_error3(
                     &format!(
                         "    <warning>Could not remove junction at {} - is another process locking it?</warning>",
-                        path
+                        path.display()
                     ),
                     true,
                     io_interface::NORMAL,
@@ -534,20 +530,25 @@ impl DownloaderInterface for PathDownloader {
         let abs_path = if fs.is_absolute_path(&path) {
             path.clone()
         } else {
-            format!("{}/{}", Platform::get_cwd(false)?, path)
+            std::path::PathBuf::from(format!(
+                "{}/{}",
+                Platform::get_cwd(false)?.display(),
+                path.display()
+            ))
         };
         let abs_dist_url = if fs.is_absolute_path(&url) {
             url.to_string()
         } else {
-            format!("{}/{}", Platform::get_cwd(false)?, url)
+            format!("{}/{}", Platform::get_cwd(false)?.display(), url)
         };
-        if fs.normalize_path(&abs_path) == fs.normalize_path(&abs_dist_url) {
+        if fs.normalize_path(&abs_path).as_os_str() == fs.normalize_path(&abs_dist_url).as_os_str()
+        {
             if output {
                 self.inner.io.borrow().write_error3(
                     &format!(
                         "  - {}, source is still present in {}",
                         UninstallOperation::format(package.clone(), false),
-                        path
+                        path.display()
                     ),
                     true,
                     io_interface::NORMAL,
@@ -557,7 +558,9 @@ impl DownloaderInterface for PathDownloader {
             return Ok(None);
         }
 
-        self.inner.remove(package, &path, output).await
+        self.inner
+            .remove(package, &legacy_lossy(path_to_bytes(&path)), output)
+            .await
     }
 
     async fn cleanup(

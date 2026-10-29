@@ -78,15 +78,22 @@ pub fn stream_isatty(stream: PhpResource) -> bool {
 }
 
 /// PHP `stream_is_local()`: true for plain paths and the `file://` wrapper, false for remote
-/// wrappers (`http://`, `ftp://`, ...).
+/// wrappers (`http://`, `ftp://`, ...) and `data:`. The scheme is located the way
+/// `php_stream_locate_url_wrapper()` does: a run of alphanumerics, `+`, `-` and `.` followed by
+/// `://`.
 /// TODO(php-semantics): PHP asks the wrapper registered for the path's scheme whether it is flagged
 /// `STREAM_IS_URL`; this classifies by the scheme itself, so a registered custom wrapper claiming to
 /// be local (or vice versa) comes out differently than in PHP.
-pub fn stream_is_local(path: &str) -> bool {
-    match crate::parse_url(path).and_then(|url| url.scheme) {
-        Some(scheme) => scheme.eq_ignore_ascii_case("file"),
-        None => true,
+pub fn stream_is_local(path: impl AsRef<[u8]>) -> bool {
+    let path = path.as_ref();
+    let n = path
+        .iter()
+        .take_while(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'-' | b'.'))
+        .count();
+    if n > 1 && path[n..].starts_with(b"://") {
+        return path[..n].eq_ignore_ascii_case(b"file");
     }
+    !path.starts_with(b"data:")
 }
 
 pub fn stream_get_wrappers() -> Vec<String> {
@@ -174,7 +181,7 @@ pub struct StreamMetaData {
     pub mode: String,
     pub unread_bytes: i64,
     pub seekable: bool,
-    pub uri: Option<String>,
+    pub uri: Option<BString>,
 }
 
 pub fn stream_get_meta_data(resource: &PhpResource) -> StreamMetaData {
@@ -186,7 +193,7 @@ pub fn stream_get_meta_data(resource: &PhpResource) -> StreamMetaData {
             "STDIO",
             "r".to_string(),
             false,
-            Some("php://stdin".to_string()),
+            Some("php://stdin".into()),
         ),
         PhpResource::Stdout => (
             false,
@@ -194,7 +201,7 @@ pub fn stream_get_meta_data(resource: &PhpResource) -> StreamMetaData {
             "STDIO",
             "w".to_string(),
             false,
-            Some("php://stdout".to_string()),
+            Some("php://stdout".into()),
         ),
         PhpResource::Stderr => (
             false,
@@ -202,13 +209,13 @@ pub fn stream_get_meta_data(resource: &PhpResource) -> StreamMetaData {
             "STDIO",
             "w".to_string(),
             false,
-            Some("php://stderr".to_string()),
+            Some("php://stderr".into()),
         ),
         PhpResource::Stream(state) => {
             let state = state.borrow();
             let (wrapper_type, stream_type) = match &state.backing {
                 StreamBacking::Memory(_) => {
-                    if state.uri.starts_with("php://temp") {
+                    if state.uri.starts_with(b"php://temp") {
                         ("PHP", "TEMP")
                     } else {
                         ("PHP", "MEMORY")

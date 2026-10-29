@@ -106,7 +106,11 @@ impl ArchiverTestCase {
             if files[&path].is_none() {
                 files.insert(path.clone(), Some("content".to_string()));
             }
-            self.write_file(&path, files[&path].clone().unwrap(), &current_work_dir);
+            self.write_file(
+                &path,
+                files[&path].clone().unwrap(),
+                &legacy_lossy(path_to_bytes(&current_work_dir)),
+            );
         }
 
         std::env::set_current_dir(&current_work_dir).unwrap();
@@ -138,7 +142,10 @@ fn test_simple_files() {
 
     if !Platform::is_windows() {
         files.insert(
-            format!("zfoo{}/file.txt", Platform::get_cwd(false).unwrap()),
+            format!(
+                "zfoo{}/file.txt",
+                Platform::get_cwd(false).unwrap().display()
+            ),
             None,
         );
     }

@@ -222,7 +222,7 @@ impl Cache {
             let full_path = format!("{}{}", self.root, file);
             self.filesystem
                 .borrow_mut()
-                .ensure_directory_exists(&legacy_lossy(&dirname(&full_path)));
+                .ensure_directory_exists(path_from_bytes(&dirname(&full_path)));
 
             if !file_exists(source) {
                 self.io.write_error(&format!(

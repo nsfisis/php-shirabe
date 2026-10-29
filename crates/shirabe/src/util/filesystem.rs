@@ -1,19 +1,21 @@
 //! ref: composer/src/Composer/Util/Filesystem.php
 
 use crate::util::{Platform, ProcessExecutor};
+use bstr::BString;
 use shirabe_php_shim::{
     CHILD_FIRST, InvalidArgumentException, LogicException, PhpMixed, PregMatches, RuntimeException,
-    SELF_FIRST, SKIP_DOTS, array_pop, basename, chdir, clearstatcache, clearstatcache2, copy,
-    dirname, explode, fclose, feof, file_exists, file_get_contents, file_put_contents, fileatime,
-    filemtime, filesize, fopen, fread, fwrite, implode, is_dir, is_file, is_link, is_readable,
-    legacy_lossy, lstat, mkdir, path_from_bytes, php_regex, preg_is_match, preg_match,
-    preg_replace, preg_replace_callback, recursive_directory_iterator, recursive_iterator_iterator,
-    rename, rmdir, rtrim2, str_repeat, str_replace, stream_copy_to_stream, strlen, strpos,
-    strtoupper, strtr, substr, substr_count, symlink, touch, unlink, usleep, var_export,
+    SELF_FIRST, SKIP_DOTS, array_pop, basename, bconcat, chdir, clearstatcache, clearstatcache2,
+    copy, dirname, explode, fclose, feof, file_exists, file_get_contents, file_put_contents,
+    fileatime, filemtime, filesize, fopen, fread, fwrite, implode, is_dir, is_file, is_link,
+    is_readable, legacy_lossy, lstat, mkdir, path_from_bytes, path_to_bytes, php_regex,
+    preg_is_match, preg_match, preg_replace, preg_replace_callback, recursive_directory_iterator,
+    recursive_iterator_iterator, rename, rmdir, rtrim2, str_repeat, str_replace,
+    stream_copy_to_stream, strlen, strpos, strtoupper, strtr, substr, substr_count, symlink, touch,
+    unlink, usleep, var_export,
 };
 use shirabe_symfony_filesystem::exception::IOException;
 use shirabe_symfony_finder::Finder;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct Filesystem {
@@ -27,7 +29,7 @@ pub struct Filesystem {
 pub struct FilesystemMock {
     /// When `Some`, `remove_directory_async` returns it without touching disk and records the call.
     pub remove_directory_async_result: Option<bool>,
-    pub remove_directory_async_paths: Vec<String>,
+    pub remove_directory_async_paths: Vec<PathBuf>,
     /// When true, `normalize_path` returns its argument unchanged.
     pub normalize_path_identity: bool,
 }
@@ -52,7 +54,7 @@ impl Filesystem {
 
     /// For testing only: the directories passed to `remove_directory_async` calls intercepted by
     /// the seam, in call order (ref PHPUnit's `->with($this->equalTo($this->workingDir))`).
-    pub fn __remove_directory_async_paths(&self) -> Vec<String> {
+    pub fn __remove_directory_async_paths(&self) -> Vec<PathBuf> {
         self.mock
             .as_ref()
             .map(|m| m.remove_directory_async_paths.clone())
@@ -73,7 +75,7 @@ impl Filesystem {
     }
 
     /// Checks if a directory is empty
-    pub fn is_dir_empty(&self, dir: &str) -> bool {
+    pub fn is_dir_empty(&self, dir: impl AsRef<Path>) -> bool {
         let mut finder = Finder::create();
         finder
             .ignore_vcs(false)
@@ -86,9 +88,10 @@ impl Filesystem {
 
     pub fn empty_directory(
         &mut self,
-        dir: &str,
+        dir: impl AsRef<Path>,
         ensure_directory_exists: bool,
     ) -> anyhow::Result<()> {
+        let dir = dir.as_ref();
         if is_link(dir) && file_exists(dir) {
             self.unlink(dir)?;
         }
@@ -114,17 +117,7 @@ impl Filesystem {
 
     /// Recursively remove a directory
     pub fn remove_directory(&mut self, directory: impl AsRef<Path>) -> anyhow::Result<bool> {
-        // TODO(bytes):
-        // This path is matched against a regex (remove_edge_cases) and, on Windows, passed to an
-        // `rmdir` subprocess via the String-based ProcessExecutor, so it has to be representable as
-        // UTF-8.
         let directory = directory.as_ref();
-        let directory = directory.to_str().ok_or_else(|| {
-            RuntimeException::new(format!(
-                "Path contains invalid UTF-8: {}",
-                directory.display()
-            ))
-        })?;
         let edge_case_result = self.remove_edge_cases(directory)?;
         if let Some(r) = edge_case_result {
             return Ok(r);
@@ -137,7 +130,8 @@ impl Filesystem {
                 "rmdir".to_string(),
                 "/S".to_string(),
                 "/Q".to_string(),
-                Platform::realpath(directory),
+                // TODO(bytes): ProcessExecutor takes the command as Strings.
+                legacy_lossy(path_to_bytes(&Platform::realpath(directory))).into_owned(),
             ];
 
             let mut output = PhpMixed::Null;
@@ -146,7 +140,7 @@ impl Filesystem {
                 .map(|n| n == 0)
                 .unwrap_or(false)
         } else {
-            remove_directory_recursively(Path::new(directory)).is_ok()
+            remove_directory_recursively(directory).is_ok()
         };
 
         // clear stat cache because external processes aren't tracked by the php stat cache
@@ -162,8 +156,9 @@ impl Filesystem {
     /// Recursively remove a directory asynchronously
     pub async fn remove_directory_async_via(
         this: &std::rc::Rc<std::cell::RefCell<Filesystem>>,
-        directory: &str,
+        directory: impl AsRef<Path>,
     ) -> anyhow::Result<bool> {
+        let directory = directory.as_ref();
         {
             let mut fs = this.borrow_mut();
 
@@ -171,7 +166,7 @@ impl Filesystem {
                 && let Some(result) = mock.remove_directory_async_result
             {
                 mock.remove_directory_async_paths
-                    .push(directory.to_string());
+                    .push(directory.to_path_buf());
                 return Ok(result);
             }
 
@@ -188,7 +183,8 @@ impl Filesystem {
                 "rmdir".to_string(),
                 "/S".to_string(),
                 "/Q".to_string(),
-                Platform::realpath(directory),
+                // TODO(bytes): ProcessExecutor takes the command as Strings.
+                legacy_lossy(path_to_bytes(&Platform::realpath(directory))).into_owned(),
             ];
 
             let process_executor = this.borrow_mut().get_process_handle();
@@ -197,9 +193,7 @@ impl Filesystem {
 
             process.is_successful()
         } else {
-            remove_directory_recursively_async(Path::new(directory))
-                .await
-                .is_ok()
+            remove_directory_recursively_async(directory).await.is_ok()
         };
 
         // clear stat cache because external processes aren't tracked by the php stat cache
@@ -213,7 +207,7 @@ impl Filesystem {
     }
 
     /// Returns null when no edge case was hit. Otherwise a bool whether removal was successful
-    fn remove_edge_cases(&mut self, directory: &str) -> anyhow::Result<Option<bool>> {
+    fn remove_edge_cases(&mut self, directory: &Path) -> anyhow::Result<Option<bool>> {
         if self.is_symlinked_directory(directory) {
             return Ok(Some(self.unlink_symlinked_directory(directory)?));
         }
@@ -230,8 +224,11 @@ impl Filesystem {
             return Ok(Some(true));
         }
 
-        if preg_is_match(php_regex!("{^(?:[a-z]:)?[/\\\\]+$}i"), directory) {
-            return Err(RuntimeException::new(format!("Aborting an attempted deletion of {}, this was probably not intended, if it is a real use case please report it.", directory))
+        if preg_is_match(
+            php_regex!("{^(?:[a-z]:)?[/\\\\]+$}i"),
+            path_to_bytes(directory),
+        ) {
+            return Err(RuntimeException::new(format!("Aborting an attempted deletion of {}, this was probably not intended, if it is a real use case please report it.", directory.display()))
             .into());
         }
 
@@ -243,7 +240,8 @@ impl Filesystem {
     /// Uses a CHILD_FIRST RecursiveIteratorIterator to sort files
     /// before directories, creating a single non-recursive loop
     /// to delete files/directories in the correct order.
-    pub fn remove_directory_php(&mut self, directory: &str) -> anyhow::Result<bool> {
+    pub fn remove_directory_php(&mut self, directory: impl AsRef<Path>) -> anyhow::Result<bool> {
+        let directory = directory.as_ref();
         let edge_case_result = self.remove_edge_cases(directory)?;
         if let Some(r) = edge_case_result {
             return Ok(r);
@@ -278,22 +276,24 @@ impl Filesystem {
         self.rmdir(directory)
     }
 
-    pub fn ensure_directory_exists(&mut self, directory: &str) -> anyhow::Result<()> {
+    pub fn ensure_directory_exists(&mut self, directory: impl AsRef<Path>) -> anyhow::Result<()> {
+        let directory = directory.as_ref();
         if !is_dir(directory) {
             if file_exists(directory) {
                 return Err(RuntimeException::new(format!(
                     "{} exists and is not a directory.",
-                    directory
+                    directory.display()
                 ))
                 .into());
             }
 
             if is_link(directory)
-                && let Err(last_error) = self.unlink_implementation(Path::new(directory))
+                && let Err(last_error) = self.unlink_implementation(directory)
             {
                 return Err(RuntimeException::new(format!(
                     "Could not delete symbolic link {}: {}",
-                    directory, last_error
+                    directory.display(),
+                    last_error
                 ))
                 .into());
             }
@@ -301,7 +301,8 @@ impl Filesystem {
             if let Err(last_error) = mkdir(directory, 0o777, true) {
                 let e = RuntimeException::new(format!(
                     "{} does not exist and could not be created: {}",
-                    directory, last_error
+                    directory.display(),
+                    last_error
                 ));
 
                 // in pathological cases with paths like path/to/broken-symlink/../foo is_dir will fail to detect path/to/foo
@@ -309,7 +310,7 @@ impl Filesystem {
                 // report the initial error we had with the original path, and ignore the normalized path exception
                 // see https://github.com/composer/composer/issues/11864
                 let normalized = self.normalize_path(directory);
-                if normalized != directory {
+                if normalized.as_os_str() != directory.as_os_str() {
                     let _ = self.ensure_directory_exists(&normalized);
                     if is_dir(&normalized) {
                         return Ok(());
@@ -374,7 +375,12 @@ impl Filesystem {
     ///
     /// Some systems can't rename and also don't have proc_open,
     /// which requires this solution.
-    pub fn copy_then_remove(&mut self, source: &str, target: &str) -> anyhow::Result<()> {
+    pub fn copy_then_remove(
+        &mut self,
+        source: impl AsRef<Path>,
+        target: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        let source = source.as_ref();
         self.copy(source, target)?;
         if !is_dir(source) {
             self.unlink(source)?;
@@ -387,7 +393,12 @@ impl Filesystem {
     }
 
     /// Copies a file or directory from $source to $target.
-    pub fn copy(&mut self, source: &str, target: &str) -> anyhow::Result<bool> {
+    pub fn copy(
+        &mut self,
+        source: impl AsRef<Path>,
+        target: impl AsRef<Path>,
+    ) -> anyhow::Result<bool> {
+        let source = source.as_ref();
         // refs https://github.com/composer/composer/issues/11864
         let target = self.normalize_path(target);
 
@@ -408,10 +419,7 @@ impl Filesystem {
                                 _ => return Err(e.into()),
                             };
                         while !feof(&source_handle) {
-                            let chunk = legacy_lossy(
-                                &fread(&source_handle, 1024 * 1024).unwrap_or_default(),
-                            )
-                            .into_owned();
+                            let chunk = fread(&source_handle, 1024 * 1024).unwrap_or_default();
                             if fwrite(&target_handle, &chunk, None).is_none() {
                                 return Err(e.into());
                             }
@@ -432,11 +440,7 @@ impl Filesystem {
 
         let mut result = true;
         for file in &ri {
-            let target_path = Path::new(&target)
-                .join(ri.get_sub_pathname())
-                .into_os_string()
-                .into_string()
-                .unwrap();
+            let target_path = target.join(ri.get_sub_pathname());
             if file.is_dir() {
                 self.ensure_directory_exists(&target_path)?;
             } else {
@@ -461,15 +465,9 @@ impl Filesystem {
             return Ok(());
         }
 
-        // TODO(bytes):
-        // The fallbacks below (copy_then_remove and the mv/xcopy subprocesses) operate on
-        // path strings, so beyond this point the paths have to be representable as UTF-8.
-        let source = source.to_str().ok_or_else(|| {
-            RuntimeException::new(format!("Path contains invalid UTF-8: {}", source.display()))
-        })?;
-        let target = target.to_str().ok_or_else(|| {
-            RuntimeException::new(format!("Path contains invalid UTF-8: {}", target.display()))
-        })?;
+        // TODO(bytes): ProcessExecutor takes the command as Strings.
+        let source_arg = legacy_lossy(path_to_bytes(source)).into_owned();
+        let target_arg = legacy_lossy(path_to_bytes(target)).into_owned();
 
         if Platform::is_windows() {
             // Try to copy & delete - this is a workaround for random "Access denied" errors.
@@ -477,8 +475,8 @@ impl Filesystem {
             let result = self.get_process().execute(
                 &[
                     "xcopy".to_string(),
-                    source.to_string(),
-                    target.to_string(),
+                    source_arg,
+                    target_arg,
                     "/E".to_string(),
                     "/I".to_string(),
                     "/Q".to_string(),
@@ -501,7 +499,7 @@ impl Filesystem {
             // the case where $source, and $target are located on different partitions.
             let mut output = String::new();
             let result = self.get_process().execute(
-                &["mv".to_string(), source.to_string(), target.to_string()],
+                &["mv".to_string(), source_arg, target_arg],
                 &mut output,
                 None,
             )?;
@@ -520,106 +518,106 @@ impl Filesystem {
     /// Returns the shortest path from $from to $to
     pub fn find_shortest_path(
         &self,
-        from: &str,
-        to: &str,
+        from: impl AsRef<Path>,
+        to: impl AsRef<Path>,
         directories: bool,
         prefer_relative: bool,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<PathBuf> {
+        let (from, to) = (from.as_ref(), to.as_ref());
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
             return Err(InvalidArgumentException::new(format!(
                 "$from ({}) and $to ({}) must be absolute paths.",
-                from, to
+                from.display(),
+                to.display()
             ))
             .into());
         }
 
-        let mut from = self.normalize_path(from);
-        let to = self.normalize_path(to);
+        let mut from = BString::from(path_to_bytes(&self.normalize_path(from)));
+        let to = BString::from(path_to_bytes(&self.normalize_path(to)));
 
         if directories {
-            from = format!("{}/dummy_file", rtrim2(&from, "/"));
+            from = bconcat!(rtrim2(&from, "/"), "/dummy_file");
         }
 
         if dirname(&from) == dirname(&to) {
-            return Ok(format!("./{}", basename(&to)));
+            return Ok(Self::path_buf(bconcat!("./", basename(&to))));
         }
 
         let mut common_path = to.clone();
-        while strpos(format!("{}/", from), format!("{}/", common_path)) != Some(0)
+        while strpos(bconcat!(from, "/"), bconcat!(common_path, "/")) != Some(0)
             && "/" != common_path
             && !preg_is_match(php_regex!("{^[A-Z]:/?$}i"), &common_path)
         {
-            common_path = legacy_lossy(&strtr(dirname(&common_path), "\\", "/")).into_owned();
+            common_path = strtr(dirname(&common_path), "\\", "/");
         }
 
         // no commonality at all
         if Some(0) != strpos(&from, &common_path) {
-            return Ok(to);
+            return Ok(Self::path_buf(to));
         }
 
-        common_path = format!("{}/", rtrim2(&common_path, "/"));
+        common_path = bconcat!(rtrim2(&common_path, "/"), "/");
         let source_path_depth = substr_count(substr(&from, strlen(&common_path), None), "/");
         let common_path_code = str_repeat("../", source_path_depth as usize);
 
         // allow top level /foo & /bar dirs to be addressed relatively as this is common in Docker setups
         if !prefer_relative && "/" == common_path && source_path_depth > 1 {
-            return Ok(to);
+            return Ok(Self::path_buf(to));
         }
 
-        let result = format!(
-            "{}{}",
-            common_path_code,
-            substr(&to, strlen(&common_path), None)
-        );
+        let result = bconcat!(common_path_code, substr(&to, strlen(&common_path), None));
         if strlen(&result) == 0 {
-            return Ok("./".to_string());
+            return Ok(PathBuf::from("./"));
         }
 
-        Ok(result)
+        Ok(Self::path_buf(result))
     }
 
     /// Returns PHP code that, when executed in $from, will return the path to $to
     pub fn find_shortest_path_code(
         &self,
-        from: &str,
-        to: &str,
+        from: impl AsRef<Path>,
+        to: impl AsRef<Path>,
         directories: bool,
         static_code: bool,
         prefer_relative: bool,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<BString> {
+        let (from, to) = (from.as_ref(), to.as_ref());
         if !self.is_absolute_path(from) || !self.is_absolute_path(to) {
             return Err(InvalidArgumentException::new(format!(
                 "$from ({}) and $to ({}) must be absolute paths.",
-                from, to
+                from.display(),
+                to.display()
             ))
             .into());
         }
 
-        let from = self.normalize_path(from);
-        let to = self.normalize_path(to);
+        let from = BString::from(path_to_bytes(&self.normalize_path(from)));
+        let to = BString::from(path_to_bytes(&self.normalize_path(to)));
 
         if from == to {
-            return Ok((if directories { "__DIR__" } else { "__FILE__" }).to_string());
+            return Ok((if directories { "__DIR__" } else { "__FILE__" }).into());
         }
 
         let mut common_path = to.clone();
-        while strpos(format!("{}/", from), format!("{}/", common_path)) != Some(0)
+        while strpos(bconcat!(from, "/"), bconcat!(common_path, "/")) != Some(0)
             && "/" != common_path
             && !preg_is_match(php_regex!("{^[A-Z]:/?$}i"), &common_path)
             && "." != common_path
         {
-            common_path = legacy_lossy(&strtr(dirname(&common_path), "\\", "/")).into_owned();
+            common_path = strtr(dirname(&common_path), "\\", "/");
         }
 
         // no commonality at all
         if Some(0) != strpos(&from, &common_path) || "." == common_path {
-            return Ok(legacy_lossy(&var_export(&PhpMixed::string(to), true)).into_owned());
+            return Ok(var_export(&PhpMixed::string(to), true));
         }
 
-        common_path = format!("{}/", rtrim2(&common_path, "/"));
-        if to.starts_with(&format!("{}/", from)) {
-            return Ok(format!(
-                "__DIR__ . {}",
+        common_path = bconcat!(rtrim2(&common_path, "/"), "/");
+        if to.starts_with(&bconcat!(from, "/")) {
+            return Ok(bconcat!(
+                "__DIR__ . ",
                 var_export(&PhpMixed::string(substr(&to, strlen(&from), None)), true)
             ));
         }
@@ -629,17 +627,17 @@ impl Filesystem {
 
         // allow top level /foo & /bar dirs to be addressed relatively as this is common in Docker setups
         if !prefer_relative && "/" == common_path && source_path_depth > 1 {
-            return Ok(legacy_lossy(&var_export(&PhpMixed::string(to), true)).into_owned());
+            return Ok(var_export(&PhpMixed::string(to), true));
         }
 
         let common_path_code = if static_code {
-            format!(
-                "__DIR__ . '{}'",
-                str_repeat("/..", source_path_depth as usize)
+            bconcat!(
+                "__DIR__ . '",
+                str_repeat("/..", source_path_depth as usize),
+                "'"
             )
         } else {
-            format!(
-                "{}{}{}",
+            bconcat!(
                 str_repeat("dirname(", source_path_depth as usize),
                 "__DIR__",
                 str_repeat(")", source_path_depth as usize)
@@ -647,18 +645,21 @@ impl Filesystem {
         };
         let rel_target = substr(&to, strlen(&common_path), None);
 
-        Ok(format!(
-            "{}{}",
+        Ok(bconcat!(
             common_path_code,
             if strlen(&rel_target) > 0 {
-                format!(
-                    ".{}",
-                    var_export(&PhpMixed::string(format!("/{}", rel_target)), true)
+                bconcat!(
+                    ".",
+                    var_export(&PhpMixed::string(bconcat!("/", rel_target)), true)
                 )
             } else {
-                String::new()
+                BString::default()
             }
         ))
+    }
+
+    fn path_buf(path: impl AsRef<[u8]>) -> PathBuf {
+        path_from_bytes(&path).to_path_buf()
     }
 
     /// Checks if the given path is absolute
@@ -687,22 +688,23 @@ impl Filesystem {
 
     /// Normalize a path. This replaces backslashes with slashes, removes ending
     /// slash and collapses redundant separators and up-level references.
-    pub fn normalize_path(&self, path: &str) -> String {
+    pub fn normalize_path(&self, path: impl AsRef<Path>) -> PathBuf {
+        let path = path.as_ref();
         if let Some(mock) = &self.mock
             && mock.normalize_path_identity
         {
-            return path.to_string();
+            return path.to_path_buf();
         }
 
-        let mut parts: Vec<String> = vec![];
-        let mut path = legacy_lossy(&strtr(path, "\\", "/")).into_owned();
-        let mut prefix = String::new();
-        let mut absolute = String::new();
+        let mut parts: Vec<BString> = vec![];
+        let mut path = strtr(path_to_bytes(path), "\\", "/");
+        let mut prefix = BString::default();
+        let mut absolute = "";
 
         // extract windows UNC paths e.g. \\foo\bar
         if strpos(&path, "//") == Some(0) && strlen(&path) > 2 {
-            absolute = "//".to_string();
-            path = legacy_lossy(&substr(&path, 2, None)).into_owned();
+            absolute = "//";
+            path = substr(&path, 2, None);
         }
 
         // extract a prefix being a protocol://, protocol:, protocol://drive: or simply drive:
@@ -710,57 +712,54 @@ impl Filesystem {
             php_regex!("{^( [0-9a-z]{2,}+: (?: // (?: [a-z]: )? )? | [a-z]: )}ix"),
             &path,
         ) {
-            prefix = prefix_match.get(1).unwrap_or_default().to_string();
-            path = legacy_lossy(&substr(&path, strlen(&prefix), None)).into_owned();
+            prefix = BString::from(prefix_match.get(1).unwrap_or_default());
+            path = substr(&path, strlen(&prefix), None);
         }
 
         if strpos(&path, "/") == Some(0) {
-            absolute = "/".to_string();
-            path = legacy_lossy(&substr(&path, 1, None)).into_owned();
+            absolute = "/";
+            path = substr(&path, 1, None);
         }
 
         let mut up = false;
         for chunk in explode("/", &path) {
-            if ".." == chunk && (strlen(&absolute) > 0 || up) {
+            if ".." == chunk && (strlen(absolute) > 0 || up) {
                 array_pop(&mut parts);
-                up = !(parts.is_empty() || ".." == parts.last().cloned().unwrap_or_default());
+                up = !(parts.is_empty() || parts.last().is_some_and(|part| part == ".."));
             } else if "." != chunk && !chunk.is_empty() {
-                parts.push(legacy_lossy(&chunk.clone()).into_owned());
                 up = ".." != chunk;
+                parts.push(chunk);
             }
         }
 
         // ensure c: is normalized to C:
-        prefix = legacy_lossy(
-            &preg_replace_callback(
-                php_regex!("{(^|://)[a-z]:$}i"),
-                |m: &PregMatches| -> anyhow::Result<String> {
-                    let s = m.get(0).unwrap_or_default().to_string();
-                    Ok(legacy_lossy(&strtoupper(&s)).into_owned())
-                },
-                &prefix,
-            )
-            .expect("the replacement callback cannot fail"),
+        prefix = preg_replace_callback(
+            php_regex!("{(^|://)[a-z]:$}i"),
+            |m: &PregMatches| -> anyhow::Result<BString> {
+                Ok(strtoupper(m.get(0).unwrap_or_default()))
+            },
+            &prefix,
         )
-        .into_owned();
+        .expect("the replacement callback cannot fail");
 
-        format!("{}{}{}", prefix, absolute, implode("/", &parts))
+        Self::path_buf(bconcat!(prefix, absolute, implode("/", &parts)))
     }
 
     /// Remove trailing slashes if present to avoid issues with symlinks
     ///
     /// And other possible unforeseen disasters, see https://github.com/composer/composer/pull/9422
-    pub fn trim_trailing_slash(path: &str) -> String {
-        let mut path = path.to_string();
+    pub fn trim_trailing_slash(path: impl AsRef<Path>) -> PathBuf {
+        let mut path = BString::from(path_to_bytes(path.as_ref()));
         if !preg_is_match(php_regex!("{^[/\\\\]+$}"), &path) {
-            path = legacy_lossy(&rtrim2(&path, "/\\")).into_owned();
+            path = rtrim2(&path, "/\\");
         }
 
-        path
+        Self::path_buf(path)
     }
 
     /// Return if the given path is local
-    pub fn is_local_path(path: &str) -> bool {
+    pub fn is_local_path(path: impl AsRef<[u8]>) -> bool {
+        let path = path.as_ref();
         // on windows, \\foo indicates network paths so we exclude those from local paths, however it is unsafe
         // on linux as file:////foo (which would be a network path \\foo on windows) will resolve to /foo which could be a local path
         if Platform::is_windows() {
@@ -778,25 +777,25 @@ impl Filesystem {
         )
     }
 
-    pub fn get_platform_path(path: &str) -> String {
-        let mut path = path.to_string();
+    pub fn get_platform_path(path: impl AsRef<[u8]>) -> PathBuf {
+        let mut path = BString::from(path.as_ref());
         if Platform::is_windows() {
-            path = legacy_lossy(&preg_replace(
+            path = preg_replace(
                 php_regex!("{^(?:file:///([a-z]):?/)}i"),
                 "file://$1:/",
                 &path,
-            ))
-            .into_owned();
+            );
         }
 
-        legacy_lossy(&preg_replace(php_regex!("{^file://}i"), "", &path)).into_owned()
+        Self::path_buf(preg_replace(php_regex!("{^file://}i"), "", &path))
     }
 
     /// Cross-platform safe version of is_readable()
     ///
     /// This will also check for readability by reading the file as is_readable can not be trusted on network-mounts
     /// and \\\\wsl$ paths. See https://github.com/composer/composer/issues/8231 and https://bugs.php.net/bug.php?id=68926
-    pub fn is_readable(path: &str) -> bool {
+    pub fn is_readable(path: impl AsRef<Path>) -> bool {
+        let path = path.as_ref();
         if is_readable(path) {
             return true;
         }
@@ -857,11 +856,16 @@ impl Filesystem {
     }
 
     /// Creates a relative symlink from $link to $target
-    pub fn relative_symlink(&self, target: &str, link: &str) -> anyhow::Result<bool> {
+    pub fn relative_symlink(
+        &self,
+        target: impl AsRef<Path>,
+        link: impl AsRef<Path>,
+    ) -> anyhow::Result<bool> {
+        let (target, link) = (target.as_ref(), link.as_ref());
         let cwd = Platform::get_cwd(false).unwrap_or_default();
 
         let relative_path = self.find_shortest_path(link, target, false, false)?;
-        chdir(path_from_bytes(&dirname(link)));
+        chdir(path_from_bytes(&dirname(path_to_bytes(link))));
         let result = symlink(&relative_path, link).is_ok();
 
         chdir(&cwd);
@@ -870,7 +874,8 @@ impl Filesystem {
     }
 
     /// return true if that directory is a symlink.
-    pub fn is_symlinked_directory(&self, directory: &str) -> bool {
+    pub fn is_symlinked_directory(&self, directory: impl AsRef<Path>) -> bool {
+        let directory = directory.as_ref();
         if !is_dir(directory) {
             return false;
         }
@@ -880,29 +885,34 @@ impl Filesystem {
         is_link(&resolved)
     }
 
-    fn unlink_symlinked_directory(&self, directory: &str) -> anyhow::Result<bool> {
+    fn unlink_symlinked_directory(&self, directory: &Path) -> anyhow::Result<bool> {
         let resolved = self.resolve_symlinked_directory_symlink(directory);
 
         self.unlink(&resolved)
     }
 
     /// resolve pathname to symbolic link of a directory
-    fn resolve_symlinked_directory_symlink(&self, pathname: &str) -> String {
+    fn resolve_symlinked_directory_symlink(&self, pathname: &Path) -> PathBuf {
         if !is_dir(pathname) {
-            return pathname.to_string();
+            return pathname.to_path_buf();
         }
 
-        let resolved = legacy_lossy(&rtrim2(pathname, "/")).into_owned();
+        let resolved = rtrim2(path_to_bytes(pathname), "/");
 
         if 0 == strlen(&resolved) {
-            return pathname.to_string();
+            return pathname.to_path_buf();
         }
 
-        resolved
+        Self::path_buf(resolved)
     }
 
     /// Creates an NTFS junction.
-    pub fn junction(&mut self, target: &str, junction: &str) -> anyhow::Result<()> {
+    pub fn junction(
+        &mut self,
+        target: impl AsRef<Path>,
+        junction: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        let (target, junction) = (target.as_ref(), junction.as_ref());
         if !Platform::is_windows() {
             return Err(LogicException::new(format!(
                 "Function {} is not available on non-Windows platform",
@@ -914,11 +924,11 @@ impl Filesystem {
             return Err(IOException::new(
                 format!(
                     "Cannot junction to \"{}\" as it is not a directory.",
-                    target
+                    target.display()
                 ),
                 0,
                 None,
-                Some(target.to_string()),
+                Some(target.display().to_string()),
             )
             .into());
         }
@@ -931,19 +941,26 @@ impl Filesystem {
         let cmd = vec![
             "mklink".to_string(),
             "/J".to_string(),
-            legacy_lossy(&str_replace("/", std::path::MAIN_SEPARATOR_STR, junction)).into_owned(),
-            Platform::realpath(target),
+            // TODO(bytes): ProcessExecutor takes the command as Strings.
+            legacy_lossy(&str_replace(
+                "/",
+                std::path::MAIN_SEPARATOR_STR,
+                path_to_bytes(junction),
+            ))
+            .into_owned(),
+            legacy_lossy(path_to_bytes(&Platform::realpath(target))).into_owned(),
         ];
         let mut output = String::new();
         if self.get_process().execute(&cmd, &mut output, None)? != 0 {
             return Err(IOException::new(
                 format!(
                     "Failed to create junction to \"{}\" at \"{}\".",
-                    target, junction
+                    target.display(),
+                    junction.display()
                 ),
                 0,
                 None,
-                Some(target.to_string()),
+                Some(target.display().to_string()),
             )
             .into());
         }
@@ -966,7 +983,8 @@ impl Filesystem {
     /// detected and a recursive delete operation could lead to loss of data in
     /// the target directory. Note that Windows rmdir can handle this situation
     /// and will only delete the junction (from Windows 7 onwards).
-    pub fn is_junction(&self, junction: &str) -> bool {
+    pub fn is_junction(&self, junction: impl AsRef<Path>) -> bool {
+        let junction = junction.as_ref();
         if !Platform::is_windows() {
             return false;
         }
@@ -988,20 +1006,23 @@ impl Filesystem {
     }
 
     /// Removes a Windows NTFS junction.
-    pub fn remove_junction(&mut self, junction: &str) -> anyhow::Result<bool> {
+    pub fn remove_junction(&mut self, junction: impl AsRef<Path>) -> anyhow::Result<bool> {
         if !Platform::is_windows() {
             return Ok(false);
         }
-        let junction = legacy_lossy(&rtrim2(
-            str_replace("/", std::path::MAIN_SEPARATOR_STR, junction),
+        let junction = Self::path_buf(rtrim2(
+            str_replace(
+                "/",
+                std::path::MAIN_SEPARATOR_STR,
+                path_to_bytes(junction.as_ref()),
+            ),
             std::path::MAIN_SEPARATOR_STR,
-        ))
-        .into_owned();
+        ));
         if !self.is_junction(&junction) {
             return Err(IOException::new(
                 format!(
                     "{} is not a junction and thus cannot be removed as one",
-                    junction
+                    junction.display()
                 ),
                 0,
                 None,
@@ -1013,24 +1034,34 @@ impl Filesystem {
         self.rmdir(&junction)
     }
 
-    pub fn file_put_contents_if_modified(&self, path: &str, content: &str) -> anyhow::Result<i64> {
+    pub fn file_put_contents_if_modified(
+        &self,
+        path: impl AsRef<Path>,
+        content: impl AsRef<[u8]>,
+    ) -> anyhow::Result<i64> {
+        let (path, content) = (path.as_ref(), content.as_ref());
         let current_content = file_get_contents(path).unwrap_or_default();
-        if current_content.is_empty() || current_content != content.as_bytes() {
-            return Ok(file_put_contents(path, content.as_bytes()).unwrap_or(0));
+        if current_content.is_empty() || current_content != content {
+            return Ok(file_put_contents(path, content).unwrap_or(0));
         }
 
         Ok(0)
     }
 
     /// Copy file using stream_copy_to_stream to work around https://bugs.php.net/bug.php?id=6463
-    pub fn safe_copy(&self, source: &str, target: &str) -> anyhow::Result<()> {
+    pub fn safe_copy(
+        &self,
+        source: impl AsRef<Path>,
+        target: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        let (source, target) = (source.as_ref(), target.as_ref());
         if !file_exists(target) || !file_exists(source) || !self.files_are_equal(source, target) {
             let source_handle = match fopen(source, "r") {
                 Ok(source_handle) => source_handle,
                 Err(_) => {
                     return Err(anyhow::anyhow!(
                         "Could not open \"{}\" for reading.",
-                        source
+                        source.display()
                     ));
                 }
             };
@@ -1039,7 +1070,7 @@ impl Filesystem {
                 Err(_) => {
                     return Err(anyhow::anyhow!(
                         "Could not open \"{}\" for writing.",
-                        target
+                        target.display()
                     ));
                 }
             };
@@ -1057,7 +1088,7 @@ impl Filesystem {
 
     /// compare 2 files
     /// https://stackoverflow.com/questions/3060125/can-i-use-file-get-contents-to-compare-two-files
-    fn files_are_equal(&self, a: &str, b: &str) -> bool {
+    fn files_are_equal(&self, a: &Path, b: &Path) -> bool {
         // Check if filesize is different
         if filesize(a) != filesize(b) {
             return false;

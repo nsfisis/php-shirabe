@@ -292,7 +292,10 @@ impl BinaryInstaller {
              SET BIN_TARGET=%~dp0/{}\r\n\
              SET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n\
              {} \"%BIN_TARGET%\" %*\r\n",
-            trim2(ProcessExecutor::escape(&bin_path), "\"'"),
+            trim2(
+                ProcessExecutor::escape(&legacy_lossy(path_to_bytes(&bin_path))),
+                "\"'"
+            ),
             caller,
         ))
     }
@@ -303,8 +306,8 @@ impl BinaryInstaller {
             .borrow_mut()
             .find_shortest_path(link, bin, false, false)?;
 
-        let bin_dir = ProcessExecutor::escape(&legacy_lossy(&dirname(&bin_path)));
-        let bin_file = basename(&bin_path);
+        let bin_dir = ProcessExecutor::escape(&legacy_lossy(&dirname(path_to_bytes(&bin_path))));
+        let bin_file = basename(path_to_bytes(&bin_path));
 
         // TODO(bytes): preg_match matches over a &str, and the shebang it captures is spliced
         // into the generated proxy as a String.
@@ -342,7 +345,7 @@ impl BinaryInstaller {
                     "$GLOBALS['_composer_autoload_path'] = {};\n",
                     self.filesystem.borrow_mut().find_shortest_path_code(
                         link,
-                        &format!("{}/autoload.php", vendor_dir_real),
+                        format!("{}/autoload.php", vendor_dir_real),
                         false,
                         true,
                         false,
@@ -351,11 +354,12 @@ impl BinaryInstaller {
             }
             // Add workaround for PHPUnit process isolation
             if let Some(vendor_dir) = &self.vendor_dir
-                && self.filesystem.borrow().normalize_path(bin)
+                && self.filesystem.borrow().normalize_path(bin).as_os_str()
                     == self
                         .filesystem
                         .borrow()
-                        .normalize_path(&format!("{}/phpunit/phpunit/phpunit", vendor_dir))
+                        .normalize_path(format!("{}/phpunit/phpunit/phpunit", vendor_dir))
+                        .as_os_str()
             {
                 // workaround issue on PHPUnit 6.5+ running on PHP 8+
                 globals_code.push_str(&format!(
@@ -478,6 +482,7 @@ impl BinaryInstaller {
                 );
             }
 
+            let bin_path = legacy_lossy(path_to_bytes(&bin_path));
             return Ok(format!(
                 r#"{proxy_code}
 <?php

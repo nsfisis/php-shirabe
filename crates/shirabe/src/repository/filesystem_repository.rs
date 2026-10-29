@@ -217,7 +217,7 @@ impl FilesystemRepository {
             .ensure_directory_exists(&repo_dir);
 
         let repo_dir = self.filesystem.borrow().normalize_path(
-            &realpath(path_from_bytes(&repo_dir))
+            realpath(path_from_bytes(&repo_dir))
                 .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                 .unwrap_or_default(),
         );
@@ -235,7 +235,7 @@ impl FilesystemRepository {
                 } else {
                     format!(
                         "{}/{}",
-                        Platform::get_cwd(false).unwrap_or_default(),
+                        Platform::get_cwd(false).unwrap_or_default().display(),
                         path_str
                     )
                 };
@@ -243,12 +243,17 @@ impl FilesystemRepository {
                     .filesystem
                     .borrow_mut()
                     .normalize_path(&path_to_normalize);
-                install_path = Some(self.filesystem.borrow_mut().find_shortest_path(
-                    &repo_dir,
-                    &normalized_path,
-                    true,
-                    false,
-                )?);
+                install_path = Some(
+                    legacy_lossy(path_to_bytes(
+                        &self.filesystem.borrow_mut().find_shortest_path(
+                            &repo_dir,
+                            &normalized_path,
+                            true,
+                            false,
+                        )?,
+                    ))
+                    .into_owned(),
+                );
             }
             install_paths.insert(package.get_name().to_string(), install_path.clone());
 
@@ -314,16 +319,16 @@ impl FilesystemRepository {
                 installation_manager,
                 &install_paths,
                 dev_mode,
-                &repo_dir,
+                &legacy_lossy(path_to_bytes(&repo_dir)),
             )?;
 
             let installed_php = format!("<?php return {};\n", self.dump_to_php_code(&versions, 0));
             self.filesystem.borrow_mut().file_put_contents_if_modified(
-                &format!("{}/installed.php", repo_dir),
+                format!("{}/installed.php", repo_dir.display()),
                 &installed_php,
             );
             self.filesystem.borrow_mut().file_put_contents_if_modified(
-                &format!("{}/InstalledVersions.php", repo_dir),
+                format!("{}/InstalledVersions.php", repo_dir.display()),
                 include_str!("../../../../composer/src/Composer/InstalledVersions.php"),
             );
 
@@ -338,7 +343,7 @@ impl FilesystemRepository {
                     "__shirabe_installed_versions_reload",
                     vec![
                         shirabe_php_rpc::PluginValue::from_php_mixed(&PhpMixed::Array(versions)),
-                        shirabe_php_rpc::PluginValue::string(repo_dir.clone()),
+                        shirabe_php_rpc::PluginValue::string(path_to_bytes(&repo_dir)),
                     ],
                 ))?;
             }
@@ -610,7 +615,7 @@ impl FilesystemRepository {
 
         let install_path = if package.as_root().is_some() {
             let to = self.filesystem.borrow_mut().normalize_path(
-                &realpath(Platform::get_cwd(false).unwrap_or_default())
+                realpath(Platform::get_cwd(false).unwrap_or_default())
                     .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                     .unwrap_or_default(),
             );
@@ -620,7 +625,11 @@ impl FilesystemRepository {
                     .find_shortest_path(repo_dir, &to, true, false)?,
             )
         } else {
-            install_paths.get(&package.get_name()).cloned().flatten()
+            install_paths
+                .get(&package.get_name())
+                .cloned()
+                .flatten()
+                .map(std::path::PathBuf::from)
         };
 
         let mut data: IndexMap<BString, PhpMixed> = IndexMap::new();
@@ -640,7 +649,7 @@ impl FilesystemRepository {
         data.insert(
             "install_path".into(),
             match install_path {
-                Some(s) => PhpMixed::string(s),
+                Some(s) => PhpMixed::string(path_to_bytes(&s)),
                 None => PhpMixed::Null,
             },
         );

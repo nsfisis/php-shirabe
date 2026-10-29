@@ -196,7 +196,7 @@ pub fn proc_open(
                                 !child_reads,
                                 child_reads,
                                 mode.clone(),
-                                format!("pipe:fd{}", fd),
+                                format!("pipe:fd{}", fd).into(),
                             ),
                         ))),
                     );
@@ -290,7 +290,7 @@ pub fn proc_open(
                 readable,
                 writable,
                 mode,
-                format!("pipe:fd{}", fd),
+                format!("pipe:fd{}", fd).into(),
             ))));
         pipes.insert(fd, resource);
     }

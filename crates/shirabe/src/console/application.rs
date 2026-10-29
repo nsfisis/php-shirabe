@@ -1918,14 +1918,22 @@ impl ApplicationHandle {
         let new_work_dir = application.borrow().get_new_working_dir(input.clone())?;
         let mut old_working_dir: Option<String> = None;
         if let Some(ref nwd) = new_work_dir {
-            old_working_dir = Some(Platform::get_cwd(true).unwrap_or_default());
+            old_working_dir = Some(
+                legacy_lossy(path_to_bytes(&Platform::get_cwd(true).unwrap_or_default()))
+                    .into_owned(),
+            );
             chdir(nwd);
             application.borrow_mut().initial_working_directory = getcwd();
             let cwd = Platform::get_cwd(true).unwrap_or_default();
             io.write_error3(
                 &format!(
                     "Changed CWD to {}",
-                    if !cwd.is_empty() { cwd } else { nwd.clone() }
+                    if !cwd.as_os_str().is_empty() {
+                        cwd
+                    } else {
+                        std::path::PathBuf::from(nwd.clone())
+                    }
+                    .display()
                 ),
                 true,
                 io_interface::DEBUG,
@@ -1977,7 +1985,7 @@ impl ApplicationHandle {
             && !input.borrow().has_parameter_option(&["--help"], true)
             && !input.borrow().has_parameter_option(&["-h"], true)
         {
-            let mut dir = dirname(Platform::get_cwd(true).unwrap_or_default());
+            let mut dir = dirname(path_to_bytes(&Platform::get_cwd(true).unwrap_or_default()));
             let home_value = Platform::get_env("HOME")
                 .or_else(|| Platform::get_env("USERPROFILE"))
                 .unwrap_or_else(|| "/".to_string());
@@ -2006,7 +2014,7 @@ impl ApplicationHandle {
                         } else {
                             io.write_error("<info>Always want to use the parent dir? Use \"shirabe config --global use-parent-dir true\" to change the default.</info>");
                         }
-                        old_working_dir = Some(Platform::get_cwd(true).unwrap_or_default());
+                        old_working_dir = Some(legacy_lossy(path_to_bytes(&Platform::get_cwd(true).unwrap_or_default())).into_owned());
                         chdir(path_from_bytes(&dir));
                     }
                     break;

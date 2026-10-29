@@ -54,7 +54,11 @@ impl ArchiverInterface for ZipArchiver {
 
         let mut zip = ZipArchive::new();
         if zip.open(&target, ZipArchive::CREATE).is_ok() {
-            let files = ArchivableFilesFinder::new(&sources, excludes, ignore_filters)?;
+            let files = ArchivableFilesFinder::new(
+                &legacy_lossy(path_to_bytes(&sources)),
+                excludes,
+                ignore_filters,
+            )?;
             for file in files {
                 let filepath = file;
                 // TODO(bytes): ZipArchive takes the local name as a &str.
@@ -104,7 +108,7 @@ impl ArchiverInterface for ZipArchiver {
         let message = format!(
             "Could not create archive '{}' from '{}': {}",
             target,
-            sources,
+            sources.display(),
             zip.get_status_string()
         );
         Err(RuntimeException::new(message).into())

@@ -16,7 +16,7 @@ use shirabe::repository::{
     InstalledArrayRepository, RepositoryInterfaceHandle, RepositoryManagerInterface,
 };
 use shirabe::util::Platform;
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::{PhpMixed, legacy_lossy, path_to_bytes};
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface, InputValue, ParameterName};
@@ -145,7 +145,7 @@ fn test_uses_config_from_composer_object() {
                 && file_name.is_none()
                 && !*ignore_filters
         })
-        .returning(move |_, _, _, _, _| Ok(cwd.clone()));
+        .returning(move |_, _, _, _, _| Ok(legacy_lossy(path_to_bytes(&cwd.clone())).into_owned()));
 
     let package = root_package("archive/test", "1.0.0");
 
@@ -232,7 +232,7 @@ fn test_uses_config_from_composer_object_with_package_name() {
                 && file_name.is_none()
                 && !*ignore_filters
         })
-        .returning(move |_, _, _, _, _| Ok(cwd.clone()));
+        .returning(move |_, _, _, _, _| Ok(legacy_lossy(path_to_bytes(&cwd.clone())).into_owned()));
 
     let package = root_package("foo/bar", "1.0.0");
 

@@ -203,7 +203,7 @@ impl ZipArchive {
                 true,
                 false,
                 "r".to_string(),
-                format!("zip://{}", crate::legacy_lossy(name)),
+                crate::bconcat!("zip://", name),
             )),
         )))
     }

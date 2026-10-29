@@ -8,8 +8,8 @@ use crate::util::Filesystem;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, LogicException, PhpMixed, RuntimeException, array_keys,
-    array_reverse, array_shift, dirname, implode, in_array_strict, legacy_lossy, preg_is_match,
-    preg_quote, rtrim2, str_replace, strtolower, usort,
+    array_reverse, array_shift, dirname, implode, in_array_strict, legacy_lossy, path_from_bytes,
+    preg_is_match, preg_quote, rtrim2, str_replace, strtolower, usort,
 };
 
 /// Downloaders manager.
@@ -151,7 +151,7 @@ impl DownloadManager {
         let target_dir = self.normalize_target_dir(target_dir);
         self.filesystem
             .borrow_mut()
-            .ensure_directory_exists(&legacy_lossy(&dirname(&target_dir)));
+            .ensure_directory_exists(path_from_bytes(&dirname(&target_dir)));
 
         let mut sources = self.get_available_sources(package.clone(), prev_package.clone())?;
 

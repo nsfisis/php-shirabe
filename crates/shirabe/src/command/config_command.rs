@@ -15,8 +15,8 @@ use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
     array_values_mixed, chmod, escapeshellcmd, exec, explode, file_exists, impl_php_class, implode,
     in_array_loose, in_array_strict, intval, is_array, is_bool, is_dir, is_numeric, is_object,
-    is_string, json_encode, legacy_lossy, php_regex, php_to_string, preg_is_match, preg_match,
-    preg_replace, str_replace, strpos, strtolower, system, touch, trim2, var_export,
+    is_string, json_encode, legacy_lossy, path_from_bytes, php_regex, php_to_string, preg_is_match,
+    preg_match, preg_replace, str_replace, strpos, strtolower, system, touch, trim2, var_export,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
@@ -1824,9 +1824,9 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
             Box::new(|val| {
                 PhpMixed::Bool(
                     file_exists(&*val.as_string().unwrap_or_default().to_str_lossy())
-                        && Filesystem::is_readable(
-                            &val.as_string().unwrap_or_default().to_str_lossy(),
-                        ),
+                        && Filesystem::is_readable(path_from_bytes(
+                            val.as_string().unwrap_or_default(),
+                        )),
                 )
             }),
             Box::new(|val| {
@@ -1844,9 +1844,9 @@ fn build_unique_config_values() -> IndexMap<String, (ValidatorFn, NormalizerFn)>
             Box::new(|val| {
                 PhpMixed::Bool(
                     is_dir(&*val.as_string().unwrap_or_default().to_str_lossy())
-                        && Filesystem::is_readable(
-                            &val.as_string().unwrap_or_default().to_str_lossy(),
-                        ),
+                        && Filesystem::is_readable(path_from_bytes(
+                            val.as_string().unwrap_or_default(),
+                        )),
                 )
             }),
             Box::new(|val| {
