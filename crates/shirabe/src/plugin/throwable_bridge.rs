@@ -16,7 +16,7 @@ use shirabe_php_rpc::{PhpThrow, PluginValue};
 use shirabe_php_shim::{
     AnyThrowable, BadFunctionCallException, BadMethodCallException, Catch as _, Error, Exception,
     InvalidArgumentException, LogicException, OutOfBoundsException, PhpClass as _, PhpMixed,
-    RuntimeException, TypeError, UnexpectedValueException, UnportedThrowable,
+    RuntimeException, TypeError, UnexpectedValueException, UnportedThrowable, legacy_lossy,
 };
 
 /// The error a `Throw` from the PHP worker stands for: the ported exception of its class, or,
@@ -42,7 +42,7 @@ pub(crate) fn throw_into_error(throw: PhpThrow) -> anyhow::Error {
     };
     exception.set_code(throw.code);
     if !throw.file.is_empty() {
-        exception.set_location(throw.file, throw.line);
+        exception.set_location(legacy_lossy(&throw.file).into_owned(), throw.line);
     }
     anyhow::Error::new(exception)
 }
@@ -62,16 +62,14 @@ pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
     if let Some(PhpMixed::Array(properties)) = fields.get(3) {
         *throw.properties = properties
             .iter()
-            // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
-            .map(|(name, value)| {
-                (
-                    name.to_str_lossy().into_owned(),
-                    PluginValue::from_php_mixed(value),
-                )
-            })
+            .map(|(name, value)| (name.clone(), PluginValue::from_php_mixed(value)))
             .collect();
     }
-    throw.file = string(4);
+    throw.file = fields
+        .get(4)
+        .and_then(PhpMixed::as_string)
+        .map(bstr::BString::from)
+        .unwrap_or_default();
     throw.line = int(5);
     if let Some(PhpMixed::List(parents)) = fields.get(6) {
         throw.parents = parents
@@ -90,7 +88,7 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
     let property = |name: &str| {
         throw
             .properties
-            .get(name)
+            .get(bstr::B(name))
             .map(|value| {
                 value
                     .to_php_mixed()
@@ -233,7 +231,7 @@ pub(crate) fn exception_into_throw(exception: &AnyThrowable, error: &anyhow::Err
         exception.get_code(),
     );
     *throw.properties = throwable_properties(error);
-    throw.file = exception.get_file().to_string();
+    throw.file = exception.get_file().into();
     throw.line = exception.get_line();
     throw
 }
@@ -244,35 +242,35 @@ pub(crate) fn exception_into_throw(exception: &AnyThrowable, error: &anyhow::Err
 /// TODO(plugin): the state of ProcessFailedException, ProcessSignaledException and
 /// SolverProblemsException is the Process or the solver problems, which do not cross, and an
 /// exception of a class the port has no type for keeps none of its own.
-fn throwable_properties(error: &anyhow::Error) -> IndexMap<String, PluginValue> {
+fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, PluginValue> {
     let strings = |items: &[String]| {
         PluginValue::List(items.iter().cloned().map(PluginValue::string).collect())
     };
     let mut properties = IndexMap::new();
     if let Some(exception) = error.catch::<TransportException>() {
         properties.insert(
-            "headers".to_string(),
+            "headers".into(),
             match exception.get_headers() {
                 Some(headers) => strings(headers),
                 None => PluginValue::Null,
             },
         );
         properties.insert(
-            "response".to_string(),
+            "response".into(),
             match exception.get_response() {
                 Some(response) => PluginValue::string(response),
                 None => PluginValue::Null,
             },
         );
         properties.insert(
-            "statusCode".to_string(),
+            "statusCode".into(),
             match exception.get_status_code() {
                 Some(status_code) => PluginValue::Int(status_code),
                 None => PluginValue::Null,
             },
         );
         properties.insert(
-            "responseInfo".to_string(),
+            "responseInfo".into(),
             PluginValue::List(
                 exception
                     .get_response_info()
@@ -283,23 +281,20 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<String, PluginValue> 
         );
     }
     if let Some(exception) = error.catch::<InvalidPackageException>() {
-        properties.insert("errors".to_string(), strings(exception.get_errors()));
-        properties.insert("warnings".to_string(), strings(exception.get_warnings()));
+        properties.insert("errors".into(), strings(exception.get_errors()));
+        properties.insert("warnings".into(), strings(exception.get_warnings()));
         properties.insert(
-            "data".to_string(),
+            "data".into(),
             PluginValue::from_php_mixed(&PhpMixed::Array(exception.get_data().clone())),
         );
     }
     if let Some(exception) = error.catch::<JsonValidationException>() {
-        properties.insert("errors".to_string(), strings(exception.get_errors()));
+        properties.insert("errors".into(), strings(exception.get_errors()));
     }
     if let Some(exception) =
         error.catch::<shirabe_symfony_console::exception::CommandNotFoundException>()
     {
-        properties.insert(
-            "alternatives".to_string(),
-            strings(exception.get_alternatives()),
-        );
+        properties.insert("alternatives".into(), strings(exception.get_alternatives()));
     }
     properties
 }
@@ -310,7 +305,7 @@ mod tests {
 
     fn throw(class: &str, parents: &[&str]) -> PhpThrow {
         let mut throw = PhpThrow::new(class.to_string(), "boom".to_string(), 7);
-        throw.file = "/project/src/Thrower.php".to_string();
+        throw.file = bstr::BString::from("/project/src/Thrower.php".to_string());
         throw.line = 12;
         throw.parents = parents.iter().map(|parent| parent.to_string()).collect();
         throw
@@ -355,12 +350,14 @@ mod tests {
             r"Composer\Downloader\TransportException",
             &["RuntimeException", "Exception"],
         );
-        thrown
-            .properties
-            .insert("statusCode".to_string(), PluginValue::Int(404));
-        thrown
-            .properties
-            .insert("response".to_string(), PluginValue::string("missing"));
+        thrown.properties.insert(
+            bstr::BString::from("statusCode".to_string()),
+            PluginValue::Int(404),
+        );
+        thrown.properties.insert(
+            bstr::BString::from("response".to_string()),
+            PluginValue::string("missing"),
+        );
         let error = throw_into_error(thrown);
 
         let exception = error.catch::<TransportException>().unwrap();
@@ -370,7 +367,7 @@ mod tests {
         let back = exception_into_throw(AnyThrowable::of(&error).unwrap(), &error);
         assert_eq!(
             Some(&PluginValue::Int(404)),
-            back.properties.get("statusCode")
+            back.properties.get(bstr::B("statusCode"))
         );
     }
 }

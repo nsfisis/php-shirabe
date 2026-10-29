@@ -114,7 +114,7 @@ impl SolverProblemsException {
     fn create_extension_hint(&self, missing_extensions: &[String]) -> String {
         let mut paths = IniHelper::get_all();
 
-        if paths.first().is_some_and(|s| s.is_empty()) {
+        if paths.first().is_some_and(|s| s.as_os_str().is_empty()) {
             if paths.len() == 1 {
                 return String::new();
             }
@@ -131,7 +131,13 @@ impl SolverProblemsException {
         let mut text =
             "To enable extensions, verify that they are enabled in your .ini files:\n    - "
                 .to_string();
-        text.push_str(&paths.join("\n    - "));
+        text.push_str(
+            &paths
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join("\n    - "),
+        );
         text.push_str("\nYou can also run `php --ini` in a terminal to see which files are used by PHP in CLI mode.");
         text.push_str(&format!("\nAlternatively, you can run Composer with `{}` to temporarily ignore these required extensions.", ignore_extensions_arguments));
 

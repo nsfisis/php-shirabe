@@ -390,7 +390,7 @@ impl Problem {
                 let version = Self::get_platform_package_version(
                     pool,
                     package_name,
-                    &shirabe_php_rpc::phpversion("").unwrap_or_default(),
+                    &legacy_lossy(&shirabe_php_rpc::phpversion("").unwrap_or_default()),
                 );
 
                 let msg = format!(
@@ -457,7 +457,7 @@ impl Problem {
                 let runtime_version = shirabe_php_rpc::phpversion(&ext);
                 let effective_version = match runtime_version {
                     None => "0".to_string(),
-                    Some(ref v) => v.clone(),
+                    Some(ref v) => legacy_lossy(&v.clone()).into_owned(),
                 };
                 let version =
                     Self::get_platform_package_version(pool, package_name, &effective_version);

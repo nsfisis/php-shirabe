@@ -5,6 +5,7 @@
 use crate::value::{self, PluginValue};
 use bstr::BString;
 use indexmap::IndexMap;
+use shirabe_php_shim::utf8_text;
 use std::io::{Read as _, Write as _};
 use std::os::unix::net::UnixStream;
 
@@ -69,8 +70,8 @@ pub enum Frame {
         code: i64,
         /// The state the exception carries beyond `message` and `code`, keyed by the property
         /// names its class declares. Empty for an exception that carries none.
-        properties: IndexMap<String, PluginValue>,
-        file: String,
+        properties: IndexMap<BString, PluginValue>,
+        file: BString,
         line: i64,
         /// The superclasses of `exception_class`, nearest first.
         parents: Vec<String>,
@@ -197,12 +198,7 @@ impl Frame {
                 PluginValue::string(exception_class.clone()),
                 PluginValue::string(message.clone()),
                 PluginValue::Int(*code),
-                PluginValue::Array(
-                    properties
-                        .iter()
-                        .map(|(name, v)| (name.as_str().into(), v.clone()))
-                        .collect(),
-                ),
+                PluginValue::Array(properties.clone()),
                 PluginValue::string(file.clone()),
                 PluginValue::Int(*line),
                 PluginValue::List(parents.iter().cloned().map(PluginValue::string).collect()),
@@ -324,9 +320,8 @@ fn decode_frame(tag: u8, corr_id: u64, payload: &[u8]) -> Frame {
                 }
             },
             properties: expect_properties(next()),
-            // TODO(bytes): a PHP path is bytes, not necessarily UTF-8.
             file: match next() {
-                PluginValue::String(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
+                PluginValue::String(bytes) => bytes,
                 other => {
                     panic!("PHP RPC: protocol violation — Throw file is not a string: {other:?}")
                 }
@@ -397,21 +392,10 @@ fn expect_positions(value: PluginValue) -> Vec<u32> {
         .collect()
 }
 
-fn expect_properties(value: PluginValue) -> IndexMap<String, PluginValue> {
+fn expect_properties(value: PluginValue) -> IndexMap<BString, PluginValue> {
     match value {
         PluginValue::List(items) if items.is_empty() => IndexMap::new(),
-        PluginValue::Array(map) => map
-            .into_iter()
-            .map(|(key, item)| {
-                let name = String::from_utf8(key.into()).unwrap_or_else(|error| {
-                    panic!(
-                        "PHP RPC: protocol violation — exception property name is not UTF-8: {:?}",
-                        String::from_utf8_lossy(error.as_bytes())
-                    )
-                });
-                (name, item)
-            })
-            .collect(),
+        PluginValue::Array(map) => map,
         other => {
             panic!("PHP RPC: protocol violation — exception properties is not an array: {other:?}")
         }
@@ -429,13 +413,11 @@ fn expect_out_params(value: PluginValue) -> IndexMap<u32, PluginValue> {
         PluginValue::Array(map) => map
             .into_iter()
             .map(|(key, item)| {
-                let position = std::str::from_utf8(&key)
-                    .ok()
+                let position = utf8_text(&key)
                     .and_then(|s| s.parse().ok())
                     .unwrap_or_else(|| {
                         panic!(
-                            "PHP RPC: protocol violation — out param key is not a position: {:?}",
-                            String::from_utf8_lossy(&key)
+                            "PHP RPC: protocol violation — out param key is not a position: {key:?}"
                         )
                     });
                 (position, item)
@@ -487,12 +469,12 @@ mod tests {
             message: "The \"https://example.org\" file could not be downloaded".to_string(),
             code: 401,
             properties: [
-                ("statusCode".to_string(), PluginValue::Int(401)),
-                ("response".to_string(), PluginValue::Null),
+                ("statusCode".into(), PluginValue::Int(401)),
+                ("response".into(), PluginValue::Null),
             ]
             .into_iter()
             .collect(),
-            file: "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php".to_string(),
+            file: "/vendor/composer/composer/src/Composer/Util/Http/CurlDownloader.php".into(),
             line: 42,
             parents: vec!["RuntimeException".to_string(), "Exception".to_string()],
         });
@@ -520,8 +502,14 @@ mod tests {
                     "The \"https://example.org\" file could not be downloaded"
                 );
                 assert_eq!(code, 401);
-                assert_eq!(properties.get("statusCode"), Some(&PluginValue::Int(401)));
-                assert_eq!(properties.get("response"), Some(&PluginValue::Null));
+                assert_eq!(
+                    properties.get(bstr::B("statusCode")),
+                    Some(&PluginValue::Int(401))
+                );
+                assert_eq!(
+                    properties.get(bstr::B("response")),
+                    Some(&PluginValue::Null)
+                );
             }
             other => panic!("unexpected frame: {other:?}"),
         }

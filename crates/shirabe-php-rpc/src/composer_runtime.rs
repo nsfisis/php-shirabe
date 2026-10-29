@@ -3,7 +3,8 @@
 //! See `docs/dev/composer-runtime-bundle.md`.
 
 use crate::{PluginValue, call_function};
-use shirabe_php_shim::{Phar, RuntimeException, getenv};
+use bstr::BString;
+use shirabe_php_shim::{Phar, RuntimeException, getenv, path_to_bytes};
 
 const BUNDLE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/composer-runtime-bundle.phar"));
 
@@ -25,27 +26,21 @@ const OVERRIDE_ENV: &str = "SHIRABE_COMPOSER_PHP_DIR";
 /// to. A bundle the worker cannot read in place is unpacked under `cache_dir`, Composer's cache
 /// directory; the process answers with the path it resolved first, so a later call's `cache_dir`
 /// no longer moves the runtime.
-pub fn base_path(cache_dir: &std::path::Path) -> anyhow::Result<String> {
-    static BASE: std::sync::OnceLock<Result<String, String>> = std::sync::OnceLock::new();
+pub fn base_path(cache_dir: &std::path::Path) -> anyhow::Result<BString> {
+    static BASE: std::sync::OnceLock<Result<BString, String>> = std::sync::OnceLock::new();
     BASE.get_or_init(|| resolve(cache_dir).map_err(|e| format!("{e:#}")))
         .clone()
         .map_err(|e| anyhow::anyhow!(e))
 }
 
-fn resolve(cache_dir: &std::path::Path) -> anyhow::Result<String> {
+fn resolve(cache_dir: &std::path::Path) -> anyhow::Result<BString> {
     if let Some(directory) = override_directory()? {
-        return path_to_string(directory);
+        return Ok(path_to_bytes(&directory).into());
     }
     if worker_opens_bundle()? {
-        return Ok(format!("phar://{ALIAS}"));
+        return Ok(format!("phar://{ALIAS}").into());
     }
-    path_to_string(extract_into(&cache_dir.join("runtime"))?)
-}
-
-fn path_to_string(directory: std::path::PathBuf) -> anyhow::Result<String> {
-    directory.into_os_string().into_string().map_err(|path| {
-        anyhow::anyhow!("the Composer PHP runtime path {path:?} is not valid UTF-8")
-    })
+    Ok(path_to_bytes(&extract_into(&cache_dir.join("runtime"))?).into())
 }
 
 /// The checkout that stands in for the bundle, if `OVERRIDE_ENV` names one. Both the worker and
@@ -71,13 +66,10 @@ fn override_directory() -> anyhow::Result<Option<std::path::PathBuf>> {
 /// wrapper.
 fn worker_opens_bundle() -> anyhow::Result<bool> {
     let executable = std::env::current_exe()?;
-    let executable = executable.to_str().ok_or_else(|| {
-        anyhow::anyhow!("the path of this executable, {executable:?}, is not valid UTF-8")
-    })?;
     let opened = call_function(
         "__shirabe_open_runtime_bundle",
         vec![
-            PluginValue::string(executable),
+            PluginValue::string(path_to_bytes(&executable)),
             PluginValue::string(ALIAS),
             PluginValue::string(SENTINEL_PATH),
             PluginValue::string(BUNDLE_ID),
@@ -218,7 +210,7 @@ mod tests {
             .join("vendor/autoload.php");
         call_function(
             "__shirabe_require",
-            vec![PluginValue::string(autoload.to_str().unwrap())],
+            vec![PluginValue::string(path_to_bytes(&autoload))],
         )
         .unwrap()
         .unwrap();

@@ -2468,7 +2468,7 @@ impl ApplicationHandle {
                 io.write_error(&format!(
                     "<info>PHP</info> version <comment>{}</comment> ({})",
                     shirabe_php_rpc::get_php_version().version,
-                    shirabe_php_rpc::get_php_binary(),
+                    shirabe_php_rpc::get_php_binary().display(),
                 ));
                 io.write_error(
                     "Run the \"diagnose\" command to get more detailed diagnostics output.",

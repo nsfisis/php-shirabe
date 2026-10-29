@@ -59,7 +59,7 @@ impl PlatformRepository {
         let mut overrides_map: IndexMap<String, PlatformOverride> = IndexMap::new();
         for (name, version) in overrides {
             // TODO(bytes): platform package names are Strings, so non-UTF-8 bytes are replaced.
-            let name = name.to_str_lossy().into_owned();
+            let name = legacy_lossy(&name.to_str_lossy().into_owned()).into_owned();
             if !is_string(&version) && !matches!(version, PhpMixed::Bool(false)) {
                 return Err(UnexpectedValueException::new(format!(
                     "config.platform.{} should be a string or false, but got {} {}",
@@ -295,11 +295,14 @@ impl PlatformRepository {
 
         // Extensions scanning
         for name in &loaded_extensions {
-            if ["standard", "Core"].contains(&name.as_str()) {
+            if [b"standard".as_slice(), b"Core"].contains(&name.as_slice()) {
                 continue;
             }
 
-            self.add_extension(name, platform_info.get_extension_version(name))?;
+            self.add_extension(
+                &legacy_lossy(name),
+                &legacy_lossy(platform_info.get_extension_version(name)),
+            )?;
         }
 
         // Check for Xdebug in a restarted process
@@ -312,8 +315,8 @@ impl PlatformRepository {
         // Doing it this way to know that functions or constants exist before
         // relying on them.
         for name in &loaded_extensions {
-            match name.as_str() {
-                "amqp" => {
+            match name.as_slice() {
+                b"amqp" => {
                     let info = platform_info.get_extension_info(name);
 
                     // librabbitmq version => 0.9.0
@@ -351,7 +354,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "bz2" => {
+                b"bz2" => {
                     let info = platform_info.get_extension_info(name);
 
                     // BZip2 Version => 1.0.6, 6-Sept-2010
@@ -360,7 +363,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            name,
+                            &legacy_lossy(name),
                             matches.name("version"),
                             None,
                             &[],
@@ -369,7 +372,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "curl" => {
+                b"curl" => {
                     let curl_version = &platform_info.curl_version;
                     let curl_version_str = curl_version
                         .as_array()
@@ -377,7 +380,14 @@ impl PlatformRepository {
                         .and_then(|v| v.as_string())
                         .map(|s| s.to_string());
                     if let Some(cv) = curl_version_str.as_deref() {
-                        self.add_library(&mut libraries, name, Some(cv), None, &[], &[])?;
+                        self.add_library(
+                            &mut libraries,
+                            &legacy_lossy(name),
+                            Some(cv),
+                            None,
+                            &[],
+                            &[],
+                        )?;
                     }
 
                     let info = platform_info.get_extension_info(name);
@@ -477,7 +487,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "date" => {
+                b"date" => {
                     let info = platform_info.get_extension_info(name);
 
                     // timelib version => 2018.03
@@ -539,7 +549,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "fileinfo" => {
+                b"fileinfo" => {
                     let info = platform_info.get_extension_info(name);
 
                     // libmagic => 537
@@ -557,7 +567,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "gd" => {
+                b"gd" => {
                     let gd_version = platform_info.get_constant("GD_VERSION", None);
                     let gd_version_str = match &gd_version {
                         PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
@@ -565,7 +575,7 @@ impl PlatformRepository {
                     };
                     self.add_library(
                         &mut libraries,
-                        name,
+                        &legacy_lossy(name),
                         gd_version_str.as_deref(),
                         None,
                         &[],
@@ -639,7 +649,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "gmp" => {
+                b"gmp" => {
                     let gmp_version = platform_info.get_constant("GMP_VERSION", None);
                     let gmp_version_str = match &gmp_version {
                         PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
@@ -647,7 +657,7 @@ impl PlatformRepository {
                     };
                     self.add_library(
                         &mut libraries,
-                        name,
+                        &legacy_lossy(name),
                         gmp_version_str.as_deref(),
                         None,
                         &[],
@@ -655,7 +665,7 @@ impl PlatformRepository {
                     )?;
                 }
 
-                "iconv" => {
+                b"iconv" => {
                     let iconv_version = platform_info.get_constant("ICONV_VERSION", None);
                     let iconv_version_str = match &iconv_version {
                         PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
@@ -663,7 +673,7 @@ impl PlatformRepository {
                     };
                     self.add_library(
                         &mut libraries,
-                        name,
+                        &legacy_lossy(name),
                         iconv_version_str.as_deref(),
                         None,
                         &[],
@@ -671,7 +681,7 @@ impl PlatformRepository {
                     )?;
                 }
 
-                "intl" => {
+                b"intl" => {
                     let info = platform_info.get_extension_info(name);
 
                     let description = "The ICU unicode and globalization support library";
@@ -764,7 +774,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "imagick" => {
+                b"imagick" => {
                     let image_magick_version = &platform_info.imagick;
                     let image_magick_version_str =
                         Self::imagick_get_version_string(image_magick_version);
@@ -791,7 +801,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "ldap" => {
+                b"ldap" => {
                     let info = platform_info.get_extension_info(name);
 
                     if let Some(matches) = preg_match(
@@ -820,13 +830,13 @@ impl PlatformRepository {
                     }
                 }
 
-                "libxml" => {
+                b"libxml" => {
                     // ext/dom, ext/simplexml, ext/xmlreader and ext/xmlwriter use the same libxml as the ext/libxml
                     let target_exts = ["dom", "simplexml", "xml", "xmlreader", "xmlwriter"];
                     let intersected: Vec<String> = loaded_extensions
                         .iter()
-                        .filter(|e| target_exts.contains(&e.as_str()))
-                        .cloned()
+                        .filter(|e| target_exts.iter().any(|t| e == t))
+                        .map(|s| legacy_lossy(s).into_owned())
                         .collect();
                     let libxml_provides: Vec<String> =
                         array_map_str_fn(|extension| format!("{}-libxml", extension), &intersected);
@@ -837,7 +847,7 @@ impl PlatformRepository {
                     };
                     self.add_library(
                         &mut libraries,
-                        name,
+                        &legacy_lossy(name),
                         libxml_dotted_str.as_deref(),
                         Some("libxml library version"),
                         &[],
@@ -845,7 +855,7 @@ impl PlatformRepository {
                     )?;
                 }
 
-                "mbstring" => {
+                b"mbstring" => {
                     let info = platform_info.get_extension_info(name);
 
                     // libmbfl version => 1.3.2
@@ -898,7 +908,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "memcached" => {
+                b"memcached" => {
                     let info = platform_info.get_extension_info(name);
 
                     // libmemcached version => 1.0.18
@@ -917,7 +927,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "openssl" => {
+                b"openssl" => {
                     let openssl_text = platform_info.get_constant("OPENSSL_VERSION_TEXT", None);
                     let openssl_text_str = match &openssl_text {
                         PhpMixed::String(s) => s.to_str_lossy().into_owned(),
@@ -947,7 +957,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "pcre" => {
+                b"pcre" => {
                     let pcre_version = platform_info.get_constant("PCRE_VERSION", None);
                     let pcre_version_str = match &pcre_version {
                         PhpMixed::String(s) => s.to_str_lossy().into_owned(),
@@ -959,7 +969,14 @@ impl PlatformRepository {
                         &pcre_version_str,
                     ))
                     .into_owned();
-                    self.add_library(&mut libraries, name, Some(&stripped), None, &[], &[])?;
+                    self.add_library(
+                        &mut libraries,
+                        &legacy_lossy(name),
+                        Some(&stripped),
+                        None,
+                        &[],
+                        &[],
+                    )?;
 
                     let info = platform_info.get_extension_info(name);
 
@@ -979,7 +996,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "mysqlnd" | "pdo_mysql" => {
+                b"mysqlnd" | b"pdo_mysql" => {
                     let info = platform_info.get_extension_info(name);
 
                     if let Some(matches) = preg_match(
@@ -999,7 +1016,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "mongodb" => {
+                b"mongodb" => {
                     let info = platform_info.get_extension_info(name);
 
                     if let Some(libmongoc_matches) = preg_match(
@@ -1031,7 +1048,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "pgsql" => {
+                b"pgsql" => {
                     if platform_info.has_constant("PGSQL_LIBPQ_VERSION", None) {
                         let pq_version = platform_info.get_constant("PGSQL_LIBPQ_VERSION", None);
                         let pq_version_str = match &pq_version {
@@ -1066,7 +1083,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "pdo_pgsql" => {
+                b"pdo_pgsql" => {
                     let info = platform_info.get_extension_info(name);
 
                     if let Some(matches) = preg_match(
@@ -1084,7 +1101,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "pq" => {
+                b"pq" => {
                     let info = platform_info.get_extension_info(name);
 
                     // Used Library => Compiled => Linked
@@ -1104,7 +1121,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "rdkafka" => {
+                b"rdkafka" => {
                     if platform_info.has_constant("RD_KAFKA_VERSION", None) {
                         // Interpreted as hex MM.mm.rr.xx:
                         //  - MM = Major
@@ -1134,7 +1151,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "libsodium" | "sodium" => {
+                b"libsodium" | b"sodium" => {
                     if platform_info.has_constant("SODIUM_LIBRARY_VERSION", None) {
                         let sodium = platform_info.get_constant("SODIUM_LIBRARY_VERSION", None);
                         let sodium_str = match &sodium {
@@ -1160,7 +1177,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "sqlite3" | "pdo_sqlite" => {
+                b"sqlite3" | b"pdo_sqlite" => {
                     let info = platform_info.get_extension_info(name);
 
                     if let Some(matches) =
@@ -1177,7 +1194,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "ssh2" => {
+                b"ssh2" => {
                     let info = platform_info.get_extension_info(name);
 
                     if let Some(matches) =
@@ -1194,7 +1211,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "xsl" => {
+                b"xsl" => {
                     let libxslt_version =
                         platform_info.get_constant("LIBXSLT_DOTTED_VERSION", None);
                     let libxslt_str = match &libxslt_version {
@@ -1228,7 +1245,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "yaml" => {
+                b"yaml" => {
                     let info = platform_info.get_extension_info("yaml");
 
                     if let Some(matches) =
@@ -1245,7 +1262,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "zip" => {
+                b"zip" => {
                     if platform_info.has_constant("LIBZIP_VERSION", Some("ZipArchive")) {
                         let libzip =
                             platform_info.get_constant("LIBZIP_VERSION", Some("ZipArchive"));
@@ -1264,7 +1281,7 @@ impl PlatformRepository {
                     }
                 }
 
-                "zlib" => {
+                b"zlib" => {
                     if platform_info.has_constant("ZLIB_VERSION", None) {
                         let zlib = platform_info.get_constant("ZLIB_VERSION", None);
                         let zlib_str = match &zlib {
@@ -1273,7 +1290,7 @@ impl PlatformRepository {
                         };
                         self.add_library(
                             &mut libraries,
-                            name,
+                            &legacy_lossy(name),
                             zlib_str.as_deref(),
                             None,
                             &[],
@@ -1288,7 +1305,7 @@ impl PlatformRepository {
                         {
                             self.add_library(
                                 &mut libraries,
-                                name,
+                                &legacy_lossy(name),
                                 matches.name("version"),
                                 None,
                                 &[],

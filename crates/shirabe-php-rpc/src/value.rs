@@ -9,9 +9,9 @@
 //! codec must round-trip non-UTF-8 byte sequences losslessly.
 
 use anyhow::bail;
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, utf8_text};
 
 /// A handle to an object whose entity lives on the Rust side. PHP holds a thin proxy stub.
 #[derive(Debug, Clone, PartialEq)]
@@ -346,7 +346,7 @@ fn canonical_int_key(key: &[u8]) -> Option<i64> {
     let digits = key.strip_prefix(b"-").unwrap_or(key);
     match digits {
         [b'1'..=b'9', rest @ ..] if rest.iter().all(u8::is_ascii_digit) => {
-            std::str::from_utf8(key).ok()?.parse().ok()
+            utf8_text(key)?.parse().ok()
         }
         _ => None,
     }
@@ -494,25 +494,19 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
         b"b:" => match take_until(payload, pos, b';')? {
             b"0" => Ok(Lex::Value(PluginValue::Bool(false))),
             b"1" => Ok(Lex::Value(PluginValue::Bool(true))),
-            other => bail!(
-                "malformed bool payload: {:?}",
-                String::from_utf8_lossy(other)
-            ),
+            other => bail!("malformed bool payload: {:?}", BStr::new(other)),
         },
         b"i:" => {
             let bytes = take_until(payload, pos, b';')?;
-            let n = std::str::from_utf8(bytes).ok().and_then(|s| s.parse().ok());
+            let n = utf8_text(bytes).and_then(|s| s.parse().ok());
             match n {
                 Some(n) => Ok(Lex::Value(PluginValue::Int(n))),
-                None => bail!(
-                    "malformed int payload: {:?}",
-                    String::from_utf8_lossy(bytes)
-                ),
+                None => bail!("malformed int payload: {:?}", BStr::new(bytes)),
             }
         }
         b"d:" => {
             let bytes = take_until(payload, pos, b';')?;
-            let f = std::str::from_utf8(bytes).ok().and_then(|s| match s {
+            let f = utf8_text(bytes).and_then(|s| match s {
                 // Rust's float parser accepts these spellings too, but be explicit about the
                 // exact special forms PHP emits.
                 "INF" => Some(f64::INFINITY),
@@ -522,10 +516,7 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
             });
             match f {
                 Some(f) => Ok(Lex::Value(PluginValue::Float(f))),
-                None => bail!(
-                    "malformed float payload: {:?}",
-                    String::from_utf8_lossy(bytes)
-                ),
+                None => bail!("malformed float payload: {:?}", BStr::new(bytes)),
             }
         }
         b"s:" => Ok(Lex::Value(PluginValue::String(parse_string_body(
@@ -543,12 +534,9 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
         }
         b"r:" => {
             let bytes = take_until(payload, pos, b';')?;
-            match std::str::from_utf8(bytes).ok().and_then(|s| s.parse().ok()) {
+            match utf8_text(bytes).and_then(|s| s.parse().ok()) {
                 Some(number) => Ok(Lex::BackReference(number)),
-                None => bail!(
-                    "malformed back-reference: {:?}",
-                    String::from_utf8_lossy(bytes)
-                ),
+                None => bail!("malformed back-reference: {:?}", BStr::new(bytes)),
             }
         }
         // A PHP reference aliases a variable; nothing on this side can carry that aliasing, and
@@ -559,7 +547,7 @@ fn lex(payload: &[u8], pos: &mut usize) -> anyhow::Result<Lex> {
         ),
         _ => bail!(
             "unknown serialized type tag {:?} at byte {}",
-            String::from_utf8_lossy(tag),
+            BStr::new(tag),
             *pos - 2
         ),
     }
@@ -585,15 +573,9 @@ fn finish_frame(frame: Frame) -> anyhow::Result<PluginValue> {
 /// The `<count>:{` a container's entries follow.
 fn parse_entry_count(payload: &[u8], pos: &mut usize) -> anyhow::Result<usize> {
     let count_bytes = take_until(payload, pos, b':')?;
-    let count: usize = std::str::from_utf8(count_bytes)
-        .ok()
+    let count: usize = utf8_text(count_bytes)
         .and_then(|s| s.parse().ok())
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "malformed entry count: {:?}",
-                String::from_utf8_lossy(count_bytes)
-            )
-        })?;
+        .ok_or_else(|| anyhow::anyhow!("malformed entry count: {:?}", BStr::new(count_bytes)))?;
     if payload.get(*pos) != Some(&b'{') {
         bail!("expected opening brace at byte {}", *pos);
     }
@@ -608,15 +590,9 @@ fn parse_string_body(payload: &[u8], pos: &mut usize) -> anyhow::Result<BString>
 /// A length-prefixed quoted run: `<len>:"<bytes>"` followed by `terminator`.
 fn parse_quoted(payload: &[u8], pos: &mut usize, terminator: u8) -> anyhow::Result<BString> {
     let len_bytes = take_until(payload, pos, b':')?;
-    let len: usize = std::str::from_utf8(len_bytes)
-        .ok()
+    let len: usize = utf8_text(len_bytes)
         .and_then(|s| s.parse().ok())
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "malformed string length: {:?}",
-                String::from_utf8_lossy(len_bytes)
-            )
-        })?;
+        .ok_or_else(|| anyhow::anyhow!("malformed string length: {:?}", BStr::new(len_bytes)))?;
     if payload.get(*pos) != Some(&b'"') {
         bail!("expected opening quote at byte {}", *pos);
     }
@@ -763,12 +739,7 @@ mod tests {
     fn roundtrip(value: PluginValue) {
         let encoded = serialize(&value);
         let decoded = unserialize(&encoded).expect("decode failed");
-        assert_eq!(
-            decoded,
-            value,
-            "encoded form: {:?}",
-            String::from_utf8_lossy(&encoded)
-        );
+        assert_eq!(decoded, value, "encoded form: {:?}", BStr::new(&encoded));
     }
 
     #[test]

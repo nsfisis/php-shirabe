@@ -3,7 +3,7 @@
 use indexmap::IndexMap;
 use shirabe_php_rpc::stream_resolve_include_path;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, file_exists, legacy_lossy, path_from_bytes,
+    InvalidArgumentException, PhpMixed, file_exists, legacy_lossy, path_from_bytes, path_to_bytes,
     spl_autoload_register, spl_autoload_unregister, strlen, strpos, strrpos, strtr, substr,
 };
 use std::sync::{LazyLock, Mutex};
@@ -424,7 +424,7 @@ impl ClassLoader {
         if self.use_include_path
             && let Some(file) = stream_resolve_include_path(&logical_path_psr0)
         {
-            return Some(file);
+            return Some(legacy_lossy(path_to_bytes(&file)).into_owned());
         }
 
         None

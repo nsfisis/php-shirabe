@@ -9,10 +9,10 @@ pub mod xdebug;
 
 pub use value::{PhpClassHandle, PhpObjHandle, PhpObject, PluginValue, RustObjHandle};
 
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use frame::Frame;
 use indexmap::IndexMap;
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, path_from_bytes};
 use shirabe_symfony_process::PhpExecutableFinder;
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -22,7 +22,7 @@ use std::sync::{Mutex, OnceLock};
 #[derive(Debug)]
 pub struct PhpVersion {
     /// `\PHP_VERSION`.
-    pub version: String,
+    pub version: BString,
     /// `\PHP_VERSION_ID`.
     pub version_id: i64,
     /// `\PHP_MAJOR_VERSION`.
@@ -48,8 +48,8 @@ pub fn get_php_version() -> &'static PhpVersion {
 }
 
 /// PHP `\PHP_BINARY`.
-pub fn get_php_binary() -> String {
-    string_constant("PHP_BINARY")
+pub fn get_php_binary() -> std::path::PathBuf {
+    path_from_bytes(&string_constant("PHP_BINARY")).to_path_buf()
 }
 
 /// PHP `constant($name)`.
@@ -57,10 +57,9 @@ fn get_constant(name: &str) -> PhpMixed {
     call("constant", name)
 }
 
-fn string_constant(name: &str) -> String {
+fn string_constant(name: &str) -> BString {
     match get_constant(name) {
-        // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
-        PhpMixed::String(s) => s.to_str_lossy().into_owned(),
+        PhpMixed::String(s) => s,
         other => panic!("PHP RPC: {name} constant did not resolve to a string: {other:?}"),
     }
 }
@@ -76,10 +75,10 @@ fn int_constant(name: &str) -> i64 {
 /// `Option` field is `None` when the corresponding array key or constant is absent.
 #[derive(Debug)]
 pub struct Curl {
-    pub version: String,
-    pub libz_version: Option<String>,
-    pub brotli_version: Option<String>,
-    pub ssl_version: Option<String>,
+    pub version: BString,
+    pub libz_version: Option<BString>,
+    pub brotli_version: Option<BString>,
+    pub ssl_version: Option<BString>,
     pub features: Option<i64>,
     pub version_zstd: Option<i64>,
     pub version_http2: Option<i64>,
@@ -91,12 +90,12 @@ pub struct Curl {
 /// round trip because the command would otherwise query the same runtime dozens of times.
 #[derive(Debug)]
 pub struct Diagnostics {
-    pub php_version: String,
+    pub php_version: BString,
     pub php_version_id: i64,
     /// `None` when `PHP_BINARY` is undefined.
-    pub php_binary: Option<String>,
+    pub php_binary: Option<std::path::PathBuf>,
     /// `None` when `OPENSSL_VERSION_TEXT` is undefined.
-    pub openssl_version_text: Option<String>,
+    pub openssl_version_text: Option<BString>,
     /// `0` when `OPENSSL_VERSION_NUMBER` is undefined.
     pub openssl_version_number: i64,
     pub has_hhvm_version: bool,
@@ -106,41 +105,42 @@ pub struct Diagnostics {
     /// `0` when the ionCube loader is not loaded.
     pub ioncube_loader_iversion: i64,
     /// Empty when the ionCube loader is not loaded.
-    pub ioncube_loader_version: String,
+    pub ioncube_loader_version: BString,
     /// `phpinfo(INFO_GENERAL)` output.
-    pub phpinfo_general: String,
+    pub phpinfo_general: BString,
     /// `None` when the curl extension is not loaded.
     pub curl: Option<Curl>,
-    extensions: IndexMap<String, bool>,
-    functions: IndexMap<String, bool>,
-    ini_settings: IndexMap<String, Option<String>>,
+    extensions: IndexMap<BString, bool>,
+    functions: IndexMap<BString, bool>,
+    ini_settings: IndexMap<BString, Option<BString>>,
 }
 
 impl Diagnostics {
     /// PHP `extension_loaded($name)`. Only the extensions the worker reports can be asked about;
     /// any other name is a bug in the caller, not a missing extension.
     pub fn extension_loaded(&self, name: &str) -> bool {
-        *self.extensions.get(name).unwrap_or_else(|| {
+        *self.extensions.get(B(name)).unwrap_or_else(|| {
             panic!("PHP RPC: extension `{name}` is not reported by the diagnose payload")
         })
     }
 
     /// PHP `function_exists($name)`. See [`Diagnostics::extension_loaded`] for the fixed set of names.
     pub fn function_exists(&self, name: &str) -> bool {
-        *self.functions.get(name).unwrap_or_else(|| {
+        *self.functions.get(B(name)).unwrap_or_else(|| {
             panic!("PHP RPC: function `{name}` is not reported by the diagnose payload")
         })
     }
 
     /// PHP `ini_get($option)`, with PHP's `false` (no such setting) mapped to `None`. See
     /// [`Diagnostics::extension_loaded`] for the fixed set of names.
-    pub fn ini_get(&self, option: &str) -> Option<&str> {
+    pub fn ini_get(&self, option: &str) -> Option<&BStr> {
         self.ini_settings
-            .get(option)
+            .get(B(option))
             .unwrap_or_else(|| {
                 panic!("PHP RPC: ini setting `{option}` is not reported by the diagnose payload")
             })
-            .as_deref()
+            .as_ref()
+            .map(|value| value.as_bstr())
     }
 }
 
@@ -162,7 +162,9 @@ pub fn get_diagnostics() -> &'static Diagnostics {
         Diagnostics {
             php_version: payload.string("php_version"),
             php_version_id: payload.int("php_version_id"),
-            php_binary: payload.nullable_string("php_binary"),
+            php_binary: payload
+                .nullable_string("php_binary")
+                .map(|path| path_from_bytes(&path).to_path_buf()),
             openssl_version_text: payload.nullable_string("openssl_version_text"),
             openssl_version_number: payload.int("openssl_version_number"),
             has_hhvm_version: payload.bool("has_hhvm_version"),
@@ -177,10 +179,8 @@ pub fn get_diagnostics() -> &'static Diagnostics {
             ini_settings: payload
                 .entries("ini")
                 .map(|(name, value)| {
-                    // TODO(bytes): the result is keyed by String, so non-UTF-8 bytes are replaced.
-                    let name = name.to_str_lossy().into_owned();
-                    let value = as_nullable_string(value, "ini", &name);
-                    (name, value)
+                    let value = as_nullable_string(value, "ini", name);
+                    (name.clone(), value)
                 })
                 .collect(),
         }
@@ -220,9 +220,9 @@ const PLATFORM_CLASSES: &[&str] = &["ResourceBundle", "IntlChar"];
 /// consumer reads off them rather than the object itself.
 #[derive(Debug, Clone)]
 pub struct PlatformInfo {
-    extensions: Vec<String>,
-    extension_versions: IndexMap<String, String>,
-    extension_info: IndexMap<String, String>,
+    extensions: Vec<BString>,
+    extension_versions: IndexMap<BString, BString>,
+    extension_info: IndexMap<BString, BString>,
     /// Keyed as `ltrim($class.'::'.$constant, ':')`; `None` for a reported but undefined constant.
     constants: IndexMap<String, Option<PhpMixed>>,
     classes: IndexMap<String, bool>,
@@ -266,29 +266,31 @@ impl Default for PlatformInfo {
 
 impl PlatformInfo {
     /// PHP `get_loaded_extensions()`.
-    pub fn get_extensions(&self) -> &[String] {
+    pub fn get_extensions(&self) -> &[BString] {
         &self.extensions
     }
 
     /// PHP `phpversion($extension)`, with PHP's `false` mapped to `'0'`.
-    pub fn get_extension_version(&self, extension: &str) -> &str {
+    pub fn get_extension_version(&self, extension: impl AsRef<[u8]>) -> &BStr {
+        let extension = extension.as_ref().as_bstr();
         self.extension_versions
             .get(extension)
             .unwrap_or_else(|| {
                 panic!("PHP RPC: extension `{extension}` is not loaded in the platform payload")
             })
-            .as_str()
+            .as_bstr()
     }
 
     /// PHP `(new \ReflectionExtension($extension))->info()` output. Only the extensions the worker
     /// reports can be asked about; any other name is a bug in the caller.
-    pub fn get_extension_info(&self, extension: &str) -> &str {
+    pub fn get_extension_info(&self, extension: impl AsRef<[u8]>) -> &BStr {
+        let extension = extension.as_ref().as_bstr();
         self.extension_info
             .get(extension)
             .unwrap_or_else(|| {
                 panic!("PHP RPC: extension `{extension}` info is not in the platform payload")
             })
-            .as_str()
+            .as_bstr()
     }
 
     /// PHP `defined(ltrim($class.'::'.$constant, ':'))`. Only the constants the worker reports can
@@ -317,15 +319,15 @@ impl PlatformInfo {
     pub fn __set_extensions(&mut self, extensions: Vec<String>, version: &str) {
         self.extension_versions = extensions
             .iter()
-            .map(|name| (name.clone(), version.to_string()))
+            .map(|name| (BString::from(name.as_str()), BString::from(version)))
             .collect();
-        self.extensions = extensions;
+        self.extensions = extensions.into_iter().map(BString::from).collect();
     }
 
     /// For testing only: reports `info` as the `ReflectionExtension::info()` output of `extension`.
     pub fn __set_extension_info(&mut self, extension: &str, info: &str) {
         self.extension_info
-            .insert(extension.to_string(), info.to_string());
+            .insert(BString::from(extension), BString::from(info));
     }
 
     /// For testing only: reports the constant as defined with `value`. Panics on a constant the
@@ -381,17 +383,13 @@ pub fn get_platform_info() -> &'static PlatformInfo {
 
         let constant_names = payload.string_list("constant_names");
         assert_eq!(
-            constant_names
-                .iter()
-                .map(String::as_str)
-                .collect::<Vec<_>>(),
-            PLATFORM_CONSTANTS,
+            constant_names, PLATFORM_CONSTANTS,
             "PHP RPC: the worker reports different constants than the platform payload declares"
         );
         let constants = payload.map("constants");
         let classes = payload.bool_map("classes");
         assert_eq!(
-            classes.keys().map(String::as_str).collect::<Vec<_>>(),
+            classes.keys().collect::<Vec<_>>(),
             PLATFORM_CLASSES,
             "PHP RPC: the worker reports different classes than the platform payload declares"
         );
@@ -400,14 +398,17 @@ pub fn get_platform_info() -> &'static PlatformInfo {
             extensions: payload.string_list("extensions"),
             extension_versions: payload.string_map("extension_versions"),
             extension_info: payload.string_map("extension_info"),
-            constants: constant_names
-                .into_iter()
+            constants: PLATFORM_CONSTANTS
+                .iter()
                 .map(|name| {
-                    let value = constants.and_then(|map| map.get(B(&name))).cloned();
-                    (name, value)
+                    let value = constants.and_then(|map| map.get(B(name))).cloned();
+                    ((*name).to_string(), value)
                 })
                 .collect(),
-            classes,
+            classes: PLATFORM_CLASSES
+                .iter()
+                .map(|name| ((*name).to_string(), classes[B(name)]))
+                .collect(),
             curl_version: payload.mixed("curl_version"),
             inet_pton_ipv6: payload.mixed("inet_pton_ipv6"),
             resource_bundle: payload.mixed("resource_bundle"),
@@ -435,10 +436,9 @@ impl Payload<'_> {
         self.field(key).clone()
     }
 
-    fn string(&self, key: &str) -> String {
+    fn string(&self, key: &str) -> BString {
         match self.field(key) {
-            // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
-            PhpMixed::String(s) => s.to_str_lossy().into_owned(),
+            PhpMixed::String(s) => s.clone(),
             other => panic!(
                 "PHP RPC: `{}` payload entry `{key}` is not a string: {other:?}",
                 self.what
@@ -446,7 +446,7 @@ impl Payload<'_> {
         }
     }
 
-    fn nullable_string(&self, key: &str) -> Option<String> {
+    fn nullable_string(&self, key: &str) -> Option<BString> {
         as_nullable_string(self.field(key), self.what, key)
     }
 
@@ -480,25 +480,16 @@ impl Payload<'_> {
         self.map(key).into_iter().flatten()
     }
 
-    fn bool_map(&self, key: &str) -> IndexMap<String, bool> {
+    fn bool_map(&self, key: &str) -> IndexMap<BString, bool> {
         self.entries(key)
-            .map(|(name, value)| {
-                // TODO(bytes): the result is keyed by String, so non-UTF-8 bytes are replaced.
-                let name = name.to_str_lossy().into_owned();
-                let value = as_bool(value, self.what, &name);
-                (name, value)
-            })
+            .map(|(name, value)| (name.clone(), as_bool(value, self.what, name)))
             .collect()
     }
 
-    fn string_map(&self, key: &str) -> IndexMap<String, String> {
+    fn string_map(&self, key: &str) -> IndexMap<BString, BString> {
         self.entries(key)
             .map(|(name, value)| match value {
-                // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
-                PhpMixed::String(s) => (
-                    name.to_str_lossy().into_owned(),
-                    s.to_str_lossy().into_owned(),
-                ),
+                PhpMixed::String(s) => (name.clone(), s.clone()),
                 other => panic!(
                     "PHP RPC: `{}` payload entry `{key}[{name}]` is not a string: {other:?}",
                     self.what
@@ -507,13 +498,12 @@ impl Payload<'_> {
             .collect()
     }
 
-    fn string_list(&self, key: &str) -> Vec<String> {
+    fn string_list(&self, key: &str) -> Vec<BString> {
         match self.field(key) {
             PhpMixed::List(items) => items
                 .iter()
                 .map(|item| match item {
-                    // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
-                    PhpMixed::String(s) => s.to_str_lossy().into_owned(),
+                    PhpMixed::String(s) => s.clone(),
                     other => panic!(
                         "PHP RPC: `{}` payload entry `{key}` has a non-string element: {other:?}",
                         self.what
@@ -528,17 +518,20 @@ impl Payload<'_> {
     }
 }
 
-fn as_bool(value: &PhpMixed, what: &str, key: &str) -> bool {
+fn as_bool(value: &PhpMixed, what: &str, key: impl std::fmt::Display) -> bool {
     match value {
         PhpMixed::Bool(b) => *b,
         other => panic!("PHP RPC: `{what}` payload entry `{key}` is not a bool: {other:?}"),
     }
 }
 
-fn as_nullable_string(value: &PhpMixed, what: &str, key: &str) -> Option<String> {
+fn as_nullable_string(
+    value: &PhpMixed,
+    what: &str,
+    key: impl std::fmt::Display,
+) -> Option<BString> {
     match value {
-        // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
-        PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
+        PhpMixed::String(s) => Some(s.clone()),
         PhpMixed::Null => None,
         other => {
             panic!("PHP RPC: `{what}` payload entry `{key}` is not a string or null: {other:?}")
@@ -582,10 +575,9 @@ fn curl_field(payload: &Payload, key: &str) -> Option<Curl> {
 }
 
 /// PHP `phpversion($extension)`.
-pub fn phpversion(extension: &str) -> Option<String> {
+pub fn phpversion(extension: &str) -> Option<BString> {
     match call("phpversion", extension) {
-        // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
-        PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
+        PhpMixed::String(s) => Some(s),
         PhpMixed::Bool(false) => None,
         other => panic!("PHP RPC: `phpversion` returned an unexpected value: {other:?}"),
     }
@@ -594,10 +586,9 @@ pub fn phpversion(extension: &str) -> Option<String> {
 /// PHP `stream_resolve_include_path($filename)`. It is answered by the worker because the
 /// `include_path` it searches is the worker's own, including whatever a required `autoload_real.php`
 /// put there with `set_include_path()`.
-pub fn stream_resolve_include_path(filename: &str) -> Option<String> {
+pub fn stream_resolve_include_path(filename: &str) -> Option<std::path::PathBuf> {
     match call("stream_resolve_include_path", filename) {
-        // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
-        PhpMixed::String(s) => Some(s.to_str_lossy().into_owned()),
+        PhpMixed::String(s) => Some(path_from_bytes(&s).to_path_buf()),
         PhpMixed::Bool(false) => None,
         other => {
             panic!("PHP RPC: `stream_resolve_include_path` returned an unexpected value: {other:?}")
@@ -609,8 +600,11 @@ pub fn stream_resolve_include_path(filename: &str) -> Option<String> {
 /// php_ini_loaded_file()]` merged with the trimmed, comma-split `php_ini_scanned_files()` list
 /// when scanning is active. The worker runs on the ini files of the machine, so these are the
 /// user's own.
-pub fn get_all_ini_files() -> Vec<String> {
+pub fn get_all_ini_files() -> Vec<std::path::PathBuf> {
     string_list(call("get_all_ini_files", ""), "get_all_ini_files")
+        .into_iter()
+        .map(|path| path_from_bytes(&path).to_path_buf())
+        .collect()
 }
 
 /// `Composer\XdebugHandler\XdebugHandler::isXdebugActive()` as measured in the worker, which is
@@ -622,13 +616,12 @@ fn xdebug_active() -> bool {
     }
 }
 
-fn string_list(value: PhpMixed, name: &str) -> Vec<String> {
+fn string_list(value: PhpMixed, name: &str) -> Vec<BString> {
     match value {
         PhpMixed::List(items) => items
             .into_iter()
             .map(|item| match item {
-                // TODO(bytes): the result is a String, so non-UTF-8 bytes are replaced.
-                PhpMixed::String(s) => s.to_str_lossy().into_owned(),
+                PhpMixed::String(s) => s,
                 other => panic!("PHP RPC: `{name}` returned a non-string element: {other:?}"),
             })
             .collect(),
@@ -647,10 +640,10 @@ pub struct PhpThrow {
     /// its class declares. The receiving side revives them onto the instance it rebuilds.
     ///
     /// Boxed so a `Result<_, PhpThrow>` stays small; every dispatcher returns one.
-    pub properties: Box<IndexMap<String, PluginValue>>,
+    pub properties: Box<IndexMap<BString, PluginValue>>,
     /// Where the exception was created, as `getFile()` and `getLine()` report it. Empty and 0
     /// for a failure that was no exception.
-    pub file: String,
+    pub file: BString,
     pub line: i64,
     /// The superclasses of `exception_class`, nearest first, so the receiving side can rebuild
     /// the nearest one it has a type for. Empty from Rust to PHP, where every class is known.
@@ -665,7 +658,7 @@ impl PhpThrow {
             message,
             code,
             properties: Box::new(IndexMap::new()),
-            file: String::new(),
+            file: BString::default(),
             line: 0,
             parents: Vec::new(),
         }
@@ -1484,11 +1477,14 @@ mod tests {
         assert_eq!(diagnostics.php_version, get_php_version().version);
         assert!(diagnostics.php_version_id >= 70205);
         let php_binary = get_php_binary();
-        assert_eq!(diagnostics.php_binary.as_deref(), Some(php_binary.as_str()));
+        assert_eq!(
+            diagnostics.php_binary.as_deref(),
+            Some(php_binary.as_path())
+        );
         assert!(diagnostics.function_exists("json_decode"));
         assert!(!diagnostics.extension_loaded("ionCube Loader"));
         assert!(
-            diagnostics.phpinfo_general.contains("PHP Version"),
+            diagnostics.phpinfo_general.contains_str("PHP Version"),
             "expected phpinfo(INFO_GENERAL) output, got: {}",
             diagnostics.phpinfo_general,
         );
@@ -1505,9 +1501,9 @@ mod tests {
         assert!(!php.version.is_empty(), "expected a PHP version");
         assert_eq!(
             php.version
-                .split('.')
+                .split_str(".")
                 .next()
-                .and_then(|n| n.parse::<i64>().ok()),
+                .and_then(|n| shirabe_php_shim::utf8_text(n)?.parse::<i64>().ok()),
             Some(php.major),
             "version should start with the major version: {}",
             php.version,
@@ -1518,10 +1514,11 @@ mod tests {
         );
 
         let binary = get_php_binary();
-        assert!(!binary.is_empty(), "expected a PHP binary path");
+        assert!(!binary.as_os_str().is_empty(), "expected a PHP binary path");
         assert!(
             std::path::Path::new(&binary).exists(),
-            "binary should exist: {binary}",
+            "binary should exist: {}",
+            binary.display(),
         );
     }
 

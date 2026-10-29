@@ -1,9 +1,7 @@
 1 crates/shirabe-class-map-generator/src/class_map_generator.rs
 4 crates/shirabe-php-rpc/build.rs
-3 crates/shirabe-php-rpc/src/composer_runtime.rs
-6 crates/shirabe-php-rpc/src/frame.rs
-11 crates/shirabe-php-rpc/src/lib.rs
-16 crates/shirabe-php-rpc/src/value.rs
+1 crates/shirabe-php-rpc/src/frame.rs
+2 crates/shirabe-php-rpc/src/value.rs
 1 crates/shirabe-php-rpc/tests/generated_stubs.rs
 6 crates/shirabe-php-rpc/tests/oracle.rs
 4 crates/shirabe-php-shim/src/array.rs
@@ -83,10 +81,10 @@
 5 crates/shirabe/src/package/loader/validating_array_loader.rs
 5 crates/shirabe/src/package/locker.rs
 1 crates/shirabe/src/package/version/version_bumper.rs
-18 crates/shirabe/src/plugin/php_plugin_proxy.rs
+17 crates/shirabe/src/plugin/php_plugin_proxy.rs
 6 crates/shirabe/src/plugin/php_plugin_value.rs
 5 crates/shirabe/src/plugin/plugin_manager.rs
-3 crates/shirabe/src/plugin/throwable_bridge.rs
+2 crates/shirabe/src/plugin/throwable_bridge.rs
 7 crates/shirabe/src/repository/artifact_repository.rs
 10 crates/shirabe/src/repository/composer_repository.rs
 2 crates/shirabe/src/repository/filter_repository.rs

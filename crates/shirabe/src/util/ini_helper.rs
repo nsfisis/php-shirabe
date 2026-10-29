@@ -9,7 +9,7 @@ impl IniHelper {
     /// when it is set, because a restarted process runs on a generated ini file and has to name
     /// the ones it replaced. Nothing here restarts PHP, so the worker always runs on the machine's
     /// own ini files and the variable is not consulted.
-    pub fn get_all() -> Vec<String> {
+    pub fn get_all() -> Vec<std::path::PathBuf> {
         shirabe_php_rpc::get_all_ini_files()
     }
 
@@ -17,17 +17,17 @@ impl IniHelper {
     pub fn get_message() -> String {
         let mut paths = Self::get_all();
 
-        if paths.first().is_some_and(|s| s.is_empty()) {
+        if paths.first().is_some_and(|s| s.as_os_str().is_empty()) {
             paths.remove(0);
         }
 
         let ini = if paths.is_empty() {
-            String::new()
+            std::path::PathBuf::new()
         } else {
             paths.remove(0)
         };
 
-        if ini.is_empty() {
+        if ini.as_os_str().is_empty() {
             return "A php.ini file does not exist. You will have to create one.".to_string();
         }
 
@@ -35,6 +35,9 @@ impl IniHelper {
             return "Your command-line PHP is using multiple ini files. Run `php --ini` to show them.".to_string();
         }
 
-        format!("The php.ini used by your command-line PHP is: {}", ini)
+        format!(
+            "The php.ini used by your command-line PHP is: {}",
+            ini.display()
+        )
     }
 }

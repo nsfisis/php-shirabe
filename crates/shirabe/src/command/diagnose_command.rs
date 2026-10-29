@@ -722,19 +722,19 @@ impl DiagnoseCommand {
                 .expect("the diagnose payload carries curl details while the extension is loaded");
             let libz_version = version
                 .libz_version
-                .as_deref()
+                .as_ref()
                 .filter(|v| !v.is_empty())
-                .unwrap_or("missing");
+                .map_or(bstr::BStr::new("missing"), |v| v.as_bstr());
             let brotli_version = version
                 .brotli_version
-                .as_deref()
+                .as_ref()
                 .filter(|v| !v.is_empty())
-                .unwrap_or("missing");
+                .map_or(bstr::BStr::new("missing"), |v| v.as_bstr());
             let ssl_version = version
                 .ssl_version
-                .as_deref()
+                .as_ref()
                 .filter(|v| !v.is_empty())
-                .unwrap_or("missing");
+                .map_or(bstr::BStr::new("missing"), |v| v.as_bstr());
             let has_zstd = match (version.features, version.version_zstd) {
                 (Some(features), Some(zstd)) => features & zstd != 0,
                 _ => false,
@@ -857,12 +857,15 @@ impl DiagnoseCommand {
         {
             errors.insert(
                 "ioncube".to_string(),
-                Some(diagnostics.ioncube_loader_version.clone()),
+                Some(legacy_lossy(&diagnostics.ioncube_loader_version.clone()).into_owned()),
             );
         }
 
         if diagnostics.php_version_id < 70205 {
-            errors.insert("php".to_string(), Some(diagnostics.php_version.clone()));
+            errors.insert(
+                "php".to_string(),
+                Some(legacy_lossy(&diagnostics.php_version.clone()).into_owned()),
+            );
         }
 
         if !diagnostics.extension_loaded("openssl") {
@@ -919,7 +922,7 @@ impl DiagnoseCommand {
         {
             warnings.insert(
                 "onedrive".to_string(),
-                Some(diagnostics.php_version.clone()),
+                Some(legacy_lossy(&diagnostics.php_version.clone()).into_owned()),
             );
         }
 
@@ -1037,7 +1040,7 @@ impl DiagnoseCommand {
                         let mut openssl_version =
                             strstr3(&openssl_trimmed, " ", true).unwrap_or_default();
                         if openssl_version.is_empty() {
-                            openssl_version = bstr::BString::from(openssl_version_text);
+                            openssl_version = openssl_version_text;
                         }
 
                         format!(
@@ -1281,7 +1284,7 @@ impl Command for DiagnoseCommand {
         if let Some(php_binary) = &diagnostics.php_binary {
             io.write(&format!(
                 "PHP binary path: <comment>{}</comment>",
-                php_binary
+                php_binary.display()
             ));
         }
 

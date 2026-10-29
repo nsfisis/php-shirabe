@@ -210,13 +210,7 @@ fn push_settle(id: u64, outcome: Result<PluginValue, PhpThrow>) -> Result<(), Ph
 /// The fields a `Throw` frame carries, as the argument list the worker rebuilds an exception
 /// from: class, message, code, declared state, file and line.
 pub(crate) fn throw_fields(throw: PhpThrow) -> Vec<PluginValue> {
-    let properties = PluginValue::Array(
-        throw
-            .properties
-            .iter()
-            .map(|(name, value)| (name.as_str().into(), value.clone()))
-            .collect(),
-    );
+    let properties = PluginValue::Array(*throw.properties);
     vec![
         PluginValue::string(throw.exception_class),
         PluginValue::string(throw.message),

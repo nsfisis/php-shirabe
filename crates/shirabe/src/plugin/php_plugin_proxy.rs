@@ -406,15 +406,10 @@ pub(crate) fn dispatch_job_service_method(
                 arg::<i64>(method_name, args, 3)?,
             );
             *throw.properties = match args.get(4) {
-                Some(PluginValue::Array(properties)) => properties
-                    .iter()
-                    .map(|(name, value)| {
-                        (String::from_utf8_lossy(name).into_owned(), value.clone())
-                    })
-                    .collect(),
+                Some(PluginValue::Array(properties)) => properties.clone(),
                 _ => IndexMap::new(),
             };
-            throw.file = arg::<String>(method_name, args, 5)?;
+            throw.file = arg::<bstr::BString>(method_name, args, 5)?;
             throw.line = arg::<i64>(method_name, args, 6)?;
             throw.parents = arg::<Vec<String>>(method_name, args, 7)?;
             job_registry::settle_php_job(id, Err(throw));
@@ -2306,6 +2301,19 @@ impl FromPluginArg for String {
         match value {
             // TODO(bytes): lossy UTF-8; every PHP string crossing the boundary is bytes.
             Some(PluginValue::String(bytes)) => Ok(String::from_utf8_lossy(bytes).into_owned()),
+            other => Err(arg_throw(method, position, "a string", other)),
+        }
+    }
+}
+
+impl FromPluginArg for bstr::BString {
+    fn from_arg(
+        method: &str,
+        position: usize,
+        value: Option<&PluginValue>,
+    ) -> Result<Self, PhpThrow> {
+        match value {
+            Some(PluginValue::String(bytes)) => Ok(bytes.clone()),
             other => Err(arg_throw(method, position, "a string", other)),
         }
     }
