@@ -77,3 +77,6 @@ type_complexity = "allow"
 
 [profile.release]
 strip = "debuginfo"
+
+[patch.crates-io]
+bstr = { git = "https://github.com/nsfisis/bstr", branch = "php-shirabe" }

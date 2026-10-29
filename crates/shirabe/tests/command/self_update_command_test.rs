@@ -61,7 +61,12 @@ fn test_successful_update() {
     )
     .unwrap();
     let status = app_tester.run(None, IndexMap::new()).unwrap();
-    assert_eq!(0, status, "{}", app_tester.get_error_output().unwrap());
+    assert_eq!(
+        0,
+        status,
+        "{}",
+        app_tester.get_error_output().unwrap().display_lossy()
+    );
 
     assert!(
         app_tester
@@ -91,7 +96,12 @@ fn test_update_to_specific_version() {
     )
     .unwrap();
     let status = app_tester.run(None, IndexMap::new()).unwrap();
-    assert_eq!(0, status, "{}", app_tester.get_error_output().unwrap());
+    assert_eq!(
+        0,
+        status,
+        "{}",
+        app_tester.get_error_output().unwrap().display_lossy()
+    );
 
     assert!(
         app_tester
@@ -158,7 +168,12 @@ fn test_update_to_different_channel() {
         )
         .unwrap();
         let status = app_tester.run(None, IndexMap::new()).unwrap();
-        assert_eq!(0, status, "{}", app_tester.get_error_output().unwrap());
+        assert_eq!(
+            0,
+            status,
+            "{}",
+            app_tester.get_error_output().unwrap().display_lossy()
+        );
 
         let output = app_tester.get_output().unwrap();
         assert!(output.contains_str("Upgrading to version"));

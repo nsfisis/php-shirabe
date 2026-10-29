@@ -8,8 +8,8 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, CmpOp, ErrorException, PhpMixed, RuntimeException, UnexpectedValueException,
     ZipArchive, bin2hex, class_exists, file_exists, file_get_contents, filesize, hash_file,
-    impl_php_class, is_file, json_encode, php_regex, preg_match, random_int, str_replace, strlen,
-    substr, version_compare,
+    impl_php_class, is_file, json_encode, legacy_lossy, php_regex, preg_match, random_int,
+    str_replace, strlen, substr, version_compare,
 };
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
@@ -114,7 +114,7 @@ impl ZipDownloader {
                 && let Some(m) =
                     preg_match(php_regex!(r"{^\s*7-Zip(?:\s\[64\])?\s([0-9.]+)}"), &output)
             {
-                let m1 = m.get(1).unwrap_or_default().to_string();
+                let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
                 if version_compare(&m1, "21.01", CmpOp::Lt) {
                     self.inner.io.borrow().write_error(&format!(
                         "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",
@@ -159,7 +159,7 @@ impl ZipDownloader {
                                     .map(|c| c.to_string())
                                     .unwrap_or_default(),
                                 command.join(" "),
-                                output
+                                output.display_lossy()
                             ))
                             .into(),
                             is_last_chance,
@@ -226,7 +226,7 @@ impl ZipDownloader {
                 ));
                 self.inner.io.borrow().write_error(&format!(
                     "File SHA1: {}",
-                    hash_file("sha1", file).unwrap_or_default()
+                    hash_file("sha1", file).unwrap_or_default().display_lossy()
                 ));
                 self.inner.io.borrow().write_error(&format!(
                     "First 100 bytes (hex): {}",
@@ -235,6 +235,7 @@ impl ZipDownloader {
                         0,
                         Some(100)
                     ))
+                    .display_lossy()
                 ));
                 self.inner.io.borrow().write_error(&format!(
                     "Last 100 bytes (hex): {}",
@@ -243,6 +244,7 @@ impl ZipDownloader {
                         -100,
                         None
                     ))
+                    .display_lossy()
                 ));
                 if strlen(package.get_dist_url().unwrap_or_default()) > 0 {
                     self.inner.io.borrow().write_error(&format!(

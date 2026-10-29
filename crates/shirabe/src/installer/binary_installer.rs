@@ -117,7 +117,7 @@ impl BinaryInstaller {
                     .unwrap_or_default();
             }
             self.initialize_bin_dir();
-            let link = format!("{}/{}", self.bin_dir, basename(bin));
+            let link = format!("{}/{}", self.bin_dir, legacy_lossy(&basename(bin)));
             if file_exists(&link) {
                 if !is_link(&link) {
                     if warn_on_overwrite {
@@ -167,7 +167,7 @@ impl BinaryInstaller {
             return;
         }
         for bin in &binaries {
-            let link = format!("{}/{}", self.bin_dir, basename(bin));
+            let link = format!("{}/{}", self.bin_dir, legacy_lossy(&basename(bin)));
             if is_link(&link) || file_exists(&link) {
                 // still checking for symlinks here for legacy support
                 self.filesystem.borrow_mut().unlink(&link);
@@ -278,10 +278,10 @@ impl BinaryInstaller {
                  SET BIN_TARGET=%~dp0/{}\r\n\
                  SET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n\
                  {} \"%BIN_TARGET%\" %*\r\n",
-                trim2(
+                legacy_lossy(&trim2(
                     ProcessExecutor::escape(basename_with_suffix(link, ".bat")),
                     "\"'"
-                ),
+                )),
                 caller,
             ));
         }
@@ -292,7 +292,10 @@ impl BinaryInstaller {
              SET BIN_TARGET=%~dp0/{}\r\n\
              SET COMPOSER_RUNTIME_BIN_DIR=%~dp0\r\n\
              {} \"%BIN_TARGET%\" %*\r\n",
-            trim2(ProcessExecutor::escape(path_to_bytes(&bin_path)), "\"'"),
+            legacy_lossy(&trim2(
+                ProcessExecutor::escape(path_to_bytes(&bin_path)),
+                "\"'"
+            )),
             caller,
         ))
     }
@@ -340,13 +343,13 @@ impl BinaryInstaller {
                     .unwrap_or_else(|| vendor_dir.clone());
                 globals_code.push_str(&format!(
                     "$GLOBALS['_composer_autoload_path'] = {};\n",
-                    self.filesystem.borrow_mut().find_shortest_path_code(
+                    legacy_lossy(&self.filesystem.borrow_mut().find_shortest_path_code(
                         link,
                         format!("{}/autoload.php", vendor_dir_real),
                         false,
                         true,
                         false,
-                    )?,
+                    )?),
                 ));
             }
             // Add workaround for PHPUnit process isolation
@@ -361,7 +364,7 @@ impl BinaryInstaller {
                 // workaround issue on PHPUnit 6.5+ running on PHP 8+
                 globals_code.push_str(&format!(
                         "$GLOBALS['__PHPUNIT_ISOLATION_EXCLUDE_LIST'] = $GLOBALS['__PHPUNIT_ISOLATION_BLACKLIST'] = array(realpath({}));\n",
-                        bin_path_exported,
+                        legacy_lossy(&bin_path_exported),
                     ));
                 // workaround issue on all PHPUnit versions running on PHP <8
                 phpunit_hack1 = "'phpvfscomposer://'.".to_string();
@@ -370,6 +373,7 @@ impl BinaryInstaller {
                 $data = str_replace('__FILE__', var_export($this->realpath, true), $data);"
                     .to_string();
             }
+            let bin_path_exported = legacy_lossy(&bin_path_exported).into_owned();
             if trim(m.get(0).unwrap_or_default()) != "<?php" {
                 stream_hint =
                     " using a stream wrapper to prevent the shebang from being output on PHP<8\n *"
@@ -501,6 +505,8 @@ return include {bin_path_exported};
             ));
         }
 
+        let bin_dir = legacy_lossy(&bin_dir);
+        let bin_file = legacy_lossy(&bin_file);
         Ok(format!(
             r#"#!/usr/bin/env sh
 

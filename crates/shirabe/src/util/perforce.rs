@@ -100,22 +100,22 @@ impl Perforce {
             .get(B("unique_perforce_client_name"))
             .and_then(|v| v.as_string())
         {
-            self.unique_perforce_client_name = value.to_string();
+            self.unique_perforce_client_name = legacy_lossy(value).into_owned();
         }
 
         if let Some(value) = repo_config.get(B("depot")).and_then(|v| v.as_string()) {
-            self.p4_depot = Some(value.to_string());
+            self.p4_depot = Some(legacy_lossy(value).into_owned());
         }
         if let Some(value) = repo_config.get(B("branch")).and_then(|v| v.as_string()) {
-            self.p4_branch = Some(value.to_string());
+            self.p4_branch = Some(legacy_lossy(value).into_owned());
         }
         if let Some(value) = repo_config.get(B("p4user")).and_then(|v| v.as_string()) {
-            self.p4_user = Some(value.to_string());
+            self.p4_user = Some(legacy_lossy(value).into_owned());
         } else {
             self.p4_user = self.get_p4_variable("P4USER");
         }
         if let Some(value) = repo_config.get(B("p4password")).and_then(|v| v.as_string()) {
-            self.p4_password = Some(value.to_string());
+            self.p4_password = Some(legacy_lossy(value).into_owned());
         }
     }
 
@@ -171,7 +171,8 @@ impl Perforce {
             );
             self.p4_client = Some(format!(
                 "composer_perforce_{}_{}",
-                self.unique_perforce_client_name, clean_stream_name
+                self.unique_perforce_client_name,
+                legacy_lossy(&clean_stream_name)
             ));
         }
 
@@ -261,17 +262,21 @@ impl Perforce {
             .io
             .ask("Enter P4 User:".into(), PhpMixed::Null)?
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         let command = if self.windows_flag {
             format!(
                 "{} set P4USER={}",
                 Self::get_p4_executable(),
-                ProcessExecutor::escape(self.p4_user.as_deref().unwrap_or_default())
+                legacy_lossy(&ProcessExecutor::escape(
+                    self.p4_user.as_deref().unwrap_or_default()
+                ))
             )
         } else {
             format!(
                 "export P4USER={}",
-                ProcessExecutor::escape(self.p4_user.as_deref().unwrap_or_default())
+                legacy_lossy(&ProcessExecutor::escape(
+                    self.p4_user.as_deref().unwrap_or_default()
+                ))
             )
         };
         self.execute_command(CommandLine::Shell(bstr::BString::from(command)));
@@ -357,7 +362,7 @@ impl Perforce {
                 .collect::<Vec<_>>(),
         ));
         if exit_code != 0 {
-            let error_output = self.process.borrow().get_error_output().to_string();
+            let error_output = legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
             let user = self.get_user().unwrap_or_default();
             let index = strpos(&error_output, &user);
             if index.is_none() {
@@ -553,7 +558,7 @@ impl Perforce {
                 if !process.is_successful() {
                     return Err(Exception::new(format!(
                         "Error logging in:{}",
-                        self.process.borrow().get_error_output()
+                        self.process.borrow().get_error_output().display_lossy()
                     ))
                     .into());
                 }
@@ -610,9 +615,9 @@ impl Perforce {
 
         let path = format!(
             "{}/{}{}",
-            substr(identifier, 0, Some(idx)),
+            legacy_lossy(&substr(identifier, 0, Some(idx))),
             file,
-            substr(identifier, idx, None)
+            legacy_lossy(&substr(identifier, idx, None))
         );
         let command = self.generate_p4_command(vec!["files".to_string(), path], false);
         self.execute_command(CommandLine::Args(
@@ -631,9 +636,9 @@ impl Perforce {
 
                 return Some(format!(
                     "{}/{}@{}",
-                    substr(identifier, 0, Some(idx)),
+                    legacy_lossy(&substr(identifier, 0, Some(idx))),
                     file,
-                    fields.get(1).cloned().unwrap_or_default()
+                    legacy_lossy(&fields.get(1).cloned().unwrap_or_default())
                 ));
             }
         }
@@ -706,7 +711,7 @@ impl Perforce {
                     .get(self.p4_branch.as_deref().unwrap_or_default())
                     .cloned()
                     .unwrap_or_default(),
-                last_commit_num
+                legacy_lossy(&last_commit_num)
             ),
         );
         result
@@ -789,7 +794,10 @@ impl Perforce {
         let from_change_list = self.get_change_list(from_reference)?;
         let to_change_list = self.get_change_list(to_reference)?;
         let index = strpos(from_reference, "@").unwrap_or(0);
-        let main = format!("{}/...", substr(from_reference, 0, Some(index as i64)));
+        let main = format!(
+            "{}/...",
+            legacy_lossy(&substr(from_reference, 0, Some(index as i64)))
+        );
         let command = self.generate_p4_command(
             vec![
                 "filelog".to_string(),

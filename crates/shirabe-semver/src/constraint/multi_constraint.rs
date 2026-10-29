@@ -1,7 +1,7 @@
 //! ref: composer/vendor/composer/semver/src/Constraint/MultiConstraint.php
 
 use crate::constraint::{AnyConstraint, Bound, MatchAllConstraint};
-use bstr::{BString, ByteSlice};
+use bstr::BString;
 use shirabe_php_shim::{CmpOp, bconcat, implode};
 use std::sync::OnceLock;
 
@@ -266,11 +266,5 @@ impl MultiConstraint {
 
     pub fn get_upper_bound(&self) -> Bound {
         self.extract_bounds().1
-    }
-}
-
-impl std::fmt::Display for MultiConstraint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(self.php_string().as_bstr(), f)
     }
 }

@@ -7,8 +7,8 @@ use indexmap::IndexMap;
 use shirabe::io::IOInterface;
 use shirabe::util::{GetResult, RemoteFilesystem};
 use shirabe_php_shim::{
-    PhpMixed, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS, parse_url,
-    strpos,
+    PhpMixed, STREAM_NOTIFY_FAILURE, STREAM_NOTIFY_FILE_SIZE_IS, STREAM_NOTIFY_PROGRESS,
+    legacy_lossy, parse_url, strpos,
 };
 
 // Mirrors RemoteFilesystemTest::getConfigMock: get('github-domains') and
@@ -43,7 +43,7 @@ fn http_header_list(res: &IndexMap<BString, PhpMixed>) -> Option<Vec<String>> {
         .and_then(|v| v.as_list())
         .map(|list| {
             list.iter()
-                .map(|v| v.as_string().unwrap_or_default().to_string())
+                .map(|v| legacy_lossy(v.as_string().unwrap_or_default()).into_owned())
                 .collect()
         })
 }

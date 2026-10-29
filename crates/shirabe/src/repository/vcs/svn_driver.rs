@@ -77,7 +77,7 @@ impl SvnDriver {
             self.cache_credentials = v.to_bool();
         }
         if let Some(PhpMixed::String(v)) = self.inner.repo_config.get(B("package-path")).cloned() {
-            self.package_path = format!("/{}", trim2(&v, "/"));
+            self.package_path = format!("/{}", legacy_lossy(&trim2(&v, "/")));
         }
 
         if let Some(pos) = strrpos(
@@ -92,13 +92,20 @@ impl SvnDriver {
             self.inner.io.clone(),
             &format!(
                 "{}/{}",
-                self.inner
-                    .config
-                    .borrow_mut()
-                    .get("cache-repo-dir")
-                    .as_string()
-                    .unwrap_or_default(),
-                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(self.base_url.clone())),
+                legacy_lossy(
+                    &self
+                        .inner
+                        .config
+                        .borrow_mut()
+                        .get("cache-repo-dir")
+                        .as_string()
+                        .unwrap_or_default()
+                ),
+                legacy_lossy(&preg_replace(
+                    r"{[^a-z0-9.]}i",
+                    "-",
+                    Url::sanitize(self.base_url.clone())
+                )),
             ),
             None,
             None,
@@ -243,12 +250,15 @@ impl SvnDriver {
         file: &str,
         identifier: &str,
     ) -> anyhow::Result<Option<String>> {
-        let identifier = format!("/{}/", trim2(identifier, "/"));
+        let identifier = format!("/{}/", legacy_lossy(&trim2(identifier, "/")));
 
         let (path, rev) = if let Some(m) = preg_match(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
             && let Some(rev) = m.get(2)
         {
-            (m.get(1).unwrap_or_default().to_string(), rev.to_string())
+            (
+                legacy_lossy(m.get(1).unwrap_or_default()).into_owned(),
+                legacy_lossy(rev).into_owned(),
+            )
         } else {
             (identifier, String::new())
         };
@@ -276,12 +286,15 @@ impl SvnDriver {
         &mut self,
         identifier: &str,
     ) -> anyhow::Result<Option<DateTime<FixedOffset>>> {
-        let identifier = format!("/{}/", trim2(identifier, "/"));
+        let identifier = format!("/{}/", legacy_lossy(&trim2(identifier, "/")));
 
         let (path, rev) = if let Some(m) = preg_match(php_regex!(r"{^(.+?)(@\d+)?/$}"), &identifier)
             && let Some(rev) = m.get(2)
         {
-            (m.get(1).unwrap_or_default().to_string(), rev.to_string())
+            (
+                legacy_lossy(m.get(1).unwrap_or_default()).into_owned(),
+                legacy_lossy(rev).into_owned(),
+            )
         } else {
             (identifier, String::new())
         };
@@ -294,7 +307,7 @@ impl SvnDriver {
             if !line.is_empty()
                 && let Some(m) = preg_match(php_regex!(r"{^Last Changed Date: ([^(]+)}"), &line)
             {
-                let date_str = m.get(1).unwrap_or_default().to_string();
+                let date_str = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
                 return Ok(date_create::<Utc>(date_str.trim())
                     .ok()
                     .map(|d| d.fixed_offset()));
@@ -326,7 +339,7 @@ impl SvnDriver {
                                 .get(1)
                                 .and_then(|s| legacy_lossy(s).parse().ok())
                                 .unwrap_or(0);
-                            let path = m.get(2).unwrap_or_default().to_string();
+                            let path = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
                             if path == "./" {
                                 last_rev = rev;
                             } else {
@@ -371,7 +384,7 @@ impl SvnDriver {
                             .get(1)
                             .and_then(|s| legacy_lossy(s).parse().ok())
                             .unwrap_or(0);
-                        let path = m.get(2).unwrap_or_default().to_string();
+                        let path = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
                         if path == "./" {
                             let identifier = self.build_identifier(
                                 &format!("/{}", self.trunk_path.clone().unwrap_or_default()),
@@ -404,7 +417,7 @@ impl SvnDriver {
                                 .get(1)
                                 .and_then(|s| legacy_lossy(s).parse().ok())
                                 .unwrap_or(0);
-                            let path = m.get(2).unwrap_or_default().to_string();
+                            let path = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
                             if path == "./" {
                                 last_rev = rev;
                             } else {
@@ -481,7 +494,7 @@ impl SvnDriver {
     fn normalize_url(url: &str) -> String {
         let fs = Filesystem::new(None);
         if fs.is_absolute_path(url) {
-            return format!("file://{}", strtr(url, "\\", "/"));
+            return format!("file://{}", legacy_lossy(&strtr(url, "\\", "/")));
         }
 
         url.to_string()
@@ -515,7 +528,7 @@ impl SvnDriver {
                     return Err(RuntimeException::new(format!(
                         "Failed to load {}, svn was not found, check that it is installed and in your PATH env.\n\n{}",
                         self.inner.url,
-                        self.inner.process.borrow().get_error_output(),
+                        self.inner.process.borrow().get_error_output().display_lossy(),
                     ))
                     .into());
                 }

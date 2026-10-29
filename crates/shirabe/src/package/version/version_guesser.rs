@@ -231,8 +231,8 @@ impl VersionGuesser {
                         &branch,
                     )
                 {
-                    let g1 = m.get(1).unwrap_or_default().to_string();
-                    let g2 = m.get(2).unwrap_or_default().to_string();
+                    let g1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
+                    let g2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
                     if g1 == "(no branch)"
                         || strpos(&g1, "(detached ") == Some(0)
                         || strpos(&g1, "(HEAD detached at") == Some(0)
@@ -259,7 +259,7 @@ impl VersionGuesser {
                         &branch,
                     )
                 {
-                    branches.push(m.get(1).unwrap_or_default().to_string());
+                    branches.push(legacy_lossy(m.get(1).unwrap_or_default()).into_owned());
                 }
             }
 
@@ -318,7 +318,7 @@ impl VersionGuesser {
                 .as_list()
                 .map(|l| {
                     l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                         .collect()
                 })
                 .unwrap_or_default(),
@@ -581,7 +581,7 @@ impl VersionGuesser {
                             self.version_parser
                                 .normalize_branch(&legacy_lossy(&candidate_version))?,
                         );
-                        pretty_version = Some(format!("dev-{}", candidate_version));
+                        pretty_version = Some(format!("dev-{}", legacy_lossy(&candidate_version)));
                         if length == 0 {
                             break;
                         }
@@ -612,7 +612,7 @@ impl VersionGuesser {
                 .and_then(|v| v.as_list())
                 .map(|l| {
                     l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -733,7 +733,7 @@ impl VersionGuesser {
                     }));
                 }
 
-                assert!(is_string(&PhpMixed::string(m1.to_string())));
+                assert!(is_string(&PhpMixed::string(legacy_lossy(m1).into_owned())));
                 let pretty_version = legacy_lossy(&trim(m1)).into_owned();
                 let version = if pretty_version == "trunk" {
                     "dev-trunk".to_string()
@@ -766,7 +766,10 @@ impl VersionGuesser {
             }
         };
         if let Some(m) = preg_match(php_regex!(r"{^(\d+(?:\.\d+)*)-dev$}i"), &version) {
-            return Ok(format!("{}.x-dev", m.get(1).unwrap_or_default()));
+            return Ok(format!(
+                "{}.x-dev",
+                legacy_lossy(&m.get(1).unwrap_or_default())
+            ));
         }
 
         Ok(version)

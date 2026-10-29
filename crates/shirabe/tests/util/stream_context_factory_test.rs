@@ -14,7 +14,8 @@ use shirabe::util::http::proxy_manager::ProxyManager;
 use shirabe::util::platform::Platform;
 use shirabe::util::stream_context_factory::StreamContextFactory;
 use shirabe_php_shim::{
-    PhpMixed, base64_encode, extension_loaded, implode, stream_context_get_options, stripos,
+    PhpMixed, base64_encode, extension_loaded, implode, legacy_lossy, stream_context_get_options,
+    stripos,
 };
 
 fn s(value: &str) -> PhpMixed {
@@ -151,7 +152,7 @@ fn test_http_proxy() {
                     s("User-Agent: foo"),
                     s(&format!(
                         "Proxy-Authorization: Basic {}",
-                        base64_encode("username:p@ssword")
+                        legacy_lossy(&base64_encode("username:p@ssword"))
                     )),
                 ]),
             ),
@@ -263,7 +264,7 @@ fn test_options_are_preserved() {
                     s("X-Foo: bar"),
                     s(&format!(
                         "Proxy-Authorization: Basic {}",
-                        base64_encode("username:password")
+                        legacy_lossy(&base64_encode("username:password"))
                     )),
                 ]),
             ),
@@ -302,7 +303,7 @@ fn test_http_proxy_without_port() {
                     s("User-Agent: foo"),
                     s(&format!(
                         "Proxy-Authorization: Basic {}",
-                        base64_encode("username:password")
+                        legacy_lossy(&base64_encode("username:password"))
                     )),
                 ]),
             ),
@@ -438,7 +439,7 @@ fn test_init_options_does_include_proxy_auth_headers() {
         .and_then(|v| v.as_list())
         .unwrap()
         .iter()
-        .filter_map(|item| item.as_string().map(|s| s.to_string()))
+        .filter_map(|item| item.as_string().map(|s| legacy_lossy(s).into_owned()))
         .collect();
     let headers = implode(" ", &header_list);
 
@@ -465,7 +466,7 @@ fn test_init_options_for_curl_does_not_include_proxy_auth_headers() {
         .and_then(|v| v.as_list())
         .unwrap()
         .iter()
-        .filter_map(|item| item.as_string().map(|s| s.to_string()))
+        .filter_map(|item| item.as_string().map(|s| legacy_lossy(s).into_owned()))
         .collect();
     let headers = implode(" ", &header_list);
 

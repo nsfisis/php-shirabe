@@ -159,7 +159,11 @@ impl ArchiveManager {
                 .into_string()
                 .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
             let random_suffix = bin2hex(random_bytes(5));
-            source_path = format!("{}/composer_archive{}", tmp_dir, random_suffix);
+            source_path = format!(
+                "{}/composer_archive{}",
+                tmp_dir,
+                legacy_lossy(&random_suffix)
+            );
             filesystem.ensure_directory_exists(&source_path)?;
 
             let download_result: anyhow::Result<()> = async {
@@ -202,14 +206,14 @@ impl ArchiveManager {
                     if let Some(name) = archive.get("name").and_then(|v| v.as_string())
                         && !name.is_empty()
                     {
-                        package.set_archive_name(name.to_string());
+                        package.set_archive_name(legacy_lossy(name).into_owned());
                     }
                     if let Some(exclude) = archive.get("exclude")
                         && let Some(excludes) = exclude.as_array()
                     {
                         let excludes: Vec<String> = excludes
                             .values()
-                            .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                            .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                             .collect();
                         if !excludes.is_empty() {
                             package.set_archive_excludes(excludes);
@@ -257,7 +261,7 @@ impl ArchiveManager {
                 .into_os_string()
                 .into_string()
                 .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}")),
-            tmp_suffix,
+            legacy_lossy(&tmp_suffix),
             format
         );
         if let Some(parent) = std::path::Path::new(&temp_target).parent() {

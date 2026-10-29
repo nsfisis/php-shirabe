@@ -13,9 +13,10 @@ use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_diff, array_map,
-    array_search_mixed, base64_decode, basename, date_create, empty, explode, extension_loaded,
-    in_array_loose, legacy_lossy, parse_url, php_regex, preg_is_match, preg_match, preg_replace,
-    preg_split, strpos, strtolower, substr, trim, trim2, urlencode,
+    array_search_mixed, base64_decode, basename, bconcat, date_create, empty, explode,
+    extension_loaded, in_array_loose, legacy_lossy, parse_url, php_regex, php_to_string,
+    preg_is_match, preg_match, preg_replace, preg_split, strpos, strtolower, substr, trim, trim2,
+    urlencode,
 };
 
 #[derive(Debug)]
@@ -75,14 +76,14 @@ impl GitHubDriver {
             .into());
         };
 
-        self.owner = match_.get(3).unwrap_or_default().to_string();
-        self.repository = match_.get(4).unwrap_or_default().to_string();
+        self.owner = legacy_lossy(match_.get(3).unwrap_or_default()).into_owned();
+        self.repository = legacy_lossy(match_.get(4).unwrap_or_default()).into_owned();
         self.inner.origin_url = legacy_lossy(&strtolower(
             match_
                 .get(1)
                 .filter(|s| !s.is_empty())
                 .map(|s| legacy_lossy(s).into_owned())
-                .unwrap_or_else(|| match_.get(2).unwrap_or_default().to_string()),
+                .unwrap_or_else(|| legacy_lossy(match_.get(2).unwrap_or_default()).into_owned()),
         ))
         .into_owned();
         if self.inner.origin_url == "www.github.com" {
@@ -92,12 +93,15 @@ impl GitHubDriver {
             self.inner.io.clone(),
             &format!(
                 "{}/{}/{}/{}",
-                self.inner
-                    .config
-                    .borrow_mut()
-                    .get("cache-repo-dir")
-                    .as_string()
-                    .unwrap_or_default(),
+                legacy_lossy(
+                    &self
+                        .inner
+                        .config
+                        .borrow_mut()
+                        .get("cache-repo-dir")
+                        .as_string()
+                        .unwrap_or_default()
+                ),
                 self.inner.origin_url,
                 self.owner,
                 self.repository
@@ -325,7 +329,8 @@ impl GitHubDriver {
                         .filter(|v| !matches!(v, PhpMixed::Bool(false) | PhpMixed::Null));
                     }
                     let label = label.unwrap_or_else(|| PhpMixed::string(identifier.to_string()));
-                    let label_str = label.as_string().unwrap_or(identifier.into()).to_string();
+                    let label_str =
+                        legacy_lossy(label.as_string().unwrap_or(identifier.into())).into_owned();
                     if let Some(support) = composer.get_mut(B("support")).and_then(|v| match v {
                         PhpMixed::Array(m) => Some(m),
                         _ => None,
@@ -470,14 +475,14 @@ impl GitHubDriver {
         for line in preg_split(php_regex!(r"{\r?\n}"), &funding) {
             let line = legacy_lossy(&trim(&line)).into_owned();
             if let Some(m) = preg_match(php_regex!(r"{^(\w+)\s*:\s*(.+)$}"), &line) {
-                let g1 = m.get(1).unwrap_or_default().to_string();
-                let g2 = m.get(2).unwrap_or_default().to_string();
+                let g1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
+                let g2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
                 if g2 == "[" {
                     key = Some(g1);
                     continue;
                 }
                 if let Some(m2) = preg_match(php_regex!(r"{^\[(.*?)\](?:\s*#.*)?$}"), &g2) {
-                    let inner = m2.get(1).unwrap_or_default().to_string();
+                    let inner = legacy_lossy(m2.get(1).unwrap_or_default()).into_owned();
                     for item in array_map(
                         |s: &BString| trim(s),
                         &preg_split(php_regex!(r#"{[\'\"]?\s*,\s*[\'\"]?}"#), &inner),
@@ -498,7 +503,7 @@ impl GitHubDriver {
                 }
                 key = None;
             } else if let Some(m) = preg_match(php_regex!(r"{^(\w+)\s*:\s*#\s*$}"), &line) {
-                key = Some(m.get(1).unwrap_or_default().to_string());
+                key = Some(legacy_lossy(m.get(1).unwrap_or_default()).into_owned());
             } else if key.is_some()
                 && let Some(m) = preg_match(php_regex!(r"{^-\s*(.+)(?:\s+#.*)?$}"), &line)
                     .or_else(|| preg_match(php_regex!(r"{^(.+),(?:\s*#.*)?$}"), &line))
@@ -521,22 +526,24 @@ impl GitHubDriver {
         let mut keys_to_remove: Vec<usize> = vec![];
         let mut result_for_iter: Vec<IndexMap<BString, PhpMixed>> = result.clone();
         for (key_idx, item) in result_for_iter.iter_mut().enumerate() {
-            let item_type = item
-                .get(B("type"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string();
-            let item_url = item
-                .get(B("url"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string();
+            let item_type = legacy_lossy(
+                item.get(B("type"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned();
+            let item_url = legacy_lossy(
+                item.get(B("url"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             match item_type.as_str() {
                 "community_bridge" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(format!(
-                            "https://funding.communitybridge.org/projects/{}",
+                        PhpMixed::string(bconcat!(
+                            "https://funding.communitybridge.org/projects/",
                             basename(&item_url)
                         )),
                     );
@@ -544,7 +551,7 @@ impl GitHubDriver {
                 "github" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(format!("https://github.com/{}", basename(&item_url))),
+                        PhpMixed::string(bconcat!("https://github.com/", basename(&item_url))),
                     );
                 }
                 "issuehunt" => {
@@ -556,20 +563,20 @@ impl GitHubDriver {
                 "ko_fi" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(format!("https://ko-fi.com/{}", basename(&item_url))),
+                        PhpMixed::string(bconcat!("https://ko-fi.com/", basename(&item_url))),
                     );
                 }
                 "liberapay" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(format!("https://liberapay.com/{}", basename(&item_url))),
+                        PhpMixed::string(bconcat!("https://liberapay.com/", basename(&item_url))),
                     );
                 }
                 "open_collective" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(format!(
-                            "https://opencollective.com/{}",
+                        PhpMixed::string(bconcat!(
+                            "https://opencollective.com/",
                             basename(&item_url)
                         )),
                     );
@@ -577,10 +584,7 @@ impl GitHubDriver {
                 "patreon" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(format!(
-                            "https://www.patreon.com/{}",
-                            basename(&item_url)
-                        )),
+                        PhpMixed::string(bconcat!("https://www.patreon.com/", basename(&item_url))),
                     );
                 }
                 "tidelift" => {
@@ -595,14 +599,14 @@ impl GitHubDriver {
                 "polar" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(format!("https://polar.sh/{}", basename(&item_url))),
+                        PhpMixed::string(bconcat!("https://polar.sh/", basename(&item_url))),
                     );
                 }
                 "buy_me_a_coffee" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(format!(
-                            "https://www.buymeacoffee.com/{}",
+                        PhpMixed::string(bconcat!(
+                            "https://www.buymeacoffee.com/",
                             basename(&item_url)
                         )),
                     );
@@ -616,7 +620,7 @@ impl GitHubDriver {
                 "otechie" => {
                     result[key_idx].insert(
                         "url".into(),
-                        PhpMixed::string(format!("https://otechie.com/{}", basename(&item_url))),
+                        PhpMixed::string(bconcat!("https://otechie.com/", basename(&item_url))),
                     );
                 }
                 "custom" => {
@@ -678,7 +682,7 @@ impl GitHubDriver {
             self.owner,
             self.repository,
             file,
-            urlencode(identifier)
+            legacy_lossy(&urlencode(identifier))
         );
         let mut resource = self.get_contents(&resource_url, false)??.decode_json()?;
 
@@ -700,11 +704,13 @@ impl GitHubDriver {
             && resource_map.get(B("encoding")).and_then(|v| v.as_string()) == Some("none".into())
             && resource_map.contains_key(B("git_url"));
         if needs_git_url {
-            let git_url = resource_map
-                .get(B("git_url"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string();
+            let git_url = legacy_lossy(
+                resource_map
+                    .get(B("git_url"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             resource = self.get_contents(&git_url, false)??.decode_json()?;
         }
 
@@ -752,20 +758,21 @@ impl GitHubDriver {
             self.get_api_url(),
             self.owner,
             self.repository,
-            urlencode(identifier)
+            legacy_lossy(&urlencode(identifier))
         );
         let commit = self.get_contents(&resource, false)??.decode_json()?;
 
         let date_str = match commit {
-            PhpMixed::Array(m) => m
-                .get(B("commit"))
-                .and_then(|v| v.as_array())
-                .and_then(|c| c.get(B("committer")))
-                .and_then(|v| v.as_array())
-                .and_then(|c| c.get(B("date")))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string(),
+            PhpMixed::Array(m) => legacy_lossy(
+                m.get(B("commit"))
+                    .and_then(|v| v.as_array())
+                    .and_then(|c| c.get(B("committer")))
+                    .and_then(|v| v.as_array())
+                    .and_then(|c| c.get(B("date")))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned(),
             _ => String::new(),
         };
 
@@ -793,18 +800,22 @@ impl GitHubDriver {
                 if let PhpMixed::List(ref list) = tags_data {
                     for tag in list {
                         if let PhpMixed::Array(ref tag_map) = *tag {
-                            let name = tag_map
-                                .get(B("name"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                                .to_string();
-                            let sha = tag_map
-                                .get(B("commit"))
-                                .and_then(|v| v.as_array())
-                                .and_then(|m| m.get(B("sha")))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                                .to_string();
+                            let name = legacy_lossy(
+                                tag_map
+                                    .get(B("name"))
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default(),
+                            )
+                            .into_owned();
+                            let sha = legacy_lossy(
+                                tag_map
+                                    .get(B("commit"))
+                                    .and_then(|v| v.as_array())
+                                    .and_then(|m| m.get(B("sha")))
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default(),
+                            )
+                            .into_owned();
                             tags.insert(name, sha);
                         }
                     }
@@ -848,13 +859,15 @@ impl GitHubDriver {
                                 .unwrap_or_default();
                             let name = legacy_lossy(&substr(ref_str, 11, None)).into_owned();
                             if name != "gh-pages" {
-                                let sha = branch_map
-                                    .get(B("object"))
-                                    .and_then(|v| v.as_array())
-                                    .and_then(|m| m.get(B("sha")))
-                                    .and_then(|v| v.as_string())
-                                    .unwrap_or_default()
-                                    .to_string();
+                                let sha = legacy_lossy(
+                                    branch_map
+                                        .get(B("object"))
+                                        .and_then(|v| v.as_array())
+                                        .and_then(|m| m.get(B("sha")))
+                                        .and_then(|v| v.as_string())
+                                        .unwrap_or_default(),
+                                )
+                                .into_owned();
                                 branches.insert(name, sha);
                             }
                         }
@@ -892,7 +905,7 @@ impl GitHubDriver {
             .get(2)
             .filter(|s| !s.is_empty())
             .map(|s| legacy_lossy(s).into_owned())
-            .unwrap_or_else(|| matches.get(3).unwrap_or_default().to_string());
+            .unwrap_or_else(|| legacy_lossy(matches.get(3).unwrap_or_default()).into_owned());
         if !in_array_loose(
             strtolower(preg_replace(php_regex!(r"{^www\.}i"), "", &origin_url)),
             config.borrow().get("github-domains").values(),
@@ -1067,8 +1080,8 @@ impl GitHubDriver {
                             self.inner.io.write_error3(
                                 &format!(
                                     "<error>GitHub API limit ({} calls/hr) is exhausted. You are already authorized so you have to wait until {} before doing more requests</error>",
-                                    rate_limit.get(B("limit")).cloned().unwrap_or(PhpMixed::Null),
-                                    rate_limit.get(B("reset")).cloned().unwrap_or(PhpMixed::Null),
+                                    rate_limit.get(B("limit")).map(php_to_string).unwrap_or_default().display_lossy(),
+                                    rate_limit.get(B("reset")).map(php_to_string).unwrap_or_default().display_lossy(),
                                 ),
                                 true,
                                 io_interface::NORMAL,
@@ -1118,18 +1131,22 @@ impl GitHubDriver {
         }
 
         let repo_data = self.repo_data.clone().unwrap_or_default();
-        self.owner = repo_data
-            .get(B("owner"))
-            .and_then(|v| v.as_array())
-            .and_then(|m| m.get(B("login")))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
-        self.repository = repo_data
-            .get(B("name"))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
+        self.owner = legacy_lossy(
+            repo_data
+                .get(B("owner"))
+                .and_then(|v| v.as_array())
+                .and_then(|m| m.get(B("login")))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned();
+        self.repository = legacy_lossy(
+            repo_data
+                .get(B("name"))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned();
 
         self.is_private = !empty(
             &repo_data
@@ -1141,12 +1158,12 @@ impl GitHubDriver {
             .get(B("default_branch"))
             .and_then(|v| v.as_string())
         {
-            self.root_identifier = default_branch.to_string();
+            self.root_identifier = legacy_lossy(default_branch).into_owned();
         } else if let Some(master_branch) = repo_data
             .get(B("master_branch"))
             .and_then(|v| v.as_string())
         {
-            self.root_identifier = master_branch.to_string();
+            self.root_identifier = legacy_lossy(master_branch).into_owned();
         } else {
             self.root_identifier = "master".to_string();
         }
@@ -1233,7 +1250,7 @@ impl GitHubDriver {
         let links = explode(",", &header);
         for link in links.iter() {
             if let Some(m) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
-                return Some(m.get(1).unwrap_or_default().to_string());
+                return Some(legacy_lossy(m.get(1).unwrap_or_default()).into_owned());
             }
         }
 
@@ -1295,7 +1312,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitHubDriver {
                 .map(|(k, v)| {
                     (
                         k.to_str_lossy().into_owned(),
-                        v.as_string().unwrap_or_default().to_string(),
+                        legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
                     )
                 })
                 .collect()
@@ -1309,7 +1326,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitHubDriver {
             .map(|(k, v)| {
                 (
                     k.to_str_lossy().into_owned(),
-                    v.as_string().unwrap_or_default().to_string(),
+                    legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
                 )
             })
             .collect()

@@ -79,7 +79,7 @@ impl VersionBumper {
             )
             (?:$|[,\ |@]) # trailing separator
         }}x"#,
-            major = major
+            major = legacy_lossy(&major)
         );
 
         let constraint_matches: Vec<(String, i64)> = preg_match_all(&pattern, &pretty_constraint)
@@ -90,7 +90,7 @@ impl VersionBumper {
                 let offset = match_
                     .name_offset("constraint")
                     .expect("the `constraint` group participates whenever the pattern matches");
-                (constraint.to_string(), offset as i64)
+                (legacy_lossy(constraint).into_owned(), offset as i64)
             })
             .collect();
         if !constraint_matches.is_empty() {

@@ -1,11 +1,12 @@
 //! ref: composer/vendor/symfony/filesystem/Exception/IOException.php
 
 use shirabe_php_shim::RuntimeException;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct IOException {
     inner: RuntimeException,
-    pub path: Option<String>,
+    pub path: Option<PathBuf>,
 }
 
 impl IOException {
@@ -14,7 +15,7 @@ impl IOException {
         message: String,
         code: i64,
         previous: Option<std::sync::Arc<anyhow::Error>>,
-        path: Option<String>,
+        path: Option<PathBuf>,
     ) -> Self {
         Self {
             inner: RuntimeException::with_code_and_previous(message, code, previous),

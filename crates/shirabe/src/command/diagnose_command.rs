@@ -359,7 +359,7 @@ impl DiagnoseCommand {
                     .unwrap()
                     .borrow_mut()
                     .get(
-                        &format!("{}://repo.packagist.org/{}", protocol, path),
+                        &format!("{}://repo.packagist.org/{}", protocol, legacy_lossy(&path)),
                         IndexMap::new(),
                     )?;
                 let provider = response.get_body().unwrap_or_default().to_string();
@@ -495,16 +495,10 @@ impl DiagnoseCommand {
         }
 
         let min_space_free: f64 = (1024 * 1024) as f64;
-        let home_dir = config
-            .get("home")
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
-        let vendor_dir = config
-            .get("vendor-dir")
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let home_dir =
+            legacy_lossy(config.get("home").as_string().unwrap_or_default()).into_owned();
+        let vendor_dir =
+            legacy_lossy(config.get("vendor-dir").as_string().unwrap_or_default()).into_owned();
         let mut dir = home_dir.clone();
         let df_home = disk_free_space(&home_dir);
         if df_home.map(|d| d < min_space_free).unwrap_or(false) {
@@ -526,11 +520,7 @@ impl DiagnoseCommand {
     }
 
     fn check_pub_keys(&self, config: &Config) -> anyhow::Result<CheckResult> {
-        let home = config
-            .get("home")
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let home = legacy_lossy(config.get("home").as_string().unwrap_or_default()).into_owned();
         let mut errors: Vec<String> = vec![];
         let io = self.get_io();
 
@@ -590,11 +580,13 @@ impl DiagnoseCommand {
             Err(e) => return Ok(CheckResult::Exception(e)),
         };
 
-        let latest_version = latest
-            .get(B("version"))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
+        let latest_version = legacy_lossy(
+            latest
+                .get(B("version"))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned();
         if composer::VERSION != latest_version && composer::VERSION != "@package_version@" {
             return Ok(CheckResult::Message(format!(
                 "<comment>You are not running the latest {} version, run `shirabe self-update` to update ({} => {})</comment>",
@@ -754,11 +746,11 @@ impl DiagnoseCommand {
 
             return format!(
                 "<comment>{}</comment> libz <comment>{}</comment> brotli <comment>{}</comment> zstd <comment>{}</comment> ssl <comment>{}</comment> HTTP <comment>{}</comment>",
-                version.version,
-                libz_version,
-                brotli_version,
+                legacy_lossy(&version.version),
+                legacy_lossy(&libz_version),
+                legacy_lossy(&brotli_version),
                 if has_zstd { "supported" } else { "missing" },
-                ssl_version,
+                legacy_lossy(&ssl_version),
                 http_versions,
             );
         }
@@ -893,7 +885,7 @@ impl DiagnoseCommand {
             php_regex!("{Configure Command(?: *</td><td class=\"v\">| *=> *)(.*?)(?:</td>|$)}m"),
             &diagnostics.phpinfo_general,
         ) {
-            let configure = phpinfo_match.get(1).unwrap_or_default().to_string();
+            let configure = legacy_lossy(phpinfo_match.get(1).unwrap_or_default()).into_owned();
             let configure = configure.as_str();
 
             if configure.contains("--enable-sigchild") {
@@ -1045,7 +1037,8 @@ impl DiagnoseCommand {
 
                         format!(
                             "The OpenSSL library ({}) used by PHP does not support TLSv1.2 or TLSv1.1.{}If possible you should upgrade OpenSSL to version 1.0.1 or above.",
-                            openssl_version, PHP_EOL
+                            legacy_lossy(&openssl_version),
+                            PHP_EOL
                         )
                     }
                     "xdebug_loaded" => format!(
@@ -1291,7 +1284,7 @@ impl Command for DiagnoseCommand {
         io.write(&format!(
             "OpenSSL version: {}",
             match &diagnostics.openssl_version_text {
-                Some(text) => format!("<comment>{}</comment>", text),
+                Some(text) => format!("<comment>{}</comment>", legacy_lossy(&text)),
                 None => "<error>missing</error>".to_string(),
             }
         ));
@@ -1344,10 +1337,10 @@ impl Command for DiagnoseCommand {
             let c = crate::composer::composer_full(c);
             io.write(&format!(
                 "Active plugins: {}",
-                implode(
+                legacy_lossy(&implode(
                     ", ",
                     &c.get_plugin_manager().borrow().get_registered_plugins()
-                )
+                ))
             ));
 
             io.write_no_newline("Checking composer.json: ");
@@ -1409,10 +1402,12 @@ impl Command for DiagnoseCommand {
                 }
                 io.write_no_newline(&format!(
                     "Checking connectivity to {}: ",
-                    repo_arr
-                        .get(B("url"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
+                    legacy_lossy(
+                        &repo_arr
+                            .get(B("url"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default()
+                    )
                 ));
                 let r = self.check_composer_repo(&url, &config)?;
                 self.output_result(r);
@@ -1462,7 +1457,10 @@ impl Command for DiagnoseCommand {
             .unwrap_or_default();
         if oauth.len() as i64 > 0 {
             for (domain, token) in &oauth {
-                io.write_no_newline(&format!("Checking {} oauth access: ", domain));
+                io.write_no_newline(&format!(
+                    "Checking {} oauth access: ",
+                    legacy_lossy(&domain)
+                ));
                 let r = self.check_github_oauth(
                     // TODO(bytes): domains are Strings, so non-UTF-8 bytes are replaced.
                     &domain.to_str_lossy(),

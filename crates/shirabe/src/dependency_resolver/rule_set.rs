@@ -3,7 +3,7 @@
 use crate::dependency_resolver::{Pool, Request, Rule, RuleSetIterator};
 use crate::repository::RepositorySet;
 use indexmap::IndexMap;
-use shirabe_php_shim::OutOfBoundsException;
+use shirabe_php_shim::{OutOfBoundsException, legacy_lossy, php_to_string};
 
 #[derive(Debug)]
 pub struct RuleSet {
@@ -59,7 +59,7 @@ impl RuleSet {
             return Err(OutOfBoundsException::new(format!("Unknown rule type: {}", r#type)).into());
         }
 
-        let hash = rule.borrow().get_hash()?.to_string();
+        let hash = legacy_lossy(&php_to_string(&rule.borrow().get_hash()?)).into_owned();
 
         // Skip exact duplicates that share the same hash.
         if let Some(potential_duplicates) = self.rules_by_hash.get(&hash) {

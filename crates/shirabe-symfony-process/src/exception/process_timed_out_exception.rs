@@ -15,7 +15,7 @@ impl ProcessTimedOutException {
 
         let message = format!(
             "The process \"{}\" exceeded the timeout of {} seconds.",
-            process.get_command_line(),
+            process.get_command_line().display_lossy(),
             exceeded_timeout.map(|t| t.to_string()).unwrap_or_default(),
         );
 

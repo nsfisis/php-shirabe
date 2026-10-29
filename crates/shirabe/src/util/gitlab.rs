@@ -9,7 +9,7 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, http_build_query, in_array_strict, json_decode_assoc,
-    php_regex, preg_replace, time,
+    legacy_lossy, php_regex, preg_replace, time,
 };
 
 #[derive(Debug)]
@@ -126,20 +126,22 @@ impl GitLab {
         if let Some(token) = token {
             let (username, password) = match &token {
                 PhpMixed::Array(arr) => {
-                    let username = arr
-                        .get(B("username"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
-                    let password = arr
-                        .get(B("token"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("private-token".into())
-                        .to_string();
+                    let username = legacy_lossy(
+                        arr.get(B("username"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned();
+                    let password = legacy_lossy(
+                        arr.get(B("token"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or("private-token".into()),
+                    )
+                    .into_owned();
                     (username, password)
                 }
                 _ => {
-                    let username = token.as_string().unwrap_or_default().to_string();
+                    let username = legacy_lossy(token.as_string().unwrap_or_default()).into_owned();
                     let password = "private-token".to_string();
                     (username, password)
                 }
@@ -304,12 +306,14 @@ impl GitLab {
                 }
             };
 
-            let access_token = response
-                .as_array()
-                .and_then(|arr| arr.get(B("access_token")))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string();
+            let access_token = legacy_lossy(
+                response
+                    .as_array()
+                    .and_then(|arr| arr.get(B("access_token")))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned();
 
             self.io.borrow_mut().set_authentication(
                 origin_url.to_string(),
@@ -384,12 +388,14 @@ impl GitLab {
             },
         };
 
-        let access_token = response
-            .as_array()
-            .and_then(|arr| arr.get(B("access_token")))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
+        let access_token = legacy_lossy(
+            response
+                .as_array()
+                .and_then(|arr| arr.get(B("access_token")))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned();
 
         self.io.borrow_mut().set_authentication(
             origin_url.to_string(),
@@ -476,7 +482,7 @@ impl GitLab {
             .and_then(|v| v.as_array())
             .and_then(|token_map| token_map.get(B("refresh-token")))
             .and_then(|v| v.as_string())
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
 
         let refresh_token = match refresh_token {
             Some(t) => t,
@@ -543,12 +549,14 @@ impl GitLab {
             .and_then(|arr| arr.get(B("expires_in")))
             .and_then(|v| v.as_int())
             .unwrap_or(0);
-        let refresh_token = response
-            .as_array()
-            .and_then(|arr| arr.get(B("refresh_token")))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
+        let refresh_token = legacy_lossy(
+            response
+                .as_array()
+                .and_then(|arr| arr.get(B("refresh_token")))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned();
         let mut setting = IndexMap::new();
         setting.insert("expires-at".into(), PhpMixed::Int(created_at + expires_in));
         setting.insert("refresh-token".into(), PhpMixed::string(refresh_token));

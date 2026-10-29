@@ -504,11 +504,12 @@ impl NativeHttpDownloader {
         attributes: &IndexMap<BString, PhpMixed>,
     ) -> Result<RawResponse, TransportError> {
         let http = options.get(B("http")).and_then(|v| v.as_array());
-        let method = http
-            .and_then(|h| h.get(B("method")))
-            .and_then(|v| v.as_string())
-            .unwrap_or("GET".into())
-            .to_string();
+        let method = legacy_lossy(
+            http.and_then(|h| h.get(B("method")))
+                .and_then(|v| v.as_string())
+                .unwrap_or("GET".into()),
+        )
+        .into_owned();
         let body = http
             .and_then(|h| h.get(B("content")))
             .and_then(|v| v.as_string())
@@ -873,7 +874,7 @@ impl NativeHttpDownloader {
             details = format!(
                 ":{}{}{}",
                 PHP_EOL,
-                substr(body, 0, Some(200)),
+                legacy_lossy(&substr(body, 0, Some(200))),
                 if strlen(body) > 200 { "..." } else { "" }
             );
         }
@@ -908,7 +909,7 @@ impl NativeHttpDownloader {
             .and_then(|v| match v {
                 PhpMixed::List(l) => Some(
                     l.iter()
-                        .filter_map(|x| x.as_string().map(|s| s.to_string()))
+                        .filter_map(|x| x.as_string().map(|s| legacy_lossy(s).into_owned()))
                         .collect(),
                 ),
                 _ => None,

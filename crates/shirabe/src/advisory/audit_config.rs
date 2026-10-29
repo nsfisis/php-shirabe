@@ -4,7 +4,7 @@ use crate::advisory::Auditor;
 use crate::config::Config;
 use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, canonical_int_key};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, canonical_int_key, legacy_lossy};
 
 #[derive(Debug, Clone)]
 pub struct AuditConfig {
@@ -72,8 +72,8 @@ impl AuditConfig {
             PhpMixed::List(list) => {
                 for value in list {
                     if let Some(id) = value.as_string() {
-                        for_audit.insert(id.to_string(), None);
-                        for_block.insert(id.to_string(), None);
+                        for_audit.insert(legacy_lossy(id).into_owned(), None);
+                        for_block.insert(legacy_lossy(id).into_owned(), None);
                     }
                 }
                 return Ok((for_audit, for_block));
@@ -103,20 +103,22 @@ impl AuditConfig {
                     }
                 }
                 PhpMixed::Array(detail) => {
-                    let apply = detail
-                        .get(B("apply"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or("all".into())
-                        .to_string();
+                    let apply = legacy_lossy(
+                        detail
+                            .get(B("apply"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or("all".into()),
+                    )
+                    .into_owned();
                     let reason = detail
                         .get(B("reason"))
                         .and_then(|v| v.as_string())
-                        .map(|s| s.to_string());
+                        .map(|s| legacy_lossy(s).into_owned());
 
                     if !["audit", "block", "all"].contains(&apply.as_str()) {
                         return Err(InvalidArgumentException::new(format!(
                             "Invalid 'apply' value for '{}': {}. Expected 'audit', 'block', or 'all'.",
-                            key, apply
+                            key.display_lossy(), apply
                         )).into());
                     }
 
@@ -168,11 +170,13 @@ impl AuditConfig {
         let (ignore_severity_for_audit, ignore_severity_for_blocking) =
             Self::parse_ignore_with_apply(&ignore_severity_raw)?;
 
-        let audit_abandoned = audit_config
-            .and_then(|m| m.get(B("abandoned")))
-            .and_then(|v| v.as_string())
-            .unwrap_or(Auditor::ABANDONED_FAIL.into())
-            .to_string();
+        let audit_abandoned = legacy_lossy(
+            audit_config
+                .and_then(|m| m.get(B("abandoned")))
+                .and_then(|v| v.as_string())
+                .unwrap_or(Auditor::ABANDONED_FAIL.into()),
+        )
+        .into_owned();
 
         let block_insecure = audit_config
             .and_then(|m| m.get(B("block-insecure")))

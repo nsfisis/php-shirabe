@@ -387,7 +387,7 @@ impl IOInterfaceImmutable for ConsoleIO {
             .expect("a freshly constructed question has no autocompleter");
 
         let result = self.ask_question(&question)?;
-        Ok(result.as_string().map(|s| s.to_string()))
+        Ok(result.as_string().map(|s| legacy_lossy(s).into_owned()))
     }
 
     fn select(
@@ -461,19 +461,22 @@ impl IOInterfaceImmutable for ConsoleIO {
         }
 
         if !is_array(&result) {
-            let result_str = result.as_string().unwrap_or_default().to_string();
+            let result_str = legacy_lossy(result.as_string().unwrap_or_default()).into_owned();
             let haystack: IndexMap<String, String> = match &choices {
                 PhpMixed::List(l) => l
                     .iter()
                     .enumerate()
-                    .filter_map(|(i, v)| v.as_string().map(|s| (i.to_string(), s.to_string())))
+                    .filter_map(|(i, v)| {
+                        v.as_string()
+                            .map(|s| (i.to_string(), legacy_lossy(s).into_owned()))
+                    })
                     .collect(),
                 PhpMixed::Array(a) => a
                     .iter()
                     // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
                     .filter_map(|(k, v)| {
                         v.as_string()
-                            .map(|s| (k.to_str_lossy().into_owned(), s.to_string()))
+                            .map(|s| (k.to_str_lossy().into_owned(), legacy_lossy(s).into_owned()))
                     })
                     .collect(),
                 _ => IndexMap::new(),

@@ -86,7 +86,7 @@ fn read_test_file(file: &str, fixtures_dir: &str) -> IndexMap<String, String> {
                 panic!(
                     "The test file \"{}\" must not contain a section named \"{}\".",
                     file.replace(&format!("{}/", fixtures_dir), ""),
-                    token
+                    token.display_lossy()
                 );
             }
             section = Some(legacy_lossy(&token).into_owned());
@@ -352,10 +352,12 @@ fn run_test_pool_builder(
     };
 
     let minimum_stability: String = if !is_empty(get_root("minimum-stability")) {
-        get_root("minimum-stability")
-            .and_then(|v| v.as_string())
-            .unwrap_or("stable".into())
-            .to_string()
+        legacy_lossy(
+            get_root("minimum-stability")
+                .and_then(|v| v.as_string())
+                .unwrap_or("stable".into()),
+        )
+        .into_owned()
     } else {
         "stable".to_string()
     };
@@ -368,7 +370,7 @@ fn run_test_pool_builder(
                 m.iter()
                     .filter_map(|(k, v)| {
                         v.as_string()
-                            .map(|s| (k.to_str_lossy().into_owned(), s.to_string()))
+                            .map(|s| (k.to_str_lossy().into_owned(), legacy_lossy(s).into_owned()))
                     })
                     .collect()
             })
@@ -384,7 +386,7 @@ fn run_test_pool_builder(
                 m.iter()
                     .filter_map(|(k, v)| {
                         v.as_string()
-                            .map(|s| (k.to_str_lossy().into_owned(), s.to_string()))
+                            .map(|s| (k.to_str_lossy().into_owned(), legacy_lossy(s).into_owned()))
                     })
                     .collect()
             })
@@ -406,11 +408,13 @@ fn run_test_pool_builder(
     // PHP: foreach ($rootAliases as $index => $alias) { normalize version + alias }
     let mut root_aliases: Vec<RootAliasInput> = Vec::new();
     for alias in &root_aliases_data {
-        let package = alias
-            .get(B("package"))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
+        let package = legacy_lossy(
+            alias
+                .get(B("package"))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned();
         let version = parser
             .normalize(
                 &alias
@@ -421,11 +425,13 @@ fn run_test_pool_builder(
                 None,
             )
             .unwrap();
-        let alias_str = alias
-            .get(B("alias"))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
+        let alias_str = legacy_lossy(
+            alias
+                .get(B("alias"))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned();
         let alias_normalized = parser
             .normalize(
                 &alias
@@ -585,7 +591,7 @@ fn run_test_pool_builder(
             .as_list()
             .unwrap()
             .iter()
-            .filter_map(|v| v.as_string().map(|s| s.to_string()))
+            .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
             .collect();
         request.set_update_allow_list(allow_list_names, transitive_deps);
     }

@@ -67,16 +67,16 @@ impl Hg {
         {
             let authenticated_url = if matches.name("proto") == Some(bstr::BStr::new("ssh")) {
                 let user = if let Some(u) = matches.name("user") {
-                    format!("{}@", rawurlencode(u))
+                    format!("{}@", legacy_lossy(&rawurlencode(u)))
                 } else {
                     String::new()
                 };
                 format!(
                     "{}://{}{}{}",
-                    matches.name("proto").unwrap_or_default(),
+                    legacy_lossy(&matches.name("proto").unwrap_or_default()),
                     user,
-                    matches.name("host").unwrap_or_default(),
-                    matches.name("path").unwrap_or_default(),
+                    legacy_lossy(&matches.name("host").unwrap_or_default()),
+                    legacy_lossy(&matches.name("path").unwrap_or_default()),
                 )
             } else {
                 let auth = self
@@ -84,19 +84,19 @@ impl Hg {
                     .get_authentication(&legacy_lossy(matches.name("host").unwrap_or_default()));
                 format!(
                     "{}://{}:{}@{}{}",
-                    matches.name("proto").unwrap_or_default(),
-                    rawurlencode(
+                    legacy_lossy(&matches.name("proto").unwrap_or_default()),
+                    legacy_lossy(&rawurlencode(
                         auth.get("username")
                             .and_then(|s| s.as_deref())
                             .unwrap_or_default()
-                    ),
-                    rawurlencode(
+                    )),
+                    legacy_lossy(&rawurlencode(
                         auth.get("password")
                             .and_then(|s| s.as_deref())
                             .unwrap_or_default()
-                    ),
-                    matches.name("host").unwrap_or_default(),
-                    matches.name("path").unwrap_or_default(),
+                    )),
+                    legacy_lossy(&matches.name("host").unwrap_or_default()),
+                    legacy_lossy(&matches.name("path").unwrap_or_default()),
                 )
             };
 
@@ -111,7 +111,7 @@ impl Hg {
                 return Ok(());
             }
 
-            let error = self.process.borrow().get_error_output().to_string();
+            let error = legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
             return self.throw_exception(&format!("Failed to clone {}, \n\n{}", url, error), &url);
         }
 
@@ -129,7 +129,7 @@ impl Hg {
                 Url::sanitize(format!(
                     "Failed to clone {}, hg was not found, check that it is installed and in your PATH env.\n\n{}",
                     url,
-                    self.process.borrow().get_error_output()
+                    self.process.borrow().get_error_output().display_lossy()
                 ))
             );
         }

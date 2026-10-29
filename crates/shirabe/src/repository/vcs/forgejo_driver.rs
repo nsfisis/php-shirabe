@@ -12,7 +12,7 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, base64_decode, date_create, explode, extension_loaded,
-    php_regex, preg_match, urlencode,
+    legacy_lossy, php_regex, preg_match, urlencode,
 };
 
 #[derive(Debug)]
@@ -49,12 +49,15 @@ impl ForgejoDriver {
 
         let cache_dir = format!(
             "{}/{}/{}/{}",
-            self.inner
-                .config
-                .borrow_mut()
-                .get("cache-repo-dir")
-                .as_string()
-                .unwrap_or_default(),
+            legacy_lossy(
+                &self
+                    .inner
+                    .config
+                    .borrow_mut()
+                    .get("cache-repo-dir")
+                    .as_string()
+                    .unwrap_or_default()
+            ),
             forgejo_url.origin_url,
             forgejo_url.owner,
             forgejo_url.repository
@@ -98,7 +101,7 @@ impl ForgejoDriver {
             "{}/contents/{}?ref={}",
             api_url,
             file,
-            urlencode(identifier)
+            legacy_lossy(&urlencode(identifier))
         );
         let response = self.get_contents(&resource_url, false)??;
         let mut resource = response.decode_json()?;
@@ -181,7 +184,7 @@ impl ForgejoDriver {
         let resource_url = format!(
             "{}/git/commits/{}?verification=false&files=false",
             api_url,
-            urlencode(identifier)
+            legacy_lossy(&urlencode(identifier))
         );
         let commit = self.get_contents(&resource_url, false)??.decode_json()?;
 
@@ -572,7 +575,7 @@ impl ForgejoDriver {
             if let Some(m) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), &link)
                 && let Some(url) = m.get(1)
             {
-                return Some(url.to_string());
+                return Some(legacy_lossy(url).into_owned());
             }
         }
 

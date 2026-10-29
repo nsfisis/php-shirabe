@@ -73,8 +73,12 @@ impl PartialSecurityAdvisory {
                             arr.iter()
                                 // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
                                 .filter_map(|(k, v)| {
-                                    v.as_string()
-                                        .map(|s| (k.to_str_lossy().into_owned(), s.to_string()))
+                                    v.as_string().map(|s| {
+                                        (
+                                            k.to_str_lossy().into_owned(),
+                                            legacy_lossy(s).into_owned(),
+                                        )
+                                    })
                                 })
                                 .collect()
                         })
@@ -83,32 +87,27 @@ impl PartialSecurityAdvisory {
                 .unwrap_or_default();
             let advisory = SecurityAdvisory::new(
                 package_name.to_string(),
-                data[B("advisoryId")]
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string(),
+                legacy_lossy(data[B("advisoryId")].as_string().unwrap_or_default()).into_owned(),
                 constraint,
-                data[B("title")].as_string().unwrap_or_default().to_string(),
+                legacy_lossy(data[B("title")].as_string().unwrap_or_default()).into_owned(),
                 sources,
                 reported_at,
                 data.get(B("cve"))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string()),
+                    .map(|s| legacy_lossy(s).into_owned()),
                 data.get(B("link"))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string()),
+                    .map(|s| legacy_lossy(s).into_owned()),
                 data.get(B("severity"))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string()),
+                    .map(|s| legacy_lossy(s).into_owned()),
             );
             return Ok(AnySecurityAdvisory::Full(advisory));
         }
 
         Ok(AnySecurityAdvisory::Partial(Self {
-            advisory_id: data[B("advisoryId")]
-                .as_string()
-                .unwrap_or_default()
-                .to_string(),
+            advisory_id: legacy_lossy(data[B("advisoryId")].as_string().unwrap_or_default())
+                .into_owned(),
             package_name: package_name.to_string(),
             affected_versions: constraint,
         }))

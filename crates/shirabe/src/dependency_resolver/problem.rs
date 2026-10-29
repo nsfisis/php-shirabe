@@ -101,7 +101,10 @@ impl Problem {
                     &package_name,
                     constraint,
                 )?;
-                return Ok(format!("\n    {}", implode("", &[missing.0, missing.1])));
+                return Ok(format!(
+                    "\n    {}",
+                    implode("", &[missing.0, missing.1]).display_lossy()
+                ));
             }
         }
 
@@ -227,8 +230,8 @@ impl Problem {
                 None
             };
             if let Some(m) = matched {
-                let pkg_key = m.get(1).unwrap_or_default().to_string();
-                let m2 = m.get(2).unwrap_or_default().to_string();
+                let pkg_key = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
+                let m2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
                 message = legacy_lossy(&str_replace("%", "%%", &message)).into_owned();
                 let template =
                     legacy_lossy(&preg_replace(php_regex!(r"{^\S+ \S+ }"), "%s%s ", &message))
@@ -307,9 +310,10 @@ impl Problem {
                                 &message_var,
                                 &[
                                     PhpMixed::string(package.clone()),
-                                    PhpMixed::string(format!(
-                                        "[{}]",
-                                        implode(", ", &versions_list)
+                                    PhpMixed::string(bconcat!(
+                                        "[",
+                                        implode(", ", &versions_list),
+                                        "]"
                                     )),
                                 ],
                             ))
@@ -337,7 +341,7 @@ impl Problem {
         Ok(format!(
             "\n{}- {}",
             indent,
-            implode(format!("\n{}- ", indent), &result)
+            implode(format!("\n{}- ", indent), &result).display_lossy()
         ))
     }
 
@@ -442,7 +446,7 @@ impl Problem {
                         format!(
                             "PHP extension {} should be required as {}.",
                             package_name,
-                            str_replace(" ", "-", package_name)
+                            str_replace(" ", "-", package_name).display_lossy()
                         ),
                     ));
                 }
@@ -607,7 +611,7 @@ impl Problem {
                             constraint,
                             false
                         ),
-                        str_replace("#", "+", c.get_pretty_string())
+                        str_replace("#", "+", c.get_pretty_string()).display_lossy()
                     ),
                 ));
             }
@@ -647,7 +651,7 @@ impl Problem {
                             } else {
                                 "it conflicts"
                             },
-                            root_reqs[package_name].get_pretty_string()
+                            root_reqs[package_name].get_pretty_string().display_lossy()
                         ),
                     ));
                 }
@@ -686,7 +690,7 @@ impl Problem {
                                     "it conflicts"
                                 },
                                 name,
-                                temp_reqs[&name].get_pretty_string()
+                                temp_reqs[&name].get_pretty_string().display_lossy()
                             ),
                         ));
                     }
@@ -793,7 +797,8 @@ impl Problem {
                                 return format!(
                                     "<href={}>{}</>",
                                     OutputFormatter::escape(link)
-                                        .expect("OutputFormatter::escape does not fail"),
+                                        .expect("OutputFormatter::escape does not fail")
+                                        .display_lossy(),
                                     advisory_id
                                 );
                             }
@@ -805,7 +810,8 @@ impl Problem {
                                         "https://packagist.org/security-advisories/{}",
                                         advisory_id
                                     ))
-                                    .expect("OutputFormatter::escape does not fail"),
+                                    .expect("OutputFormatter::escape does not fail")
+                                    .display_lossy(),
                                     advisory_id
                                 );
                             }
@@ -827,7 +833,8 @@ impl Problem {
                                         "https://packagist.org/security-advisories/{}",
                                         advisory_id
                                     ))
-                                    .expect("OutputFormatter::escape does not fail"),
+                                    .expect("OutputFormatter::escape does not fail")
+                                    .display_lossy(),
                                     advisory_id
                                 );
                             }
@@ -852,7 +859,7 @@ impl Problem {
                             constraint,
                             false
                         ),
-                        implode("\", \"", &advisories_list)
+                        implode("\", \"", &advisories_list).display_lossy()
                     ),
                 ));
             }
@@ -995,7 +1002,7 @@ impl Problem {
                 format!("- Root composer.json requires {}, it ", package_name),
                 format!(
                     "could not be found, it looks like its name is invalid, \"{}\" is not allowed in package names.",
-                    illegal_chars
+                    illegal_chars.display_lossy()
                 ),
             ));
         }
@@ -1112,7 +1119,7 @@ impl Problem {
             prepared_strings.push(format!(
                 "{}[{}]",
                 package.name,
-                implode(", ", &version_list)
+                implode(", ", &version_list).display_lossy()
             ));
         }
 
@@ -1151,7 +1158,7 @@ impl Problem {
                         return Some(format!(
                             "{} {}d by {}",
                             link.get_pretty_constraint(),
-                            substr(link.get_description(), 0, Some(-1)),
+                            substr(link.get_description(), 0, Some(-1)).display_lossy(),
                             selected.get_pretty_string()
                         ));
                     }
@@ -1168,7 +1175,11 @@ impl Problem {
                     .as_complete()
                     .and_then(|c| c.get_description())
                     .unwrap_or_default();
-                version = format!("{}; {}", version, str_replace("Package ", "", &description));
+                version = format!(
+                    "{}; {}",
+                    version,
+                    str_replace("Package ", "", &description).display_lossy()
+                );
             }
             return Some(version);
         }
@@ -1375,7 +1386,10 @@ impl Problem {
             && !c.get_version().starts_with(b"dev-")
         {
             if !preg_is_match(php_regex!(r"{^\d+(?:\.\d+)*$}"), c.get_pretty_string()) {
-                return format!(" {} (exact version match)", c.get_pretty_string());
+                return format!(
+                    " {} (exact version match)",
+                    c.get_pretty_string().display_lossy()
+                );
             }
 
             let mut versions = vec![c.get_pretty_string()];
@@ -1390,21 +1404,21 @@ impl Problem {
             let detail = if versions.len() > 1 {
                 format!(
                     "{} or {}",
-                    implode(", ", &versions[..versions.len() - 1]),
-                    last
+                    (implode(", ", &versions[..versions.len() - 1])).display_lossy(),
+                    last.display_lossy()
                 )
             } else {
                 legacy_lossy(&versions[0].clone()).into_owned()
             };
             return format!(
                 " {} (exact version match: {})",
-                c.get_pretty_string(),
+                c.get_pretty_string().display_lossy(),
                 detail
             );
         }
 
         match constraint {
-            Some(c) => format!(" {}", c.get_pretty_string()),
+            Some(c) => format!(" {}", c.get_pretty_string().display_lossy()),
             None => String::new(),
         }
     }
@@ -1433,7 +1447,9 @@ impl Problem {
                     .iter()
                     .map(|p| {
                         let description = match &p.description {
-                            Some(d) if !d.is_empty() => format!(" {}", substr(d, 0, Some(100))),
+                            Some(d) if !d.is_empty() => {
+                                format!(" {}", substr(d, 0, Some(100)).display_lossy())
+                            }
                             _ => String::new(),
                         };
 

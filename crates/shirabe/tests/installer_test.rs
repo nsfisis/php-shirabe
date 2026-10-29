@@ -619,7 +619,7 @@ fn read_test_file(
                 known.contains(&*legacy_lossy(&token)),
                 "The test file \"{}\" must not contain a section named \"{}\".",
                 file.display(),
-                token
+                token.display_lossy()
             );
             section = Some(legacy_lossy(&token).into_owned());
             continue;
@@ -1212,7 +1212,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         result,
         "{}{}",
         output_string,
-        bstr::BStr::new(&app_output_contents)
+        bstr::BStr::new(&app_output_contents).display_lossy()
     );
 
     if let ExpectLock::Json(expect_lock) = &case.expect_lock {
@@ -1257,12 +1257,12 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
                 let an = a
                     .get(B("name"))
                     .and_then(|m| m.as_string())
-                    .map(|s| s.to_string())
+                    .map(|s| legacy_lossy(s).into_owned())
                     .unwrap_or_default();
                 let bn = b
                     .get(B("name"))
                     .and_then(|m| m.as_string())
-                    .map(|s| s.to_string())
+                    .map(|s| legacy_lossy(s).into_owned())
                     .unwrap_or_default();
                 an.cmp(&bn)
             },

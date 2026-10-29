@@ -139,7 +139,7 @@ impl GitHub {
             "Use the following URL to create such a token:".to_string(),
             format!(
                 "https://{}/settings/personal-access-tokens/new?name={}",
-                origin_url, encoded_note
+                origin_url, legacy_lossy(&encoded_note)
             ),
             String::new(),
         ];
@@ -152,7 +152,7 @@ impl GitHub {
             "to the right user or organisation. Additionally, you can scope permissions down to apply only to selected repositories.".to_string(),
             format!(
                 "https://{}/settings/personal-access-tokens/new?contents=read&name={}",
-                origin_url, encoded_note
+                origin_url, legacy_lossy(&encoded_note)
             ),
             String::new(),
         ];
@@ -166,7 +166,7 @@ impl GitHub {
             "is not an option. You can generate a classic token here:".to_string(),
             format!(
                 "https://{}/settings/tokens/new?scopes=repo&description={}",
-                origin_url, encoded_note
+                origin_url, legacy_lossy(&encoded_note)
             ),
             String::new(),
         ];

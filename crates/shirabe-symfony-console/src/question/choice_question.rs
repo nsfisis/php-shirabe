@@ -5,8 +5,7 @@ use crate::question::{Question, QuestionInterface};
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, array_search, explode, implode, legacy_lossy, php_regex, preg_is_match, sprintf,
-    strval, trim,
+    PhpMixed, array_search, explode, legacy_lossy, php_regex, preg_is_match, sprintf, strval, trim,
 };
 
 /// Represents a choice question.
@@ -159,7 +158,7 @@ impl ChoiceQuestion {
                 if results.len() > 1 {
                     return Err(InvalidArgumentException::new(format!(
                         "The provided answer is ambiguous. Value should be one of \"{}\".",
-                        implode("\" or \"", &results),
+                        results.join("\" or \""),
                     )));
                 }
 

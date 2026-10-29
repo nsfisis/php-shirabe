@@ -54,7 +54,7 @@ impl FundCommand {
             if url_val.is_none_or(|s| s.is_empty()) {
                 continue;
             }
-            let mut url = url_val.unwrap().to_string();
+            let mut url = legacy_lossy(url_val.unwrap()).into_owned();
             let r#type = funding_option
                 .get(B("type"))
                 .and_then(|v| v.as_string())
@@ -191,7 +191,7 @@ impl Command for FundCommand {
                     }
                     io.write(&format!(
                         "    <href={}>{}</>",
-                        OutputFormatter::escape(url)?,
+                        legacy_lossy(&OutputFormatter::escape(url)?),
                         url
                     ));
                 }

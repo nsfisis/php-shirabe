@@ -264,14 +264,14 @@ impl XmlDescriptor {
                 "shortcut",
                 &format!(
                     "-{}",
-                    substr(option.get_shortcut().unwrap(), 0, Some(pos as i64))
+                    legacy_lossy(&substr(option.get_shortcut().unwrap(), 0, Some(pos as i64)))
                 ),
             );
             object_xml.set_attribute(
                 "shortcuts",
                 &format!(
                     "-{}",
-                    str_replace("|", "|-", option.get_shortcut().unwrap())
+                    legacy_lossy(&str_replace("|", "|-", option.get_shortcut().unwrap()))
                 ),
             );
         } else {

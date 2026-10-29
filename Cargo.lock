@@ -184,8 +184,7 @@ checksum = "dc0b364ead1874514c8c2855ab558056ebfeb775653e7ae45ff72f28f8f3166c"
 [[package]]
 name = "bstr"
 version = "1.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bb31b46c14244e20ee9984b11bf5c992b91fb6939fea616e3512c8baecdbe5f"
+source = "git+https://github.com/nsfisis/bstr?branch=php-shirabe#d70c949fdf7db314f631fb7f15205784676c9634"
 dependencies = [
  "memchr",
  "regex-automata",

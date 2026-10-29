@@ -138,7 +138,7 @@ impl Svn {
             return Ok(output);
         }
 
-        let error_output = self.process.borrow().get_error_output().to_string();
+        let error_output = legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
         let full_output = legacy_lossy(&trim(implode(
             "\n",
             &[output.unwrap_or_default(), error_output],
@@ -194,12 +194,13 @@ impl Svn {
 
         self.has_auth = Some(true);
         self.credentials = Some(SvnCredentials {
-            username: self
-                .io
-                .ask("Username: ".into(), PhpMixed::string("".to_string()))?
-                .as_string()
-                .unwrap_or_default()
-                .to_string(),
+            username: legacy_lossy(
+                self.io
+                    .ask("Username: ".into(), PhpMixed::string("".to_string()))?
+                    .as_string()
+                    .unwrap_or_default(),
+            )
+            .into_owned(),
             password: self
                 .io
                 .ask_and_hide_answer("Password: ".to_string())?
@@ -318,16 +319,20 @@ impl Svn {
             && let Some(entry_arr) = entry.as_array()
         {
             self.credentials = Some(SvnCredentials {
-                username: entry_arr
-                    .get(B("username"))
-                    .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_string(),
-                password: entry_arr
-                    .get(B("password"))
-                    .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_string(),
+                username: legacy_lossy(
+                    entry_arr
+                        .get(B("username"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default(),
+                )
+                .into_owned(),
+                password: legacy_lossy(
+                    entry_arr
+                        .get(B("password"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default(),
+                )
+                .into_owned(),
             });
 
             self.has_auth = Some(true);
@@ -372,7 +377,7 @@ impl Svn {
                 None,
             )? && let Some(matches) = preg_match(php_regex!(r"{(\d+(?:\.\d+)+)}"), &output)
             {
-                *cached = Some(matches.get(1).unwrap_or_default().to_string());
+                *cached = Some(legacy_lossy(matches.get(1).unwrap_or_default()).into_owned());
             }
         }
 

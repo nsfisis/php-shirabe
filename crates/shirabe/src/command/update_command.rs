@@ -176,7 +176,7 @@ impl UpdateCommand {
         let packages: Vec<String> = match select_result {
             PhpMixed::List(l) => l
                 .into_iter()
-                .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                 .collect(),
             _ => Vec::new(),
         };
@@ -448,8 +448,10 @@ impl Command for UpdateCommand {
                 let Some(matches) = matches else {
                     continue;
                 };
-                let constraint = parser
-                    .parse_constraints(&format!("~{}", matches.get(1).unwrap_or_default()))?;
+                let constraint = parser.parse_constraints(&format!(
+                    "~{}",
+                    legacy_lossy(&matches.get(1).unwrap_or_default())
+                ))?;
                 if let Some(existing) = temporary_constraints.get(&package.get_name()) {
                     temporary_constraints.insert(
                         package.get_name(),

@@ -947,7 +947,7 @@ impl Process {
                 if throw_exception {
                     return Err(RuntimeException::new(format!(
                         "Unable to kill the process ({}).",
-                        implode(" ", &output)
+                        implode(" ", &output).display_lossy()
                     ))
                     .into());
                 }
@@ -980,7 +980,7 @@ impl Process {
         env: &mut IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<BString> {
         let uid = uniqid("", true);
-        let mut var_count = 0;
+        let mut var_count: i64 = 0;
         let mut var_cache: IndexMap<BString, BString> = IndexMap::new();
         let cmd = preg_replace_callback(
             php_regex!(
@@ -1024,11 +1024,11 @@ impl Process {
                     "\""
                 );
                 var_count += 1;
-                let var = format!("{}{}", uid, var_count);
+                let var = bconcat!(uid, var_count);
 
-                env.insert(var.as_str().into(), PhpMixed::string(value));
+                env.insert(var.clone(), PhpMixed::string(value));
 
-                let replacement = BString::from(format!("!{}!", var));
+                let replacement = bconcat!("!", var, "!");
                 var_cache.insert(m0, replacement.clone());
                 Ok(replacement)
             },
@@ -1130,14 +1130,14 @@ impl Process {
                 match env.get(key) {
                     None => Err(InvalidArgumentException::new(format!(
                         "Command line is missing a value for parameter \"{}\": {}",
-                        key,
-                        commandline.as_bstr()
+                        key.display_lossy(),
+                        commandline.as_bstr().display_lossy()
                     ))
                     .into()),
                     Some(PhpMixed::Bool(false)) => Err(InvalidArgumentException::new(format!(
                         "Command line is missing a value for parameter \"{}\": {}",
-                        key,
-                        commandline.as_bstr()
+                        key.display_lossy(),
+                        commandline.as_bstr().display_lossy()
                     ))
                     .into()),
                     Some(v) => Ok(self.escape_argument(Some(&to_php_string(v)))),

@@ -96,7 +96,7 @@ impl LocalFilesystem {
                 "{}{}access_token={}",
                 file_url,
                 separator,
-                token.as_string().unwrap_or_default()
+                legacy_lossy(&token.as_string().unwrap_or_default())
             );
         }
 

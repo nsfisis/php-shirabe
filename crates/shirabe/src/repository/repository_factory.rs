@@ -240,11 +240,13 @@ impl RepositoryFactory {
                         ))
                         .into());
                     }
-                    let repo_type = repo_arr
-                        .get(B("type"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
+                    let repo_type = legacy_lossy(
+                        repo_arr
+                            .get(B("type"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned();
                     let repo_config_map: IndexMap<BString, PhpMixed> = repo_arr
                         .iter()
                         .map(|(k, v)| (k.clone(), v.clone()))
@@ -253,11 +255,13 @@ impl RepositoryFactory {
                         Self::generate_repository_name_indexed(index, &repo_config_map, &repo_map);
 
                     if repo_type == "filesystem" {
-                        let json_path = repo_arr
-                            .get(B("json"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_string();
+                        let json_path = legacy_lossy(
+                            repo_arr
+                                .get(B("json"))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        )
+                        .into_owned();
                         let created: RepositoryInterfaceHandle =
                             RepositoryInterfaceHandle::new(FilesystemRepository::new(
                                 JsonFile::new(json_path, None, None)?,
@@ -280,7 +284,7 @@ impl RepositoryFactory {
                         "Repository \"{}\" ({}) should be an array, {} given",
                         index,
                         json_encode(&repo).unwrap_or_default(),
-                        get_debug_type(&repo)
+                        get_debug_type(&repo).display_lossy()
                     ))
                     .into());
                 }

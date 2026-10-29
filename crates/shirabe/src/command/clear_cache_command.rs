@@ -86,35 +86,27 @@ impl Command for ClearCacheCommand {
         let cache_paths: [(&str, String); 4] = [
             (
                 "cache-vcs-dir",
-                config
-                    .get("cache-vcs-dir")
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string(),
+                legacy_lossy(config.get("cache-vcs-dir").as_string().unwrap_or_default())
+                    .into_owned(),
             ),
             (
                 "cache-repo-dir",
-                config
-                    .get("cache-repo-dir")
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string(),
+                legacy_lossy(config.get("cache-repo-dir").as_string().unwrap_or_default())
+                    .into_owned(),
             ),
             (
                 "cache-files-dir",
-                config
-                    .get("cache-files-dir")
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string(),
+                legacy_lossy(
+                    config
+                        .get("cache-files-dir")
+                        .as_string()
+                        .unwrap_or_default(),
+                )
+                .into_owned(),
             ),
             (
                 "cache-dir",
-                config
-                    .get("cache-dir")
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string(),
+                legacy_lossy(config.get("cache-dir").as_string().unwrap_or_default()).into_owned(),
             ),
         ];
 

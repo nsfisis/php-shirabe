@@ -20,7 +20,7 @@ impl ProcessFailedException {
 
         let mut error = format!(
             "The command \"{}\" failed.\n\nExit Code: {}({})\n\nWorking directory: {}",
-            process.get_command_line(),
+            process.get_command_line().display_lossy(),
             process
                 .get_exit_code()
                 .map(|c| c.to_string())
@@ -34,8 +34,8 @@ impl ProcessFailedException {
 
         error += &format!(
             "\n\nOutput:\n================\n{}\n\nError Output:\n================\n{}",
-            process.get_output()?,
-            process.get_error_output()?,
+            process.get_output()?.display_lossy(),
+            process.get_error_output()?.display_lossy(),
         );
 
         Ok(Self {

@@ -121,16 +121,16 @@ impl JsonManipulator {
             if let Some(groups) =
                 preg_match(php_regex!("#^\\s*\\{\\s*\\S+.*?(\\s*\\}\\s*)$#s"), &links)
             {
-                let groups_1 = groups.get(1).unwrap_or_default().to_string();
+                let groups_1 = legacy_lossy(groups.get(1).unwrap_or_default()).into_owned();
                 // link missing but non empty links
                 links = preg_replace(
                     format!("{{{}$}}", preg_quote(&groups_1, None)),
                     addcslashes(
                         format!(
                             ",{}{}{}{}: {}{}",
-                            self.newline,
-                            self.indent,
-                            self.indent,
+                            legacy_lossy(&self.newline),
+                            legacy_lossy(&self.indent),
+                            legacy_lossy(&self.indent),
                             JsonFile::encode(package)?,
                             JsonFile::encode(constraint)?,
                             groups_1
@@ -554,7 +554,7 @@ impl JsonManipulator {
             let repo_name_owned: Option<String> = repository
                 .as_object()
                 .and_then(|o| o.get(B("name")).cloned())
-                .and_then(|v| v.as_string().map(|s| s.to_string()));
+                .and_then(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()));
             if Some(name) == repo_name_owned.as_deref() {
                 if is_assoc {
                     if !self.remove_sub_node("repositories", repository_index)? {
@@ -722,7 +722,7 @@ impl JsonManipulator {
         // child exists. The child pattern looks for the raw `"name"` key token within the children
         // object and rewrites its value in place; the surrounding `"name"\s*:\s*` and optional comma
         // are preserved as-is.
-        let child_key = format!("\"{}\"", name_owned);
+        let child_key = format!("\"{}\"", legacy_lossy(&name_owned));
         let child = json_grammar::find_top_level_key(
             children.as_bytes(),
             child_key.as_bytes(),
@@ -754,14 +754,12 @@ impl JsonManipulator {
                 ),
                 &children,
             ) {
-                let mut whitespace = leading_match
-                    .name("trailingspace")
-                    .unwrap_or_default()
-                    .to_string();
-                let leading_space = leading_match
-                    .name("leadingspace")
-                    .unwrap_or_default()
-                    .to_string();
+                let mut whitespace =
+                    legacy_lossy(leading_match.name("trailingspace").unwrap_or_default())
+                        .into_owned();
+                let leading_space =
+                    legacy_lossy(leading_match.name("leadingspace").unwrap_or_default())
+                        .into_owned();
                 let content_present = leading_match.name("content").is_some();
                 if content_present {
                     let mut value_local = value;
@@ -778,9 +776,9 @@ impl JsonManipulator {
                             addcslashes(
                                 format!(
                                     ",{}{}{}{}: {}{}}}",
-                                    self.newline,
-                                    self.indent,
-                                    self.indent,
+                                    legacy_lossy(&self.newline),
+                                    legacy_lossy(&self.indent),
+                                    legacy_lossy(&self.indent),
                                     JsonFile::encode(&PhpMixed::String(name_owned.clone()))?,
                                     self.format(&value_local, 1, false)?,
                                     whitespace
@@ -799,9 +797,9 @@ impl JsonManipulator {
                                     whitespace,
                                     JsonFile::encode(&PhpMixed::String(name_owned.clone()))?,
                                     self.format(&value_local, 1, false)?,
-                                    self.newline,
-                                    self.indent,
-                                    self.indent
+                                    legacy_lossy(&self.newline),
+                                    legacy_lossy(&self.indent),
+                                    legacy_lossy(&self.indent)
                                 ),
                                 "\\$",
                             ),
@@ -832,7 +830,7 @@ impl JsonManipulator {
             } else {
                 return Err(LogicException::new(format!(
                     "Nothing matched above for: {}",
-                    children
+                    children.display_lossy()
                 ))
                 .into());
             }
@@ -912,7 +910,10 @@ impl JsonManipulator {
         // try and find a match for the subkey
         let key_regex = str_replace("/", "\\\\?/", preg_quote(&name_owned, None));
         let mut children_clean: Option<BString> = None;
-        if preg_is_match(format!("{{\"{}\"\\s*:}}i", key_regex), &children) {
+        if preg_is_match(
+            format!("{{\"{}\"\\s*:}}i", legacy_lossy(&key_regex)),
+            &children,
+        ) {
             // find best match for the value of "name". The PHP pattern `"name"\s*:\s*(?&json)` is
             // not anchored, so it can match the key at several nesting levels; collect every such
             // occurrence and keep the longest, reproducing PHP's behaviour.
@@ -1076,13 +1077,13 @@ impl JsonManipulator {
                 // child missing but non empty children
                 if append {
                     children = preg_replace(
-                        format!("#{}\\]$#", whitespace),
+                        format!("#{}\\]$#", legacy_lossy(&whitespace)),
                         addcslashes(
                             format!(
                                 ",{}{}{}]",
-                                leading_item_whitespace,
+                                legacy_lossy(&leading_item_whitespace),
                                 self.format(&value, item_depth, false)?,
-                                trailing_item_whitespace
+                                legacy_lossy(&trailing_item_whitespace)
                             ),
                             "\\$",
                         ),
@@ -1091,13 +1092,13 @@ impl JsonManipulator {
                 } else {
                     whitespace = leading_whitespace;
                     children = preg_replace(
-                        format!("#^\\[{}#", whitespace),
+                        format!("#^\\[{}#", legacy_lossy(&whitespace)),
                         addcslashes(
                             format!(
                                 "[{}{},{}",
-                                whitespace,
+                                legacy_lossy(&whitespace),
                                 self.format(&value, item_depth, false)?,
-                                leading_item_whitespace
+                                legacy_lossy(&leading_item_whitespace)
                             ),
                             "\\$",
                         ),
@@ -1115,9 +1116,11 @@ impl JsonManipulator {
                 );
             }
         } else {
-            return Err(
-                LogicException::new(format!("Nothing matched above for: {}", children)).into(),
-            );
+            return Err(LogicException::new(format!(
+                "Nothing matched above for: {}",
+                children.display_lossy()
+            ))
+            .into());
         }
 
         self.contents = bconcat!(node_start, children, node_end);
@@ -1334,17 +1337,17 @@ impl JsonManipulator {
 
         // append at the end of the file and keep whitespace
         if let Some(tail_match) = preg_match(php_regex!("#[^{\\s](\\s*)\\}$#"), &self.contents) {
-            let tail_match_1 = tail_match.get(1).unwrap_or_default().to_string();
+            let tail_match_1 = legacy_lossy(tail_match.get(1).unwrap_or_default()).into_owned();
             self.contents = preg_replace(
                 format!("#{}\\}}$#", tail_match_1),
                 addcslashes(
                     format!(
                         ",{}{}{}: {}{}}}",
-                        self.newline,
-                        self.indent,
+                        legacy_lossy(&self.newline),
+                        legacy_lossy(&self.indent),
                         JsonFile::encode(key)?,
                         content,
-                        self.newline
+                        legacy_lossy(&self.newline)
                     ),
                     "\\$",
                 ),
@@ -1360,10 +1363,10 @@ impl JsonManipulator {
             addcslashes(
                 format!(
                     "{}{}: {}{}}}",
-                    self.indent,
+                    legacy_lossy(&self.indent),
                     JsonFile::encode(key)?,
                     content,
-                    self.newline
+                    legacy_lossy(&self.newline)
                 ),
                 "\\$",
             ),
@@ -1500,8 +1503,8 @@ impl JsonManipulator {
                 return Ok(if was_object {
                     format!(
                         "{{{}{}}}",
-                        self.newline,
-                        str_repeat(&self.indent, (depth + 1) as usize)
+                        legacy_lossy(&self.newline),
+                        legacy_lossy(&str_repeat(&self.indent, (depth + 1) as usize))
                     )
                 } else {
                     "[]".to_string()
@@ -1514,16 +1517,16 @@ impl JsonManipulator {
                     formatted.push(self.format(val, depth + 1, false)?);
                 }
 
-                return Ok(format!("[{}]", implode(", ", &formatted)));
+                return Ok(format!("[{}]", legacy_lossy(&implode(", ", &formatted))));
             }
 
-            let out = format!("{{{}", self.newline);
+            let out = format!("{{{}", legacy_lossy(&self.newline));
             let mut elems: Vec<String> = vec![];
             if let Some(arr) = data.as_array() {
                 for (key, val) in arr {
                     elems.push(format!(
                         "{}{}: {}",
-                        str_repeat(&self.indent, (depth + 2) as usize),
+                        legacy_lossy(&str_repeat(&self.indent, (depth + 2) as usize)),
                         JsonFile::encode(&PhpMixed::String(key.clone()))?,
                         self.format(val, depth + 1, false)?
                     ));
@@ -1533,9 +1536,12 @@ impl JsonManipulator {
             return Ok(format!(
                 "{}{}{}{}}}",
                 out,
-                implode(format!(",{}", self.newline), &elems),
-                self.newline,
-                str_repeat(&self.indent, (depth + 1) as usize)
+                legacy_lossy(&implode(
+                    format!(",{}", legacy_lossy(&self.newline)),
+                    &elems
+                )),
+                legacy_lossy(&self.newline),
+                legacy_lossy(&str_repeat(&self.indent, (depth + 1) as usize))
             ));
         }
 
@@ -1679,8 +1685,8 @@ impl ManipulatorFormatter {
                 return Ok(if was_object {
                     format!(
                         "{{{}{}}}",
-                        self.newline,
-                        str_repeat(&self.indent, (depth + 1) as usize)
+                        legacy_lossy(&self.newline),
+                        legacy_lossy(&str_repeat(&self.indent, (depth + 1) as usize))
                     )
                 } else {
                     "[]".to_string()
@@ -1693,16 +1699,16 @@ impl ManipulatorFormatter {
                     formatted.push(self.format(val, depth + 1, false)?);
                 }
 
-                return Ok(format!("[{}]", implode(", ", &formatted)));
+                return Ok(format!("[{}]", legacy_lossy(&implode(", ", &formatted))));
             }
 
-            let out = format!("{{{}", self.newline);
+            let out = format!("{{{}", legacy_lossy(&self.newline));
             let mut elems: Vec<String> = vec![];
             if let Some(arr) = data.as_array() {
                 for (key, val) in arr {
                     elems.push(format!(
                         "{}{}: {}",
-                        str_repeat(&self.indent, (depth + 2) as usize),
+                        legacy_lossy(&str_repeat(&self.indent, (depth + 2) as usize)),
                         JsonFile::encode(&PhpMixed::String(key.clone()))?,
                         self.format(val, depth + 1, false)?
                     ));
@@ -1712,9 +1718,12 @@ impl ManipulatorFormatter {
             return Ok(format!(
                 "{}{}{}{}}}",
                 out,
-                implode(format!(",{}", self.newline), &elems),
-                self.newline,
-                str_repeat(&self.indent, (depth + 1) as usize)
+                legacy_lossy(&implode(
+                    format!(",{}", legacy_lossy(&self.newline)),
+                    &elems
+                )),
+                legacy_lossy(&self.newline),
+                legacy_lossy(&str_repeat(&self.indent, (depth + 1) as usize))
             ));
         }
 

@@ -324,7 +324,10 @@ impl Command for CheckPlatformReqsCommand {
                                     } else {
                                         require.clone()
                                     },
-                                    version: candidate_constraint.get_pretty_string().to_string(),
+                                    version: legacy_lossy(
+                                        &candidate_constraint.get_pretty_string(),
+                                    )
+                                    .into_owned(),
                                     link: Some(link.clone()),
                                     status: "<error>failed</error>".to_string(),
                                     provider: if candidate.get_name() == *require {
@@ -346,7 +349,8 @@ impl Command for CheckPlatformReqsCommand {
                             } else {
                                 require.clone()
                             },
-                            version: candidate_constraint.get_pretty_string().to_string(),
+                            version: legacy_lossy(&candidate_constraint.get_pretty_string())
+                                .into_owned(),
                             link: None,
                             status: "<info>success</info>".to_string(),
                             provider: if candidate.get_name() == *require {

@@ -6,7 +6,8 @@ use crate::util::HttpDownloader;
 use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PHP_EOL, PhpMixed, UnexpectedValueException, php_regex, preg_is_match,
+    InvalidArgumentException, PHP_EOL, PhpMixed, UnexpectedValueException, legacy_lossy, php_regex,
+    preg_is_match,
 };
 
 pub struct Versions {
@@ -47,11 +48,14 @@ impl Versions {
 
         let channel_file = format!(
             "{}/update-channel",
-            self.config
-                .borrow_mut()
-                .get("home")
-                .as_string()
-                .unwrap_or_default()
+            legacy_lossy(
+                &self
+                    .config
+                    .borrow_mut()
+                    .get("home")
+                    .as_string()
+                    .unwrap_or_default()
+            )
         );
         if std::path::Path::new(&channel_file).exists() {
             let channel = std::fs::read_to_string(&channel_file)?.trim().to_string();
@@ -80,11 +84,14 @@ impl Versions {
 
         let channel_file = format!(
             "{}/update-channel",
-            self.config
-                .borrow_mut()
-                .get("home")
-                .as_string()
-                .unwrap_or_default()
+            legacy_lossy(
+                &self
+                    .config
+                    .borrow_mut()
+                    .get("home")
+                    .as_string()
+                    .unwrap_or_default()
+            )
         );
         self.channel = Some(channel.clone());
 
@@ -143,7 +150,7 @@ impl Versions {
 
         Ok(Err(UnexpectedValueException::new(format!(
             "There is no version of Composer available for your PHP version ({})",
-            shirabe_php_rpc::get_php_version().version
+            shirabe_php_rpc::get_php_version().version.display_lossy()
         ))))
     }
 

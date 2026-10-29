@@ -62,14 +62,15 @@ impl GitDriver {
                 .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                 .unwrap_or_else(|| self.inner.url.clone());
         } else {
-            let cache_vcs_dir = self
-                .inner
-                .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or_default()
-                .to_string();
+            let cache_vcs_dir = legacy_lossy(
+                self.inner
+                    .config
+                    .borrow_mut()
+                    .get("cache-vcs-dir")
+                    .as_string()
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             if !Cache::is_usable(&cache_vcs_dir) {
                 return Err(RuntimeException::new("GitDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string())
                 .into());
@@ -78,7 +79,11 @@ impl GitDriver {
             self.repo_dir = format!(
                 "{}/{}/",
                 cache_vcs_dir,
-                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(self.inner.url.clone()))
+                legacy_lossy(&preg_replace(
+                    r"{[^a-z0-9.]}i",
+                    "-",
+                    Url::sanitize(self.inner.url.clone())
+                ))
             );
 
             GitUtil::clean_env(&self.inner.process);
@@ -90,7 +95,7 @@ impl GitDriver {
                 return Err(RuntimeException::new(format!(
                     "Can not clone {} to access package information. The \"{}\" directory is not writable by the current user.",
                     self.inner.url,
-                    dirname(&self.repo_dir)
+                    dirname(&self.repo_dir).display_lossy()
                 ))
                 .into());
             }
@@ -129,20 +134,25 @@ impl GitDriver {
         self.get_tags()?;
         self.get_branches()?;
 
-        let cache_repo_dir = self
-            .inner
-            .config
-            .borrow_mut()
-            .get("cache-repo-dir")
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let cache_repo_dir = legacy_lossy(
+            self.inner
+                .config
+                .borrow_mut()
+                .get("cache-repo-dir")
+                .as_string()
+                .unwrap_or_default(),
+        )
+        .into_owned();
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
             &format!(
                 "{}/{}",
                 cache_repo_dir,
-                preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(cache_url))
+                legacy_lossy(&preg_replace(
+                    r"{[^a-z0-9.]}i",
+                    "-",
+                    Url::sanitize(cache_url)
+                ))
             ),
             None,
             None,
@@ -198,7 +208,7 @@ impl GitDriver {
                         && let Some(caps) = preg_match(php_regex!(r"{^\* +(\S+)}"), branch)
                         && let Some(name) = caps.get(1)
                     {
-                        self.root_identifier = Some(name.to_string());
+                        self.root_identifier = Some(legacy_lossy(name).into_owned());
                         break;
                     }
                 }
@@ -317,10 +327,10 @@ impl GitDriver {
                     )
                     && let (Some(hash), Some(name)) = (caps.get(1), caps.get(2))
                 {
-                    self.tags
-                        .as_mut()
-                        .unwrap()
-                        .insert(name.to_string(), hash.to_string());
+                    self.tags.as_mut().unwrap().insert(
+                        legacy_lossy(name).into_owned(),
+                        legacy_lossy(hash).into_owned(),
+                    );
                 }
             }
         }
@@ -354,7 +364,10 @@ impl GitDriver {
                     && let (Some(name), Some(hash)) = (caps.get(1), caps.get(2))
                     && !name.starts_with(b"-")
                 {
-                    branches.insert(name.to_string(), hash.to_string());
+                    branches.insert(
+                        legacy_lossy(name).into_owned(),
+                        legacy_lossy(hash).into_owned(),
+                    );
                 }
             }
 

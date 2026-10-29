@@ -231,7 +231,10 @@ fn test_lock_bad_packages() {
 #[test]
 fn test_is_fresh() {
     let json_content = get_json_content(&[]);
-    let lock = format!(r#"{{"hash": "{}"}}"#, hash("md5", &json_content));
+    let lock = format!(
+        r#"{{"hash": "{}"}}"#,
+        legacy_lossy(&hash("md5", &json_content))
+    );
     let (mut locker, _temp_dir, _io) = make_locker(&json_content, Some(&lock));
 
     assert!(locker.is_fresh().unwrap());
@@ -262,8 +265,8 @@ fn test_is_fresh_with_content_hash() {
     let json_content = get_json_content(&[]);
     let lock = format!(
         r#"{{"hash": "{}", "content-hash": "{}"}}"#,
-        hash("md5", format!("{}  ", json_content)),
-        hash("md5", &json_content),
+        legacy_lossy(&hash("md5", format!("{}  ", json_content))),
+        legacy_lossy(&hash("md5", &json_content)),
     );
     let (mut locker, _temp_dir, _io) = make_locker(&json_content, Some(&lock));
 
@@ -273,7 +276,10 @@ fn test_is_fresh_with_content_hash() {
 #[test]
 fn test_is_fresh_with_content_hash_and_no_hash() {
     let json_content = get_json_content(&[]);
-    let lock = format!(r#"{{"content-hash": "{}"}}"#, hash("md5", &json_content));
+    let lock = format!(
+        r#"{{"content-hash": "{}"}}"#,
+        legacy_lossy(&hash("md5", &json_content))
+    );
     let (mut locker, _temp_dir, _io) = make_locker(&json_content, Some(&lock));
 
     assert!(locker.is_fresh().unwrap());
@@ -285,7 +291,8 @@ fn test_is_fresh_false_with_content_hash() {
     let different_hash = hash("md5", get_json_content(&[("name", "test2")]));
     let lock = format!(
         r#"{{"hash": "{}", "content-hash": "{}"}}"#,
-        different_hash, different_hash,
+        legacy_lossy(&different_hash),
+        legacy_lossy(&different_hash),
     );
     let (mut locker, _temp_dir, _io) = make_locker(&json_content, Some(&lock));
 

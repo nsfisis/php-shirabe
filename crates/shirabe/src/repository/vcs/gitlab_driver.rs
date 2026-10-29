@@ -80,14 +80,16 @@ impl GitLabDriver {
             .name("domain")
             .filter(|s| !s.is_empty())
             .map(|s| legacy_lossy(s).into_owned())
-            .unwrap_or_else(|| match_.name("domain2").unwrap_or_default().to_string());
+            .unwrap_or_else(|| {
+                legacy_lossy(match_.name("domain2").unwrap_or_default()).into_owned()
+            });
         let configured_domains = self.inner.config.borrow_mut().get("gitlab-domains");
         let mut url_parts: Vec<String> = explode("/", match_.name("parts").unwrap_or_default())
             .iter()
             .map(|s| legacy_lossy(s).into_owned())
             .collect::<Vec<_>>();
 
-        let scheme_match = match_.name("scheme").unwrap_or_default().to_string();
+        let scheme_match = legacy_lossy(match_.name("scheme").unwrap_or_default()).into_owned();
         self.scheme = if matches!(scheme_match.as_str(), "https" | "http") {
             scheme_match
         } else if self
@@ -153,12 +155,15 @@ impl GitLabDriver {
             self.inner.io.clone(),
             &format!(
                 "{}/{}/{}/{}",
-                self.inner
-                    .config
-                    .borrow_mut()
-                    .get("cache-repo-dir")
-                    .as_string()
-                    .unwrap_or_default(),
+                legacy_lossy(
+                    &self
+                        .inner
+                        .config
+                        .borrow_mut()
+                        .get("cache-repo-dir")
+                        .as_string()
+                        .unwrap_or_default()
+                ),
                 self.inner.origin_url,
                 self.namespace,
                 self.repository,
@@ -303,12 +308,15 @@ impl GitLabDriver {
                     })
                     .filter(|v| !matches!(v, PhpMixed::Bool(false) | PhpMixed::Null))
                     .unwrap_or_else(|| PhpMixed::string(identifier.to_string()));
-                    let label_str = label.as_string().unwrap_or(identifier.into()).to_string();
-                    let web_url = project
-                        .get(B("web_url"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
+                    let label_str =
+                        legacy_lossy(label.as_string().unwrap_or(identifier.into())).into_owned();
+                    let web_url = legacy_lossy(
+                        project
+                            .get(B("web_url"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned();
                     if let Some(support) = composer.get_mut(B("support")).and_then(|v| match v {
                         PhpMixed::Array(m) => Some(m),
                         _ => None,
@@ -331,18 +339,20 @@ impl GitLabDriver {
                         .unwrap_or(PhpMixed::Null),
                 );
                 if issues_missing && issues_enabled && has_web_url {
-                    let web_url = project
-                        .get(B("web_url"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
+                    let web_url = legacy_lossy(
+                        project
+                            .get(B("web_url"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned();
                     if let Some(support) = composer.get_mut(B("support")).and_then(|v| match v {
                         PhpMixed::Array(m) => Some(m),
                         _ => None,
                     }) {
                         support.insert(
                             "issues".into(),
-                            PhpMixed::string(format!("{}/-/issues", PhpMixed::string(web_url))),
+                            PhpMixed::string(format!("{}/-/issues", web_url)),
                         );
                     }
                 }
@@ -433,25 +443,31 @@ impl GitLabDriver {
     pub fn get_repository_url(&self) -> String {
         let project = self.project.clone().unwrap_or_default();
         if !self.protocol.is_empty() {
-            return project
-                .get(B(&format!("{}_url_to_repo", self.protocol)))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string();
+            return legacy_lossy(
+                project
+                    .get(B(&format!("{}_url_to_repo", self.protocol)))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned();
         }
 
         if self.is_private {
-            project
-                .get(B("ssh_url_to_repo"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string()
+            legacy_lossy(
+                project
+                    .get(B("ssh_url_to_repo"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned()
         } else {
-            project
-                .get(B("http_url_to_repo"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string()
+            legacy_lossy(
+                project
+                    .get(B("http_url_to_repo"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned()
         }
     }
 
@@ -460,12 +476,14 @@ impl GitLabDriver {
             return git_driver.get_url();
         }
 
-        self.project
-            .as_ref()
-            .and_then(|p| p.get(B("web_url")))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string()
+        legacy_lossy(
+            self.project
+                .as_ref()
+                .and_then(|p| p.get(B("web_url")))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned()
     }
 
     pub fn get_dist(&self, identifier: &str) -> Option<IndexMap<BString, PhpMixed>> {
@@ -504,13 +522,14 @@ impl GitLabDriver {
             return git_driver.get_root_identifier();
         }
 
-        Ok(self
-            .project
-            .as_ref()
-            .and_then(|p| p.get(B("default_branch")))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string())
+        Ok(legacy_lossy(
+            self.project
+                .as_ref()
+                .and_then(|p| p.get(B("default_branch")))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned())
     }
 
     pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<String, String>> {
@@ -582,18 +601,22 @@ impl GitLabDriver {
             if let PhpMixed::List(ref list) = data {
                 for datum in list {
                     if let PhpMixed::Array(ref datum_map) = *datum {
-                        let name = datum_map
-                            .get(B("name"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_string();
-                        let commit_id = datum_map
-                            .get(B("commit"))
-                            .and_then(|v| v.as_array())
-                            .and_then(|m| m.get(B("id")))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_string();
+                        let name = legacy_lossy(
+                            datum_map
+                                .get(B("name"))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        )
+                        .into_owned();
+                        let commit_id = legacy_lossy(
+                            datum_map
+                                .get(B("commit"))
+                                .and_then(|v| v.as_array())
+                                .and_then(|m| m.get(B("id")))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        )
+                        .into_owned();
                         references.insert(name, commit_id.clone());
 
                         // Keep the last commit date of a reference to avoid
@@ -912,12 +935,14 @@ impl GitLabDriver {
             return Ok(false);
         };
 
-        let scheme = match_.name("scheme").unwrap_or_default().to_string();
+        let scheme = legacy_lossy(match_.name("scheme").unwrap_or_default()).into_owned();
         let guessed_domain = match_
             .name("domain")
             .filter(|s| !s.is_empty())
             .map(|s| legacy_lossy(s).into_owned())
-            .unwrap_or_else(|| match_.name("domain2").unwrap_or_default().to_string());
+            .unwrap_or_else(|| {
+                legacy_lossy(match_.name("domain2").unwrap_or_default()).into_owned()
+            });
         let mut url_parts: Vec<String> = explode("/", match_.name("parts").unwrap_or_default())
             .iter()
             .map(|s| legacy_lossy(s).into_owned())
@@ -963,7 +988,7 @@ impl GitLabDriver {
         let links = explode(",", &header);
         for link in links.iter() {
             if let Some(match_) = preg_match(php_regex!(r#"{<(.+?)>; *rel="next"}"#), link) {
-                return Some(match_.get(1).unwrap_or_default().to_string());
+                return Some(legacy_lossy(match_.get(1).unwrap_or_default()).into_owned());
             }
         }
 
@@ -1060,7 +1085,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitLabDriver {
                 .map(|(k, v)| {
                     (
                         k.to_str_lossy().into_owned(),
-                        v.as_string().unwrap_or_default().to_string(),
+                        legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
                     )
                 })
                 .collect()
@@ -1074,7 +1099,7 @@ impl crate::repository::vcs::VcsDriverInterface for GitLabDriver {
             .map(|(k, v)| {
                 (
                     k.to_str_lossy().into_owned(),
-                    v.as_string().unwrap_or_default().to_string(),
+                    legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
                 )
             })
             .collect()

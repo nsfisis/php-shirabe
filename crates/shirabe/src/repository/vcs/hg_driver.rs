@@ -45,14 +45,15 @@ impl HgDriver {
         if Filesystem::is_local_path(&self.inner.url) {
             self.repo_dir = self.inner.url.clone();
         } else {
-            let cache_vcs_dir = self
-                .inner
-                .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or_default()
-                .to_string();
+            let cache_vcs_dir = legacy_lossy(
+                self.inner
+                    .config
+                    .borrow_mut()
+                    .get("cache-vcs-dir")
+                    .as_string()
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             if !Cache::is_usable(&cache_vcs_dir) {
                 return Err(RuntimeException::new("HgDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string()).into());
             }
@@ -62,7 +63,7 @@ impl HgDriver {
                 "-",
                 Url::sanitize(self.inner.url.clone()),
             );
-            self.repo_dir = format!("{}/{}/", cache_vcs_dir, sanitized);
+            self.repo_dir = format!("{}/{}/", cache_vcs_dir, legacy_lossy(&sanitized));
 
             let mut fs = Filesystem::new(None);
             fs.ensure_directory_exists(&cache_vcs_dir)?;
@@ -99,7 +100,7 @@ impl HgDriver {
                     Some(std::path::Path::new(&self.repo_dir)),
                 )? != 0
                 {
-                    self.inner.io.write_error3(&format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.borrow().get_error_output()), true, crate::io::NORMAL);
+                    self.inner.io.write_error3(&format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url, self.inner.process.borrow().get_error_output().display_lossy()), true, crate::io::NORMAL);
                 }
             } else {
                 let mut fs2 = Filesystem::new(None);
@@ -240,8 +241,8 @@ impl HgDriver {
                     && let Some(m) = preg_match(php_regex!(r"(^([^\s]+)\s+\d+:(.*)$)"), &tag)
                 {
                     tags.insert(
-                        m.get(1).unwrap_or_default().to_string(),
-                        m.get(2).unwrap_or_default().to_string(),
+                        legacy_lossy(m.get(1).unwrap_or_default()).into_owned(),
+                        legacy_lossy(m.get(2).unwrap_or_default()).into_owned(),
                     );
                 }
             }
@@ -269,9 +270,12 @@ impl HgDriver {
                     && let Some(m) =
                         preg_match(php_regex!(r"(^([^\s]+)\s+\d+:([a-f0-9]+))"), &branch)
                 {
-                    let name = m.get(1).unwrap_or_default().to_string();
+                    let name = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
                     if !name.starts_with('-') {
-                        branches.insert(name, m.get(2).unwrap_or_default().to_string());
+                        branches.insert(
+                            name,
+                            legacy_lossy(m.get(2).unwrap_or_default()).into_owned(),
+                        );
                     }
                 }
             }
@@ -287,9 +291,12 @@ impl HgDriver {
                     && let Some(m) =
                         preg_match(php_regex!(r"(^(?:[\s*]*)([^\s]+)\s+\d+:(.*)$)"), &branch)
                 {
-                    let name = m.get(1).unwrap_or_default().to_string();
+                    let name = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
                     if !name.starts_with('-') {
-                        bookmarks.insert(name, m.get(2).unwrap_or_default().to_string());
+                        bookmarks.insert(
+                            name,
+                            legacy_lossy(m.get(2).unwrap_or_default()).into_owned(),
+                        );
                     }
                 }
             }

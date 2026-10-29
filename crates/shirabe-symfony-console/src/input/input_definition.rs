@@ -3,7 +3,7 @@
 use crate::exception::{InvalidArgumentException, LogicException};
 use crate::input::{InputArgument, InputOption, InputValue};
 use indexmap::IndexMap;
-use shirabe_php_shim::{explode, implode, legacy_lossy, strtoupper};
+use shirabe_php_shim::{explode, legacy_lossy, strtoupper};
 
 /// A InputDefinition represents a set of valid command line arguments and options.
 ///
@@ -260,7 +260,7 @@ impl InputDefinition {
                 {
                     return Err(LogicException::new(format!(
                         "An option with shortcut \"{}\" already exists.",
-                        shortcut.clone(),
+                        shortcut.display_lossy(),
                     ))
                     .into());
                 }
@@ -388,7 +388,7 @@ impl InputDefinition {
                         } else {
                             String::new()
                         },
-                        strtoupper(option.get_name()),
+                        legacy_lossy(&strtoupper(option.get_name())),
                         if option.is_value_optional() {
                             "]".to_string()
                         } else {
@@ -437,7 +437,7 @@ impl InputDefinition {
             elements.push(element);
         }
 
-        format!("{}{}", implode(" ", &elements), tail)
+        format!("{}{}", elements.join(" "), tail)
     }
 }
 

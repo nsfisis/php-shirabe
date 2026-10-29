@@ -9,7 +9,7 @@ use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, json_encode_ex, php_regex, preg_replace, str_replace};
+use shirabe_php_shim::{PhpMixed, bconcat, json_encode_ex, php_regex, preg_replace, str_replace};
 
 /// JSON descriptor.
 #[derive(Debug, Default)]
@@ -190,9 +190,9 @@ impl JsonDescriptor {
             data.insert(
                 "shortcut".into(),
                 PhpMixed::string(if let Some(shortcut) = option.get_shortcut() {
-                    format!("-{}", str_replace("|", "|-", shortcut))
+                    bconcat!("-", str_replace("|", "|-", shortcut))
                 } else {
-                    String::new()
+                    BString::default()
                 }),
             );
             data.insert("accept_value".into(), PhpMixed::Bool(option.accept_value()));

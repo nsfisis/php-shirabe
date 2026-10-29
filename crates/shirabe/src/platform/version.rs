@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Platform/Version.php
 
-use shirabe_php_shim::{CmpOp, php_regex, preg_match, version_compare};
+use shirabe_php_shim::{CmpOp, legacy_lossy, php_regex, preg_match, version_compare};
 
 pub struct Version;
 
@@ -15,9 +15,9 @@ impl Version {
             openssl_version,
         )?;
 
-        let version = matches.name("version").unwrap_or_default().to_string();
-        let patch_str = matches.name("patch").unwrap_or_default().to_string();
-        let suffix_str = matches.name("suffix").unwrap_or_default().to_string();
+        let version = legacy_lossy(matches.name("version").unwrap_or_default()).into_owned();
+        let patch_str = legacy_lossy(matches.name("patch").unwrap_or_default()).into_owned();
+        let suffix_str = legacy_lossy(matches.name("suffix").unwrap_or_default()).into_owned();
 
         let patch = if version_compare(&version, "3.0.0", CmpOp::Lt) {
             format!(
@@ -46,8 +46,8 @@ impl Version {
             libjpeg_version,
         )?;
 
-        let major = matches.name("major").unwrap_or_default().to_string();
-        let minor = matches.name("minor").unwrap_or_default().to_string();
+        let major = legacy_lossy(matches.name("major").unwrap_or_default()).into_owned();
+        let minor = legacy_lossy(matches.name("minor").unwrap_or_default()).into_owned();
         Some(format!(
             "{}.{}",
             major,
@@ -61,8 +61,8 @@ impl Version {
             zoneinfo_version,
         )?;
 
-        let year = matches.name("year").unwrap_or_default().to_string();
-        let revision = matches.name("revision").unwrap_or_default().to_string();
+        let year = legacy_lossy(matches.name("year").unwrap_or_default()).into_owned();
+        let revision = legacy_lossy(matches.name("revision").unwrap_or_default()).into_owned();
         Some(format!(
             "{}.{}",
             year,

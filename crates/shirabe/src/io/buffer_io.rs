@@ -83,11 +83,15 @@ impl BufferIO {
                     let pre = strip_tags(g2);
 
                     if pre.len() == g3.len() {
-                        return Ok(g1.to_string());
+                        return Ok(legacy_lossy(g1).into_owned());
                     }
 
                     // TODO reverse parse the string, skipping span tags and \033\[([0-9;]+)m(.*?)\033\[0m style blobs
-                    Ok(format!("{}{}\n", g1, rtrim(g2)))
+                    Ok(format!(
+                        "{}{}\n",
+                        legacy_lossy(&g1),
+                        legacy_lossy(&rtrim(g2))
+                    ))
                 },
                 &output,
             )

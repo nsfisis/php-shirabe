@@ -7,7 +7,7 @@ use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, json_encode, time};
+use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, json_encode, legacy_lossy, time};
 
 fn transport_error_code(err: &anyhow::Error) -> Option<i64> {
     err.catch::<TransportException>().map(|te| te.get_code())
@@ -62,7 +62,7 @@ impl Bitbucket {
             Some(token) => token
                 .get(B("access_token"))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string())
+                .map(|s| legacy_lossy(s).into_owned())
                 .unwrap_or_default(),
             None => String::new(),
         }
@@ -316,7 +316,7 @@ impl Bitbucket {
                 .unwrap()
                 .get(B("access_token"))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string())
+                .map(|s| legacy_lossy(s).into_owned())
                 .unwrap_or_default());
         }
 
@@ -338,7 +338,7 @@ impl Bitbucket {
             .as_ref()
             .and_then(|t| t.get(B("access_token")))
             .and_then(|v| v.as_string())
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
 
         match access_token {
             Some(t) => Ok(t),

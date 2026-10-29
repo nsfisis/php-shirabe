@@ -12,7 +12,7 @@ use crate::util::{Platform, Tar, Zip};
 use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash_file,
+    PhpMixed, RuntimeException, UnexpectedValueException, extension_loaded, hash_file, legacy_lossy,
 };
 use shirabe_semver::constraint::AnyConstraint;
 use std::path::Path;
@@ -46,10 +46,7 @@ impl ArtifactRepository {
             .into());
         }
 
-        let url = repo_config[B("url")]
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let url = legacy_lossy(repo_config[B("url")].as_string().unwrap_or_default()).into_owned();
         let lookup = Platform::expand_path(&url);
         Ok(Self {
             inner: ArrayRepository::new(Vec::new())?,

@@ -88,7 +88,7 @@ impl Platform {
             return format!(
                 "{}{}",
                 Self::get_user_directory().unwrap(),
-                substr(path, 1, None)
+                legacy_lossy(&substr(path, 1, None))
             );
         }
 
@@ -113,20 +113,20 @@ impl Platform {
                         let home = Platform::get_env("HOME")
                             .filter(|v| PhpMixed::string(v.clone()).to_bool());
                         if let Some(home) = home {
-                            return Ok(format!("{}{}", home, path_part));
+                            return Ok(format!("{}{}", home, legacy_lossy(&path_part)));
                         }
 
                         return Ok(format!(
                             "{}{}",
                             Platform::get_env("USERPROFILE").unwrap_or_default(),
-                            path_part,
+                            legacy_lossy(&path_part),
                         ));
                     }
 
                     Ok(format!(
                         "{}{}",
                         Platform::get_env(&var).unwrap_or_default(),
-                        path_part,
+                        legacy_lossy(&path_part),
                     ))
                 },
                 path,

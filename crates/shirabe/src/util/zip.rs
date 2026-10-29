@@ -67,7 +67,7 @@ impl Zip {
                 if top_level_paths.len() > 1 {
                     return Err(RuntimeException::new(format!(
                         "Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}",
-                        implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>())
+                        implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>()).display_lossy()
                     ))
                     .into());
                 }
@@ -80,7 +80,7 @@ impl Zip {
                 if top_level_paths.len() > 1 {
                     return Err(RuntimeException::new(format!(
                         "Archive has more than one top level directories, and no composer.json was found on the top level, so it's an invalid archive. Top level paths found were: {}",
-                        implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>())
+                        implode(",", &top_level_paths.keys().cloned().collect::<Vec<_>>()).display_lossy()
                     ))
                     .into());
                 }

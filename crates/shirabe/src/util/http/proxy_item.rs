@@ -54,7 +54,7 @@ impl ProxyItem {
             if let Some(pass_raw) = &proxy.pass {
                 safe += ":***";
                 user += &format!(":{}", pass_raw);
-                auth += &format!(":{}", rawurldecode(pass_raw));
+                auth += &format!(":{}", legacy_lossy(&rawurldecode(pass_raw)));
             }
 
             safe += "@";
@@ -63,7 +63,7 @@ impl ProxyItem {
                 curl_auth = Some(user);
                 options_auth = Some(format!(
                     "Proxy-Authorization: Basic {}",
-                    base64_encode(&auth)
+                    legacy_lossy(&base64_encode(&auth))
                 ));
             }
         }

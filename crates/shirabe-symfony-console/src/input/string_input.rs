@@ -4,9 +4,11 @@ use crate::exception::InvalidArgumentException;
 use crate::input::{
     ArgvInput, InputDefinition, InputInterface, InputValue, StreamableInputInterface,
 };
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, php_regex, preg_match, str_replace_arr, stripcslashes, strlen, substr,
+    PhpResource, bconcat, legacy_lossy, php_regex, preg_match, str_replace_arr, stripcslashes,
+    strlen, substr,
 };
 
 /// StringInput represents an input provided as a string.
@@ -45,15 +47,15 @@ impl StringInput {
         let mut tokens: Vec<String> = vec![];
         let length = strlen(input);
         let mut cursor: i64 = 0;
-        let mut token: Option<String> = None;
+        let mut token: Option<BString> = None;
         while cursor < length {
             if bytes[cursor as usize] == b'\\' {
                 cursor += 1;
-                let next: String = match bytes.get(cursor as usize) {
-                    Some(b) => String::from_utf8_lossy(&[*b]).into_owned(),
-                    None => String::new(),
-                };
-                token = Some(format!("{}{}", token.unwrap_or_default(), next));
+                let mut t = token.unwrap_or_default();
+                if let Some(b) = bytes.get(cursor as usize) {
+                    t.push(*b);
+                }
+                token = Some(t);
                 cursor += 1;
                 continue;
             }
@@ -63,11 +65,11 @@ impl StringInput {
             // exactly there. The `regex` crate anchors only at the head of the haystack, so the
             // search runs over the part of the input that begins at the cursor and each pattern
             // carries a leading `^` instead of the `A` modifier.
-            let rest = &input[cursor as usize..];
+            let rest = &bytes[cursor as usize..];
 
             if let Some(m) = preg_match(php_regex!(r"/^\s+/"), rest) {
                 if token.is_some() {
-                    tokens.push(token.take().unwrap());
+                    tokens.push(legacy_lossy(&token.take().unwrap()).into_owned());
                 }
                 cursor += strlen(m.get(0).unwrap_or_default());
             } else if let Some(m) = preg_match(
@@ -76,8 +78,7 @@ impl StringInput {
             ) {
                 let inner = substr(m.get(3).unwrap_or_default(), 1, Some(-1));
                 let replaced = str_replace_arr(&["\"'", "'\"", "''", "\"\""], "", &inner);
-                token = Some(format!(
-                    "{}{}{}{}",
+                token = Some(bconcat!(
                     token.unwrap_or_default(),
                     m.get(1).unwrap_or_default(),
                     m.get(2).unwrap_or_default(),
@@ -85,16 +86,14 @@ impl StringInput {
                 ));
                 cursor += strlen(m.get(0).unwrap_or_default());
             } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_QUOTED_STRING), rest) {
-                token = Some(format!(
-                    "{}{}",
+                token = Some(bconcat!(
                     token.unwrap_or_default(),
                     stripcslashes(substr(m.get(0).unwrap_or_default(), 1, Some(-1)))
                 ));
                 cursor += strlen(m.get(0).unwrap_or_default());
             } else if let Some(m) = preg_match(format!(r"/^{}/", Self::REGEX_UNQUOTED_STRING), rest)
             {
-                token = Some(format!(
-                    "{}{}",
+                token = Some(bconcat!(
                     token.unwrap_or_default(),
                     m.get(1).unwrap_or_default()
                 ));
@@ -103,14 +102,14 @@ impl StringInput {
                 // should never happen
                 return Err(InvalidArgumentException::new(format!(
                     "Unable to parse input near \"... {} ...\".",
-                    substr(input, cursor, Some(10)),
+                    substr(input, cursor, Some(10)).display_lossy(),
                 ))
                 .into());
             }
         }
 
         if let Some(token) = token {
-            tokens.push(token);
+            tokens.push(legacy_lossy(&token).into_owned());
         }
 
         Ok(tokens)

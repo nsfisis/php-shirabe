@@ -256,7 +256,7 @@ impl IOInterfaceImmutable for IOMock {
             format!("{}{}", trim_eol(&question), PHP_EOL),
             PhpMixed::Null,
         )?;
-        Ok(result.as_string().map(|s| s.to_string()))
+        Ok(result.as_string().map(|s| legacy_lossy(s).into_owned()))
     }
     fn select(
         &self,

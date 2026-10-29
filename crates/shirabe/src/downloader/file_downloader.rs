@@ -191,7 +191,7 @@ impl FileDownloader {
 
             return Ok(Some(format!(
                 "Failed to detect changes: [{}] {}",
-                get_class(&PhpMixed::Null),
+                legacy_lossy(&get_class(&PhpMixed::Null)),
                 err
             )));
         }
@@ -286,15 +286,18 @@ impl FileDownloader {
         legacy_lossy(&rtrim2(
             format!(
                 "{}/composer/tmp-{}.{}",
-                self.config
-                    .borrow_mut()
-                    .get("vendor-dir")
-                    .as_string()
-                    .unwrap_or_default(),
-                hash(
+                legacy_lossy(
+                    &self
+                        .config
+                        .borrow_mut()
+                        .get("vendor-dir")
+                        .as_string()
+                        .unwrap_or_default()
+                ),
+                legacy_lossy(&hash(
                     "md5",
                     format!("{}{}", package, spl_object_hash(&PhpMixed::Null))
-                ),
+                )),
                 extension
             ),
             ".",
@@ -381,7 +384,7 @@ impl DownloaderInterface for FileDownloader {
             format!(
                 "{}/{}.{}",
                 package.get_name(),
-                cache_key,
+                legacy_lossy(&cache_key),
                 package.get_dist_type().unwrap_or_default()
             )
         };
@@ -589,7 +592,7 @@ impl DownloaderInterface for FileDownloader {
                                 self.io.borrow().write_error(&format!(
                                     "    Failed downloading {}: [{}] {}: {}",
                                     package.get_name(),
-                                    get_class(&PhpMixed::Null),
+                                    get_class(&PhpMixed::Null).display_lossy(),
                                     code,
                                     e
                                 ));
@@ -680,13 +683,14 @@ impl DownloaderInterface for FileDownloader {
             self.filesystem.borrow_mut().unlink(&file_name)?;
         }
 
-        let vendor_dir = self
-            .config
-            .borrow_mut()
-            .get("vendor-dir")
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let vendor_dir = legacy_lossy(
+            self.config
+                .borrow_mut()
+                .get("vendor-dir")
+                .as_string()
+                .unwrap_or_default(),
+        )
+        .into_owned();
         let first_segment = package
             .get_pretty_name()
             .split('/')
@@ -741,13 +745,14 @@ impl DownloaderInterface for FileDownloader {
             ));
         }
 
-        let vendor_dir = self
-            .config
-            .borrow_mut()
-            .get("vendor-dir")
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let vendor_dir = legacy_lossy(
+            self.config
+                .borrow_mut()
+                .get("vendor-dir")
+                .as_string()
+                .unwrap_or_default(),
+        )
+        .into_owned();
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the file to be installed. This is the case when installing with create-project in the current directory

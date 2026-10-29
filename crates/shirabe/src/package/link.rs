@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/Package/Link.php
 
 use crate::package::PackageInterfaceHandle;
+use shirabe_php_shim::legacy_lossy;
 use shirabe_semver::constraint::AnyConstraint;
 
 #[derive(Clone, Debug)]
@@ -82,7 +83,7 @@ impl Link {
             source_package.get_pretty_string(),
             self.description,
             self.target,
-            self.constraint.get_pretty_string()
+            legacy_lossy(&self.constraint.get_pretty_string())
         )
     }
 }
@@ -92,7 +93,10 @@ impl std::fmt::Display for Link {
         write!(
             f,
             "{} {} {} ({})",
-            self.source, self.description, self.target, self.constraint,
+            self.source,
+            self.description,
+            self.target,
+            legacy_lossy(&self.constraint.to_php_string()),
         )
     }
 }

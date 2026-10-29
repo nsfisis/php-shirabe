@@ -15,8 +15,8 @@ use crate::repository::{
 use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, LogicException, PhpMixed, array_flip_strings, array_map, in_array_strict, microtime,
-    number_format, preg_is_match, round, strpos,
+    CmpOp, LogicException, PhpMixed, array_flip_strings, array_map, in_array_strict, legacy_lossy,
+    microtime, number_format, preg_is_match, round, strpos,
 };
 use shirabe_semver::constraint::{AnyConstraint, MatchAllConstraint, MultiConstraint};
 use shirabe_semver::{CompilingMatcher, Intervals};
@@ -1093,8 +1093,8 @@ impl PoolBuilder {
         self.io.write3(
             &format!(
                 "<info>Found {} package versions referenced in your dependency graph. {} ({}%) were optimized away.</info>",
-                number_format(total, 0, ".", ","),
-                number_format(filtered, 0, ".", ","),
+                legacy_lossy(&number_format(total, 0, ".", ",")),
+                legacy_lossy(&number_format(filtered, 0, ".", ",")),
                 round(100.0 / total * filtered, 0),
             ),
             true,
@@ -1143,8 +1143,8 @@ impl PoolBuilder {
         self.io.write3(
             &format!(
                 "<info>Found {} package versions referenced in your dependency graph. {} ({}%) were filtered away.</info>",
-                number_format(total, 0, ".", ","),
-                number_format(filtered, 0, ".", ","),
+                legacy_lossy(&number_format(total, 0, ".", ",")),
+                legacy_lossy(&number_format(filtered, 0, ".", ",")),
                 round(100.0 / total * filtered, 0),
             ),
             true,

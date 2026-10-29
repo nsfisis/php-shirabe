@@ -48,8 +48,8 @@ impl Request {
             return Err(LogicException::new(format!(
                 "Overwriting requires seems like a bug ({} {} => {}, check why it is happening, might be a root alias",
                 package_name,
-                self.requires[&package_name].get_pretty_string(),
-                constraint.get_pretty_string()
+                self.requires[&package_name].get_pretty_string().display_lossy(),
+                constraint.get_pretty_string().display_lossy()
             ))
             .into());
         }

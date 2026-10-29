@@ -45,7 +45,7 @@ impl GitExcludeFilter {
         if parts.len() == 2 && parts[1] == "-export-ignore" {
             return Some(BaseExcludeFilterBase::generate_pattern(&format!(
                 "!{}",
-                parts[0]
+                legacy_lossy(&parts[0])
             )));
         }
 

@@ -276,7 +276,7 @@ impl PlatformInfo {
         self.extension_versions
             .get(extension)
             .unwrap_or_else(|| {
-                panic!("PHP RPC: extension `{extension}` is not loaded in the platform payload")
+                panic!("PHP RPC: extension {extension:?} is not loaded in the platform payload")
             })
             .as_bstr()
     }
@@ -288,7 +288,7 @@ impl PlatformInfo {
         self.extension_info
             .get(extension)
             .unwrap_or_else(|| {
-                panic!("PHP RPC: extension `{extension}` info is not in the platform payload")
+                panic!("PHP RPC: extension {extension:?} info is not in the platform payload")
             })
             .as_bstr()
     }
@@ -491,7 +491,7 @@ impl Payload<'_> {
             .map(|(name, value)| match value {
                 PhpMixed::String(s) => (name.clone(), s.clone()),
                 other => panic!(
-                    "PHP RPC: `{}` payload entry `{key}[{name}]` is not a string: {other:?}",
+                    "PHP RPC: `{}` payload entry `{key}`[{name:?}] is not a string: {other:?}",
                     self.what
                 ),
             })
@@ -518,23 +518,19 @@ impl Payload<'_> {
     }
 }
 
-fn as_bool(value: &PhpMixed, what: &str, key: impl std::fmt::Display) -> bool {
+fn as_bool(value: &PhpMixed, what: &str, key: impl std::fmt::Debug) -> bool {
     match value {
         PhpMixed::Bool(b) => *b,
-        other => panic!("PHP RPC: `{what}` payload entry `{key}` is not a bool: {other:?}"),
+        other => panic!("PHP RPC: `{what}` payload entry {key:?} is not a bool: {other:?}"),
     }
 }
 
-fn as_nullable_string(
-    value: &PhpMixed,
-    what: &str,
-    key: impl std::fmt::Display,
-) -> Option<BString> {
+fn as_nullable_string(value: &PhpMixed, what: &str, key: impl std::fmt::Debug) -> Option<BString> {
     match value {
         PhpMixed::String(s) => Some(s.clone()),
         PhpMixed::Null => None,
         other => {
-            panic!("PHP RPC: `{what}` payload entry `{key}` is not a string or null: {other:?}")
+            panic!("PHP RPC: `{what}` payload entry {key:?} is not a string or null: {other:?}")
         }
     }
 }
@@ -1486,7 +1482,7 @@ mod tests {
         assert!(
             diagnostics.phpinfo_general.contains_str("PHP Version"),
             "expected phpinfo(INFO_GENERAL) output, got: {}",
-            diagnostics.phpinfo_general,
+            diagnostics.phpinfo_general.display_lossy(),
         );
     }
 
@@ -1506,7 +1502,7 @@ mod tests {
                 .and_then(|n| shirabe_php_shim::utf8_text(n)?.parse::<i64>().ok()),
             Some(php.major),
             "version should start with the major version: {}",
-            php.version,
+            php.version.display_lossy(),
         );
         assert_eq!(
             php.version_id,

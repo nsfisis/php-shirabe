@@ -3,7 +3,7 @@
 use crate::exception::InvalidArgumentException;
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{bconcat, getenv, hexdec, implode, round, strlen, substr};
+use shirabe_php_shim::{bconcat, getenv, hexdec, round, strlen, substr};
 
 const COLORS: [(&str, i64); 9] = [
     ("black", 0),
@@ -82,14 +82,12 @@ impl Color {
             if available.is_none() {
                 return Err(InvalidArgumentException::new(format!(
                     "Invalid option specified: \"{}\". Expected one of ({}).",
-                    option.clone(),
-                    implode(
-                        ", ",
-                        &AVAILABLE_OPTIONS
-                            .iter()
-                            .map(|(k, _)| k.to_string())
-                            .collect::<Vec<String>>(),
-                    ),
+                    option.display_lossy(),
+                    AVAILABLE_OPTIONS
+                        .iter()
+                        .map(|(k, _)| k.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", "),
                 )));
             }
 
@@ -118,7 +116,7 @@ impl Color {
             return String::new();
         }
 
-        format!("\u{1b}[{}m", implode(";", &set_codes))
+        format!("\u{1b}[{}m", set_codes.join(";"))
     }
 
     pub fn unset(&self) -> String {
@@ -136,7 +134,7 @@ impl Color {
             return String::new();
         }
 
-        format!("\u{1b}[{}m", implode(";", &unset_codes))
+        format!("\u{1b}[{}m", unset_codes.join(";"))
     }
 
     fn parse_color(color: &BStr, background: bool) -> Result<String, InvalidArgumentException> {
@@ -155,7 +153,7 @@ impl Color {
             if strlen(&color) != 6 {
                 return Err(InvalidArgumentException::new(format!(
                     "Invalid \"{}\" color.",
-                    color
+                    color.display_lossy()
                 )));
             }
 
@@ -178,8 +176,8 @@ impl Color {
         available.extend(BRIGHT_COLORS.iter().map(|(k, _)| k.to_string()));
         Err(InvalidArgumentException::new(format!(
             "Invalid \"{}\" color; expected one of ({}).",
-            color,
-            implode(", ", &available),
+            color.display_lossy(),
+            available.join(", "),
         )))
     }
 

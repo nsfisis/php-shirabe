@@ -118,7 +118,7 @@ impl Cache {
     pub fn read(&mut self, file: &str) -> Option<String> {
         if self.is_enabled() {
             let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, file);
+            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
             if file_exists(&full_path) {
                 self.io.write_error3(
                     &format!("Reading {} from cache", full_path),
@@ -154,7 +154,12 @@ impl Cache {
                 crate::io::DEBUG,
             );
 
-            let temp_file_name = format!("{}{}{}.tmp", self.root, file, bin2hex(random_bytes(5)));
+            let temp_file_name = format!(
+                "{}{}{}.tmp",
+                self.root,
+                file,
+                legacy_lossy(&bin2hex(random_bytes(5)))
+            );
             let dest = format!("{}{}", self.root, file);
             // TODO(php-semantics): the shim's file_put_contents() discards the io::Error, so a failed
             // write returns false here instead of reaching the error handling below. Only rename()
@@ -197,8 +202,8 @@ impl Cache {
                         let message = format!(
                             "<warning>Writing {} into cache failed after {} of {} bytes written, only {} bytes of free space available</warning>",
                             temp_file_name,
-                            m.get(1).unwrap_or_default(),
-                            m.get(2).unwrap_or_default(),
+                            legacy_lossy(&m.get(1).unwrap_or_default()),
+                            legacy_lossy(&m.get(2).unwrap_or_default()),
                             free_space,
                         );
 
@@ -219,7 +224,7 @@ impl Cache {
     pub fn copy_from(&mut self, file: &str, source: &str) -> bool {
         if self.is_enabled() && !self.read_only {
             let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, file);
+            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
             self.filesystem
                 .borrow_mut()
                 .ensure_directory_exists(path_from_bytes(&dirname(&full_path)));
@@ -248,7 +253,7 @@ impl Cache {
     pub fn copy_to(&mut self, file: &str, target: &str) -> anyhow::Result<bool> {
         if self.is_enabled() {
             let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, file);
+            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
             if file_exists(&full_path) {
                 if !touch3(&full_path, filemtime(&full_path).unwrap_or(0), time()) {
                     // fallback in case the above failed due to incorrect ownership
@@ -296,7 +301,7 @@ impl Cache {
     pub fn remove(&mut self, file: &str) -> bool {
         if self.is_enabled() && !self.read_only {
             let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, file);
+            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
             if file_exists(&full_path) {
                 return self
                     .filesystem
@@ -325,7 +330,7 @@ impl Cache {
     pub fn get_age(&mut self, file: &str) -> Option<i64> {
         if self.is_enabled() {
             let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, file);
+            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
             if file_exists(&full_path)
                 && let Some(mtime) = filemtime(&full_path)
             {
@@ -442,7 +447,7 @@ impl Cache {
     pub fn sha1(&mut self, file: &str) -> Option<String> {
         if self.is_enabled() {
             let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, file);
+            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
             if file_exists(&full_path) {
                 return hash_file("sha1", &full_path).map(|s| legacy_lossy(&s).into_owned());
             }
@@ -454,7 +459,7 @@ impl Cache {
     pub fn sha256(&mut self, file: &str) -> Option<String> {
         if self.is_enabled() {
             let file = preg_replace(format!("{{[^{}]}}i", self.allowlist), "-", file);
-            let full_path = format!("{}{}", self.root, file);
+            let full_path = format!("{}{}", self.root, legacy_lossy(&file));
             if file_exists(&full_path) {
                 return hash_file("sha256", &full_path).map(|s| legacy_lossy(&s).into_owned());
             }

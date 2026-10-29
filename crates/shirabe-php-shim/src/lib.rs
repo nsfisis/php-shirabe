@@ -419,12 +419,6 @@ where
     }
 }
 
-impl std::fmt::Display for PhpMixed {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(php_to_string(self).as_bstr(), f)
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum PhpResource {
     Stdin,

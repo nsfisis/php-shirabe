@@ -10,6 +10,7 @@ use indexmap::IndexMap;
 use shirabe::installer::InstallerInterface;
 use shirabe::package::loader::{ArrayLoader, JsonLoader, JsonLoaderInput};
 use shirabe::package::{Link, PackageInterfaceHandle};
+use shirabe_php_shim::legacy_lossy;
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MatchNoneConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -90,7 +91,11 @@ fn seeded_requires() -> IndexMap<String, Link> {
 fn describe(constraint: &AnyConstraint) -> String {
     let shape = match constraint {
         AnyConstraint::Simple(c) => {
-            format!("Constraint({} {})", c.get_operator(), c.get_version())
+            format!(
+                "Constraint({} {})",
+                c.get_operator(),
+                legacy_lossy(&c.get_version())
+            )
         }
         AnyConstraint::Multi(c) => format!(
             "MultiConstraint({}: {})",
@@ -104,7 +109,10 @@ fn describe(constraint: &AnyConstraint) -> String {
         AnyConstraint::MatchAll(_) => "MatchAllConstraint()".to_string(),
         AnyConstraint::MatchNone(_) => "MatchNoneConstraint()".to_string(),
     };
-    format!("{shape} pretty={}", constraint.get_pretty_string())
+    format!(
+        "{shape} pretty={}",
+        legacy_lossy(&constraint.get_pretty_string())
+    )
 }
 
 fn describe_links(links: &IndexMap<String, Link>) -> Vec<String> {

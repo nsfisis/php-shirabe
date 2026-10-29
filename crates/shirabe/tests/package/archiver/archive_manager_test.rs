@@ -133,7 +133,10 @@ impl TestCase {
         if result > 0 {
             panic!(
                 "Could not set up git repo: {}",
-                process.get_error_output().unwrap_or_default()
+                process
+                    .get_error_output()
+                    .unwrap_or_default()
+                    .display_lossy()
             );
         }
     }

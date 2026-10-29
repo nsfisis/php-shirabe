@@ -342,7 +342,7 @@ impl NoProxyPattern {
     fn make_data(&self, host: &str, port: i64, ipdata: Option<IpData>) -> UrlData {
         UrlData {
             host: host.to_string(),
-            name: format!(".{}", ltrim2(host, ".")),
+            name: format!(".{}", legacy_lossy(&ltrim2(host, "."))),
             port,
             ipdata,
         }

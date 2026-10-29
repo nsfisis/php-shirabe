@@ -94,6 +94,7 @@ impl ArrayLoader {
                     .get(B("name"))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default()
+                    .display_lossy()
             ))
             .into());
         }
@@ -107,11 +108,13 @@ impl ArrayLoader {
         if config.contains_key(B("version_normalized"))
             && is_string(config.get(B("version_normalized")).unwrap())
         {
-            let mut v = config
-                .get(B("version_normalized"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string();
+            let mut v = legacy_lossy(
+                config
+                    .get(B("version_normalized"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned();
 
             // handling of existing repos which need to remain composer v1 compatible, in case the version_normalized contained VersionParser::DEFAULT_BRANCH_ALIAS, we renormalize it
             if v == VersionParser::DEFAULT_BRANCH_ALIAS {
@@ -136,10 +139,12 @@ impl ArrayLoader {
                 Err(e) => {
                     let message = format!(
                         "Failed to normalize version for package \"{}\": {}",
-                        config
-                            .get(B("name"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default(),
+                        legacy_lossy(
+                            &config
+                                .get(B("name"))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default()
+                        ),
                         e
                     );
                     let code = AnyThrowable::of(&e).map_or(0, AnyThrowable::get_code);
@@ -153,12 +158,15 @@ impl ArrayLoader {
             }
         }
 
-        let name = config
-            .get(B("name"))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
-        let pretty_version = config_version.as_string().unwrap_or_default().to_string();
+        let name = legacy_lossy(
+            config
+                .get(B("name"))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned();
+        let pretty_version =
+            legacy_lossy(config_version.as_string().unwrap_or_default()).into_owned();
 
         if class == "Composer\\Package\\RootPackage" {
             Ok(CompleteOrRootPackage::Root(RootPackage::new(
@@ -191,7 +199,7 @@ impl ArrayLoader {
         if let Some(target_dir) = config.get(B("target-dir")) {
             package
                 .package_mut()
-                .set_target_dir(target_dir.as_string().map(|s| s.to_string()));
+                .set_target_dir(target_dir.as_string().map(|s| legacy_lossy(s).into_owned()));
         }
 
         if let Some(extra) = config.get(B("extra"))
@@ -225,9 +233,11 @@ impl ArrayLoader {
         }
 
         if let Some(installation_source) = config.get(B("installation-source")) {
-            package
-                .package_mut()
-                .set_installation_source(installation_source.as_string().map(|s| s.to_string()));
+            package.package_mut().set_installation_source(
+                installation_source
+                    .as_string()
+                    .map(|s| legacy_lossy(s).into_owned()),
+            );
         }
 
         if let Some(default_branch) = config.get(B("default-branch"))
@@ -255,7 +265,7 @@ impl ArrayLoader {
                     config
                         .get(B("name"))
                         .and_then(|v| v.as_string())
-                        .unwrap_or_default(),
+                        .unwrap_or_default().display_lossy(),
                     json_encode(&source).unwrap_or_default(),
                 ))
                 .into());
@@ -302,7 +312,7 @@ impl ArrayLoader {
                     config
                         .get(B("name"))
                         .and_then(|v| v.as_string())
-                        .unwrap_or_default(),
+                        .unwrap_or_default().display_lossy(),
                     json_encode(&dist).unwrap_or_default(),
                 ))
                 .into());
@@ -390,9 +400,9 @@ impl ArrayLoader {
         {
             let time_str = time_value.as_string().unwrap_or_default();
             let time = if preg_is_match(php_regex!(r"/^\d++$/D"), time_str) {
-                format!("@{}", time_str)
+                format!("@{}", legacy_lossy(&time_str))
             } else {
-                time_str.to_string()
+                legacy_lossy(time_str).into_owned()
             };
 
             if let Ok(date) = date_create::<Utc>(&time) {
@@ -462,9 +472,9 @@ impl ArrayLoader {
             && !empty(description)
             && is_string(description)
         {
-            package
-                .complete_mut()
-                .set_description(description.as_string().unwrap_or_default().to_string());
+            package.complete_mut().set_description(
+                legacy_lossy(description.as_string().unwrap_or_default()).into_owned(),
+            );
         }
 
         if let Some(homepage) = config.get(B("homepage"))
@@ -473,7 +483,7 @@ impl ArrayLoader {
         {
             package
                 .complete_mut()
-                .set_homepage(homepage.as_string().unwrap_or_default().to_string());
+                .set_homepage(legacy_lossy(homepage.as_string().unwrap_or_default()).into_owned());
         }
 
         if let Some(keywords) = config.get(B("keywords"))
@@ -502,13 +512,13 @@ impl ArrayLoader {
             let license_vec: Vec<String> = match license {
                 PhpMixed::Array(map) => map
                     .values()
-                    .map(|v| v.as_string().unwrap_or_default().to_string())
+                    .map(|v| legacy_lossy(v.as_string().unwrap_or_default()).into_owned())
                     .collect(),
                 PhpMixed::List(list) => list
                     .iter()
-                    .map(|v| v.as_string().unwrap_or_default().to_string())
+                    .map(|v| legacy_lossy(v.as_string().unwrap_or_default()).into_owned())
                     .collect(),
-                other => vec![other.as_string().unwrap_or_default().to_string()],
+                other => vec![legacy_lossy(other.as_string().unwrap_or_default()).into_owned()],
             };
             package.complete_mut().set_license(license_vec);
         }
@@ -527,7 +537,7 @@ impl ArrayLoader {
                             .map(|(k, v)| {
                                 (
                                     k.to_str_lossy().into_owned(),
-                                    v.as_string().unwrap_or_default().to_string(),
+                                    legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
                                 )
                             })
                             .collect(),
@@ -547,7 +557,7 @@ impl ArrayLoader {
                 .map(|(k, v)| {
                     (
                         k.to_str_lossy().into_owned(),
-                        v.as_string().unwrap_or_default().to_string(),
+                        legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
                     )
                 })
                 .collect();
@@ -638,7 +648,8 @@ impl ArrayLoader {
                         continue;
                     }
 
-                    let constraint_str = constraint.as_string().unwrap_or_default().to_string();
+                    let constraint_str =
+                        legacy_lossy(constraint.as_string().unwrap_or_default()).into_owned();
                     if constraint_str == "self.version" {
                         let link = self.create_link(
                             &name,
@@ -770,7 +781,7 @@ impl ArrayLoader {
             config_version = PhpMixed::string(strval(&config_version));
         }
 
-        let version_str = config_version.as_string().unwrap_or_default().to_string();
+        let version_str = legacy_lossy(config_version.as_string().unwrap_or_default()).into_owned();
         if strpos(&version_str, "dev-") != Some(0) && "-dev" != substr(&version_str, -4, None) {
             return Ok(None);
         }
@@ -790,10 +801,8 @@ impl ArrayLoader {
             for (source_branch, target_branch_value) in branch_alias_map {
                 let source_branch =
                     legacy_lossy(&strval(&PhpMixed::String(source_branch))).into_owned();
-                let target_branch = target_branch_value
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string();
+                let target_branch =
+                    legacy_lossy(target_branch_value.as_string().unwrap_or_default()).into_owned();
 
                 // ensure it is an alias to a -dev package
                 if "-dev" != substr(&target_branch, -4, None) {
@@ -951,11 +960,12 @@ fn php_to_mirrors(value: &PhpMixed) -> Vec<Mirror> {
         .into_iter()
         .filter_map(|entry| match entry {
             PhpMixed::Array(m) => Some(Mirror {
-                url: m
-                    .get(B("url"))
-                    .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_string(),
+                url: legacy_lossy(
+                    m.get(B("url"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default(),
+                )
+                .into_owned(),
                 preferred: m.get(B("preferred")).is_some_and(|v| v.to_bool()),
             }),
             _ => None,

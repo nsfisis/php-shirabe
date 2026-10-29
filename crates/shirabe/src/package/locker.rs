@@ -223,25 +223,30 @@ impl Locker {
             {
                 for alias in alias_list {
                     if let PhpMixed::Array(m) = alias {
-                        let alias_pkg_name = m
-                            .get(B("package"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_string();
+                        let alias_pkg_name = legacy_lossy(
+                            m.get(B("package"))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        )
+                        .into_owned();
                         if let Some(base_pkg) = package_by_name.get(&alias_pkg_name) {
                             let alias_of = base_pkg.as_complete_package().expect(
                                     "CompleteAliasPackage requires aliasOf to be a real CompletePackage",
                                 );
                             let alias_pkg = CompleteAliasPackageHandle::new(
                                 alias_of,
-                                m.get(B("alias_normalized"))
-                                    .and_then(|v| v.as_string())
-                                    .unwrap_or_default()
-                                    .to_string(),
-                                m.get(B("alias"))
-                                    .and_then(|v| v.as_string())
-                                    .unwrap_or_default()
-                                    .to_string(),
+                                legacy_lossy(
+                                    m.get(B("alias_normalized"))
+                                        .and_then(|v| v.as_string())
+                                        .unwrap_or_default(),
+                                )
+                                .into_owned(),
+                                legacy_lossy(
+                                    m.get(B("alias"))
+                                        .and_then(|v| v.as_string())
+                                        .unwrap_or_default(),
+                                )
+                                .into_owned(),
                             );
                             alias_pkg.set_root_package_alias(true);
                             packages.add_package(alias_pkg.into())?;
@@ -330,11 +335,13 @@ impl Locker {
     pub fn get_minimum_stability(&mut self) -> anyhow::Result<String> {
         let lock_data = self.get_lock_data()?;
 
-        Ok(lock_data
-            .get(B("minimum-stability"))
-            .and_then(|v| v.as_string())
-            .unwrap_or("stable".into())
-            .to_string())
+        Ok(legacy_lossy(
+            lock_data
+                .get(B("minimum-stability"))
+                .and_then(|v| v.as_string())
+                .unwrap_or("stable".into()),
+        )
+        .into_owned())
     }
 
     /// The values are BasePackage::STABILITIES ints, written verbatim by set_lock_data,
@@ -382,7 +389,7 @@ impl Locker {
                         .map(|(k, v)| {
                             (
                                 k.to_str_lossy().into_owned(),
-                                v.as_string().unwrap_or_default().to_string(),
+                                legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
                             )
                         })
                         .collect(),
@@ -407,7 +414,8 @@ impl Locker {
                                     .map(|(k, v)| {
                                         (
                                             k.to_str_lossy().into_owned(),
-                                            v.as_string().unwrap_or_default().to_string(),
+                                            legacy_lossy(v.as_string().unwrap_or_default())
+                                                .into_owned(),
                                         )
                                     })
                                     .collect(),
@@ -424,11 +432,13 @@ impl Locker {
     pub fn get_plugin_api(&mut self) -> anyhow::Result<String> {
         let lock_data = self.get_lock_data()?;
 
-        Ok(lock_data
-            .get(B("plugin-api-version"))
-            .and_then(|v| v.as_string())
-            .unwrap_or("1.1.0".into())
-            .to_string())
+        Ok(legacy_lossy(
+            lock_data
+                .get(B("plugin-api-version"))
+                .and_then(|v| v.as_string())
+                .unwrap_or("1.1.0".into()),
+        )
+        .into_owned())
     }
 
     pub fn get_lock_data(&mut self) -> anyhow::Result<IndexMap<BString, PhpMixed>> {
@@ -849,10 +859,8 @@ impl Locker {
                         php_regex!(r"{^\s*(\d+)\s*}"),
                         &output.as_string().unwrap_or_default(),
                     ) {
-                        let ts = m
-                            .get(1)
-                            .unwrap_or_default()
-                            .to_string()
+                        let ts = legacy_lossy(m.get(1).unwrap_or_default())
+                            .into_owned()
                             .parse::<i64>()
                             .unwrap_or(0);
                         datetime = chrono::DateTime::from_timestamp(ts, 0);

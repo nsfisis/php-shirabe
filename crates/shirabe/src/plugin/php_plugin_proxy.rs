@@ -45,7 +45,7 @@ use shirabe_php_rpc::{
 };
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, path_to_bytes,
+    UnexpectedValueException, legacy_lossy, path_to_bytes,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -547,7 +547,7 @@ pub(crate) fn construct_entity(args: &[PluginValue]) -> Result<PluginValue, PhpT
             )));
         }
     };
-    let class_name = class.to_string();
+    let class_name = legacy_lossy(class).into_owned();
     let string_arg = |position: usize| arg::<String>(&class_name, ctor_args, position);
     let package_arg =
         |position: usize| arg::<PackageInterfaceHandle>(&class_name, ctor_args, position);
@@ -1969,7 +1969,7 @@ pub(crate) fn call_static_entity(args: &[PluginValue]) -> Result<PluginValue, Ph
             )));
         }
     };
-    let name = format!("{class}::{method}");
+    let name = format!("{}::{}", class.display_lossy(), method.display_lossy());
     let string_arg = |position: usize| arg::<String>(&name, &call_args, position);
     match (class.as_slice(), method.as_slice()) {
         (b"Composer\\Util\\Filesystem", b"isLocalPath") => {

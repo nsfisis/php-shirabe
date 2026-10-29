@@ -227,7 +227,7 @@ impl PoolOptimizer {
                     ) {
                         group_hash_parts.push(format!(
                             "require:{}",
-                            require_constraint.get_pretty_string()
+                            legacy_lossy(&require_constraint.get_pretty_string())
                         ));
                     }
 
@@ -241,7 +241,7 @@ impl PoolOptimizer {
                                 // Use the same hash part as the regular require hash because that's what the replacement does
                                 group_hash_parts.push(format!(
                                     "require:{}",
-                                    link.get_constraint().get_pretty_string()
+                                    legacy_lossy(&link.get_constraint().get_pretty_string())
                                 ));
                             }
                         }
@@ -258,7 +258,7 @@ impl PoolOptimizer {
                             ) {
                                 group_hash_parts.push(format!(
                                     "conflict:{}",
-                                    conflict_constraint.get_pretty_string()
+                                    legacy_lossy(&conflict_constraint.get_pretty_string())
                                 ));
                             }
                         }
@@ -368,7 +368,7 @@ impl PoolOptimizer {
                 // performance more than the additional few packages that could be filtered out would benefit the process.
                 subhash.insert(
                     link.get_target().to_string(),
-                    link.get_constraint().to_string(),
+                    legacy_lossy(&link.get_constraint().to_php_string()).into_owned(),
                 );
             }
 
@@ -599,7 +599,10 @@ impl PoolOptimizer {
             self.require_constraints_per_package
                 .entry(package.to_string())
                 .or_default()
-                .insert(expanded.to_string(), expanded);
+                .insert(
+                    legacy_lossy(&expanded.to_php_string()).into_owned(),
+                    expanded,
+                );
         }
     }
 
@@ -615,7 +618,10 @@ impl PoolOptimizer {
             self.conflict_constraints_per_package
                 .entry(package.to_string())
                 .or_default()
-                .insert(expanded.to_string(), expanded);
+                .insert(
+                    legacy_lossy(&expanded.to_php_string()).into_owned(),
+                    expanded,
+                );
         }
     }
 

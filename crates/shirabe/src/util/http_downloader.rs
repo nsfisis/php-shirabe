@@ -276,12 +276,16 @@ impl HttpDownloader {
             self.io.borrow_mut().set_authentication(
                 origin.clone(),
                 legacy_lossy(&rawurldecode(
-                    m.get(1).unwrap_or_default().to_string().as_str(),
+                    legacy_lossy(m.get(1).unwrap_or_default())
+                        .into_owned()
+                        .as_str(),
                 ))
                 .into_owned(),
                 Some(
                     legacy_lossy(&rawurldecode(
-                        m.get(2).unwrap_or_default().to_string().as_str(),
+                        legacy_lossy(m.get(2).unwrap_or_default())
+                            .into_owned()
+                            .as_str(),
                     ))
                     .into_owned(),
                 ),
@@ -382,7 +386,7 @@ impl HttpDownloader {
                         "",
                         &list
                             .iter()
-                            .map(|v| v.as_string().unwrap_or_default().to_string())
+                            .map(|v| legacy_lossy(v.as_string().unwrap_or_default()).into_owned())
                             .collect::<Vec<_>>(),
                     );
                     stripos(&joined, "if-modified-since").is_some()
@@ -390,7 +394,7 @@ impl HttpDownloader {
                     let joined = implode(
                         "",
                         &m.values()
-                            .map(|v| v.as_string().unwrap_or_default().to_string())
+                            .map(|v| legacy_lossy(v.as_string().unwrap_or_default()).into_owned())
                             .collect::<Vec<_>>(),
                     );
                     stripos(&joined, "if-modified-since").is_some()
@@ -535,7 +539,7 @@ impl HttpDownloader {
             io.write_error(&format!(
                 "<{tp}>{capitalized} from {url}: {msg}</{tp}>",
                 tp = r#type,
-                capitalized = ucfirst(r#type),
+                capitalized = ucfirst(r#type).display_lossy(),
                 url = Url::sanitize(url.to_string()),
                 msg = clean_message(
                     &entry
@@ -579,8 +583,8 @@ impl HttpDownloader {
 
                         io.write_error(&format!(
                             "<{tp}>{capitalized} from {url}: {msg}</{tp}>",
-                            tp = r#type,
-                            capitalized = ucfirst(&r#type),
+                            tp = r#type.display_lossy(),
+                            capitalized = ucfirst(&r#type).display_lossy(),
                             url = Url::sanitize(url.to_string()),
                             msg = clean_message(
                                 &spec_map

@@ -69,14 +69,15 @@ pub trait ArchiveDownloader {
             ));
         }
 
-        let vendor_dir = self
-            .inner()
-            .config
-            .borrow_mut()
-            .get("vendor-dir")
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let vendor_dir = legacy_lossy(
+            self.inner()
+                .config
+                .borrow_mut()
+                .get("vendor-dir")
+                .as_string()
+                .unwrap_or_default(),
+        )
+        .into_owned();
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the archive to be extracted. This is the case when installing with create-project in the current directory
@@ -97,7 +98,11 @@ pub trait ArchiveDownloader {
         }
 
         let temporary_dir = loop {
-            let candidate = format!("{}/composer/{}", vendor_dir, bin2hex(random_bytes(4)));
+            let candidate = format!(
+                "{}/composer/{}",
+                vendor_dir,
+                legacy_lossy(&bin2hex(random_bytes(4)))
+            );
             if !is_dir(&candidate) {
                 break candidate;
             }

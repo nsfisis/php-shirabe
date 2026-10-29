@@ -42,7 +42,7 @@ impl Filesystem {
                 ),
                 0,
                 None,
-                Some(origin_file.display().to_string()),
+                Some(origin_file.to_path_buf()),
             )
             .into());
         }
@@ -78,7 +78,7 @@ impl Filesystem {
                     ),
                     0,
                     None,
-                    Some(origin_file.display().to_string()),
+                    Some(origin_file.to_path_buf()),
                 )
                 .into());
             }
@@ -93,7 +93,7 @@ impl Filesystem {
                     ),
                     0,
                     None,
-                    Some(origin_file.display().to_string()),
+                    Some(origin_file.to_path_buf()),
                 )
                 .into());
             }
@@ -120,7 +120,7 @@ impl Filesystem {
                         ),
                         0,
                         None,
-                        Some(origin_file.display().to_string()),
+                        Some(origin_file.to_path_buf()),
                     )
                     .into());
                 }
@@ -140,7 +140,7 @@ impl Filesystem {
                 format!("Failed to create \"{}\".", dir.display()),
                 0,
                 None,
-                Some(dir.display().to_string()),
+                Some(dir.to_path_buf()),
             )
             .into());
         }
@@ -158,7 +158,7 @@ impl Filesystem {
                 ),
                 0,
                 None,
-                Some(file.display().to_string()),
+                Some(file.to_path_buf()),
             )
             .into());
         }
@@ -291,7 +291,7 @@ impl Filesystem {
                 ),
                 0,
                 None,
-                Some(target_dir.display().to_string()),
+                Some(target_dir.to_path_buf()),
             )
             .into());
         }
@@ -312,11 +312,11 @@ impl Filesystem {
             return Err(IOException::new(
                 format!(
                     "The origin directory specified \"{}\" was not found.",
-                    origin_dir
+                    origin_dir.display_lossy()
                 ),
                 0,
                 None,
-                Some(origin_dir.to_string()),
+                Some(path_from_bytes(&origin_dir).to_path_buf()),
             )
             .into());
         }
@@ -356,7 +356,7 @@ impl Filesystem {
                     format!("Unable to guess \"{}\" file type.", pathname.display()),
                     0,
                     None,
-                    Some(pathname.display().to_string()),
+                    Some(pathname.to_path_buf()),
                 )
                 .into());
             }

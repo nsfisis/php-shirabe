@@ -6,7 +6,7 @@ use crate::php_file_parser::PhpFileParser;
 use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PATHINFO_EXTENSION, RuntimeException, bconcat,
-    explode, getcwd, implode, is_dir, is_file, path_from_bytes, path_to_bytes, pathinfo, php_regex,
+    explode, getcwd, is_dir, is_file, path_from_bytes, path_to_bytes, pathinfo, php_regex,
     preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback, realpath,
     str_replace, stream_get_wrappers, strlen, strpos, strrpos, strtr, substr,
 };
@@ -27,7 +27,7 @@ impl ClassMapGenerator {
             .iter()
             .map(|w| preg_quote(w, None))
             .collect();
-        let stream_wrappers_regex = format!("{{^(?:{})://}}", implode("|", &wrappers));
+        let stream_wrappers_regex = format!("{{^(?:{})://}}", wrappers.join("|"));
 
         ClassMapGenerator {
             extensions,
@@ -97,14 +97,11 @@ impl ClassMapGenerator {
         } else if is_dir(fs_path) || strpos(path, "*").is_some() {
             let ext_pattern = format!(
                 "/\\.(?:{})$/",
-                implode(
-                    "|",
-                    &self
-                        .extensions
-                        .iter()
-                        .map(|e| preg_quote(e, None))
-                        .collect::<Vec<_>>(),
-                )
+                self.extensions
+                    .iter()
+                    .map(|e| preg_quote(e, None))
+                    .collect::<Vec<_>>()
+                    .join("|")
             );
             Finder::create()
                 .files()
@@ -118,7 +115,7 @@ impl ClassMapGenerator {
         } else {
             return Err(RuntimeException::new(format!(
                 "Could not scan for classes inside \"{}\" which does not appear to be a file nor a folder",
-                path
+                path.display_lossy()
             )).into());
         };
 
@@ -153,9 +150,11 @@ impl ClassMapGenerator {
             }
 
             if file_path.is_empty() {
-                return Err(
-                    LogicException::new(format!("Got an empty $filePath for {}", file)).into(),
-                );
+                return Err(LogicException::new(format!(
+                    "Got an empty $filePath for {}",
+                    file.display_lossy()
+                ))
+                .into());
             }
 
             let real_path = if is_stream_wrapper_path {
@@ -166,7 +165,7 @@ impl ClassMapGenerator {
                     None => {
                         return Err(RuntimeException::new(format!(
                             "realpath of {} failed to resolve, got false",
-                            file_path
+                            file_path.display_lossy()
                         ))
                         .into());
                     }
@@ -314,7 +313,7 @@ impl ClassMapGenerator {
                 self.class_map.add_psr_violation(
                     format!(
                         "Class {} located in {} does not comply with {} autoloading standard (rule: {} => {}). Skipping.",
-                        class, short_path, namespace_type, base_namespace, short_base_path
+                        class.display_lossy(), short_path.display_lossy(), namespace_type, base_namespace.display_lossy(), short_base_path.display_lossy()
                     ),
                     class.clone(),
                     file_path,

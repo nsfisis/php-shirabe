@@ -268,7 +268,7 @@ impl std::fmt::Display for ArrayInput {
             }
         }
 
-        write!(f, "{}", implode(" ", &params))
+        f.write_str(&params.join(" "))
     }
 }
 

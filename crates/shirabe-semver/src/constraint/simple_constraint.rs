@@ -38,7 +38,7 @@ impl SimpleConstraint {
             // because invalid operators are programmer errors caught during porting.
             panic!(
                 "Invalid operator \"{}\" given, expected one of: {}",
-                operator.as_bstr(),
+                operator.as_bstr().display_lossy(),
                 Self::get_supported_operators().join(", ")
             )
         });
@@ -319,11 +319,5 @@ impl SimpleConstraint {
 
     pub fn get_upper_bound(&self) -> Bound {
         self.extract_bounds().1
-    }
-}
-
-impl std::fmt::Display for SimpleConstraint {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.operator, self.version.as_bstr())
     }
 }

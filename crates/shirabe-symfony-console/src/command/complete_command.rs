@@ -10,8 +10,9 @@ use crate::output::OutputInterface;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    FILE_APPEND, PHP_EOL, PHP_SERVER, PhpMixed, RuntimeException, basename, ctype_digit, date_utc,
-    file_put_contents3, filter_var_boolean, getenv, impl_php_class, sys_get_temp_dir,
+    FILE_APPEND, PHP_EOL, PHP_SERVER, PhpMixed, RuntimeException, basename, bconcat, ctype_digit,
+    date_utc, file_put_contents3, filter_var_boolean, getenv, impl_php_class, path_from_bytes,
+    sys_get_temp_dir,
 };
 use std::ops::{Deref, DerefMut};
 
@@ -143,7 +144,7 @@ impl CompleteCommand {
             .into_string()
             .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}"));
         file_put_contents3(
-            format!("{}/sf_{}.log", tmp_dir, command_name),
+            path_from_bytes(&bconcat!(tmp_dir, "/sf_", command_name, ".log")),
             &(messages.join(PHP_EOL) + PHP_EOL),
             FILE_APPEND,
         );
@@ -169,13 +170,16 @@ fn get_definition_options(
 
 /// new $completionOutput();
 fn instantiate_completion_output(class: &PhpMixed) -> Box<dyn CompletionOutputInterface> {
-    match class.to_string().as_str() {
-        "Symfony\\Component\\Console\\Completion\\Output\\BashCompletionOutput" => {
+    let class = class
+        .as_string()
+        .expect("completion outputs are registered as class names");
+    match class.as_bytes() {
+        b"Symfony\\Component\\Console\\Completion\\Output\\BashCompletionOutput" => {
             Box::new(BashCompletionOutput)
         }
         // completion_outputs only ever registers the bash output (Composer registers no extra
         // ones), so any other FQCN is a programming error.
-        other => panic!("unknown completion output class: {}", other),
+        other => panic!("unknown completion output class: {:?}", other.as_bstr()),
     }
 }
 

@@ -235,7 +235,7 @@ impl AdvisoryProviderInterface for PackageRepository {
                         "Advisory for {} could not be loaded as a full advisory from {}\n{}",
                         package_name,
                         self.get_repo_name()?,
-                        var_export(data, true)
+                        var_export(data, true).display_lossy()
                     ))
                     .into());
                 }

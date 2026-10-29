@@ -7,10 +7,10 @@ use crate::util::{Bitbucket, GitHub, GitLab};
 use bstr::{B, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    E_USER_DEPRECATED, PhpMixed, RuntimeException, array_merge, base64_encode, explode,
+    E_USER_DEPRECATED, PhpMixed, RuntimeException, array_merge, base64_encode, bconcat, explode,
     in_array_loose, in_array_strict, is_array, is_string, json_decode_assoc, legacy_lossy,
-    parse_url, php_regex, preg_is_match, str_replace, strpos, strtolower, substr, trigger_error,
-    trim,
+    parse_url, php_regex, php_to_string, preg_is_match, str_replace, strpos, strtolower, substr,
+    trigger_error, trim,
 };
 
 #[derive(Debug)]
@@ -177,14 +177,16 @@ impl AuthHelper {
                     "GitHub API limit ({} calls/hr) is exhausted, could not fetch {}. {} You can also wait until {} for the rate limit to reset.\n",
                     rate_limit
                         .get(B("limit"))
-                        .cloned()
-                        .unwrap_or(PhpMixed::Null),
+                        .map(php_to_string)
+                        .unwrap_or_default()
+                        .display_lossy(),
                     url,
                     message,
                     rate_limit
                         .get(B("reset"))
-                        .cloned()
-                        .unwrap_or(PhpMixed::Null),
+                        .map(php_to_string)
+                        .unwrap_or_default()
+                        .display_lossy(),
                 );
             } else {
                 // Try to extract a more specific error message from GitHub's API response
@@ -196,7 +198,7 @@ impl AuthHelper {
                         && let Some(msg) = arr.get(B("message"))
                         && is_string(msg)
                     {
-                        git_hub_api_message = msg.as_string().map(|s| s.to_string());
+                        git_hub_api_message = msg.as_string().map(|s| legacy_lossy(s).into_owned());
                     }
                 }
 
@@ -415,7 +417,7 @@ impl AuthHelper {
                 .ask_and_hide_answer("      Password: ".to_string())?;
             self.io.borrow_mut().set_authentication(
                 origin.to_string(),
-                username.as_string().unwrap_or_default().to_string(),
+                legacy_lossy(username.as_string().unwrap_or_default()).into_owned(),
                 password,
             );
             // PHP: $this->config->get('store-auths') returns 'prompt'|bool
@@ -458,7 +460,7 @@ impl AuthHelper {
             .and_then(|header| header.as_list())
             .expect("addAuthenticationOptions always leaves http.header a list")
             .iter()
-            .map(|v| v.as_string().unwrap_or_default().to_string())
+            .map(|v| legacy_lossy(v.as_string().unwrap_or_default()).into_owned())
             .collect())
     }
 
@@ -587,9 +589,9 @@ impl AuthHelper {
                 authentication_display_message = Some("Using SSL client certificate".to_string());
             } else {
                 let auth_str = base64_encode(format!("{}:{}", username, password));
-                headers.push(PhpMixed::string(format!(
-                    "Authorization: Basic {}",
-                    auth_str,
+                headers.push(PhpMixed::string(bconcat!(
+                    "Authorization: Basic ",
+                    auth_str
                 )));
                 authentication_display_message = Some(format!(
                     "Using HTTP basic authentication with username \"{}\"",

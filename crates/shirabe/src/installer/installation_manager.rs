@@ -173,7 +173,11 @@ impl InstallationManager {
             }
         }
 
-        Err(InvalidArgumentException::new(format!("Unknown installer type: {}", r#type)).into())
+        Err(InvalidArgumentException::new(format!(
+            "Unknown installer type: {}",
+            r#type.display_lossy()
+        ))
+        .into())
     }
 
     /// Checks whether provided package is installed in one of the registered installers.
@@ -654,7 +658,7 @@ impl InstallationManager {
                 if let Err(e) = chain_result {
                     self.io.write_error(&format!(
                         "    <error>{} of {} failed</error>",
-                        ucfirst(op_type),
+                        ucfirst(op_type).display_lossy(),
                         package.get_pretty_name()
                     ));
                     return Err(e);

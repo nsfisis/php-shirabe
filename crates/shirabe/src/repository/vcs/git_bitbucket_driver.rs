@@ -75,21 +75,23 @@ impl GitBitbucketDriver {
             .into());
         };
 
-        self.owner = m.get(1).unwrap_or_default().to_string();
-        self.repository = m.get(2).unwrap_or_default().to_string();
+        self.owner = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
+        self.repository = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
         self.inner.origin_url = "bitbucket.org".to_string();
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
             &legacy_lossy(&implode(
                 "/",
                 &[
-                    self.inner
-                        .config
-                        .borrow_mut()
-                        .get("cache-repo-dir")
-                        .as_string()
-                        .unwrap_or_default()
-                        .to_string(),
+                    legacy_lossy(
+                        self.inner
+                            .config
+                            .borrow_mut()
+                            .get("cache-repo-dir")
+                            .as_string()
+                            .unwrap_or_default(),
+                    )
+                    .into_owned(),
                     self.inner.origin_url.clone(),
                     self.owner.clone(),
                     self.repository.clone(),
@@ -126,7 +128,7 @@ impl GitBitbucketDriver {
             "https://api.bitbucket.org/2.0/repositories/{}/{}?{}",
             self.owner.clone(),
             self.repository.clone(),
-            http_build_query(&[("fields", "-project,-owner")]),
+            legacy_lossy(&http_build_query(&[("fields", "-project,-owner")])),
         );
 
         let repo_data = self
@@ -293,7 +295,7 @@ impl GitBitbucketDriver {
                             false,
                         )
                     })
-                    .map(|v| v.as_string().unwrap_or_default().to_string())
+                    .map(|v| legacy_lossy(v.as_string().unwrap_or_default()).into_owned())
                     .unwrap_or_else(|| identifier.to_string());
 
                     let tags2 = self.get_tags()?;
@@ -493,11 +495,11 @@ impl GitBitbucketDriver {
             let mut resource = format!(
                 "{}?{}",
                 self.tags_url.clone(),
-                http_build_query(&[
+                legacy_lossy(&http_build_query(&[
                     ("pagelen", "100"),
                     ("fields", "values.name,values.target.hash,next"),
                     ("sort", "-target.date"),
-                ]),
+                ])),
             );
             let mut has_next = true;
             while has_next {
@@ -508,20 +510,22 @@ impl GitBitbucketDriver {
                 if let Some(PhpMixed::List(list)) = values {
                     for data in list {
                         if let PhpMixed::Array(m) = data {
-                            let name = m
-                                .get(B("name"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                                .to_string();
-                            let hash = m
-                                .get(B("target"))
-                                .and_then(|v| match v {
-                                    PhpMixed::Array(m) => m.get(B("hash")),
-                                    _ => None,
-                                })
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                                .to_string();
+                            let name = legacy_lossy(
+                                m.get(B("name"))
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default(),
+                            )
+                            .into_owned();
+                            let hash = legacy_lossy(
+                                m.get(B("target"))
+                                    .and_then(|v| match v {
+                                        PhpMixed::Array(m) => m.get(B("hash")),
+                                        _ => None,
+                                    })
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default(),
+                            )
+                            .into_owned();
                             tags.insert(name, hash);
                         }
                     }
@@ -535,11 +539,13 @@ impl GitBitbucketDriver {
                 ) {
                     has_next = false;
                 } else {
-                    resource = tags_data
-                        .get("next")
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
+                    resource = legacy_lossy(
+                        tags_data
+                            .get("next")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned();
                 }
             }
 
@@ -559,11 +565,11 @@ impl GitBitbucketDriver {
             let mut resource = format!(
                 "{}?{}",
                 self.branches_url.clone(),
-                http_build_query(&[
+                legacy_lossy(&http_build_query(&[
                     ("pagelen", "100"),
                     ("fields", "values.name,values.target.hash,values.heads,next"),
                     ("sort", "-target.date"),
-                ]),
+                ])),
             );
             let mut has_next = true;
             while has_next {
@@ -574,20 +580,22 @@ impl GitBitbucketDriver {
                 if let Some(PhpMixed::List(list)) = values {
                     for data in list {
                         if let PhpMixed::Array(m) = data {
-                            let name = m
-                                .get(B("name"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                                .to_string();
-                            let hash = m
-                                .get(B("target"))
-                                .and_then(|v| match v {
-                                    PhpMixed::Array(m) => m.get(B("hash")),
-                                    _ => None,
-                                })
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                                .to_string();
+                            let name = legacy_lossy(
+                                m.get(B("name"))
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default(),
+                            )
+                            .into_owned();
+                            let hash = legacy_lossy(
+                                m.get(B("target"))
+                                    .and_then(|v| match v {
+                                        PhpMixed::Array(m) => m.get(B("hash")),
+                                        _ => None,
+                                    })
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default(),
+                            )
+                            .into_owned();
                             branches.insert(name, hash);
                         }
                     }
@@ -601,11 +609,13 @@ impl GitBitbucketDriver {
                 ) {
                     has_next = false;
                 } else {
-                    resource = branch_data
-                        .get("next")
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
+                    resource = legacy_lossy(
+                        branch_data
+                            .get("next")
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned();
                 }
             }
 

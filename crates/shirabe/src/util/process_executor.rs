@@ -516,7 +516,7 @@ impl ProcessExecutor {
                 "There are still {} expected process calls which have not been consumed:{}{}{}{}Received calls:{}{}",
                 expectations.len(),
                 PHP_EOL,
-                implode(PHP_EOL, &remaining),
+                implode(PHP_EOL, &remaining).display_lossy(),
                 PHP_EOL,
                 PHP_EOL,
                 PHP_EOL,
@@ -772,7 +772,7 @@ impl ProcessExecutor {
             "Executing{} command ({}): {}",
             if r#async { " async" } else { "" },
             cwd.map_or("CWD".into(), |cwd| cwd.display().to_string()),
-            safe_command
+            safe_command.display_lossy()
         ));
     }
 

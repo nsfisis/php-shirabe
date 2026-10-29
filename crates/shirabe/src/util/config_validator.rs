@@ -157,7 +157,7 @@ impl ConfigValidator {
 
             publish_errors.push(format!(
                     "Name \"{}\" does not match the best practice (e.g. lower-cased/with-dashes). We suggest using \"{}\" instead. As such you will not be able to submit it to Packagist.",
-                    name, suggest_name
+                    name.display_lossy(), suggest_name.display_lossy()
                 ));
         }
 
@@ -186,7 +186,7 @@ impl ConfigValidator {
                 };
                 warnings.push(format!(
                     "{} {} required both in require and require-dev, this can lead to unexpected behavior",
-                    bstr::join(", ", &require_overrides).as_bstr(),
+                    bstr::join(", ", &require_overrides).as_bstr().display_lossy(),
                     plural
                 ));
             }
@@ -201,7 +201,7 @@ impl ConfigValidator {
                             if require_map.contains_key(provide) {
                                 warnings.push(format!(
                                     "The package {} in {} is also listed in {} which satisfies the requirement. Remove it from {} if you wish to install it.",
-                                    provide, require_type, link_type, link_type
+                                    provide.display_lossy(), require_type, link_type, link_type
                                 ));
                             }
                         }
@@ -227,7 +227,7 @@ impl ConfigValidator {
             {
                 warnings.push(format!(
                         "The package \"{}\" is pointing to a commit-ref, this is bad practice and can cause unforeseen issues.",
-                        package
+                        package.display_lossy()
                     ));
             }
         }
@@ -245,7 +245,7 @@ impl ConfigValidator {
             if !scripts.contains_key(script_name) {
                 warnings.push(format!(
                     "Description for non-existent script \"{}\" found in \"scripts-descriptions\"",
-                    script_name
+                    script_name.display_lossy()
                 ));
             }
         }
@@ -259,7 +259,7 @@ impl ConfigValidator {
             if !scripts.contains_key(script_name) {
                 warnings.push(format!(
                     "Aliases for non-existent script \"{}\" found in \"scripts-aliases\"",
-                    script_name
+                    script_name.display_lossy()
                 ));
             }
         }

@@ -326,7 +326,7 @@ impl ClassLoader {
         // PSR-4 lookup
         let logical_path_psr4 = format!(
             "{}{}",
-            strtr(class, "\\", std::path::MAIN_SEPARATOR_STR),
+            legacy_lossy(&strtr(class, "\\", std::path::MAIN_SEPARATOR_STR)),
             ext
         );
 
@@ -375,18 +375,18 @@ impl ClassLoader {
             // namespaced class name
             logical_path_psr0 = format!(
                 "{}{}",
-                substr(&logical_path_psr4, 0, Some((pos + 1) as i64)),
-                strtr(
+                legacy_lossy(&substr(&logical_path_psr4, 0, Some((pos + 1) as i64))),
+                legacy_lossy(&strtr(
                     substr(&logical_path_psr4, (pos + 1) as i64, None),
                     "_",
                     std::path::MAIN_SEPARATOR_STR,
-                )
+                ))
             );
         } else {
             // PEAR-like class name
             logical_path_psr0 = format!(
                 "{}{}",
-                strtr(class, "_", std::path::MAIN_SEPARATOR_STR),
+                legacy_lossy(&strtr(class, "_", std::path::MAIN_SEPARATOR_STR)),
                 ext
             );
         }

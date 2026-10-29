@@ -91,7 +91,7 @@ impl Factory {
             let appdata = Platform::get_env("APPDATA").unwrap_or_default();
             return Ok(format!(
                 "{}/Shirabe",
-                rtrim2(strtr(&appdata, "\\", "/"), "/")
+                legacy_lossy(&rtrim2(strtr(&appdata, "\\", "/"), "/"))
             ));
         }
 
@@ -343,7 +343,11 @@ impl Factory {
         if ext == "json" {
             format!(
                 "{}lock",
-                substr(composer_file, 0, Some(composer_file.len() as i64 - 4))
+                legacy_lossy(&substr(
+                    composer_file,
+                    0,
+                    Some(composer_file.len() as i64 - 4)
+                ))
             )
         } else {
             format!("{}.lock", composer_file)
@@ -444,7 +448,7 @@ impl Factory {
                 if let Some(jve) = e.catch::<JsonValidationException>() {
                     let errors = format!(
                         " - {}",
-                        implode(format!("{} - ", PHP_EOL), jve.get_errors())
+                        legacy_lossy(&implode(format!("{} - ", PHP_EOL), jve.get_errors()))
                     );
                     let message = format!("{}:{}{}", jve.get_message(), PHP_EOL, errors);
                     return Err(
@@ -503,11 +507,11 @@ impl Factory {
             let local_auth_file = JsonFile::new(
                 format!(
                     "{}/auth.json",
-                    dirname(
+                    legacy_lossy(&dirname(
                         realpath(composer_file_path)
                             .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                             .unwrap_or_default()
-                    )
+                    ))
                 ),
                 None,
                 Some(io.clone()),
@@ -1612,7 +1616,7 @@ impl Factory {
                     "{}, this may result in errors and should be resolved:{} - {}",
                     jve.get_message(),
                     PHP_EOL,
-                    implode(format!("{} - ", PHP_EOL), jve.get_errors())
+                    legacy_lossy(&implode(format!("{} - ", PHP_EOL), jve.get_errors()))
                 );
                 if let Some(io_ref) = io {
                     io_ref.write_error3(&format!("<warning>{}</>", msg), true, crate::io::NORMAL);

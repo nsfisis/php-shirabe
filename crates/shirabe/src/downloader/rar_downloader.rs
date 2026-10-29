@@ -10,7 +10,7 @@ use crate::util::{Filesystem, HttpDownloader, IniHelper, Platform, ProcessExecut
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RarArchive, RuntimeException, UnexpectedValueException, class_exists, impl_php_class,
-    implode,
+    implode, legacy_lossy,
 };
 
 #[derive(Debug)]
@@ -85,8 +85,8 @@ impl ArchiveDownloader for RarDownloader {
 
             process_error = Some(format!(
                 "Failed to execute {}\n\n{}",
-                implode(" ", &command),
-                self.inner.process.borrow().get_error_output(),
+                legacy_lossy(&implode(" ", &command)),
+                legacy_lossy(&self.inner.process.borrow().get_error_output()),
             ));
         }
 

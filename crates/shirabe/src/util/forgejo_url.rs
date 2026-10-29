@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/ForgejoUrl.php
 
-use shirabe_php_shim::{InvalidArgumentException, preg_match};
+use shirabe_php_shim::{InvalidArgumentException, legacy_lossy, preg_match};
 
 #[derive(Debug)]
 pub struct ForgejoUrl {
@@ -39,7 +39,7 @@ impl ForgejoUrl {
         let matches = preg_match(Self::URL_REGEX, repo_url)?;
 
         let m: Vec<String> = (0..5)
-            .map(|i| matches.get(i).unwrap_or_default().to_string())
+            .map(|i| legacy_lossy(matches.get(i).unwrap_or_default()).into_owned())
             .collect();
 
         let origin_url = if !m[1].is_empty() {

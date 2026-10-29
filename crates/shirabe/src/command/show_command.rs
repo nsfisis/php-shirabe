@@ -125,7 +125,9 @@ impl ShowCommand {
                 io.write_no_newline(&format!(
                     "{}<href={}>{}</>{}",
                     indent,
-                    OutputFormatter::escape(&link).expect("OutputFormatter::escape failed"),
+                    legacy_lossy(
+                        &OutputFormatter::escape(&link).expect("OutputFormatter::escape failed")
+                    ),
                     name,
                     " ".repeat(pad)
                 ));
@@ -338,7 +340,7 @@ impl ShowCommand {
         {
             return Err(LogicException::new(format!(
                 "ShowCommand::getPackage can only work with CompletePackageInterface, but got {}",
-                get_class(&PhpMixed::Null)
+                get_class(&PhpMixed::Null).display_lossy()
             ))
             .into());
         }
@@ -503,7 +505,7 @@ impl ShowCommand {
             self.get_io().write("\n<info>autoload</info>");
             for (r#type, autoloads) in autoload_config.iter() {
                 self.get_io()
-                    .write(&format!("<comment>{}</comment>", r#type));
+                    .write(&format!("<comment>{}</comment>", legacy_lossy(&r#type)));
 
                 if r#type == "psr-0" || r#type == "psr-4" {
                     if let PhpMixed::Array(map) = autoloads {
@@ -511,7 +513,9 @@ impl ShowCommand {
                             let path_str = match path {
                                 PhpMixed::List(l) => l
                                     .iter()
-                                    .filter_map(|p| p.as_string().map(|s| s.to_string()))
+                                    .filter_map(|p| {
+                                        p.as_string().map(|s| legacy_lossy(s).into_owned())
+                                    })
                                     .collect::<Vec<_>>()
                                     .join(", "),
                                 PhpMixed::String(s) if !s.is_empty() => {
@@ -524,8 +528,11 @@ impl ShowCommand {
                             } else {
                                 name.as_bstr()
                             };
-                            self.get_io()
-                                .write(&format!("{} => {}", name_disp, path_str));
+                            self.get_io().write(&format!(
+                                "{} => {}",
+                                legacy_lossy(&name_disp),
+                                path_str
+                            ));
                         }
                     }
                 } else if r#type == "classmap"
@@ -533,7 +540,7 @@ impl ShowCommand {
                 {
                     let joined: Vec<String> = l
                         .iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                         .collect();
                     self.get_io().write(&joined.join(", "));
                 }
@@ -1186,13 +1193,13 @@ impl ShowCommand {
                     &package.get_version(),
                 )
             {
-                let zero_major = groups.name("zero_major").unwrap_or_default().to_string();
-                let first_meaningful = groups
-                    .name("first_meaningful")
-                    .unwrap_or_default()
-                    .to_string()
-                    .parse::<i64>()
-                    .unwrap_or(0);
+                let zero_major =
+                    legacy_lossy(groups.name("zero_major").unwrap_or_default()).into_owned();
+                let first_meaningful =
+                    legacy_lossy(groups.name("first_meaningful").unwrap_or_default())
+                        .into_owned()
+                        .parse::<i64>()
+                        .unwrap_or(0);
                 target_version = Some(format!(
                     ">={}{},<9999999-dev",
                     zero_major,
@@ -1216,7 +1223,7 @@ impl ShowCommand {
                 while trimmed_version.iter().filter(|&&c| c == b'.').count() + 1 < parts_needed {
                     trimmed_version.push_str(".0");
                 }
-                target_version = Some(format!("~{}", trimmed_version));
+                target_version = Some(format!("~{}", legacy_lossy(&trimmed_version)));
             }
         }
 

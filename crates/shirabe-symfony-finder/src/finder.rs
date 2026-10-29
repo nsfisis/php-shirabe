@@ -319,13 +319,12 @@ impl Finder {
             return dir.to_string();
         }
 
-        let dir = rtrim2(dir, "/");
+        let mut dir = rtrim2(dir, "/");
 
         if preg_is_match(php_regex!("#^(ssh2\\.)?s?ftp://#"), &dir) {
-            format!("{dir}/")
-        } else {
-            legacy_lossy(&dir).into_owned()
+            dir.push(b'/');
         }
+        legacy_lossy(&dir).into_owned()
     }
 
     fn collect_paths(&self) -> Vec<PathBuf> {
@@ -667,8 +666,7 @@ fn is_regex(str: &str) -> bool {
 
     let pattern = format!("/^(.{{3,}}?)[{available_modifiers}]*$/");
     if let Some(matches) = preg_match(&pattern, str) {
-        let group = matches.get(1).unwrap_or_default().to_string();
-        let bytes = group.as_bytes();
+        let bytes = matches.get(1).unwrap_or_default();
         let start = bytes
             .first()
             .map(|b| (*b as char).to_string())
@@ -711,7 +709,7 @@ fn parse_date_comparator(test: &str) -> (String, i64) {
         panic!("Don't understand \"{test}\" as a date test.");
     };
 
-    let date = matches.get(2).unwrap_or_default().to_string();
+    let date = legacy_lossy(matches.get(2).unwrap_or_default()).into_owned();
     let target = parse_datetime_to_unix(&date);
 
     let mut operator = matches

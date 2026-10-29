@@ -97,7 +97,7 @@ impl ClassMap {
             Some(path) => Ok(path.as_bstr()),
             None => Err(OutOfBoundsException::new(format!(
                 "Class {} is not present in the map",
-                class_name
+                class_name.display_lossy()
             ))
             .into()),
         }

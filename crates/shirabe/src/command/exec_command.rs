@@ -39,13 +39,15 @@ impl ExecCommand {
     fn get_binaries(&self, for_display: bool) -> anyhow::Result<Vec<String>> {
         let composer = self.require_composer(None, None)?;
         let composer_ref = crate::composer::composer_full(&composer);
-        let bin_dir = composer_ref
-            .get_config()
-            .borrow_mut()
-            .get("bin-dir")
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let bin_dir = legacy_lossy(
+            composer_ref
+                .get_config()
+                .borrow_mut()
+                .get("bin-dir")
+                .as_string()
+                .unwrap_or_default(),
+        )
+        .into_owned();
         let bins: Vec<String> = glob(format!("{}/*", bin_dir))
             .iter()
             .map(|bin| legacy_lossy(bin).into_owned())
@@ -170,13 +172,15 @@ impl Command for ExecCommand {
         {
             let bins = self.get_binaries(true)?;
             if bins.is_empty() {
-                let bin_dir = crate::composer::composer_full(&composer)
-                    .get_config()
-                    .borrow_mut()
-                    .get("bin-dir")
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string();
+                let bin_dir = legacy_lossy(
+                    crate::composer::composer_full(&composer)
+                        .get_config()
+                        .borrow_mut()
+                        .get("bin-dir")
+                        .as_string()
+                        .unwrap_or_default(),
+                )
+                .into_owned();
                 return Err(RuntimeException::new(format!(
                     "No binaries found in composer.json or in bin-dir ({})",
                     bin_dir

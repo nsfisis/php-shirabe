@@ -347,7 +347,7 @@ impl Table {
             panic!(
                 "Setting a maximum column width is only supported when using a \"{}\" formatter, got \"{}\".",
                 "Symfony\\Component\\Console\\Formatter\\WrappableOutputFormatterInterface",
-                get_debug_type(&PhpMixed::from(()))
+                get_debug_type(&PhpMixed::from(())).display_lossy()
             );
         }
 
@@ -674,7 +674,7 @@ impl Table {
                     Some(fmt) => cell_format = fmt,
                     None => {
                         let tag = http_build_query_mixed(&cell_style.get_tag_options(), "", ";");
-                        cell_format = format!("<{}>%s</>", tag);
+                        cell_format = format!("<{}>%s</>", legacy_lossy(&tag));
                     }
                 }
 

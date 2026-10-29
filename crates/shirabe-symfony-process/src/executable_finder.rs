@@ -1,8 +1,9 @@
 //! ref: composer/vendor/symfony/process/ExecutableFinder.php
 
 use shirabe_php_shim::{
-    PATHINFO_EXTENSION, PHP_EOL, basename, escapeshellarg, exec, getenv, is_dir, is_executable,
-    is_file, legacy_lossy, path_from_bytes, pathinfo, strcspn, strpos, strtolower, substr,
+    PATHINFO_EXTENSION, PHP_EOL, basename, bconcat, escapeshellarg, exec, getenv, is_dir,
+    is_executable, is_file, legacy_lossy, path_from_bytes, pathinfo, strcspn, strpos, strtolower,
+    substr,
 };
 
 const CMD_BUILTINS: &[&str] = &[
@@ -90,12 +91,8 @@ impl ExecutableFinder {
             return default.map(ToString::to_string);
         }
 
-        let exec_result = exec(
-            format!("command -v -- {}", escapeshellarg(name)),
-            None,
-            None,
-        )
-        .unwrap_or_default();
+        let exec_result =
+            exec(bconcat!("command -v -- ", escapeshellarg(name)), None, None).unwrap_or_default();
 
         let executable_path = substr(
             &exec_result,

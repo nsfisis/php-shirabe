@@ -9,8 +9,8 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_ca_bundle::CaBundle;
 use shirabe_php_shim::{
-    PhpMixed, array_replace_recursive, extension_loaded, is_dir, php_uname, stream_context_create,
-    stripos, uasort,
+    PhpMixed, array_replace_recursive, extension_loaded, is_dir, legacy_lossy, php_uname,
+    stream_context_create, stripos, uasort,
 };
 
 pub struct StreamContextFactory;
@@ -178,8 +178,8 @@ impl StreamContextFactory {
             let user_agent = format!(
                 "User-Agent: Composer/{} ({os}; {release}; {php_version}; {http_version}{platform}{ci})",
                 composer::get_version(),
-                os = php_uname("s"),
-                release = php_uname("r"),
+                os = legacy_lossy(&php_uname("s")),
+                release = legacy_lossy(&php_uname("r")),
                 php_version = php_version,
                 http_version = http_version,
                 platform = platform_php_version
@@ -321,7 +321,7 @@ impl StreamContextFactory {
             .and_then(|v| v.as_array())
             .and_then(|a| a.get(B("cafile")))
             .and_then(|v| v.as_string())
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         if let Some(ref cafile) = cafile
             && (!Filesystem::is_readable(cafile) || !CaBundle::validate_ca_file(cafile, logger))
         {
@@ -336,7 +336,7 @@ impl StreamContextFactory {
             .and_then(|v| v.as_array())
             .and_then(|a| a.get(B("capath")))
             .and_then(|v| v.as_string())
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         if let Some(ref capath) = capath
             && (!is_dir(capath) || !Filesystem::is_readable(capath))
         {
@@ -366,7 +366,7 @@ impl StreamContextFactory {
             PhpMixed::List(list) => list
                 .iter()
                 .filter_map(|v| v.as_string())
-                .map(|s| s.to_string())
+                .map(|s| legacy_lossy(s).into_owned())
                 .collect(),
             _ => vec![],
         };

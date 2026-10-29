@@ -9,7 +9,7 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use anyhow::bail;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, impl_php_class};
+use shirabe_php_shim::{PhpMixed, impl_php_class, legacy_lossy};
 
 #[derive(Debug)]
 pub struct XzDownloader {
@@ -75,7 +75,7 @@ impl ArchiveDownloader for XzDownloader {
         let process_error = format!(
             "Failed to execute {}\n\n{}",
             command.join(" "),
-            self.inner.process.borrow().get_error_output()
+            legacy_lossy(&self.inner.process.borrow().get_error_output())
         );
 
         bail!(process_error);

@@ -13,7 +13,7 @@ use shirabe::dependency_resolver::pool::Pool;
 use shirabe::dependency_resolver::request::Request;
 use shirabe::package::handle::{CompletePackageHandle, PackageHandle, PackageInterfaceHandle};
 use shirabe::repository::{PackageRepository, RepositoryInterfaceHandle};
-use shirabe_php_shim::{PhpMixed, uniqid};
+use shirabe_php_shim::{PhpMixed, legacy_lossy, uniqid};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 
 #[test]
@@ -108,8 +108,8 @@ fn test_filter_packages_by_advisories() {
     assert!(advisory_map["acme/package"].contains_key("1.0.0.0"));
     assert_eq!(
         vec![
-            advisory1[B("advisoryId")].as_string().unwrap().to_string(),
-            advisory2[B("advisoryId")].as_string().unwrap().to_string(),
+            legacy_lossy(advisory1[B("advisoryId")].as_string().unwrap()).into_owned(),
+            legacy_lossy(advisory2[B("advisoryId")].as_string().unwrap()).into_owned(),
         ],
         filtered_pool.get_security_advisory_identifiers_for_package_version(
             "acme/package",

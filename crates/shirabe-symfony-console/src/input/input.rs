@@ -4,7 +4,7 @@ use crate::exception::{InvalidArgumentException, RuntimeException};
 use crate::input::{ArgumentName, InputDefinition, InputValue};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, array_filter, array_keys, array_merge_map, escapeshellarg, implode, legacy_lossy,
+    PhpResource, array_filter, array_keys, array_merge_map, escapeshellarg, legacy_lossy,
     php_regex, preg_is_match,
 };
 
@@ -84,7 +84,7 @@ impl Input {
         if !missing_arguments.is_empty() {
             return Err(RuntimeException::new(format!(
                 "Not enough arguments (missing: \"{}\").",
-                implode(", ", &missing_arguments),
+                missing_arguments.join(", "),
             ))
             .into());
         }

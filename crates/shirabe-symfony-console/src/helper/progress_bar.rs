@@ -10,9 +10,9 @@ use crate::terminal::Terminal;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, explode, legacy_lossy, memory_get_usage,
-    microtime, preg_replace_callback, round, rtrim2, sprintf, str_pad, str_repeat, substr_count,
-    time,
+    AsAny, PHP_EOL, PhpMixed, PregMatches, STR_PAD_LEFT, bconcat, explode, legacy_lossy,
+    memory_get_usage, microtime, php_to_string, preg_replace_callback, round, rtrim2, sprintf,
+    str_pad, str_repeat, substr_count, time,
 };
 
 pub const FORMAT_VERBOSE: &str = "verbose";
@@ -789,7 +789,7 @@ impl ProgressBar {
 
         // $callback in PHP, expressed as a closure over $this and the matches.
         let callback = |matches: &PregMatches| -> anyhow::Result<String> {
-            let name = matches.get(1).unwrap_or_default().to_string();
+            let name = legacy_lossy(matches.get(1).unwrap_or_default()).into_owned();
 
             let text: PhpMixed = if Self::get_placeholder_formatter_definition(&name).is_some() {
                 // $text = $formatter($this, $this->output);
@@ -802,11 +802,11 @@ impl ProgressBar {
             } else if let Some(message) = self.messages.get(&name) {
                 PhpMixed::string(message.clone())
             } else {
-                return Ok(matches.get(0).unwrap_or_default().to_string());
+                return Ok(legacy_lossy(matches.get(0).unwrap_or_default()).into_owned());
             };
 
             if let Some(modifier) = matches.get(2) {
-                return Ok(legacy_lossy(&sprintf(format!("%{modifier}"), &[text])).into_owned());
+                return Ok(legacy_lossy(&sprintf(bconcat!("%", modifier), &[text])).into_owned());
             }
 
             // PHP implicitly casts the formatter result to string here.
@@ -816,7 +816,7 @@ impl ProgressBar {
                 PhpMixed::Float(f) => {
                     format!("{}", f)
                 }
-                other => format!("{}", other),
+                other => legacy_lossy(&php_to_string(&other)).into_owned(),
             })
         };
 

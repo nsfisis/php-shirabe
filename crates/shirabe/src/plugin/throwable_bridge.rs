@@ -51,11 +51,13 @@ pub(crate) fn throw_into_error(throw: PhpThrow) -> anyhow::Error {
 /// as a plain value rather than as a frame.
 pub(crate) fn described_throw(fields: &[PhpMixed]) -> PhpThrow {
     let string = |position: usize| {
-        fields
-            .get(position)
-            .and_then(PhpMixed::as_string)
-            .unwrap_or_default()
-            .to_string()
+        legacy_lossy(
+            fields
+                .get(position)
+                .and_then(PhpMixed::as_string)
+                .unwrap_or_default(),
+        )
+        .into_owned()
     };
     let int = |position: usize| fields.get(position).and_then(PhpMixed::as_int).unwrap_or(0);
     let mut throw = PhpThrow::new(string(0), string(1), int(2));
@@ -99,11 +101,11 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
     let strings = |name: &str| match property(name) {
         PhpMixed::List(items) => items
             .iter()
-            .map(|item| item.as_string().unwrap_or_default().to_string())
+            .map(|item| legacy_lossy(item.as_string().unwrap_or_default()).into_owned())
             .collect(),
         PhpMixed::Array(items) => items
             .values()
-            .map(|item| item.as_string().unwrap_or_default().to_string())
+            .map(|item| legacy_lossy(item.as_string().unwrap_or_default()).into_owned())
             .collect(),
         _ => Vec::new(),
     };

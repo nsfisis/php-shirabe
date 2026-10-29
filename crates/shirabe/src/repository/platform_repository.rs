@@ -64,8 +64,8 @@ impl PlatformRepository {
                 return Err(UnexpectedValueException::new(format!(
                     "config.platform.{} should be a string or false, but got {} {}",
                     name,
-                    get_debug_type(&version),
-                    var_export(&version, true)
+                    get_debug_type(&version).display_lossy(),
+                    var_export(&version, true).display_lossy()
                 ))
                 .into());
             }
@@ -326,7 +326,7 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-librabbitmq", name),
+                            &format!("{}-librabbitmq", legacy_lossy(&name)),
                             librabbitmq_matches.name("version"),
                             Some("AMQP librabbitmq version"),
                             &[],
@@ -339,13 +339,12 @@ impl PlatformRepository {
                         php_regex!("/^AMQP protocol version => (?<version>.+)$/im"),
                         info,
                     ) {
-                        let version_str = protocol_matches
-                            .name("version")
-                            .unwrap_or_default()
-                            .to_string();
+                        let version_str =
+                            legacy_lossy(protocol_matches.name("version").unwrap_or_default())
+                                .into_owned();
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-protocol", name),
+                            &format!("{}-protocol", legacy_lossy(&name)),
                             Some(&*legacy_lossy(&str_replace("-", ".", &version_str))),
                             Some("AMQP protocol version"),
                             &[],
@@ -378,7 +377,7 @@ impl PlatformRepository {
                         .as_array()
                         .and_then(|m| m.get(B("version")))
                         .and_then(|v| v.as_string())
-                        .map(|s| s.to_string());
+                        .map(|s| legacy_lossy(s).into_owned());
                     if let Some(cv) = curl_version_str.as_deref() {
                         self.add_library(
                             &mut libraries,
@@ -398,9 +397,11 @@ impl PlatformRepository {
                         info,
                     ) {
                         let ssl_library_raw =
-                            ssl_matches.name("library").unwrap_or_default().to_string();
+                            legacy_lossy(ssl_matches.name("library").unwrap_or_default())
+                                .into_owned();
                         let ssl_version =
-                            ssl_matches.name("version").unwrap_or_default().to_string();
+                            legacy_lossy(ssl_matches.name("version").unwrap_or_default())
+                                .into_owned();
                         let library = legacy_lossy(&strtolower(&ssl_library_raw)).into_owned();
                         if library == "openssl" {
                             let mut is_fips = false;
@@ -413,7 +414,11 @@ impl PlatformRepository {
                             };
                             self.add_library(
                                 &mut libraries,
-                                &format!("{}-openssl{}", name, if is_fips { "-fips" } else { "" }),
+                                &format!(
+                                    "{}-openssl{}",
+                                    legacy_lossy(&name),
+                                    if is_fips { "-fips" } else { "" }
+                                ),
                                 Some(&parsed_version),
                                 Some(&format!("curl OpenSSL version ({})", parsed_version)),
                                 &[],
@@ -427,10 +432,10 @@ impl PlatformRepository {
                                     &library,
                                 ) {
                                     shortlib = "securetransport".to_string();
-                                    let m1 = securetransport_matches
-                                        .get(1)
-                                        .unwrap_or_default()
-                                        .to_string();
+                                    let m1 = legacy_lossy(
+                                        securetransport_matches.get(1).unwrap_or_default(),
+                                    )
+                                    .into_owned();
                                     ssl_lib = format!("curl-{}", m1);
                                 } else {
                                     shortlib = library.clone();
@@ -442,7 +447,7 @@ impl PlatformRepository {
                             }
                             self.add_library(
                                 &mut libraries,
-                                &format!("{}-{}", name, shortlib),
+                                &format!("{}-{}", legacy_lossy(&name), shortlib),
                                 Some(&ssl_version),
                                 Some(&format!("curl {} version ({})", library, ssl_version)),
                                 &[ssl_lib],
@@ -459,12 +464,18 @@ impl PlatformRepository {
                         info,
                     ) {
                         let ssh_library =
-                            ssh_matches.name("library").unwrap_or_default().to_string();
+                            legacy_lossy(ssh_matches.name("library").unwrap_or_default())
+                                .into_owned();
                         let ssh_version =
-                            ssh_matches.name("version").unwrap_or_default().to_string();
+                            legacy_lossy(ssh_matches.name("version").unwrap_or_default())
+                                .into_owned();
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-{}", name, strtolower(&ssh_library)),
+                            &format!(
+                                "{}-{}",
+                                legacy_lossy(&name),
+                                legacy_lossy(&strtolower(&ssh_library))
+                            ),
                             Some(&ssh_version),
                             Some(&format!("curl {} version", &ssh_library)),
                             &[],
@@ -478,7 +489,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-zlib", name),
+                            &format!("{}-zlib", legacy_lossy(&name)),
                             zlib_matches.name("version"),
                             Some("curl zlib version"),
                             &[],
@@ -496,7 +507,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-timelib", name),
+                            &format!("{}-timelib", legacy_lossy(&name)),
                             timelib_matches.name("version"),
                             Some("date timelib version"),
                             &[],
@@ -519,10 +530,9 @@ impl PlatformRepository {
                             ),
                             info,
                         ) {
-                            let zoneinfo_version = zoneinfo_matches
-                                .name("version")
-                                .unwrap_or_default()
-                                .to_string();
+                            let zoneinfo_version =
+                                legacy_lossy(zoneinfo_matches.name("version").unwrap_or_default())
+                                    .into_owned();
                             // If the timezonedb is provided by ext/timezonedb, register that version as a replacement
                             if external && loaded_extensions.iter().any(|n| n == "timezonedb") {
                                 self.add_library(
@@ -532,13 +542,13 @@ impl PlatformRepository {
                                 Some(
                                     "zoneinfo (\"Olson\") database for date (replaced by timezonedb)",
                                 ),
-                                &[format!("{}-zoneinfo", name)],
+                                &[format!("{}-zoneinfo", legacy_lossy(&name))],
                                 &[],
                             )?;
                             } else {
                                 self.add_library(
                                     &mut libraries,
-                                    &format!("{}-zoneinfo", name),
+                                    &format!("{}-zoneinfo", legacy_lossy(&name)),
                                     Some(&zoneinfo_version),
                                     Some("zoneinfo (\"Olson\") database for date"),
                                     &[],
@@ -558,7 +568,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libmagic", name),
+                            &format!("{}-libmagic", legacy_lossy(&name)),
                             magic_matches.name("version"),
                             Some("fileinfo libmagic version"),
                             &[],
@@ -588,14 +598,13 @@ impl PlatformRepository {
                         php_regex!("/^libJPEG Version => (?<version>.+?)(?: compatible)?$/im"),
                         info,
                     ) {
-                        let libjpeg_version = libjpeg_matches
-                            .name("version")
-                            .unwrap_or_default()
-                            .to_string();
+                        let libjpeg_version =
+                            legacy_lossy(libjpeg_matches.name("version").unwrap_or_default())
+                                .into_owned();
                         let parsed = Version::parse_libjpeg(&libjpeg_version).unwrap_or_default();
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libjpeg", name),
+                            &format!("{}-libjpeg", legacy_lossy(&name)),
                             Some(&parsed),
                             Some("libjpeg version for gd"),
                             &[],
@@ -608,7 +617,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libpng", name),
+                            &format!("{}-libpng", legacy_lossy(&name)),
                             libpng_matches.name("version"),
                             Some("libpng version for gd"),
                             &[],
@@ -621,7 +630,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-freetype", name),
+                            &format!("{}-freetype", legacy_lossy(&name)),
                             freetype_matches.name("version"),
                             Some("freetype version for gd"),
                             &[],
@@ -640,7 +649,7 @@ impl PlatformRepository {
                         let converted = Version::convert_libxpm_version_id(version_id);
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libxpm", name),
+                            &format!("{}-libxpm", legacy_lossy(&name)),
                             Some(&converted),
                             Some("libxpm version for gd"),
                             &[],
@@ -720,10 +729,9 @@ impl PlatformRepository {
                         php_regex!("/^ICU TZData version => (?<version>.*)$/im"),
                         info,
                     ) {
-                        let zi_version = zoneinfo_matches
-                            .name("version")
-                            .unwrap_or_default()
-                            .to_string();
+                        let zi_version =
+                            legacy_lossy(zoneinfo_matches.name("version").unwrap_or_default())
+                                .into_owned();
                         if let Some(parsed) = Version::parse_zoneinfo_version(&zi_version) {
                             self.add_library(
                                 &mut libraries,
@@ -785,14 +793,14 @@ impl PlatformRepository {
                         &image_magick_version_str,
                     ) {
                         let mut version_built =
-                            matches.name("version").unwrap_or_default().to_string();
+                            legacy_lossy(matches.name("version").unwrap_or_default()).into_owned();
                         if let Some(patch) = matches.name("patch") {
-                            version_built = format!("{}.{}", version_built, patch);
+                            version_built = format!("{}.{}", version_built, legacy_lossy(&patch));
                         }
 
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-imagemagick", name),
+                            &format!("{}-imagemagick", legacy_lossy(&name)),
                             Some(&version_built),
                             None,
                             &["imagick".to_string()],
@@ -815,13 +823,16 @@ impl PlatformRepository {
                             .and_then(|s| legacy_lossy(s).parse().ok())
                             .unwrap_or(0);
                         let converted = Version::convert_openldap_version_id(version_id);
-                        let vendor = vendor_matches
-                            .name("vendor")
-                            .unwrap_or_default()
-                            .to_string();
+                        let vendor =
+                            legacy_lossy(vendor_matches.name("vendor").unwrap_or_default())
+                                .into_owned();
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-{}", name, strtolower(&vendor)),
+                            &format!(
+                                "{}-{}",
+                                legacy_lossy(&name),
+                                legacy_lossy(&strtolower(&vendor))
+                            ),
                             Some(&converted),
                             Some(&format!("{} version of ldap", vendor)),
                             &[],
@@ -864,7 +875,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libmbfl", name),
+                            &format!("{}-libmbfl", legacy_lossy(&name)),
                             libmbfl_matches.name("version"),
                             Some("mbstring libmbfl version"),
                             &[],
@@ -880,7 +891,7 @@ impl PlatformRepository {
                         };
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-oniguruma", name),
+                            &format!("{}-oniguruma", legacy_lossy(&name)),
                             oniguruma_str.as_deref(),
                             Some("mbstring oniguruma version"),
                             &[],
@@ -898,7 +909,7 @@ impl PlatformRepository {
                         ) {
                             self.add_library(
                                 &mut libraries,
-                                &format!("{}-oniguruma", name),
+                                &format!("{}-oniguruma", legacy_lossy(&name)),
                                 oniguruma_matches.name("version"),
                                 Some("mbstring oniguruma version"),
                                 &[],
@@ -918,7 +929,7 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libmemcached", name),
+                            &format!("{}-libmemcached", legacy_lossy(&name)),
                             matches.name("version"),
                             Some("libmemcached version"),
                             &[],
@@ -938,17 +949,22 @@ impl PlatformRepository {
                         php_regex!("{^(?:OpenSSL|LibreSSL)?\\s*(?<version>\\S+)}i"),
                         &openssl_text_str,
                     ) {
-                        let version = matches.name("version").unwrap_or_default().to_string();
+                        let version =
+                            legacy_lossy(matches.name("version").unwrap_or_default()).into_owned();
                         let mut is_fips = false;
                         let parsed_version =
                             Version::parse_openssl(&version, &mut is_fips).unwrap_or_default();
                         let mut provides_list: Vec<String> = Vec::new();
                         if is_fips {
-                            provides_list.push(name.to_string());
+                            provides_list.push(legacy_lossy(name).into_owned());
                         }
                         self.add_library(
                             &mut libraries,
-                            &format!("{}{}", name, if is_fips { "-fips" } else { "" }),
+                            &format!(
+                                "{}{}",
+                                legacy_lossy(&name),
+                                if is_fips { "-fips" } else { "" }
+                            ),
                             Some(&parsed_version),
                             Some(&openssl_text_str),
                             &[],
@@ -987,7 +1003,7 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-unicode", name),
+                            &format!("{}-unicode", legacy_lossy(&name)),
                             pcre_unicode_matches.name("version"),
                             Some("PCRE Unicode version support"),
                             &[],
@@ -1007,9 +1023,12 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-mysqlnd", name),
+                            &format!("{}-mysqlnd", legacy_lossy(&name)),
                             matches.name("version"),
-                            Some(&format!("mysqlnd library version for {}", name)),
+                            Some(&format!(
+                                "mysqlnd library version for {}",
+                                legacy_lossy(&name)
+                            )),
                             &[],
                             &[],
                         )?;
@@ -1025,7 +1044,7 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libmongoc", name),
+                            &format!("{}-libmongoc", legacy_lossy(&name)),
                             libmongoc_matches.name("version"),
                             Some("libmongoc version of mongodb"),
                             &[],
@@ -1039,7 +1058,7 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libbson", name),
+                            &format!("{}-libbson", legacy_lossy(&name)),
                             libbson_matches.name("version"),
                             Some("libbson version of mongodb"),
                             &[],
@@ -1073,9 +1092,9 @@ impl PlatformRepository {
                         ) {
                             self.add_library(
                                 &mut libraries,
-                                &format!("{}-libpq", name),
+                                &format!("{}-libpq", legacy_lossy(&name)),
                                 matches.name("version"),
-                                Some(&format!("libpq for {}", name)),
+                                Some(&format!("libpq for {}", legacy_lossy(&name))),
                                 &[],
                                 &[],
                             )?;
@@ -1092,9 +1111,9 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libpq", name),
+                            &format!("{}-libpq", legacy_lossy(&name)),
                             matches.name("version"),
-                            Some(&format!("libpq for {}", name)),
+                            Some(&format!("libpq for {}", legacy_lossy(&name))),
                             &[],
                             &[],
                         )?;
@@ -1112,9 +1131,9 @@ impl PlatformRepository {
                     ) {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libpq", name),
+                            &format!("{}-libpq", legacy_lossy(&name)),
                             matches.name("linked"),
-                            Some(&format!("libpq for {}", name)),
+                            Some(&format!("libpq for {}", legacy_lossy(&name))),
                             &[],
                             &[],
                         )?;
@@ -1142,9 +1161,9 @@ impl PlatformRepository {
                         );
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-librdkafka", name),
+                            &format!("{}-librdkafka", legacy_lossy(&name)),
                             Some(&version_built),
-                            Some(&format!("librdkafka for {}", name)),
+                            Some(&format!("librdkafka for {}", legacy_lossy(&name))),
                             &[],
                             &[],
                         )?;
@@ -1185,7 +1204,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-sqlite", name),
+                            &format!("{}-sqlite", legacy_lossy(&name)),
                             matches.name("version"),
                             None,
                             &[],
@@ -1202,7 +1221,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libssh2", name),
+                            &format!("{}-libssh2", legacy_lossy(&name)),
                             matches.name("version"),
                             None,
                             &[],
@@ -1253,7 +1272,7 @@ impl PlatformRepository {
                     {
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libyaml", name),
+                            &format!("{}-libyaml", legacy_lossy(&name)),
                             matches.name("version"),
                             Some("libyaml version of yaml"),
                             &[],
@@ -1272,7 +1291,7 @@ impl PlatformRepository {
                         };
                         self.add_library(
                             &mut libraries,
-                            &format!("{}-libzip", name),
+                            &format!("{}-libzip", legacy_lossy(&name)),
                             libzip_str.as_deref(),
                             None,
                             &["zip".to_string()],
@@ -1358,7 +1377,7 @@ impl PlatformRepository {
         if package.as_complete().is_none() {
             return Err(UnexpectedValueException::new(format!(
                 "Expected CompletePackage but got {}",
-                get_class(&PhpMixed::Null)
+                get_class(&PhpMixed::Null).display_lossy()
             ))
             .into());
         }
@@ -1514,7 +1533,7 @@ impl PlatformRepository {
                     php_regex!("{^(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)}"),
                     &pretty_version,
                 ) {
-                    pretty_version = m.get(1).unwrap_or_default().to_string();
+                    pretty_version = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
                 } else {
                     pretty_version = "0".to_string();
                 }
@@ -1554,7 +1573,10 @@ impl PlatformRepository {
     }
 
     fn build_package_name(&self, name: &str) -> String {
-        format!("ext-{}", str_replace(" ", "-", strtolower(name)))
+        format!(
+            "ext-{}",
+            legacy_lossy(&str_replace(" ", "-", strtolower(name)))
+        )
     }
 
     fn add_library(

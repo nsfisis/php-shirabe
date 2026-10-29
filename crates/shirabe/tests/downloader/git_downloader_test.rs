@@ -224,11 +224,8 @@ fn test_download_with_cache() {
     GitUtil::__set_version(Some("2.17.0".to_string()));
 
     let config = setup_config(Config::new(false, None));
-    let cache_vcs_dir = config
-        .get("cache-vcs-dir")
-        .as_string()
-        .unwrap_or_default()
-        .to_string();
+    let cache_vcs_dir =
+        legacy_lossy(config.get("cache-vcs-dir").as_string().unwrap_or_default()).into_owned();
     // ref: GitDownloaderTest cachePath = cache-vcs-dir.'/'.preg_replace('{[^a-z0-9.]}i', '-', url).'/'
     let sanitized: String = url
         .chars()

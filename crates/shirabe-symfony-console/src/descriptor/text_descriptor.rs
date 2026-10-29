@@ -13,7 +13,7 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, count, json_encode_ex, legacy_lossy,
-    php_truthy, preg_replace, str_repeat, str_replace, strip_tags, strlen, strtoupper,
+    php_truthy, preg_replace, str_replace, strip_tags, strlen, strtoupper,
 };
 
 /// Text descriptor.
@@ -59,13 +59,13 @@ impl TextDescriptor {
             &format!(
                 "  <info>{}</info>  {}{}{}",
                 argument.get_name(),
-                str_repeat(" ", spacing_width as usize),
+                " ".repeat(spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
-                preg_replace(
+                legacy_lossy(&preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
-                    format!("\n{}", str_repeat(" ", (total_width + 4) as usize)),
+                    format!("\n{}", " ".repeat((total_width + 4) as usize)),
                     argument.get_description(),
-                ),
+                )),
                 default,
             ),
             &options,
@@ -94,7 +94,7 @@ impl TextDescriptor {
 
         let mut value = String::new();
         if option.accept_value() {
-            value = format!("={}", strtoupper(option.get_name()));
+            value = format!("={}", legacy_lossy(&strtoupper(option.get_name())));
 
             if option.is_value_optional() {
                 value = format!("[{}]", value);
@@ -125,13 +125,13 @@ impl TextDescriptor {
             &format!(
                 "  <info>{}</info>  {}{}{}{}",
                 synopsis,
-                str_repeat(" ", spacing_width as usize),
+                " ".repeat(spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
-                preg_replace(
+                legacy_lossy(&preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
-                    format!("\n{}", str_repeat(" ", (total_width + 4) as usize)),
+                    format!("\n{}", " ".repeat((total_width + 4) as usize)),
                     option.get_description(),
-                ),
+                )),
                 default,
                 if option.is_array() {
                     "<comment> (multiple values allowed)</comment>".to_string()
@@ -220,7 +220,10 @@ impl TextDescriptor {
         usages.extend(command.get_usages());
         for usage in usages {
             self.write_text("\n", &IndexMap::new());
-            self.write_text(&format!("  {}", OutputFormatter::escape(&usage)?), &options);
+            self.write_text(
+                &format!("  {}", legacy_lossy(&OutputFormatter::escape(&usage)?)),
+                &options,
+            );
         }
         self.write_text("\n", &IndexMap::new());
 
@@ -236,7 +239,10 @@ impl TextDescriptor {
             self.write_text("\n", &IndexMap::new());
             self.write_text("<comment>Help:</comment>", &options);
             self.write_text("\n", &IndexMap::new());
-            self.write_text(&format!("  {}", str_replace("\n", "\n  ", &help)), &options);
+            self.write_text(
+                &format!("  {}", legacy_lossy(&str_replace("\n", "\n  ", &help))),
+                &options,
+            );
             self.write_text("\n", &IndexMap::new());
         }
         Ok(())
@@ -307,7 +313,7 @@ impl TextDescriptor {
                 if let Some(PhpMixed::List(names)) = described_namespace_info.get(B("commands")) {
                     let names: Vec<String> = names
                         .iter()
-                        .filter_map(|n| n.as_string().map(|s| s.to_string()))
+                        .filter_map(|n| n.as_string().map(|s| legacy_lossy(s).into_owned()))
                         .collect();
                     for name in names {
                         let command = description.get_command(&name)?;
@@ -394,7 +400,7 @@ impl TextDescriptor {
                         &format!(
                             "  <info>{}</info>{}{}{}",
                             name.clone(),
-                            str_repeat(" ", spacing_width as usize),
+                            " ".repeat(spacing_width as usize),
                             command_aliases,
                             command.get_description(),
                         ),

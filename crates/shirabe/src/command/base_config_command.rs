@@ -7,7 +7,7 @@ use crate::factory::Factory;
 use crate::json::JsonFile;
 use crate::util::Platform;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, chmod, touch};
+use shirabe_php_shim::{PhpMixed, chmod, legacy_lossy, path_from_bytes, php_to_string, touch};
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
 
@@ -51,7 +51,8 @@ pub trait BaseConfigCommand: BaseCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            let home = config_rc.borrow_mut().get("home").to_string();
+            let home =
+                legacy_lossy(&php_to_string(&config_rc.borrow_mut().get("home"))).into_owned();
             config_rc.borrow_mut().set_base_dir(Some(home));
         }
 
@@ -61,7 +62,10 @@ pub trait BaseConfigCommand: BaseCommand {
         if (config_file == "composer.json" || config_file == "./composer.json")
             && !std::path::Path::new(&config_file).exists()
             && std::fs::canonicalize(Platform::get_cwd(false)?).ok()
-                == std::fs::canonicalize(config_rc.borrow_mut().get("home").to_string()).ok()
+                == std::fs::canonicalize(path_from_bytes(&php_to_string(
+                    &config_rc.borrow_mut().get("home"),
+                )))
+                .ok()
         {
             std::fs::write(&config_file, "{\n}\n")?;
         }
@@ -116,7 +120,10 @@ pub trait BaseConfigCommand: BaseCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            Ok(format!("{}/config.json", config.get("home")))
+            Ok(format!(
+                "{}/config.json",
+                legacy_lossy(&php_to_string(&config.get("home")))
+            ))
         } else {
             Ok(input
                 .borrow()
@@ -140,7 +147,10 @@ pub trait BaseConfigCommand: BaseCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            Ok(format!("{}/auth.json", config.get("home")))
+            Ok(format!(
+                "{}/auth.json",
+                legacy_lossy(&php_to_string(&config.get("home")))
+            ))
         } else {
             let composer_config = self.get_composer_config_file(input, config)?;
             let parent = std::path::Path::new(&composer_config)

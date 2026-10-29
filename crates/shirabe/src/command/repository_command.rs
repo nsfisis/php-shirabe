@@ -8,8 +8,8 @@ use crate::json::JsonFile;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class, parse_url, php_regex,
-    preg_is_match, strtolower,
+    InvalidArgumentException, PhpMixed, RuntimeException, impl_php_class, legacy_lossy, parse_url,
+    php_regex, php_to_string, preg_is_match, strtolower,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -88,7 +88,7 @@ impl RepositoryCommand {
 
         for (key, repo) in &repos {
             if matches!(*repo, PhpMixed::Bool(false)) {
-                io.write(&format!("[{}] <info>disabled</info>", key));
+                io.write(&format!("[{}] <info>disabled</info>", legacy_lossy(&key)));
                 continue;
             }
 
@@ -98,7 +98,10 @@ impl RepositoryCommand {
                     && matches!(*first_val, PhpMixed::Bool(false))
                 {
                     let first_key = repo_map.keys().next().unwrap();
-                    io.write(&format!("[{}] <info>disabled</info>", first_key));
+                    io.write(&format!(
+                        "[{}] <info>disabled</info>",
+                        legacy_lossy(&first_key)
+                    ));
                     continue;
                 }
 
@@ -113,12 +116,17 @@ impl RepositoryCommand {
                 let url = match repo_map
                     .get(B("url"))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string())
+                    .map(|s| legacy_lossy(s).into_owned())
                 {
                     Some(url) => url,
                     None => JsonFile::encode(repo)?,
                 };
-                io.write(&format!("[{}] <info>{}</info> {}", name, r#type, url));
+                io.write(&format!(
+                    "[{}] <info>{}</info> {}",
+                    legacy_lossy(&name),
+                    legacy_lossy(&r#type),
+                    url
+                ));
             }
         }
 
@@ -175,13 +183,13 @@ impl RepositoryCommand {
                 if let Some(list) = repositories.as_list() {
                     for repo in list {
                         if let Some(name) = repo.as_array().and_then(|r| r.get(B("name"))) {
-                            repos.push(name.to_string());
+                            repos.push(legacy_lossy(&php_to_string(name)).into_owned());
                         }
                     }
                 } else if let Some(map) = repositories.as_array() {
                     for repo in map.values() {
                         if let Some(name) = repo.as_array().and_then(|r| r.get(B("name"))) {
-                            repos.push(name.to_string());
+                            repos.push(legacy_lossy(&php_to_string(name)).into_owned());
                         }
                     }
                 }
@@ -560,7 +568,7 @@ impl Command for RepositoryCommand {
             }
             _ => Err(InvalidArgumentException::new(format!(
                 "Unknown action \"{}\". Use list, add, remove, set-url, get-url, enable, disable",
-                action
+                action.display_lossy()
             ))
             .into()),
         }

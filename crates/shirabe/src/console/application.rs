@@ -26,7 +26,7 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, AsAny, Catch as _, Error, ExitException, InvalidArgumentException,
     LogicException as ShimLogicException, PHP_ENV, PHP_SERVER, PhpClass, PhpMixed,
-    RuntimeException, STDIN, STR_PAD_RIGHT, basename, bin2hex, chdir, defined, dirname,
+    RuntimeException, STDIN, STR_PAD_RIGHT, basename, bconcat, bin2hex, chdir, defined, dirname,
     disk_free_space, exec, explode, explode_limit, extension_loaded, file_exists,
     file_get_contents, file_put_contents, function_exists, get_debug_type_obj, getcwd, getenv,
     getmypid, glob, implode, ini_set, is_array, is_dir, is_file, is_numeric_string, is_string,
@@ -209,21 +209,19 @@ impl Application {
                 let config = composer.get_config();
 
                 let min_space_free: f64 = 100.0 * 1024.0 * 1024.0;
-                let mut dir = config
+                let mut dir = legacy_lossy(config
                     .borrow_mut()
                     .get("home")
                     .as_string()
-                    .unwrap_or_default()
-                    .to_string();
+                    .unwrap_or_default()).into_owned();
                 let df = disk_free_space(&dir);
                 let mut hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 if !hit {
-                    dir = config
+                    dir = legacy_lossy(config
                         .borrow_mut()
                         .get("vendor-dir")
                         .as_string()
-                        .unwrap_or_default()
-                        .to_string();
+                        .unwrap_or_default()).into_owned();
                     let df = disk_free_space(&dir);
                     hit = df.map(|d| d < min_space_free).unwrap_or(false);
                 }
@@ -911,7 +909,7 @@ impl Application {
             .into_iter()
             .map(|p| preg_quote(&p, None))
             .collect();
-        let expr = format!("{}{}", implode("[^:]*:", &parts), "[^:]*");
+        let expr = format!("{}{}", legacy_lossy(&implode("[^:]*:", &parts)), "[^:]*");
         let namespaces: Vec<String> =
             preg_grep(format!("{{^{}}}", expr), all_namespaces.iter().cloned()).collect();
 
@@ -1009,7 +1007,7 @@ impl Application {
             .into_iter()
             .map(|p| preg_quote(&p, None))
             .collect();
-        let expr = format!("{}{}", implode("[^:]*:", &parts), "[^:]*");
+        let expr = format!("{}{}", legacy_lossy(&implode("[^:]*:", &parts)), "[^:]*");
         let mut commands: Vec<String> =
             preg_grep(format!("{{^{}}}", expr), all_commands.iter().cloned()).collect();
 
@@ -1028,10 +1026,7 @@ impl Application {
                 self.find_namespace(&name[..pos])?;
             }
 
-            let mut message = format!(
-                "SymfonyCommand \"{}\" is not defined.",
-                PhpMixed::from(name.to_string()),
-            );
+            let mut message = format!("SymfonyCommand \"{}\" is not defined.", name,);
 
             let mut alternatives = self.find_alternatives(name, &all_commands);
             if !alternatives.is_empty() {
@@ -1105,14 +1100,14 @@ impl Application {
 
                     let abbrev = format!(
                         "{} {}",
-                        str_pad(&cmd, max_len as usize, " ", STR_PAD_RIGHT),
+                        legacy_lossy(&str_pad(&cmd, max_len as usize, " ", STR_PAD_RIGHT)),
                         command_list[&cmd].borrow().get_description()
                     );
 
                     if Helper::width(&abbrev) > usable_width {
                         formatted_abbrevs.push(PhpMixed::from(format!(
                             "{}...",
-                            Helper::substr(&abbrev, 0, Some(usable_width - 3))
+                            legacy_lossy(&Helper::substr(&abbrev, 0, Some(usable_width - 3)))
                         )));
                     } else {
                         formatted_abbrevs.push(PhpMixed::from(abbrev));
@@ -1242,10 +1237,11 @@ impl Application {
             // identity over the synopsis and the application-name argument is never substituted.
             let synopsis = running_command.borrow().get_synopsis(false);
             output.borrow().writeln(
-                &[bstr::BString::from(format!(
-                    "<info>{}</info>",
+                &[bconcat!(
+                    "<info>",
                     OutputFormatter::escape(&synopsis).unwrap(),
-                ))],
+                    "</info>"
+                )],
                 output_interface::VERBOSITY_QUIET,
             );
             output.borrow().writeln(
@@ -1327,23 +1323,36 @@ impl Application {
                     .map_or_else(|| "n/a".to_string(), |line| line.to_string());
                 messages.push(format!(
                     "<comment>{}</comment>",
-                    OutputFormatter::escape(format!("In {} line {}:", file, line)).unwrap()
+                    legacy_lossy(
+                        &OutputFormatter::escape(format!(
+                            "In {} line {}:",
+                            legacy_lossy(&file),
+                            line
+                        ))
+                        .unwrap()
+                    )
                 ));
             }
-            let empty_line = format!("<error>{}</error>", str_repeat(" ", len as usize));
+            let empty_line = format!(
+                "<error>{}</error>",
+                legacy_lossy(&str_repeat(" ", len as usize))
+            );
             messages.push(empty_line.clone());
             if message.is_empty() || output_interface::VERBOSITY_VERBOSE <= verbosity {
                 messages.push(format!(
                     "<error>{}{}</error>",
                     title,
-                    str_repeat(" ", (len - Helper::width(&title)).max(0) as usize)
+                    legacy_lossy(&str_repeat(
+                        " ",
+                        (len - Helper::width(&title)).max(0) as usize
+                    ))
                 ));
             }
             for (line, line_length) in &lines {
                 messages.push(format!(
                     "<error>  {}  {}</error>",
-                    OutputFormatter::escape(line).unwrap(),
-                    str_repeat(" ", (len - line_length) as usize)
+                    legacy_lossy(&OutputFormatter::escape(line).unwrap()),
+                    legacy_lossy(&str_repeat(" ", (len - line_length) as usize))
                 ));
             }
             messages.push(empty_line);
@@ -1595,7 +1604,7 @@ impl Application {
 
     /// Returns abbreviated suggestions in string format.
     fn get_abbreviation_suggestions(&self, abbrevs: &[String]) -> String {
-        format!("    {}", implode("\n    ", abbrevs))
+        format!("    {}", legacy_lossy(&implode("\n    ", abbrevs)))
     }
 
     /// Returns the namespace part of the command name.
@@ -1770,7 +1779,7 @@ impl Application {
         for part in parts {
             if !namespaces.is_empty() {
                 let last = namespaces.last().unwrap().clone();
-                namespaces.push(format!("{}:{}", last, part));
+                namespaces.push(format!("{}:{}", last, legacy_lossy(&part)));
             } else {
                 namespaces.push(legacy_lossy(&part).into_owned());
             }
@@ -1831,7 +1840,7 @@ impl ApplicationHandle {
         if command.borrow().get_name().is_none() {
             return Err(ConsoleLogicException::new(format!(
                 "The command defined in \"{}\" cannot have an empty name.",
-                get_debug_type_obj(&command),
+                get_debug_type_obj(&command).display_lossy(),
             ))
             .into());
         }
@@ -1997,20 +2006,20 @@ impl ApplicationHandle {
             while dirname(&dir) != dir && dir != home {
                 if file_exists(format!(
                     "{}/{}",
-                    dir,
+                    legacy_lossy(&dir),
                     Factory::get_composer_file().unwrap_or_default()
                 )) {
                     if use_parent_dir_if_no_json_available.as_bool() != Some(true)
                         && !io.is_interactive()
                     {
-                        io.write_error(&format!("<info>No composer.json in current directory, to use the one at {} run interactively or set config.use-parent-dir to true</info>", dir));
+                        io.write_error(&format!("<info>No composer.json in current directory, to use the one at {} run interactively or set config.use-parent-dir to true</info>", dir.display_lossy()));
                         break;
                     }
                     if use_parent_dir_if_no_json_available.as_bool() == Some(true)
-                        || io.ask_confirmation(format!("<info>No composer.json in current directory, do you want to use the one at {}?</info> [<comment>y,n</comment>]? ", dir), true)?
+                        || io.ask_confirmation(format!("<info>No composer.json in current directory, do you want to use the one at {}?</info> [<comment>y,n</comment>]? ", legacy_lossy(&dir)), true)?
                     {
                         if use_parent_dir_if_no_json_available.as_bool() == Some(true) {
-                            io.write_error(&format!("<info>No composer.json in current directory, changing working directory to {}</info>", dir));
+                            io.write_error(&format!("<info>No composer.json in current directory, changing working directory to {}</info>", dir.display_lossy()));
                         } else {
                             io.write_error("<info>Always want to use the parent dir? Use \"shirabe config --global use-parent-dir true\" to change the default.</info>");
                         }
@@ -2163,16 +2172,16 @@ impl ApplicationHandle {
                     composer::SHIRABE_VERSION,
                     composer::SHIRABE_RELEASE_DATE,
                     composer::VERSION,
-                    shirabe_php_rpc::get_php_version().version,
-                    php_uname("s"),
-                    php_uname("r"),
+                    shirabe_php_rpc::get_php_version().version.display_lossy(),
+                    php_uname("s").display_lossy(),
+                    php_uname("r").display_lossy(),
                 ),
                 true,
                 io_interface::DEBUG,
             );
 
             if shirabe_php_rpc::get_php_version().version_id < 70205 {
-                io.write_error(&format!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", shirabe_php_rpc::get_php_version().version));
+                io.write_error(&format!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", shirabe_php_rpc::get_php_version().version.display_lossy()));
             }
 
             if shirabe_php_rpc::xdebug::is_xdebug_active()
@@ -2228,7 +2237,7 @@ impl ApplicationHandle {
                     .into_string()
                     .unwrap_or_else(|dir| panic!("temp dir is not valid UTF-8: {dir:?}")),
                 pid,
-                bin2hex(random_bytes(5))
+                legacy_lossy(&bin2hex(random_bytes(5)))
             );
             if !(file_put_contents(&tempfile, file!().as_bytes()).is_some_and(|n| n > 0)
                 && file_get_contents(&tempfile).as_deref().ok() == Some(file!().as_bytes())
@@ -2252,7 +2261,7 @@ impl ApplicationHandle {
                         let script: &str = &script.to_str_lossy();
                         let script_event_const = format!(
                             "Composer\\Script\\ScriptEvents::{}",
-                            str_replace("-", "_", strtoupper(script))
+                            legacy_lossy(&str_replace("-", "_", strtoupper(script)))
                         );
                         if !defined(&script_event_const) {
                             if application.borrow_mut().has(script) {
@@ -2269,7 +2278,7 @@ impl ApplicationHandle {
                                     .and_then(|a| a.get(B(script)))
                                     .and_then(|v| v.as_string())
                                 {
-                                    description = desc.to_string();
+                                    description = legacy_lossy(desc).into_owned();
                                 }
 
                                 let aliases: Vec<String> = arr
@@ -2279,7 +2288,9 @@ impl ApplicationHandle {
                                     .and_then(|v| v.as_list())
                                     .map(|l| {
                                         l.iter()
-                                            .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                                            .filter_map(|v| {
+                                                v.as_string().map(|s| legacy_lossy(s).into_owned())
+                                            })
                                             .collect()
                                     })
                                     .unwrap_or_default();
@@ -2311,13 +2322,14 @@ impl ApplicationHandle {
                                             .borrow()
                                             .get("vendor-dir")
                                             .as_string()
-                                            .map(|s| s.to_string()),
+                                            .map(|s| legacy_lossy(s).into_owned()),
                                     )?;
                                     loader.register(false);
                                 }
 
                                 // if the command is not an array of commands, and points to a valid SymfonyCommand subclass, import its details directly
-                                let dummy_str = dummy.as_string().unwrap_or_default().to_string();
+                                let dummy_str = legacy_lossy(dummy.as_string().unwrap_or_default())
+                                    .into_owned();
                                 // The class lives in the PHP worker, which cannot even declare
                                 // a subclass of Symfony's Command before the Composer PHP
                                 // runtime is loaded there. That load is skipped for a class the
@@ -2475,7 +2487,7 @@ impl ApplicationHandle {
             {
                 io.write_error(&format!(
                     "<info>PHP</info> version <comment>{}</comment> ({})",
-                    shirabe_php_rpc::get_php_version().version,
+                    shirabe_php_rpc::get_php_version().version.display_lossy(),
                     shirabe_php_rpc::get_php_binary().display(),
                 ));
                 io.write_error(

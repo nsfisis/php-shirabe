@@ -96,11 +96,13 @@ impl VcsRepository {
                 .to_str_lossy(),
         );
         repo_config.insert("url".into(), PhpMixed::string(url.clone()));
-        let r#type = repo_config
-            .get(B("type"))
-            .and_then(|v| v.as_string())
-            .unwrap_or("vcs".into())
-            .to_string();
+        let r#type = legacy_lossy(
+            repo_config
+                .get(B("type"))
+                .and_then(|v| v.as_string())
+                .unwrap_or("vcs".into()),
+        )
+        .into_owned();
         let is_verbose = io.is_verbose();
         let is_very_verbose = io.is_very_verbose();
         let process_executor = process.unwrap_or_else(|| {
@@ -464,11 +466,12 @@ impl VcsRepository {
                 // make sure tag do not contain the default-branch marker
                 data.shift_remove(B("default-branch"));
 
-                let version_normalized = data
-                    .get(B("version_normalized"))
-                    .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_string();
+                let version_normalized = legacy_lossy(
+                    data.get(B("version_normalized"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default(),
+                )
+                .into_owned();
 
                 // broken package, version doesn't match tag
                 if version_normalized != parsed_tag {
@@ -494,10 +497,12 @@ impl VcsRepository {
                     .clone()
                     .filter(|s| !s.is_empty())
                     .unwrap_or_else(|| {
-                        data.get(B("name"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_string()
+                        legacy_lossy(
+                            data.get(B("name"))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        )
+                        .into_owned()
                     });
                 if let Some(existing_package) = self.inner.find_package_internal(
                     &tag_package_name,
@@ -625,7 +630,7 @@ impl VcsRepository {
             if strpos(&parsed_branch, "dev-") == Some(0)
                 || VersionParser::DEFAULT_BRANCH_ALIAS == parsed_branch
             {
-                version = format!("dev-{}", str_replace("#", "+", &branch));
+                version = format!("dev-{}", legacy_lossy(&str_replace("#", "+", &branch)));
                 parsed_branch = legacy_lossy(&str_replace("#", "+", &parsed_branch)).into_owned();
             } else {
                 let prefix = if strpos(&branch, "v") == Some(0) {
@@ -636,7 +641,7 @@ impl VcsRepository {
                 version = format!(
                     "{}{}",
                     prefix,
-                    preg_replace(r"{(\.9{7})+}", ".x", &parsed_branch)
+                    legacy_lossy(&preg_replace(r"{(\.9{7})+}", ".x", &parsed_branch))
                 );
             }
 
@@ -711,6 +716,7 @@ impl VcsRepository {
                         data.get(B("version"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default()
+                            .display_lossy()
                     ));
                 }
 
@@ -952,16 +958,18 @@ impl VcsRepository {
                 data.insert("default-branch".into(), PhpMixed::Bool(true));
             }
 
-            let name = data
-                .get(B("name"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string();
-            let version_normalized = data
-                .get(B("version_normalized"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string();
+            let name = legacy_lossy(
+                data.get(B("name"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned();
+            let version_normalized = legacy_lossy(
+                data.get(B("version_normalized"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             if let Some(existing_package) = self.inner.find_package_internal(
                 &name,
                 crate::repository::FindPackageConstraint::Constraint(

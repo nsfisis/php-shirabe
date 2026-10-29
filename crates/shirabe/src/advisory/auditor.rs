@@ -415,7 +415,7 @@ impl Auditor {
                 if io_as_console.is_none() {
                     return Err(InvalidArgumentException::new(format!(
                         "Cannot use table format with {}",
-                        get_class(&PhpMixed::Null)
+                        get_class(&PhpMixed::Null).display_lossy()
                     ))
                     .into());
                 }
@@ -513,11 +513,16 @@ impl Auditor {
                 error.push(format!("Severity: {}", self.get_severity(sa)));
                 error.push(format!("Advisory ID: {}", self.get_advisory_id(sa)));
                 error.push(format!("CVE: {}", self.get_cve(sa)));
-                error.push(format!("Title: {}", OutputFormatter::escape(&sa.title)?));
+                error.push(format!(
+                    "Title: {}",
+                    legacy_lossy(&OutputFormatter::escape(&sa.title)?)
+                ));
                 error.push(format!("URL: {}", self.get_url(sa)));
                 error.push(format!(
                     "Affected versions: {}",
-                    OutputFormatter::escape(sa.affected_versions().get_pretty_string())?
+                    legacy_lossy(&OutputFormatter::escape(
+                        sa.affected_versions().get_pretty_string()
+                    )?)
                 ));
                 error.push(format!("Reported at: {}", sa.reported_at.format(DATE_ATOM)));
                 if let Some(ignored) = advisory.as_ignored() {
@@ -584,7 +589,7 @@ impl Auditor {
         if io_as_console.is_none() {
             return Err(InvalidArgumentException::new(format!(
                 "Cannot use table format with {}",
-                get_class(&PhpMixed::Null)
+                get_class(&PhpMixed::Null).display_lossy()
             ))
             .into());
         }
@@ -623,8 +628,10 @@ impl Auditor {
         if let Some(package_url) = package_url {
             format!(
                 "<href={}>{}</>",
-                OutputFormatter::escape(&package_url)
-                    .expect("OutputFormatter::escape does not fail"),
+                legacy_lossy(
+                    &OutputFormatter::escape(&package_url)
+                        .expect("OutputFormatter::escape does not fail")
+                ),
                 package.get_pretty_name()
             )
         } else {
@@ -672,8 +679,12 @@ impl Auditor {
         let link = advisory.link.as_ref().unwrap();
         format!(
             "<href={}>{}</>",
-            OutputFormatter::escape(link).expect("OutputFormatter::escape does not fail"),
-            OutputFormatter::escape(link).expect("OutputFormatter::escape does not fail")
+            legacy_lossy(
+                &OutputFormatter::escape(link).expect("OutputFormatter::escape does not fail")
+            ),
+            legacy_lossy(
+                &OutputFormatter::escape(link).expect("OutputFormatter::escape does not fail")
+            )
         )
     }
 

@@ -95,18 +95,14 @@ impl Terminal {
                 // or [w, h] from "wxh"
                 WIDTH.with(|w| {
                     w.set(Some(intval(&PhpMixed::string(
-                        matches.get(1).unwrap_or_default().to_string(),
+                        matches.get(1).unwrap_or_default(),
                     ))))
                 });
                 HEIGHT.with(|h| {
                     let value = if matches.get(4).is_some() {
-                        intval(&PhpMixed::string(
-                            matches.get(4).unwrap_or_default().to_string(),
-                        ))
+                        intval(&PhpMixed::string(matches.get(4).unwrap_or_default()))
                     } else {
-                        intval(&PhpMixed::string(
-                            matches.get(2).unwrap_or_default().to_string(),
-                        ))
+                        intval(&PhpMixed::string(matches.get(2).unwrap_or_default()))
                     };
                     h.set(Some(value));
                 });
@@ -147,12 +143,12 @@ impl Terminal {
                 // extract [w, h] from "rows h; columns w;"
                 WIDTH.with(|w| {
                     w.set(Some(intval(&PhpMixed::string(
-                        matches.get(2).unwrap_or_default().to_string(),
+                        matches.get(2).unwrap_or_default(),
                     ))))
                 });
                 HEIGHT.with(|h| {
                     h.set(Some(intval(&PhpMixed::string(
-                        matches.get(1).unwrap_or_default().to_string(),
+                        matches.get(1).unwrap_or_default(),
                     ))))
                 });
             } else if let Some(matches) =
@@ -161,12 +157,12 @@ impl Terminal {
                 // extract [w, h] from "; h rows; w columns"
                 WIDTH.with(|w| {
                     w.set(Some(intval(&PhpMixed::string(
-                        matches.get(2).unwrap_or_default().to_string(),
+                        matches.get(2).unwrap_or_default(),
                     ))))
                 });
                 HEIGHT.with(|h| {
                     h.set(Some(intval(&PhpMixed::string(
-                        matches.get(1).unwrap_or_default().to_string(),
+                        matches.get(1).unwrap_or_default(),
                     ))))
                 });
             }
@@ -186,12 +182,8 @@ impl Terminal {
         )?;
 
         Some(vec![
-            intval(&PhpMixed::string(
-                matches.get(2).unwrap_or_default().to_string(),
-            )),
-            intval(&PhpMixed::string(
-                matches.get(1).unwrap_or_default().to_string(),
-            )),
+            intval(&PhpMixed::string(matches.get(2).unwrap_or_default())),
+            intval(&PhpMixed::string(matches.get(1).unwrap_or_default())),
         ])
     }
 

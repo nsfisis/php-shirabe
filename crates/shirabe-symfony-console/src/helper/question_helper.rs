@@ -10,7 +10,7 @@ use crate::output::{
 };
 use crate::question::{ChoiceQuestion, QuestionInterface};
 use crate::terminal::Terminal;
-use bstr::{B, BString};
+use bstr::{B, BString, ByteSlice};
 use shirabe_php_shim::{
     Exception, PHP_EOL, PhpMixed, PhpResource, SEEK_SET, bconcat, copy, dir, explode, feof, fgetc,
     fgets, fopen, fread, fseek, ftell, function_exists, legacy_lossy, mb_detect_encoding,
@@ -174,7 +174,7 @@ pub trait QuestionHelperInterface {
                 }
                 r = read;
                 if question.is_trimmable() {
-                    r = PhpMixed::string(trim(r.to_string()));
+                    r = PhpMixed::string(trim(php_to_string(&r)));
                 }
             }
             ret = r;
@@ -186,11 +186,11 @@ pub trait QuestionHelperInterface {
             if let Some(section_output) =
                 (*borrowed).as_any().downcast_ref::<ConsoleSectionOutput>()
             {
-                section_output.add_content(bstr::BStr::new(&ret.to_string()));
+                section_output.add_content(php_to_string(&ret).as_bstr());
             }
         }
 
-        ret = if strlen(ret.to_string()) > 0 {
+        ret = if strlen(php_to_string(&ret)) > 0 {
             ret
         } else {
             question.get_default()
@@ -307,12 +307,12 @@ impl QuestionHelper {
 
             if !choice_question.is_multiselect() {
                 return choices
-                    .get(B(&default.to_string()))
+                    .get(B(&php_to_string(&default)))
                     .cloned()
                     .unwrap_or(default);
             }
 
-            let default_parts = explode(",", default.to_string());
+            let default_parts = explode(",", php_to_string(&default));
             let mut resolved: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
             for (k, v) in default_parts.iter().enumerate() {
                 let v = if question.is_trimmable() {
@@ -465,7 +465,7 @@ impl QuestionHelper {
                     && c.as_deref() == Some(b"".as_slice())
                     && matches!(question.get_default(), PhpMixed::Null))
             {
-                shell_exec(format!("stty {}", stty_mode));
+                shell_exec(bconcat!("stty ", stty_mode));
                 return Err(MissingInputException::new("Aborted.".to_string()));
             } else if c.as_deref() == Some(b"\x7f".as_slice()) {
                 // Backspace Character
@@ -510,7 +510,7 @@ impl QuestionHelper {
                 if c.as_deref() == Some(b"\t".as_slice()) || c.as_deref() == Some(b"\n".as_slice())
                 {
                     if num_matches > 0 && -1 != ofs {
-                        ret = matches[ofs as usize].to_string();
+                        ret = legacy_lossy(&php_to_string(&matches[ofs as usize])).into_owned();
                         // Echo out remaining chars for current match
                         let remaining_characters = substr(
                             &ret,
@@ -535,7 +535,7 @@ impl QuestionHelper {
                             .into_iter()
                             .filter(|m| {
                                 ret_for_filter.is_empty()
-                                    || m.to_string().starts_with(&ret_for_filter)
+                                    || php_to_string(m).starts_with(ret_for_filter.as_bytes())
                             })
                             .collect();
                         ofs = -1;
@@ -593,7 +593,7 @@ impl QuestionHelper {
 
                 for value in autocomplete(&ret) {
                     // If typed characters match the beginning chunk of value (e.g. [AcmeDe]moBundle)
-                    if value.to_string().starts_with(&temp_ret) {
+                    if php_to_string(&value).starts_with(temp_ret.as_bytes()) {
                         if (num_matches as usize) < matches.len() {
                             matches[num_matches as usize] = value;
                         } else {
@@ -612,14 +612,15 @@ impl QuestionHelper {
                 let characters_entered =
                     strlen(trim(self.most_recently_entered_value(&full_choice)));
                 output.borrow().write(
-                    &[bstr::BString::from(format!(
-                        "<hl>{}</hl>",
+                    &[bconcat!(
+                        "<hl>",
                         OutputFormatter::escape_trailing_backslash(substr(
-                            matches[ofs as usize].to_string(),
+                            php_to_string(&matches[ofs as usize]),
                             characters_entered,
                             None,
-                        ))
-                    ))],
+                        )),
+                        "</hl>"
+                    )],
                     false,
                     output_interface::OUTPUT_NORMAL,
                 );
@@ -628,7 +629,7 @@ impl QuestionHelper {
         }
 
         // Reset stty so it behaves normally again
-        shell_exec(format!("stty {}", stty_mode));
+        shell_exec(bconcat!("stty ", stty_mode));
 
         Ok(full_choice)
     }
@@ -699,7 +700,7 @@ impl QuestionHelper {
         let value = fgets(input_stream, Some(4096));
 
         if STTY.load(std::sync::atomic::Ordering::SeqCst) && Terminal::has_stty_available() {
-            shell_exec(format!("stty {}", stty_mode));
+            shell_exec(bconcat!("stty ", stty_mode));
         }
 
         let mut value = match value {
@@ -793,11 +794,11 @@ impl QuestionHelper {
         if 0 != cp {
             sapi_windows_cp_set(cp);
 
-            if !matches!(input, PhpMixed::Bool(false)) && input.to_string() != "" {
+            if !matches!(input, PhpMixed::Bool(false)) && !php_to_string(&input).is_empty() {
                 input = PhpMixed::string(sapi_windows_cp_conv(
                     sapi_windows_cp_get(Some("oem")),
                     cp,
-                    &input.to_string(),
+                    &legacy_lossy(&php_to_string(&input)),
                 ));
             }
         }

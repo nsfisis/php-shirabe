@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Platform/HhvmDetector.php
 
 use crate::util::{Platform, ProcessExecutor};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 use shirabe_symfony_process::ExecutableFinder;
 use std::sync::Mutex;
 
@@ -71,7 +71,11 @@ impl HhvmDetectorInterface for HhvmDetector {
                     .execute(&cmd, &mut version_output, None)
                     .unwrap_or(1);
                 if exit_code == 0 {
-                    *cache = Some(version_output.as_string().map(|s| s.to_string()));
+                    *cache = Some(
+                        version_output
+                            .as_string()
+                            .map(|s| legacy_lossy(s).into_owned()),
+                    );
                 }
             }
         }

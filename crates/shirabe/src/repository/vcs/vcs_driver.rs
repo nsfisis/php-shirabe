@@ -12,7 +12,7 @@ use bstr::{B, BString};
 use chrono::{DateTime, FixedOffset};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, DATE_RFC3339, PhpMixed, extension_loaded, php_regex, preg_is_match,
+    Catch as _, DATE_RFC3339, PhpMixed, extension_loaded, legacy_lossy, php_regex, preg_is_match,
 };
 
 #[derive(Debug)]
@@ -36,11 +36,13 @@ impl VcsDriverBase {
         http_downloader: std::rc::Rc<std::cell::RefCell<HttpDownloader>>,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     ) -> Self {
-        let url = repo_config
-            .get(B("url"))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
+        let url = legacy_lossy(
+            repo_config
+                .get(B("url"))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned();
         let origin_url = url.clone();
         Self {
             url,

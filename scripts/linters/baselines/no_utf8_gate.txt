@@ -22,7 +22,6 @@
 3 crates/shirabe-symfony-console/src/helper/question_helper.rs
 4 crates/shirabe-symfony-console/src/helper/table_cell_style.rs
 2 crates/shirabe-symfony-console/src/input/input_value.rs
-1 crates/shirabe-symfony-console/src/input/string_input.rs
 1 crates/shirabe-symfony-console/src/output/console_output.rs
 1 crates/shirabe-symfony-console/src/output/stream_output.rs
 2 crates/shirabe-symfony-console/src/question/choice_question.rs
@@ -31,7 +30,6 @@
 2 crates/shirabe-symfony-finder/src/finder.rs
 3 crates/shirabe-symfony-process/src/executable_finder.rs
 3 crates/shirabe-symfony-process/src/php_executable_finder.rs
-1 crates/shirabe-symfony-process/src/pipes/abstract_pipes.rs
 1 crates/shirabe/build.rs
 5 crates/shirabe/src/advisory/audit_config.rs
 3 crates/shirabe/src/advisory/partial_security_advisory.rs

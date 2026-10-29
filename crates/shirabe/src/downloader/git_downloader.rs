@@ -78,8 +78,12 @@ impl GitDownloader {
         {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",
-                implode(" ", &command),
-                self.inner.process.borrow().get_error_output(),
+                implode(" ", &command).display_lossy(),
+                self.inner
+                    .process
+                    .borrow()
+                    .get_error_output()
+                    .display_lossy(),
             ))
             .into());
         }
@@ -89,17 +93,19 @@ impl GitDownloader {
             // could not match the HEAD for some reason
             return Ok(None);
         };
-        let head_ref = head_match.get(1).unwrap_or_default().to_string();
+        let head_ref = legacy_lossy(head_match.get(1).unwrap_or_default()).into_owned();
 
         let candidate_branches: Vec<String> = preg_match_all(
             format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
             &refs,
         )
         .map(|branch_match| {
-            branch_match
-                .get(1)
-                .expect("group 1 participates whenever the pattern matches")
-                .to_string()
+            legacy_lossy(
+                branch_match
+                    .get(1)
+                    .expect("group 1 participates whenever the pattern matches"),
+            )
+            .into_owned()
         })
         .collect();
         if candidate_branches.is_empty() {
@@ -126,9 +132,11 @@ impl GitDownloader {
                     &refs,
                 )
                 .map(|m| {
-                    m.get(1)
-                        .expect("group 1 participates whenever the pattern matches")
-                        .to_string()
+                    legacy_lossy(
+                        m.get(1)
+                            .expect("group 1 participates whenever the pattern matches"),
+                    )
+                    .into_owned()
                 })
                 .collect();
                 if !matches.is_empty() {
@@ -172,8 +180,12 @@ impl GitDownloader {
                     {
                         return Err(RuntimeException::new(format!(
                             "Failed to execute {}\n\n{}",
-                            implode(" ", &command),
-                            self.inner.process.borrow().get_error_output(),
+                            implode(" ", &command).display_lossy(),
+                            self.inner
+                                .process
+                                .borrow()
+                                .get_error_output()
+                                .display_lossy(),
                         ))
                         .into());
                     }
@@ -214,8 +226,12 @@ impl GitDownloader {
                 {
                     return Err(RuntimeException::new(format!(
                         "Failed to execute {}\n\n{}",
-                        implode(" ", &command),
-                        self.inner.process.borrow().get_error_output(),
+                        implode(" ", &command).display_lossy(),
+                        self.inner
+                            .process
+                            .borrow()
+                            .get_error_output()
+                            .display_lossy(),
                     ))
                     .into());
                 }
@@ -456,12 +472,20 @@ impl GitDownloader {
             );
         }
 
-        let command = format!("{} && {}", implode(" ", &command1), implode(" ", &command2));
+        let command = format!(
+            "{} && {}",
+            legacy_lossy(&implode(" ", &command1)),
+            legacy_lossy(&implode(" ", &command2))
+        );
 
         Err(RuntimeException::new(Url::sanitize(format!(
             "Failed to execute {}\n\n{}{}",
             command,
-            self.inner.process.borrow().get_error_output(),
+            self.inner
+                .process
+                .borrow()
+                .get_error_output()
+                .display_lossy(),
             exception_extra,
         )))
         .into())
@@ -494,9 +518,9 @@ impl GitDownloader {
             url,
         ) {
             let protocols = self.inner.config.borrow_mut().get("github-protocols");
-            let m1 = match_.get(1).unwrap_or_default().to_string();
-            let m2 = match_.get(2).unwrap_or_default().to_string();
-            let m3 = match_.get(3).unwrap_or_default().to_string();
+            let m1 = legacy_lossy(match_.get(1).unwrap_or_default()).into_owned();
+            let m2 = legacy_lossy(match_.get(2).unwrap_or_default()).into_owned();
+            let m3 = legacy_lossy(match_.get(3).unwrap_or_default()).into_owned();
             let mut push_url = format!("git@{}:{}/{}.git", m1, m2, m3);
             if !in_array_strict("ssh".to_string(), protocols.values()) {
                 push_url = format!("https://{}/{}/{}.git", m1, m2, m3);
@@ -618,7 +642,7 @@ impl GitDownloader {
                     realpath(&base_path)
                         .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                         .unwrap_or_default(),
-                    implode("/", &removed),
+                    legacy_lossy(&implode("/", &removed)),
                 ),
                 "/",
             ))
@@ -693,8 +717,12 @@ impl ChangeReportInterface for GitDownloader {
         {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",
-                implode(" ", &command),
-                self.inner.process.borrow().get_error_output(),
+                implode(" ", &command).display_lossy(),
+                self.inner
+                    .process
+                    .borrow()
+                    .get_error_output()
+                    .display_lossy(),
             ))
             .into());
         }
@@ -752,13 +780,20 @@ impl VcsDownloader for GitDownloader {
 
         let cache_path = format!(
             "{}/{}/",
-            self.inner
-                .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or_default(),
-            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.to_string())),
+            legacy_lossy(
+                &self
+                    .inner
+                    .config
+                    .borrow_mut()
+                    .get("cache-vcs-dir")
+                    .as_string()
+                    .unwrap_or_default()
+            ),
+            legacy_lossy(&preg_replace(
+                r"{[^a-z0-9.]}i",
+                "-",
+                Url::sanitize(url.to_string())
+            )),
         );
         let git_version = GitUtil::get_version(&self.inner.process)?;
 
@@ -821,13 +856,20 @@ impl VcsDownloader for GitDownloader {
         let path = self.normalize_path(path);
         let cache_path = format!(
             "{}/{}/",
-            self.inner
-                .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or_default(),
-            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.to_string())),
+            legacy_lossy(
+                &self
+                    .inner
+                    .config
+                    .borrow_mut()
+                    .get("cache-vcs-dir")
+                    .as_string()
+                    .unwrap_or_default()
+            ),
+            legacy_lossy(&preg_replace(
+                r"{[^a-z0-9.]}i",
+                "-",
+                Url::sanitize(url.to_string())
+            )),
         );
         let r#ref = package.get_source_reference().unwrap_or_default();
 
@@ -981,13 +1023,20 @@ impl VcsDownloader for GitDownloader {
 
         let cache_path = format!(
             "{}/{}/",
-            self.inner
-                .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or_default(),
-            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url.to_string())),
+            legacy_lossy(
+                &self
+                    .inner
+                    .config
+                    .borrow_mut()
+                    .get("cache-vcs-dir")
+                    .as_string()
+                    .unwrap_or_default()
+            ),
+            legacy_lossy(&preg_replace(
+                r"{[^a-z0-9.]}i",
+                "-",
+                Url::sanitize(url.to_string())
+            )),
         );
         let r#ref = target.get_source_reference().unwrap_or_default();
 
@@ -1091,8 +1140,10 @@ impl VcsDownloader for GitDownloader {
             && let Some(composer_match) =
                 preg_match(php_regex!(r"{^composer\s+(?P<url>\S+)}m"), &output)
         {
-            let origin_url = origin_match.name("url").unwrap_or_default().to_string();
-            let composer_url = composer_match.name("url").unwrap_or_default().to_string();
+            let origin_url =
+                legacy_lossy(origin_match.name("url").unwrap_or_default()).into_owned();
+            let composer_url =
+                legacy_lossy(composer_match.name("url").unwrap_or_default()).into_owned();
             if origin_url == composer_url
                 && Some(composer_url.as_str()) != target.get_source_url().as_deref()
             {
@@ -1197,7 +1248,7 @@ impl VcsDownloader for GitDownloader {
                     PhpMixed::string("?".to_string()),
                 )?
                 .as_string()
-                .map(|s| s.to_string());
+                .map(|s| legacy_lossy(s).into_owned());
             let mut do_help = false;
             match answer.as_deref() {
                 Some("y") => {
@@ -1291,7 +1342,11 @@ impl VcsDownloader for GitDownloader {
             {
                 return Err(RuntimeException::new(format!(
                     "Failed to apply stashed changes:\n\n{}",
-                    self.inner.process.borrow().get_error_output()
+                    self.inner
+                        .process
+                        .borrow()
+                        .get_error_output()
+                        .display_lossy()
                 ))
                 .into());
             }
@@ -1324,8 +1379,12 @@ impl VcsDownloader for GitDownloader {
         {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",
-                implode(" ", &command),
-                self.inner.process.borrow().get_error_output(),
+                implode(" ", &command).display_lossy(),
+                self.inner
+                    .process
+                    .borrow()
+                    .get_error_output()
+                    .display_lossy(),
             ))
             .into());
         }

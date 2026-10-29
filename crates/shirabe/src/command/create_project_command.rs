@@ -99,15 +99,17 @@ impl CreateProjectCommand {
             Some(PhpMixed::Null) | None => None,
             Some(PhpMixed::List(list)) => Some(
                 list.into_iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                     .collect(),
             ),
             Some(PhpMixed::Array(map)) => Some(
                 map.into_iter()
-                    .filter_map(|(_, v)| v.as_string().map(|s| s.to_string()))
+                    .filter_map(|(_, v)| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                     .collect(),
             ),
-            Some(other) => Some(vec![other.as_string().unwrap_or_default().to_string()]),
+            Some(other) => Some(vec![
+                legacy_lossy(other.as_string().unwrap_or_default()).into_owned(),
+            ]),
         };
 
         let platform_requirement_filter = platform_requirement_filter
@@ -520,18 +522,18 @@ impl CreateProjectCommand {
                 let matched = preg_match(
                     format!(
                         "{{^[^,\\s]*?@({})$}}i",
-                        implode(
+                        legacy_lossy(&implode(
                             "|",
                             &STABILITIES
                                 .keys()
                                 .map(|k| k.to_string())
                                 .collect::<Vec<_>>()
-                        )
+                        ))
                     ),
                     package_version.as_deref().unwrap_or_default(),
                 );
                 if let Some(matched) = matched {
-                    stability = Some(matched.get(1).unwrap_or_default().to_string());
+                    stability = Some(legacy_lossy(matched.get(1).unwrap_or_default()).into_owned());
                 } else {
                     stability = Some(VersionParser::parse_stability(
                         package_version.as_deref().unwrap_or_default(),
@@ -555,6 +557,7 @@ impl CreateProjectCommand {
                         .map(|k| k.to_string())
                         .collect::<Vec<_>>()
                 )
+                .display_lossy()
             ))
             .into());
         }
@@ -647,7 +650,9 @@ impl CreateProjectCommand {
                     .map(|(k, v)| {
                         (
                             k.clone(),
-                            PhpMixed::string(v.as_string().unwrap_or_default().to_string()),
+                            PhpMixed::string(
+                                legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
+                            ),
                         )
                     })
                     .collect(),
@@ -917,7 +922,7 @@ impl Command for CreateProjectCommand {
                 explode_with_limit("/", strtolower(package.as_string().unwrap_or_default()), 2);
             let prompt = format!(
                 "New project directory [<comment>{}</comment>]: ",
-                array_pop(&mut parts).unwrap_or_default()
+                legacy_lossy(&array_pop(&mut parts).unwrap_or_default())
             );
             input.borrow_mut().set_argument(
                 "directory",

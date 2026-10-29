@@ -58,30 +58,36 @@ impl FossilDriver {
         if Filesystem::is_local_path(&self.inner.url) && is_dir(&self.inner.url) {
             self.checkout_dir = self.inner.url.clone();
         } else {
-            let cache_repo_dir = self
-                .inner
-                .config
-                .borrow_mut()
-                .get("cache-repo-dir")
-                .as_string()
-                .unwrap_or_default()
-                .to_string();
-            let cache_vcs_dir = self
-                .inner
-                .config
-                .borrow_mut()
-                .get("cache-vcs-dir")
-                .as_string()
-                .unwrap_or_default()
-                .to_string();
+            let cache_repo_dir = legacy_lossy(
+                self.inner
+                    .config
+                    .borrow_mut()
+                    .get("cache-repo-dir")
+                    .as_string()
+                    .unwrap_or_default(),
+            )
+            .into_owned();
+            let cache_vcs_dir = legacy_lossy(
+                self.inner
+                    .config
+                    .borrow_mut()
+                    .get("cache-vcs-dir")
+                    .as_string()
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             if !Cache::is_usable(&cache_repo_dir) || !Cache::is_usable(&cache_vcs_dir) {
                 return Err(RuntimeException::new("FossilDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string())
                 .into());
             }
 
             let local_name = preg_replace(php_regex!(r"{[^a-z0-9]}i"), "-", &self.inner.url);
-            self.repo_file = Some(format!("{}/{}.fossil", cache_repo_dir, local_name));
-            self.checkout_dir = format!("{}/{}/", cache_vcs_dir, local_name);
+            self.repo_file = Some(format!(
+                "{}/{}.fossil",
+                cache_repo_dir,
+                legacy_lossy(&local_name)
+            ));
+            self.checkout_dir = format!("{}/{}/", cache_vcs_dir, legacy_lossy(&local_name));
 
             self.update_local_repo()?;
         }
@@ -102,7 +108,11 @@ impl FossilDriver {
         {
             return Err(RuntimeException::new(format!(
                 "fossil was not found, check that it is installed and in your PATH env.\n\n{}",
-                self.inner.process.borrow().get_error_output()
+                self.inner
+                    .process
+                    .borrow()
+                    .get_error_output()
+                    .display_lossy()
             ))
             .into());
         }
@@ -143,7 +153,7 @@ impl FossilDriver {
                 self.inner.io.write_error3(&format!(
                     "<error>Failed to update {}, package information from this repository may be outdated ({})</error>",
                     self.inner.url,
-                    self.inner.process.borrow().get_error_output()
+                    self.inner.process.borrow().get_error_output().display_lossy()
                 ), true, io_interface::NORMAL);
             }
         } else {
@@ -161,7 +171,8 @@ impl FossilDriver {
                 None,
             )? != 0
             {
-                let output = self.inner.process.borrow().get_error_output().to_string();
+                let output =
+                    legacy_lossy(&self.inner.process.borrow().get_error_output()).into_owned();
                 return Err(RuntimeException::new(format!(
                     "Failed to clone {} to repository {}\n\n{}",
                     self.inner.url, repo_file, output
@@ -177,7 +188,8 @@ impl FossilDriver {
                 Some(std::path::Path::new(&self.checkout_dir)),
             )? != 0
             {
-                let output = self.inner.process.borrow().get_error_output().to_string();
+                let output =
+                    legacy_lossy(&self.inner.process.borrow().get_error_output()).into_owned();
                 return Err(RuntimeException::new(format!(
                     "Failed to open repository {} in {}\n\n{}",
                     repo_file, self.checkout_dir, output

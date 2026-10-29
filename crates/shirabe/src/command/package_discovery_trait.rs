@@ -18,9 +18,9 @@ use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, Exception, InvalidArgumentException, LogicException, PHP_EOL, PhpMixed, array_keys,
-    array_slice, asort, explode, file_get_contents, implode, in_array_strict, is_array, is_file,
-    is_numeric, json_decode_assoc, legacy_lossy, levenshtein, php_regex, preg_is_match, preg_match,
-    strlen, strpos, trim,
+    array_slice, asort, bconcat, explode, file_get_contents, implode, in_array_strict, is_array,
+    is_file, is_numeric, json_decode_assoc, legacy_lossy, levenshtein, php_regex, preg_is_match,
+    preg_match, strlen, strpos, trim,
 };
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -233,7 +233,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         loop {
             let package_input = io.ask("Search for a package: ".into(), PhpMixed::Null)?;
             let mut package = match package_input.as_string() {
-                Some(s) => s.to_string(),
+                Some(s) => legacy_lossy(s).into_owned(),
                 None => break,
             };
             let mut matches: Vec<SearchResult> = self.get_repos().search(
@@ -324,7 +324,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> = Box::new(
                         move |selection_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
                             let selection =
-                                selection_mixed.as_string().unwrap_or_default().to_string();
+                                legacy_lossy(selection_mixed.as_string().unwrap_or_default())
+                                    .into_owned();
                             if selection.is_empty() {
                                 return Ok(PhpMixed::Bool(false));
                             }
@@ -347,16 +348,16 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                     // validate version constraint
                                     version_parser_clone.parse_constraints(&v)?;
 
-                                    return Ok(PhpMixed::string(format!(
-                                        "{} {}",
+                                    return Ok(PhpMixed::string(bconcat!(
                                         m.name("name").unwrap_or_default(),
-                                        v,
+                                        " ",
+                                        v
                                     )));
                                 }
 
                                 // parsing `acme/example`
                                 return Ok(PhpMixed::string(
-                                    m.name("name").unwrap_or_default().to_string(),
+                                    legacy_lossy(m.name("name").unwrap_or_default()).into_owned(),
                                 ));
                             }
 
@@ -372,7 +373,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             PhpMixed::string(String::new()),
                         )?
                         .as_string()
-                        .map(|s| s.to_string())
+                        .map(|s| legacy_lossy(s).into_owned())
                         .unwrap_or_default();
                 }
 
@@ -494,7 +495,8 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     let name_owned = name.to_string();
                     let validator: Box<dyn Fn(PhpMixed) -> anyhow::Result<PhpMixed>> =
                         Box::new(move |value_mixed: PhpMixed| -> anyhow::Result<PhpMixed> {
-                            let value = value_mixed.as_string().unwrap_or_default().to_string();
+                            let value = legacy_lossy(value_mixed.as_string().unwrap_or_default())
+                                .into_owned();
                             let parser = VersionParser::new();
                             parser.parse_constraints(&value)?;
 
@@ -512,7 +514,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                             PhpMixed::string("*".to_string()),
                         )?
                         .as_string()
-                        .map(|s| s.to_string())
+                        .map(|s| legacy_lossy(s).into_owned())
                         .unwrap_or_default();
                 }
 
@@ -692,7 +694,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     } else {
                         "this"
                     },
-                    implode("\n    ", &similar),
+                    implode("\n    ", &similar).display_lossy(),
                 ))
                 .into());
             }
@@ -853,7 +855,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
         Ok(format!(
             ":{}  - {}",
             PHP_EOL,
-            implode(format!("{}  - ", PHP_EOL), &details)
+            legacy_lossy(&implode(format!("{}  - ", PHP_EOL), &details))
         ))
     }
 }

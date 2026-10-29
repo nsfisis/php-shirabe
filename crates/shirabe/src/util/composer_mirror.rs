@@ -60,8 +60,8 @@ impl ComposerMirror {
         ) {
             format!(
                 "gh-{}/{}",
-                gh_matches.get(1).unwrap_or_default(),
-                gh_matches.get(2).unwrap_or_default(),
+                legacy_lossy(&gh_matches.get(1).unwrap_or_default()),
+                legacy_lossy(&gh_matches.get(2).unwrap_or_default()),
             )
         } else if let Some(bb_matches) = preg_match(
             php_regex!(r"#^https://bitbucket\.org/([^/]+)/(.+?)(?:\.git)?/?$#"),
@@ -69,8 +69,8 @@ impl ComposerMirror {
         ) {
             format!(
                 "bb-{}/{}",
-                bb_matches.get(1).unwrap_or_default(),
-                bb_matches.get(2).unwrap_or_default(),
+                legacy_lossy(&bb_matches.get(1).unwrap_or_default()),
+                legacy_lossy(&bb_matches.get(2).unwrap_or_default()),
             )
         } else {
             legacy_lossy(&preg_replace(

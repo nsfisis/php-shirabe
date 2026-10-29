@@ -786,21 +786,27 @@ impl Installer {
                 ));
                 if !install_names.is_empty() {
                     self.io.write_error3(
-                        &format!("Installs: {}", implode(", ", &install_names)),
+                        &format!(
+                            "Installs: {}",
+                            implode(", ", &install_names).display_lossy()
+                        ),
                         true,
                         io_interface::VERBOSE,
                     );
                 }
                 if !update_names.is_empty() {
                     self.io.write_error3(
-                        &format!("Updates: {}", implode(", ", &update_names)),
+                        &format!("Updates: {}", implode(", ", &update_names).display_lossy()),
                         true,
                         io_interface::VERBOSE,
                     );
                 }
                 if !uninstalls.is_empty() {
                     self.io.write_error3(
-                        &format!("Removals: {}", implode(", ", &uninstall_names)),
+                        &format!(
+                            "Removals: {}",
+                            implode(", ", &uninstall_names).display_lossy()
+                        ),
                         true,
                         io_interface::VERBOSE,
                     );
@@ -1206,21 +1212,21 @@ impl Installer {
             ));
             if !installs.is_empty() {
                 self.io.write_error3(
-                    &format!("Installs: {}", implode(", ", &installs)),
+                    &format!("Installs: {}", implode(", ", &installs).display_lossy()),
                     true,
                     io_interface::VERBOSE,
                 );
             }
             if !updates.is_empty() {
                 self.io.write_error3(
-                    &format!("Updates: {}", implode(", ", &updates)),
+                    &format!("Updates: {}", implode(", ", &updates).display_lossy()),
                     true,
                     io_interface::VERBOSE,
                 );
             }
             if !uninstalls.is_empty() {
                 self.io.write_error3(
-                    &format!("Removals: {}", implode(", ", &uninstalls)),
+                    &format!("Removals: {}", implode(", ", &uninstalls).display_lossy()),
                     true,
                     io_interface::VERBOSE,
                 );
@@ -1244,13 +1250,14 @@ impl Installer {
 
             // see https://github.com/composer/composer/issues/2764
             if !local_repo_transaction.get_operations().is_empty() {
-                let vendor_dir = self
-                    .config
-                    .borrow_mut()
-                    .get("vendor-dir")
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string();
+                let vendor_dir = legacy_lossy(
+                    self.config
+                        .borrow_mut()
+                        .get("vendor-dir")
+                        .as_string()
+                        .unwrap_or_default(),
+                )
+                .into_owned();
                 if is_dir(&vendor_dir) {
                     // suppress errors as this fails sometimes on OSX for no apparent reason
                     // see https://github.com/composer/composer/issues/4070#issuecomment-129792748

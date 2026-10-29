@@ -74,11 +74,7 @@ impl GlobalCommand {
         }
 
         let config = Factory::create_config(None, None)?;
-        let home = config
-            .get("home")
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let home = legacy_lossy(config.get("home").as_string().unwrap_or_default()).into_owned();
 
         if !Path::new(&home).is_dir() {
             let mut fs = Filesystem::new(None);

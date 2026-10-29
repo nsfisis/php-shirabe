@@ -245,7 +245,7 @@ impl PluginManager {
                 self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it requires a Plugin API version (\"{}\") that does not match your Shirabe installation (\"{}\"). You may need to run shirabe update with the \"--no-plugins\" option.</warning>",
                     package.get_name(),
                     if is_global_plugin || self.running_in_global_dir { "(installed globally) " } else { "" },
-                    requires_composer.get_pretty_string(),
+                    requires_composer.get_pretty_string().display_lossy(),
                     current_plugin_api_version
                 ));
                 return Ok(());
@@ -311,11 +311,12 @@ impl PluginManager {
         // PHP: is_array($extra['class']) ? $extra['class'] : [$extra['class']] — an associative
         // array iterates its values too, and a non-string entry reaches class_exists() where it
         // raises a TypeError (an Error, not caught by the plugin installer's rollback).
-        let expect_class_name = |value: &PhpMixed| -> String {
-            value.as_string().map(|s| s.to_string()).unwrap_or_else(|| {
+        let expect_class_name =
+            |value: &PhpMixed| -> String {
+                value.as_string().map(|s| legacy_lossy(s).into_owned()).unwrap_or_else(|| {
                 panic!("extra.class entries must be strings (PHP raises a TypeError): {value:?}")
             })
-        };
+            };
         let classes: Vec<String> = match class_value {
             Some(PhpMixed::List(items)) => items.iter().map(expect_class_name).collect(),
             Some(PhpMixed::Array(map)) => map.values().map(expect_class_name).collect(),
@@ -391,7 +392,7 @@ impl PluginManager {
             .borrow()
             .get("vendor-dir")
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         let mut class_loader = generator.borrow().create_loader(&map, vendor_dir)?;
         class_loader.register(false);
 
@@ -414,7 +415,7 @@ impl PluginManager {
                     continue;
                 }
                 let file = file.as_string().unwrap_or_else(|| {
-                    panic!("autoload files entry `{file_identifier}` is not a string path")
+                    panic!("autoload files entry {file_identifier:?} is not a string path")
                 });
                 // TODO(bytes): file identifiers are Strings, so non-UTF-8 bytes are replaced.
                 self.php_runtime_composer_require(
@@ -427,7 +428,7 @@ impl PluginManager {
         for class in classes {
             let mut class = class;
             if self.php_runtime_class_exists(&class, false)? {
-                class = trim2(&class, "\\").to_string();
+                class = legacy_lossy(&trim2(&class, "\\")).into_owned();
                 let path = class_loader.find_file(&class).unwrap_or_else(|| {
                     panic!("plugin class `{class}` is already defined but has no autoloadable file")
                 });
@@ -772,7 +773,7 @@ impl PluginManager {
                 "Loading plugin {}{}",
                 plugin.borrow().get_class_name(),
                 if !details.is_empty() {
-                    format!(" ({})", implode(", ", &details))
+                    format!(" ({})", legacy_lossy(&implode(", ", &details)))
                 } else {
                     String::new()
                 }
@@ -1031,7 +1032,7 @@ impl PluginManager {
             return Err(UnexpectedValueException::new(format!(
                 "Plugin {} provided invalid capability class name(s), got {}",
                 plugin.get_class_name(),
-                var_export(value, true)
+                var_export(value, true).display_lossy()
             ))
             .into());
         }

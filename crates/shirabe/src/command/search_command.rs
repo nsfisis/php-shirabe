@@ -227,7 +227,10 @@ impl Command for SearchCommand {
                 };
                 let remaining = width - name_length - warning.len() as i64 - 2;
                 let description = if description.len() as i64 > remaining {
-                    format!("{}...", substr(&description, 0, Some(remaining - 3)))
+                    format!(
+                        "{}...",
+                        legacy_lossy(&substr(&description, 0, Some(remaining - 3)))
+                    )
                 } else {
                     description
                 };
@@ -236,7 +239,7 @@ impl Command for SearchCommand {
                 if let Some(link) = link {
                     io.write(&format!(
                         "<href={}>{}</>{}{}{}",
-                        OutputFormatter::escape(link)?,
+                        legacy_lossy(&OutputFormatter::escape(link)?),
                         result.name,
                         " ".repeat(name_length as usize - result.name.len()),
                         warning,

@@ -37,10 +37,12 @@ impl CompletionInput {
         Self::from_tokens(
             tokens
                 .map(|token| {
-                    token
-                        .get(0)
-                        .expect("group 0 participates whenever the pattern matches")
-                        .to_string()
+                    legacy_lossy(
+                        token
+                            .get(0)
+                            .expect("group 0 participates whenever the pattern matches"),
+                    )
+                    .into_owned()
                 })
                 .collect(),
             current_index,
@@ -406,6 +408,6 @@ impl std::fmt::Display for CompletionInput {
             str += "|";
         }
 
-        write!(f, "{}", rtrim(&str))
+        f.write_str(&legacy_lossy(&rtrim(&str)))
     }
 }

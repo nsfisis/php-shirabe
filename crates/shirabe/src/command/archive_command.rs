@@ -227,8 +227,8 @@ impl ArchiveCommand {
             && let Some(matches) =
                 preg_match(php_regex!(r"{@(stable|RC|beta|alpha|dev)$}i"), version_str)
         {
-            let m1 = matches.get(1).unwrap_or_default().to_string();
-            let m0 = matches.get(0).unwrap_or_default().to_string();
+            let m1 = legacy_lossy(matches.get(1).unwrap_or_default()).into_owned();
+            let m0 = legacy_lossy(matches.get(0).unwrap_or_default()).into_owned();
             min_stability = VersionParser::normalize_stability(&m1)?;
             let full_match_len = m0.len();
             version = Some(version_str[..version_str.len() - full_match_len].to_string());
@@ -290,7 +290,7 @@ impl ArchiveCommand {
         let Some(complete) = package.as_complete() else {
             return Err(LogicException::new(format!(
                 "Expected a CompletePackageInterface instance but found {}",
-                get_debug_type(&PhpMixed::Null)
+                get_debug_type(&PhpMixed::Null).display_lossy()
             ))
             .into());
         };
@@ -355,12 +355,14 @@ impl Command for ArchiveCommand {
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
-                config
-                    .borrow_mut()
-                    .get("archive-format")
-                    .as_string()
-                    .unwrap_or("tar".into())
-                    .to_string()
+                legacy_lossy(
+                    config
+                        .borrow_mut()
+                        .get("archive-format")
+                        .as_string()
+                        .unwrap_or("tar".into()),
+                )
+                .into_owned()
             });
 
         let dir = input
@@ -369,12 +371,14 @@ impl Command for ArchiveCommand {
             .as_string()
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
-                config
-                    .borrow_mut()
-                    .get("archive-dir")
-                    .as_string()
-                    .unwrap_or(".".into())
-                    .to_string()
+                legacy_lossy(
+                    config
+                        .borrow_mut()
+                        .get("archive-dir")
+                        .as_string()
+                        .unwrap_or(".".into()),
+                )
+                .into_owned()
             });
 
         let io = self.get_io().clone();

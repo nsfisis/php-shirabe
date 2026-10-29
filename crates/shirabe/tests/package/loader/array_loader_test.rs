@@ -124,7 +124,11 @@ fn test_self_version() {
     let replaces = package.get_replaces();
     assert_eq!(
         "== 1.2.3.4",
-        replaces.get("foo").unwrap().get_constraint().to_string()
+        replaces
+            .get("foo")
+            .unwrap()
+            .get_constraint()
+            .to_php_string()
     );
 }
 

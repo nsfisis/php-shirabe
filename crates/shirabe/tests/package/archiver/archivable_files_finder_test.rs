@@ -201,7 +201,11 @@ fn get_archived_files(set_up: &SetUp, command: &str) -> Vec<String> {
         if name.ends_with(b"/") {
             continue;
         }
-        let virtual_path = format!("phar://{}/archive.zip/{}", set_up.sources, name);
+        let virtual_path = format!(
+            "phar://{}/archive.zip/{}",
+            set_up.sources,
+            legacy_lossy(&name)
+        );
         files.push(
             legacy_lossy(&preg_replace(
                 &prefix,

@@ -7,8 +7,8 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
-    UnexpectedValueException, array_merge, in_array_strict, json_encode_ex, php_regex,
-    preg_is_match,
+    UnexpectedValueException, array_merge, in_array_strict, json_encode_ex, legacy_lossy,
+    php_regex, preg_is_match,
 };
 
 /// ref: composer/vendor/psr/log/Psr/Log/LogLevel.php
@@ -113,15 +113,17 @@ pub trait BaseIO: IOInterface {
                 // replaced.
                 let domain = domain.to_str_lossy().into_owned();
                 if let Some(cred_map) = cred.as_array() {
-                    let consumer_key = cred_map
-                        .get(B("consumer-key"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
+                    let consumer_key = legacy_lossy(
+                        cred_map
+                            .get(B("consumer-key"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned();
                     let consumer_secret = cred_map
                         .get(B("consumer-secret"))
                         .and_then(|v| v.as_string())
-                        .map(|s| s.to_string());
+                        .map(|s| legacy_lossy(s).into_owned());
                     self.check_and_set_authentication(domain, consumer_key, consumer_secret);
                 }
             }
@@ -132,7 +134,7 @@ pub trait BaseIO: IOInterface {
                 // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
                 // replaced.
                 let domain = domain.to_str_lossy().into_owned();
-                let token_str = token.as_string().unwrap_or_default().to_string();
+                let token_str = legacy_lossy(token.as_string().unwrap_or_default()).into_owned();
                 let github_domains = config.get("github-domains");
                 if domain != "github.com"
                     && !in_array_strict(
@@ -212,12 +214,14 @@ pub trait BaseIO: IOInterface {
                 }
 
                 let token_str = if let Some(arr) = token.as_array() {
-                    arr.get(B("token"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string()
+                    legacy_lossy(
+                        arr.get(B("token"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned()
                 } else {
-                    token.as_string().unwrap_or_default().to_string()
+                    legacy_lossy(token.as_string().unwrap_or_default()).into_owned()
                 };
                 self.check_and_set_authentication(domain, token_str, Some("oauth2".to_string()));
             }
@@ -259,18 +263,22 @@ pub trait BaseIO: IOInterface {
 
                 let (username, password) = if let Some(arr) = token.as_array() {
                     (
-                        arr.get(B("username"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_string(),
-                        arr.get(B("token"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_string(),
+                        legacy_lossy(
+                            arr.get(B("username"))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        )
+                        .into_owned(),
+                        legacy_lossy(
+                            arr.get(B("token"))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        )
+                        .into_owned(),
                     )
                 } else {
                     (
-                        token.as_string().unwrap_or_default().to_string(),
+                        legacy_lossy(token.as_string().unwrap_or_default()).into_owned(),
                         "private-token".to_string(),
                     )
                 };
@@ -311,15 +319,17 @@ pub trait BaseIO: IOInterface {
                 }
 
                 if let Some(cred_map) = cred.as_array() {
-                    let username = cred_map
-                        .get(B("username"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
+                    let username = legacy_lossy(
+                        cred_map
+                            .get(B("username"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned();
                     let token = cred_map
                         .get(B("token"))
                         .and_then(|v| v.as_string())
-                        .map(|s| s.to_string());
+                        .map(|s| legacy_lossy(s).into_owned());
                     self.check_and_set_authentication(domain, username, token);
                 }
             }
@@ -331,15 +341,17 @@ pub trait BaseIO: IOInterface {
                 // replaced.
                 let domain = domain.to_str_lossy().into_owned();
                 if let Some(cred_map) = cred.as_array() {
-                    let username = cred_map
-                        .get(B("username"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
+                    let username = legacy_lossy(
+                        cred_map
+                            .get(B("username"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned();
                     let password = cred_map
                         .get(B("password"))
                         .and_then(|v| v.as_string())
-                        .map(|s| s.to_string());
+                        .map(|s| legacy_lossy(s).into_owned());
                     self.check_and_set_authentication(domain, username, password);
                 }
             }
@@ -350,7 +362,7 @@ pub trait BaseIO: IOInterface {
                 // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
                 // replaced.
                 let domain = domain.to_str_lossy().into_owned();
-                let token_str = token.as_string().unwrap_or_default().to_string();
+                let token_str = legacy_lossy(token.as_string().unwrap_or_default()).into_owned();
                 self.check_and_set_authentication(domain, token_str, Some("bearer".to_string()));
             }
         }
@@ -380,15 +392,15 @@ pub trait BaseIO: IOInterface {
                     let local_cert = cred_map
                         .get(B("local_cert"))
                         .and_then(|v| v.as_string())
-                        .map(|s| s.to_string());
+                        .map(|s| legacy_lossy(s).into_owned());
                     let local_pk = cred_map
                         .get(B("local_pk"))
                         .and_then(|v| v.as_string())
-                        .map(|s| s.to_string());
+                        .map(|s| legacy_lossy(s).into_owned());
                     let passphrase = cred_map
                         .get(B("passphrase"))
                         .and_then(|v| v.as_string())
-                        .map(|s| s.to_string());
+                        .map(|s| legacy_lossy(s).into_owned());
 
                     let mut ssl_options = IndexMap::new();
                     if let Some(cert) = local_cert {

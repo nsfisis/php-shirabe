@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Http/Response.php
 
 use crate::json::JsonFile;
-use shirabe_php_shim::{PhpMixed, php_regex, preg_is_match, preg_match, preg_quote};
+use shirabe_php_shim::{PhpMixed, legacy_lossy, php_regex, preg_is_match, preg_match, preg_quote};
 
 #[derive(Debug)]
 pub struct Response {
@@ -74,7 +74,7 @@ impl Response {
             if let Some(matches) = preg_match(&pattern, header)
                 && let Some(s) = matches.get(1)
             {
-                value = Some(s.to_string());
+                value = Some(legacy_lossy(s).into_owned());
             }
         }
         value

@@ -3,7 +3,7 @@
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
 use crate::package::base_package::{self};
 use crate::repository::PlatformRepository;
-use shirabe_php_shim::preg_is_match;
+use shirabe_php_shim::{legacy_lossy, preg_is_match};
 use shirabe_semver::constraint::{
     AnyConstraint, MatchAllConstraint, MultiConstraint, SimpleConstraint,
 };
@@ -56,14 +56,14 @@ impl IgnoreListPlatformRequirementFilter {
         let intervals = Intervals::get(&constraint)?;
         let last = intervals.numeric.last();
         if let Some(last) = last
-            && last.get_end().to_string() != Interval::until_positive_infinity().to_string()
+            && last.get_end().to_php_string() != Interval::until_positive_infinity().to_php_string()
         {
             let constraint = MultiConstraint::new(
                 vec![
                     constraint,
                     AnyConstraint::Simple(SimpleConstraint::new(
                         ">=",
-                        last.get_end().get_version().to_string(),
+                        legacy_lossy(last.get_end().get_version()).into_owned(),
                         None,
                     )),
                 ],

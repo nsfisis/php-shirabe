@@ -229,6 +229,7 @@ impl Command for AuditCommand {
                         .map(|s| s.to_string())
                         .collect::<Vec<_>>()
                 )
+                .display_lossy()
             ))
             .into());
         }

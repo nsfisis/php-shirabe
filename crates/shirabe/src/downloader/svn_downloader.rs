@@ -12,8 +12,8 @@ use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil};
 use bstr::{B, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, php_regex, preg_is_match,
-    preg_match, preg_replace, preg_split, version_compare,
+    CmpOp, PhpMixed, RuntimeException, impl_php_class, is_dir, legacy_lossy, php_regex,
+    preg_is_match, preg_match, preg_replace, preg_split, version_compare,
 };
 
 #[derive(Debug)]
@@ -73,7 +73,11 @@ impl SvnDownloader {
         {
             return Err(RuntimeException::new(format!(
                 "Could not reset changes\n\n:{}",
-                self.inner.process.borrow().get_error_output()
+                self.inner
+                    .process
+                    .borrow()
+                    .get_error_output()
+                    .display_lossy()
             ))
             .into());
         }
@@ -269,7 +273,7 @@ impl VcsDownloader for SvnDownloader {
         let changes_str = changes.unwrap();
         let changes: Vec<String> = preg_split(php_regex!(r"{\s*\r?\n\s*}"), &changes_str)
             .into_iter()
-            .map(|elem| format!("    {}", elem))
+            .map(|elem| format!("    {}", legacy_lossy(&elem)))
             .collect();
         let count_changes = changes.len() as i64;
         self.inner.io.write_error3(
@@ -373,14 +377,18 @@ impl VcsDownloader for SvnDownloader {
                 return Err(RuntimeException::new(format!(
                     "Failed to execute {}\n\n{}",
                     command.join(" "),
-                    self.inner.process.borrow().get_error_output()
+                    self.inner
+                        .process
+                        .borrow()
+                        .get_error_output()
+                        .display_lossy()
                 ))
                 .into());
             }
 
             let url_pattern = "#<url>(.*)</url>#";
             let base_url = if let Some(matches) = preg_match(url_pattern, &output) {
-                matches.get(1).unwrap_or_default().to_string()
+                legacy_lossy(matches.get(1).unwrap_or_default()).into_owned()
             } else {
                 return Err(RuntimeException::new(format!(
                     "Unable to determine svn url for path {}",
@@ -397,7 +405,11 @@ impl VcsDownloader for SvnDownloader {
                 "svn".to_string(),
                 "log".to_string(),
                 "-r".to_string(),
-                format!("{}:{}", from_revision, to_revision),
+                format!(
+                    "{}:{}",
+                    legacy_lossy(&from_revision),
+                    legacy_lossy(&to_revision)
+                ),
                 "--incremental".to_string(),
             ];
 

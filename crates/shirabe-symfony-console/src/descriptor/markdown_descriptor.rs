@@ -10,7 +10,7 @@ use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, preg_replace, str_repeat, str_replace, var_export};
+use shirabe_php_shim::{PhpMixed, legacy_lossy, preg_replace, str_replace, var_export};
 
 /// Markdown descriptor.
 #[derive(Debug, Default)]
@@ -51,18 +51,22 @@ impl MarkdownDescriptor {
                 if !argument.get_description().is_empty() {
                     format!(
                         "{}\n\n",
-                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", argument.get_description())
+                        legacy_lossy(&preg_replace(
+                            "/\\s*[\\r\\n]\\s*/",
+                            "\n",
+                            argument.get_description()
+                        ))
                     )
                 } else {
                     String::new()
                 },
                 if argument.is_required() { "yes" } else { "no" },
                 if argument.is_array() { "yes" } else { "no" },
-                str_replace(
+                legacy_lossy(&str_replace(
                     "\n",
                     "",
                     var_export(&argument.get_default().to_php_mixed(), true),
-                ),
+                )),
             ),
             true,
         );
@@ -79,7 +83,7 @@ impl MarkdownDescriptor {
             name += &format!("|--no-{}", option.get_name());
         }
         if let Some(shortcut) = option.get_shortcut() {
-            name += &format!("|-{}", str_replace("|", "|-", shortcut));
+            name += &format!("|-{}", legacy_lossy(&str_replace("|", "|-", shortcut)));
         }
 
         self.write(
@@ -89,7 +93,7 @@ impl MarkdownDescriptor {
                 if !option.get_description().is_empty() {
                     format!(
                         "{}\n\n",
-                        preg_replace("/\\s*[\\r\\n]\\s*/", "\n", option.get_description())
+                        legacy_lossy(&preg_replace("/\\s*[\\r\\n]\\s*/", "\n", option.get_description()))
                     )
                 } else {
                     String::new()
@@ -98,11 +102,11 @@ impl MarkdownDescriptor {
                 if option.is_value_required() { "yes" } else { "no" },
                 if option.is_array() { "yes" } else { "no" },
                 if option.is_negatable() { "yes" } else { "no" },
-                str_replace(
+                legacy_lossy(&str_replace(
                     "\n",
                     "",
                     var_export(&option.get_default().to_php_mixed(), true),
-                ),
+                )),
             ),
             true,
         );
@@ -149,8 +153,7 @@ impl MarkdownDescriptor {
                 &format!(
                     "`{}`\n{}\n\n{}### Usage\n\n{}",
                     command.get_name().unwrap_or_default(),
-                    str_repeat(
-                        "-",
+                    "-".repeat(
                         (Helper::width(command.get_name().as_deref().unwrap_or_default()) + 2)
                             as usize
                     ),
@@ -181,8 +184,7 @@ impl MarkdownDescriptor {
             &format!(
                 "`{}`\n{}\n\n{}### Usage\n\n{}",
                 command.get_name().unwrap_or_default(),
-                str_repeat(
-                    "-",
+                "-".repeat(
                     (Helper::width(command.get_name().as_deref().unwrap_or_default()) + 2) as usize
                 ),
                 if !command.get_description().is_empty() {
@@ -225,11 +227,7 @@ impl MarkdownDescriptor {
         let title = self.get_application_title(&*application.borrow());
 
         self.write(
-            &format!(
-                "{}\n{}",
-                title,
-                str_repeat("=", Helper::width(&title) as usize)
-            ),
+            &format!("{}\n{}", title, "=".repeat(Helper::width(&title) as usize)),
             true,
         );
 
@@ -247,7 +245,7 @@ impl MarkdownDescriptor {
             let command_names: Vec<String> = match namespace.get(B("commands")) {
                 Some(PhpMixed::List(names)) => names
                     .iter()
-                    .filter_map(|n| n.as_string().map(|s| s.to_string()))
+                    .filter_map(|n| n.as_string().map(|s| legacy_lossy(s).into_owned()))
                     .collect(),
                 _ => vec![],
             };
@@ -258,7 +256,7 @@ impl MarkdownDescriptor {
                         Ok(format!(
                             "* [`{}`](#{})",
                             command_name.clone(),
-                            str_replace(
+                            legacy_lossy(&str_replace(
                                 ":",
                                 "",
                                 description
@@ -266,7 +264,7 @@ impl MarkdownDescriptor {
                                     .borrow()
                                     .get_name()
                                     .unwrap_or_default(),
-                            ),
+                            )),
                         ))
                     })
                     .collect::<anyhow::Result<Vec<String>>>()?

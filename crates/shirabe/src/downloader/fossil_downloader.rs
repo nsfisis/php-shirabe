@@ -48,7 +48,11 @@ impl FossilDownloader {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",
                 command.join(" "),
-                self.inner.process.borrow().get_error_output()
+                self.inner
+                    .process
+                    .borrow()
+                    .get_error_output()
+                    .display_lossy()
             ))
             .into());
         }

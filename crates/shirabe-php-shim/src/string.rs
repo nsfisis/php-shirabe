@@ -441,7 +441,11 @@ pub fn mb_convert_encoding(
         (b"UTF-8" | b"ASCII", b"ASCII") | (b"ASCII", b"UTF-8") => {
             substitute_invalid(string.as_ref(), true)
         }
-        _ => todo!("mb_convert_encoding {} -> {}", from, to),
+        _ => todo!(
+            "mb_convert_encoding {} -> {}",
+            from.display_lossy(),
+            to.display_lossy()
+        ),
     }
 }
 

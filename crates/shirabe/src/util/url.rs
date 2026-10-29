@@ -24,9 +24,9 @@ impl Url {
             ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
-                    m.get(1).unwrap_or_default(),
-                    m.get(2).unwrap_or_default(),
-                    m.get(3).unwrap_or_default(),
+                    legacy_lossy(&m.get(1).unwrap_or_default()),
+                    legacy_lossy(&m.get(2).unwrap_or_default()),
+                    legacy_lossy(&m.get(3).unwrap_or_default()),
                     r#ref
                 );
             } else if let Some(m) = preg_match(
@@ -37,9 +37,9 @@ impl Url {
             ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
-                    m.get(1).unwrap_or_default(),
-                    m.get(2).unwrap_or_default(),
-                    m.get(3).unwrap_or_default(),
+                    legacy_lossy(&m.get(1).unwrap_or_default()),
+                    legacy_lossy(&m.get(2).unwrap_or_default()),
+                    legacy_lossy(&m.get(3).unwrap_or_default()),
                     r#ref
                 );
             } else if let Some(m) = preg_match(
@@ -50,9 +50,9 @@ impl Url {
             ) {
                 url = format!(
                     "https://api.github.com/repos/{}/{}/{}ball/{}",
-                    m.get(1).unwrap_or_default(),
-                    m.get(2).unwrap_or_default(),
-                    m.get(3).unwrap_or_default(),
+                    legacy_lossy(&m.get(1).unwrap_or_default()),
+                    legacy_lossy(&m.get(2).unwrap_or_default()),
+                    legacy_lossy(&m.get(3).unwrap_or_default()),
                     r#ref
                 );
             }
@@ -65,10 +65,10 @@ impl Url {
             ) {
                 url = format!(
                     "https://bitbucket.org/{}/{}/get/{}.{}",
-                    m.get(1).unwrap_or_default(),
-                    m.get(2).unwrap_or_default(),
+                    legacy_lossy(&m.get(1).unwrap_or_default()),
+                    legacy_lossy(&m.get(2).unwrap_or_default()),
                     r#ref,
-                    m.get(4).unwrap_or_default()
+                    legacy_lossy(&m.get(4).unwrap_or_default())
                 );
             }
         } else if host == "gitlab.com" || host == "www.gitlab.com" {
@@ -80,8 +80,8 @@ impl Url {
             ) {
                 url = format!(
                     "https://gitlab.com/api/v4/projects/{}/repository/archive.{}?sha={}",
-                    m.get(1).unwrap_or_default(),
-                    m.get(2).unwrap_or_default(),
+                    legacy_lossy(&m.get(1).unwrap_or_default()),
+                    legacy_lossy(&m.get(2).unwrap_or_default()),
                     r#ref
                 );
             }
@@ -144,7 +144,7 @@ impl Url {
             let gitlab_domains: Vec<String> = match config.get("gitlab-domains") {
                 PhpMixed::List(list) => list
                     .iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                     .collect(),
                 _ => vec![],
             };
@@ -169,8 +169,8 @@ impl Url {
                     r"{^(?P<prefix>[a-z0-9]+://)?(?P<user>[^:/\s@]+):(?P<password>[^@\s/]+)@}i"
                 ),
                 |m| {
-                    let user = m.name("user").unwrap_or_default().to_string();
-                    let prefix = m.name("prefix").unwrap_or_default().to_string();
+                    let user = legacy_lossy(m.name("user").unwrap_or_default()).into_owned();
+                    let prefix = legacy_lossy(m.name("prefix").unwrap_or_default()).into_owned();
                     // if the username looks like a long (12char+) hex string, or a modern github token (e.g. ghp_xxx, github_pat_xxx) we obfuscate that
                     Ok(if preg_is_match(GitHub::GITHUB_TOKEN_REGEX, &user) {
                         format!("{}***:***@", prefix)

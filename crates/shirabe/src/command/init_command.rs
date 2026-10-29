@@ -162,12 +162,16 @@ impl InitCommand {
             *self.git_config.borrow_mut() = Some(IndexMap::new());
             for m in preg_match_all(php_regex!(r"{^([^=]+)=(.*)$}m"), &output) {
                 self.git_config.borrow_mut().as_mut().unwrap().insert(
-                    m.get(1)
-                        .expect("group 1 participates whenever the pattern matches")
-                        .to_string(),
-                    m.get(2)
-                        .expect("group 2 participates whenever the pattern matches")
-                        .to_string(),
+                    legacy_lossy(
+                        m.get(1)
+                            .expect("group 1 participates whenever the pattern matches"),
+                    )
+                    .into_owned(),
+                    legacy_lossy(
+                        m.get(2)
+                            .expect("group 2 participates whenever the pattern matches"),
+                    )
+                    .into_owned(),
                 );
             }
 
@@ -470,7 +474,7 @@ impl Command for InitCommand {
         InputOption::new("homepage", None, Some(InputOption::VALUE_REQUIRED), "Homepage of package", None).unwrap().into(),
         InputOption::new6("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
         InputOption::new6("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
-        InputOption::new("stability", Some("s"), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", implode(", ", &base_package::STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>())), None).unwrap().into(),
+        InputOption::new("stability", Some("s"), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", legacy_lossy(&implode(", ", &base_package::STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>()))), None).unwrap().into(),
         InputOption::new("license", Some("l"), Some(InputOption::VALUE_REQUIRED), "License of package", None).unwrap().into(),
         InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None).unwrap().into(),
         InputOption::new("autoload", Some("a"), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None).unwrap().into(),
@@ -530,17 +534,19 @@ impl Command for InitCommand {
         {
             return Err(InvalidArgumentException::new(format!(
                 "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
-                options.get(B("name")).and_then(|v| v.as_string()).unwrap_or_default()
+                options.get(B("name")).and_then(|v| v.as_string()).unwrap_or_default().display_lossy()
             ))
             .into());
         }
 
         if options.contains_key(B("author")) {
-            let author = options
-                .get(B("author"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string();
+            let author = legacy_lossy(
+                options
+                    .get(B("author"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             options.insert(
                 "authors".into(),
                 PhpMixed::List(
@@ -589,7 +595,7 @@ impl Command for InitCommand {
                 .and_then(|v| v.as_list())
                 .map(|l| {
                     l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -617,7 +623,7 @@ impl Command for InitCommand {
                 .and_then(|v| v.as_list())
                 .map(|l| {
                     l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -638,11 +644,13 @@ impl Command for InitCommand {
         // --autoload - create autoload object
         let mut autoload_path: Option<String> = None;
         if options.contains_key(B("autoload")) {
-            let ap = options
-                .get(B("autoload"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string();
+            let ap = legacy_lossy(
+                options
+                    .get(B("autoload"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             autoload_path = Some(ap.clone());
             let name = input
                 .borrow()
@@ -692,7 +700,7 @@ impl Command for InitCommand {
                 );
                 let errors = format!(
                     " - {}",
-                    implode(format!("{} - ", PHP_EOL), json_err.get_errors())
+                    legacy_lossy(&implode(format!("{} - ", PHP_EOL), json_err.get_errors()))
                 );
                 io.write_error3(
                     &format!("{}:{}{}", json_err.get_message(), PHP_EOL, errors),
@@ -918,7 +926,7 @@ impl Command for InitCommand {
 
             let name_default = name.clone();
             let name_for_validate = name.clone();
-            name = io
+            name = legacy_lossy(io
             .ask_and_validate(
                 format!(
                     "Package name (<vendor>/<name>) [<comment>{}</comment>]: ",
@@ -937,7 +945,7 @@ impl Command for InitCommand {
                     ) {
                         return Err(InvalidArgumentException::new(format!(
                             "The package name {} is invalid, it should be lowercase and have a vendor name, a forward slash, and a package name, matching: [a-z0-9_.-]+/[a-z0-9_.-]+",
-                            value.as_string().unwrap_or_default()
+                            value.as_string().unwrap_or_default().display_lossy()
                         ))
                         .into());
                     }
@@ -948,8 +956,7 @@ impl Command for InitCommand {
                 PhpMixed::string(name.clone()),
             )?
             .as_string()
-            .unwrap_or_default()
-            .to_string();
+            .unwrap_or_default()).into_owned();
             input
                 .borrow_mut()
                 .set_option("name", InputValue::String(name));
@@ -1000,7 +1007,7 @@ impl Command for InitCommand {
                 // parse_author_string is stateless (it only delegates to the stateless
                 // is_valid_email), so a fresh InitCommand stands in for `$self` here.
                 Box::new(move |value: PhpMixed| -> anyhow::Result<PhpMixed> {
-                    let value_str = value.as_string().map(|s| s.to_string());
+                    let value_str = value.as_string().map(|s| legacy_lossy(s).into_owned());
                     if value_str.as_deref() == Some("n") || value_str.as_deref() == Some("no") {
                         return Ok(PhpMixed::Null);
                     }
@@ -1048,7 +1055,7 @@ impl Command for InitCommand {
                     {
                         return Err(InvalidArgumentException::new(format!(
                             "Invalid minimum stability \"{}\". Must be empty or one of: {}",
-                            value.as_string().unwrap_or_default(),
+                            value.as_string().unwrap_or_default().display_lossy(),
                             implode(
                                 ", ",
                                 &base_package::STABILITIES
@@ -1056,6 +1063,7 @@ impl Command for InitCommand {
                                     .map(|k| k.to_string())
                                     .collect::<Vec<_>>()
                             )
+                            .display_lossy()
                         ))
                         .into());
                     }
@@ -1131,7 +1139,7 @@ impl Command for InitCommand {
             {
                 return Err(InvalidArgumentException::new(format!(
                     "Invalid license provided: {}. Only SPDX license identifiers (https://spdx.org/licenses/) or \"proprietary\" are accepted.",
-                    license.as_string().unwrap_or_default()
+                    license.as_string().unwrap_or_default().display_lossy()
                 ))
             .into());
             }
@@ -1244,7 +1252,7 @@ impl Command for InitCommand {
                     return Ok(PhpMixed::string(autoload_for_validate.clone()));
                 }
 
-                let value_str = value.as_string().unwrap_or_default().to_string();
+                let value_str = legacy_lossy(value.as_string().unwrap_or_default()).into_owned();
                 if value_str == "n" || value_str == "no" {
                     return Ok(PhpMixed::Null);
                 }

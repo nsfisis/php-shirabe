@@ -130,7 +130,7 @@ impl AutoloadGenerator {
             let installed_json = JsonFile::new(
                 format!(
                     "{}/composer/installed.json",
-                    config.get("vendor-dir").as_string().unwrap_or_default()
+                    legacy_lossy(&config.get("vendor-dir").as_string().unwrap_or_default())
                 ),
                 None,
                 None,
@@ -318,8 +318,11 @@ return array(
                 }
             }
             let exported_prefix = var_export(&PhpMixed::String(namespace.clone()), true);
-            namespaces_file.push_str(&format!("    {} => ", exported_prefix));
-            namespaces_file.push_str(&format!("array({}),\n", implode(", ", &exported_paths)));
+            namespaces_file.push_str(&format!("    {} => ", legacy_lossy(&exported_prefix)));
+            namespaces_file.push_str(&format!(
+                "array({}),\n",
+                legacy_lossy(&implode(", ", &exported_paths))
+            ));
         }
         namespaces_file.push_str(");\n");
 
@@ -341,8 +344,11 @@ return array(
                 }
             }
             let exported_prefix = var_export(&PhpMixed::String(namespace.clone()), true);
-            psr4_file.push_str(&format!("    {} => ", exported_prefix));
-            psr4_file.push_str(&format!("array({}),\n", implode(", ", &exported_paths)));
+            psr4_file.push_str(&format!("    {} => ", legacy_lossy(&exported_prefix)));
+            psr4_file.push_str(&format!(
+                "array({}),\n",
+                legacy_lossy(&implode(", ", &exported_paths))
+            ));
         }
         psr4_file.push_str(");\n");
 
@@ -396,7 +402,9 @@ return array(
         }}
     }}
 "#,
-                base_dir_from_target_dir_code, prefixes, levels
+                legacy_lossy(&base_dir_from_target_dir_code),
+                legacy_lossy(&prefixes),
+                levels
             ));
         }
 
@@ -408,7 +416,7 @@ return array(
         {
             excluded = ex
                 .values()
-                .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                 .collect();
         }
 
@@ -461,13 +469,16 @@ return array(
                         .and_then(|v| v.as_list())
                         .cloned()
                         .unwrap_or_default();
-                    let group_type = group
-                        .get(B("type"))
-                        .and_then(|v| v.as_string())
-                        .unwrap_or_default()
-                        .to_string();
+                    let group_type = legacy_lossy(
+                        group
+                            .get(B("type"))
+                            .and_then(|v| v.as_string())
+                            .unwrap_or_default(),
+                    )
+                    .into_owned();
                     for dir in &paths {
-                        let dir_str = dir.as_string().unwrap_or_default().to_string();
+                        let dir_str =
+                            legacy_lossy(dir.as_string().unwrap_or_default()).into_owned();
                         let joined = format!("{}/{}", base_path.display(), dir_str);
                         let dir_str =
                             filesystem.normalize_path(if filesystem.is_absolute_path(&dir_str) {
@@ -518,24 +529,24 @@ return array(
             if ambiguous_paths.len() > 1 {
                 self.io.write_error(&format!(
                     "<warning>Warning: Ambiguous class resolution, \"{}\" was found {}x: in \"{}\" and \"{}\", the first will be used.</warning>",
-                    class_name,
+                    class_name.display_lossy(),
                     ambiguous_paths.len() + 1,
-                    class_map.get_class_path(class_name)?,
-                    implode("\", \"", ambiguous_paths)
+                    class_map.get_class_path(class_name)?.display_lossy(),
+                    implode("\", \"", ambiguous_paths).display_lossy()
                 ));
             } else {
                 self.io.write_error(&format!(
                     "<warning>Warning: Ambiguous class resolution, \"{}\" was found in both \"{}\" and \"{}\", the first will be used.</warning>",
-                    class_name,
-                    class_map.get_class_path(class_name)?,
-                    implode("\", \"", ambiguous_paths)
+                    class_name.display_lossy(),
+                    class_map.get_class_path(class_name)?.display_lossy(),
+                    implode("\", \"", ambiguous_paths).display_lossy()
                 ));
             }
         }
         if !ambiguous_classes.is_empty() {
             self.io.write_error(&format!(
                 "<info>To resolve ambiguity in classes not under your control you can ignore them by path using <href={}>exclude-from-classmap</>",
-                OutputFormatter::escape("https://getcomposer.org/doc/04-schema.md#exclude-files-from-classmaps")?
+                OutputFormatter::escape("https://getcomposer.org/doc/04-schema.md#exclude-files-from-classmaps")?.display_lossy()
             ));
         }
 
@@ -575,7 +586,7 @@ return array(
             );
             classmap_file.push_str(&format!(
                 "    {} => {}",
-                var_export(&PhpMixed::string(class_name.clone()), true),
+                legacy_lossy(&var_export(&PhpMixed::string(class_name.clone()), true)),
                 path_code
             ));
         }
@@ -589,7 +600,7 @@ return array(
             suffix = config
                 .get("autoloader-suffix")
                 .as_string()
-                .map(|s| s.to_string());
+                .map(|s| legacy_lossy(s).into_owned());
 
             // carry over existing autoload.php's suffix if possible and none is configured
             if suffix.is_none()
@@ -612,12 +623,14 @@ return array(
                 suffix = Some(if let Some(l) = locker {
                     let is_locked = l.borrow_mut().is_locked();
                     if is_locked {
-                        l.borrow_mut()
-                            .get_lock_data()?
-                            .get(B("content-hash"))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_string()
+                        legacy_lossy(
+                            l.borrow_mut()
+                                .get_lock_data()?
+                                .get(B("content-hash"))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        )
+                        .into_owned()
                     } else {
                         legacy_lossy(&bin2hex(random_bytes(16))).into_owned()
                     }
@@ -669,7 +682,7 @@ return array(
             // TODO(bytes): file identifiers are Strings, so non-UTF-8 bytes are replaced.
             files_str_map.insert(
                 k.to_str_lossy().into_owned(),
-                v.as_string().unwrap_or_default().to_string(),
+                legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
             );
         }
         let include_files_file_contents = self.get_include_files_file(
@@ -831,7 +844,7 @@ return array(
         }
 
         if !excluded.is_empty() {
-            Some(format!("{{({})}}", implode("|", &excluded)))
+            Some(format!("{{({})}}", legacy_lossy(&implode("|", &excluded))))
         } else {
             None
         }
@@ -879,7 +892,7 @@ return array(
         if let Some(psr4) = autoload.get(B("psr-4")).and_then(|v| v.as_array()) {
             for (namespace, _dirs) in psr4 {
                 if !namespace.is_empty() && !namespace.ends_with(b"\\") {
-                    return Err(InvalidArgumentException::new(format!("psr-4 namespaces must end with a namespace separator, '{}' does not, use '{}\\'.", namespace, namespace))
+                    return Err(InvalidArgumentException::new(format!("psr-4 namespaces must end with a namespace separator, '{}' does not, use '{}\\'.", namespace.display_lossy(), namespace.display_lossy()))
                     .into());
                 }
             }
@@ -901,7 +914,7 @@ return array(
                 .as_list()
                 .map(|l| {
                     l.iter()
-                        .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                        .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
@@ -962,10 +975,10 @@ return array(
                     .as_list()
                     .map(|l| {
                         l.iter()
-                            .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                            .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                             .collect()
                     })
-                    .or_else(|| path.as_string().map(|s| vec![s.to_string()]))
+                    .or_else(|| path.as_string().map(|s| vec![legacy_lossy(s).into_owned()]))
                     .unwrap_or_default();
                 loader.add(namespace, paths, false);
             }
@@ -979,10 +992,10 @@ return array(
                     .as_list()
                     .map(|l| {
                         l.iter()
-                            .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                            .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                             .collect()
                     })
-                    .or_else(|| path.as_string().map(|s| vec![s.to_string()]))
+                    .or_else(|| path.as_string().map(|s| vec![legacy_lossy(s).into_owned()]))
                     .unwrap_or_default();
                 loader.add_psr4(namespace, paths, false)?;
             }
@@ -996,7 +1009,7 @@ return array(
                 excluded = ex
                     .values()
                     .into_iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                     .collect();
             }
 
@@ -1157,7 +1170,10 @@ return array(
         for (file_identifier, function_file) in &files {
             files_code.push_str(&format!(
                 "    {} => {},\n",
-                var_export(&PhpMixed::string(file_identifier.clone()), true),
+                legacy_lossy(&var_export(
+                    &PhpMixed::string(file_identifier.clone()),
+                    true
+                )),
                 function_file
             ));
         }
@@ -1219,7 +1235,7 @@ return array(
         Ok(format!(
             "{}{}",
             base_dir,
-            var_export(&PhpMixed::string(path), true)
+            legacy_lossy(&var_export(&PhpMixed::string(path), true))
         ))
     }
 
@@ -1290,7 +1306,7 @@ return array(
                     && let Some(matches) =
                         preg_match(php_regex!("{^ext-(.+)$}iD"), link.get_target())
                 {
-                    let ext_key = matches.get(1).unwrap_or_default().to_string();
+                    let ext_key = legacy_lossy(matches.get(1).unwrap_or_default()).into_owned();
                     // skip extension checks if they have a valid provider/replacer
                     if let Some(provided_list) = extension_providers.get(&ext_key) {
                         for provided in provided_list {
@@ -1432,7 +1448,7 @@ if ($missingExtensions) {{
     $issues[] = 'Your Composer dependencies require the following PHP extensions to be installed: ' . implode(', ', $missingExtensions) . '.';
 }}
 "#,
-                required_extensions_str
+                legacy_lossy(&required_extensions_str)
             )
         } else {
             String::new()
@@ -1477,7 +1493,7 @@ if ($issues) {{
         let vendor_path_to_target_dir_code = if last_char == '\'' || last_char == '"' {
             format!(
                 "{}/autoload_real.php{}",
-                substr(vendor_path_to_target_dir_code, 0, Some(-1)),
+                legacy_lossy(&substr(vendor_path_to_target_dir_code, 0, Some(-1))),
                 last_char
             )
         } else {
@@ -1607,7 +1623,7 @@ class ComposerAutoloaderInit{}
             );
             file.push_str(&format!(
                 "        $loader->setApcuPrefix({});\n",
-                apcu_prefix
+                legacy_lossy(&apcu_prefix)
             ));
         }
 
@@ -1694,7 +1710,7 @@ class ComposerStaticInit{}
                 let paths: Vec<String> = if let PhpMixed::List(items) = path.clone() {
                     items
                         .iter()
-                        .map(|i| i.as_string().unwrap_or_default().to_string())
+                        .map(|i| legacy_lossy(i.as_string().unwrap_or_default()).into_owned())
                         .collect()
                 } else {
                     vec![]
@@ -1711,7 +1727,7 @@ class ComposerStaticInit{}
                 let paths: Vec<String> = if let PhpMixed::List(items) = path.clone() {
                     items
                         .iter()
-                        .map(|i| i.as_string().unwrap_or_default().to_string())
+                        .map(|i| legacy_lossy(i.as_string().unwrap_or_default()).into_owned())
                         .collect()
                 } else {
                     vec![]
@@ -1732,7 +1748,7 @@ class ComposerStaticInit{}
                 .map(|(k, v)| {
                     (
                         k.to_str_lossy().into_owned(),
-                        v.as_string().unwrap_or_default().to_string(),
+                        legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
                     )
                 })
                 .collect();
@@ -1743,103 +1759,111 @@ class ComposerStaticInit{}
 
         let vendor_path_code = format!(
             " => {} . '/",
-            filesystem.find_shortest_path_code(
-                realpath(target_dir)
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                    .unwrap_or_default(),
-                vendor_path,
-                true,
-                true,
-                false,
-            )?
+            legacy_lossy(
+                &filesystem.find_shortest_path_code(
+                    realpath(target_dir)
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default(),
+                    vendor_path,
+                    true,
+                    true,
+                    false,
+                )?
+            )
         );
         let vendor_phar_path_code = format!(
             " => 'phar://' . {} . '/",
-            filesystem.find_shortest_path_code(
-                realpath(target_dir)
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                    .unwrap_or_default(),
-                vendor_path,
-                true,
-                true,
-                false,
-            )?
+            legacy_lossy(
+                &filesystem.find_shortest_path_code(
+                    realpath(target_dir)
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default(),
+                    vendor_path,
+                    true,
+                    true,
+                    false,
+                )?
+            )
         );
         let app_base_dir_code = format!(
             " => {} . '/",
-            filesystem.find_shortest_path_code(
-                realpath(target_dir)
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                    .unwrap_or_default(),
-                base_path,
-                true,
-                true,
-                false,
-            )?
+            legacy_lossy(
+                &filesystem.find_shortest_path_code(
+                    realpath(target_dir)
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default(),
+                    base_path,
+                    true,
+                    true,
+                    false,
+                )?
+            )
         );
         let app_base_dir_phar_code = format!(
             " => 'phar://' . {} . '/",
-            filesystem.find_shortest_path_code(
-                realpath(target_dir)
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                    .unwrap_or_default(),
-                base_path,
-                true,
-                true,
-                false,
-            )?
+            legacy_lossy(
+                &filesystem.find_shortest_path_code(
+                    realpath(target_dir)
+                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+                        .unwrap_or_default(),
+                    base_path,
+                    true,
+                    true,
+                    false,
+                )?
+            )
         );
 
         // PHP: ' => ' . substr(var_export(rtrim($vendorDir, '\\/') . '/', true), 0, -1)
         let absolute_vendor_path_code = format!(
             " => {}",
-            substr(
+            legacy_lossy(&substr(
                 var_export(
-                    &PhpMixed::string(format!("{}/", rtrim2(vendor_path, "\\/"))),
+                    &PhpMixed::string(bconcat!(rtrim2(vendor_path, "\\/"), "/")),
                     true
                 ),
                 0,
                 Some(-1),
-            )
+            ))
         );
         let absolute_vendor_phar_path_code = format!(
             " => {}",
-            substr(
+            legacy_lossy(&substr(
                 var_export(
-                    &PhpMixed::string(format!(
-                        "{}/",
-                        rtrim2(format!("phar://{}", vendor_path), "\\/")
+                    &PhpMixed::string(bconcat!(
+                        rtrim2(format!("phar://{}", vendor_path), "\\/"),
+                        "/"
                     )),
                     true
                 ),
                 0,
                 Some(-1),
-            )
+            ))
         );
         let absolute_app_base_dir_code = format!(
             " => {}",
-            substr(
+            legacy_lossy(&substr(
                 var_export(
-                    &PhpMixed::string(format!("{}/", rtrim2(base_path, "\\/"))),
+                    &PhpMixed::string(bconcat!(rtrim2(base_path, "\\/"), "/")),
                     true
                 ),
                 0,
                 Some(-1),
-            )
+            ))
         );
         let absolute_app_base_dir_phar_code = format!(
             " => {}",
-            substr(
+            legacy_lossy(&substr(
                 var_export(
-                    &PhpMixed::string(format!(
-                        "{}/",
-                        rtrim2(format!("phar://{}", base_path), "\\/")
+                    &PhpMixed::string(bconcat!(
+                        rtrim2(format!("phar://{}", base_path), "\\/"),
+                        "/"
                     )),
                     true
                 ),
                 0,
                 Some(-1),
-            )
+            ))
         );
 
         let mut initializer = String::new();
@@ -1892,13 +1916,15 @@ class ComposerStaticInit{}
 
             file.push_str(&format!(
                 "    public static ${} = {};\n\n",
-                prop.clone(),
+                legacy_lossy(&prop.clone()),
                 value.clone(),
             ));
             if *prop != "files" {
                 initializer.push_str(&format!(
                     "            $loader->{} = ComposerStaticInit{}::${};\n",
-                    prop, suffix, prop
+                    legacy_lossy(&prop),
+                    suffix,
+                    legacy_lossy(&prop)
                 ));
             }
         }
@@ -1995,7 +2021,8 @@ class ComposerStaticInit{}
                     other => vec![other.clone()],
                 };
                 for path in path_list {
-                    let mut path_str = path.as_string().unwrap_or_default().to_string();
+                    let mut path_str =
+                        legacy_lossy(path.as_string().unwrap_or_default()).into_owned();
                     if (r#type == "files"
                         || r#type == "classmap"
                         || r#type == "exclude-from-classmap")
@@ -2091,7 +2118,7 @@ class ComposerStaticInit{}
 
                         let resolved_path = realpath(format!(
                             "{}/{}",
-                            install_path_for_resolve,
+                            legacy_lossy(&install_path_for_resolve),
                             updir.clone().unwrap_or_default()
                         ))
                         .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());

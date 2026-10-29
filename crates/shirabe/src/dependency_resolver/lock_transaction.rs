@@ -177,8 +177,9 @@ impl LockTransaction {
                     &preg_replace_callback(
                         php_regex!(r"{(/|sha=)[a-f0-9]{40}(/|$)}i"),
                         |m: &PregMatches| -> anyhow::Result<String> {
-                            let get =
-                                |i: usize| -> String { m.get(i).unwrap_or_default().to_string() };
+                            let get = |i: usize| -> String {
+                                legacy_lossy(m.get(i).unwrap_or_default()).into_owned()
+                            };
                             Ok(format!("{}{}{}", get(1), dist_reference, get(2)))
                         },
                         &package.get_dist_url().unwrap(),

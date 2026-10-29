@@ -115,7 +115,7 @@ impl RootPackageLoader {
                     if name != "__root__" && package_type != "project" {
                         io.warning(&format!(
                             "Shirabe could not detect the root package ({}) version, defaulting to '1.0.0'. See https://getcomposer.org/root-version",
-                            name
+                            legacy_lossy(&name)
                         ), &[]);
                     }
                 }
@@ -195,10 +195,8 @@ impl RootPackageLoader {
                 );
                 references = Self::extract_references(&links, references);
 
-                let package_name = config[B("name")]
-                    .as_string()
-                    .unwrap_or_default()
-                    .to_string();
+                let package_name =
+                    legacy_lossy(config[B("name")].as_string().unwrap_or_default()).into_owned();
                 if links.contains_key(&package_name) {
                     return Err(RuntimeException::new(format!(
                         "Root package '{}' cannot require itself in its composer.json\nDid you accidentally name your root package after an external package?",
@@ -267,8 +265,8 @@ impl RootPackageLoader {
                 php_regex!(r"{(?:^|\| *|, *)([^,\s#|]+)(?:#[^ ]+)? +as +([^,\s|]+)(?:$| *\|| *,)}"),
                 req_version,
             ) {
-                let m1 = m.get(1).unwrap_or_default().to_string();
-                let m2 = m.get(2).unwrap_or_default().to_string();
+                let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
+                let m2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
                 let mut alias = IndexMap::new();
                 alias.insert(
                     "package".to_string(),
@@ -332,7 +330,7 @@ impl RootPackageLoader {
             for constraint in &constraints {
                 if let Some(m) = preg_match(&pattern, constraint) {
                     let name = legacy_lossy(&strtolower(req_name)).into_owned();
-                    let m1 = m.get(1).unwrap_or_default().to_string();
+                    let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
                     let normalized_m1 = VersionParser::normalize_stability(&m1).unwrap_or_default();
                     let stability = stabilities[normalized_m1.as_str()];
 
@@ -386,7 +384,10 @@ impl RootPackageLoader {
                 && VersionParser::parse_stability(&req_version) == "dev"
             {
                 let name = legacy_lossy(&strtolower(req_name)).into_owned();
-                references.insert(name, m.get(1).unwrap_or_default().to_string());
+                references.insert(
+                    name,
+                    legacy_lossy(m.get(1).unwrap_or_default()).into_owned(),
+                );
             }
         }
         references

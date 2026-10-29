@@ -24,12 +24,12 @@ impl PhpFileParser {
                 if !file_exists(fs_path) {
                     message = format!(
                         "File at \"{}\" does not exist, check your classmap definitions",
-                        path
+                        path.display_lossy()
                     );
                 } else if !Self::is_readable(fs_path) {
                     message = format!(
                         "File at \"{}\" is not readable, check its permissions",
-                        path
+                        path.display_lossy()
                     );
                 } else if trim(file_get_contents(fs_path).unwrap_or_default()).is_empty() {
                     // The input file was really empty and thus contains no classes
@@ -37,7 +37,7 @@ impl PhpFileParser {
                 } else {
                     message = format!(
                         "File at \"{}\" could not be parsed as PHP, it may be binary or corrupted",
-                        path
+                        path.display_lossy()
                     );
                 }
 

@@ -4,7 +4,7 @@ use crate::advisory::AnySecurityAdvisory;
 use crate::package::BasePackageHandle;
 use crate::package::version::VersionParser;
 use indexmap::IndexMap;
-use shirabe_php_shim::{CmpOp, STR_PAD_LEFT, str_pad};
+use shirabe_php_shim::{CmpOp, STR_PAD_LEFT, legacy_lossy, str_pad};
 use shirabe_semver::CompilingMatcher;
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use std::fmt;
@@ -201,7 +201,7 @@ impl Pool {
     ) -> Vec<BasePackageHandle> {
         // PHP: $key = (string) $constraint;
         let key = match constraint {
-            Some(c) => c.to_string(),
+            Some(c) => legacy_lossy(&c.to_php_string()).into_owned(),
             None => String::new(),
         };
         if let Some(by_key) = self.provider_cache.get(name)
@@ -345,7 +345,7 @@ impl fmt::Display for Pool {
         for package in &self.packages {
             str.push_str(&format!(
                 "- {}: {}\n",
-                str_pad(package.id().to_string(), 6, " ", STR_PAD_LEFT),
+                legacy_lossy(&str_pad(package.id().to_string(), 6, " ", STR_PAD_LEFT)),
                 package.get_name()
             ));
         }

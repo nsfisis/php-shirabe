@@ -228,7 +228,7 @@ impl Git {
                 php_regex!(r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im"),
                 &output,
             ) {
-                let m3 = m.get(3).unwrap_or_default().to_string();
+                let m3 = legacy_lossy(m.get(3).unwrap_or_default()).into_owned();
                 if !self.io.has_authentication(&m3) {
                     self.io.borrow_mut().set_authentication(
                         m3,
@@ -254,13 +254,13 @@ impl Git {
             let protocols_list: Vec<String> = match &protocols {
                 PhpMixed::List(l) => l
                     .iter()
-                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                     .collect(),
                 _ => vec![],
             };
             for protocol in &protocols_list {
-                let m1 = m.get(1).unwrap_or_default().to_string();
-                let m2 = m.get(2).unwrap_or_default().to_string();
+                let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
+                let m2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
                 let proto_url = if protocol == "ssh" {
                     format!("git@{}:{}", m1, m2)
                 } else {
@@ -279,7 +279,11 @@ impl Git {
                 messages.push(format!(
                     "- {}\n{}",
                     proto_url,
-                    preg_replace(r"#^#m", "  ", self.process.borrow().get_error_output())
+                    legacy_lossy(&preg_replace(
+                        r"#^#m",
+                        "  ",
+                        self.process.borrow().get_error_output()
+                    ))
                 ));
 
                 if initial_clone && let Some(ref orig) = orig_cwd {
@@ -288,14 +292,14 @@ impl Git {
             }
 
             // failed to checkout, first check git accessibility
-            let m1 = m.get(1).unwrap_or_default().to_string();
+            let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
             if !self.io.has_authentication(&m1) && !self.io.is_interactive() {
                 self.throw_exception(
                     &format!(
                         "Failed to clone {} via {} protocols, aborting.\n\n{}",
                         url,
-                        implode(", ", &protocols_list),
-                        implode("\n", &messages)
+                        legacy_lossy(&implode(", ", &protocols_list)),
+                        legacy_lossy(&implode("\n", &messages))
                     ),
                     url,
                 )?;
@@ -306,7 +310,7 @@ impl Git {
         let protocols_list: Vec<String> = match self.config.borrow_mut().get("github-protocols") {
             PhpMixed::List(l) => l
                 .iter()
-                .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                 .collect(),
             _ => vec![],
         };
@@ -334,7 +338,8 @@ impl Git {
                 &mut command_output,
             )
         {
-            let mut error_msg = self.process.borrow().get_error_output().to_string();
+            let mut error_msg =
+                legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
             // private github repository without ssh key access, try https with auth
             let github_matched = preg_match(
                 format!(
@@ -353,8 +358,8 @@ impl Git {
                 )
             });
             if let Some(m) = github_matched {
-                let m1 = m.get(1).unwrap_or_default().to_string();
-                let m2 = m.get(2).unwrap_or_default().to_string();
+                let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
+                let m2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
                 if !self.io.has_authentication(&m1) {
                     let mut git_hub_util = GitHub::new(
                         self.io.clone(),
@@ -384,8 +389,8 @@ impl Git {
                         .unwrap_or_default();
                     let auth_url = format!(
                         "https://{}:{}@{}/{}.git",
-                        rawurlencode(&username),
-                        rawurlencode(&password),
+                        legacy_lossy(&rawurlencode(&username)),
+                        legacy_lossy(&rawurlencode(&password)),
                         m1,
                         m2
                     );
@@ -403,7 +408,8 @@ impl Git {
                         legacy_lossy(&rawurlencode(&username)).into_owned(),
                         legacy_lossy(&rawurlencode(&password)).into_owned(),
                     ];
-                    error_msg = self.process.borrow().get_error_output().to_string();
+                    error_msg =
+                        legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
                 }
             } else if let Some(m) = preg_match(
                 php_regex!(r"{^(https?)://(bitbucket\.org)/(.*?)(?:\.git)?$}i"),
@@ -420,8 +426,9 @@ impl Git {
                     None,
                 )?;
 
-                let domain = m.get(2).unwrap_or_default().to_string();
-                let mut repo_with_git_part = m.get(3).unwrap_or_default().to_string();
+                let domain = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
+                let mut repo_with_git_part =
+                    legacy_lossy(m.get(3).unwrap_or_default()).into_owned();
                 if !repo_with_git_part.ends_with(".git") {
                     repo_with_git_part.push_str(".git");
                 }
@@ -464,8 +471,8 @@ impl Git {
 
                     let auth_url = format!(
                         "https://{}:{}@{}/{}",
-                        rawurlencode(&username),
-                        rawurlencode(&password),
+                        legacy_lossy(&rawurlencode(&username)),
+                        legacy_lossy(&rawurlencode(&password)),
                         domain,
                         repo_with_git_part
                     );
@@ -512,8 +519,8 @@ impl Git {
                         .unwrap_or_default();
                     let auth_url = format!(
                         "https://{}:{}@{}/{}",
-                        rawurlencode(&username),
-                        rawurlencode(&password),
+                        legacy_lossy(&rawurlencode(&username)),
+                        legacy_lossy(&rawurlencode(&password)),
                         domain,
                         repo_with_git_part
                     );
@@ -549,7 +556,7 @@ impl Git {
                     return Ok(());
                 }
 
-                error_msg = self.process.borrow().get_error_output().to_string();
+                error_msg = legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
             } else if let Some(m) = preg_match(
                 format!(
                     "{{^(git)@{}:(.+?\\.git)$}}i",
@@ -566,9 +573,9 @@ impl Git {
                     url,
                 )
             }) {
-                let mut m1 = m.get(1).unwrap_or_default().to_string();
-                let m2 = m.get(2).unwrap_or_default().to_string();
-                let m3 = m.get(3).unwrap_or_default().to_string();
+                let mut m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
+                let m2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
+                let m3 = legacy_lossy(m.get(3).unwrap_or_default()).into_owned();
                 if m1 == "git" {
                     m1 = "https".to_string();
                 }
@@ -611,8 +618,8 @@ impl Git {
                         format!(
                             "{}://{}:{}@{}/{}",
                             m1,
-                            rawurlencode(&password),
-                            rawurlencode(&username),
+                            legacy_lossy(&rawurlencode(&password)),
+                            legacy_lossy(&rawurlencode(&username)),
                             m2,
                             m3
                         ) // swap username and password
@@ -620,8 +627,8 @@ impl Git {
                         format!(
                             "{}://{}:{}@{}/{}",
                             m1,
-                            rawurlencode(&username),
-                            rawurlencode(&password),
+                            legacy_lossy(&rawurlencode(&username)),
+                            legacy_lossy(&rawurlencode(&password)),
                             m2,
                             m3
                         )
@@ -641,13 +648,14 @@ impl Git {
                         legacy_lossy(&rawurlencode(&username)).into_owned(),
                         legacy_lossy(&rawurlencode(&password)).into_owned(),
                     ];
-                    error_msg = self.process.borrow().get_error_output().to_string();
+                    error_msg =
+                        legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
                 }
             } else if let Some(m) = self.get_authentication_failure(url) {
                 // private non-github/gitlab/bitbucket repo that failed to authenticate
-                let m1 = m.get(1).unwrap_or_default().to_string();
-                let mut m2 = m.get(2).unwrap_or_default().to_string();
-                let m3 = m.get(3).unwrap_or_default().to_string();
+                let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
+                let mut m2 = legacy_lossy(m.get(2).unwrap_or_default()).into_owned();
+                let m3 = legacy_lossy(m.get(3).unwrap_or_default()).into_owned();
                 let mut auth_parts: Option<String> = None;
                 if m2.contains("@") {
                     let parts = explode("@", &m2);
@@ -683,7 +691,7 @@ impl Git {
                         io_interface::NORMAL,
                     );
                     self.io.write_error3(
-                        &format!("<warning>{}</warning>", trim(&error_msg)),
+                        &format!("<warning>{}</warning>", trim(&error_msg).display_lossy()),
                         true,
                         io_interface::VERBOSE,
                     );
@@ -698,7 +706,7 @@ impl Git {
                                     .unwrap_or(PhpMixed::Null),
                             )?
                             .as_string()
-                            .map(|s| s.to_string()),
+                            .map(|s| legacy_lossy(s).into_owned()),
                     );
                     auth_map.insert(
                         "password".to_string(),
@@ -723,8 +731,8 @@ impl Git {
                     let auth_url = format!(
                         "{}{}:{}@{}{}",
                         m1,
-                        rawurlencode(&username),
-                        rawurlencode(&password),
+                        legacy_lossy(&rawurlencode(&username)),
+                        legacy_lossy(&rawurlencode(&password)),
                         m2,
                         m3
                     );
@@ -756,7 +764,8 @@ impl Git {
                         legacy_lossy(&rawurlencode(&username)).into_owned(),
                         legacy_lossy(&rawurlencode(&password)).into_owned(),
                     ];
-                    error_msg = self.process.borrow().get_error_output().to_string();
+                    error_msg =
+                        legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
                 }
             }
 
@@ -1116,7 +1125,7 @@ impl Git {
             "fatal: could not read Username",
         ];
 
-        let error_output = self.process.borrow().get_error_output().to_string();
+        let error_output = legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
         for auth_failure in &auth_failures {
             if strpos(&error_output, auth_failure).is_some() {
                 return Some(m);
@@ -1191,7 +1200,9 @@ impl Git {
                 if let Some(matches) =
                     preg_match(php_regex!(r"{^\s*HEAD branch:\s(.+)\s*$}m"), &line)
                 {
-                    return Ok(Some(matches.get(1).unwrap_or_default().to_string()));
+                    return Ok(Some(
+                        legacy_lossy(matches.get(1).unwrap_or_default()).into_owned(),
+                    ));
                 }
             }
 
@@ -1255,24 +1266,24 @@ impl Git {
         let domains: Vec<String> = match config.get("github-domains") {
             PhpMixed::List(l) => l
                 .iter()
-                .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                 .collect(),
             _ => vec![],
         };
         let escaped: Vec<String> = array_map(|s: &String| preg_quote(s, None), &domains);
-        format!("({})", implode("|", &escaped))
+        format!("({})", legacy_lossy(&implode("|", &escaped)))
     }
 
     pub fn get_gitlab_domains_regex(config: &Config) -> String {
         let domains: Vec<String> = match config.get("gitlab-domains") {
             PhpMixed::List(l) => l
                 .iter()
-                .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                 .collect(),
             _ => vec![],
         };
         let escaped: Vec<String> = array_map(|s: &String| preg_quote(s, None), &domains);
-        format!("({})", implode("|", &escaped))
+        format!("({})", legacy_lossy(&implode("|", &escaped)))
     }
 
     fn throw_exception(&mut self, message: &str, url: &str) -> anyhow::Result<()> {
@@ -1289,7 +1300,7 @@ impl Git {
             return Err(RuntimeException::new(Url::sanitize(format!(
                 "Failed to clone {}, git was not found, check that it is installed and in your PATH env.\n\n{}",
                 url,
-                self.process.borrow().get_error_output()
+                self.process.borrow().get_error_output().display_lossy()
             )))
             .into());
         }
@@ -1354,11 +1365,14 @@ impl Git {
             } else if strlen(credential) > 6 {
                 masked_credentials.push(format!(
                     "{}...{}",
-                    substr(credential, 0, Some(3)),
-                    substr(credential, -3, None)
+                    legacy_lossy(&substr(credential, 0, Some(3))),
+                    legacy_lossy(&substr(credential, -3, None))
                 ));
             } else if strlen(credential) > 3 {
-                masked_credentials.push(format!("{}...", substr(credential, 0, Some(3))));
+                masked_credentials.push(format!(
+                    "{}...",
+                    legacy_lossy(&substr(credential, 0, Some(3)))
+                ));
             } else {
                 masked_credentials.push("XXX".to_string());
             }

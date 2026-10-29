@@ -225,7 +225,7 @@ impl JsonFile {
             if mkdir(path_from_bytes(&dir), 0o777, true).is_err() {
                 return Err(UnexpectedValueException::new(format!(
                     "{} does not exist and could not be created.",
-                    dir
+                    dir.display_lossy()
                 ))
                 .into());
             }

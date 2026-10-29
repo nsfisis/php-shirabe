@@ -13,7 +13,9 @@ use crate::repository::{
 use crate::util::PackageInfo;
 use bstr::{B, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, UnexpectedValueException};
+use shirabe_php_shim::{
+    InvalidArgumentException, PhpMixed, UnexpectedValueException, legacy_lossy,
+};
 use shirabe_semver::constraint::{AnyConstraint, Bound};
 use shirabe_symfony_console::formatter::{OutputFormatter, OutputFormatterStyle};
 use shirabe_symfony_console::input::InputInterface;
@@ -179,10 +181,9 @@ pub trait BaseDependencyCommand: BaseCommand {
                     let parser = VersionParser::new();
                     let platform_constraint = parser.parse_constraints(&text_constraint)?;
                     if platform_constraint.get_lower_bound() != Bound::zero() {
-                        let version = platform_constraint
-                            .get_lower_bound()
-                            .get_version()
-                            .to_string();
+                        let version =
+                            legacy_lossy(platform_constraint.get_lower_bound().get_version())
+                                .into_owned();
                         let temp_platform_pkg =
                             Package::new(needle.clone(), version.clone(), version);
                         installed_repo.add_repository(
@@ -366,7 +367,10 @@ pub trait BaseDependencyCommand: BaseCommand {
                 let name_with_link = match &package_url {
                     Some(url) => format!(
                         "<href={}>{}</>",
-                        OutputFormatter::escape(url).expect("OutputFormatter::escape never fails"),
+                        legacy_lossy(
+                            &OutputFormatter::escape(url)
+                                .expect("OutputFormatter::escape never fails")
+                        ),
                         package.get_pretty_name()
                     ),
                     None => package.get_pretty_name().to_string(),
@@ -432,7 +436,9 @@ pub trait BaseDependencyCommand: BaseCommand {
             let name_with_link = match &package_url {
                 Some(url) => format!(
                     "<href={}>{}</>",
-                    OutputFormatter::escape(url).expect("OutputFormatter::escape never fails"),
+                    legacy_lossy(
+                        &OutputFormatter::escape(url).expect("OutputFormatter::escape never fails")
+                    ),
                     package.get_pretty_name()
                 ),
                 None => package.get_pretty_name().to_string(),

@@ -616,14 +616,18 @@ fn test_funding_format() {
                     .map(|entry| {
                         let m = entry.as_array().unwrap();
                         (
-                            m.get(B("type"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                                .to_string(),
-                            m.get(B("url"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                                .to_string(),
+                            legacy_lossy(
+                                m.get(B("type"))
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default(),
+                            )
+                            .into_owned(),
+                            legacy_lossy(
+                                m.get(B("url"))
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default(),
+                            )
+                            .into_owned(),
                         )
                     })
                     .collect();
@@ -757,12 +761,14 @@ fn test_private_repository_no_interaction() {
         top.insert("config".into(), PhpMixed::Array(config_section));
         config.borrow_mut().merge(&top, Config::SOURCE_UNKNOWN);
     }
-    let resolved_cache_vcs_dir = config
-        .borrow_mut()
-        .get("cache-vcs-dir")
-        .as_string()
-        .unwrap_or_default()
-        .to_string();
+    let resolved_cache_vcs_dir = legacy_lossy(
+        config
+            .borrow_mut()
+            .get("cache-vcs-dir")
+            .as_string()
+            .unwrap_or_default(),
+    )
+    .into_owned();
 
     let (process, _process_guard): (_, ProcessExecutorMockGuard) = get_process_executor_mock(
         vec![

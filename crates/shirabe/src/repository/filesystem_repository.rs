@@ -106,7 +106,7 @@ impl FilesystemRepository {
                         .as_list()
                         .map(|l| {
                             l.iter()
-                                .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                                .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                                 .collect()
                         })
                         .unwrap_or_default();
@@ -366,9 +366,12 @@ impl FilesystemRepository {
         for (key, value) in array {
             lines.push_str(&legacy_lossy(&str_repeat("    ", level as usize)));
             lines.push_str(&if is_php_integer_key(key) {
-                format!("{} => ", key)
+                format!("{} => ", legacy_lossy(&key))
             } else {
-                format!("{} => ", var_export(&PhpMixed::String(key.clone()), true))
+                format!(
+                    "{} => ",
+                    legacy_lossy(&var_export(&PhpMixed::String(key.clone()), true))
+                )
             });
 
             if is_array(value) {
@@ -395,30 +398,36 @@ impl FilesystemRepository {
                     }
                 }
             } else if key == "install_path" && is_string(value) {
-                let s = value.as_string().unwrap_or_default().to_string();
+                let s = legacy_lossy(value.as_string().unwrap_or_default()).into_owned();
                 if self.filesystem.borrow_mut().is_absolute_path(&s) {
-                    lines.push_str(&format!("{},\n", var_export(&PhpMixed::string(s), true)));
+                    lines.push_str(&format!(
+                        "{},\n",
+                        legacy_lossy(&var_export(&PhpMixed::string(s), true))
+                    ));
                 } else {
                     lines.push_str(&format!(
                         "__DIR__ . {},\n",
-                        var_export(&PhpMixed::string(format!("/{}", s)), true),
+                        legacy_lossy(&var_export(&PhpMixed::string(format!("/{}", s)), true)),
                     ));
                 }
             } else if is_string(value) {
-                lines.push_str(&format!("{},\n", var_export(value, true)));
+                lines.push_str(&format!("{},\n", legacy_lossy(&var_export(value, true))));
             } else if let PhpMixed::Bool(b) = value {
                 lines.push_str(&format!("{},\n", if *b { "true" } else { "false" }));
             } else if is_null(value) {
                 lines.push_str("null,\n");
             } else {
                 // PHP: throw new \UnexpectedValueException('Unexpected type '.get_debug_type($value));
-                panic!("{}", format!("Unexpected type {}", get_debug_type(value)));
+                panic!(
+                    "{}",
+                    format!("Unexpected type {}", legacy_lossy(&get_debug_type(value)))
+                );
             }
         }
 
         lines.push_str(&format!(
             "{}){}",
-            str_repeat("    ", (level - 1) as usize),
+            legacy_lossy(&str_repeat("    ", (level - 1) as usize)),
             if (level - 1) == 0 { "" } else { ",\n" },
         ));
 

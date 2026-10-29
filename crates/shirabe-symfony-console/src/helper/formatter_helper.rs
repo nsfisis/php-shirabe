@@ -28,9 +28,9 @@ impl FormatterHelper {
         for message in &messages {
             let message = OutputFormatter::escape(message).unwrap();
             lines.push(if large {
-                format!("  {}  ", message)
+                format!("  {}  ", legacy_lossy(&message))
             } else {
-                format!(" {} ", message)
+                format!(" {} ", legacy_lossy(&message))
             });
             len = std::cmp::max(Helper::width(&message) + (if large { 4 } else { 2 }), len);
         }
@@ -45,7 +45,7 @@ impl FormatterHelper {
             messages.push(format!(
                 "{}{}",
                 lines[i],
-                str_repeat(" ", (len - Helper::width(&lines[i])) as usize)
+                " ".repeat((len - Helper::width(&lines[i])) as usize)
             ));
             i += 1;
         }
@@ -70,7 +70,11 @@ impl FormatterHelper {
             return message.to_string();
         }
 
-        format!("{}{}", Helper::substr(message, 0, Some(length)), suffix)
+        format!(
+            "{}{}",
+            legacy_lossy(&Helper::substr(message, 0, Some(length))),
+            suffix
+        )
     }
 }
 

@@ -28,7 +28,7 @@ use shirabe::script::{Event as ScriptEvent, ScriptEvents};
 use shirabe::util::platform::Platform;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
 use shirabe_class_map_generator::class_map::ClassMap;
-use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, RuntimeException, getenv};
+use shirabe_php_shim::{Catch as _, PHP_EOL, PhpMixed, RuntimeException, getenv, legacy_lossy};
 use shirabe_symfony_console::output::output_interface;
 
 fn tear_down() {
@@ -276,7 +276,7 @@ fn test_recursion_in_scripts_names() {
     let (process, _process_guard) = get_process_executor_mock(
         vec![cmd(format!(
             "echo Hello {}",
-            ProcessExecutor::escape("World")
+            legacy_lossy(&ProcessExecutor::escape("World"))
         ))],
         true,
         MockHandler::default(),
@@ -309,7 +309,7 @@ fn test_recursion_in_scripts_names() {
     let expected = format!(
         "> helloWorld: @hello World{eol}> hello: echo Hello {world}{eol}",
         eol = PHP_EOL,
-        world = ProcessExecutor::escape("World"),
+        world = legacy_lossy(&ProcessExecutor::escape("World")),
     );
     assert_eq!(expected, io.borrow().get_output());
 }
@@ -858,9 +858,9 @@ fn test_dispatcher_support_for_additional_args() {
 
     let args = format!(
         "{} {} {}",
-        ProcessExecutor::escape("ARG"),
-        ProcessExecutor::escape("ARG2"),
-        ProcessExecutor::escape("--arg"),
+        legacy_lossy(&ProcessExecutor::escape("ARG")),
+        legacy_lossy(&ProcessExecutor::escape("ARG2")),
+        legacy_lossy(&ProcessExecutor::escape("--arg")),
     );
 
     let (process, _process_guard) = get_process_executor_mock(
@@ -991,8 +991,8 @@ fn test_dispatcher_runs_composer_scripts_through_the_running_binary() {
 
     let (process, _process_guard) = get_process_executor_mock(
         vec![
-            cmd(format!("{} install --no-dev", binary)),
-            cmd(format!("{} update", binary)),
+            cmd(format!("{} install --no-dev", legacy_lossy(&binary))),
+            cmd(format!("{} update", legacy_lossy(&binary))),
         ],
         true,
         MockHandler::default(),

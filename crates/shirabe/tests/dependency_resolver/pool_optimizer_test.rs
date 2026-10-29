@@ -79,7 +79,7 @@ fn read_test_file(file: &str, fixtures_dir: &str) -> IndexMap<String, String> {
                 panic!(
                     "The test file \"{}\" must not contain a section named \"{}\".",
                     file.replace(&format!("{}/", fixtures_dir), ""),
-                    token
+                    token.display_lossy()
                 );
             }
             section = Some(legacy_lossy(&token).into_owned());

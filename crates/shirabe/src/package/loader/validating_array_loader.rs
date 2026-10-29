@@ -107,7 +107,7 @@ impl ValidatingArrayLoader {
                 return Some(format!(
                     "{} is invalid, it should not contain uppercase characters. Please use {} instead.",
                     name,
-                    strtolower(name)
+                    strtolower(name).display_lossy()
                 ));
             }
 
@@ -120,7 +120,8 @@ impl ValidatingArrayLoader {
 
             return Some(format!(
                 "{} is invalid, it should not contain uppercase characters. We suggest using {} instead.",
-                name, suggest_name
+                name,
+                suggest_name.display_lossy()
             ));
         }
 
@@ -132,10 +133,12 @@ impl ValidatingArrayLoader {
             return false;
         }
 
-        let value = self.config.borrow()[B(property)]
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let value = legacy_lossy(
+            self.config.borrow()[B(property)]
+                .as_string()
+                .unwrap_or_default(),
+        )
+        .into_owned();
         if !preg_is_match(format!("{{^{}$}}u", regex), &value) {
             let message = format!(
                 "{} : invalid value ({}), must match {}",
@@ -161,7 +164,7 @@ impl ValidatingArrayLoader {
             self.errors.borrow_mut().push(format!(
                 "{} : should be a string, {} given",
                 property,
-                get_debug_type(&self.config.borrow()[B(property)])
+                get_debug_type(&self.config.borrow()[B(property)]).display_lossy()
             ));
             self.config.borrow_mut().shift_remove(B(property));
 
@@ -197,7 +200,7 @@ impl ValidatingArrayLoader {
             self.errors.borrow_mut().push(format!(
                 "{} : should be an array, {} given",
                 property,
-                get_debug_type(&self.config.borrow()[B(property)])
+                get_debug_type(&self.config.borrow()[B(property)]).display_lossy()
             ));
             self.config.borrow_mut().shift_remove(B(property));
 
@@ -241,8 +244,8 @@ impl ValidatingArrayLoader {
                 self.errors.borrow_mut().push(format!(
                     "{}.{} : must be a string or int, {} given",
                     property,
-                    key,
-                    get_debug_type(&value)
+                    key.display_lossy(),
+                    get_debug_type(&value).display_lossy()
                 ));
                 if let Some(PhpMixed::Array(arr)) = self.config.borrow_mut().get_mut(B(property)) {
                     arr.shift_remove(B(&key));
@@ -257,7 +260,10 @@ impl ValidatingArrayLoader {
                 if !preg_is_match(format!("{{^{}$}}u", regex_str), &value_str) {
                     self.warnings.borrow_mut().push(format!(
                         "{}.{} : invalid value ({}), must match {}",
-                        property, key, value_str, regex_str
+                        property,
+                        key.display_lossy(),
+                        value_str.display_lossy(),
+                        regex_str
                     ));
                     if let Some(PhpMixed::Array(arr)) =
                         self.config.borrow_mut().get_mut(B(property))
@@ -277,10 +283,12 @@ impl ValidatingArrayLoader {
             return false;
         }
 
-        let value = self.config.borrow()[B(property)]
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let value = legacy_lossy(
+            self.config.borrow()[B(property)]
+                .as_string()
+                .unwrap_or_default(),
+        )
+        .into_owned();
         if !self.filter_url(&value, &["http", "https"]) {
             self.warnings.borrow_mut().push(format!(
                 "{} : invalid value ({}), must be an http/https URL",
@@ -364,13 +372,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                         PhpMixed::string(php_to_string(&version_val)),
                     );
                 }
-                let version_str = self
-                    .config
-                    .borrow()
-                    .get(B("version"))
-                    .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_string();
+                let version_str = legacy_lossy(
+                    self.config
+                        .borrow()
+                        .get(B("version"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default(),
+                )
+                .into_owned();
                 match self.version_parser.normalize(&version_str, None) {
                     Ok(_) => {}
                     Err(e) => {
@@ -406,17 +415,20 @@ impl LoaderInterface for ValidatingArrayLoader {
                 if !is_string(platform) {
                     self.errors.borrow_mut().push(format!(
                         "config.platform.{} : invalid value ({} {}): expected string or false",
-                        key,
-                        get_debug_type(platform),
-                        var_export(platform, true)
+                        key.display_lossy(),
+                        get_debug_type(platform).display_lossy(),
+                        var_export(platform, true).display_lossy()
                     ));
                     continue;
                 }
-                let platform_str = platform.as_string().unwrap_or_default().to_string();
+                let platform_str =
+                    legacy_lossy(platform.as_string().unwrap_or_default()).into_owned();
                 if let Err(e) = self.version_parser.normalize(&platform_str, None) {
                     self.errors.borrow_mut().push(format!(
                         "config.platform.{} : invalid value ({}): {}",
-                        key, platform_str, e
+                        key.display_lossy(),
+                        platform_str,
+                        e
                     ));
                 }
             }
@@ -442,10 +454,12 @@ impl LoaderInterface for ValidatingArrayLoader {
         let mut release_date: Option<chrono::DateTime<chrono::Utc>> = None;
         self.validate_string("time", false);
         if self.config.borrow().contains_key(B("time")) {
-            let time_str = self.config.borrow()[B("time")]
-                .as_string()
-                .unwrap_or_default()
-                .to_string();
+            let time_str = legacy_lossy(
+                self.config.borrow()[B("time")]
+                    .as_string()
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             match date_create::<chrono::Utc>(&time_str) {
                 Ok(dt) => {
                     release_date = Some(dt);
@@ -496,7 +510,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                 if release_date.is_none() || release_date.unwrap().timestamp() >= cutoff {
                     let license_validator = SpdxLicenses::new();
                     for license in licenses.values() {
-                        let license_str = license.as_string().unwrap_or_default().to_string();
+                        let license_str =
+                            legacy_lossy(license.as_string().unwrap_or_default()).into_owned();
                         // replace proprietary by MIT for validation purposes since it's not a valid SPDX identifier, but is accepted by composer
                         if license_str == "proprietary" {
                             continue;
@@ -554,8 +569,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                 if !is_array(&author) {
                     self.errors.borrow_mut().push(format!(
                         "authors.{} : should be an array, {} given",
-                        key,
-                        get_debug_type(&author)
+                        key.display_lossy(),
+                        get_debug_type(&author).display_lossy()
                     ));
                     if let Some(PhpMixed::Array(m)) = self.config.borrow_mut().get_mut(B("authors"))
                     {
@@ -573,7 +588,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                     {
                         self.errors.borrow_mut().push(format!(
                             "authors.{}.{} : invalid value, must be a string",
-                            key, author_data
+                            key.display_lossy(),
+                            author_data
                         ));
                         if let Some(PhpMixed::Array(authors)) =
                             self.config.borrow_mut().get_mut(B("authors"))
@@ -588,13 +604,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .as_array()
                     .and_then(|m| m.get(B("homepage")))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string());
+                    .map(|s| legacy_lossy(s).into_owned());
                 if let Some(homepage_str) = homepage
                     && !self.filter_url(&homepage_str, &["http", "https"])
                 {
                     self.warnings.borrow_mut().push(format!(
                         "authors.{}.homepage : invalid value ({}), must be an http/https URL",
-                        key, homepage_str
+                        key.display_lossy(),
+                        homepage_str
                     ));
                     if let Some(PhpMixed::Array(authors)) =
                         self.config.borrow_mut().get_mut(B("authors"))
@@ -608,13 +625,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .as_array()
                     .and_then(|m| m.get(B("email")))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string());
+                    .map(|s| legacy_lossy(s).into_owned());
                 if let Some(email_str) = email
                     && !filter_var_email(&email_str)
                 {
                     self.warnings.borrow_mut().push(format!(
                         "authors.{}.email : invalid value ({}), must be a valid email address",
-                        key, email_str
+                        key.display_lossy(),
+                        email_str
                     ));
                     if let Some(PhpMixed::Array(authors)) =
                         self.config.borrow_mut().get_mut(B("authors"))
@@ -687,7 +705,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 .and_then(|v| v.as_array())
                 .and_then(|m| m.get(B("email")))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string());
+                .map(|s| legacy_lossy(s).into_owned());
             if let Some(email_str) = support_email
                 && !filter_var_email(&email_str)
             {
@@ -709,7 +727,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 .and_then(|v| v.as_array())
                 .and_then(|m| m.get(B("irc")))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string());
+                .map(|s| legacy_lossy(s).into_owned());
             if let Some(irc_str) = support_irc
                 && !self.filter_url(&irc_str, &["irc", "ircs"])
             {
@@ -734,7 +752,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .and_then(|v| v.as_array())
                     .and_then(|m| m.get(B(key)))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string());
+                    .map(|s| legacy_lossy(s).into_owned());
                 if let Some(url_str) = url_opt
                     && !self.filter_url(&url_str, &["http", "https"])
                 {
@@ -770,8 +788,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                 if !is_array(&funding_option) {
                     self.errors.borrow_mut().push(format!(
                         "funding.{} : should be an array, {} given",
-                        key,
-                        get_debug_type(&funding_option)
+                        key.display_lossy(),
+                        get_debug_type(&funding_option).display_lossy()
                     ));
                     if let Some(PhpMixed::Array(funding)) =
                         self.config.borrow_mut().get_mut(B("funding"))
@@ -790,7 +808,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                     {
                         self.errors.borrow_mut().push(format!(
                             "funding.{}.{} : invalid value, must be a string",
-                            key, funding_data
+                            key.display_lossy(),
+                            funding_data
                         ));
                         if let Some(PhpMixed::Array(funding)) =
                             self.config.borrow_mut().get_mut(B("funding"))
@@ -805,13 +824,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .as_array()
                     .and_then(|m| m.get(B("url")))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string());
+                    .map(|s| legacy_lossy(s).into_owned());
                 if let Some(url_str) = url
                     && !self.filter_url(&url_str, &["http", "https"])
                 {
                     self.warnings.borrow_mut().push(format!(
                         "funding.{}.url : invalid value ({}), must be an http/https URL",
-                        key, url_str
+                        key.display_lossy(),
+                        url_str
                     ));
                     if let Some(PhpMixed::Array(funding)) =
                         self.config.borrow_mut().get_mut(B("funding"))
@@ -844,13 +864,14 @@ impl LoaderInterface for ValidatingArrayLoader {
 
         if self.config.borrow().contains_key(B("php-ext")) && self.validate_array("php-ext", false)
         {
-            let pkg_type = self
-                .config
-                .borrow()
-                .get(B("type"))
-                .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_string();
+            let pkg_type = legacy_lossy(
+                self.config
+                    .borrow()
+                    .get(B("type"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             if !["php-ext", "php-ext-zend"].contains(&pkg_type.as_str()) {
                 self.errors.borrow_mut().push(
                     "php-ext can only be set by packages of type \"php-ext\" or \"php-ext-zend\" which must be C extensions".to_string()
@@ -870,7 +891,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 {
                     self.errors.borrow_mut().push(format!(
                         "php-ext.extension-name : should be a string, {} given",
-                        get_debug_type(&v)
+                        get_debug_type(&v).display_lossy()
                     ));
                     php_ext.shift_remove(B("extension-name"));
                 }
@@ -880,7 +901,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 {
                     self.errors.borrow_mut().push(format!(
                         "php-ext.priority : should be an integer, {} given",
-                        get_debug_type(&v)
+                        get_debug_type(&v).display_lossy()
                     ));
                     php_ext.shift_remove(B("priority"));
                 }
@@ -890,7 +911,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 {
                     self.errors.borrow_mut().push(format!(
                         "php-ext.support-zts : should be a boolean, {} given",
-                        get_debug_type(&v)
+                        get_debug_type(&v).display_lossy()
                     ));
                     php_ext.shift_remove(B("support-zts"));
                 }
@@ -900,7 +921,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 {
                     self.errors.borrow_mut().push(format!(
                         "php-ext.support-nts : should be a boolean, {} given",
-                        get_debug_type(&v)
+                        get_debug_type(&v).display_lossy()
                     ));
                     php_ext.shift_remove(B("support-nts"));
                 }
@@ -911,7 +932,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 {
                     self.errors.borrow_mut().push(format!(
                         "php-ext.build-path : should be a string or null, {} given",
-                        get_debug_type(&v)
+                        get_debug_type(&v).display_lossy()
                     ));
                     php_ext.shift_remove(B("build-path"));
                 }
@@ -921,7 +942,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     if !is_array(&v) && !is_string(&v) {
                         self.errors.borrow_mut().push(format!(
                             "php-ext.download-url-method : should be an array or a string, {} given",
-                            get_debug_type(&v)
+                            get_debug_type(&v).display_lossy()
                         ));
                         php_ext.shift_remove(B("download-url-method"));
                     } else {
@@ -950,8 +971,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                                 if !is_string(download_url_method) {
                                     self.errors.borrow_mut().push(format!(
                                         "php-ext.download-url-method.{} : should be a string, {} given",
-                                        key,
-                                        get_debug_type(download_url_method)
+                                        key.display_lossy(),
+                                        get_debug_type(download_url_method).display_lossy()
                                     ));
                                     php_ext.shift_remove(B("download-url-method"));
                                 } else if !valid_download_url_methods.contains(
@@ -962,8 +983,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                                 ) {
                                     self.errors.borrow_mut().push(format!(
                                         "php-ext.download-url-method.{} : invalid value ({}), must be one of {}",
-                                        key,
-                                        download_url_method.as_string().unwrap_or_default(),
+                                        key.display_lossy(),
+                                        download_url_method.as_string().unwrap_or_default().display_lossy(),
                                         valid_download_url_methods.join(", ")
                                     ));
                                     php_ext.shift_remove(B("download-url-method"));
@@ -992,7 +1013,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                                 self.errors.borrow_mut().push(format!(
                                     "php-ext.{} : should be an array, {} given",
                                     field_name,
-                                    get_debug_type(&field_val)
+                                    get_debug_type(&field_val).display_lossy()
                                 ));
                                 php_ext.shift_remove(B(field_name));
                             } else if field_val.as_array().unwrap().is_empty() {
@@ -1010,8 +1031,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                                         self.errors.borrow_mut().push(format!(
                                             "php-ext.{}.{} : should be a string, {} given",
                                             field_name,
-                                            key,
-                                            get_debug_type(&os_family)
+                                            key.display_lossy(),
+                                            get_debug_type(&os_family).display_lossy()
                                         ));
                                         if let Some(PhpMixed::Array(arr)) =
                                             php_ext.get_mut(B(field_name))
@@ -1024,8 +1045,11 @@ impl LoaderInterface for ValidatingArrayLoader {
                                         self.errors.borrow_mut().push(format!(
                                             "php-ext.{}.{} : invalid value ({}), must be one of {}",
                                             field_name,
-                                            key,
-                                            os_family.as_string().unwrap_or_default(),
+                                            key.display_lossy(),
+                                            os_family
+                                                .as_string()
+                                                .unwrap_or_default()
+                                                .display_lossy(),
                                             valid_os_families.join(", ")
                                         ));
                                         if let Some(PhpMixed::Array(arr)) =
@@ -1053,7 +1077,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     if !is_array(&configure_options) {
                         self.errors.borrow_mut().push(format!(
                             "php-ext.configure-options : should be an array, {} given",
-                            get_debug_type(&configure_options)
+                            get_debug_type(&configure_options).display_lossy()
                         ));
                         php_ext.shift_remove(B("configure-options"));
                     } else {
@@ -1068,8 +1092,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                             if !is_array(&option) {
                                 self.errors.borrow_mut().push(format!(
                                     "php-ext.configure-options.{} : should be an array, {} given",
-                                    key,
-                                    get_debug_type(&option)
+                                    key.display_lossy(),
+                                    get_debug_type(&option).display_lossy()
                                 ));
                                 if let Some(PhpMixed::Array(arr)) =
                                     php_ext.get_mut(B("configure-options"))
@@ -1083,7 +1107,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                             if !option_map.contains_key(B("name")) {
                                 self.errors.borrow_mut().push(format!(
                                     "php-ext.configure-options.{}.name : must be present",
-                                    key
+                                    key.display_lossy()
                                 ));
                                 if let Some(PhpMixed::Array(arr)) =
                                     php_ext.get_mut(B("configure-options"))
@@ -1097,8 +1121,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                             if !is_string(&name_val) {
                                 self.errors.borrow_mut().push(format!(
                                     "php-ext.configure-options.{}.name : should be a string, {} given",
-                                    key,
-                                    get_debug_type(&name_val)
+                                    key.display_lossy(),
+                                    get_debug_type(&name_val).display_lossy()
                                 ));
                                 if let Some(PhpMixed::Array(arr)) =
                                     php_ext.get_mut(B("configure-options"))
@@ -1113,8 +1137,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                             {
                                 self.errors.borrow_mut().push(format!(
                                         "php-ext.configure-options.{}.needs-value : should be a boolean, {} given",
-                                        key,
-                                        get_debug_type(&needs_value)
+                                        key.display_lossy(),
+                                        get_debug_type(&needs_value).display_lossy()
                                     ));
                                 if let Some(PhpMixed::Array(co)) =
                                     php_ext.get_mut(B("configure-options"))
@@ -1130,8 +1154,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                             {
                                 self.errors.borrow_mut().push(format!(
                                         "php-ext.configure-options.{}.description : should be a string, {} given",
-                                        key,
-                                        get_debug_type(&description)
+                                        key.display_lossy(),
+                                        get_debug_type(&description).display_lossy()
                                     ));
                                 if let Some(PhpMixed::Array(co)) =
                                     php_ext.get_mut(B("configure-options"))
@@ -1176,7 +1200,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     .cloned()
                     .unwrap_or_default();
                 for (package, constraint) in &link_section {
-                    let package = package.to_string();
+                    let package = legacy_lossy(package).into_owned();
                     let conflicts_with_own_name = self
                         .config
                         .borrow()
@@ -1216,7 +1240,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                             arr.shift_remove(B(&package));
                         }
                     } else if constraint.as_string().unwrap_or_default() != "self.version" {
-                        let constraint_str = constraint.as_string().unwrap_or_default().to_string();
+                        let constraint_str =
+                            legacy_lossy(constraint.as_string().unwrap_or_default()).into_owned();
                         let link_constraint =
                             match self.version_parser.parse_constraints(&constraint_str) {
                                 Ok(c) => c,
@@ -1315,7 +1340,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 if !is_string(description) {
                     self.errors.borrow_mut().push(format!(
                         "suggest.{} : invalid value, must be a string describing why the package is suggested",
-                        package
+                        package.display_lossy()
                     ));
                     if let Some(PhpMixed::Array(arr)) =
                         self.config.borrow_mut().get_mut(B("suggest"))
@@ -1329,10 +1354,12 @@ impl LoaderInterface for ValidatingArrayLoader {
         if self.validate_string("minimum-stability", false)
             && self.config.borrow().contains_key(B("minimum-stability"))
         {
-            let min_stability = self.config.borrow()[B("minimum-stability")]
-                .as_string()
-                .unwrap_or_default()
-                .to_string();
+            let min_stability = legacy_lossy(
+                self.config.borrow()[B("minimum-stability")]
+                    .as_string()
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             if !STABILITIES.contains_key(&*legacy_lossy(&strtolower(&min_stability)))
                 && min_stability != "RC"
             {
@@ -1367,7 +1394,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                 if !types.iter().any(|t| r#type == t) {
                     self.errors.borrow_mut().push(format!(
                         "autoload : invalid value ({}), must be one of {}",
-                        r#type,
+                        r#type.display_lossy(),
                         types.join(", ")
                     ));
                     if let Some(PhpMixed::Array(arr)) =
@@ -1446,7 +1473,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     self.errors.borrow_mut().push(format!(
                         "{}.type : should be a string, {} given",
                         src_type,
-                        get_debug_type(type_val)
+                        get_debug_type(type_val).display_lossy()
                     ));
                 }
                 if let Some(url_val) = section.get(B("url")).filter(|_| isset("url"))
@@ -1455,7 +1482,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     self.errors.borrow_mut().push(format!(
                         "{}.url : should be a string, {} given",
                         src_type,
-                        get_debug_type(url_val)
+                        get_debug_type(url_val).display_lossy()
                     ));
                 }
                 if let Some(ref_val) = section.get(B("reference")).filter(|_| isset("reference"))
@@ -1465,7 +1492,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     self.errors.borrow_mut().push(format!(
                         "{}.reference : should be a string or int, {} given",
                         src_type,
-                        get_debug_type(ref_val)
+                        get_debug_type(ref_val).display_lossy()
                     ));
                 }
                 if let Some(ref_val) = section.get(B("reference")).filter(|_| isset("reference")) {
@@ -1473,7 +1500,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                     if preg_is_match(php_regex!("{^\\s*-}"), &ref_str) {
                         self.errors.borrow_mut().push(format!(
                             "{}.reference : must not start with a \"-\", \"{}\" given",
-                            src_type, ref_str
+                            src_type,
+                            ref_str.display_lossy()
                         ));
                     }
                 }
@@ -1482,7 +1510,8 @@ impl LoaderInterface for ValidatingArrayLoader {
                     if preg_is_match(php_regex!("{^\\s*-}"), &url_str) {
                         self.errors.borrow_mut().push(format!(
                             "{}.url : must not start with a \"-\", \"{}\" given",
-                            src_type, url_str
+                            src_type,
+                            url_str.display_lossy()
                         ));
                     }
                 }
@@ -1516,9 +1545,9 @@ impl LoaderInterface for ValidatingArrayLoader {
                     if !is_string(target_branch) {
                         self.warnings.borrow_mut().push(format!(
                             "extra.branch-alias.{} : the target branch ({}) must be a string, \"{}\" received.",
-                            source_branch,
+                            source_branch.display_lossy(),
                             json_encode(target_branch).unwrap_or_default(),
-                            get_debug_type(target_branch)
+                            get_debug_type(target_branch).display_lossy()
                         ));
                         if let Some(PhpMixed::Array(extra)) =
                             self.config.borrow_mut().get_mut(B("extra"))
@@ -1531,13 +1560,14 @@ impl LoaderInterface for ValidatingArrayLoader {
                     }
 
                     let target_branch_str =
-                        target_branch.as_string().unwrap_or_default().to_string();
+                        legacy_lossy(target_branch.as_string().unwrap_or_default()).into_owned();
 
                     // ensure it is an alias to a -dev package
                     if substr(&target_branch_str, -4, None) != "-dev" {
                         self.warnings.borrow_mut().push(format!(
                             "extra.branch-alias.{} : the target branch ({}) must end in -dev",
-                            source_branch, target_branch_str
+                            source_branch.display_lossy(),
+                            target_branch_str
                         ));
                         if let Some(PhpMixed::Array(extra)) =
                             self.config.borrow_mut().get_mut(B("extra"))
@@ -1560,7 +1590,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     if substr(&validated_target_branch, -4, None) != "-dev" {
                         self.warnings.borrow_mut().push(format!(
                             "extra.branch-alias.{} : the target branch ({}) must be a parseable number like 2.0-dev",
-                            source_branch, target_branch_str
+                            source_branch.display_lossy(), target_branch_str
                         ));
                         if let Some(PhpMixed::Array(extra)) =
                             self.config.borrow_mut().get_mut(B("extra"))
@@ -1586,7 +1616,7 @@ impl LoaderInterface for ValidatingArrayLoader {
                     {
                         self.warnings.borrow_mut().push(format!(
                                 "extra.branch-alias.{} : the target branch ({}) is not a valid numeric alias for this version",
-                                source_branch, target_branch_str
+                                source_branch.display_lossy(), target_branch_str
                             ));
                         if let Some(PhpMixed::Array(extra)) =
                             self.config.borrow_mut().get_mut(B("extra"))

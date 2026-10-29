@@ -45,9 +45,20 @@ Boundaries with Rust APIs that take text:
 PHP's `.` operator and string interpolation map to `bconcat!`, and `sprintf()` to the shim's
 `sprintf()`. Both keep the bytes of their operands.
 
-`format!` (and `Display` of `BStr`/`Path`) replaces invalid UTF-8 with U+FFFD. That is acceptable for
-messages read by people (errors, warnings, progress), but not for text read by machines:
-`composer.json` and `composer.lock`, the files generated under `vendor/composer/` (`installed.json`,
-`installed.php`, `autoload_*.php`, ...), caches, subprocess arguments and input, HTTP requests,
-values passed to plugins, and values printed to stdout for other programs (`--format=json`,
-`config <key>`, paths). Build those with `bconcat!` or `sprintf()`.
+`format!` produces a `String`, so formatting bytes into it replaces invalid UTF-8 with U+FFFD. That
+is acceptable for messages read by people (errors, warnings, progress), but not for text read by
+machines: `composer.json` and `composer.lock`, the files generated under `vendor/composer/`
+(`installed.json`, `installed.php`, `autoload_*.php`, ...), caches, subprocess arguments and input,
+HTTP requests, values passed to plugins, and values printed to stdout for other programs
+(`--format=json`, `config <key>`, paths). Build those with `bconcat!` or `sprintf()`.
+
+The workspace patches bstr with a fork that removes `Display` from `BStr` and `BString`, so that
+`format!("{}", bstr)` and `.to_string()` cannot convert lossily without a trace. Format a string
+explicitly instead:
+
+* `display_lossy()` for a message read by people, as `Path::display()` does for a path.
+* `{:?}` for an error about malformed data, where the exact bytes matter.
+* `legacy_lossy()` where the result goes into code that still holds the string as `String`.
+
+`PhpMixed` and the semver constraints do not implement `Display` either: convert them with
+`php_to_string()` and `to_php_string()`, which keep the bytes.

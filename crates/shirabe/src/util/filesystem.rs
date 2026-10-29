@@ -928,7 +928,7 @@ impl Filesystem {
                 ),
                 0,
                 None,
-                Some(target.display().to_string()),
+                Some(target.to_path_buf()),
             )
             .into());
         }
@@ -960,7 +960,7 @@ impl Filesystem {
                 ),
                 0,
                 None,
-                Some(target.display().to_string()),
+                Some(target.to_path_buf()),
             )
             .into());
         }

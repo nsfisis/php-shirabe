@@ -71,7 +71,7 @@ impl VersionParser {
         ) {
             anyhow::bail!(
                 "Invalid stability string \"{}\", expected one of stable, RC, beta, alpha or dev",
-                stability
+                stability.display_lossy()
             );
         }
 
@@ -212,7 +212,7 @@ impl VersionParser {
         ) {
             format!(
                 " in \"{}\", the alias must be an exact version",
-                full_version
+                full_version.display_lossy()
             )
         } else if preg_is_match(
             format!(
@@ -225,7 +225,7 @@ impl VersionParser {
             format!(
                 " in \"{}\", the alias source must be an exact version, if it is a branch name \
                 you should prefix it with dev-",
-                full_version
+                full_version.display_lossy()
             )
         } else {
             String::new()
@@ -233,7 +233,7 @@ impl VersionParser {
 
         anyhow::bail!(
             "Invalid version string \"{}\"{}",
-            orig_version,
+            orig_version.display_lossy(),
             extra_message
         )
     }
@@ -391,7 +391,7 @@ impl VersionParser {
                 anyhow::bail!(
                     "Could not parse version constraint {}: Invalid operator \"~>\", you probably \
                     meant to use the \"~\" operator",
-                    constraint
+                    constraint.display_lossy()
                 );
             }
 
@@ -657,14 +657,20 @@ impl VersionParser {
                 ))]);
             }
 
-            let mut message = format!("Could not parse version constraint {}", constraint);
+            let mut message = format!(
+                "Could not parse version constraint {}",
+                constraint.display_lossy()
+            );
             if let Some(error) = version_error {
                 message.push_str(&format!(": {}", error));
             }
             anyhow::bail!(message);
         }
 
-        anyhow::bail!("Could not parse version constraint {}", constraint)
+        anyhow::bail!(
+            "Could not parse version constraint {}",
+            constraint.display_lossy()
+        )
     }
 
     fn manipulate_version_string<'a>(

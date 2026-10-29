@@ -7,8 +7,8 @@ use crate::input::{
 use bstr::ByteSlice;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, implode, legacy_lossy, mb_detect_encoding, mb_substr, php_regex, preg_match,
-    strlen, strpos, substr,
+    PhpResource, legacy_lossy, mb_detect_encoding, mb_substr, php_regex, preg_match, strlen,
+    strpos, substr,
 };
 
 /// ArgvInput represents an input coming from the CLI arguments.
@@ -172,7 +172,7 @@ impl ArgvInput {
                 };
                 return Err(RuntimeException::new(format!(
                     "The \"-{}\" option does not exist.",
-                    bad
+                    bad.display_lossy()
                 ))
                 .into());
             }
@@ -286,12 +286,12 @@ impl ArgvInput {
                         format!(
                             "Too many arguments to \"{}\" command, expected arguments \"{}\".",
                             symfony_command_name.to_php_string(),
-                            implode("\" \"", &names),
+                            names.join("\" \""),
                         )
                     }
                     _ => format!(
                         "Too many arguments, expected arguments \"{}\".",
-                        implode("\" \"", &names),
+                        names.join("\" \""),
                     ),
                 }
             } else if symfony_command_name
@@ -544,7 +544,7 @@ impl std::fmt::Display for ArgvInput {
                 if let Some(r#match) = preg_match(php_regex!("{^(-[^=]+=)(.+)}"), token) {
                     return format!(
                         "{}{}",
-                        r#match.get(1).unwrap_or_default(),
+                        legacy_lossy(r#match.get(1).unwrap_or_default()),
                         self.inner
                             .escape_token(&legacy_lossy(r#match.get(2).unwrap_or_default()))
                     );
@@ -558,7 +558,7 @@ impl std::fmt::Display for ArgvInput {
             })
             .collect();
 
-        write!(f, "{}", implode(" ", &tokens))
+        f.write_str(&tokens.join(" "))
     }
 }
 

@@ -4,7 +4,7 @@ use crate::helper::{DebugFormatterHelper, Helper, HelperInterface, HelperSet};
 use crate::output::{ConsoleOutputInterface, OutputInterface, output_interface};
 use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    AsAny, InvalidArgumentException, PhpMixed, legacy_lossy, spl_object_hash, str_replace,
+    AsAny, InvalidArgumentException, PhpMixed, bconcat, legacy_lossy, spl_object_hash, str_replace,
 };
 use shirabe_symfony_process::exception::ProcessFailedException;
 use shirabe_symfony_process::process::Process;
@@ -93,7 +93,7 @@ impl ProcessHelper {
             None => {
                 anyhow::bail!(InvalidArgumentException::new(format!(
                     "Invalid command provided to \"{}()\": the command should be an array whose first element is either the path to the binary to run or a \"Process\" object.",
-                    PhpMixed::string("ProcessHelper::run".to_string()),
+                    "ProcessHelper::run",
                 )));
             }
         }
@@ -143,10 +143,10 @@ impl ProcessHelper {
             } else {
                 format!(
                     "{} Command did not run successfully",
-                    match process.get_exit_code() {
-                        Some(code) => PhpMixed::Int(code),
-                        None => PhpMixed::Null,
-                    },
+                    process
+                        .get_exit_code()
+                        .map(|code| code.to_string())
+                        .unwrap_or_default(),
                 )
             };
             let stopped = Self::formatter_stop(
@@ -166,10 +166,7 @@ impl ProcessHelper {
             && let Some(error) = error
         {
             output.borrow().writeln(
-                &[bstr::BString::from(format!(
-                    "<error>{}</error>",
-                    Self::escape_string(error)
-                ))],
+                &[bconcat!("<error>", Self::escape_string(error), "</error>")],
                 output_interface::OUTPUT_NORMAL,
             );
         }

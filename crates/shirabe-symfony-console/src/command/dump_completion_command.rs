@@ -153,7 +153,7 @@ impl Command for DumpCompletionCommand {
             .unwrap_or_default()
             .into_string()
             .unwrap_or_else(|php_self| panic!("PHP_SELF is not valid UTF-8: {php_self:?}"));
-        let command_name = basename(&full_command);
+        let command_name = legacy_lossy(&basename(&full_command)).into_owned();
         // @realpath($fullCommand) ?: $fullCommand
         let full_command = match realpath(&full_command) {
             Some(p) if !p.as_os_str().is_empty() => legacy_lossy(path_to_bytes(&p)).into_owned(),

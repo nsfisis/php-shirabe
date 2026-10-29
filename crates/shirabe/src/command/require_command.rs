@@ -146,7 +146,7 @@ impl RequireCommand {
                 // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
                 .filter_map(|(k, v)| {
                     v.as_string()
-                        .map(|s| (k.to_str_lossy().into_owned(), s.to_string()))
+                        .map(|s| (k.to_str_lossy().into_owned(), legacy_lossy(s).into_owned()))
                 })
                 .collect()
         })
@@ -332,7 +332,8 @@ impl RequireCommand {
                     &array_keys(requirements)
                         .into_iter()
                         .collect::<Vec<String>>()
-                ),
+                )
+                .display_lossy(),
                 flags,
             ),
             true,
@@ -860,11 +861,13 @@ impl Command for RequireCommand {
             let package_type = if empty(&config.get("type").cloned().unwrap_or(PhpMixed::Null)) {
                 "library".to_string()
             } else {
-                config
-                    .get("type")
-                    .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_string()
+                legacy_lossy(
+                    config
+                        .get("type")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default(),
+                )
+                .into_owned()
             };
 
             // @see https://github.com/composer/composer/pull/8313#issuecomment-532637955
@@ -1031,7 +1034,7 @@ impl Command for RequireCommand {
                     plural,
                     plural2,
                     plural3,
-                    implode("\", \"", &pkg_dev_tags),
+                    legacy_lossy(&implode("\", \"", &pkg_dev_tags)),
                 );
                 self.get_io().warning(&warn_msg, &[]);
                 if self.get_io().ask_confirmation(

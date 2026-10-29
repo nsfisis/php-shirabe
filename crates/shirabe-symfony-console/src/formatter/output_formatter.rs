@@ -262,9 +262,11 @@ impl OutputFormatterInterface for OutputFormatter {
     ) -> anyhow::Result<std::rc::Rc<std::cell::RefCell<Box<dyn OutputFormatterStyleInterface>>>>
     {
         if !self.has_style(name) {
-            return Err(
-                InvalidArgumentException::new(format!("Undefined style: \"{}\".", name)).into(),
-            );
+            return Err(InvalidArgumentException::new(format!(
+                "Undefined style: \"{}\".",
+                name.display_lossy()
+            ))
+            .into());
         }
 
         Ok(std::rc::Rc::clone(&self.styles[strtolower(name).as_bstr()]))

@@ -349,7 +349,7 @@ impl Command for RemoveCommand {
                 .and_then(|v| v.as_array())
                 .and_then(|m| m.get(B(package)))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string());
+                .map(|s| legacy_lossy(s).into_owned());
 
             let in_alt_type = composer_data
                 .as_array()
@@ -357,7 +357,7 @@ impl Command for RemoveCommand {
                 .and_then(|v| v.as_array())
                 .and_then(|m| m.get(B(package)))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string());
+                .map(|s| legacy_lossy(s).into_owned());
 
             if let Some(canonical_name) = in_type {
                 if dry_run {

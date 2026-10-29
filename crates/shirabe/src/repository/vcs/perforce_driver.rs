@@ -9,7 +9,7 @@ use crate::util::{Perforce, PerforceInterface, ProcessExecutor};
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    BadMethodCallException, PhpMixed, RuntimeException, php_regex, preg_is_match,
+    BadMethodCallException, PhpMixed, RuntimeException, legacy_lossy, php_regex, preg_is_match,
 };
 
 #[derive(Debug)]
@@ -37,13 +37,14 @@ impl PerforceDriver {
     }
 
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        self.depot = self
-            .inner
-            .repo_config
-            .get(B("depot"))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
+        self.depot = legacy_lossy(
+            self.inner
+                .repo_config
+                .get(B("depot"))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned();
         self.branch = String::new();
         if let Some(branch) = self
             .inner
@@ -52,7 +53,7 @@ impl PerforceDriver {
             .and_then(|v| v.as_string())
             && !branch.is_empty()
         {
-            self.branch = branch.to_string();
+            self.branch = legacy_lossy(branch).into_owned();
         }
 
         let repo_config = self.inner.repo_config.clone();
@@ -70,14 +71,15 @@ impl PerforceDriver {
             return Ok(());
         }
 
-        let cache_vcs_dir = self
-            .inner
-            .config
-            .borrow_mut()
-            .get("cache-vcs-dir")
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let cache_vcs_dir = legacy_lossy(
+            self.inner
+                .config
+                .borrow_mut()
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or_default(),
+        )
+        .into_owned();
         if !Cache::is_usable(&cache_vcs_dir) {
             return Err(RuntimeException::new("PerforceDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string()).into());
         }
@@ -266,7 +268,7 @@ impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
                 .map(|(k, v)| {
                     (
                         k.to_str_lossy().into_owned(),
-                        v.as_string().unwrap_or_default().to_string(),
+                        legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
                     )
                 })
                 .collect()
@@ -280,7 +282,7 @@ impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
             .map(|(k, v)| {
                 (
                     k.to_str_lossy().into_owned(),
-                    v.as_string().unwrap_or_default().to_string(),
+                    legacy_lossy(v.as_string().unwrap_or_default()).into_owned(),
                 )
             })
             .collect()

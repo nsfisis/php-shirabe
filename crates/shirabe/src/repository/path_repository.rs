@@ -53,11 +53,13 @@ impl PathRepository {
             .into());
         }
 
-        let url_str = repo_config
-            .get(B("url"))
-            .and_then(|v| v.as_string())
-            .unwrap_or_default()
-            .to_string();
+        let url_str = legacy_lossy(
+            repo_config
+                .get(B("url"))
+                .and_then(|v| v.as_string())
+                .unwrap_or_default(),
+        )
+        .into_owned();
         let url = Platform::expand_path(&url_str);
         let process = process.unwrap_or_else(|| {
             std::rc::Rc::new(std::cell::RefCell::new(ProcessExecutor::new(Some(
@@ -98,11 +100,13 @@ impl PathRepository {
         format!(
             "path repo ({})",
             Url::sanitize(
-                self.repo_config
-                    .get(B("url"))
-                    .and_then(|v| v.as_string())
-                    .unwrap_or_default()
-                    .to_string()
+                legacy_lossy(
+                    self.repo_config
+                        .get(B("url"))
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default()
+                )
+                .into_owned()
             )
         )
     }
@@ -195,12 +199,13 @@ impl PathRepository {
             };
             package.insert("dist".into(), PhpMixed::Array(dist));
 
-            let reference = self
-                .options
-                .get(B("reference"))
-                .and_then(|v| v.as_string())
-                .unwrap_or("auto".into())
-                .to_string();
+            let reference = legacy_lossy(
+                self.options
+                    .get(B("reference"))
+                    .and_then(|v| v.as_string())
+                    .unwrap_or("auto".into()),
+            )
+            .into_owned();
             if reference == "none" {
                 if let Some(PhpMixed::Array(dist)) = package.get_mut(B("dist")) {
                     dist.insert("reference".into(), PhpMixed::Null);
@@ -237,14 +242,14 @@ impl PathRepository {
             if let Some(name) = package
                 .get(B("name"))
                 .and_then(|v| v.as_string())
-                .map(|s| s.to_string())
+                .map(|s| legacy_lossy(s).into_owned())
                 && let Some(version) = self
                     .options
                     .get(B("versions"))
                     .and_then(|v| v.as_array())
                     .and_then(|a| a.get(B(&name)))
                     .and_then(|v| v.as_string())
-                    .map(|s| s.to_string())
+                    .map(|s| legacy_lossy(s).into_owned())
             {
                 package.insert("version".into(), PhpMixed::string(version));
             }

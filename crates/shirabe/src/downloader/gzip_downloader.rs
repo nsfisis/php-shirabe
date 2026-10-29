@@ -120,8 +120,8 @@ impl ArchiveDownloader for GzipDownloader {
 
             let process_error = format!(
                 "Failed to execute {}\n\n{}",
-                implode(" ", &command),
-                self.inner.process.borrow().get_error_output(),
+                legacy_lossy(&implode(" ", &command)),
+                legacy_lossy(&self.inner.process.borrow().get_error_output()),
             );
             return Err(RuntimeException::new(process_error).into());
         }

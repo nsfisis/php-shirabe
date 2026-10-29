@@ -77,8 +77,8 @@ impl DownloadManager {
         if !self.downloaders.contains_key(&*legacy_lossy(&r#type)) {
             return Err(InvalidArgumentException::new(format!(
                 "Unknown downloader type: {}. Available types: {}.",
-                r#type,
-                implode(", ", &array_keys(&self.downloaders)),
+                r#type.display_lossy(),
+                implode(", ", &array_keys(&self.downloaders)).display_lossy(),
             ))
             .into());
         }
@@ -369,7 +369,7 @@ impl DownloadManager {
         for (pattern, preference) in &self.package_preferences {
             let pattern_regex = format!(
                 "{{^{}$}}i",
-                str_replace("\\*", ".*", preg_quote(pattern, None)),
+                legacy_lossy(&str_replace("\\*", ".*", preg_quote(pattern, None))),
             );
             if preg_is_match(&pattern_regex, package.get_name()) {
                 if "dist" == preference || (!package.is_dev() && "auto" == preference) {

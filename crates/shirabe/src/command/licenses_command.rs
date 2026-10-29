@@ -10,7 +10,9 @@ use crate::repository::{RepositoryInterface, RepositoryUtils};
 use crate::util::{PackageInfo, PackageSorter};
 use bstr::BString;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, RuntimeException, UnexpectedValueException, impl_php_class};
+use shirabe_php_shim::{
+    PhpMixed, RuntimeException, UnexpectedValueException, impl_php_class, legacy_lossy,
+};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::formatter::OutputFormatter;
 use shirabe_symfony_console::helper::{Row, Table};
@@ -192,7 +194,7 @@ impl Command for LicensesCommand {
                     let name = if let Some(link) = link {
                         format!(
                             "<href={}>{}</>",
-                            OutputFormatter::escape(&link)?,
+                            legacy_lossy(&OutputFormatter::escape(&link)?),
                             package.get_pretty_name()
                         )
                     } else {

@@ -10,7 +10,9 @@ use crate::repository::{
     RepositoryInterfaceHandle, RepositoryInterfaceWeakHandle, SearchResult,
 };
 use indexmap::IndexMap;
-use shirabe_php_shim::{implode, php_regex, preg_is_match, preg_quote, preg_split, strtolower};
+use shirabe_php_shim::{
+    implode, legacy_lossy, php_regex, preg_is_match, preg_quote, preg_split, strtolower,
+};
 use shirabe_semver::constraint::{AnyConstraint, SimpleConstraint};
 use std::rc::Weak;
 
@@ -309,11 +311,11 @@ impl RepositoryInterface for ArrayRepository {
     ) -> anyhow::Result<Vec<SearchResult>> {
         let regex = if mode == crate::repository::SEARCH_FULLTEXT {
             let parts = preg_split(php_regex!("{\\s+}"), preg_quote(&query, None));
-            format!("{{(?:{})}}i", implode("|", &parts))
+            format!("{{(?:{})}}i", legacy_lossy(&implode("|", &parts)))
         } else {
             // vendor/name searches expect the caller to have preg_quoted the query
             let parts = preg_split(php_regex!("{\\s+}"), &query);
-            format!("{{(?:{})}}i", implode("|", &parts))
+            format!("{{(?:{})}}i", legacy_lossy(&implode("|", &parts)))
         };
 
         let mut matches: IndexMap<String, SearchResult> = IndexMap::new();
@@ -341,7 +343,7 @@ impl RepositoryInterface for ArrayRepository {
                     &regex,
                     format!(
                         "{} {}",
-                        implode(" ", &complete.as_ref().unwrap().get_keywords()),
+                        legacy_lossy(&implode(" ", &complete.as_ref().unwrap().get_keywords())),
                         complete
                             .as_ref()
                             .unwrap()

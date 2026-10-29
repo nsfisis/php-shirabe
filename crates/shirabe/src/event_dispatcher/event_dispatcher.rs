@@ -409,7 +409,7 @@ impl EventDispatcher {
                     return Err(RuntimeException::new(format!(
                         "Subscriber {}::{} for event {} is not callable, make sure the function is defined and public",
                         handle.class,
-                        method_name,
+                        method_name.display_lossy(),
                         event.get_name()
                     )).into());
                 }
@@ -418,7 +418,7 @@ impl EventDispatcher {
                         "> {}: {}->{}",
                         formatted_event_name_with_args.clone(),
                         handle.class,
-                        method_name,
+                        method_name.display_lossy(),
                     ),
                     true,
                     crate::io::VERBOSE,
@@ -430,7 +430,7 @@ impl EventDispatcher {
                         "no proxy stub is available yet for the event `{}` dispatched to {}::{}",
                         event.get_name(),
                         handle.class,
-                        method_name,
+                        method_name.display_lossy(),
                     ))
                     .into()
                     })?;
@@ -547,11 +547,13 @@ impl EventDispatcher {
                                 .map(|arg| legacy_lossy(&ProcessExecutor::escape(arg)).into_owned())
                                 .collect::<Vec<_>>()
                                 .join(" ");
-                            let existing = flags
-                                .get(B("script-alias-input"))
-                                .and_then(|v| v.as_string())
-                                .unwrap_or_default()
-                                .to_string();
+                            let existing = legacy_lossy(
+                                flags
+                                    .get(B("script-alias-input"))
+                                    .and_then(|v| v.as_string())
+                                    .unwrap_or_default(),
+                            )
+                            .into_owned();
                             flags.insert(
                                 "script-alias-input".into(),
                                 PhpMixed::string(format!("{} {}", args_string, existing)),
@@ -562,9 +564,9 @@ impl EventDispatcher {
                             // of being passed to a PHP interpreter.
                             let exec = format!(
                                 "{} {}",
-                                ProcessExecutor::escape(
+                                legacy_lossy(&ProcessExecutor::escape(
                                     Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
-                                ),
+                                )),
                                 args.join(" ")
                             );
                             let exit_code = self.execute_tty(&exec)?;
@@ -579,7 +581,7 @@ impl EventDispatcher {
                                 return Err(ScriptExecutionException::new(
                                     format!(
                                         "Error Output: {}",
-                                        self.process.borrow().get_error_output()
+                                        self.process.borrow().get_error_output().display_lossy()
                                     ),
                                     exit_code,
                                 )
@@ -736,7 +738,7 @@ impl EventDispatcher {
                             "defined",
                             vec![PluginValue::string(format!(
                                 "Composer\\Script\\ScriptEvents::{}",
-                                str_replace("-", "_", strtoupper(event.get_name()))
+                                legacy_lossy(&str_replace("-", "_", strtoupper(event.get_name())))
                             ))],
                         )? {
                             self.io.write_error3(&format!(
@@ -762,7 +764,7 @@ impl EventDispatcher {
                         let string_input = event
                             .get_flags()
                             .get(B("script-alias-input"))
-                            .and_then(|v| v.as_string().map(|s| s.to_string()))
+                            .and_then(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                             .unwrap_or(args);
                         let verbosity = if self.io.is_debug() {
                             output_interface::VERBOSITY_DEBUG
@@ -821,12 +823,14 @@ try {{
                             Ok(value) => value.to_php_mixed()?,
                             Err(throw) => return Err(throw_into_error(throw)),
                         };
-                        let command_output = result
-                            .as_array()
-                            .and_then(|map| map.get(B("output")))
-                            .and_then(|v| v.as_string())
-                            .unwrap_or_default()
-                            .to_string();
+                        let command_output = legacy_lossy(
+                            result
+                                .as_array()
+                                .and_then(|map| map.get(B("output")))
+                                .and_then(|v| v.as_string())
+                                .unwrap_or_default(),
+                        )
+                        .into_owned();
                         if !command_output.is_empty() {
                             self.io.write3(&command_output, false, crate::io::NORMAL);
                         }
@@ -964,7 +968,7 @@ try {{
                             if let Some(m) =
                                 preg_match(php_regex!("{^[^\\'\"\\s/\\\\]+}"), &path_and_args)
                             {
-                                let m0 = m.get(0).unwrap_or_default().to_string();
+                                let m0 = legacy_lossy(m.get(0).unwrap_or_default()).into_owned();
                                 if !file_exists(&m0) {
                                     let finder = ExecutableFinder::new();
                                     if let Some(path_to_exec) = finder.find(&m0, None, &[]) {
@@ -984,7 +988,11 @@ try {{
                                         path_and_args = format!(
                                             "{}{}",
                                             path_to_exec,
-                                            substr(&path_and_args, strlen(m.get(0).unwrap()), None)
+                                            legacy_lossy(&substr(
+                                                &path_and_args,
+                                                strlen(m.get(0).unwrap()),
+                                                None
+                                            ))
                                         );
                                     }
                                 }
@@ -1025,10 +1033,10 @@ try {{
                             // of being passed to a PHP interpreter.
                             exec = format!(
                                 "{}{}",
-                                ProcessExecutor::escape(
+                                legacy_lossy(&ProcessExecutor::escape(
                                     Platform::get_env("COMPOSER_BINARY").unwrap_or_default()
-                                ),
-                                substr(&exec, 8, None)
+                                )),
+                                legacy_lossy(&substr(&exec, 8, None))
                             );
                         }
 
@@ -1044,7 +1052,7 @@ try {{
                             return Err(ScriptExecutionException::new(
                                 format!(
                                     "Error Output: {}",
-                                    self.process.borrow().get_error_output()
+                                    self.process.borrow().get_error_output().display_lossy()
                                 ),
                                 exit_code,
                             )
@@ -1102,26 +1110,32 @@ try {{
         };
         let php_args = finder.find_arguments();
         let php_args = if !php_args.is_empty() {
-            format!(" {}", implode(" ", &php_args))
+            format!(" {}", legacy_lossy(&implode(" ", &php_args)))
         } else {
             "".to_string()
         };
         let allow_url_fopen_flag = format!(
             " -d allow_url_fopen={}",
-            ProcessExecutor::escape(ini_get("allow_url_fopen").unwrap_or_default())
+            legacy_lossy(&ProcessExecutor::escape(
+                ini_get("allow_url_fopen").unwrap_or_default()
+            ))
         );
         let disable_functions_flag = format!(
             " -d disable_functions={}",
-            ProcessExecutor::escape(ini_get("disable_functions").unwrap_or_default())
+            legacy_lossy(&ProcessExecutor::escape(
+                ini_get("disable_functions").unwrap_or_default()
+            ))
         );
         let memory_limit_flag = format!(
             " -d memory_limit={}",
-            ProcessExecutor::escape(ini_get("memory_limit").unwrap_or_default())
+            legacy_lossy(&ProcessExecutor::escape(
+                ini_get("memory_limit").unwrap_or_default()
+            ))
         );
 
         Ok(format!(
             "{}{}{}{}{}",
-            ProcessExecutor::escape(&php_path),
+            legacy_lossy(&ProcessExecutor::escape(&php_path)),
             php_args,
             allow_url_fopen_flag,
             disable_functions_flag,
@@ -1423,7 +1437,7 @@ try {{
         if self.event_stack.iter().any(|n| n == &event_name) {
             return Err(RuntimeException::new(format!(
                 "Circular call to script handler '{}' detected",
-                PhpMixed::string(event_name),
+                event_name,
             ))
             .into());
         }
@@ -1455,7 +1469,7 @@ try {{
             .borrow()
             .get("bin-dir")
             .as_string()
-            .map(|s| s.to_string())
+            .map(|s| legacy_lossy(s).into_owned())
             .unwrap_or_default();
         if is_dir(&bin_dir) {
             let bin_dir = realpath(&bin_dir)
@@ -1478,7 +1492,7 @@ try {{
 
     fn get_callback_identifier(cb: &PhpMixed) -> String {
         if let PhpMixed::String(s) = cb {
-            return format!("fn:{}", s);
+            return format!("fn:{}", legacy_lossy(&s));
         }
         if is_object(cb) {
             return format!("obj:{}", spl_object_hash(cb));
@@ -1497,7 +1511,11 @@ try {{
                         "?".to_string()
                     }
                 } else {
-                    format!("{}#{}", get_class(first), spl_object_hash(first))
+                    format!(
+                        "{}#{}",
+                        legacy_lossy(&get_class(first)),
+                        spl_object_hash(first)
+                    )
                 };
                 let suffix = if let PhpMixed::String(s) = second {
                     s.to_str_lossy().into_owned()
@@ -1525,11 +1543,13 @@ try {{
         let callable_key = match callable {
             Callable::String(callable_str) => callable_str.clone(),
             Callable::ArrayCallable(first, method) => match first.as_ref() {
-                PhpMixed::String(class) => format!("{}::{}", class, method),
-                other => format!("{}::{}", get_class(other), method),
+                PhpMixed::String(class) => format!("{}::{}", legacy_lossy(&class), method),
+                other => format!("{}::{}", legacy_lossy(&get_class(other)), method),
             },
             // PHP: get_class($callable[0]).'::'.$callable[1] — the object half's runtime class.
-            Callable::PhpMethod(handle, method) => format!("{}::{}", handle.class, method),
+            Callable::PhpMethod(handle, method) => {
+                format!("{}::{}", handle.class, legacy_lossy(&method))
+            }
             Callable::Closure(_) => "closure".to_string(),
         };
         if self.previous_listeners.contains_key(&callable_key) {
@@ -1597,7 +1617,7 @@ try {{
             .borrow()
             .get("vendor-dir")
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         let loader = generator.borrow().create_loader(&map, vendor_dir)?;
         loader.register(false);
         self.loader = Some(loader);
@@ -1637,7 +1657,7 @@ try {{
     fn composer_php_runtime_autoload(cache_dir: &std::path::Path) -> anyhow::Result<String> {
         Ok(format!(
             "{}/vendor/autoload.php",
-            shirabe_php_rpc::composer_runtime::base_path(cache_dir)?
+            legacy_lossy(&shirabe_php_rpc::composer_runtime::base_path(cache_dir)?)
         ))
     }
 

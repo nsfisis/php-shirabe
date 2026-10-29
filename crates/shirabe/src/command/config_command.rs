@@ -13,10 +13,11 @@ use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     InvalidArgumentException, PhpMixed, RuntimeException, array_is_list, array_merge,
-    array_values_mixed, chmod, escapeshellcmd, exec, explode, file_exists, impl_php_class, implode,
-    in_array_loose, in_array_strict, intval, is_array, is_bool, is_dir, is_numeric, is_object,
-    is_string, json_encode, legacy_lossy, path_from_bytes, php_regex, php_to_string, preg_is_match,
-    preg_match, preg_replace, str_replace, strpos, strtolower, system, touch, trim2, var_export,
+    array_values_mixed, bconcat, chmod, escapeshellcmd, exec, explode, file_exists, impl_php_class,
+    implode, in_array_loose, in_array_strict, intval, is_array, is_bool, is_dir, is_numeric,
+    is_object, is_string, json_encode, legacy_lossy, path_from_bytes, php_regex, php_to_string,
+    preg_is_match, preg_match, preg_replace, str_replace, strpos, strtolower, system, touch, trim2,
+    var_export,
 };
 use shirabe_semver::VersionParser;
 use shirabe_symfony_console::command::Command;
@@ -88,7 +89,10 @@ impl ConfigCommand {
         let validation = validator(&PhpMixed::string(values[0].clone()));
         if validation.as_bool() != Some(true) {
             let suffix = if !validation.is_null() && validation.as_bool() != Some(false) {
-                format!(" ({})", validation.as_string().unwrap_or_default())
+                format!(
+                    " ({})",
+                    legacy_lossy(&validation.as_string().unwrap_or_default())
+                )
             } else {
                 String::new()
             };
@@ -148,13 +152,16 @@ impl ConfigCommand {
         let validation = validator(&values_mixed);
         if validation.as_bool() != Some(true) {
             let suffix = if !validation.is_null() && validation.as_bool() != Some(false) {
-                format!(" ({})", validation.as_string().unwrap_or_default())
+                format!(
+                    " ({})",
+                    legacy_lossy(&validation.as_string().unwrap_or_default())
+                )
             } else {
                 String::new()
             };
             return Err(RuntimeException::new(format!(
                 "{} is an invalid value{}",
-                PhpMixed::from(json_encode(&values_mixed).ok()),
+                json_encode(&values_mixed).ok().unwrap_or_default(),
                 suffix
             ))
             .into());
@@ -233,7 +240,7 @@ impl ConfigCommand {
                         }
                     })
                     .collect();
-                value_inner = PhpMixed::string(format!("[{}]", implode(", ", &arr_strs)));
+                value_inner = PhpMixed::string(bconcat!("[", implode(", ", &arr_strs), "]"));
             }
 
             if is_bool(&value_inner) {
@@ -270,7 +277,10 @@ impl ConfigCommand {
                         strtolower(trim2(&id, " \t\n\r\0\u{0B}")),
                     );
                     let id = preg_replace(php_regex!("{-+}"), "-", &id);
-                    format!("https://getcomposer.org/doc/06-config.md#{}", id)
+                    format!(
+                        "https://getcomposer.org/doc/06-config.md#{}",
+                        legacy_lossy(&id)
+                    )
                 };
             if is_string(&raw_val) && raw_val.as_string() != value_inner.as_string() {
                 self.get_io().write3(
@@ -279,8 +289,8 @@ impl ConfigCommand {
                         link,
                         k.clone().unwrap_or_default(),
                         key,
-                        raw_val.as_string().unwrap_or_default(),
-                        php_to_string(&value_inner),
+                        legacy_lossy(&raw_val.as_string().unwrap_or_default()),
+                        legacy_lossy(&php_to_string(&value_inner)),
                         source
                     ),
                     true,
@@ -293,7 +303,7 @@ impl ConfigCommand {
                         link,
                         k.clone().unwrap_or_default(),
                         key,
-                        php_to_string(&value_inner),
+                        legacy_lossy(&php_to_string(&value_inner)),
                         source
                     ),
                     true,
@@ -698,7 +708,7 @@ impl Command for ConfigCommand {
                         .cloned()
                         .unwrap_or_else(|| PhpMixed::Array(IndexMap::new()));
                 } else {
-                    let repo_key = matches.get(1).unwrap_or_default().to_string();
+                    let repo_key = legacy_lossy(matches.get(1).unwrap_or_default()).into_owned();
                     let repos = data.get(B("repositories")).cloned();
                     value = match repos
                         .as_ref()
@@ -726,7 +736,7 @@ impl Command for ConfigCommand {
                 let mut key_acc: Option<String> = None;
                 for bit in &bits {
                     let new_key = match &key_acc {
-                        Some(k) => format!("{}.{}", k, bit),
+                        Some(k) => format!("{}.{}", k, legacy_lossy(&bit)),
                         None => legacy_lossy(&bit.clone()).into_owned(),
                     };
                     key_acc = Some(new_key.clone());
@@ -788,7 +798,9 @@ impl Command for ConfigCommand {
                             .as_list()
                             .map(|l| {
                                 l.iter()
-                                    .filter_map(|v| v.as_string().map(|s| s.to_string()))
+                                    .filter_map(|v| {
+                                        v.as_string().map(|s| legacy_lossy(s).into_owned())
+                                    })
                                     .collect::<Vec<_>>()
                             })
                             .unwrap_or_default();
@@ -1320,8 +1332,8 @@ impl Command for ConfigCommand {
                     .unwrap()
                     .remove_config_setting(&format!(
                         "{}.{}",
-                        matches.get(1).unwrap(),
-                        matches.get(2).unwrap()
+                        legacy_lossy(&matches.get(1).unwrap()),
+                        legacy_lossy(&matches.get(2).unwrap())
                     ));
                 self.config_source
                     .borrow_mut()
@@ -1329,14 +1341,18 @@ impl Command for ConfigCommand {
                     .unwrap()
                     .remove_config_setting(&format!(
                         "{}.{}",
-                        matches.get(1).unwrap(),
-                        matches.get(2).unwrap()
+                        legacy_lossy(&matches.get(1).unwrap()),
+                        legacy_lossy(&matches.get(2).unwrap())
                     ));
 
                 return Ok(0);
             }
 
-            let key = format!("{}.{}", matches.get(1).unwrap(), matches.get(2).unwrap());
+            let key = format!(
+                "{}.{}",
+                legacy_lossy(&matches.get(1).unwrap()),
+                legacy_lossy(&matches.get(2).unwrap())
+            );
             if matches.get(1).unwrap() == "bitbucket-oauth" {
                 if 2 != values.len() {
                     return Err(RuntimeException::new(format!(
@@ -2120,13 +2136,13 @@ fn flatten_setting_keys(config: PhpMixed, prefix: &str) -> Vec<String> {
         None => return vec![],
     };
     for (key, value) in &arr {
-        keys.push(vec![format!("{}{}", prefix, key)]);
+        keys.push(vec![format!("{}{}", prefix, legacy_lossy(&key))]);
         // array-lists must not be added to completion
         // sub-keys of repository-keys must not be added to completion
         if is_array(value) && !array_is_list(value) && prefix != "repositories." {
             keys.push(flatten_setting_keys(
                 value.clone(),
-                &format!("{}{}.", prefix, key),
+                &format!("{}{}.", prefix, legacy_lossy(&key)),
             ));
         }
     }

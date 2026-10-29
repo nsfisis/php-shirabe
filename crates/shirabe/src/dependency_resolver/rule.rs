@@ -312,7 +312,7 @@ impl Rule {
                     return Ok(format!(
                         "No package found to satisfy root composer.json require {} {}",
                         package_name,
-                        constraint.get_pretty_string(),
+                        constraint.get_pretty_string().display_lossy(),
                     ));
                 }
 
@@ -335,7 +335,7 @@ impl Rule {
                 format!(
                     "Root composer.json requires {} {} -> satisfiable by {}.",
                     package_name,
-                    constraint.get_pretty_string(),
+                    constraint.get_pretty_string().display_lossy(),
                     self.format_packages_unique_from_packages(
                         pool,
                         packages.to_vec(),
@@ -501,7 +501,10 @@ impl Rule {
                         let mut reason_str = if replacer_names.len() == 1 {
                             format!("{} replaces ", replacer_names[0])
                         } else {
-                            format!("[{}] replace ", implode(", ", &replacer_names))
+                            format!(
+                                "[{}] replace ",
+                                implode(", ", &replacer_names).display_lossy()
+                            )
                         };
                         reason_str.push_str(&format!(
                             "{} and thus cannot coexist with it.",
