@@ -2,31 +2,33 @@
 
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::{CommandLine, Filesystem, Platform, ProcessExecutor};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Exception, PHP_EOL, PhpMixed, PhpResource, chdir, date_local, explode, fclose, feof, fgets,
-    file_get_contents, fopen, fwrite, gethostname, json_decode_assoc, legacy_lossy, php_regex,
-    preg_replace, str_replace_array, strcmp, strlen, strpos, strrpos, substr, time, trim,
+    Exception, PHP_EOL, PhpMixed, PhpResource, bconcat, chdir, date_local, explode, fclose, feof,
+    fgets, file_get_contents, fopen, fwrite, gethostname, json_decode_assoc, path_from_bytes,
+    php_regex, preg_replace, str_replace_array, strcmp, strlen, strpos, strrpos, substr, time,
+    trim,
 };
 use shirabe_symfony_process::{ExecutableFinder, Process};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct Perforce {
-    path: String,
-    p4_depot: Option<String>,
-    p4_client: Option<String>,
-    p4_user: Option<String>,
-    p4_password: Option<String>,
-    p4_port: String,
-    p4_stream: Option<String>,
-    p4_client_spec: String,
-    p4_depot_type: Option<String>,
-    p4_branch: Option<String>,
+    path: PathBuf,
+    p4_depot: Option<BString>,
+    p4_client: Option<BString>,
+    p4_user: Option<BString>,
+    p4_password: Option<BString>,
+    p4_port: BString,
+    p4_stream: Option<BString>,
+    p4_client_spec: BString,
+    p4_depot_type: Option<BString>,
+    p4_branch: Option<BString>,
     process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    unique_perforce_client_name: String,
+    unique_perforce_client_name: BString,
     windows_flag: bool,
-    command_result: String,
+    command_result: BString,
     io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     filesystem: Option<std::rc::Rc<std::cell::RefCell<Filesystem>>>,
 }
@@ -34,27 +36,27 @@ pub struct Perforce {
 impl Perforce {
     pub fn new(
         repo_config: IndexMap<BString, PhpMixed>,
-        port: String,
-        path: String,
+        port: BString,
+        path: PathBuf,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         is_windows: bool,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> Self {
         let mut this = Self {
-            path: String::new(),
+            path: PathBuf::new(),
             p4_depot: None,
             p4_client: None,
             p4_user: None,
             p4_password: None,
             p4_port: port,
             p4_stream: None,
-            p4_client_spec: String::new(),
+            p4_client_spec: BString::default(),
             p4_depot_type: None,
             p4_branch: None,
             process,
-            unique_perforce_client_name: String::new(),
+            unique_perforce_client_name: BString::default(),
             windows_flag: is_windows,
-            command_result: String::new(),
+            command_result: BString::default(),
             io,
             filesystem: None,
         };
@@ -65,8 +67,8 @@ impl Perforce {
 
     pub fn create(
         repo_config: IndexMap<BString, PhpMixed>,
-        port: String,
-        path: String,
+        port: BString,
+        path: PathBuf,
         process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
         io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>,
     ) -> Self {
@@ -74,20 +76,20 @@ impl Perforce {
     }
 
     pub fn check_server_exists(
-        url: &str,
+        url: &BStr,
         process_executor: &mut ProcessExecutor,
     ) -> anyhow::Result<bool> {
-        let mut ignored_output = String::new();
+        let mut ignored_output = BString::default();
         Ok(process_executor.execute(
             &[
-                "p4".to_string(),
-                "-p".to_string(),
-                url.to_string(),
-                "info".to_string(),
-                "-s".to_string(),
+                BString::from("p4"),
+                "-p".into(),
+                url.to_owned(),
+                "info".into(),
+                "-s".into(),
             ],
             &mut ignored_output,
-            Option::<&str>::None.map(std::path::Path::new),
+            None,
         )? == 0)
     }
 
@@ -100,60 +102,51 @@ impl Perforce {
             .get(B("unique_perforce_client_name"))
             .and_then(|v| v.as_string())
         {
-            self.unique_perforce_client_name = legacy_lossy(value).into_owned();
+            self.unique_perforce_client_name = value.to_owned();
         }
 
         if let Some(value) = repo_config.get(B("depot")).and_then(|v| v.as_string()) {
-            self.p4_depot = Some(legacy_lossy(value).into_owned());
+            self.p4_depot = Some(value.to_owned());
         }
         if let Some(value) = repo_config.get(B("branch")).and_then(|v| v.as_string()) {
-            self.p4_branch = Some(legacy_lossy(value).into_owned());
+            self.p4_branch = Some(value.to_owned());
         }
         if let Some(value) = repo_config.get(B("p4user")).and_then(|v| v.as_string()) {
-            self.p4_user = Some(legacy_lossy(value).into_owned());
+            self.p4_user = Some(value.to_owned());
         } else {
             self.p4_user = self.get_p4_variable("P4USER");
         }
         if let Some(value) = repo_config.get(B("p4password")).and_then(|v| v.as_string()) {
-            self.p4_password = Some(legacy_lossy(value).into_owned());
+            self.p4_password = Some(value.to_owned());
         }
     }
 
-    pub fn initialize_depot_and_branch(&mut self, depot: Option<&str>, branch: Option<&str>) {
+    pub fn initialize_depot_and_branch(&mut self, depot: Option<&BStr>, branch: Option<&BStr>) {
         if let Some(depot) = depot {
-            self.p4_depot = Some(depot.to_string());
+            self.p4_depot = Some(depot.to_owned());
         }
         if let Some(branch) = branch {
-            self.p4_branch = Some(branch.to_string());
+            self.p4_branch = Some(branch.to_owned());
         }
     }
 
-    pub fn generate_unique_perforce_client_name(&self) -> String {
-        // TODO(bytes): the client name is returned as a String.
-        let hostname = gethostname()
-            .into_string()
-            .unwrap_or_else(|hostname| panic!("hostname is not valid UTF-8: {hostname:?}"));
-        format!("{}_{}", hostname, time())
+    pub fn generate_unique_perforce_client_name(&self) -> BString {
+        bconcat!(gethostname().into_encoded_bytes(), "_", time())
     }
 
     pub fn cleanup_client_spec(&mut self) {
         let client = self.get_client();
-        let task = vec!["client".to_string(), "-d".to_string(), client];
+        let task: Vec<BString> = vec!["client".into(), "-d".into(), client];
         let use_p4_client = false;
         let command = self.generate_p4_command(task, use_p4_client);
-        self.execute_command(CommandLine::Args(
-            command
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-        ));
+        self.execute_command(CommandLine::Args(command));
         let client_spec = self.get_p4_client_spec();
         let file_system = self.get_filesystem();
         file_system.borrow_mut().remove(&client_spec);
     }
 
     fn execute_command(&mut self, command: CommandLine) -> i64 {
-        self.command_result = String::new();
+        self.command_result = BString::default();
 
         self.process
             .borrow_mut()
@@ -161,91 +154,86 @@ impl Perforce {
             .unwrap_or(1)
     }
 
-    pub fn get_client(&mut self) -> String {
+    pub fn get_client(&mut self) -> BString {
         if self.p4_client.is_none() {
             let stream = self.get_stream();
-            let clean_stream_name = str_replace_array(
-                &["//".to_string(), "/".to_string(), "@".to_string()],
-                &["".to_string(), "_".to_string(), "".to_string()],
-                &stream,
-            );
-            self.p4_client = Some(format!(
-                "composer_perforce_{}_{}",
+            let clean_stream_name = str_replace_array(&["//", "/", "@"], &["", "_", ""], &stream);
+            self.p4_client = Some(bconcat!(
+                "composer_perforce_",
                 self.unique_perforce_client_name,
-                legacy_lossy(&clean_stream_name)
+                "_",
+                clean_stream_name
             ));
         }
 
         self.p4_client.clone().unwrap_or_default()
     }
 
-    fn get_path(&self) -> &str {
+    fn get_path(&self) -> &Path {
         &self.path
     }
 
-    pub fn initialize_path(&mut self, path: &str) {
-        self.path = path.to_string();
+    pub fn initialize_path(&mut self, path: &Path) {
+        self.path = path.to_path_buf();
         let fs = self.get_filesystem();
         fs.borrow_mut().ensure_directory_exists(path);
     }
 
-    fn get_port(&self) -> &str {
-        &self.p4_port
+    fn get_port(&self) -> &BStr {
+        self.p4_port.as_bstr()
     }
 
-    pub fn set_stream(&mut self, stream: &str) {
-        self.p4_stream = Some(stream.to_string());
+    pub fn set_stream(&mut self, stream: &BStr) {
+        self.p4_stream = Some(stream.to_owned());
         let index = strrpos(stream, "/");
         // Stream format is //depot/stream, while non-streaming depot is //depot
         if let Some(i) = index
             && (i as i64) > 2
         {
-            self.p4_depot_type = Some("stream".to_string());
+            self.p4_depot_type = Some("stream".into());
         }
     }
 
     pub fn is_stream(&self) -> bool {
         self.p4_depot_type.is_some()
-            && strcmp(self.p4_depot_type.as_deref().unwrap_or_default(), "stream") == 0
+            && strcmp(self.p4_depot_type.clone().unwrap_or_default(), "stream") == 0
     }
 
-    pub fn get_stream(&mut self) -> String {
+    pub fn get_stream(&mut self) -> BString {
         if self.p4_stream.is_none() {
             if self.is_stream() {
-                self.p4_stream = Some(format!(
-                    "//{}/{}",
-                    self.p4_depot.as_deref().unwrap_or_default(),
-                    self.p4_branch.as_deref().unwrap_or_default()
+                self.p4_stream = Some(bconcat!(
+                    "//",
+                    self.p4_depot.clone().unwrap_or_default(),
+                    "/",
+                    self.p4_branch.clone().unwrap_or_default()
                 ));
             } else {
-                self.p4_stream = Some(format!(
-                    "//{}",
-                    self.p4_depot.as_deref().unwrap_or_default()
-                ));
+                self.p4_stream = Some(bconcat!("//", self.p4_depot.clone().unwrap_or_default()));
             }
         }
 
         self.p4_stream.clone().unwrap_or_default()
     }
 
-    pub fn get_stream_without_label(&self, stream: &str) -> String {
+    pub fn get_stream_without_label(&self, stream: &BStr) -> BString {
         let index = strpos(stream, "@");
         match index {
-            None => stream.to_string(),
-            Some(idx) => legacy_lossy(&substr(stream, 0, Some(idx as i64))).into_owned(),
+            None => stream.to_owned(),
+            Some(idx) => substr(stream, 0, Some(idx as i64)),
         }
     }
 
-    pub fn get_p4_client_spec(&mut self) -> String {
-        let path = self.path.clone();
-        format!("{}/{}.p4.spec", path, self.get_client())
+    pub fn get_p4_client_spec(&mut self) -> PathBuf {
+        let client = self.get_client();
+        path_from_bytes(&bconcat!(&self.path, "/", client, ".p4.spec")).to_path_buf()
     }
 
-    pub fn get_user(&self) -> Option<String> {
+    pub fn get_user(&self) -> Option<BString> {
         self.p4_user.clone()
     }
 
-    pub fn set_user(&mut self, user: Option<String>) {
+    pub fn set_user(&mut self, user: Option<BString>) {
         self.p4_user = user;
     }
 
@@ -262,32 +250,28 @@ impl Perforce {
             .io
             .ask("Enter P4 User:".into(), PhpMixed::Null)?
             .as_string()
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BStr::to_owned);
         let command = if self.windows_flag {
-            format!(
-                "{} set P4USER={}",
+            bconcat!(
                 Self::get_p4_executable(),
-                legacy_lossy(&ProcessExecutor::escape(
-                    self.p4_user.as_deref().unwrap_or_default()
-                ))
+                " set P4USER=",
+                ProcessExecutor::escape(self.p4_user.clone().unwrap_or_default())
             )
         } else {
-            format!(
-                "export P4USER={}",
-                legacy_lossy(&ProcessExecutor::escape(
-                    self.p4_user.as_deref().unwrap_or_default()
-                ))
+            bconcat!(
+                "export P4USER=",
+                ProcessExecutor::escape(self.p4_user.clone().unwrap_or_default())
             )
         };
-        self.execute_command(CommandLine::Shell(bstr::BString::from(command)));
+        self.execute_command(CommandLine::Shell(command));
 
         Ok(())
     }
 
-    fn get_p4_variable(&mut self, name: &str) -> Option<String> {
+    fn get_p4_variable(&mut self, name: &str) -> Option<BString> {
         if self.windows_flag {
-            let command = format!("{} set", Self::get_p4_executable());
-            self.execute_command(CommandLine::Shell(bstr::BString::from(command)));
+            let command = bconcat!(Self::get_p4_executable(), " set");
+            self.execute_command(CommandLine::Shell(command));
             let result = trim(&self.command_result);
             let res_array = explode(PHP_EOL, &result);
             for line in &res_array {
@@ -303,50 +287,56 @@ impl Perforce {
                         None => field1,
                         Some(idx) => substr(&field1, 0, Some(idx as i64)),
                     };
-                    let value = legacy_lossy(&trim(&value)).into_owned();
 
-                    return Some(value);
+                    return Some(trim(&value));
                 }
             }
 
             return None;
         }
 
-        let command = format!("echo ${}", name);
-        self.execute_command(CommandLine::Shell(bstr::BString::from(command)));
-        let result = legacy_lossy(&trim(&self.command_result)).into_owned();
+        let command = bconcat!("echo $", name);
+        self.execute_command(CommandLine::Shell(command));
+        let result = trim(&self.command_result);
 
         Some(result)
     }
 
-    pub fn query_p4_password(&mut self) -> anyhow::Result<Option<String>> {
+    pub fn query_p4_password(&mut self) -> anyhow::Result<Option<BString>> {
         if let Some(ref p) = self.p4_password {
             return Ok(Some(p.clone()));
         }
         let mut password = self.get_p4_variable("P4PASSWD");
         if strlen(password.clone().unwrap_or_default()) <= 0 {
-            password = self.io.ask_and_hide_answer(format!(
-                "Enter password for Perforce user {}: ",
-                self.get_user().unwrap_or_default()
-            ))?;
+            password = self
+                .io
+                .ask_and_hide_answer(format!(
+                    "Enter password for Perforce user {}: ",
+                    self.get_user().unwrap_or_default().display_lossy()
+                ))?
+                .map(BString::from);
         }
         self.p4_password = password.clone();
 
         Ok(password)
     }
 
-    pub fn generate_p4_command(&mut self, arguments: Vec<String>, use_client: bool) -> Vec<String> {
-        let mut p4_command: Vec<String> = vec![Self::get_p4_executable()];
+    pub fn generate_p4_command(
+        &mut self,
+        arguments: Vec<BString>,
+        use_client: bool,
+    ) -> Vec<BString> {
+        let mut p4_command: Vec<BString> = vec![Self::get_p4_executable()];
         if self.get_user().is_some() {
-            p4_command.push("-u".to_string());
+            p4_command.push("-u".into());
             p4_command.push(self.get_user().unwrap_or_default());
         }
         if use_client {
-            p4_command.push("-c".to_string());
+            p4_command.push("-c".into());
             p4_command.push(self.get_client());
         }
-        p4_command.push("-p".to_string());
-        p4_command.push(self.get_port().to_string());
+        p4_command.push("-p".into());
+        p4_command.push(self.get_port().to_owned());
 
         let mut result = p4_command;
         result.extend(arguments);
@@ -354,15 +344,10 @@ impl Perforce {
     }
 
     pub fn is_logged_in(&mut self) -> anyhow::Result<bool> {
-        let command = self.generate_p4_command(vec!["login".to_string(), "-s".to_string()], false);
-        let exit_code = self.execute_command(CommandLine::Args(
-            command
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-        ));
+        let command = self.generate_p4_command(vec!["login".into(), "-s".into()], false);
+        let exit_code = self.execute_command(CommandLine::Args(command));
         if exit_code != 0 {
-            let error_output = legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
+            let error_output = self.process.borrow().get_error_output();
             let user = self.get_user().unwrap_or_default();
             let index = strpos(&error_output, &user);
             if index.is_none() {
@@ -372,11 +357,13 @@ impl Perforce {
                 }
                 return Err(Exception::new(format!(
                     "p4 command not found in path: {}",
-                    error_output
+                    error_output.display_lossy()
                 ))
                 .into());
             }
-            return Err(Exception::new(format!("Invalid user name: {}", user)).into());
+            return Err(
+                Exception::new(format!("Invalid user name: {}", user.display_lossy())).into(),
+            );
         }
 
         Ok(true)
@@ -384,7 +371,7 @@ impl Perforce {
 
     pub fn connect_client(&mut self) -> anyhow::Result<()> {
         let p4_create_client_command =
-            self.generate_p4_command(vec!["client".to_string(), "-i".to_string()], true);
+            self.generate_p4_command(vec!["client".into(), "-i".into()], true);
 
         let mut process = Process::new(
             p4_create_client_command,
@@ -399,35 +386,26 @@ impl Perforce {
         Ok(())
     }
 
-    pub fn sync_code_base(&mut self, source_reference: Option<&str>) -> anyhow::Result<()> {
+    pub fn sync_code_base(&mut self, source_reference: Option<&BStr>) -> anyhow::Result<()> {
         let prev_dir = Platform::get_cwd(false)?;
         chdir(&self.path);
-        let mut p4_sync_command =
-            self.generate_p4_command(vec!["sync".to_string(), "-f".to_string()], true);
+        let mut p4_sync_command = self.generate_p4_command(vec!["sync".into(), "-f".into()], true);
         if let Some(source_reference) = source_reference {
-            p4_sync_command.push(format!("@{}", source_reference));
+            p4_sync_command.push(bconcat!("@", source_reference));
         }
-        self.execute_command(CommandLine::Args(
-            p4_sync_command
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-        ));
+        self.execute_command(CommandLine::Args(p4_sync_command));
         chdir(&prev_dir);
 
         Ok(())
     }
 
     pub fn write_client_spec_to_file(&mut self, spec: &PhpResource) {
+        let client = self.get_client();
+        fwrite(spec, bconcat!("Client: ", client, PHP_EOL, PHP_EOL), None);
         fwrite(
             spec,
-            format!("Client: {}{}{}", self.get_client(), PHP_EOL, PHP_EOL),
-            None,
-        );
-        fwrite(
-            spec,
-            format!(
-                "Update: {}{}{}",
+            bconcat!(
+                "Update: ",
                 date_local("Y/m/d H:i:s", None),
                 PHP_EOL,
                 PHP_EOL
@@ -436,25 +414,26 @@ impl Perforce {
         );
         fwrite(
             spec,
-            format!("Access: {}{}", date_local("Y/m/d H:i:s", None), PHP_EOL),
+            bconcat!("Access: ", date_local("Y/m/d H:i:s", None), PHP_EOL),
             None,
         );
         fwrite(
             spec,
-            format!(
-                "Owner:  {}{}{}",
+            bconcat!(
+                "Owner:  ",
                 self.get_user().unwrap_or_default(),
                 PHP_EOL,
                 PHP_EOL
             ),
             None,
         );
-        fwrite(spec, format!("Description:{}", PHP_EOL), None);
+        fwrite(spec, bconcat!("Description:", PHP_EOL), None);
         fwrite(
             spec,
-            format!(
-                "  Created by {} from composer.{}{}",
+            bconcat!(
+                "  Created by ",
                 self.get_user().unwrap_or_default(),
+                " from composer.",
                 PHP_EOL,
                 PHP_EOL
             ),
@@ -462,31 +441,32 @@ impl Perforce {
         );
         fwrite(
             spec,
-            format!("Root: {}{}{}", self.get_path(), PHP_EOL, PHP_EOL),
+            bconcat!("Root: ", self.get_path(), PHP_EOL, PHP_EOL),
             None,
         );
         fwrite(
             spec,
-            format!(
-                "Options:  noallwrite noclobber nocompress unlocked modtime rmdir{}{}",
-                PHP_EOL, PHP_EOL
+            bconcat!(
+                "Options:  noallwrite noclobber nocompress unlocked modtime rmdir",
+                PHP_EOL,
+                PHP_EOL
             ),
             None,
         );
         fwrite(
             spec,
-            format!("SubmitOptions:  revertunchanged{}{}", PHP_EOL, PHP_EOL),
+            bconcat!("SubmitOptions:  revertunchanged", PHP_EOL, PHP_EOL),
             None,
         );
-        fwrite(spec, format!("LineEnd:  local{}{}", PHP_EOL, PHP_EOL), None);
+        fwrite(spec, bconcat!("LineEnd:  local", PHP_EOL, PHP_EOL), None);
         if self.is_stream() {
-            fwrite(spec, format!("Stream:{}", PHP_EOL), None);
+            fwrite(spec, bconcat!("Stream:", PHP_EOL), None);
             let stream_clone = self.p4_stream.clone().unwrap_or_default();
             fwrite(
                 spec,
-                format!(
-                    "  {}{}",
-                    self.get_stream_without_label(&stream_clone),
+                bconcat!(
+                    "  ",
+                    self.get_stream_without_label(stream_clone.as_bstr()),
                     PHP_EOL
                 ),
                 None,
@@ -496,7 +476,7 @@ impl Perforce {
             let client = self.get_client();
             fwrite(
                 spec,
-                format!("View:  {}/...  //{}/... {}", stream, client, PHP_EOL),
+                bconcat!("View:  ", stream, "/...  //", client, "/... ", PHP_EOL),
                 None,
             );
         }
@@ -520,15 +500,15 @@ impl Perforce {
         }
     }
 
-    pub fn windows_login(&mut self, password: Option<&str>) -> anyhow::Result<i64> {
-        let command = self.generate_p4_command(vec!["login".to_string(), "-a".to_string()], true);
+    pub fn windows_login(&mut self, password: Option<&BStr>) -> anyhow::Result<i64> {
+        let command = self.generate_p4_command(vec!["login".into(), "-a".into()], true);
 
         let mut process = Process::new(
             command,
             None,
             None,
             password
-                .map(|s| PhpMixed::string(s.to_string()))
+                .map(|s| PhpMixed::string(s.to_owned()))
                 .unwrap_or(PhpMixed::Null),
             None,
         )?;
@@ -541,10 +521,9 @@ impl Perforce {
         if !self.is_logged_in()? {
             let password = self.query_p4_password()?;
             if self.windows_flag {
-                self.windows_login(password.as_deref())?;
+                self.windows_login(password.as_ref().map(|p| p.as_bstr()))?;
             } else {
-                let command =
-                    self.generate_p4_command(vec!["login".to_string(), "-a".to_string()], false);
+                let command = self.generate_p4_command(vec!["login".into(), "-a".into()], false);
 
                 let mut process = Process::new(
                     command,
@@ -570,9 +549,9 @@ impl Perforce {
 
     pub fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
-        let composer_file_content = self.get_file_content("composer.json", identifier);
+        let composer_file_content = self.get_file_content(B("composer.json").as_bstr(), identifier);
 
         let composer_file_content = match composer_file_content {
             None => return Ok(None),
@@ -587,16 +566,11 @@ impl Perforce {
         })
     }
 
-    pub fn get_file_content(&mut self, file: &str, identifier: &str) -> Option<String> {
+    pub fn get_file_content(&mut self, file: &BStr, identifier: &BStr) -> Option<BString> {
         let path = self.get_file_path(file, identifier)?;
 
-        let command = self.generate_p4_command(vec!["print".to_string(), path], true);
-        self.execute_command(CommandLine::Args(
-            command
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-        ));
+        let command = self.generate_p4_command(vec!["print".into(), path], true);
+        self.execute_command(CommandLine::Args(command));
         let result = self.command_result.clone();
 
         if trim(&result).is_empty() {
@@ -606,26 +580,21 @@ impl Perforce {
         Some(result)
     }
 
-    pub fn get_file_path(&mut self, file: &str, identifier: &str) -> Option<String> {
+    pub fn get_file_path(&mut self, file: &BStr, identifier: &BStr) -> Option<BString> {
         let index = strpos(identifier, "@");
         if index.is_none() {
-            return Some(format!("{}/{}", identifier, file));
+            return Some(bconcat!(identifier, "/", file));
         }
         let idx = index.unwrap() as i64;
 
-        let path = format!(
-            "{}/{}{}",
-            legacy_lossy(&substr(identifier, 0, Some(idx))),
+        let path = bconcat!(
+            substr(identifier, 0, Some(idx)),
+            "/",
             file,
-            legacy_lossy(&substr(identifier, idx, None))
+            substr(identifier, idx, None)
         );
-        let command = self.generate_p4_command(vec!["files".to_string(), path], false);
-        self.execute_command(CommandLine::Args(
-            command
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-        ));
+        let command = self.generate_p4_command(vec!["files".into(), path], false);
+        self.execute_command(CommandLine::Args(command));
         let result = self.command_result.clone();
         let index2 = strpos(&result, "no such file(s).");
         if index2.is_none() {
@@ -634,11 +603,12 @@ impl Perforce {
                 let phrase = trim(substr(&result, i3 as i64, None));
                 let fields = explode(" ", &phrase);
 
-                return Some(format!(
-                    "{}/{}@{}",
-                    legacy_lossy(&substr(identifier, 0, Some(idx))),
+                return Some(bconcat!(
+                    substr(identifier, 0, Some(idx)),
+                    "/",
                     file,
-                    legacy_lossy(&fields.get(1).cloned().unwrap_or_default())
+                    "@",
+                    fields.get(1).cloned().unwrap_or_default()
                 ));
             }
         }
@@ -646,56 +616,38 @@ impl Perforce {
         None
     }
 
-    pub fn get_branches(&mut self) -> IndexMap<String, String> {
-        let mut possible_branches: IndexMap<String, String> = IndexMap::new();
+    pub fn get_branches(&mut self) -> IndexMap<BString, BString> {
+        let mut possible_branches: IndexMap<BString, BString> = IndexMap::new();
         if !self.is_stream() {
-            possible_branches.insert(
-                self.p4_branch.clone().unwrap_or_default(),
-                self.get_stream(),
-            );
+            let stream = self.get_stream();
+            possible_branches.insert(self.p4_branch.clone().unwrap_or_default(), stream);
         } else {
             let command = self.generate_p4_command(
                 vec![
-                    "streams".to_string(),
-                    format!("//{}/...", self.p4_depot.as_deref().unwrap_or_default()),
+                    "streams".into(),
+                    bconcat!("//", self.p4_depot.clone().unwrap_or_default(), "/..."),
                 ],
                 true,
             );
-            self.execute_command(CommandLine::Args(
-                command
-                    .into_iter()
-                    .map(bstr::BString::from)
-                    .collect::<Vec<_>>(),
-            ));
+            self.execute_command(CommandLine::Args(command));
             let result = self.command_result.clone();
             let res_array = explode(PHP_EOL, &result);
             for line in &res_array {
                 let res_bits = explode(" ", line);
                 if res_bits.len() > 4 {
-                    let branch = legacy_lossy(&preg_replace(
+                    let branch = preg_replace(
                         php_regex!(r"/[^A-Za-z0-9 ]/"),
                         "",
                         res_bits.get(4).cloned().unwrap_or_default(),
-                    ))
-                    .into_owned();
-                    possible_branches.insert(
-                        branch,
-                        legacy_lossy(&res_bits.get(1).cloned().unwrap_or_default()).into_owned(),
                     );
+                    possible_branches.insert(branch, res_bits.get(1).cloned().unwrap_or_default());
                 }
             }
         }
         let stream = self.get_stream();
-        let command = self.generate_p4_command(
-            vec!["changes".to_string(), format!("{}/...", stream)],
-            false,
-        );
-        self.execute_command(CommandLine::Args(
-            command
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-        ));
+        let command =
+            self.generate_p4_command(vec!["changes".into(), bconcat!(stream, "/...")], false);
+        self.execute_command(CommandLine::Args(command));
         let result = self.command_result.clone();
         let res_array = explode(PHP_EOL, &result);
         let last_commit = res_array.first().cloned().unwrap_or_default();
@@ -704,36 +656,31 @@ impl Perforce {
 
         let mut result = IndexMap::new();
         result.insert(
-            "master".to_string(),
-            format!(
-                "{}@{}",
+            "master".into(),
+            bconcat!(
                 possible_branches
-                    .get(self.p4_branch.as_deref().unwrap_or_default())
+                    .get(self.p4_branch.clone().unwrap_or_default().as_slice())
                     .cloned()
                     .unwrap_or_default(),
-                legacy_lossy(&last_commit_num)
+                "@",
+                last_commit_num
             ),
         );
         result
     }
 
-    pub fn get_tags(&mut self) -> IndexMap<String, String> {
-        let command = self.generate_p4_command(vec!["labels".to_string()], true);
-        self.execute_command(CommandLine::Args(
-            command
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-        ));
+    pub fn get_tags(&mut self) -> IndexMap<BString, BString> {
+        let command = self.generate_p4_command(vec!["labels".into()], true);
+        self.execute_command(CommandLine::Args(command));
         let result = self.command_result.clone();
         let res_array = explode(PHP_EOL, &result);
-        let mut tags: IndexMap<String, String> = IndexMap::new();
+        let mut tags: IndexMap<BString, BString> = IndexMap::new();
         let stream = self.get_stream();
         for line in &res_array {
             if strpos(line, "Label").is_some() {
                 let fields = explode(" ", line);
-                let key = legacy_lossy(&fields.get(1).cloned().unwrap_or_default()).into_owned();
-                tags.insert(key.clone(), format!("{}@{}", stream, key));
+                let key = fields.get(1).cloned().unwrap_or_default();
+                tags.insert(key.clone(), bconcat!(stream, "@", key));
             }
         }
 
@@ -741,26 +688,19 @@ impl Perforce {
     }
 
     pub fn check_stream(&mut self) -> bool {
-        let command = self.generate_p4_command(vec!["depots".to_string()], false);
-        self.execute_command(CommandLine::Args(
-            command
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-        ));
+        let command = self.generate_p4_command(vec!["depots".into()], false);
+        self.execute_command(CommandLine::Args(command));
         let result = self.command_result.clone();
         let res_array = explode(PHP_EOL, &result);
         for line in &res_array {
             if strpos(line, "Depot").is_some() {
                 let fields = explode(" ", line);
                 if strcmp(
-                    self.p4_depot.as_deref().unwrap_or_default(),
-                    &*legacy_lossy(fields.get(1).map(|s| s.as_slice()).unwrap_or_default()),
+                    self.p4_depot.clone().unwrap_or_default(),
+                    fields.get(1).map(|s| s.as_slice()).unwrap_or_default(),
                 ) == 0
                 {
-                    self.p4_depot_type = Some(
-                        legacy_lossy(&fields.get(3).cloned().unwrap_or_default()).into_owned(),
-                    );
+                    self.p4_depot_type = Some(fields.get(3).cloned().unwrap_or_default());
 
                     return self.is_stream();
                 }
@@ -770,47 +710,37 @@ impl Perforce {
         false
     }
 
-    fn get_change_list(&mut self, reference: &str) -> Option<String> {
+    fn get_change_list(&mut self, reference: &BStr) -> Option<BString> {
         let index = strpos(reference, "@")?;
-        let label = legacy_lossy(&substr(reference, index as i64, None)).into_owned();
-        let command =
-            self.generate_p4_command(vec!["changes".to_string(), "-m1".to_string(), label], true);
-        self.execute_command(CommandLine::Args(
-            command
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-        ));
+        let label = substr(reference, index as i64, None);
+        let command = self.generate_p4_command(vec!["changes".into(), "-m1".into(), label], true);
+        self.execute_command(CommandLine::Args(command));
         let changes = self.command_result.clone();
         if strpos(&changes, "Change") != Some(0) {
             return None;
         }
         let fields = explode(" ", &changes);
 
-        Some(legacy_lossy(&fields.get(1).cloned().unwrap_or_default()).into_owned())
+        Some(fields.get(1).cloned().unwrap_or_default())
     }
 
-    pub fn get_commit_logs(&mut self, from_reference: &str, to_reference: &str) -> Option<String> {
+    pub fn get_commit_logs(
+        &mut self,
+        from_reference: &BStr,
+        to_reference: &BStr,
+    ) -> Option<BString> {
         let from_change_list = self.get_change_list(from_reference)?;
         let to_change_list = self.get_change_list(to_reference)?;
         let index = strpos(from_reference, "@").unwrap_or(0);
-        let main = format!(
-            "{}/...",
-            legacy_lossy(&substr(from_reference, 0, Some(index as i64)))
-        );
+        let main = bconcat!(substr(from_reference, 0, Some(index as i64)), "/...");
         let command = self.generate_p4_command(
             vec![
-                "filelog".to_string(),
-                format!("{}@{},{}", main, from_change_list, to_change_list),
+                "filelog".into(),
+                bconcat!(main, "@", from_change_list, ",", to_change_list),
             ],
             true,
         );
-        self.execute_command(CommandLine::Args(
-            command
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-        ));
+        self.execute_command(CommandLine::Args(command));
 
         Some(self.command_result.clone())
     }
@@ -829,13 +759,13 @@ impl Perforce {
         self.filesystem = Some(fs);
     }
 
-    fn get_p4_executable() -> String {
-        static P4_EXECUTABLE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    fn get_p4_executable() -> BString {
+        static P4_EXECUTABLE: std::sync::OnceLock<BString> = std::sync::OnceLock::new();
 
         P4_EXECUTABLE
             .get_or_init(|| {
                 let finder = ExecutableFinder::new();
-                finder.find("p4", None, &[]).unwrap_or("p4".to_string())
+                BString::from(finder.find("p4", None, &[]).unwrap_or("p4".to_string()))
             })
             .clone()
     }
@@ -843,31 +773,31 @@ impl Perforce {
 
 /// Seam over `Perforce` so consumers can be exercised with a mock in tests.
 pub trait PerforceInterface: std::fmt::Debug {
-    fn initialize_path(&mut self, path: &str);
-    fn set_stream(&mut self, stream: &str);
+    fn initialize_path(&mut self, path: &Path);
+    fn set_stream(&mut self, stream: &BStr);
     fn p4_login(&mut self) -> anyhow::Result<()>;
     fn check_stream(&mut self) -> bool;
     fn write_p4_client_spec(&mut self) -> anyhow::Result<()>;
     fn connect_client(&mut self) -> anyhow::Result<()>;
-    fn sync_code_base(&mut self, source_reference: Option<String>) -> anyhow::Result<()>;
+    fn sync_code_base(&mut self, source_reference: Option<BString>) -> anyhow::Result<()>;
     fn cleanup_client_spec(&mut self);
-    fn get_commit_logs(&mut self, from_reference: &str, to_reference: &str) -> Option<String>;
-    fn get_file_content(&mut self, file: &str, identifier: &str) -> Option<String>;
-    fn get_branches(&mut self) -> IndexMap<String, String>;
-    fn get_tags(&mut self) -> IndexMap<String, String>;
-    fn get_user(&self) -> Option<String>;
+    fn get_commit_logs(&mut self, from_reference: &BStr, to_reference: &BStr) -> Option<BString>;
+    fn get_file_content(&mut self, file: &BStr, identifier: &BStr) -> Option<BString>;
+    fn get_branches(&mut self) -> IndexMap<BString, BString>;
+    fn get_tags(&mut self) -> IndexMap<BString, BString>;
+    fn get_user(&self) -> Option<BString>;
     fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>>;
 }
 
 impl PerforceInterface for Perforce {
-    fn initialize_path(&mut self, path: &str) {
+    fn initialize_path(&mut self, path: &Path) {
         Perforce::initialize_path(self, path)
     }
 
-    fn set_stream(&mut self, stream: &str) {
+    fn set_stream(&mut self, stream: &BStr) {
         Perforce::set_stream(self, stream)
     }
 
@@ -887,37 +817,37 @@ impl PerforceInterface for Perforce {
         Perforce::connect_client(self)
     }
 
-    fn sync_code_base(&mut self, source_reference: Option<String>) -> anyhow::Result<()> {
-        Perforce::sync_code_base(self, source_reference.as_deref())
+    fn sync_code_base(&mut self, source_reference: Option<BString>) -> anyhow::Result<()> {
+        Perforce::sync_code_base(self, source_reference.as_ref().map(|r| r.as_bstr()))
     }
 
     fn cleanup_client_spec(&mut self) {
         Perforce::cleanup_client_spec(self)
     }
 
-    fn get_commit_logs(&mut self, from_reference: &str, to_reference: &str) -> Option<String> {
+    fn get_commit_logs(&mut self, from_reference: &BStr, to_reference: &BStr) -> Option<BString> {
         Perforce::get_commit_logs(self, from_reference, to_reference)
     }
 
-    fn get_file_content(&mut self, file: &str, identifier: &str) -> Option<String> {
+    fn get_file_content(&mut self, file: &BStr, identifier: &BStr) -> Option<BString> {
         Perforce::get_file_content(self, file, identifier)
     }
 
-    fn get_branches(&mut self) -> IndexMap<String, String> {
+    fn get_branches(&mut self) -> IndexMap<BString, BString> {
         Perforce::get_branches(self)
     }
 
-    fn get_tags(&mut self) -> IndexMap<String, String> {
+    fn get_tags(&mut self) -> IndexMap<BString, BString> {
         Perforce::get_tags(self)
     }
 
-    fn get_user(&self) -> Option<String> {
+    fn get_user(&self) -> Option<BString> {
         Perforce::get_user(self)
     }
 
     fn get_composer_information(
         &mut self,
-        identifier: &str,
+        identifier: &BStr,
     ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>> {
         Perforce::get_composer_information(self, identifier)
     }

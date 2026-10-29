@@ -83,7 +83,6 @@
 2 crates/shirabe/src/util/http_downloader.rs
 1 crates/shirabe/src/util/local_filesystem.rs
 5 crates/shirabe/src/util/no_proxy_pattern.rs
-1 crates/shirabe/src/util/perforce.rs
 2 crates/shirabe/src/util/platform.rs
 3 crates/shirabe/src/util/remote_filesystem.rs
 3 crates/shirabe/src/util/stream_context_factory.rs

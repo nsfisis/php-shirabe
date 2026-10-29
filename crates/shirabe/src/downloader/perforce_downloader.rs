@@ -11,7 +11,7 @@ use crate::repository::VcsRepository;
 use crate::util::{Filesystem, Perforce, PerforceInterface, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, impl_php_class, legacy_lossy, path_to_bytes, strpos, substr};
+use shirabe_php_shim::{PhpMixed, impl_php_class, strpos, substr};
 use std::path::Path;
 
 #[derive(Debug)]
@@ -47,11 +47,9 @@ impl PerforceDownloader {
         None
     }
 
-    // TODO(bytes): the Perforce utility holds paths and URLs as Strings.
-    pub fn init_perforce(&self, package: PackageInterfaceHandle, path: &Path, url: String) {
-        let path = legacy_lossy(path_to_bytes(path)).into_owned();
+    pub fn init_perforce(&self, package: PackageInterfaceHandle, path: &Path, url: BString) {
         if let Some(perforce) = self.perforce.borrow_mut().as_mut() {
-            perforce.initialize_path(&path);
+            perforce.initialize_path(path);
             return;
         }
 
@@ -68,7 +66,7 @@ impl PerforceDownloader {
         *self.perforce.borrow_mut() = Some(Box::new(Perforce::create(
             repo_config.unwrap_or_default(),
             url,
-            path,
+            path.to_path_buf(),
             self.inner.process.clone(),
             self.inner.io.clone(),
         )));
@@ -128,15 +126,15 @@ impl VcsDownloader for PerforceDownloader {
             "Cloning {}",
             source_ref.clone().unwrap_or_default().display_lossy()
         ));
-        self.init_perforce(package, path, legacy_lossy(url).into_owned());
+        self.init_perforce(package, path, url.to_owned());
         {
             let mut perforce = self.perforce.borrow_mut();
             let perforce = perforce.as_mut().unwrap();
-            perforce.set_stream(&legacy_lossy(&source_ref.unwrap_or_default()));
+            perforce.set_stream(source_ref.unwrap_or_default().as_bstr());
             perforce.p4_login();
             perforce.write_p4_client_spec();
             perforce.connect_client();
-            perforce.sync_code_base(label.map(|l| legacy_lossy(&l).into_owned()));
+            perforce.sync_code_base(label);
             perforce.cleanup_client_spec();
         }
 
@@ -164,8 +162,7 @@ impl VcsDownloader for PerforceDownloader {
             .borrow_mut()
             .as_mut()
             .unwrap()
-            .get_commit_logs(&legacy_lossy(from_reference), &legacy_lossy(to_reference))
-            .map(BString::from)
+            .get_commit_logs(from_reference, to_reference)
             .unwrap_or_default())
     }
 

@@ -23,22 +23,22 @@ mockall::mock! {
     #[derive(Debug)]
     pub Perforce {}
     impl shirabe::util::PerforceInterface for Perforce {
-        fn initialize_path(&mut self, path: &str);
-        fn set_stream(&mut self, stream: &str);
+        fn initialize_path(&mut self, path: &std::path::Path);
+        fn set_stream(&mut self, stream: &bstr::BStr);
         fn p4_login(&mut self) -> anyhow::Result<()>;
         fn check_stream(&mut self) -> bool;
         fn write_p4_client_spec(&mut self) -> anyhow::Result<()>;
         fn connect_client(&mut self) -> anyhow::Result<()>;
-        fn sync_code_base(&mut self, source_reference: Option<String>) -> anyhow::Result<()>;
+        fn sync_code_base(&mut self, source_reference: Option<BString>) -> anyhow::Result<()>;
         fn cleanup_client_spec(&mut self);
-        fn get_commit_logs(&mut self, from_reference: &str, to_reference: &str) -> Option<String>;
-        fn get_file_content(&mut self, file: &str, identifier: &str) -> Option<String>;
-        fn get_branches(&mut self) -> IndexMap<String, String>;
-        fn get_tags(&mut self) -> IndexMap<String, String>;
-        fn get_user(&self) -> Option<String>;
+        fn get_commit_logs(&mut self, from_reference: &bstr::BStr, to_reference: &bstr::BStr) -> Option<BString>;
+        fn get_file_content(&mut self, file: &bstr::BStr, identifier: &bstr::BStr) -> Option<BString>;
+        fn get_branches(&mut self) -> IndexMap<BString, BString>;
+        fn get_tags(&mut self) -> IndexMap<BString, BString>;
+        fn get_user(&self) -> Option<BString>;
         fn get_composer_information(
             &mut self,
-            identifier: &str,
+            identifier: &bstr::BStr,
         ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>>;
     }
 }
@@ -193,7 +193,7 @@ fn test_has_composer_file_returns_false_on_no_composer_file() {
     perforce.expect_connect_client().returning(|| Ok(()));
     perforce
         .expect_get_composer_information()
-        .withf(move |id: &str| id == formatted_depot_path)
+        .withf(move |id: &bstr::BStr| id == formatted_depot_path)
         .returning(|_| Ok(Some(IndexMap::new())));
     driver.__override_perforce(Box::new(perforce));
 
@@ -222,7 +222,7 @@ fn test_has_composer_file_returns_true_with_one_or_more_composer_files() {
     perforce.expect_connect_client().returning(|| Ok(()));
     perforce
         .expect_get_composer_information()
-        .withf(move |id: &str| id == formatted_depot_path)
+        .withf(move |id: &bstr::BStr| id == formatted_depot_path)
         .returning(|_| {
             // ref: returnValue(['']) — a non-empty list with one empty-string element.
             let mut info: IndexMap<BString, PhpMixed> = IndexMap::new();

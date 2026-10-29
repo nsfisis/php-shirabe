@@ -9,8 +9,8 @@ use crate::util::{Perforce, PerforceInterface, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    BadMethodCallException, PhpMixed, RuntimeException, bconcat, legacy_lossy, path_from_bytes,
-    php_regex, preg_is_match,
+    BadMethodCallException, PhpMixed, RuntimeException, bconcat, path_from_bytes, php_regex,
+    preg_is_match,
 };
 
 #[derive(Debug)]
@@ -72,23 +72,21 @@ impl PerforceDriver {
         }
 
         let cache_vcs_dir = BString::from(
-            &BString::from(
-                self.inner
-                    .config
-                    .borrow_mut()
-                    .get(&legacy_lossy(b"cache-vcs-dir".as_slice()))
-                    .as_string()
-                    .unwrap_or_default(),
-            )[..],
+            self.inner
+                .config
+                .borrow_mut()
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or_default(),
         );
         if !Cache::is_usable(path_from_bytes(&cache_vcs_dir)) {
             return Err(RuntimeException::new("PerforceDriver requires a usable cache directory, and it looks like you set it to be disabled".to_string()).into());
         }
 
-        let repo_dir = legacy_lossy(&bconcat!(cache_vcs_dir, "/", self.depot)).into_owned();
+        let repo_dir = path_from_bytes(&bconcat!(cache_vcs_dir, "/", self.depot)).to_path_buf();
         self.perforce = Some(Box::new(Perforce::create(
             repo_config.clone(),
-            legacy_lossy(&self.inner.url.clone()).into_owned(),
+            self.inner.url.clone(),
             repo_dir,
             self.inner.process.clone(),
             self.inner.io.clone(),
@@ -112,13 +110,12 @@ impl PerforceDriver {
             .perforce
             .as_mut()
             .unwrap()
-            .get_file_content(&legacy_lossy(file), &legacy_lossy(identifier))
-            .map(bstr::BString::from))
+            .get_file_content(file, identifier))
     }
 
     pub fn get_change_date(
         &self,
-        _identifier: &str,
+        _identifier: &BStr,
     ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
         Ok(None)
     }
@@ -128,14 +125,14 @@ impl PerforceDriver {
     }
 
     pub fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
-        Ok(bytes_map(self.perforce.as_mut().unwrap().get_branches()))
+        Ok(self.perforce.as_mut().unwrap().get_branches())
     }
 
     pub fn get_tags(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
-        Ok(bytes_map(self.perforce.as_mut().unwrap().get_tags()))
+        Ok(self.perforce.as_mut().unwrap().get_tags())
     }
 
-    pub fn get_dist(&self, _identifier: &str) -> Option<IndexMap<BString, PhpMixed>> {
+    pub fn get_dist(&self, _identifier: &BStr) -> Option<IndexMap<BString, PhpMixed>> {
         None
     }
 
@@ -172,11 +169,11 @@ impl PerforceDriver {
     }
 
     pub fn has_composer_file(&mut self, identifier: &BStr) -> bool {
-        let path = legacy_lossy(&bconcat!("//", self.depot, "/", identifier)).into_owned();
+        let path = bconcat!("//", self.depot, "/", identifier);
         self.perforce
             .as_mut()
             .unwrap()
-            .get_composer_information(&path)
+            .get_composer_information(path.as_bstr())
             .is_ok_and(|info| info.is_some_and(|i| !i.is_empty()))
     }
 
@@ -194,10 +191,7 @@ impl PerforceDriver {
         deep: bool,
     ) -> anyhow::Result<bool> {
         if deep || preg_is_match(php_regex!(r"#\b(perforce|p4)\b#i"), url) {
-            return Perforce::check_server_exists(
-                &legacy_lossy(url),
-                &mut ProcessExecutor::new(Some(io)),
-            );
+            return Perforce::check_server_exists(url, &mut ProcessExecutor::new(Some(io)));
         }
         Ok(false)
     }
@@ -213,7 +207,7 @@ impl PerforceDriver {
         let file_content = self.get_file_content(bstr::BStr::new("composer.json"), identifier)?;
         let composer =
             VcsDriverBase::finish_base_composer_information(identifier, file_content, || {
-                self.get_change_date(&legacy_lossy(identifier))
+                self.get_change_date(identifier)
             })?;
 
         self.inner.write_cached_composer(identifier, composer)
@@ -258,13 +252,11 @@ impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
         &mut self,
         identifier: &BStr,
     ) -> anyhow::Result<Option<chrono::DateTime<chrono::FixedOffset>>> {
-        PerforceDriver::get_change_date(self, &legacy_lossy(identifier))
+        PerforceDriver::get_change_date(self, identifier)
     }
 
     fn get_root_identifier(&mut self) -> anyhow::Result<BString> {
-        Ok(bstr::BString::from(
-            legacy_lossy(PerforceDriver::get_root_identifier(self)).into_owned(),
-        ))
+        Ok(PerforceDriver::get_root_identifier(self).to_owned())
     }
 
     fn get_branches(&mut self) -> anyhow::Result<IndexMap<BString, BString>> {
@@ -276,7 +268,7 @@ impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
     }
 
     fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
-        PerforceDriver::get_dist(self, &legacy_lossy(identifier)).map(|m| {
+        PerforceDriver::get_dist(self, identifier).map(|m| {
             m.into_iter()
                 .map(|(k, v)| (k.clone(), BString::from(v.as_string().unwrap_or_default())))
                 .collect()
@@ -310,11 +302,4 @@ impl crate::repository::vcs::VcsDriverInterface for PerforceDriver {
     ) -> anyhow::Result<bool> {
         PerforceDriver::supports(io, config, url, deep)
     }
-}
-
-// TODO(bytes): Perforce returns branch and tag maps as Strings.
-fn bytes_map(map: IndexMap<String, String>) -> IndexMap<BString, BString> {
-    map.into_iter()
-        .map(|(k, v)| (BString::from(k), BString::from(v)))
-        .collect()
 }

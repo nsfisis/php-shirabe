@@ -24,22 +24,22 @@ mockall::mock! {
     #[derive(Debug)]
     pub Perforce {}
     impl shirabe::util::PerforceInterface for Perforce {
-        fn initialize_path(&mut self, path: &str);
-        fn set_stream(&mut self, stream: &str);
+        fn initialize_path(&mut self, path: &std::path::Path);
+        fn set_stream(&mut self, stream: &bstr::BStr);
         fn p4_login(&mut self) -> anyhow::Result<()>;
         fn check_stream(&mut self) -> bool;
         fn write_p4_client_spec(&mut self) -> anyhow::Result<()>;
         fn connect_client(&mut self) -> anyhow::Result<()>;
-        fn sync_code_base(&mut self, source_reference: Option<String>) -> anyhow::Result<()>;
+        fn sync_code_base(&mut self, source_reference: Option<BString>) -> anyhow::Result<()>;
         fn cleanup_client_spec(&mut self);
-        fn get_commit_logs(&mut self, from_reference: &str, to_reference: &str) -> Option<String>;
-        fn get_file_content(&mut self, file: &str, identifier: &str) -> Option<String>;
-        fn get_branches(&mut self) -> IndexMap<String, String>;
-        fn get_tags(&mut self) -> IndexMap<String, String>;
-        fn get_user(&self) -> Option<String>;
+        fn get_commit_logs(&mut self, from_reference: &bstr::BStr, to_reference: &bstr::BStr) -> Option<BString>;
+        fn get_file_content(&mut self, file: &bstr::BStr, identifier: &bstr::BStr) -> Option<BString>;
+        fn get_branches(&mut self) -> IndexMap<BString, BString>;
+        fn get_tags(&mut self) -> IndexMap<BString, BString>;
+        fn get_user(&self) -> Option<BString>;
         fn get_composer_information(
             &mut self,
-            identifier: &str,
+            identifier: &bstr::BStr,
         ) -> anyhow::Result<Option<IndexMap<BString, PhpMixed>>>;
     }
 }
@@ -93,7 +93,7 @@ fn test_init_perforce_instantiates_a_new_perforce_object() {
     let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     let downloader = PerforceDownloader::new(io, config, process, fs);
 
-    downloader.init_perforce(package, test_path.path(), "SOURCE_REF".to_string());
+    downloader.init_perforce(package, test_path.path(), "SOURCE_REF".into());
 }
 
 #[test]
@@ -114,12 +114,12 @@ fn test_init_perforce_does_nothing_if_perforce_already_set() {
     downloader.set_perforce(Box::new(perforce));
 
     let package = make_package(None);
-    downloader.init_perforce(package, test_path.path(), "SOURCE_REF".to_string());
+    downloader.init_perforce(package, test_path.path(), "SOURCE_REF".into());
 }
 
 #[test]
 fn test_do_install_with_tag() {
-    do_install_workflow("SOURCE_REF@123", Some("123".to_string()));
+    do_install_workflow("SOURCE_REF@123", Some("123".into()));
 }
 
 #[test]
@@ -129,7 +129,7 @@ fn test_do_install_with_no_tag() {
 
 // Shared body for testDoInstallWithTag / testDoInstallWithNoTag: enforce the install workflow
 // against a mocked Perforce, asserting each step is invoked exactly once.
-fn do_install_workflow(source_ref: &'static str, expected_label: Option<String>) {
+fn do_install_workflow(source_ref: &'static str, expected_label: Option<BString>) {
     let test_path = TempDir::new().unwrap();
     let test_path_str = test_path.path().to_str().unwrap().to_string();
 
@@ -153,12 +153,14 @@ fn do_install_workflow(source_ref: &'static str, expected_label: Option<String>)
     perforce
         .expect_initialize_path()
         .times(1)
-        .withf(move |path: &str| path == expected_path)
+        .withf(move |path: &std::path::Path| {
+            bstr::BStr::new(shirabe_php_shim::path_to_bytes(path)) == expected_path
+        })
         .returning(|_| ());
     perforce
         .expect_set_stream()
         .times(1)
-        .withf(move |stream: &str| stream == source_ref)
+        .withf(move |stream: &bstr::BStr| stream == source_ref)
         .returning(|_| ());
     perforce.expect_p4_login().times(1).returning(|| Ok(()));
     perforce
@@ -172,7 +174,7 @@ fn do_install_workflow(source_ref: &'static str, expected_label: Option<String>)
     perforce
         .expect_sync_code_base()
         .times(1)
-        .withf(move |reference: &Option<String>| *reference == expected_label)
+        .withf(move |reference: &Option<BString>| *reference == expected_label)
         .returning(|_| Ok(()));
     perforce
         .expect_cleanup_client_spec()

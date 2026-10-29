@@ -2,14 +2,14 @@
 
 use crate::io_stub::IOStub;
 use crate::process_executor_mock::{cmd, cmd_full, get_process_executor_mock};
-use bstr::BString;
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use serial_test::serial;
 use shirabe::io::{IOInterface, NullIO};
 use shirabe::util::Perforce;
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::{MockHandler, ProcessExecutor};
-use shirabe_php_shim::{PHP_EOL, PhpMixed, legacy_lossy};
+use shirabe_php_shim::{PHP_EOL, PhpMixed, legacy_lossy, path_to_bytes};
 
 const TEST_DEPOT: &str = "depot";
 const TEST_BRANCH: &str = "branch";
@@ -36,8 +36,8 @@ fn create_new_perforce_with_windows_flag(flag: bool) -> Perforce {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     Perforce::new(
         get_test_repo_config(),
-        TEST_PORT.to_string(),
-        TEST_PATH.to_string(),
+        TEST_PORT.into(),
+        TEST_PATH.into(),
         process,
         flag,
         io,
@@ -53,8 +53,8 @@ fn create_perforce(
 ) -> Perforce {
     Perforce::new(
         get_test_repo_config(),
-        TEST_PORT.to_string(),
-        TEST_PATH.to_string(),
+        TEST_PORT.into(),
+        TEST_PATH.into(),
         process,
         flag,
         io,
@@ -99,7 +99,7 @@ fn test_get_client_without_stream() {
 #[test]
 fn test_get_client_from_stream() {
     let mut perforce = create_new_perforce_with_windows_flag(true);
-    perforce.set_stream("//depot/branch");
+    perforce.set_stream("//depot/branch".into());
 
     let client = perforce.get_client();
 
@@ -118,7 +118,7 @@ fn test_get_stream_without_stream() {
 #[test]
 fn test_get_stream_with_stream() {
     let mut perforce = create_new_perforce_with_windows_flag(true);
-    perforce.set_stream("//depot/branch");
+    perforce.set_stream("//depot/branch".into());
 
     let stream = perforce.get_stream();
     assert_eq!("//depot/branch", stream);
@@ -128,7 +128,7 @@ fn test_get_stream_with_stream() {
 fn test_get_stream_without_label_with_stream_without_label() {
     let perforce = create_new_perforce_with_windows_flag(true);
 
-    let stream = perforce.get_stream_without_label("//depot/branch");
+    let stream = perforce.get_stream_without_label("//depot/branch".into());
     assert_eq!("//depot/branch", stream);
 }
 
@@ -136,7 +136,7 @@ fn test_get_stream_without_label_with_stream_without_label() {
 fn test_get_stream_without_label_with_stream_with_label() {
     let perforce = create_new_perforce_with_windows_flag(true);
 
-    let stream = perforce.get_stream_without_label("//depot/branching@label");
+    let stream = perforce.get_stream_without_label("//depot/branching@label".into());
     assert_eq!("//depot/branching", stream);
 }
 
@@ -146,15 +146,14 @@ fn test_get_client_spec() {
 
     let client_spec = perforce.get_p4_client_spec();
     let expected = "path/composer_perforce_TEST_depot.p4.spec";
-    assert_eq!(expected, client_spec);
+    assert_eq!(expected, BStr::new(path_to_bytes(&client_spec)));
 }
 
 #[test]
 fn test_generate_p4_command() {
     let mut perforce = create_new_perforce_with_windows_flag(true);
 
-    let p4_command =
-        perforce.generate_p4_command(vec!["do".to_string(), "something".to_string()], true);
+    let p4_command = perforce.generate_p4_command(vec!["do".into(), "something".into()], true);
     let expected = vec![
         "p4".to_string(),
         "-u".to_string(),
@@ -174,7 +173,7 @@ fn test_query_p4_user_with_user_already_set() {
     let mut perforce = create_new_perforce_with_windows_flag(true);
 
     perforce.query_p4_user().unwrap();
-    assert_eq!(Some(TEST_P4USER.to_string()), perforce.get_user());
+    assert_eq!(Some(BString::from(TEST_P4USER)), perforce.get_user());
 }
 
 #[test]
@@ -196,7 +195,7 @@ fn test_query_p4_user_with_user_set_in_p4_variables_with_windows_os() {
 
     perforce.query_p4_user().unwrap();
     assert_eq!(
-        Some("TEST_P4VARIABLE_USER".to_string()),
+        Some(BString::from("TEST_P4VARIABLE_USER")),
         perforce.get_user()
     );
 }
@@ -220,7 +219,7 @@ fn test_query_p4_user_with_user_set_in_p4_variables_not_windows_os() {
 
     perforce.query_p4_user().unwrap();
     assert_eq!(
-        Some("TEST_P4VARIABLE_USER".to_string()),
+        Some(BString::from("TEST_P4VARIABLE_USER")),
         perforce.get_user()
     );
 }
@@ -238,7 +237,7 @@ fn test_query_p4_user_queries_for_user() {
     perforce.set_user(None);
 
     perforce.query_p4_user().unwrap();
-    assert_eq!(Some("TEST_QUERY_USER".to_string()), perforce.get_user());
+    assert_eq!(Some(BString::from("TEST_QUERY_USER")), perforce.get_user());
 }
 
 #[test]
@@ -339,15 +338,15 @@ fn test_query_p4_password_with_password_already_set() {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = Perforce::new(
         repo_config,
-        "port".to_string(),
-        "path".to_string(),
+        "port".into(),
+        "path".into(),
         process,
         false,
         io,
     );
 
     let password = perforce.query_p4_password().unwrap();
-    assert_eq!(Some("TEST_PASSWORD".to_string()), password);
+    assert_eq!(Some(BString::from("TEST_PASSWORD")), password);
 }
 
 #[test]
@@ -367,7 +366,7 @@ fn test_query_p4_password_with_password_set_in_p4_variables_with_windows_os() {
     let mut perforce = create_perforce(true, process, io);
 
     let password = perforce.query_p4_password().unwrap();
-    assert_eq!(Some("TEST_P4VARIABLE_PASSWORD".to_string()), password);
+    assert_eq!(Some(BString::from("TEST_P4VARIABLE_PASSWORD")), password);
 }
 
 #[test]
@@ -387,7 +386,7 @@ fn test_query_p4_password_with_password_set_in_p4_variables_not_windows_os() {
     let mut perforce = create_perforce(false, process, io);
 
     let password = perforce.query_p4_password().unwrap();
-    assert_eq!(Some("TEST_P4VARIABLE_PASSWORD".to_string()), password);
+    assert_eq!(Some(BString::from("TEST_P4VARIABLE_PASSWORD")), password);
 }
 
 #[test]
@@ -402,7 +401,7 @@ fn test_query_p4_password_queries_for_password() {
     let mut perforce = create_perforce(true, process, io);
 
     let password = perforce.query_p4_password().unwrap();
-    assert_eq!(Some("TEST_QUERY_PASSWORD".to_string()), password);
+    assert_eq!(Some(BString::from("TEST_QUERY_PASSWORD")), password);
 }
 
 #[test]
@@ -460,10 +459,10 @@ fn test_get_branches_with_stream() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
-    perforce.set_stream("//depot/branch");
+    perforce.set_stream("//depot/branch".into());
 
     let branches = perforce.get_branches();
-    assert_eq!("//depot/branch@1234", branches["master"]);
+    assert_eq!("//depot/branch@1234", branches[B("master")]);
 }
 
 #[test]
@@ -483,7 +482,7 @@ fn test_get_branches_without_stream() {
     let mut perforce = create_perforce(true, process, io);
 
     let branches = perforce.get_branches();
-    assert_eq!("//depot@5678", branches["master"]);
+    assert_eq!("//depot@5678", branches[B("master")]);
 }
 
 #[test]
@@ -515,8 +514,8 @@ fn test_get_tags_without_stream() {
     let mut perforce = create_perforce(true, process, io);
 
     let tags = perforce.get_tags();
-    assert_eq!("//depot@0.0.1", tags["0.0.1"]);
-    assert_eq!("//depot@0.0.2", tags["0.0.2"]);
+    assert_eq!("//depot@0.0.1", tags[B("0.0.1")]);
+    assert_eq!("//depot@0.0.2", tags[B("0.0.2")]);
 }
 
 #[test]
@@ -546,11 +545,11 @@ fn test_get_tags_with_stream() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
-    perforce.set_stream("//depot/branch");
+    perforce.set_stream("//depot/branch".into());
 
     let tags = perforce.get_tags();
-    assert_eq!("//depot/branch@0.0.1", tags["0.0.1"]);
-    assert_eq!("//depot/branch@0.0.2", tags["0.0.2"]);
+    assert_eq!("//depot/branch@0.0.1", tags[B("0.0.1")]);
+    assert_eq!("//depot/branch@0.0.2", tags[B("0.0.2")]);
 }
 
 #[test]
@@ -609,7 +608,7 @@ fn test_get_composer_information_without_label_without_stream() {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
 
-    let result = perforce.get_composer_information("//depot").unwrap();
+    let result = perforce.get_composer_information("//depot".into()).unwrap();
     assert_eq!(Some(expected_composer_information()), result);
 }
 
@@ -655,7 +654,9 @@ fn test_get_composer_information_with_label_without_stream() {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
 
-    let result = perforce.get_composer_information("//depot@0.0.1").unwrap();
+    let result = perforce
+        .get_composer_information("//depot@0.0.1".into())
+        .unwrap();
     assert_eq!(Some(expected_composer_information()), result);
 }
 
@@ -684,9 +685,11 @@ fn test_get_composer_information_without_label_with_stream() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
-    perforce.set_stream("//depot/branch");
+    perforce.set_stream("//depot/branch".into());
 
-    let result = perforce.get_composer_information("//depot/branch").unwrap();
+    let result = perforce
+        .get_composer_information("//depot/branch".into())
+        .unwrap();
     assert_eq!(Some(expected_composer_information()), result);
 }
 
@@ -731,10 +734,10 @@ fn test_get_composer_information_with_label_with_stream() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
-    perforce.set_stream("//depot/branch");
+    perforce.set_stream("//depot/branch".into());
 
     let result = perforce
-        .get_composer_information("//depot/branch@0.0.1")
+        .get_composer_information("//depot/branch@0.0.1".into())
         .unwrap();
     assert_eq!(Some(expected_composer_information()), result);
 }
@@ -762,7 +765,7 @@ fn test_sync_code_base_without_stream() {
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
 
-    perforce.sync_code_base(Some("label")).unwrap();
+    perforce.sync_code_base(Some("label".into())).unwrap();
 }
 
 #[test]
@@ -787,9 +790,9 @@ fn test_sync_code_base_with_stream() {
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(NullIO::new()));
     let mut perforce = create_perforce(true, process, io);
-    perforce.set_stream("//depot/branch");
+    perforce.set_stream("//depot/branch".into());
 
-    perforce.sync_code_base(Some("label")).unwrap();
+    perforce.sync_code_base(Some("label".into())).unwrap();
 }
 
 #[test]
@@ -807,7 +810,7 @@ fn test_check_server_exists() {
     );
 
     let result =
-        Perforce::check_server_exists("perforce.does.exist:port", &mut process.borrow_mut())
+        Perforce::check_server_exists("perforce.does.exist:port".into(), &mut process.borrow_mut())
             .unwrap();
     assert!(result);
 }
@@ -828,7 +831,7 @@ fn test_check_server_client_error() {
     );
 
     let result =
-        Perforce::check_server_exists("perforce.does.exist:port", &mut process.borrow_mut())
+        Perforce::check_server_exists("perforce.does.exist:port".into(), &mut process.borrow_mut())
             .unwrap();
     assert!(!result);
 }
