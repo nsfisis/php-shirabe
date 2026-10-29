@@ -18,6 +18,7 @@ use shirabe_php_shim::{
     path_from_bytes, path_to_bytes, realpath,
 };
 use shirabe_symfony_filesystem::Filesystem as SymfonyFilesystem;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct PathDownloader {
@@ -52,7 +53,11 @@ impl PathDownloader {
         }
     }
 
-    pub fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
+    pub fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> Option<bstr::BString> {
         let path = Filesystem::trim_trailing_slash(path);
         let parser = VersionParser::new();
         let mut guesser = VersionGuesser::new(
@@ -67,7 +72,7 @@ impl PathDownloader {
         let package_version =
             guesser.guess_version(&package_config, &legacy_lossy(path_to_bytes(&path)));
         if let Ok(Some(version)) = package_version {
-            return version.commit;
+            return version.commit.map(BString::from);
         }
 
         None
@@ -76,7 +81,7 @@ impl PathDownloader {
     fn get_install_operation_appendix(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<String> {
         let url = package.get_dist_url().ok_or_else(|| {
             RuntimeException::new(format!(
@@ -84,17 +89,11 @@ impl PathDownloader {
                 package.get_pretty_name().display_lossy()
             ))
         })?;
-        let real_url = realpath(path_from_bytes(&url))
-            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            .ok_or_else(|| {
-                RuntimeException::new(format!("Failed to realpath {}", url.display_lossy()))
-            })?;
+        let real_url = realpath(path_from_bytes(&url)).ok_or_else(|| {
+            RuntimeException::new(format!("Failed to realpath {}", url.display_lossy()))
+        })?;
 
-        if realpath(path)
-            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            .as_deref()
-            == Some(&real_url)
-        {
+        if realpath(path).as_deref().map(Path::as_os_str) == Some(real_url.as_os_str()) {
             return Ok(": Source already present".to_string());
         }
 
@@ -105,19 +104,19 @@ impl PathDownloader {
             if Platform::is_windows() {
                 return Ok(format!(
                     ": Junctioning from {}",
-                    legacy_lossy(&package.get_dist_url().unwrap_or_default())
+                    package.get_dist_url().unwrap_or_default().display_lossy()
                 ));
             }
 
             return Ok(format!(
                 ": Symlinking from {}",
-                legacy_lossy(&package.get_dist_url().unwrap_or_default())
+                package.get_dist_url().unwrap_or_default().display_lossy()
             ));
         }
 
         Ok(format!(
             ": Mirroring from {}",
-            legacy_lossy(&package.get_dist_url().unwrap_or_default())
+            package.get_dist_url().unwrap_or_default().display_lossy()
         ))
     }
 
@@ -176,8 +175,12 @@ impl PathDownloader {
 }
 
 impl VcsCapableDownloaderInterface for PathDownloader {
-    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
-        PathDownloader::get_vcs_reference(self, package, &path)
+    fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> Option<bstr::BString> {
+        PathDownloader::get_vcs_reference(self, package, path)
     }
 }
 
@@ -186,8 +189,8 @@ impl crate::downloader::ChangeReportInterface for PathDownloader {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.base_get_local_changes(self, package, path).await
     }
 }
@@ -211,7 +214,7 @@ impl DownloaderInterface for PathDownloader {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -222,11 +225,10 @@ impl DownloaderInterface for PathDownloader {
                 package.get_pretty_name().display_lossy()
             ))
         })?;
-        let real_url =
-            realpath(path_from_bytes(&url)).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
+        let real_url = realpath(path_from_bytes(&url));
         if real_url.is_none()
-            || !file_exists(real_url.as_deref().unwrap_or_default())
-            || !is_dir(real_url.as_deref().unwrap_or_default())
+            || !file_exists(real_url.as_deref().unwrap_or(Path::new("")))
+            || !is_dir(real_url.as_deref().unwrap_or(Path::new("")))
         {
             return Err(RuntimeException::new(format!(
                 "Source path \"{}\" is not found for package {}",
@@ -237,22 +239,15 @@ impl DownloaderInterface for PathDownloader {
         }
         let real_url = real_url.unwrap();
 
-        if realpath(&path)
-            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            .as_deref()
-            == Some(&real_url)
-        {
+        if realpath(&path).as_deref().map(Path::as_os_str) == Some(real_url.as_os_str()) {
             return Ok(None);
         }
 
-        if format!(
-            "{}{}",
-            realpath(&path)
-                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                .unwrap_or_default(),
-            std::path::MAIN_SEPARATOR
+        if bconcat!(
+            realpath(&path).unwrap_or_default(),
+            std::path::MAIN_SEPARATOR_STR
         )
-        .starts_with(&format!("{}{}", real_url, std::path::MAIN_SEPARATOR))
+        .starts_with(&bconcat!(real_url, std::path::MAIN_SEPARATOR_STR))
         {
             // IMPORTANT NOTICE: If you wish to change this, don't. You are wasting your time and ours.
             //
@@ -261,10 +256,8 @@ impl DownloaderInterface for PathDownloader {
             return Err(RuntimeException::new(format!(
                 "Package {} cannot install to \"{}\" inside its source at \"{}\"",
                 package.get_name().display_lossy(),
-                realpath(&path)
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                    .unwrap_or_default(),
-                real_url
+                realpath(&path).unwrap_or_default().display(),
+                real_url.display()
             ))
             .into());
         }
@@ -276,7 +269,7 @@ impl DownloaderInterface for PathDownloader {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner
@@ -287,7 +280,7 @@ impl DownloaderInterface for PathDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(path);
@@ -297,22 +290,13 @@ impl DownloaderInterface for PathDownloader {
                 package.get_pretty_name().display_lossy()
             ))
         })?;
-        let real_url = realpath(path_from_bytes(&url))
-            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            .ok_or_else(|| {
-                RuntimeException::new(format!("Failed to realpath {}", url.display_lossy()))
-            })?;
+        let real_url = realpath(path_from_bytes(&url)).ok_or_else(|| {
+            RuntimeException::new(format!("Failed to realpath {}", url.display_lossy()))
+        })?;
 
-        if realpath(&path)
-            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            .as_deref()
-            == Some(&real_url)
-        {
+        if realpath(&path).as_deref().map(Path::as_os_str) == Some(real_url.as_os_str()) {
             if output {
-                let appendix = self.get_install_operation_appendix(
-                    package.clone(),
-                    &legacy_lossy(path_to_bytes(&path)),
-                )?;
+                let appendix = self.get_install_operation_appendix(package.clone(), &path)?;
                 self.inner.io.borrow().write_error3(
                     &format!(
                         "  - {}{}",
@@ -423,7 +407,7 @@ impl DownloaderInterface for PathDownloader {
                     } else {
                         return Err(RuntimeException::new(format!(
                             "Symlink from \"{}\" to \"{}\" failed!",
-                            real_url,
+                            real_url.display(),
                             path.display()
                         ))
                         .into());
@@ -466,7 +450,7 @@ impl DownloaderInterface for PathDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let appendix = self.get_install_operation_appendix(target.clone(), path)?;
         self.inner
@@ -477,7 +461,7 @@ impl DownloaderInterface for PathDownloader {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let path = Filesystem::trim_trailing_slash(path);
@@ -535,22 +519,21 @@ impl DownloaderInterface for PathDownloader {
         let abs_path = if fs.is_absolute_path(&path) {
             path.clone()
         } else {
-            std::path::PathBuf::from(format!(
-                "{}/{}",
-                Platform::get_cwd(false)?.display(),
-                path.display()
-            ))
+            PathBuf::from(path_from_bytes(&bconcat!(
+                Platform::get_cwd(false)?,
+                "/",
+                path
+            )))
         };
         let abs_dist_url = if fs.is_absolute_path(path_from_bytes(&url)) {
-            legacy_lossy(&url).into_owned()
+            url.clone()
         } else {
-            format!(
-                "{}/{}",
-                Platform::get_cwd(false)?.display(),
-                legacy_lossy(&url)
-            )
+            bconcat!(Platform::get_cwd(false)?, "/", url)
         };
-        if fs.normalize_path(&abs_path).as_os_str() == fs.normalize_path(&abs_dist_url).as_os_str()
+        if fs.normalize_path(&abs_path).as_os_str()
+            == fs
+                .normalize_path(path_from_bytes(&abs_dist_url))
+                .as_os_str()
         {
             if output {
                 self.inner.io.borrow().write_error3(
@@ -567,16 +550,14 @@ impl DownloaderInterface for PathDownloader {
             return Ok(None);
         }
 
-        self.inner
-            .remove(package, &legacy_lossy(path_to_bytes(&path)), output)
-            .await
+        self.inner.remove(package, &path, output).await
     }
 
     async fn cleanup(
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner

@@ -3,5 +3,9 @@
 use crate::package::PackageInterfaceHandle;
 
 pub trait VcsCapableDownloaderInterface {
-    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String>;
+    fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &std::path::Path,
+    ) -> Option<bstr::BString>;
 }

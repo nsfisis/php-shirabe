@@ -436,6 +436,45 @@ impl PregPattern for String {
     }
 }
 
+// A pattern built from PHP strings may hold bytes that are not valid UTF-8. They are written as
+// `\xNN` escapes, which without the `u` modifier match the same byte, as a non-ASCII literal does.
+// A backslash right before such a byte escapes it, so it is dropped in favour of the escape.
+fn byte_pattern_source(pattern: &BStr) -> std::borrow::Cow<'_, str> {
+    if let Some(text) = crate::utf8_text(pattern) {
+        return std::borrow::Cow::Borrowed(text);
+    }
+    let mut out = String::with_capacity(pattern.len() * 2);
+    for chunk in pattern.utf8_chunks() {
+        out.push_str(chunk.valid());
+        for byte in chunk.invalid() {
+            let trailing_backslashes = out.bytes().rev().take_while(|&b| b == b'\\').count();
+            if trailing_backslashes % 2 == 1 {
+                out.pop();
+            }
+            out.push_str(&format!("\\x{byte:02X}"));
+        }
+    }
+    std::borrow::Cow::Owned(out)
+}
+
+impl PregPattern for &BStr {
+    fn resolve(self) -> ResolvedPattern {
+        byte_pattern_source(self).as_ref().resolve()
+    }
+}
+
+impl PregPattern for &BString {
+    fn resolve(self) -> ResolvedPattern {
+        self.as_bstr().resolve()
+    }
+}
+
+impl PregPattern for BString {
+    fn resolve(self) -> ResolvedPattern {
+        self.as_bstr().resolve()
+    }
+}
+
 impl PregPattern for &'static CompiledPattern {
     fn resolve(self) -> ResolvedPattern {
         ResolvedPattern::Static(self)
@@ -529,4 +568,20 @@ fn php_replacement_group(bytes: &[u8]) -> (usize, usize) {
         consumed += 1;
     }
     (group, consumed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn byte_pattern_matches_invalid_utf8_literally() {
+        let pattern = BString::from(b"{^vendor/\xff\\\xfe$}".to_vec());
+        assert!(preg_is_match(&pattern, b"vendor/\xff\xfe"));
+        assert!(!preg_is_match(&pattern, b"vendor/\xff\\\xfe"));
+        assert!(preg_is_match(
+            BString::from(b"{^[\xfe\xff]+$}".to_vec()),
+            b"\xff\xfe"
+        ));
+    }
 }

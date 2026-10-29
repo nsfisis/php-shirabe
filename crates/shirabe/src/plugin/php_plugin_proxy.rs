@@ -45,7 +45,7 @@ use shirabe_php_rpc::{
 };
 use shirabe_php_shim::{
     AnyThrowable, Catch as _, LogicException, PhpClass, PhpMixed, RuntimeException,
-    UnexpectedValueException, legacy_lossy, path_to_bytes,
+    UnexpectedValueException, legacy_lossy, path_from_bytes, path_to_bytes,
 };
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
@@ -1198,6 +1198,10 @@ fn dispatch_download_manager_method(
     args: &[PluginValue],
 ) -> Result<PluginValue, PhpThrow> {
     let string_arg = |position: usize| arg::<String>(method_name, args, position);
+    let path_arg = |position: usize| {
+        arg::<bstr::BString>(method_name, args, position)
+            .map(|path| std::path::PathBuf::from(path_from_bytes(&path)))
+    };
     let package_arg = |position: usize| arg::<PackageInterfaceHandle>(method_name, args, position);
     let optional_package_arg =
         |position: usize| arg::<Option<PackageInterfaceHandle>>(method_name, args, position);
@@ -1217,7 +1221,7 @@ fn dispatch_download_manager_method(
             let (dm, package, path, prev) = (
                 dm.clone(),
                 package_arg(0)?,
-                string_arg(1)?,
+                path_arg(1)?,
                 optional_package_arg(2)?,
             );
             Box::pin(async move { dm.borrow().download(package, &path, prev).await })
@@ -1227,22 +1231,22 @@ fn dispatch_download_manager_method(
                 dm.clone(),
                 string_arg(0)?,
                 package_arg(1)?,
-                string_arg(2)?,
+                path_arg(2)?,
                 optional_package_arg(3)?,
             );
             Box::pin(async move { dm.borrow().prepare(&r#type, package, &path, prev).await })
         }
         "install" => {
-            let (dm, package, path) = (dm.clone(), package_arg(0)?, string_arg(1)?);
+            let (dm, package, path) = (dm.clone(), package_arg(0)?, path_arg(1)?);
             Box::pin(async move { dm.borrow().install(package, &path).await })
         }
         "update" => {
             let (dm, initial, target, path) =
-                (dm.clone(), package_arg(0)?, package_arg(1)?, string_arg(2)?);
+                (dm.clone(), package_arg(0)?, package_arg(1)?, path_arg(2)?);
             Box::pin(async move { dm.borrow().update(initial, target, &path).await })
         }
         "remove" => {
-            let (dm, package, path) = (dm.clone(), package_arg(0)?, string_arg(1)?);
+            let (dm, package, path) = (dm.clone(), package_arg(0)?, path_arg(1)?);
             Box::pin(async move { dm.borrow().remove(package, &path).await })
         }
         "cleanup" => {
@@ -1250,7 +1254,7 @@ fn dispatch_download_manager_method(
                 dm.clone(),
                 string_arg(0)?,
                 package_arg(1)?,
-                string_arg(2)?,
+                path_arg(2)?,
                 optional_package_arg(3)?,
             );
             Box::pin(async move { dm.borrow().cleanup(&r#type, package, &path, prev).await })
@@ -4021,7 +4025,7 @@ impl PhpInstallerProxy {
 
 #[async_trait::async_trait(?Send)]
 impl crate::installer::InstallerInterface for PhpInstallerProxy {
-    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
         match self.call("supports", vec![PluginValue::string(package_type)])? {
             PluginValue::Bool(supports) => Ok(supports),
             other => Err(self.unsupported_shape("supports", &other)),
@@ -4118,7 +4122,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         self.promise_result("cleanup", value).await
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         // PHP declares `getInstallPath(): string`; a failure here is a plugin error the
         // infallible signature cannot carry, so it aborts rather than answering a path that
         // would silently install the package in the wrong place.
@@ -4131,7 +4135,7 @@ impl crate::installer::InstallerInterface for PhpInstallerProxy {
         });
         match value {
             PluginValue::Null => None,
-            PluginValue::String(path) => Some(String::from_utf8_lossy(&path).into_owned()),
+            PluginValue::String(path) => Some(std::path::PathBuf::from(path_from_bytes(&path))),
             other => panic!("{}", self.unsupported_shape("getInstallPath", &other)),
         }
     }

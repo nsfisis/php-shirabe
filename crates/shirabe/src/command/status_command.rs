@@ -11,7 +11,7 @@ use crate::script::ScriptEvents;
 use crate::util::ProcessExecutor;
 use bstr::ByteSlice;
 use indexmap::IndexMap;
-use shirabe_php_shim::{impl_php_class, legacy_lossy};
+use shirabe_php_shim::{impl_php_class, legacy_lossy, path_to_bytes};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
 use shirabe_symfony_console::output::OutputInterface;
@@ -87,10 +87,12 @@ impl StatusCommand {
                 .get_installation_manager()
                 .borrow_mut()
                 .get_install_path(package.clone());
-            let target_dir = match target_dir {
+            let target_path = match target_dir {
                 Some(d) => d,
                 None => continue,
             };
+            // TODO(bytes): IOInterface writes Strings, so the report is keyed by the lossy path.
+            let target_dir = legacy_lossy(path_to_bytes(&target_path)).into_owned();
             let downloader_handle = match dm.borrow().get_downloader_for_package(package.clone())? {
                 Some(d) => d,
                 None => continue,
@@ -98,7 +100,7 @@ impl StatusCommand {
             let downloader = downloader_handle.borrow();
 
             if let Some(change_reporter) = downloader.as_change_report_interface() {
-                if std::path::Path::new(&target_dir).is_symlink() {
+                if target_path.is_symlink() {
                     errors.insert(
                         target_dir.clone(),
                         format!("{} is a symbolic link.", target_dir),
@@ -106,16 +108,16 @@ impl StatusCommand {
                 }
 
                 if let Some(changes) = change_reporter
-                    .get_local_changes(package.clone(), &target_dir)
+                    .get_local_changes(package.clone(), &target_path)
                     .await?
                 {
-                    errors.insert(target_dir.clone(), changes);
+                    errors.insert(target_dir.clone(), legacy_lossy(&changes).into_owned());
                 }
             }
 
             if let Some(vcs_downloader) = downloader.as_vcs_capable_downloader_interface()
                 && vcs_downloader
-                    .get_vcs_reference(package.clone(), target_dir.clone())
+                    .get_vcs_reference(package.clone(), &target_path)
                     .is_some()
             {
                 let previous_ref = match package
@@ -166,9 +168,9 @@ impl StatusCommand {
 
             if let Some(dvcs_downloader) = downloader.as_dvcs_downloader_interface()
                 && let Some(unpushed) =
-                    dvcs_downloader.get_unpushed_changes(package.clone(), target_dir.clone())?
+                    dvcs_downloader.get_unpushed_changes(package.clone(), &target_path)?
             {
-                unpushed_changes.insert(target_dir, unpushed);
+                unpushed_changes.insert(target_dir, legacy_lossy(&unpushed).into_owned());
             }
         }
 

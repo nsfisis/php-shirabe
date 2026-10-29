@@ -112,12 +112,12 @@ fn test_error_messages() {
     let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
         downloader
-            .download3(package.clone(), &install_path, None)
+            .download3(package.clone(), std::path::Path::new(&install_path), None)
             .await
             .map(|_| ())
     });
     run(loop_.wait(vec![promise], None)).unwrap();
-    let result = run(downloader.install2(package, &install_path));
+    let result = run(downloader.install2(package, std::path::Path::new(&install_path)));
 
     // Download of invalid tarball should throw an exception.
     let e = result.expect_err("Download of invalid tarball should throw an exception");

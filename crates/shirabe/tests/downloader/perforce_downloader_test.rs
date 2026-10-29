@@ -93,11 +93,7 @@ fn test_init_perforce_instantiates_a_new_perforce_object() {
     let fs = std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(None)));
     let downloader = PerforceDownloader::new(io, config, process, fs);
 
-    downloader.init_perforce(
-        package,
-        test_path.path().to_str().unwrap().to_string(),
-        "SOURCE_REF".to_string(),
-    );
+    downloader.init_perforce(package, test_path.path(), "SOURCE_REF".to_string());
 }
 
 #[test]
@@ -118,11 +114,7 @@ fn test_init_perforce_does_nothing_if_perforce_already_set() {
     downloader.set_perforce(Box::new(perforce));
 
     let package = make_package(None);
-    downloader.init_perforce(
-        package,
-        test_path.path().to_str().unwrap().to_string(),
-        "SOURCE_REF".to_string(),
-    );
+    downloader.init_perforce(package, test_path.path(), "SOURCE_REF".to_string());
 }
 
 #[test]
@@ -189,5 +181,5 @@ fn do_install_workflow(source_ref: &'static str, expected_label: Option<String>)
     downloader.set_perforce(Box::new(perforce));
 
     let package = make_package(Some(source_ref));
-    run(downloader.do_install(package, &test_path_str, "url")).unwrap();
+    run(downloader.do_install(package, std::path::Path::new(&test_path_str), "url")).unwrap();
 }

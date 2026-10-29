@@ -112,7 +112,7 @@ mockall::mock! {
             run_scripts: bool,
             download_only: bool,
         ) -> anyhow::Result<()>;
-        fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
+        fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf>;
         fn set_output_progress(&mut self, output_progress: bool);
         async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
     }
@@ -147,7 +147,7 @@ fn test_repository_write() {
         .to_string();
     im.expect_get_install_path()
         .times(2)
-        .returning(move |_| Some(fixed_path.clone()));
+        .returning(move |_| Some(std::path::PathBuf::from(fixed_path.clone())));
 
     repository.set_dev_package_names(vec![bstr::BString::from("mypkg2".to_string())]);
     repository
@@ -318,21 +318,28 @@ fn test_repository_writes_installed_php() {
     im.expect_get_install_path().returning(move |package| {
         // check for empty paths handling
         if package.get_type() == "metapackage" {
-            return Some(String::new());
+            return Some(std::path::PathBuf::from(String::new()));
         }
         if package.get_name() == "c/c" {
             // check for absolute paths
-            return Some("/foo/bar/ven\\do{}r/c/c${}".to_string());
+            return Some(std::path::PathBuf::from(
+                "/foo/bar/ven\\do{}r/c/c${}".to_string(),
+            ));
         }
         if package.get_name() == "a/provider" {
-            return Some("vendor/{${passthru('bash -i')}}".to_string());
+            return Some(std::path::PathBuf::from(
+                "vendor/{${passthru('bash -i')}}".to_string(),
+            ));
         }
         // check for cwd
         if package.as_root().is_some() {
-            return Some(cwd.clone());
+            return Some(std::path::PathBuf::from(cwd.clone()));
         }
         // check for relative paths
-        Some(format!("vendor/{}", legacy_lossy(&package.get_name())))
+        Some(std::path::PathBuf::from(format!(
+            "vendor/{}",
+            legacy_lossy(&package.get_name())
+        )))
     });
 
     repository.write(true, &im).unwrap();

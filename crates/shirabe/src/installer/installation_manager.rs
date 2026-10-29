@@ -16,9 +16,11 @@ use crate::util::r#loop::Loop;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    InvalidArgumentException, PhpMixed, array_splice, array_unshift, http_build_query, json_encode,
-    legacy_lossy, str_replace, strip_tags, strpos, strtolower, ucfirst,
+    InvalidArgumentException, PhpMixed, array_splice, array_unshift, bconcat, http_build_query,
+    json_encode, legacy_lossy, path_from_bytes, str_replace, strip_tags, strpos, strtolower,
+    ucfirst,
 };
+use std::path::PathBuf;
 
 /// Package operation manager.
 #[derive(Debug)]
@@ -153,11 +155,11 @@ impl InstallationManager {
     /// Returns installer for a specific package type.
     pub fn get_installer(
         &self,
-        r#type: &str,
+        r#type: impl AsRef<[u8]>,
     ) -> anyhow::Result<std::rc::Rc<dyn InstallerInterface>> {
         let r#type = strtolower(r#type);
 
-        if let Some(installer) = self.cache.borrow().get(bstr::B(&*legacy_lossy(&r#type))) {
+        if let Some(installer) = self.cache.borrow().get(r#type.as_bstr()) {
             return Ok(installer.clone());
         }
 
@@ -165,10 +167,10 @@ impl InstallationManager {
         // it can register a further installer from that call.
         let installers = self.installers.borrow().clone();
         for installer in installers {
-            if installer.supports(&legacy_lossy(&r#type))? {
+            if installer.supports(r#type.as_bstr())? {
                 self.cache
                     .borrow_mut()
-                    .insert(bstr::BString::from(&r#type[..]), installer.clone());
+                    .insert(r#type.clone(), installer.clone());
                 return Ok(installer);
             }
         }
@@ -197,14 +199,14 @@ impl InstallationManager {
                 && self.is_package_installed(repo, alias_of)?);
         }
 
-        self.get_installer(&legacy_lossy(&package.get_type()))?
+        self.get_installer(package.get_type())?
             .is_installed(repo, package)
     }
 
     /// Install binary for the given package.
     /// If the installer associated to this package doesn't handle that function, it'll do nothing.
     pub fn ensure_binaries_presence(&self, package: PackageInterfaceHandle) -> anyhow::Result<()> {
-        let installer = self.get_installer(&legacy_lossy(&package.get_type()));
+        let installer = self.get_installer(package.get_type());
         let installer = match installer {
             Ok(i) => i,
             Err(_e) => {
@@ -420,7 +422,7 @@ impl InstallationManager {
                 AnyOperation::Update(update_op) => Some(update_op.get_initial_package()),
                 _ => None,
             };
-            let installer = self.get_installer(&legacy_lossy(&package.get_type()))?;
+            let installer = self.get_installer(package.get_type())?;
 
             // PHP: $cleanupPromises[$index] = static function () use ($opType, $installer, $package, $initialPackage) {
             //   if (null === $package->getInstallationSource()) { return \React\Promise\resolve(null); }
@@ -613,7 +615,7 @@ impl InstallationManager {
                 )?;
             }
 
-            let installer = self.get_installer(&legacy_lossy(&package.get_type()))?;
+            let installer = self.get_installer(package.get_type())?;
 
             // PHP: $promise = $installer->prepare(...)
             //      ->then(fn() => $this->{$opType}($repo, $operation))
@@ -714,9 +716,7 @@ impl InstallationManager {
 
     /// Executes download operation.
     pub async fn download(&self, package: PackageInterfaceHandle) -> Option<PhpMixed> {
-        let installer = self
-            .get_installer(&legacy_lossy(&package.get_type()))
-            .ok()?;
+        let installer = self.get_installer(package.get_type()).ok()?;
 
         installer.cleanup("install", package, None).await.ok()?
     }
@@ -728,8 +728,7 @@ impl InstallationManager {
         operation: &InstallOperation,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let package = operation.get_package();
-        let package_type = legacy_lossy(&package.get_type()).into_owned();
-        let installer = self.get_installer(&package_type)?;
+        let installer = self.get_installer(package.get_type())?;
         let promise = installer.install(repo, package.clone()).await?;
         self.mark_for_notification(package.clone());
 
@@ -745,8 +744,8 @@ impl InstallationManager {
         let initial = operation.get_initial_package().clone();
         let target = operation.get_target_package().clone();
 
-        let initial_type = legacy_lossy(&initial.get_type()).into_owned();
-        let target_type = legacy_lossy(&target.get_type()).into_owned();
+        let initial_type = initial.get_type();
+        let target_type = target.get_type();
 
         if initial_type == target_type {
             let installer = self.get_installer(&initial_type)?;
@@ -771,8 +770,7 @@ impl InstallationManager {
         operation: &UninstallOperation,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let package = operation.get_package();
-        let package_type = legacy_lossy(&package.get_type()).into_owned();
-        let installer = self.get_installer(&package_type)?;
+        let installer = self.get_installer(package.get_type())?;
 
         installer.uninstall(repo, package).await
     }
@@ -804,15 +802,16 @@ impl InstallationManager {
     }
 
     /// Returns the installation path of a package
-    pub fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    pub fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<PathBuf> {
         // For testing only (ref InstallationManagerMock::getInstallPath).
         if self.mock.is_some() {
-            return Some(format!("vendor/{}", legacy_lossy(&package.get_name())));
+            return Some(PathBuf::from(path_from_bytes(&bconcat!(
+                "vendor/",
+                package.get_name()
+            ))));
         }
 
-        let installer = self
-            .get_installer(&legacy_lossy(&package.get_type()))
-            .ok()?;
+        let installer = self.get_installer(package.get_type()).ok()?;
 
         installer.get_install_path(package)
     }
@@ -1074,7 +1073,7 @@ pub trait InstallationManagerInterface: std::fmt::Debug {
         run_scripts: bool,
         download_only: bool,
     ) -> anyhow::Result<()>;
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<PathBuf>;
     fn set_output_progress(&mut self, output_progress: bool);
     async fn notify_installs(&mut self, io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>>);
 }
@@ -1121,7 +1120,7 @@ impl InstallationManagerInterface for InstallationManager {
             .await
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<PathBuf> {
         self.get_install_path(package)
     }
 

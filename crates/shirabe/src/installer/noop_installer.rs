@@ -3,14 +3,14 @@
 use crate::installer::InstallerInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
-use shirabe_php_shim::{InvalidArgumentException, PhpMixed, legacy_lossy};
+use shirabe_php_shim::{InvalidArgumentException, PhpMixed, bconcat, path_from_bytes};
 
 #[derive(Debug)]
 pub struct NoopInstaller;
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for NoopInstaller {
-    fn supports(&self, _package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, _package_type: &bstr::BStr) -> anyhow::Result<bool> {
         Ok(true)
     }
 
@@ -102,14 +102,14 @@ impl InstallerInterface for NoopInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         let target_dir = package.get_target_dir();
-        let pretty_name = legacy_lossy(&package.get_pretty_name()).into_owned();
 
-        Some(if let Some(dir) = target_dir {
-            format!("{}/{}", pretty_name, legacy_lossy(&dir))
+        let install_path = if let Some(dir) = target_dir {
+            bconcat!(package.get_pretty_name(), "/", dir)
         } else {
-            pretty_name
-        })
+            package.get_pretty_name()
+        };
+        Some(std::path::PathBuf::from(path_from_bytes(&install_path)))
     }
 }

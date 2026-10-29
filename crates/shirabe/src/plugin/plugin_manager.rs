@@ -25,9 +25,9 @@ use indexmap::IndexMap;
 use shirabe_php_rpc::{PluginValue, call_function_with_dispatcher};
 use shirabe_php_shim::{
     CmpOp, E_USER_DEPRECATED, PhpMixed, RuntimeException, UnexpectedValueException, dirname, empty,
-    file_get_contents, implode, ksort, legacy_lossy, php_regex, preg_is_match, preg_quote,
-    preg_replace2, strrpos, strtr_array, substr, trigger_error, trim2, var_export, var_export_str,
-    version_compare,
+    file_get_contents, implode, ksort, legacy_lossy, path_to_bytes, php_regex, preg_is_match,
+    preg_quote, preg_replace2, strrpos, strtr_array, substr, trigger_error, trim2, var_export,
+    var_export_str, version_compare,
 };
 use shirabe_semver::constraint::SimpleConstraint;
 
@@ -1014,7 +1014,8 @@ impl PluginManager {
                 .borrow()
                 .get_installation_manager()
                 .borrow()
-                .get_install_path(package);
+                .get_install_path(package)
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
         }
 
         // PHP: assert(null !== $this->globalComposer);
@@ -1025,6 +1026,7 @@ impl PluginManager {
             .get_installation_manager()
             .borrow()
             .get_install_path(package)
+            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
     }
 
     fn get_capability_implementation_class_name(

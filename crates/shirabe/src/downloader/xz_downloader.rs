@@ -9,12 +9,12 @@ use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, HttpDownloader, ProcessExecutor};
 use anyhow::bail;
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpMixed, impl_php_class, legacy_lossy};
+use shirabe_php_shim::{PhpMixed, impl_php_class, implode, path_to_bytes};
 
 #[derive(Debug)]
 pub struct XzDownloader {
     inner: FileDownloader,
-    cleanup_executed: std::cell::RefCell<IndexMap<String, bool>>,
+    cleanup_executed: std::cell::RefCell<IndexMap<bstr::BString, bool>>,
 }
 
 impl_php_class!(XzDownloader, r"Composer\Downloader\XzDownloader");
@@ -49,17 +49,23 @@ impl ArchiveDownloader for XzDownloader {
         &self.inner
     }
 
-    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
+    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<bstr::BString, bool>> {
         &self.cleanup_executed
     }
 
     async fn extract(
         &self,
         _package: PackageInterfaceHandle,
-        file: &str,
-        path: &str,
+        file: &std::path::Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        let command = ["tar", "-xJf", file, "-C", path];
+        let command: Vec<bstr::BString> = vec![
+            "tar".into(),
+            "-xJf".into(),
+            path_to_bytes(file).into(),
+            "-C".into(),
+            path_to_bytes(path).into(),
+        ];
 
         let mut ignored_output = PhpMixed::Null;
         if self
@@ -74,8 +80,12 @@ impl ArchiveDownloader for XzDownloader {
 
         let process_error = format!(
             "Failed to execute {}\n\n{}",
-            command.join(" "),
-            legacy_lossy(&self.inner.process.borrow().get_error_output())
+            implode(" ", &command).display_lossy(),
+            self.inner
+                .process
+                .borrow()
+                .get_error_output()
+                .display_lossy()
         );
 
         bail!(process_error);
@@ -87,8 +97,8 @@ impl ChangeReportInterface for XzDownloader {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &std::path::Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.base_get_local_changes(self, package, path).await
     }
 }
@@ -106,7 +116,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -119,7 +129,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -128,7 +138,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::install(self, package, path, output).await
@@ -138,7 +148,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let appendix = self.get_install_operation_appendix(target.clone(), path);
         self.inner
@@ -149,7 +159,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.remove(package, path, output).await
@@ -159,7 +169,7 @@ impl crate::downloader::DownloaderInterface for XzDownloader {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::cleanup(self, r#type, package, path, prev_package).await

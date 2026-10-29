@@ -3,7 +3,9 @@
 use crate::config::Config;
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::{ProcessExecutor, Url};
-use shirabe_php_shim::{legacy_lossy, php_regex, preg_match, rawurlencode};
+use bstr::{BStr, BString, ByteSlice};
+use shirabe_php_shim::{bconcat, legacy_lossy, php_regex, preg_match, rawurlencode};
+use std::path::Path;
 use std::sync::Mutex;
 
 static VERSION: Mutex<Option<Option<String>>> = Mutex::new(None);
@@ -30,24 +32,25 @@ impl Hg {
 
     pub fn run_command(
         &self,
-        command_callable: impl Fn(String) -> Vec<String>,
-        url: String,
-        cwd: Option<String>,
+        command_callable: impl Fn(BString) -> Vec<BString>,
+        url: &BStr,
+        cwd: Option<&Path>,
     ) -> anyhow::Result<()> {
+        // TODO(bytes): Config::prohibit_url_by_config() takes a &str.
         self.config.borrow_mut().prohibit_url_by_config(
-            &url,
+            &legacy_lossy(url),
             Some(self.io.clone()),
             &indexmap::IndexMap::new(),
         )?;
 
         // Try as is
-        let command = command_callable(url.clone());
-        let mut ignored_output = String::new();
-        if self.process.borrow_mut().execute(
-            &command,
-            &mut ignored_output,
-            cwd.as_deref().map(std::path::Path::new),
-        )? == 0
+        let command = command_callable(url.to_owned());
+        let mut ignored_output = BString::default();
+        if self
+            .process
+            .borrow_mut()
+            .execute(&command, &mut ignored_output, cwd)?
+            == 0
         {
             return Ok(());
         }
@@ -57,80 +60,92 @@ impl Hg {
             php_regex!(
                 r"{^(?P<proto>ssh|https?)://(?:(?P<user>[^:@]+)(?::(?P<pass>[^:@]+))?@)?(?P<host>[^/]+)(?P<path>/.*)?}mi"
             ),
-            &url,
+            url,
         );
 
+        // TODO(bytes): IOInterface authentications are keyed and valued by Strings.
         if let Some(matches) = matched
             && self
                 .io
                 .has_authentication(&legacy_lossy(matches.name("host").unwrap_or_default()))
         {
-            let authenticated_url = if matches.name("proto") == Some(bstr::BStr::new("ssh")) {
+            let authenticated_url = if matches.name("proto") == Some(BStr::new("ssh")) {
                 let user = if let Some(u) = matches.name("user") {
-                    format!("{}@", legacy_lossy(&rawurlencode(u)))
+                    bconcat!(rawurlencode(u), "@")
                 } else {
-                    String::new()
+                    BString::default()
                 };
-                format!(
-                    "{}://{}{}{}",
-                    legacy_lossy(&matches.name("proto").unwrap_or_default()),
+                bconcat!(
+                    matches.name("proto").unwrap_or_default(),
+                    "://",
                     user,
-                    legacy_lossy(&matches.name("host").unwrap_or_default()),
-                    legacy_lossy(&matches.name("path").unwrap_or_default()),
+                    matches.name("host").unwrap_or_default(),
+                    matches.name("path").unwrap_or_default(),
                 )
             } else {
                 let auth = self
                     .io
                     .get_authentication(&legacy_lossy(matches.name("host").unwrap_or_default()));
-                format!(
-                    "{}://{}:{}@{}{}",
-                    legacy_lossy(&matches.name("proto").unwrap_or_default()),
-                    legacy_lossy(&rawurlencode(
+                bconcat!(
+                    matches.name("proto").unwrap_or_default(),
+                    "://",
+                    rawurlencode(
                         auth.get("username")
                             .and_then(|s| s.as_deref())
                             .unwrap_or_default()
-                    )),
-                    legacy_lossy(&rawurlencode(
+                    ),
+                    ":",
+                    rawurlencode(
                         auth.get("password")
                             .and_then(|s| s.as_deref())
                             .unwrap_or_default()
-                    )),
-                    legacy_lossy(&matches.name("host").unwrap_or_default()),
-                    legacy_lossy(&matches.name("path").unwrap_or_default()),
+                    ),
+                    "@",
+                    matches.name("host").unwrap_or_default(),
+                    matches.name("path").unwrap_or_default(),
                 )
             };
 
             let command = command_callable(authenticated_url);
-            let mut ignored_output = String::new();
-            if self.process.borrow_mut().execute(
-                &command,
-                &mut ignored_output,
-                cwd.as_deref().map(std::path::Path::new),
-            )? == 0
+            let mut ignored_output = BString::default();
+            if self
+                .process
+                .borrow_mut()
+                .execute(&command, &mut ignored_output, cwd)?
+                == 0
             {
                 return Ok(());
             }
 
-            let error = legacy_lossy(&self.process.borrow().get_error_output()).into_owned();
-            return self.throw_exception(&format!("Failed to clone {}, \n\n{}", url, error), &url);
+            let error = self.process.borrow().get_error_output();
+            return self.throw_exception(
+                bconcat!("Failed to clone ", url, ", \n\n", error).as_bstr(),
+                url,
+            );
         }
 
-        let error = format!(
-            "The given URL ({}) does not match the required format (ssh|http(s)://(username:password@)example.com/path-to-repository)",
-            url
+        let error = bconcat!(
+            "The given URL (",
+            url,
+            ") does not match the required format (ssh|http(s)://(username:password@)example.com/path-to-repository)"
         );
-        self.throw_exception(&format!("Failed to clone {}, \n\n{}", url, error), &url)
+        self.throw_exception(
+            bconcat!("Failed to clone ", url, ", \n\n", error).as_bstr(),
+            url,
+        )
     }
 
-    fn throw_exception(&self, message: &str, url: &str) -> anyhow::Result<()> {
+    fn throw_exception(&self, message: &BStr, url: &BStr) -> anyhow::Result<()> {
         if Self::get_version(&self.process)?.is_none() {
             anyhow::bail!(
                 "{}",
-                Url::sanitize(format!(
-                    "Failed to clone {}, hg was not found, check that it is installed and in your PATH env.\n\n{}",
+                Url::sanitize(bconcat!(
+                    "Failed to clone ",
                     url,
-                    self.process.borrow().get_error_output().display_lossy()
-                )).display_lossy()
+                    ", hg was not found, check that it is installed and in your PATH env.\n\n",
+                    self.process.borrow().get_error_output()
+                ))
+                .display_lossy()
             );
         }
 

@@ -461,13 +461,17 @@ impl ShowCommand {
             legacy_lossy(&package.get_dist_reference().unwrap_or_default())
         ));
         if is_installed_package {
-            let path: Option<String> = self.require_composer(None, None).ok().and_then(|c| {
-                let installation_manager = c.borrow_partial().get_installation_manager();
+            let path: Option<String> = self
+                .require_composer(None, None)
+                .ok()
+                .and_then(|c| {
+                    let installation_manager = c.borrow_partial().get_installation_manager();
 
-                installation_manager
-                    .borrow_mut()
-                    .get_install_path(package.clone().into())
-            });
+                    installation_manager
+                        .borrow_mut()
+                        .get_install_path(package.clone().into())
+                })
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
             if let Some(p) = path {
                 self.get_io().write(&format!(
                     "<info>path</info>     : {}",
@@ -749,7 +753,8 @@ impl ShowCommand {
             let installation_manager = composer.borrow_partial().get_installation_manager();
             let path: Option<String> = installation_manager
                 .borrow_mut()
-                .get_install_path(package.clone().into());
+                .get_install_path(package.clone().into())
+                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
             match path {
                 Some(p) => {
                     if let Some(r) =
@@ -2470,7 +2475,8 @@ impl Command for ShowCommand {
                                 .get_installation_manager();
                             let path: Option<String> = installation_manager
                                 .borrow_mut()
-                                .get_install_path(package.clone());
+                                .get_install_path(package.clone())
+                                .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
                             if let Some(p) = path {
                                 let r = realpath(&p)
                                     .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())

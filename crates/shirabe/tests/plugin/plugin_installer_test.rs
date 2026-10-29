@@ -72,37 +72,37 @@ mockall::mock! {
         async fn download(
             &self,
             package: PackageInterfaceHandle,
-            target_dir: &str,
+            target_dir: &std::path::Path,
             prev_package: Option<PackageInterfaceHandle>,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn prepare(
             &self,
             r#type: &str,
             package: PackageInterfaceHandle,
-            target_dir: &str,
+            target_dir: &std::path::Path,
             prev_package: Option<PackageInterfaceHandle>,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn install(
             &self,
             package: PackageInterfaceHandle,
-            target_dir: &str,
+            target_dir: &std::path::Path,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn update(
             &self,
             initial: PackageInterfaceHandle,
             target: PackageInterfaceHandle,
-            target_dir: &str,
+            target_dir: &std::path::Path,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn remove(
             &self,
             package: PackageInterfaceHandle,
-            target_dir: &str,
+            target_dir: &std::path::Path,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn cleanup(
             &self,
             r#type: &str,
             package: PackageInterfaceHandle,
-            target_dir: &str,
+            target_dir: &std::path::Path,
             prev_package: Option<PackageInterfaceHandle>,
         ) -> anyhow::Result<Option<PhpMixed>>;
     }
@@ -180,19 +180,21 @@ impl InstallationManagerInterface for MockInstallationManager {
         Ok(())
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         let upstream = fixtures_dir().join(path_from_bytes(&package.get_pretty_name()));
         if upstream.exists() {
-            return Some(upstream.to_str().unwrap().to_string());
+            return Some(std::path::PathBuf::from(
+                upstream.to_str().unwrap().to_string(),
+            ));
         }
         // Shirabe-specific fixtures (subscriber_test) live next to this test binary.
-        Some(
+        Some(std::path::PathBuf::from(
             shirabe_fixtures_dir()
                 .join(path_from_bytes(&package.get_pretty_name()))
                 .to_str()
                 .unwrap()
                 .to_string(),
-        )
+        ))
     }
 
     fn set_output_progress(&mut self, _output_progress: bool) {}

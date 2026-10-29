@@ -14,7 +14,7 @@ impl<'a> DownloaderOrManager<'a> {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
@@ -27,7 +27,7 @@ impl<'a> DownloaderOrManager<'a> {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
@@ -47,7 +47,7 @@ impl<'a> DownloaderOrManager<'a> {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.borrow_mut().install2(package, path).await,
@@ -59,7 +59,7 @@ impl<'a> DownloaderOrManager<'a> {
         &self,
         package: PackageInterfaceHandle,
         prev_package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
             Self::Interface(d) => d.borrow_mut().update(package, prev_package, path).await,
@@ -71,7 +71,7 @@ impl<'a> DownloaderOrManager<'a> {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         match self {
@@ -95,7 +95,7 @@ impl SyncHelper {
     pub async fn download_and_install_package_sync(
         r#loop: &std::rc::Rc<std::cell::RefCell<Loop>>,
         downloader: DownloaderOrManager<'_>,
-        path: String,
+        path: std::path::PathBuf,
         package: PackageInterfaceHandle,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<()> {

@@ -38,7 +38,7 @@ struct InstallPathStubInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for InstallPathStubInstaller {
-    fn supports(&self, _package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, _package_type: &bstr::BStr) -> anyhow::Result<bool> {
         Ok(true)
     }
 
@@ -101,7 +101,7 @@ impl InstallerInterface for InstallPathStubInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         if package.get_type() == "metapackage" {
             return None;
         }
@@ -113,7 +113,7 @@ impl InstallerInterface for InstallPathStubInstaller {
             path = path.join(path_from_bytes(&dir));
         }
 
-        Some(path.to_str().unwrap().to_string())
+        Some(std::path::PathBuf::from(path.to_str().unwrap().to_string()))
     }
 }
 

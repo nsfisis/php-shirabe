@@ -107,7 +107,7 @@ impl DownloadManagerInterface for StubDownloadManager {
     async fn download(
         &self,
         _package: PackageInterfaceHandle,
-        _target_dir: &str,
+        _target_dir: &std::path::Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -116,7 +116,7 @@ impl DownloadManagerInterface for StubDownloadManager {
         &self,
         _type: &str,
         _package: PackageInterfaceHandle,
-        _target_dir: &str,
+        _target_dir: &std::path::Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
@@ -124,7 +124,7 @@ impl DownloadManagerInterface for StubDownloadManager {
     async fn install(
         &self,
         _package: PackageInterfaceHandle,
-        _target_dir: &str,
+        _target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
@@ -132,14 +132,14 @@ impl DownloadManagerInterface for StubDownloadManager {
         &self,
         _initial: PackageInterfaceHandle,
         _target: PackageInterfaceHandle,
-        _target_dir: &str,
+        _target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
     async fn remove(
         &self,
         _package: PackageInterfaceHandle,
-        _target_dir: &str,
+        _target_dir: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)
     }
@@ -147,7 +147,7 @@ impl DownloadManagerInterface for StubDownloadManager {
         &self,
         _type: &str,
         _package: PackageInterfaceHandle,
-        _target_dir: &str,
+        _target_dir: &std::path::Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(None)

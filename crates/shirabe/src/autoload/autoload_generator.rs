@@ -872,7 +872,10 @@ return array(
             let install_path = installation_manager
                 .borrow()
                 .get_install_path(package.clone());
-            package_map.push((package, install_path));
+            package_map.push((
+                package,
+                install_path.map(|p| legacy_lossy(path_to_bytes(&p)).into_owned()),
+            ));
         }
 
         Ok(package_map)

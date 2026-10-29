@@ -12,13 +12,14 @@ use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
 use crate::util::{Filesystem, ProcessExecutor};
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, InvalidArgumentException, PhpClass as _, PhpMixed, RuntimeException, array_map,
     array_shift, bconcat, explode, implode, legacy_lossy, path_to_bytes, rawurldecode, realpath,
     str_replace, strlen, strpos, substr, trim,
 };
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct VcsDownloaderBase {
@@ -26,7 +27,7 @@ pub struct VcsDownloaderBase {
     pub config: std::rc::Rc<std::cell::RefCell<Config>>,
     pub process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
     pub filesystem: std::rc::Rc<std::cell::RefCell<Filesystem>>,
-    pub has_cleaned_changes: std::cell::RefCell<IndexMap<String, bool>>,
+    pub has_cleaned_changes: std::cell::RefCell<IndexMap<BString, bool>>,
 }
 
 impl VcsDownloaderBase {
@@ -50,7 +51,11 @@ impl VcsDownloaderBase {
         }
     }
 
-    pub fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
+    pub fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> Option<bstr::BString> {
         let parser = VersionParser::new();
         let mut guesser = VersionGuesser::new(
             self.config.clone(),
@@ -61,8 +66,10 @@ impl VcsDownloaderBase {
         let dumper = ArrayDumper::new();
 
         let package_config = dumper.dump(package);
-        if let Ok(Some(package_version)) = guesser.guess_version(&package_config, path) {
-            return package_version.commit;
+        if let Ok(Some(package_version)) =
+            guesser.guess_version(&package_config, &legacy_lossy(path_to_bytes(path)))
+        {
+            return package_version.commit.map(BString::from);
         }
 
         None
@@ -76,13 +83,13 @@ pub trait VcsDownloader:
     fn config(&self) -> &std::rc::Rc<std::cell::RefCell<Config>>;
     fn process(&self) -> &std::rc::Rc<std::cell::RefCell<ProcessExecutor>>;
     fn filesystem(&self) -> &std::rc::Rc<std::cell::RefCell<Filesystem>>;
-    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<String, bool>>;
+    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<BString, bool>>;
 
     /// Downloads data needed to run an install/update later
     async fn do_download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         url: &str,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
@@ -91,7 +98,7 @@ pub trait VcsDownloader:
     async fn do_install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         url: &str,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
@@ -100,21 +107,21 @@ pub trait VcsDownloader:
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         url: &str,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     /// Fetches the commit logs between two commits
     fn get_commit_logs(
         &self,
-        from_reference: &str,
-        to_reference: &str,
-        path: &str,
-    ) -> anyhow::Result<String>;
+        from_reference: &bstr::BStr,
+        to_reference: &bstr::BStr,
+        path: &Path,
+    ) -> anyhow::Result<bstr::BString>;
 
     /// Checks if VCS metadata repository has been initialized
     /// repository example: .git|.svn|.hg
-    fn has_metadata_repository(&self, path: &str) -> bool;
+    fn has_metadata_repository(&self, path: &Path) -> bool;
 
     fn get_installation_source(&self) -> String {
         "source".to_string()
@@ -123,7 +130,7 @@ pub trait VcsDownloader:
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
@@ -189,16 +196,15 @@ pub trait VcsDownloader:
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if r#type == "update" {
             self.clean_changes(prev_package.clone().unwrap(), path, true)
                 .await?;
-            self.has_cleaned_changes().borrow_mut().insert(
-                legacy_lossy(&prev_package.unwrap().get_unique_name()).into_owned(),
-                true,
-            );
+            self.has_cleaned_changes()
+                .borrow_mut()
+                .insert(prev_package.unwrap().get_unique_name(), true);
         } else if r#type == "install" {
             self.filesystem().borrow_mut().empty_directory(path, true)?;
         } else if r#type == "uninstall" {
@@ -212,7 +218,7 @@ pub trait VcsDownloader:
         &self,
         r#type: &str,
         _package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if r#type == "update"
@@ -221,14 +227,14 @@ pub trait VcsDownloader:
                 .map(|p| {
                     self.has_cleaned_changes()
                         .borrow()
-                        .contains_key(&*legacy_lossy(&p.get_unique_name()))
+                        .contains_key(p.get_unique_name().as_bstr())
                 })
                 .unwrap_or(false)
         {
             self.reapply_changes(path)?;
             self.has_cleaned_changes()
                 .borrow_mut()
-                .shift_remove(&*legacy_lossy(&prev_package.unwrap().get_unique_name()));
+                .shift_remove(prev_package.unwrap().get_unique_name().as_bstr());
         }
 
         Ok(None)
@@ -237,7 +243,7 @@ pub trait VcsDownloader:
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if package.get_source_reference().is_none() {
             return Err(InvalidArgumentException::new(format!(
@@ -306,7 +312,7 @@ pub trait VcsDownloader:
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if target.get_source_reference().is_none() {
             return Err(InvalidArgumentException::new(format!(
@@ -378,16 +384,15 @@ pub trait VcsDownloader:
         // print the commit logs if in verbose mode and VCS metadata is present
         // because in case of missing metadata code would trigger another exception
         if exception.is_none() && self.io().is_verbose() && self.has_metadata_repository(path) {
-            let initial_ref =
-                legacy_lossy(&initial.get_source_reference().unwrap_or_default()).into_owned();
-            let target_ref =
-                legacy_lossy(&target.get_source_reference().unwrap_or_default()).into_owned();
+            let initial_ref = initial.get_source_reference().unwrap_or_default();
+            let target_ref = target.get_source_reference().unwrap_or_default();
             let mut message = "Pulling in changes:";
-            let mut logs = self.get_commit_logs(&initial_ref, &target_ref, path)?;
+            let mut logs =
+                self.get_commit_logs(initial_ref.as_bstr(), target_ref.as_bstr(), path)?;
 
             if trim(&logs).is_empty() {
                 message = "Rolling back changes:";
-                logs = self.get_commit_logs(&target_ref, &initial_ref, path)?;
+                logs = self.get_commit_logs(target_ref.as_bstr(), initial_ref.as_bstr(), path)?;
             }
 
             if !trim(&logs).is_empty() {
@@ -395,14 +400,18 @@ pub trait VcsDownloader:
                     |line: &BString| bconcat!("      ", line),
                     &explode("\n", &logs),
                 );
-                logs = legacy_lossy(&implode("\n", &prefixed)).into_owned();
+                logs = implode("\n", &prefixed);
 
                 // escape angle brackets for proper output in the console
-                logs = legacy_lossy(&str_replace("<", "\\<", &logs)).into_owned();
+                logs = str_replace("<", "\\<", &logs);
 
                 self.io()
                     .write_error3(&format!("    {}", message), true, io_interface::NORMAL);
-                self.io().write_error3(&logs, true, io_interface::NORMAL);
+                self.io().write_error3(
+                    &logs.display_lossy().to_string(),
+                    true,
+                    io_interface::NORMAL,
+                );
             }
         }
 
@@ -418,7 +427,7 @@ pub trait VcsDownloader:
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io().write_error3(
             &format!("  - {}", UninstallOperation::format(package, false)),
@@ -430,7 +439,7 @@ pub trait VcsDownloader:
         if !result {
             return Err(RuntimeException::new(format!(
                 "Could not completely delete {}, aborting.",
-                path
+                path.display()
             ))
             .into());
         }
@@ -438,7 +447,11 @@ pub trait VcsDownloader:
         Ok(None)
     }
 
-    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: &str) -> Option<String> {
+    fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> Option<bstr::BString> {
         let parser = VersionParser::new();
         let guesser = VersionGuesser::new(
             self.config().clone(),
@@ -450,8 +463,10 @@ pub trait VcsDownloader:
 
         let package_config = dumper.dump(package);
         let mut guesser = guesser;
-        if let Ok(Some(package_version)) = guesser.guess_version(&package_config, path) {
-            return package_version.commit;
+        if let Ok(Some(package_version)) =
+            guesser.guess_version(&package_config, &legacy_lossy(path_to_bytes(path)))
+        {
+            return package_version.commit.map(BString::from);
         }
 
         None
@@ -461,14 +476,14 @@ pub trait VcsDownloader:
     async fn clean_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _update: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         // the default implementation just fails if there are any changes, override in child classes to provide stash-ability
         if self.get_local_changes(package, path).await?.is_some() {
             return Err(RuntimeException::new(format!(
                 "Source directory {} has uncommitted changes.",
-                path
+                path.display()
             ))
             .into());
         }
@@ -477,7 +492,7 @@ pub trait VcsDownloader:
     }
 
     /// Reapply previously stashed changes if applicable, only called after an update (regardless if successful or not)
-    fn reapply_changes(&self, _path: &str) -> anyhow::Result<()> {
+    fn reapply_changes(&self, _path: &Path) -> anyhow::Result<()> {
         Ok(())
     }
 

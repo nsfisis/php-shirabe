@@ -1023,13 +1023,12 @@ impl Factory {
             dm.set_preferences(
                 prefs
                     .into_iter()
-                    // TODO(bytes): the keys are Strings, so non-UTF-8 bytes are replaced.
                     .map(|(k, v)| {
                         (
-                            k.to_str_lossy().into_owned(),
+                            k,
                             match v {
-                                PhpMixed::String(s) => s.to_str_lossy().into_owned(),
-                                _ => String::new(),
+                                PhpMixed::String(s) => s,
+                                _ => BString::default(),
                             },
                         )
                     })
@@ -1243,23 +1242,28 @@ impl Factory {
                 .expect("Composer must outlive create_default_installers");
             let composer_ref = composer_rc.borrow_partial();
             let config = composer_ref.get_config();
-            let bin_dir = legacy_lossy(&rtrim2(
-                config.borrow_mut().get_str("bin-dir").unwrap_or_default(),
-                "/",
-            ))
-            .into_owned();
-            let bin_compat = config
-                .borrow_mut()
-                .get_str("bin-compat")
-                .unwrap_or_default();
-            let vendor_dir = legacy_lossy(&rtrim2(
+            let bin_dir = std::path::PathBuf::from(path_from_bytes(&rtrim2(
                 config
                     .borrow_mut()
-                    .get_str("vendor-dir")
+                    .get("bin-dir")
+                    .as_string()
                     .unwrap_or_default(),
                 "/",
-            ))
-            .into_owned();
+            )));
+            let bin_compat = config
+                .borrow_mut()
+                .get("bin-compat")
+                .as_string()
+                .unwrap_or_default()
+                .to_owned();
+            let vendor_dir = std::path::PathBuf::from(path_from_bytes(&rtrim2(
+                config
+                    .borrow_mut()
+                    .get("vendor-dir")
+                    .as_string()
+                    .unwrap_or_default(),
+                "/",
+            )));
             (bin_dir, bin_compat, vendor_dir)
         };
 

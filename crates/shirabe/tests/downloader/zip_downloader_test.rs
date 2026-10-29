@@ -178,15 +178,21 @@ fn test_error_messages() {
     let result: anyhow::Result<()> = (|| {
         let loop_ = Loop::new(http_downloader.clone(), None);
         let promise = Box::pin(async {
-            DownloaderInterface::download(&downloader, package.clone(), &path, None, true)
-                .await
-                .map(|_| ())
+            DownloaderInterface::download(
+                &downloader,
+                package.clone(),
+                std::path::Path::new(&path),
+                None,
+                true,
+            )
+            .await
+            .map(|_| ())
         });
         run(loop_.wait(vec![promise], None))?;
         run(DownloaderInterface::install(
             &downloader,
             package.clone(),
-            &path,
+            std::path::Path::new(&path),
             true,
         ))
         .map(|_| ())
@@ -212,7 +218,11 @@ fn test_zip_archive_only_failed() {
     downloader.__set_zip_archive_object(Some(zip_archive));
 
     let filename = set_up.filename.to_str().unwrap().to_string();
-    let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
+    let result = run(downloader.extract(
+        set_up.package,
+        std::path::Path::new(&filename),
+        std::path::Path::new("vendor/dir"),
+    ));
 
     let e = result.expect_err("expected RuntimeException");
     assert!(
@@ -238,7 +248,11 @@ fn test_zip_archive_extract_only_failed() {
     downloader.__set_zip_archive_object(Some(zip_archive));
 
     let filename = set_up.filename.to_str().unwrap().to_string();
-    let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
+    let result = run(downloader.extract(
+        set_up.package,
+        std::path::Path::new(&filename),
+        std::path::Path::new("vendor/dir"),
+    ));
 
     let e = result.expect_err("expected RuntimeException");
     assert!(
@@ -266,7 +280,11 @@ fn test_zip_archive_only_good() {
     downloader.__set_zip_archive_object(Some(zip_archive));
 
     let filename = set_up.filename.to_str().unwrap().to_string();
-    let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
+    let result = run(downloader.extract(
+        set_up.package,
+        std::path::Path::new(&filename),
+        std::path::Path::new("vendor/dir"),
+    ));
 
     result.expect("extract should succeed");
 }
@@ -277,8 +295,8 @@ fn test_zip_archive_only_good() {
 // PHPUnit test fully replaces $processExecutor, so the exact command content is never asserted on;
 // this only needs to be non-empty so extractWithSystemUnzip proceeds past the "no commands"
 // short-circuit into ZipDownloader::extract_with_zip_archive.
-fn unzip_command_spec() -> Vec<Vec<String>> {
-    vec![vec!["unzip".to_string(), "unzip -qq %s -d %s".to_string()]]
+fn unzip_command_spec() -> Vec<Vec<bstr::BString>> {
+    vec![vec!["unzip".into(), "unzip -qq %s -d %s".into()]]
 }
 
 #[test]
@@ -304,7 +322,11 @@ fn test_system_unzip_only_failed() {
     let downloader = make_downloader_with_process(&set_up, process);
 
     let filename = set_up.filename.to_str().unwrap().to_string();
-    let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
+    let result = run(downloader.extract(
+        set_up.package,
+        std::path::Path::new(&filename),
+        std::path::Path::new("vendor/dir"),
+    ));
 
     let e = result.expect_err("expected RuntimeException");
     assert!(
@@ -337,7 +359,11 @@ fn test_system_unzip_only_good() {
     let downloader = make_downloader_with_process(&set_up, process);
 
     let filename = set_up.filename.to_str().unwrap().to_string();
-    let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
+    let result = run(downloader.extract(
+        set_up.package,
+        std::path::Path::new(&filename),
+        std::path::Path::new("vendor/dir"),
+    ));
 
     result.expect("extract should succeed");
 }
@@ -371,7 +397,11 @@ fn test_non_windows_fallback_good() {
     downloader.__set_zip_archive_object(Some(zip_archive));
 
     let filename = set_up.filename.to_str().unwrap().to_string();
-    let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
+    let result = run(downloader.extract(
+        set_up.package,
+        std::path::Path::new(&filename),
+        std::path::Path::new("vendor/dir"),
+    ));
 
     result.expect("extract should succeed");
 }
@@ -405,7 +435,11 @@ fn test_non_windows_fallback_failed() {
     downloader.__set_zip_archive_object(Some(zip_archive));
 
     let filename = set_up.filename.to_str().unwrap().to_string();
-    let result = run(downloader.extract(set_up.package, &filename, "vendor/dir"));
+    let result = run(downloader.extract(
+        set_up.package,
+        std::path::Path::new(&filename),
+        std::path::Path::new("vendor/dir"),
+    ));
 
     let e = result.expect_err("expected RuntimeException");
     assert!(

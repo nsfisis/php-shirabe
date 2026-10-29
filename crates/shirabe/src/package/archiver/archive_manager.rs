@@ -195,7 +195,11 @@ impl ArchiveManager {
                     Some(Box::pin(async {
                         self.download_manager
                             .borrow()
-                            .download(package.clone().into(), &source_path, None)
+                            .download(
+                                package.clone().into(),
+                                std::path::Path::new(&source_path),
+                                None,
+                            )
                             .await
                             .map(|_| ())
                     })),
@@ -206,7 +210,7 @@ impl ArchiveManager {
                     Some(Box::pin(async {
                         self.download_manager
                             .borrow()
-                            .install(package.clone().into(), &source_path)
+                            .install(package.clone().into(), std::path::Path::new(&source_path))
                             .await
                             .map(|_| ())
                     })),

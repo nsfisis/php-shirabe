@@ -20,7 +20,7 @@ mockall::mock! {
         async fn download(
             &self,
             package: PackageInterfaceHandle,
-            path: &str,
+            path: &std::path::Path,
             prev_package: Option<PackageInterfaceHandle>,
             output: bool,
         ) -> anyhow::Result<Option<PhpMixed>>;
@@ -28,32 +28,32 @@ mockall::mock! {
             &self,
             r#type: &str,
             package: PackageInterfaceHandle,
-            path: &str,
+            path: &std::path::Path,
             prev_package: Option<PackageInterfaceHandle>,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn install(
             &self,
             package: PackageInterfaceHandle,
-            path: &str,
+            path: &std::path::Path,
             output: bool,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn update(
             &self,
             initial: PackageInterfaceHandle,
             target: PackageInterfaceHandle,
-            path: &str,
+            path: &std::path::Path,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn remove(
             &self,
             package: PackageInterfaceHandle,
-            path: &str,
+            path: &std::path::Path,
             output: bool,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn cleanup(
             &self,
             r#type: &str,
             package: PackageInterfaceHandle,
-            path: &str,
+            path: &std::path::Path,
             prev_package: Option<PackageInterfaceHandle>,
         ) -> anyhow::Result<Option<PhpMixed>>;
     }
@@ -241,7 +241,7 @@ fn test_full_package_download() {
     let mut manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -274,7 +274,7 @@ fn test_full_package_download_failover() {
     manager.set_downloader("pear", as_dyn(downloader_fail));
     manager.set_downloader("git", as_dyn(downloader_success));
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     // PHP asserts setInstallationSource was called with 'dist' then 'source'
     // (withConsecutive/exactly(2)). The real package retains only the final
@@ -295,7 +295,7 @@ fn test_bad_package_download() {
 
     let manager = create_manager();
 
-    assert!(run(manager.download(package, "target_dir", None)).is_err());
+    assert!(run(manager.download(package, std::path::Path::new("target_dir"), None)).is_err());
 }
 
 #[test]
@@ -313,7 +313,7 @@ fn test_dist_only_package_download() {
     let mut manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -336,7 +336,7 @@ fn test_source_only_package_download() {
     let mut manager = create_manager();
     manager.set_downloader("git", as_dyn(downloader));
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -353,7 +353,7 @@ fn test_metapackage_package_download() {
 
     let manager = create_manager();
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -378,7 +378,7 @@ fn test_full_package_download_with_source_preferred() {
     manager.set_downloader("git", as_dyn(downloader));
 
     manager.set_prefer_source(true);
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -402,7 +402,7 @@ fn test_dist_only_package_download_with_source_preferred() {
     manager.set_downloader("pear", as_dyn(downloader));
 
     manager.set_prefer_source(true);
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -426,7 +426,7 @@ fn test_source_only_package_download_with_source_preferred() {
     manager.set_downloader("git", as_dyn(downloader));
 
     manager.set_prefer_source(true);
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -442,7 +442,7 @@ fn test_bad_package_download_with_source_preferred() {
     let manager = create_manager();
     manager.set_prefer_source(true);
 
-    assert!(run(manager.download(package, "target_dir", None)).is_err());
+    assert!(run(manager.download(package, std::path::Path::new("target_dir"), None)).is_err());
 }
 
 #[test]
@@ -465,7 +465,12 @@ fn test_update_dist_with_equal_types() {
     let mut manager = create_manager();
     manager.set_downloader("zip", as_dyn(zip_downloader));
 
-    run(manager.update(initial, target, "vendor/bundles/FOS/UserBundle")).unwrap();
+    run(manager.update(
+        initial,
+        target,
+        std::path::Path::new("vendor/bundles/FOS/UserBundle"),
+    ))
+    .unwrap();
 }
 
 #[test]
@@ -496,7 +501,12 @@ fn test_update_dist_with_not_equal_types() {
     manager.set_downloader("xz", as_dyn(xz_downloader));
     manager.set_downloader("zip", as_dyn(zip_downloader));
 
-    run(manager.update(initial, target, "vendor/bundles/FOS/UserBundle")).unwrap();
+    run(manager.update(
+        initial,
+        target,
+        std::path::Path::new("vendor/bundles/FOS/UserBundle"),
+    ))
+    .unwrap();
 }
 
 #[test]
@@ -636,7 +646,7 @@ fn test_update_metapackage() {
     let manager = create_manager();
 
     assert!(
-        run(manager.update(initial, target, "vendor/pkg"))
+        run(manager.update(initial, target, std::path::Path::new("vendor/pkg")))
             .unwrap()
             .is_none()
     );
@@ -658,7 +668,11 @@ fn test_remove() {
     let mut manager = create_manager();
     manager.set_downloader("pear", as_dyn(pear_downloader));
 
-    run(manager.remove(package, "vendor/bundles/FOS/UserBundle")).unwrap();
+    run(manager.remove(
+        package,
+        std::path::Path::new("vendor/bundles/FOS/UserBundle"),
+    ))
+    .unwrap();
 }
 
 #[test]
@@ -670,9 +684,12 @@ fn test_metapackage_remove() {
     let manager = create_manager();
 
     assert!(
-        run(manager.remove(package, "vendor/bundles/FOS/UserBundle"))
-            .unwrap()
-            .is_none()
+        run(manager.remove(
+            package,
+            std::path::Path::new("vendor/bundles/FOS/UserBundle")
+        ))
+        .unwrap()
+        .is_none()
     );
 }
 
@@ -692,7 +709,7 @@ fn test_install_preference_without_preference_dev() {
     let mut manager = create_manager();
     manager.set_downloader("git", as_dyn(downloader));
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -716,7 +733,7 @@ fn test_install_preference_without_preference_no_dev() {
     let mut manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -739,12 +756,9 @@ fn test_install_preference_without_match_dev() {
 
     let mut manager = create_manager();
     manager.set_downloader("git", as_dyn(downloader));
-    manager.set_preferences(IndexMap::from([(
-        "foo/*".to_string(),
-        "source".to_string(),
-    )]));
+    manager.set_preferences(IndexMap::from([("foo/*".into(), "source".into())]));
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -767,12 +781,9 @@ fn test_install_preference_without_match_no_dev() {
 
     let mut manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
-    manager.set_preferences(IndexMap::from([(
-        "foo/*".to_string(),
-        "source".to_string(),
-    )]));
+    manager.set_preferences(IndexMap::from([("foo/*".into(), "source".into())]));
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -795,9 +806,9 @@ fn test_install_preference_with_match_auto_dev() {
 
     let mut manager = create_manager();
     manager.set_downloader("git", as_dyn(downloader));
-    manager.set_preferences(IndexMap::from([("foo/*".to_string(), "auto".to_string())]));
+    manager.set_preferences(IndexMap::from([("foo/*".into(), "auto".into())]));
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -820,9 +831,9 @@ fn test_install_preference_with_match_auto_no_dev() {
 
     let mut manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
-    manager.set_preferences(IndexMap::from([("foo/*".to_string(), "auto".to_string())]));
+    manager.set_preferences(IndexMap::from([("foo/*".into(), "auto".into())]));
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -845,12 +856,9 @@ fn test_install_preference_with_match_source() {
 
     let mut manager = create_manager();
     manager.set_downloader("git", as_dyn(downloader));
-    manager.set_preferences(IndexMap::from([(
-        "foo/*".to_string(),
-        "source".to_string(),
-    )]));
+    manager.set_preferences(IndexMap::from([("foo/*".into(), "source".into())]));
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),
@@ -873,9 +881,9 @@ fn test_install_preference_with_match_dist() {
 
     let mut manager = create_manager();
     manager.set_downloader("pear", as_dyn(downloader));
-    manager.set_preferences(IndexMap::from([("foo/*".to_string(), "dist".to_string())]));
+    manager.set_preferences(IndexMap::from([("foo/*".into(), "dist".into())]));
 
-    run(manager.download(package.clone(), "target_dir", None)).unwrap();
+    run(manager.download(package.clone(), std::path::Path::new("target_dir"), None)).unwrap();
 
     assert_eq!(
         package.get_installation_source().as_ref(),

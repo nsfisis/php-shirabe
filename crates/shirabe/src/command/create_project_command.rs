@@ -769,7 +769,8 @@ impl CreateProjectCommand {
         dm.borrow_mut().set_prefer_source(prefer_source);
         dm.borrow_mut().set_prefer_dist(prefer_dist);
 
-        let project_installer = ProjectInstaller::new(&directory, dm.clone(), fs);
+        let project_installer =
+            ProjectInstaller::new(std::path::Path::new(&directory), dm.clone(), fs);
         let installation_manager = composer.get_installation_manager().clone();
         {
             let mut im = installation_manager.borrow_mut();

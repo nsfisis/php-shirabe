@@ -5,10 +5,10 @@ use crate::downloader::{DownloaderInterface, FileDownloader};
 use crate::io::IOInterfaceImmutable;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Platform};
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, bin2hex, file_exists, is_dir, legacy_lossy,
+    Catch as _, PhpMixed, RuntimeException, bconcat, bin2hex, file_exists, is_dir, path_from_bytes,
     path_to_bytes, random_bytes, realpath,
 };
 use shirabe_symfony_finder::Finder;
@@ -16,25 +16,25 @@ use std::path::{Path, PathBuf};
 
 pub trait ArchiveDownloader {
     fn inner(&self) -> &FileDownloader;
-    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<String, bool>>;
+    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<BString, bool>>;
 
     async fn extract(
         &self,
         package: PackageInterfaceHandle,
-        file: &str,
-        path: &str,
+        file: &Path,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn prepare(
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup_executed()
             .borrow_mut()
-            .shift_remove(&*legacy_lossy(&package.get_name()));
+            .shift_remove(package.get_name().as_bstr());
         self.inner()
             .prepare(r#type, package, path, prev_package)
             .await
@@ -44,12 +44,12 @@ pub trait ArchiveDownloader {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.cleanup_executed()
             .borrow_mut()
-            .insert(legacy_lossy(&package.get_name()).into_owned(), true);
+            .insert(package.get_name(), true);
         self.inner()
             .cleanup(r#type, package, path, prev_package)
             .await
@@ -58,7 +58,7 @@ pub trait ArchiveDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
@@ -69,28 +69,35 @@ pub trait ArchiveDownloader {
             ));
         }
 
-        let vendor_dir = legacy_lossy(
-            self.inner()
-                .config
-                .borrow_mut()
-                .get("vendor-dir")
-                .as_string()
-                .unwrap_or_default(),
-        )
-        .into_owned();
+        let vendor_dir = self
+            .inner()
+            .config
+            .borrow_mut()
+            .get("vendor-dir")
+            .as_string()
+            .unwrap_or_default()
+            .to_owned();
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the archive to be extracted. This is the case when installing with create-project in the current directory
         // but in that case we ensure the directory is empty already in ProjectInstaller so no need to empty it here.
-        if !path_to_bytes(&self.inner().filesystem.borrow().normalize_path(&vendor_dir))
-            .contains_str(path_to_bytes(
-                &self.inner().filesystem.borrow().normalize_path(format!(
-                    "{}{}",
+        if !path_to_bytes(
+            &self
+                .inner()
+                .filesystem
+                .borrow()
+                .normalize_path(path_from_bytes(&vendor_dir)),
+        )
+        .contains_str(path_to_bytes(
+            &self
+                .inner()
+                .filesystem
+                .borrow()
+                .normalize_path(path_from_bytes(&bconcat!(
                     path,
-                    std::path::MAIN_SEPARATOR
-                )),
-            ))
-        {
+                    std::path::MAIN_SEPARATOR_STR
+                ))),
+        )) {
             self.inner()
                 .filesystem
                 .borrow_mut()
@@ -98,11 +105,11 @@ pub trait ArchiveDownloader {
         }
 
         let temporary_dir = loop {
-            let candidate = format!(
-                "{}/composer/{}",
+            let candidate = PathBuf::from(path_from_bytes(&bconcat!(
                 vendor_dir,
-                legacy_lossy(&bin2hex(random_bytes(4)))
-            );
+                "/composer/",
+                bin2hex(random_bytes(4))
+            )));
             if !is_dir(&candidate) {
                 break candidate;
             }
@@ -113,11 +120,8 @@ pub trait ArchiveDownloader {
         // avoid cleaning up $path if installing in "." for eg create-project as we can not
         // delete the directory we are currently in on windows
         if !is_dir(path)
-            || realpath(path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                != Some(
-                    legacy_lossy(path_to_bytes(&Platform::get_cwd(false).unwrap_or_default()))
-                        .into_owned(),
-                )
+            || realpath(path).as_deref().map(Path::as_os_str)
+                != Some(Platform::get_cwd(false).unwrap_or_default().as_os_str())
         {
             self.inner().add_cleanup_path(package.clone(), path);
         }
@@ -173,7 +177,7 @@ pub trait ArchiveDownloader {
                     let extracted_dir: PathBuf = if single_dir_at_top_level {
                         content_dir.first().unwrap().clone()
                     } else {
-                        PathBuf::from(&temporary_dir)
+                        temporary_dir.clone()
                     };
                     self.inner()
                         .filesystem
@@ -181,17 +185,12 @@ pub trait ArchiveDownloader {
                         .rename(&extracted_dir, path)?;
                 } else {
                     // only one dir in the archive, extract its contents out of it
-                    let mut from = PathBuf::from(&temporary_dir);
+                    let mut from = temporary_dir.clone();
                     if single_dir_at_top_level {
                         from = content_dir.first().unwrap().clone();
                     }
 
-                    rename_recursively(
-                        &self.inner().filesystem,
-                        package.clone(),
-                        &from,
-                        Path::new(path),
-                    )?;
+                    rename_recursively(&self.inner().filesystem, package.clone(), &from, path)?;
                 }
 
                 Filesystem::remove_directory_async_via(&self.inner().filesystem, &temporary_dir)
@@ -208,7 +207,7 @@ pub trait ArchiveDownloader {
     fn get_install_operation_appendix(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &str,
+        _path: &Path,
     ) -> &str {
         ": Extracting archive"
     }
@@ -217,8 +216,8 @@ pub trait ArchiveDownloader {
 fn install_cleanup(
     inner: &FileDownloader,
     package: PackageInterfaceHandle,
-    path: &str,
-    temporary_dir: &str,
+    path: &Path,
+    temporary_dir: &Path,
 ) -> anyhow::Result<()> {
     // remove cache if the file was corrupted
     inner.clear_last_cache_write(package.clone());
@@ -229,16 +228,13 @@ fn install_cleanup(
         .borrow_mut()
         .remove_directory(temporary_dir)?;
     if is_dir(path)
-        && realpath(path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            != Some(
-                legacy_lossy(path_to_bytes(&Platform::get_cwd(false).unwrap_or_default()))
-                    .into_owned(),
-            )
+        && realpath(path).as_deref().map(Path::as_os_str)
+            != Some(Platform::get_cwd(false).unwrap_or_default().as_os_str())
     {
         inner.filesystem.borrow_mut().remove_directory(path)?;
     }
     inner.remove_cleanup_path(package.clone(), temporary_dir);
-    let realpath = realpath(path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
+    let realpath = realpath(path);
     if let Some(realpath) = realpath {
         inner.remove_cleanup_path(package, &realpath);
     }

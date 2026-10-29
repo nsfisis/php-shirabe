@@ -15,7 +15,7 @@ use shirabe_php_shim::{Phar, PhpMixed, impl_php_class};
 #[derive(Debug)]
 pub struct PharDownloader {
     inner: FileDownloader,
-    cleanup_executed: std::cell::RefCell<IndexMap<String, bool>>,
+    cleanup_executed: std::cell::RefCell<IndexMap<bstr::BString, bool>>,
 }
 
 impl_php_class!(PharDownloader, r"Composer\Downloader\PharDownloader");
@@ -50,15 +50,15 @@ impl ArchiveDownloader for PharDownloader {
         &self.inner
     }
 
-    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
+    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<bstr::BString, bool>> {
         &self.cleanup_executed
     }
 
     async fn extract(
         &self,
         _package: PackageInterfaceHandle,
-        file: &str,
-        path: &str,
+        file: &std::path::Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         // Can throw an UnexpectedValueException
         let archive = Phar::new(file)?;
@@ -77,8 +77,8 @@ impl ChangeReportInterface for PharDownloader {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &std::path::Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.base_get_local_changes(self, package, path).await
     }
 }
@@ -96,7 +96,7 @@ impl DownloaderInterface for PharDownloader {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -109,7 +109,7 @@ impl DownloaderInterface for PharDownloader {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -118,7 +118,7 @@ impl DownloaderInterface for PharDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::install(self, package, path, output).await
@@ -128,7 +128,7 @@ impl DownloaderInterface for PharDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let appendix = self.get_install_operation_appendix(target.clone(), path);
         self.inner
@@ -139,7 +139,7 @@ impl DownloaderInterface for PharDownloader {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.remove(package, path, output).await
@@ -149,7 +149,7 @@ impl DownloaderInterface for PharDownloader {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::cleanup(self, r#type, package, path, prev_package).await

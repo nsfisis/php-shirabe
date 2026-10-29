@@ -7,17 +7,18 @@ use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PATHINFO_FILENAME, PhpMixed, RuntimeException, extension_loaded, fclose, fopen, fwrite,
     gzclose, gzopen, gzread, impl_php_class, implode, legacy_lossy, parse_url, path_from_bytes,
-    pathinfo, strtr,
+    path_to_bytes, pathinfo, strtr,
 };
 
 #[derive(Debug)]
 pub struct GzipDownloader {
     inner: FileDownloader,
-    cleanup_executed: std::cell::RefCell<IndexMap<String, bool>>,
+    cleanup_executed: std::cell::RefCell<IndexMap<bstr::BString, bool>>,
 }
 
 impl_php_class!(GzipDownloader, r"Composer\Downloader\GzipDownloader");
@@ -46,7 +47,7 @@ impl GzipDownloader {
         }
     }
 
-    fn extract_using_ext(&self, file: &str, target_filepath: &str) {
+    fn extract_using_ext(&self, file: &std::path::Path, target_filepath: &std::path::Path) {
         // PHP does not check the gzopen result either; gzread(false, ...) is a fatal TypeError.
         let archive_file = gzopen(file, "rb").unwrap();
         let target_file = fopen(target_filepath, "wb").unwrap();
@@ -67,15 +68,15 @@ impl ArchiveDownloader for GzipDownloader {
         &self.inner
     }
 
-    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
+    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<bstr::BString, bool>> {
         &self.cleanup_executed
     }
 
     async fn extract(
         &self,
         package: PackageInterfaceHandle,
-        file: &str,
-        path: &str,
+        file: &std::path::Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let filename = pathinfo(
             parse_url(&legacy_lossy(&strtr(
@@ -87,19 +88,15 @@ impl ArchiveDownloader for GzipDownloader {
             .unwrap_or_default(),
             PATHINFO_FILENAME,
         );
-        let target_filepath = std::path::Path::new(path)
-            .join(path_from_bytes(&filename))
-            .into_os_string()
-            .into_string()
-            .unwrap();
+        let target_filepath = path.join(path_from_bytes(&filename));
 
         if !Platform::is_windows() {
-            let command = vec![
-                "sh".to_string(),
-                "-c".to_string(),
-                "gzip -cd -- \"$0\" > \"$1\"".to_string(),
-                file.to_string(),
-                target_filepath.clone(),
+            let command: Vec<BString> = vec![
+                "sh".into(),
+                "-c".into(),
+                "gzip -cd -- \"$0\" > \"$1\"".into(),
+                path_to_bytes(file).into(),
+                path_to_bytes(&target_filepath).into(),
             ];
 
             let mut process_output = PhpMixed::Null;
@@ -120,8 +117,12 @@ impl ArchiveDownloader for GzipDownloader {
 
             let process_error = format!(
                 "Failed to execute {}\n\n{}",
-                legacy_lossy(&implode(" ", &command)),
-                legacy_lossy(&self.inner.process.borrow().get_error_output()),
+                implode(" ", &command).display_lossy(),
+                self.inner
+                    .process
+                    .borrow()
+                    .get_error_output()
+                    .display_lossy(),
             );
             return Err(RuntimeException::new(process_error).into());
         }
@@ -137,8 +138,8 @@ impl ChangeReportInterface for GzipDownloader {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &std::path::Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.base_get_local_changes(self, package, path).await
     }
 }
@@ -156,7 +157,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -169,7 +170,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -178,7 +179,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::install(self, package, path, output).await
@@ -188,7 +189,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let appendix = self.get_install_operation_appendix(target.clone(), path);
         self.inner
@@ -199,7 +200,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.remove(package, path, output).await
@@ -209,7 +210,7 @@ impl crate::downloader::DownloaderInterface for GzipDownloader {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::cleanup(self, r#type, package, path, prev_package).await

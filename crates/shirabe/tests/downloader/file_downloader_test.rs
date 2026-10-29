@@ -18,7 +18,7 @@ use shirabe::util::http_downloader::HttpDownloaderMockHandler;
 use shirabe::util::r#loop::Loop;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, UnexpectedValueException,
-    legacy_lossy,
+    legacy_lossy, path_to_bytes,
 };
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
@@ -85,7 +85,7 @@ fn test_download_for_package_without_dist_reference() {
     let package = get_package("dummy/pkg", "1.0.0");
 
     let (downloader, _http_downloader, _guard) = get_downloader(None, None);
-    let result = run(downloader.download(package, "/path", None, true));
+    let result = run(downloader.download(package, std::path::Path::new("/path"), None, true));
 
     let e = result.expect_err("expected InvalidArgumentException");
     assert!(
@@ -108,7 +108,7 @@ fn test_download_to_existing_file() {
 
     let (downloader, _http_downloader, _guard) = get_downloader(None, None);
 
-    let result = run(downloader.download(package, &path, None, true));
+    let result = run(downloader.download(package, std::path::Path::new(&path), None, true));
 
     let e = result.expect_err("download to an existing file was expected to throw");
     assert!(
@@ -135,9 +135,13 @@ fn test_get_file_name() {
 
     let (downloader, _http_downloader, _guard) = get_downloader(None, Some(config));
 
-    let file_name = downloader.__get_file_name(package, "/path");
+    let file_name = downloader.__get_file_name(package, std::path::Path::new("/path"));
     let re = regex::Regex::new(r"/vendor/composer/tmp-[a-z0-9]+\.js").unwrap();
-    assert!(re.is_match(&file_name), "unexpected file name: {file_name}");
+    assert!(
+        re.is_match(&legacy_lossy(path_to_bytes(&file_name))),
+        "unexpected file name: {}",
+        file_name.display()
+    );
 }
 
 #[test]
@@ -165,7 +169,7 @@ fn test_download_but_file_is_unsaved() {
     let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
         downloader
-            .download(package.clone(), &path, None, true)
+            .download(package.clone(), std::path::Path::new(&path), None, true)
             .await
             .map(|_| ())
     });
@@ -286,7 +290,7 @@ fn test_download_file_with_invalid_checksum() {
     let (downloader, http_downloader, _guard) = get_downloader(None, Some(config));
 
     // make sure the file expected to be downloaded is on disk already
-    let dl_file = downloader.__get_file_name(package.clone(), &path);
+    let dl_file = downloader.__get_file_name(package.clone(), std::path::Path::new(&path));
     let dir = std::path::Path::new(&dl_file).parent().unwrap();
     std::fs::create_dir_all(dir).unwrap();
     std::fs::write(&dl_file, b"").unwrap();
@@ -294,7 +298,7 @@ fn test_download_file_with_invalid_checksum() {
     let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
         downloader
-            .download(package.clone(), &path, None, true)
+            .download(package.clone(), std::path::Path::new(&path), None, true)
             .await
             .map(|_| ())
     });
@@ -374,7 +378,7 @@ fn test_downgrade_shows_appropriate_message() {
     );
 
     // make sure the file expected to be downloaded is on disk already
-    let dl_file = downloader.__get_file_name(new_package.clone(), &path);
+    let dl_file = downloader.__get_file_name(new_package.clone(), std::path::Path::new(&path));
     let dir = std::path::Path::new(&dl_file).parent().unwrap();
     std::fs::create_dir_all(dir).unwrap();
     std::fs::write(&dl_file, b"").unwrap();
@@ -382,14 +386,23 @@ fn test_downgrade_shows_appropriate_message() {
     let loop_ = Loop::new(http_downloader, None);
     let promise = Box::pin(async {
         downloader
-            .download(new_package.clone(), &path, Some(old_package.clone()), true)
+            .download(
+                new_package.clone(),
+                std::path::Path::new(&path),
+                Some(old_package.clone()),
+                true,
+            )
             .await
             .map(|_| ())
     });
     run(loop_.wait(vec![promise], None)).expect("download should succeed");
 
-    run(downloader.update(old_package.clone(), new_package.clone(), &path))
-        .expect("update should succeed");
+    run(downloader.update(
+        old_package.clone(),
+        new_package.clone(),
+        std::path::Path::new(&path),
+    ))
+    .expect("update should succeed");
 
     assert_eq!(
         filesystem.borrow().__remove_directory_async_calls(),

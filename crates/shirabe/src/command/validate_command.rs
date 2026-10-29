@@ -352,7 +352,7 @@ impl Command for ValidateCommand {
                     Some(p) => p,
                     None => continue,
                 };
-                let dep_file = format!("{}/composer.json", path);
+                let dep_file = format!("{}/composer.json", path.display());
                 if std::path::Path::new(&path).is_dir() && std::path::Path::new(&dep_file).exists()
                 {
                     let (mut dep_errors, mut dep_publish_errors, mut dep_warnings) =

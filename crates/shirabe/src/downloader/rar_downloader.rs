@@ -7,16 +7,17 @@ use crate::event_dispatcher::EventDispatcher;
 use crate::io::IOInterface;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, HttpDownloader, IniHelper, Platform, ProcessExecutor};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PhpMixed, RarArchive, RuntimeException, UnexpectedValueException, class_exists, impl_php_class,
-    implode, legacy_lossy,
+    implode, path_to_bytes,
 };
 
 #[derive(Debug)]
 pub struct RarDownloader {
     inner: FileDownloader,
-    cleanup_executed: std::cell::RefCell<IndexMap<String, bool>>,
+    cleanup_executed: std::cell::RefCell<IndexMap<bstr::BString, bool>>,
 }
 
 impl_php_class!(RarDownloader, r"Composer\Downloader\RarDownloader");
@@ -51,25 +52,25 @@ impl ArchiveDownloader for RarDownloader {
         &self.inner
     }
 
-    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
+    fn cleanup_executed(&self) -> &std::cell::RefCell<IndexMap<bstr::BString, bool>> {
         &self.cleanup_executed
     }
 
     async fn extract(
         &self,
         _package: PackageInterfaceHandle,
-        file: &str,
-        path: &str,
+        file: &std::path::Path,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let mut process_error: Option<String> = None;
 
         if !Platform::is_windows() {
-            let command = vec![
-                "sh".to_string(),
-                "-c".to_string(),
-                r#"unrar x -- "$0" "$1" >/dev/null && chmod -R u+w "$1""#.to_string(),
-                file.to_string(),
-                path.to_string(),
+            let command: Vec<BString> = vec![
+                "sh".into(),
+                "-c".into(),
+                r#"unrar x -- "$0" "$1" >/dev/null && chmod -R u+w "$1""#.into(),
+                path_to_bytes(file).into(),
+                path_to_bytes(path).into(),
             ];
 
             let mut process_output = PhpMixed::Null;
@@ -85,8 +86,12 @@ impl ArchiveDownloader for RarDownloader {
 
             process_error = Some(format!(
                 "Failed to execute {}\n\n{}",
-                legacy_lossy(&implode(" ", &command)),
-                legacy_lossy(&self.inner.process.borrow().get_error_output()),
+                implode(" ", &command).display_lossy(),
+                self.inner
+                    .process
+                    .borrow()
+                    .get_error_output()
+                    .display_lossy(),
             ));
         }
 
@@ -111,7 +116,7 @@ impl ArchiveDownloader for RarDownloader {
         if rar_archive.is_none() {
             return Err(UnexpectedValueException::new(format!(
                 "Could not open RAR archive: {}",
-                file
+                file.display()
             ))
             .into());
         }
@@ -142,8 +147,8 @@ impl ChangeReportInterface for RarDownloader {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &std::path::Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         self.inner.base_get_local_changes(self, package, path).await
     }
 }
@@ -161,7 +166,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -174,7 +179,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -183,7 +188,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::install(self, package, path, output).await
@@ -193,7 +198,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let appendix = self.get_install_operation_appendix(target.clone(), path);
         self.inner
@@ -204,7 +209,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.inner.remove(package, path, output).await
@@ -214,7 +219,7 @@ impl crate::downloader::DownloaderInterface for RarDownloader {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as ArchiveDownloader>::cleanup(self, r#type, package, path, prev_package).await

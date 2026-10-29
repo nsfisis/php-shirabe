@@ -97,7 +97,7 @@ fn test_install_for_package_without_source_reference() {
     let downloader = get_downloader_mock(None, None, process, None);
 
     let path = working_dir.path().join("path");
-    let result = run(downloader.install(package, path.to_str().unwrap()));
+    let result = run(downloader.install(package, std::path::Path::new(path.to_str().unwrap())));
 
     let e = result.expect_err("missing source reference should throw");
     assert!(e.to_string().contains("missing reference information"));
@@ -129,7 +129,7 @@ fn test_install() {
     );
 
     let downloader = get_downloader_mock(None, None, process, None);
-    run(downloader.install(package, &working_dir_str)).unwrap();
+    run(downloader.install(package, std::path::Path::new(&working_dir_str))).unwrap();
 }
 
 #[test]
@@ -148,15 +148,24 @@ fn test_updatefor_package_without_source_reference() {
             .prepare(
                 "update",
                 source_package.clone(),
-                "/path",
+                std::path::Path::new("/path"),
                 Some(initial_package.clone()),
             )
             .await?;
         downloader
-            .update(initial_package.clone(), source_package.clone(), "/path")
+            .update(
+                initial_package.clone(),
+                source_package.clone(),
+                std::path::Path::new("/path"),
+            )
             .await?;
         downloader
-            .cleanup("update", source_package, "/path", Some(initial_package))
+            .cleanup(
+                "update",
+                source_package,
+                std::path::Path::new("/path"),
+                Some(initial_package),
+            )
             .await
     });
 
@@ -195,17 +204,26 @@ fn test_update() {
             .prepare(
                 "update",
                 package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
             )
             .await
             .unwrap();
         downloader
-            .update(package.clone(), package.clone(), &working_dir_str)
+            .update(
+                package.clone(),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
             .await
             .unwrap();
         downloader
-            .cleanup("update", package.clone(), &working_dir_str, Some(package))
+            .cleanup(
+                "update",
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package),
+            )
             .await
             .unwrap();
     });
@@ -239,15 +257,25 @@ fn test_remove() {
     let downloader = get_downloader_mock(None, None, process, Some(filesystem.clone()));
     run(async {
         downloader
-            .prepare("uninstall", package.clone(), &working_dir_str, None)
+            .prepare(
+                "uninstall",
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                None,
+            )
             .await
             .unwrap();
         downloader
-            .remove(package.clone(), &working_dir_str)
+            .remove(package.clone(), std::path::Path::new(&working_dir_str))
             .await
             .unwrap();
         downloader
-            .cleanup("uninstall", package, &working_dir_str, None)
+            .cleanup(
+                "uninstall",
+                package,
+                std::path::Path::new(&working_dir_str),
+                None,
+            )
             .await
             .unwrap();
     });

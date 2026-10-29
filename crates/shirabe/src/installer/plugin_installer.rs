@@ -28,7 +28,7 @@ impl PluginInstaller {
             inner: LibraryInstaller::new(
                 io,
                 composer,
-                Some("composer-plugin".to_string()),
+                Some("composer-plugin".into()),
                 fs,
                 binary_installer,
             ),
@@ -70,7 +70,7 @@ impl PluginInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for PluginInstaller {
-    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
         Ok(package_type == "composer-plugin" || package_type == "composer-installer")
     }
 
@@ -192,7 +192,7 @@ impl InstallerInterface for PluginInstaller {
         self.inner.cleanup(r#type, package, prev_package).await
     }
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         self.inner.get_install_path(package)
     }
 

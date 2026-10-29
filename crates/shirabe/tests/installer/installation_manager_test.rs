@@ -48,7 +48,7 @@ fn set_up() -> SetUp {
 mockall::mock! {
     #[derive(Debug)]
     pub Installer {
-        fn supports(&self, package_type: &str) -> bool;
+        fn supports(&self, package_type: &bstr::BStr) -> bool;
         fn install(
             &self,
             package: PackageInterfaceHandle,
@@ -67,7 +67,7 @@ mockall::mock! {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for MockInstaller {
-    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
         Ok(MockInstaller::supports(self, package_type))
     }
 
@@ -130,7 +130,7 @@ impl InstallerInterface for MockInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         None
     }
 }
@@ -140,7 +140,7 @@ impl InstallerInterface for MockInstaller {
 /// are exercised).
 #[derive(Debug, Default)]
 struct BinaryInstallerCalls {
-    supports_args: Vec<String>,
+    supports_args: Vec<bstr::BString>,
     ensure_binaries_presence: Vec<PackageInterfaceHandle>,
 }
 
@@ -163,11 +163,11 @@ impl BinaryInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for BinaryInstaller {
-    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
         self.calls
             .borrow_mut()
             .supports_args
-            .push(package_type.to_string());
+            .push(package_type.to_owned());
         Ok(package_type == "library")
     }
 
@@ -230,7 +230,7 @@ impl InstallerInterface for BinaryInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         None
     }
 
@@ -482,7 +482,10 @@ fn test_install_binary() {
     let package = get_package("test/pkg", "1.0.0");
     manager.ensure_binaries_presence(package.clone()).unwrap();
 
-    assert_eq!(calls.borrow().supports_args, vec!["library".to_string()]);
+    assert_eq!(
+        calls.borrow().supports_args,
+        vec![bstr::BString::from("library")]
+    );
     assert_eq!(calls.borrow().ensure_binaries_presence.len(), 1);
     assert!(same_handle(
         &calls.borrow().ensure_binaries_presence[0],

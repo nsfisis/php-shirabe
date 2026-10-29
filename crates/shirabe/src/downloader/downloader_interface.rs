@@ -10,7 +10,7 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>>;
@@ -19,7 +19,7 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
     async fn download3(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.download(package, path, prev_package, true).await
@@ -29,14 +29,14 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
@@ -44,7 +44,7 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
     async fn install2(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.install(package, path, true).await
     }
@@ -53,13 +53,13 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
@@ -67,7 +67,7 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
     async fn remove2(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.remove(package, path, true).await
     }
@@ -76,7 +76,7 @@ pub trait DownloaderInterface: std::fmt::Debug + PhpClass {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &std::path::Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 

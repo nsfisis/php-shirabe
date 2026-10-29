@@ -87,14 +87,18 @@ fn run_install_and_exec_binary_with_full_compat(contents: &[u8]) {
 
     let mut installer = BinaryInstaller::new(
         setup.io.clone(),
-        setup.bin_dir.to_str().unwrap().to_string(),
-        "full".to_string(),
+        std::path::PathBuf::from(setup.bin_dir.to_str().unwrap().to_string()),
+        bstr::BString::from("full".to_string()),
         Some(std::rc::Rc::new(std::cell::RefCell::new(Filesystem::new(
             None,
         )))),
         None,
     );
-    installer.install_binaries(package, pkg_dir.to_str().unwrap(), true);
+    installer.install_binaries(
+        package,
+        std::path::Path::new(pkg_dir.to_str().unwrap()),
+        true,
+    );
 
     let proc = ProcessExecutor::new(None);
     let mut output = String::new();

@@ -130,12 +130,23 @@ fn test_download_for_package_without_source_reference() {
     let downloader = get_downloader_mock(None, None, process, None);
 
     let result = run(async {
-        downloader.download(package.clone(), "/path", None).await?;
         downloader
-            .prepare("install", package.clone(), "/path", None)
+            .download(package.clone(), std::path::Path::new("/path"), None)
             .await?;
-        downloader.install(package.clone(), "/path").await?;
-        downloader.cleanup("install", package, "/path", None).await
+        downloader
+            .prepare(
+                "install",
+                package.clone(),
+                std::path::Path::new("/path"),
+                None,
+            )
+            .await?;
+        downloader
+            .install(package.clone(), std::path::Path::new("/path"))
+            .await?;
+        downloader
+            .cleanup("install", package, std::path::Path::new("/path"), None)
+            .await
     });
 
     let e = result.expect_err("missing source reference should throw");
@@ -195,19 +206,29 @@ fn test_download() {
 
     run(async {
         downloader
-            .download(package.clone(), &expected_path, None)
+            .download(package.clone(), std::path::Path::new(&expected_path), None)
             .await
             .unwrap();
         downloader
-            .prepare("install", package.clone(), &expected_path, None)
+            .prepare(
+                "install",
+                package.clone(),
+                std::path::Path::new(&expected_path),
+                None,
+            )
             .await
             .unwrap();
         downloader
-            .install(package.clone(), &expected_path)
+            .install(package.clone(), std::path::Path::new(&expected_path))
             .await
             .unwrap();
         downloader
-            .cleanup("install", package, &expected_path, None)
+            .cleanup(
+                "install",
+                package,
+                std::path::Path::new(&expected_path),
+                None,
+            )
             .await
             .unwrap();
     });
@@ -313,19 +334,29 @@ fn test_download_with_cache() {
 
     run(async {
         downloader
-            .download(package.clone(), &expected_path, None)
+            .download(package.clone(), std::path::Path::new(&expected_path), None)
             .await
             .unwrap();
         downloader
-            .prepare("install", package.clone(), &expected_path, None)
+            .prepare(
+                "install",
+                package.clone(),
+                std::path::Path::new(&expected_path),
+                None,
+            )
             .await
             .unwrap();
         downloader
-            .install(package.clone(), &expected_path)
+            .install(package.clone(), std::path::Path::new(&expected_path))
             .await
             .unwrap();
         downloader
-            .cleanup("install", package, &expected_path, None)
+            .cleanup(
+                "install",
+                package,
+                std::path::Path::new(&expected_path),
+                None,
+            )
             .await
             .unwrap();
     });
@@ -439,19 +470,29 @@ fn test_download_uses_various_protocols_and_sets_push_url_for_github() {
 
     run(async {
         downloader
-            .download(package.clone(), &expected_path, None)
+            .download(package.clone(), std::path::Path::new(&expected_path), None)
             .await
             .unwrap();
         downloader
-            .prepare("install", package.clone(), &expected_path, None)
+            .prepare(
+                "install",
+                package.clone(),
+                std::path::Path::new(&expected_path),
+                None,
+            )
             .await
             .unwrap();
         downloader
-            .install(package.clone(), &expected_path)
+            .install(package.clone(), std::path::Path::new(&expected_path))
             .await
             .unwrap();
         downloader
-            .cleanup("install", package, &expected_path, None)
+            .cleanup(
+                "install",
+                package,
+                std::path::Path::new(&expected_path),
+                None,
+            )
             .await
             .unwrap();
     });
@@ -541,19 +582,29 @@ fn test_download_and_set_push_url_use_custom_various_protocols_for_github() {
 
         run(async {
             downloader
-                .download(package.clone(), &expected_path, None)
+                .download(package.clone(), std::path::Path::new(&expected_path), None)
                 .await
                 .unwrap();
             downloader
-                .prepare("install", package.clone(), &expected_path, None)
+                .prepare(
+                    "install",
+                    package.clone(),
+                    std::path::Path::new(&expected_path),
+                    None,
+                )
                 .await
                 .unwrap();
             downloader
-                .install(package.clone(), &expected_path)
+                .install(package.clone(), std::path::Path::new(&expected_path))
                 .await
                 .unwrap();
             downloader
-                .cleanup("install", package, &expected_path, None)
+                .cleanup(
+                    "install",
+                    package,
+                    std::path::Path::new(&expected_path),
+                    None,
+                )
                 .await
                 .unwrap();
         });
@@ -591,14 +642,26 @@ fn test_download_throws_runtime_exception_if_git_command_fails() {
 
     let result = run(async {
         downloader
-            .download(package.clone(), &expected_path, None)
+            .download(package.clone(), std::path::Path::new(&expected_path), None)
             .await?;
         downloader
-            .prepare("install", package.clone(), &expected_path, None)
+            .prepare(
+                "install",
+                package.clone(),
+                std::path::Path::new(&expected_path),
+                None,
+            )
             .await?;
-        downloader.install(package.clone(), &expected_path).await?;
         downloader
-            .cleanup("install", package, &expected_path, None)
+            .install(package.clone(), std::path::Path::new(&expected_path))
+            .await?;
+        downloader
+            .cleanup(
+                "install",
+                package,
+                std::path::Path::new(&expected_path),
+                None,
+            )
             .await
     });
 
@@ -625,7 +688,7 @@ fn test_updatefor_package_without_source_reference() {
         downloader
             .download(
                 source_package.clone(),
-                "/path",
+                std::path::Path::new("/path"),
                 Some(initial_package.clone()),
             )
             .await?;
@@ -633,15 +696,24 @@ fn test_updatefor_package_without_source_reference() {
             .prepare(
                 "update",
                 source_package.clone(),
-                "/path",
+                std::path::Path::new("/path"),
                 Some(initial_package.clone()),
             )
             .await?;
         downloader
-            .update(initial_package.clone(), source_package.clone(), "/path")
+            .update(
+                initial_package.clone(),
+                source_package.clone(),
+                std::path::Path::new("/path"),
+            )
             .await?;
         downloader
-            .cleanup("update", source_package, "/path", Some(initial_package))
+            .cleanup(
+                "update",
+                source_package,
+                std::path::Path::new("/path"),
+                Some(initial_package),
+            )
             .await
     });
 
@@ -693,24 +765,37 @@ fn test_update() {
 
     run(async {
         downloader
-            .download(package.clone(), &working_dir_str, Some(package.clone()))
+            .download(
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package.clone()),
+            )
             .await
             .unwrap();
         downloader
             .prepare(
                 "update",
                 package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
             )
             .await
             .unwrap();
         downloader
-            .update(package.clone(), package.clone(), &working_dir_str)
+            .update(
+                package.clone(),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
             .await
             .unwrap();
         downloader
-            .cleanup("update", package.clone(), &working_dir_str, Some(package))
+            .cleanup(
+                "update",
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package),
+            )
             .await
             .unwrap();
     });
@@ -773,24 +858,37 @@ fn test_update_with_new_repo_url() {
 
     run(async {
         downloader
-            .download(package.clone(), &working_dir_str, Some(package.clone()))
+            .download(
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package.clone()),
+            )
             .await
             .unwrap();
         downloader
             .prepare(
                 "update",
                 package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
             )
             .await
             .unwrap();
         downloader
-            .update(package.clone(), package.clone(), &working_dir_str)
+            .update(
+                package.clone(),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
             .await
             .unwrap();
         downloader
-            .cleanup("update", package.clone(), &working_dir_str, Some(package))
+            .cleanup(
+                "update",
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package),
+            )
             .await
             .unwrap();
     });
@@ -847,21 +945,34 @@ fn test_update_throws_runtime_exception_if_git_command_fails() {
 
     let result = run(async {
         downloader
-            .download(package.clone(), &working_dir_str, Some(package.clone()))
+            .download(
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package.clone()),
+            )
             .await?;
         downloader
             .prepare(
                 "update",
                 package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
             )
             .await?;
         downloader
-            .update(package.clone(), package.clone(), &working_dir_str)
+            .update(
+                package.clone(),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
             .await?;
         downloader
-            .cleanup("update", package.clone(), &working_dir_str, Some(package))
+            .cleanup(
+                "update",
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package),
+            )
             .await
     });
 
@@ -950,24 +1061,37 @@ fn test_update_doesnt_throws_runtime_exception_if_git_command_fails_at_first_but
 
     run(async {
         downloader
-            .download(package.clone(), &working_dir_str, Some(package.clone()))
+            .download(
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package.clone()),
+            )
             .await
             .unwrap();
         downloader
             .prepare(
                 "update",
                 package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(package.clone()),
             )
             .await
             .unwrap();
         downloader
-            .update(package.clone(), package.clone(), &working_dir_str)
+            .update(
+                package.clone(),
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
             .await
             .unwrap();
         downloader
-            .cleanup("update", package.clone(), &working_dir_str, Some(package))
+            .cleanup(
+                "update",
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                Some(package),
+            )
             .await
             .unwrap();
     });
@@ -1008,7 +1132,7 @@ fn test_downgrade_shows_appropriate_message() {
         downloader
             .download(
                 new_package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(old_package.clone()),
             )
             .await
@@ -1017,17 +1141,26 @@ fn test_downgrade_shows_appropriate_message() {
             .prepare(
                 "update",
                 new_package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(old_package.clone()),
             )
             .await
             .unwrap();
         downloader
-            .update(old_package.clone(), new_package.clone(), &working_dir_str)
+            .update(
+                old_package.clone(),
+                new_package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
             .await
             .unwrap();
         downloader
-            .cleanup("update", new_package, &working_dir_str, Some(old_package))
+            .cleanup(
+                "update",
+                new_package,
+                std::path::Path::new(&working_dir_str),
+                Some(old_package),
+            )
             .await
             .unwrap();
     });
@@ -1086,7 +1219,7 @@ fn test_not_using_downgrading_with_references() {
         downloader
             .download(
                 new_package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(old_package.clone()),
             )
             .await
@@ -1095,17 +1228,26 @@ fn test_not_using_downgrading_with_references() {
             .prepare(
                 "update",
                 new_package.clone(),
-                &working_dir_str,
+                std::path::Path::new(&working_dir_str),
                 Some(old_package.clone()),
             )
             .await
             .unwrap();
         downloader
-            .update(old_package.clone(), new_package.clone(), &working_dir_str)
+            .update(
+                old_package.clone(),
+                new_package.clone(),
+                std::path::Path::new(&working_dir_str),
+            )
             .await
             .unwrap();
         downloader
-            .cleanup("update", new_package, &working_dir_str, Some(old_package))
+            .cleanup(
+                "update",
+                new_package,
+                std::path::Path::new(&working_dir_str),
+                Some(old_package),
+            )
             .await
             .unwrap();
     });
@@ -1142,15 +1284,25 @@ fn test_remove() {
     let downloader = get_downloader_mock(None, None, process, Some(filesystem.clone()));
     run(async {
         downloader
-            .prepare("uninstall", package.clone(), &working_dir_str, None)
+            .prepare(
+                "uninstall",
+                package.clone(),
+                std::path::Path::new(&working_dir_str),
+                None,
+            )
             .await
             .unwrap();
         downloader
-            .remove(package.clone(), &working_dir_str)
+            .remove(package.clone(), std::path::Path::new(&working_dir_str))
             .await
             .unwrap();
         downloader
-            .cleanup("uninstall", package, &working_dir_str, None)
+            .cleanup(
+                "uninstall",
+                package,
+                std::path::Path::new(&working_dir_str),
+                None,
+            )
             .await
             .unwrap();
     });

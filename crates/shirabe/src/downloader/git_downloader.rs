@@ -9,22 +9,23 @@ use crate::downloader::{
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Git as GitUtil, Platform, ProcessExecutor, Url};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     CmpOp, PhpMixed, RuntimeException, array_map, basename, bconcat, dirname, impl_php_class,
-    implode, in_array_strict, is_dir, legacy_lossy, path_to_bytes, php_regex, preg_is_match,
-    preg_match, preg_match_all, preg_quote, preg_replace, preg_split, realpath, rtrim2, strlen,
-    strpos, substr, trim, version_compare,
+    implode, in_array_strict, is_dir, legacy_lossy, path_from_bytes, path_to_bytes, php_regex,
+    preg_is_match, preg_match, preg_match_all, preg_quote, preg_replace, preg_split, realpath,
+    rtrim2, strlen, strpos, substr, trim, version_compare,
 };
+use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub struct GitDownloader {
     inner: VcsDownloaderBase,
-    has_stashed_changes: std::cell::RefCell<IndexMap<String, bool>>,
-    has_discarded_changes: std::cell::RefCell<IndexMap<String, bool>>,
+    has_stashed_changes: std::cell::RefCell<IndexMap<BString, bool>>,
+    has_discarded_changes: std::cell::RefCell<IndexMap<BString, bool>>,
     git_util: std::cell::RefCell<GitUtil>,
-    cached_packages: std::cell::RefCell<IndexMap<i64, IndexMap<String, bool>>>,
+    cached_packages: std::cell::RefCell<IndexMap<i64, IndexMap<BString, bool>>>,
 }
 
 impl_php_class!(GitDownloader, r"Composer\Downloader\GitDownloader");
@@ -55,26 +56,27 @@ impl GitDownloader {
     pub fn get_unpushed_changes(
         &self,
         _package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &Path,
+    ) -> anyhow::Result<Option<BString>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
         if !self.has_metadata_repository(&path) {
             return Ok(None);
         }
 
-        let command = vec![
-            "git".to_string(),
-            "show-ref".to_string(),
-            "--head".to_string(),
-            "-d".to_string(),
+        let command: Vec<BString> = vec![
+            "git".into(),
+            "show-ref".into(),
+            "--head".into(),
+            "-d".into(),
         ];
-        let mut output = String::new();
-        if self.inner.process.borrow_mut().execute(
-            &command,
-            &mut output,
-            Some(std::path::Path::new(&path)),
-        )? != 0
+        let mut output = BString::default();
+        if self
+            .inner
+            .process
+            .borrow_mut()
+            .execute(&command, &mut output, Some(&path))?
+            != 0
         {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",
@@ -88,24 +90,23 @@ impl GitDownloader {
             .into());
         }
 
-        let mut refs = legacy_lossy(&trim(&output)).into_owned();
+        let mut refs = trim(&output);
         let Some(head_match) = preg_match(php_regex!(r"{^([a-f0-9]+) HEAD$}mi"), &refs) else {
             // could not match the HEAD for some reason
             return Ok(None);
         };
-        let head_ref = legacy_lossy(head_match.get(1).unwrap_or_default()).into_owned();
+        let head_ref = BString::from(head_match.get(1).unwrap_or_default());
 
-        let candidate_branches: Vec<String> = preg_match_all(
-            format!("{{^{} refs/heads/(.+)$}}mi", preg_quote(&head_ref, None)),
+        let candidate_branches: Vec<BString> = preg_match_all(
+            bconcat!("{^", preg_quote(&head_ref, None), " refs/heads/(.+)$}mi"),
             &refs,
         )
         .map(|branch_match| {
-            legacy_lossy(
+            BString::from(
                 branch_match
                     .get(1)
                     .expect("group 1 participates whenever the pattern matches"),
             )
-            .into_owned()
         })
         .collect();
         if candidate_branches.is_empty() {
@@ -115,28 +116,28 @@ impl GitDownloader {
 
         // use the first match as branch name for now
         let mut branch = candidate_branches[0].clone();
-        let mut unpushed_changes: Option<String> = None;
+        let mut unpushed_changes: Option<BString> = None;
         let mut branch_not_found_error = false;
 
         // do two passes, as if we find anything we want to fetch and then re-try
         for i in 0..=1 {
-            let mut remote_branches: Vec<String> = vec![];
+            let mut remote_branches: Vec<BString> = vec![];
 
             // try to find matching branch names in remote repos
             for candidate in &candidate_branches {
-                let matches: Vec<String> = preg_match_all(
-                    format!(
-                        "{{^[a-f0-9]+ refs/remotes/((?:[^/]+)/{})$}}mi",
-                        preg_quote(candidate, None)
+                let matches: Vec<BString> = preg_match_all(
+                    bconcat!(
+                        "{^[a-f0-9]+ refs/remotes/((?:[^/]+)/",
+                        preg_quote(candidate, None),
+                        ")$}mi"
                     ),
                     &refs,
                 )
                 .map(|m| {
-                    legacy_lossy(
+                    BString::from(
                         m.get(1)
                             .expect("group 1 participates whenever the pattern matches"),
                     )
-                    .into_owned()
                 })
                 .collect();
                 if !matches.is_empty() {
@@ -152,9 +153,10 @@ impl GitDownloader {
             // this is bad as we have no reference point to do a diff so we just bail listing
             // the branch as being unpushed
             if remote_branches.is_empty() {
-                unpushed_changes = Some(format!(
-                    "Branch {} could not be found on any remote and appears to be unpushed",
-                    branch
+                unpushed_changes = Some(bconcat!(
+                    "Branch ",
+                    branch,
+                    " could not be found on any remote and appears to be unpushed"
                 ));
                 branch_not_found_error = true;
             } else {
@@ -164,18 +166,18 @@ impl GitDownloader {
                     unpushed_changes = None;
                 }
                 for remote_branch in &remote_branches {
-                    let command = vec![
-                        "git".to_string(),
-                        "diff".to_string(),
-                        "--name-status".to_string(),
-                        format!("{}...{}", remote_branch, branch),
-                        "--".to_string(),
+                    let command: Vec<BString> = vec![
+                        "git".into(),
+                        "diff".into(),
+                        "--name-status".into(),
+                        bconcat!(remote_branch, "...", branch),
+                        "--".into(),
                     ];
-                    let mut output = String::new();
+                    let mut output = BString::default();
                     if self.inner.process.borrow_mut().execute(
                         &command,
                         &mut output,
-                        Some(std::path::Path::new(&path)),
+                        Some(&path),
                     )? != 0
                     {
                         return Err(RuntimeException::new(format!(
@@ -190,10 +192,16 @@ impl GitDownloader {
                         .into());
                     }
 
-                    let output = legacy_lossy(&trim(&output)).into_owned();
+                    let output = trim(&output);
                     // keep the shortest diff from all remote branches we compare against
                     if unpushed_changes.is_none()
-                        || strlen(&output) < strlen(unpushed_changes.as_deref().unwrap_or_default())
+                        || strlen(&output)
+                            < strlen(
+                                unpushed_changes
+                                    .as_deref()
+                                    .map(Vec::as_slice)
+                                    .unwrap_or_default(),
+                            )
                     {
                         unpushed_changes = Some(output);
                     }
@@ -203,26 +211,27 @@ impl GitDownloader {
             // first pass and we found unpushed changes, fetch from all remotes to make sure we have up to date
             // remotes and then try again as outdated remotes can sometimes cause false-positives
             if unpushed_changes.is_some() && i == 0 {
-                let mut output = String::new();
+                let mut output = BString::default();
                 self.inner.process.borrow_mut().execute(
-                    &["git".to_string(), "fetch".to_string(), "--all".to_string()],
+                    &["git", "fetch", "--all"],
                     &mut output,
-                    Some(std::path::Path::new(&path)),
+                    Some(&path),
                 )?;
 
                 // update list of refs after fetching
-                let command = vec![
-                    "git".to_string(),
-                    "show-ref".to_string(),
-                    "--head".to_string(),
-                    "-d".to_string(),
+                let command: Vec<BString> = vec![
+                    "git".into(),
+                    "show-ref".into(),
+                    "--head".into(),
+                    "-d".into(),
                 ];
-                let mut output = String::new();
-                if self.inner.process.borrow_mut().execute(
-                    &command,
-                    &mut output,
-                    Some(std::path::Path::new(&path)),
-                )? != 0
+                let mut output = BString::default();
+                if self
+                    .inner
+                    .process
+                    .borrow_mut()
+                    .execute(&command, &mut output, Some(&path))?
+                    != 0
                 {
                     return Err(RuntimeException::new(format!(
                         "Failed to execute {}\n\n{}",
@@ -235,7 +244,7 @@ impl GitDownloader {
                     ))
                     .into());
                 }
-                refs = legacy_lossy(&trim(&output)).into_owned();
+                refs = trim(&output);
             }
 
             // abort after first pass if we didn't find anything
@@ -251,24 +260,25 @@ impl GitDownloader {
     fn update_to_commit(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-        reference: &str,
-        pretty_version: &str,
-    ) -> anyhow::Result<Option<String>> {
-        let force: Vec<String> = if self
+        path: &Path,
+        reference: &BStr,
+        pretty_version: &BStr,
+    ) -> anyhow::Result<Option<BString>> {
+        let path_key = path_to_bytes(path).as_bstr();
+        let force: Vec<BString> = if self
             .has_discarded_changes
             .borrow()
-            .get(path)
+            .get(path_key)
             .copied()
             .unwrap_or(false)
             || self
                 .has_stashed_changes
                 .borrow()
-                .get(path)
+                .get(path_key)
                 .copied()
                 .unwrap_or(false)
         {
-            vec!["-f".to_string()]
+            vec!["-f".into()]
         } else {
             vec![]
         };
@@ -279,23 +289,22 @@ impl GitDownloader {
         // If the non-existent branch is actually the name of a file, the file
         // is checked out.
 
-        let mut branch = legacy_lossy(&preg_replace(
+        let mut branch = preg_replace(
             php_regex!(r"{(?:^dev-|(?:\.x)?-dev$)}i"),
             "",
             pretty_version,
-        ))
-        .into_owned();
+        );
 
         // Closure equivalent: $execute = function(array $command) use (&$output, $path) { ... };
         // Inlined below at each call site.
 
-        let mut branches: Option<String> = None;
+        let mut branches: Option<BString> = None;
         {
-            let mut output = String::new();
+            let mut output = BString::default();
             if self.inner.process.borrow_mut().execute(
-                &["git".to_string(), "branch".to_string(), "-r".to_string()],
+                &["git", "branch", "-r"],
                 &mut output,
-                Some(std::path::Path::new(path)),
+                Some(path),
             )? == 0
             {
                 branches = Some(output);
@@ -303,43 +312,44 @@ impl GitDownloader {
         }
 
         // check whether non-commitish are branches or tags, and fetch branches with the remote name
-        let git_ref = reference.to_string();
+        let git_ref = reference.to_owned();
         if !preg_is_match(php_regex!(r"{^[a-f0-9]{40}$}"), reference)
             && branches.is_some()
             && preg_is_match(
-                format!("{{^\\s+composer/{}$}}m", preg_quote(reference, None)),
-                branches.as_deref().unwrap_or_default(),
+                bconcat!("{^\\s+composer/", preg_quote(reference, None), "$}m"),
+                branches.as_deref().map(Vec::as_slice).unwrap_or_default(),
             )
         {
-            let mut command1: Vec<String> = vec!["git".to_string(), "checkout".to_string()];
+            let mut command1: Vec<BString> = vec!["git".into(), "checkout".into()];
             command1.extend(force.clone());
             command1.extend(vec![
-                "-B".to_string(),
+                "-B".into(),
                 branch.clone(),
-                format!("composer/{}", reference),
-                "--".to_string(),
+                bconcat!("composer/", reference),
+                "--".into(),
             ]);
-            let command2 = vec![
-                "git".to_string(),
-                "reset".to_string(),
-                "--hard".to_string(),
-                format!("composer/{}", reference),
-                "--".to_string(),
+            let command2: Vec<BString> = vec![
+                "git".into(),
+                "reset".into(),
+                "--hard".into(),
+                bconcat!("composer/", reference),
+                "--".into(),
             ];
 
-            let mut output = String::new();
-            let ok1 = self.inner.process.borrow_mut().execute(
-                &command1,
-                &mut output,
-                Some(std::path::Path::new(path)),
-            )? == 0;
+            let mut output = BString::default();
+            let ok1 =
+                self.inner
+                    .process
+                    .borrow_mut()
+                    .execute(&command1, &mut output, Some(path))?
+                    == 0;
             let ok2 = if ok1 {
-                let mut output = String::new();
-                self.inner.process.borrow_mut().execute(
-                    &command2,
-                    &mut output,
-                    Some(std::path::Path::new(path)),
-                )? == 0
+                let mut output = BString::default();
+                self.inner
+                    .process
+                    .borrow_mut()
+                    .execute(&command2, &mut output, Some(path))?
+                    == 0
             } else {
                 false
             };
@@ -353,62 +363,59 @@ impl GitDownloader {
             // add 'v' in front of the branch if it was stripped when generating the pretty name
             if branches.is_some()
                 && !preg_is_match(
-                    format!("{{^\\s+composer/{}$}}m", preg_quote(&branch, None)),
-                    branches.as_deref().unwrap_or_default(),
+                    bconcat!("{^\\s+composer/", preg_quote(&branch, None), "$}m"),
+                    branches.as_deref().map(Vec::as_slice).unwrap_or_default(),
                 )
                 && preg_is_match(
-                    format!("{{^\\s+composer/v{}$}}m", preg_quote(&branch, None)),
-                    branches.as_deref().unwrap_or_default(),
+                    bconcat!("{^\\s+composer/v", preg_quote(&branch, None), "$}m"),
+                    branches.as_deref().map(Vec::as_slice).unwrap_or_default(),
                 )
             {
-                branch = format!("v{}", branch);
+                branch = bconcat!("v", branch);
             }
 
-            let command = vec![
-                "git".to_string(),
-                "checkout".to_string(),
-                branch.clone(),
-                "--".to_string(),
-            ];
-            let mut fallback_command: Vec<String> = vec!["git".to_string(), "checkout".to_string()];
+            let command: Vec<BString> =
+                vec!["git".into(), "checkout".into(), branch.clone(), "--".into()];
+            let mut fallback_command: Vec<BString> = vec!["git".into(), "checkout".into()];
             fallback_command.extend(force.clone());
             fallback_command.extend(vec![
-                "-B".to_string(),
+                "-B".into(),
                 branch.clone(),
-                format!("composer/{}", branch),
-                "--".to_string(),
+                bconcat!("composer/", branch),
+                "--".into(),
             ]);
-            let reset_command = vec![
-                "git".to_string(),
-                "reset".to_string(),
-                "--hard".to_string(),
-                reference.to_string(),
-                "--".to_string(),
+            let reset_command: Vec<BString> = vec![
+                "git".into(),
+                "reset".into(),
+                "--hard".into(),
+                reference.to_owned(),
+                "--".into(),
             ];
 
-            let mut output = String::new();
-            let ok_command = self.inner.process.borrow_mut().execute(
-                &command,
-                &mut output,
-                Some(std::path::Path::new(path)),
-            )? == 0;
+            let mut output = BString::default();
+            let ok_command =
+                self.inner
+                    .process
+                    .borrow_mut()
+                    .execute(&command, &mut output, Some(path))?
+                    == 0;
             let ok_fallback = if !ok_command {
-                let mut output = String::new();
+                let mut output = BString::default();
                 self.inner.process.borrow_mut().execute(
                     &fallback_command,
                     &mut output,
-                    Some(std::path::Path::new(path)),
+                    Some(path),
                 )? == 0
             } else {
                 false
             };
             let ok_reset = if ok_command || ok_fallback {
-                let mut output = String::new();
-                self.inner.process.borrow_mut().execute(
-                    &reset_command,
-                    &mut output,
-                    Some(std::path::Path::new(path)),
-                )? == 0
+                let mut output = BString::default();
+                self.inner
+                    .process
+                    .borrow_mut()
+                    .execute(&reset_command, &mut output, Some(path))?
+                    == 0
             } else {
                 false
             };
@@ -417,30 +424,31 @@ impl GitDownloader {
             }
         }
 
-        let mut command1: Vec<String> = vec!["git".to_string(), "checkout".to_string()];
+        let mut command1: Vec<BString> = vec!["git".into(), "checkout".into()];
         command1.extend(force);
-        command1.extend(vec![git_ref.clone(), "--".to_string()]);
-        let command2 = vec![
-            "git".to_string(),
-            "reset".to_string(),
-            "--hard".to_string(),
+        command1.extend(vec![git_ref.clone(), "--".into()]);
+        let command2: Vec<BString> = vec![
+            "git".into(),
+            "reset".into(),
+            "--hard".into(),
             git_ref,
-            "--".to_string(),
+            "--".into(),
         ];
         {
-            let mut output = String::new();
-            let ok1 = self.inner.process.borrow_mut().execute(
-                &command1,
-                &mut output,
-                Some(std::path::Path::new(path)),
-            )? == 0;
+            let mut output = BString::default();
+            let ok1 =
+                self.inner
+                    .process
+                    .borrow_mut()
+                    .execute(&command1, &mut output, Some(path))?
+                    == 0;
             let ok2 = if ok1 {
-                let mut output = String::new();
-                self.inner.process.borrow_mut().execute(
-                    &command2,
-                    &mut output,
-                    Some(std::path::Path::new(path)),
-                )? == 0
+                let mut output = BString::default();
+                self.inner
+                    .process
+                    .borrow_mut()
+                    .execute(&command2, &mut output, Some(path))?
+                    == 0
             } else {
                 false
             };
@@ -449,69 +457,65 @@ impl GitDownloader {
             }
         }
 
-        let mut exception_extra = String::new();
+        let mut exception_extra = BString::default();
 
         // reference was not found (prints "fatal: reference is not a tree: $ref")
         if strpos(self.inner.process.borrow().get_error_output(), reference).is_some() {
             self.inner.io.write_error3(
                 &format!(
                     "    <warning>{} is gone (history was rewritten?)</warning>",
-                    reference
+                    reference.display_lossy()
                 ),
                 true,
                 io_interface::NORMAL,
             );
-            exception_extra = format!(
-                "\nIt looks like the commit hash is not available in the repository, maybe {}? Run \"shirabe update {}\" to resolve this.",
+            exception_extra = bconcat!(
+                "\nIt looks like the commit hash is not available in the repository, maybe ",
                 if package.is_dev() {
                     "the commit was removed from the branch"
                 } else {
                     "the tag was recreated"
                 },
-                legacy_lossy(&package.get_pretty_name()),
+                "? Run \"shirabe update ",
+                package.get_pretty_name(),
+                "\" to resolve this.",
             );
         }
 
-        let command = format!(
-            "{} && {}",
-            legacy_lossy(&implode(" ", &command1)),
-            legacy_lossy(&implode(" ", &command2))
-        );
+        let command = bconcat!(implode(" ", &command1), " && ", implode(" ", &command2));
 
         Err(RuntimeException::new(
-            legacy_lossy(&Url::sanitize(format!(
-                "Failed to execute {}\n\n{}{}",
+            Url::sanitize(bconcat!(
+                "Failed to execute ",
                 command,
-                self.inner
-                    .process
-                    .borrow()
-                    .get_error_output()
-                    .display_lossy(),
+                "\n\n",
+                self.inner.process.borrow().get_error_output(),
                 exception_extra,
-            )))
-            .into_owned(),
+            ))
+            .display_lossy()
+            .to_string(),
         )
         .into())
     }
 
-    fn update_origin_url(&self, path: &str, url: &str) -> anyhow::Result<()> {
-        let mut output = String::new();
+    fn update_origin_url(&self, path: &Path, url: &BStr) -> anyhow::Result<()> {
+        let mut output = BString::default();
         self.inner.process.borrow_mut().execute(
             &[
-                "git".to_string(),
-                "remote".to_string(),
-                "set-url".to_string(),
-                "origin".to_string(),
-                "--".to_string(),
-                url.to_string(),
+                BString::from("git"),
+                "remote".into(),
+                "set-url".into(),
+                "origin".into(),
+                "--".into(),
+                url.to_owned(),
             ],
             &mut output,
-            Some(std::path::Path::new(path)),
+            Some(path),
         )?;
         self.set_push_url(path, url)
     }
 
-    fn set_push_url(&self, path: &str, url: &str) -> anyhow::Result<()> {
+    fn set_push_url(&self, path: &Path, url: &BStr) -> anyhow::Result<()> {
         // set push url for github projects
         if let Some(match_) = preg_match(
             format!(
@@ -521,147 +525,179 @@ impl GitDownloader {
             url,
         ) {
             let protocols = self.inner.config.borrow_mut().get("github-protocols");
-            let m1 = legacy_lossy(match_.get(1).unwrap_or_default()).into_owned();
-            let m2 = legacy_lossy(match_.get(2).unwrap_or_default()).into_owned();
-            let m3 = legacy_lossy(match_.get(3).unwrap_or_default()).into_owned();
-            let mut push_url = format!("git@{}:{}/{}.git", m1, m2, m3);
+            let m1 = match_.get(1).unwrap_or_default();
+            let m2 = match_.get(2).unwrap_or_default();
+            let m3 = match_.get(3).unwrap_or_default();
+            let mut push_url = bconcat!("git@", m1, ":", m2, "/", m3, ".git");
             if !in_array_strict("ssh".to_string(), protocols.values()) {
-                push_url = format!("https://{}/{}/{}.git", m1, m2, m3);
+                push_url = bconcat!("https://", m1, "/", m2, "/", m3, ".git");
             }
-            let cmd = vec![
-                "git".to_string(),
-                "remote".to_string(),
-                "set-url".to_string(),
-                "--push".to_string(),
-                "origin".to_string(),
-                "--".to_string(),
+            let cmd: Vec<BString> = vec![
+                "git".into(),
+                "remote".into(),
+                "set-url".into(),
+                "--push".into(),
+                "origin".into(),
+                "--".into(),
                 push_url,
             ];
-            let mut ignored_output = String::new();
-            self.inner.process.borrow_mut().execute(
-                &cmd,
-                &mut ignored_output,
-                Some(std::path::Path::new(path)),
-            )?;
+            let mut ignored_output = BString::default();
+            self.inner
+                .process
+                .borrow_mut()
+                .execute(&cmd, &mut ignored_output, Some(path))?;
         }
 
         Ok(())
     }
 
-    async fn discard_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
+    async fn discard_changes(&self, path: &Path) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
-        let mut output = String::new();
+        let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
-            &["git".to_string(), "clean".to_string(), "-df".to_string()],
+            &["git", "clean", "-df"],
             &mut output,
-            Some(std::path::Path::new(&path)),
+            Some(&path),
         )? != 0
         {
-            return Err(
-                RuntimeException::new(format!("Could not reset changes\n\n:{}", output)).into(),
-            );
+            return Err(RuntimeException::new(format!(
+                "Could not reset changes\n\n:{}",
+                output.display_lossy()
+            ))
+            .into());
         }
-        let mut output = String::new();
+        let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
-            &["git".to_string(), "reset".to_string(), "--hard".to_string()],
+            &["git", "reset", "--hard"],
             &mut output,
-            Some(std::path::Path::new(&path)),
+            Some(&path),
         )? != 0
         {
-            return Err(
-                RuntimeException::new(format!("Could not reset changes\n\n:{}", output)).into(),
-            );
+            return Err(RuntimeException::new(format!(
+                "Could not reset changes\n\n:{}",
+                output.display_lossy()
+            ))
+            .into());
         }
 
-        self.has_discarded_changes.borrow_mut().insert(path, true);
+        self.has_discarded_changes
+            .borrow_mut()
+            .insert(BString::from(path_to_bytes(&path)), true);
 
         Ok(None)
     }
 
-    async fn stash_changes(&self, path: &str) -> anyhow::Result<Option<PhpMixed>> {
+    async fn stash_changes(&self, path: &Path) -> anyhow::Result<Option<PhpMixed>> {
         let path = self.normalize_path(path);
-        let mut output = String::new();
+        let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
-            &[
-                "git".to_string(),
-                "stash".to_string(),
-                "--include-untracked".to_string(),
-            ],
+            &["git", "stash", "--include-untracked"],
             &mut output,
-            Some(std::path::Path::new(&path)),
+            Some(&path),
         )? != 0
         {
-            return Err(
-                RuntimeException::new(format!("Could not stash changes\n\n:{}", output)).into(),
-            );
+            return Err(RuntimeException::new(format!(
+                "Could not stash changes\n\n:{}",
+                output.display_lossy()
+            ))
+            .into());
         }
 
-        self.has_stashed_changes.borrow_mut().insert(path, true);
+        self.has_stashed_changes
+            .borrow_mut()
+            .insert(BString::from(path_to_bytes(&path)), true);
 
         Ok(None)
     }
 
-    fn view_diff(&self, path: &str) -> anyhow::Result<()> {
+    fn view_diff(&self, path: &Path) -> anyhow::Result<()> {
         let path = self.normalize_path(path);
-        let mut output = String::new();
+        let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
-            &["git".to_string(), "diff".to_string(), "HEAD".to_string()],
+            &["git", "diff", "HEAD"],
             &mut output,
-            Some(std::path::Path::new(&path)),
+            Some(&path),
         )? != 0
         {
-            return Err(
-                RuntimeException::new(format!("Could not view diff\n\n:{}", output)).into(),
-            );
+            return Err(RuntimeException::new(format!(
+                "Could not view diff\n\n:{}",
+                output.display_lossy()
+            ))
+            .into());
         }
 
-        self.inner
-            .io
-            .write_error3(&output, true, io_interface::NORMAL);
+        self.inner.io.write_error3(
+            &output.display_lossy().to_string(),
+            true,
+            io_interface::NORMAL,
+        );
 
         Ok(())
     }
 
-    fn normalize_path(&self, path: &str) -> String {
-        let mut path = path.to_string();
+    fn normalize_path(&self, path: &Path) -> PathBuf {
+        let mut path = BString::from(path_to_bytes(path));
         if Platform::is_windows() && strlen(&path) > 0 {
             let mut base_path = path.clone();
-            let mut removed: Vec<String> = vec![];
+            let mut removed: Vec<BString> = vec![];
 
-            while !is_dir(&base_path) && base_path != "\\" {
-                let mut new_removed = vec![legacy_lossy(&basename(&base_path)).into_owned()];
+            while !is_dir(path_from_bytes(&base_path)) && base_path != "\\" {
+                let mut new_removed = vec![basename(&base_path)];
                 new_removed.extend(removed);
                 removed = new_removed;
-                base_path = legacy_lossy(&dirname(&base_path)).into_owned();
+                base_path = dirname(&base_path);
             }
 
             if base_path == "\\" {
-                return path;
+                return PathBuf::from(path_from_bytes(&path));
             }
 
-            path = legacy_lossy(&rtrim2(
-                format!(
-                    "{}/{}",
-                    realpath(&base_path)
-                        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                        .unwrap_or_default(),
-                    legacy_lossy(&implode("/", &removed)),
+            path = rtrim2(
+                bconcat!(
+                    realpath(path_from_bytes(&base_path)).unwrap_or_default(),
+                    "/",
+                    implode("/", &removed),
                 ),
                 "/",
-            ))
-            .into_owned();
+            );
         }
 
-        path
+        PathBuf::from(path_from_bytes(&path))
     }
 
-    fn get_short_hash(&self, reference: &str) -> String {
+    fn get_short_hash(&self, reference: &BStr) -> BString {
         if !self.inner.io.is_verbose() && preg_is_match(php_regex!(r"{^[0-9a-f]{40}$}"), reference)
         {
-            return legacy_lossy(&substr(reference, 0, Some(10))).into_owned();
+            return substr(reference, 0, Some(10));
         }
 
-        reference.to_string()
+        reference.to_owned()
+    }
+
+    // TODO(bytes): the Git utility holds commands, URLs and paths as Strings.
+    fn run_git_commands(
+        &self,
+        commands: Vec<Vec<BString>>,
+        url: &str,
+        cwd: &Path,
+        initial_clone: bool,
+    ) -> anyhow::Result<()> {
+        let commands: Vec<Vec<String>> = commands
+            .iter()
+            .map(|command| {
+                command
+                    .iter()
+                    .map(|arg| legacy_lossy(arg).into_owned())
+                    .collect()
+            })
+            .collect();
+        self.git_util.borrow_mut().run_commands(
+            commands,
+            url,
+            Some(&legacy_lossy(path_to_bytes(cwd))),
+            initial_clone,
+            (),
+        )
     }
 
     /// The default `VcsDownloader::clean_changes()` behavior: fail if the working copy has
@@ -669,12 +705,12 @@ impl GitDownloader {
     async fn fail_on_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<()> {
         if self.get_local_changes(package, path).await?.is_some() {
             return Err(RuntimeException::new(format!(
                 "Source directory {} has uncommitted changes.",
-                path
+                path.display()
             ))
             .into());
         }
@@ -687,9 +723,9 @@ impl DvcsDownloaderInterface for GitDownloader {
     fn get_unpushed_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: String,
-    ) -> anyhow::Result<Option<String>> {
-        GitDownloader::get_unpushed_changes(self, package, &path)
+        path: &Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
+        GitDownloader::get_unpushed_changes(self, package, path)
     }
 }
 
@@ -698,25 +734,26 @@ impl ChangeReportInterface for GitDownloader {
     async fn get_local_changes(
         &self,
         _package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         GitUtil::clean_env(&self.inner.process);
         if !self.has_metadata_repository(path) {
             return Ok(None);
         }
 
-        let command = vec![
-            "git".to_string(),
-            "status".to_string(),
-            "--porcelain".to_string(),
-            "--untracked-files=no".to_string(),
+        let command: Vec<BString> = vec![
+            "git".into(),
+            "status".into(),
+            "--porcelain".into(),
+            "--untracked-files=no".into(),
         ];
-        let mut output = String::new();
-        if self.inner.process.borrow_mut().execute(
-            &command,
-            &mut output,
-            Some(std::path::Path::new(path)),
-        )? != 0
+        let mut output = BString::default();
+        if self
+            .inner
+            .process
+            .borrow_mut()
+            .execute(&command, &mut output, Some(path))?
+            != 0
         {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",
@@ -730,7 +767,7 @@ impl ChangeReportInterface for GitDownloader {
             .into());
         }
 
-        let output = legacy_lossy(&trim(&output)).into_owned();
+        let output = trim(&output);
 
         Ok(if strlen(&output) > 0 {
             Some(output)
@@ -741,8 +778,12 @@ impl ChangeReportInterface for GitDownloader {
 }
 
 impl VcsCapableDownloaderInterface for GitDownloader {
-    fn get_vcs_reference(&self, package: PackageInterfaceHandle, path: String) -> Option<String> {
-        self.inner.get_vcs_reference(package, &path)
+    fn get_vcs_reference(
+        &self,
+        package: PackageInterfaceHandle,
+        path: &Path,
+    ) -> Option<bstr::BString> {
+        self.inner.get_vcs_reference(package, path)
     }
 }
 
@@ -763,14 +804,14 @@ impl VcsDownloader for GitDownloader {
         &self.inner.filesystem
     }
 
-    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<String, bool>> {
+    fn has_cleaned_changes(&self) -> &std::cell::RefCell<IndexMap<bstr::BString, bool>> {
         &self.inner.has_cleaned_changes
     }
 
     async fn do_download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         url: &str,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -781,19 +822,17 @@ impl VcsDownloader for GitDownloader {
 
         GitUtil::clean_env(&self.inner.process);
 
-        let cache_path = format!(
-            "{}/{}/",
-            legacy_lossy(
-                &self
-                    .inner
-                    .config
-                    .borrow_mut()
-                    .get("cache-vcs-dir")
-                    .as_string()
-                    .unwrap_or_default()
-            ),
-            legacy_lossy(&preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url))),
-        );
+        let cache_path = PathBuf::from(path_from_bytes(&bconcat!(
+            self.inner
+                .config
+                .borrow_mut()
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or_default(),
+            "/",
+            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url)),
+            "/",
+        )));
         let git_version = GitUtil::get_version(&self.inner.process)?;
 
         // --dissociate option is only available since git 2.3.0-rc0
@@ -817,27 +856,24 @@ impl VcsDownloader for GitDownloader {
                 io_interface::NORMAL,
             );
             self.inner.io.write_error3(
-                &format!("    Cloning to cache at {}", cache_path),
+                &format!("    Cloning to cache at {}", cache_path.display()),
                 true,
                 io_interface::DEBUG,
             );
-            let r#ref = package.get_source_reference();
-            let pretty_version = legacy_lossy(&package.get_pretty_version()).into_owned();
+            let r#ref = package.get_source_reference().unwrap_or_default();
+            // TODO(bytes): the Git utility holds URLs, paths and refs as Strings.
             if self.git_util.borrow_mut().fetch_ref_or_sync_mirror(
                 url,
-                &cache_path,
-                &legacy_lossy(&r#ref.clone().unwrap_or_default()),
-                Some(&pretty_version),
+                &legacy_lossy(path_to_bytes(&cache_path)),
+                &legacy_lossy(&r#ref),
+                Some(&legacy_lossy(&package.get_pretty_version())),
             )? && is_dir(&cache_path)
             {
                 self.cached_packages
                     .borrow_mut()
                     .entry(package.get_id())
                     .or_default()
-                    .insert(
-                        legacy_lossy(&r#ref.clone().unwrap_or_default()).into_owned(),
-                        true,
-                    );
+                    .insert(r#ref, true);
             }
         } else if git_version.is_none() {
             return Err(RuntimeException::new(
@@ -852,44 +888,42 @@ impl VcsDownloader for GitDownloader {
     async fn do_install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         url: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
-        let cache_path = format!(
-            "{}/{}/",
-            legacy_lossy(
-                &self
-                    .inner
-                    .config
-                    .borrow_mut()
-                    .get("cache-vcs-dir")
-                    .as_string()
-                    .unwrap_or_default()
-            ),
-            legacy_lossy(&preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url))),
+        let cache_path = bconcat!(
+            self.inner
+                .config
+                .borrow_mut()
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or_default(),
+            "/",
+            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url)),
+            "/",
         );
         let r#ref = package.get_source_reference().unwrap_or_default();
 
         let msg;
-        let commands: Vec<Vec<String>>;
+        let commands: Vec<Vec<BString>>;
         let has_cached = self
             .cached_packages
             .borrow()
             .get(&package.get_id())
-            .and_then(|m| m.get(&*legacy_lossy(&r#ref)))
+            .and_then(|m| m.get(r#ref.as_bstr()))
             .copied()
             .unwrap_or(false);
         if has_cached {
             msg = format!(
                 "Cloning {} from cache",
-                self.get_short_hash(&legacy_lossy(&r#ref))
+                self.get_short_hash(r#ref.as_bstr()).display_lossy()
             );
 
-            let mut clone_flags: Vec<String> = vec![
-                "--dissociate".to_string(),
-                "--reference".to_string(),
+            let mut clone_flags: Vec<BString> = vec![
+                "--dissociate".into(),
+                "--reference".into(),
                 cache_path.clone(),
             ];
             let transport_options = package.get_transport_options();
@@ -903,72 +937,71 @@ impl VcsDownloader for GitDownloader {
 
             commands = vec![
                 {
-                    let mut base = vec![
-                        "git".to_string(),
-                        "clone".to_string(),
-                        "--no-checkout".to_string(),
+                    let mut base: Vec<BString> = vec![
+                        "git".into(),
+                        "clone".into(),
+                        "--no-checkout".into(),
                         cache_path,
-                        path.clone(),
+                        path_to_bytes(&path).into(),
                     ];
                     base.extend(clone_flags);
                     base
                 },
                 vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "set-url".to_string(),
-                    "origin".to_string(),
-                    "--".to_string(),
-                    "%sanitizedUrl%".to_string(),
+                    "git".into(),
+                    "remote".into(),
+                    "set-url".into(),
+                    "origin".into(),
+                    "--".into(),
+                    "%sanitizedUrl%".into(),
                 ],
                 vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "add".to_string(),
-                    "composer".to_string(),
-                    "--".to_string(),
-                    "%sanitizedUrl%".to_string(),
+                    "git".into(),
+                    "remote".into(),
+                    "add".into(),
+                    "composer".into(),
+                    "--".into(),
+                    "%sanitizedUrl%".into(),
                 ],
             ];
         } else {
-            msg = format!("Cloning {}", self.get_short_hash(&legacy_lossy(&r#ref)));
+            msg = format!(
+                "Cloning {}",
+                self.get_short_hash(r#ref.as_bstr()).display_lossy()
+            );
             commands = vec![
                 vec![
-                    "git".to_string(),
-                    "clone".to_string(),
-                    "--no-checkout".to_string(),
-                    "--".to_string(),
-                    "%url%".to_string(),
-                    path.clone(),
+                    "git".into(),
+                    "clone".into(),
+                    "--no-checkout".into(),
+                    "--".into(),
+                    "%url%".into(),
+                    path_to_bytes(&path).into(),
                 ],
                 vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "add".to_string(),
-                    "composer".to_string(),
-                    "--".to_string(),
-                    "%url%".to_string(),
+                    "git".into(),
+                    "remote".into(),
+                    "add".into(),
+                    "composer".into(),
+                    "--".into(),
+                    "%url%".into(),
+                ],
+                vec!["git".into(), "fetch".into(), "composer".into()],
+                vec![
+                    "git".into(),
+                    "remote".into(),
+                    "set-url".into(),
+                    "origin".into(),
+                    "--".into(),
+                    "%sanitizedUrl%".into(),
                 ],
                 vec![
-                    "git".to_string(),
-                    "fetch".to_string(),
-                    "composer".to_string(),
-                ],
-                vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "set-url".to_string(),
-                    "origin".to_string(),
-                    "--".to_string(),
-                    "%sanitizedUrl%".to_string(),
-                ],
-                vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "set-url".to_string(),
-                    "composer".to_string(),
-                    "--".to_string(),
-                    "%sanitizedUrl%".to_string(),
+                    "git".into(),
+                    "remote".into(),
+                    "set-url".into(),
+                    "composer".into(),
+                    "--".into(),
+                    "%sanitizedUrl%".into(),
                 ],
             ];
             if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
@@ -982,28 +1015,25 @@ impl VcsDownloader for GitDownloader {
 
         self.inner.io.write_error3(&msg, true, io_interface::NORMAL);
 
-        self.git_util
-            .borrow_mut()
-            .run_commands(commands, url, Some(&path), true, ())?;
+        self.run_git_commands(commands, url, &path, true)?;
 
         let source_url = package.get_source_url();
         if source_url.as_ref().is_none_or(|s| s != url) && source_url.is_some() {
-            self.update_origin_url(&path, &legacy_lossy(source_url.as_deref().unwrap()));
+            self.update_origin_url(&path, source_url.as_deref().unwrap().as_bstr())?;
         } else {
-            self.set_push_url(&path, url);
+            self.set_push_url(&path, url.as_bytes().as_bstr())?;
         }
 
-        let pretty_version = legacy_lossy(&package.get_pretty_version()).into_owned();
         if let Some(new_ref) = self.update_to_commit(
             package.clone(),
             &path,
-            &legacy_lossy(&r#ref),
-            &pretty_version,
+            r#ref.as_bstr(),
+            package.get_pretty_version().as_bstr(),
         )? {
             if package.get_dist_reference() == package.get_source_reference() {
-                package.set_dist_reference(Some(bstr::BString::from(new_ref.clone())));
+                package.set_dist_reference(Some(new_ref.clone()));
             }
-            package.set_source_reference(Some(bstr::BString::from(new_ref)));
+            package.set_source_reference(Some(new_ref));
         }
 
         Ok(None)
@@ -1013,7 +1043,7 @@ impl VcsDownloader for GitDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         url: &str,
     ) -> anyhow::Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
@@ -1021,47 +1051,45 @@ impl VcsDownloader for GitDownloader {
         if !self.has_metadata_repository(&path) {
             return Err(RuntimeException::new(format!(
                 "The .git directory is missing from {}, see https://getcomposer.org/commit-deps for more information",
-                path
+                path.display()
             ))
             .into());
         }
 
-        let cache_path = format!(
-            "{}/{}/",
-            legacy_lossy(
-                &self
-                    .inner
-                    .config
-                    .borrow_mut()
-                    .get("cache-vcs-dir")
-                    .as_string()
-                    .unwrap_or_default()
-            ),
-            legacy_lossy(&preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url))),
+        let cache_path = bconcat!(
+            self.inner
+                .config
+                .borrow_mut()
+                .get("cache-vcs-dir")
+                .as_string()
+                .unwrap_or_default(),
+            "/",
+            preg_replace(r"{[^a-z0-9.]}i", "-", Url::sanitize(url)),
+            "/",
         );
         let r#ref = target.get_source_reference().unwrap_or_default();
 
         let msg;
-        let remote_url;
+        let remote_url: BString;
         let has_cached = self
             .cached_packages
             .borrow()
             .get(&target.get_id())
-            .and_then(|m| m.get(&*legacy_lossy(&r#ref)))
+            .and_then(|m| m.get(r#ref.as_bstr()))
             .copied()
             .unwrap_or(false);
         if has_cached {
             msg = format!(
                 "Checking out {} from cache",
-                self.get_short_hash(&legacy_lossy(&r#ref))
+                self.get_short_hash(r#ref.as_bstr()).display_lossy()
             );
             remote_url = cache_path;
         } else {
             msg = format!(
                 "Checking out {}",
-                self.get_short_hash(&legacy_lossy(&r#ref))
+                self.get_short_hash(r#ref.as_bstr()).display_lossy()
             );
-            remote_url = "%url%".to_string();
+            remote_url = "%url%".into();
             if Platform::get_env("COMPOSER_DISABLE_NETWORK").is_some() {
                 return Err(RuntimeException::new(format!(
                     "The required git reference for {} is not in cache and network is disabled, aborting",
@@ -1073,97 +1101,86 @@ impl VcsDownloader for GitDownloader {
 
         self.inner.io.write_error3(&msg, true, io_interface::NORMAL);
 
-        let mut output = String::new();
+        let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
             &[
-                "git".to_string(),
-                "rev-parse".to_string(),
-                "--quiet".to_string(),
-                "--verify".to_string(),
-                format!("{}^{{commit}}", legacy_lossy(&r#ref)),
+                BString::from("git"),
+                "rev-parse".into(),
+                "--quiet".into(),
+                "--verify".into(),
+                bconcat!(r#ref, "^{commit}"),
             ],
             &mut output,
-            Some(std::path::Path::new(&path)),
+            Some(&path),
         )? != 0
         {
-            let commands = vec![
+            let commands: Vec<Vec<BString>> = vec![
                 vec![
-                    "git".to_string(),
-                    "remote".to_string(),
-                    "set-url".to_string(),
-                    "composer".to_string(),
-                    "--".to_string(),
+                    "git".into(),
+                    "remote".into(),
+                    "set-url".into(),
+                    "composer".into(),
+                    "--".into(),
                     remote_url,
                 ],
+                vec!["git".into(), "fetch".into(), "composer".into()],
                 vec![
-                    "git".to_string(),
-                    "fetch".to_string(),
-                    "composer".to_string(),
-                ],
-                vec![
-                    "git".to_string(),
-                    "fetch".to_string(),
-                    "--tags".to_string(),
-                    "composer".to_string(),
+                    "git".into(),
+                    "fetch".into(),
+                    "--tags".into(),
+                    "composer".into(),
                 ],
             ];
 
-            self.git_util
-                .borrow_mut()
-                .run_commands(commands, url, Some(&path), false, ())?;
+            self.run_git_commands(commands, url, &path, false)?;
         }
 
-        let command = vec![
-            "git".to_string(),
-            "remote".to_string(),
-            "set-url".to_string(),
-            "composer".to_string(),
-            "--".to_string(),
-            "%sanitizedUrl%".to_string(),
+        let command: Vec<BString> = vec![
+            "git".into(),
+            "remote".into(),
+            "set-url".into(),
+            "composer".into(),
+            "--".into(),
+            "%sanitizedUrl%".into(),
         ];
-        self.git_util
-            .borrow_mut()
-            .run_commands(vec![command], url, Some(&path), false, ())?;
+        self.run_git_commands(vec![command], url, &path, false)?;
 
-        let pretty_version = legacy_lossy(&target.get_pretty_version()).into_owned();
         if let Some(new_ref) = self.update_to_commit(
             target.clone(),
             &path,
-            &legacy_lossy(&r#ref),
-            &pretty_version,
+            r#ref.as_bstr(),
+            target.get_pretty_version().as_bstr(),
         )? {
             if target.get_dist_reference() == target.get_source_reference() {
-                target.set_dist_reference(Some(bstr::BString::from(new_ref.clone())));
+                target.set_dist_reference(Some(new_ref.clone()));
             }
-            target.set_source_reference(Some(bstr::BString::from(new_ref)));
+            target.set_source_reference(Some(new_ref));
         }
 
         let mut update_origin_url = false;
-        let mut output = String::new();
+        let mut output = BString::default();
         if self.inner.process.borrow_mut().execute(
-            &["git".to_string(), "remote".to_string(), "-v".to_string()],
+            &["git", "remote", "-v"],
             &mut output,
-            Some(std::path::Path::new(&path)),
+            Some(&path),
         )? == 0
             && let Some(origin_match) =
                 preg_match(php_regex!(r"{^origin\s+(?P<url>\S+)}m"), &output)
             && let Some(composer_match) =
                 preg_match(php_regex!(r"{^composer\s+(?P<url>\S+)}m"), &output)
         {
-            let origin_url =
-                legacy_lossy(origin_match.name("url").unwrap_or_default()).into_owned();
-            let composer_url =
-                legacy_lossy(composer_match.name("url").unwrap_or_default()).into_owned();
+            let origin_url = origin_match.name("url").unwrap_or_default();
+            let composer_url = composer_match.name("url").unwrap_or_default();
             if origin_url == composer_url
                 && target
                     .get_source_url()
-                    .is_none_or(|s| s != composer_url.as_str())
+                    .is_none_or(|s| s.as_bstr() != composer_url)
             {
                 update_origin_url = true;
             }
         }
         if update_origin_url && target.get_source_url().is_some() {
-            self.update_origin_url(&path, &legacy_lossy(&target.get_source_url().unwrap()));
+            self.update_origin_url(&path, target.get_source_url().unwrap().as_bstr())?;
         }
 
         Ok(None)
@@ -1172,14 +1189,14 @@ impl VcsDownloader for GitDownloader {
     async fn clean_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         update: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         GitUtil::clean_env(&self.inner.process);
         let path = self.normalize_path(path);
 
         let unpushed = self.get_unpushed_changes(package.clone(), &path)?;
-        if let Some(unpushed) = unpushed.as_deref()
+        if let Some(unpushed) = unpushed.as_ref()
             && (self.inner.io.is_interactive()
                 || self
                     .inner
@@ -1191,7 +1208,8 @@ impl VcsDownloader for GitDownloader {
         {
             return Err(RuntimeException::new(format!(
                 "Source directory {} has unpushed changes on the current branch: \n{}",
-                path, unpushed
+                path.display(),
+                unpushed.display_lossy()
             ))
             .into());
         }
@@ -1233,7 +1251,9 @@ impl VcsDownloader for GitDownloader {
         );
         let slice_end = 10_usize.min(changes.len());
         self.inner.io.write_error3(
-            &legacy_lossy(&implode("\n", &changes[..slice_end])),
+            &implode("\n", &changes[..slice_end])
+                .display_lossy()
+                .to_string(),
             true,
             io_interface::NORMAL,
         );
@@ -1281,7 +1301,7 @@ impl VcsDownloader for GitDownloader {
                 }
                 Some("v") => {
                     self.inner.io.write_error3(
-                        &legacy_lossy(&implode("\n", &changes)),
+                        &implode("\n", &changes).display_lossy().to_string(),
                         true,
                         io_interface::NORMAL,
                     );
@@ -1330,26 +1350,27 @@ impl VcsDownloader for GitDownloader {
         Ok(None)
     }
 
-    fn reapply_changes(&self, path: &str) -> anyhow::Result<()> {
+    fn reapply_changes(&self, path: &Path) -> anyhow::Result<()> {
         let path = self.normalize_path(path);
+        let path_key = path_to_bytes(&path).as_bstr();
         if self
             .has_stashed_changes
             .borrow()
-            .get(&path)
+            .get(path_key)
             .copied()
             .unwrap_or(false)
         {
-            self.has_stashed_changes.borrow_mut().shift_remove(&path);
+            self.has_stashed_changes.borrow_mut().shift_remove(path_key);
             self.inner.io.write_error3(
                 "    <info>Re-applying stashed changes</info>",
                 true,
                 io_interface::NORMAL,
             );
-            let mut output = String::new();
+            let mut output = BString::default();
             if self.inner.process.borrow_mut().execute(
-                &["git".to_string(), "stash".to_string(), "pop".to_string()],
+                &["git", "stash", "pop"],
                 &mut output,
-                Some(std::path::Path::new(&path)),
+                Some(&path),
             )? != 0
             {
                 return Err(RuntimeException::new(format!(
@@ -1364,39 +1385,33 @@ impl VcsDownloader for GitDownloader {
             }
         }
 
-        self.has_discarded_changes.borrow_mut().shift_remove(&path);
+        self.has_discarded_changes
+            .borrow_mut()
+            .shift_remove(path_key);
         Ok(())
     }
 
     fn get_commit_logs(
         &self,
-        from_reference: &str,
-        to_reference: &str,
-        path: &str,
-    ) -> anyhow::Result<String> {
+        from_reference: &bstr::BStr,
+        to_reference: &bstr::BStr,
+        path: &Path,
+    ) -> anyhow::Result<bstr::BString> {
         let path = self.normalize_path(path);
-        let mut args = vec![
-            "--format=%h - %an: %s".to_string(),
-            format!("{}..{}", from_reference, to_reference),
+        let mut args: Vec<BString> = vec![
+            "--format=%h - %an: %s".into(),
+            bconcat!(from_reference, "..", to_reference),
         ];
-        args.extend(
-            GitUtil::get_no_show_signature_flags(&self.inner.process)?
-                .iter()
-                .map(|s| legacy_lossy(s).into_owned()),
-        );
-        let command = GitUtil::build_rev_list_command(
-            &self.inner.process,
-            args.into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>(),
-        )?;
+        args.extend(GitUtil::get_no_show_signature_flags(&self.inner.process)?);
+        let command = GitUtil::build_rev_list_command(&self.inner.process, args)?;
 
-        let mut output = bstr::BString::default();
-        if self.inner.process.borrow_mut().execute(
-            &command,
-            &mut output,
-            Some(std::path::Path::new(&path)),
-        )? != 0
+        let mut output = BString::default();
+        if self
+            .inner
+            .process
+            .borrow_mut()
+            .execute(&command, &mut output, Some(&path))?
+            != 0
         {
             return Err(RuntimeException::new(format!(
                 "Failed to execute {}\n\n{}",
@@ -1410,18 +1425,13 @@ impl VcsDownloader for GitDownloader {
             .into());
         }
 
-        // TODO(bytes): VcsDownloader takes the commit logs as a String.
-        Ok(legacy_lossy(&GitUtil::parse_rev_list_output(
-            &output,
-            &self.inner.process,
-        )?)
-        .into_owned())
+        GitUtil::parse_rev_list_output(&output, &self.inner.process)
     }
 
-    fn has_metadata_repository(&self, path: &str) -> bool {
+    fn has_metadata_repository(&self, path: &Path) -> bool {
         let path = self.normalize_path(path);
 
-        is_dir(format!("{}/.git", path))
+        is_dir(path_from_bytes(&bconcat!(path, "/.git")))
     }
 }
 
@@ -1450,7 +1460,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -1461,7 +1471,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::prepare(self, r#type, package, path, prev_package).await
@@ -1470,7 +1480,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::install(self, package, path).await
@@ -1480,7 +1490,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::update(self, initial, target, path).await
     }
@@ -1488,7 +1498,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::remove(self, package, path).await
@@ -1498,7 +1508,7 @@ impl crate::downloader::DownloaderInterface for GitDownloader {
         &self,
         r#type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         <Self as VcsDownloader>::cleanup(self, r#type, package, path, prev_package).await

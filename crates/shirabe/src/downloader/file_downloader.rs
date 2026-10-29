@@ -21,18 +21,19 @@ use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed,
-    RuntimeException, UnexpectedValueException, chmod, dirname, explode, extension_loaded,
+    RuntimeException, UnexpectedValueException, bconcat, chmod, dirname, explode, extension_loaded,
     file_exists, filesize, get_class, hash, hash_file, impl_php_class, is_dir, is_executable,
-    legacy_lossy, parse_url, path_to_bytes, pathinfo, realpath, rtrim2, spl_object_hash, strlen,
-    strpos, strtr, trim, umask, usleep,
+    legacy_lossy, parse_url, path_from_bytes, path_to_bytes, pathinfo, realpath, rtrim2,
+    spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
 };
+use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
 
 pub static DOWNLOAD_METADATA: LazyLock<Mutex<IndexMap<BString, PhpMixed>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 /// Collects response headers when running on GH Actions
-pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<String, Vec<String>>>> =
+pub static RESPONSE_HEADERS: LazyLock<Mutex<IndexMap<BString, Vec<String>>>> =
     LazyLock::new(|| Mutex::new(IndexMap::new()));
 
 /// Base downloader for files
@@ -45,8 +46,8 @@ pub struct FileDownloader {
     cache: Option<std::rc::Rc<std::cell::RefCell<Cache>>>,
     event_dispatcher: Option<std::rc::Rc<std::cell::RefCell<EventDispatcher>>>,
     pub(crate) process: std::rc::Rc<std::cell::RefCell<ProcessExecutor>>,
-    last_cache_writes: Mutex<IndexMap<String, String>>,
-    additional_cleanup_paths: std::cell::RefCell<IndexMap<String, Vec<String>>>,
+    last_cache_writes: Mutex<IndexMap<BString, BString>>,
+    additional_cleanup_paths: std::cell::RefCell<IndexMap<BString, Vec<PathBuf>>>,
 }
 
 impl_php_class!(FileDownloader, r"Composer\Downloader\FileDownloader");
@@ -129,8 +130,8 @@ impl FileDownloader {
         &self,
         this: &dyn DownloaderInterface,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         let prev_io = std::mem::replace(
             &mut *self.io.borrow_mut(),
             std::rc::Rc::new(std::cell::RefCell::new(NullIO::new())),
@@ -144,35 +145,26 @@ impl FileDownloader {
         // PHP attaches an onRejected handler to capture the error and drives the promise via
         // httpDownloader->wait() / process->wait(); awaiting the download/install futures
         // surfaces a rejection directly as the Err captured below.
-        let result: anyhow::Result<String> = async {
-            if is_dir(format!("{}_compare", target_dir.display())) {
+        let compare_dir = PathBuf::from(path_from_bytes(&bconcat!(target_dir, "_compare")));
+        let result: anyhow::Result<BString> = async {
+            if is_dir(&compare_dir) {
                 self.filesystem
                     .borrow_mut()
-                    .remove_directory(format!("{}_compare", target_dir.display()))?;
+                    .remove_directory(&compare_dir)?;
             }
 
-            this.download(
-                package.clone(),
-                &format!("{}_compare", target_dir.display()),
-                None,
-                false,
-            )
-            .await?;
-            this.install(
-                package.clone(),
-                &format!("{}_compare", target_dir.display()),
-                false,
-            )
-            .await?;
+            this.download(package.clone(), &compare_dir, None, false)
+                .await?;
+            this.install(package.clone(), &compare_dir, false).await?;
 
             let mut comparer = Comparer::new();
-            comparer.set_source(format!("{}_compare", target_dir.display()));
-            comparer.set_update(legacy_lossy(path_to_bytes(&target_dir.clone())).into_owned());
+            comparer.set_source(compare_dir.clone());
+            comparer.set_update(target_dir.clone());
             comparer.do_compare();
             let output = comparer.get_changed_as_string(true, false);
             self.filesystem
                 .borrow_mut()
-                .remove_directory(format!("{}_compare", target_dir.display()))?;
+                .remove_directory(&compare_dir)?;
             Ok(output)
         }
         .await;
@@ -181,7 +173,7 @@ impl FileDownloader {
 
         let (e, output) = match result {
             Ok(output) => (None, output),
-            Err(err) => (Some(err), String::new()),
+            Err(err) => (Some(err), BString::default()),
         };
 
         if let Some(err) = e {
@@ -189,14 +181,14 @@ impl FileDownloader {
                 return Err(err);
             }
 
-            return Ok(Some(format!(
+            return Ok(Some(BString::from(format!(
                 "Failed to detect changes: [{}] {}",
-                legacy_lossy(&get_class(&PhpMixed::Null)),
+                get_class(&PhpMixed::Null).display_lossy(),
                 err
-            )));
+            ))));
         }
 
-        let output = legacy_lossy(&trim(&output)).into_owned();
+        let output = trim(&output);
 
         Ok(if strlen(&output) > 0 {
             Some(output)
@@ -214,7 +206,7 @@ impl FileDownloader {
         install_operation_appendix: &str,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io.borrow().write_error(&format!(
             "  - {}{}",
@@ -227,8 +219,9 @@ impl FileDownloader {
         this.install(target, path, false).await
     }
 
-    fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> String {
-        legacy_lossy(&pathinfo(
+    fn get_dist_path(&self, package: PackageInterfaceHandle, component: i64) -> BString {
+        // TODO(bytes): parse_url() takes a &str, so non-UTF-8 bytes in the URL are replaced.
+        pathinfo(
             parse_url(&legacy_lossy(&strtr(
                 package.get_dist_url().unwrap_or_default(),
                 "\\",
@@ -237,40 +230,39 @@ impl FileDownloader {
             .and_then(|url| url.path)
             .unwrap_or_default(),
             component,
-        ))
-        .into_owned()
+        )
     }
 
     pub(crate) fn clear_last_cache_write(&self, package: PackageInterfaceHandle) {
         let mut last_cache_writes = self.last_cache_writes.lock().unwrap();
         if let Some(cache) = &self.cache
-            && last_cache_writes.contains_key(&*legacy_lossy(&package.get_name()))
+            && last_cache_writes.contains_key(package.get_name().as_bstr())
         {
             let key = last_cache_writes
-                .get(&*legacy_lossy(&package.get_name()))
+                .get(package.get_name().as_bstr())
                 .unwrap()
                 .clone();
             cache.borrow_mut().remove(&key);
-            last_cache_writes.shift_remove(&*legacy_lossy(&package.get_name()));
+            last_cache_writes.shift_remove(package.get_name().as_bstr());
         }
     }
 
-    pub(crate) fn add_cleanup_path(&self, package: PackageInterfaceHandle, path: &str) {
+    pub(crate) fn add_cleanup_path(&self, package: PackageInterfaceHandle, path: &Path) {
         self.additional_cleanup_paths
             .borrow_mut()
-            .entry(legacy_lossy(&package.get_name()).into_owned())
+            .entry(package.get_name())
             .or_default()
-            .push(path.to_string());
+            .push(path.to_path_buf());
     }
 
-    pub(crate) fn remove_cleanup_path(&self, package: PackageInterfaceHandle, path: &str) {
+    pub(crate) fn remove_cleanup_path(&self, package: PackageInterfaceHandle, path: &Path) {
         if let Some(paths) = self
             .additional_cleanup_paths
             .borrow_mut()
-            .get_mut(&*legacy_lossy(&package.get_name()))
+            .get_mut(package.get_name().as_bstr())
         {
             // PHP: array_search($path, ..., true)
-            let idx = paths.iter().position(|p| p == path);
+            let idx = paths.iter().position(|p| p.as_os_str() == path.as_os_str());
             if let Some(i) = idx {
                 paths.remove(i);
             }
@@ -278,51 +270,44 @@ impl FileDownloader {
     }
 
     /// Gets file name for specific package
-    pub(crate) fn get_file_name(&self, package: PackageInterfaceHandle, _path: &str) -> String {
+    pub(crate) fn get_file_name(&self, package: PackageInterfaceHandle, _path: &Path) -> PathBuf {
         let extension = self.get_dist_path(package.clone(), PATHINFO_EXTENSION);
         let extension = if extension.is_empty() {
             package.get_dist_type().unwrap_or_default()
         } else {
-            bstr::BString::from(extension)
+            extension
         };
 
-        legacy_lossy(&rtrim2(
-            format!(
-                "{}/composer/tmp-{}.{}",
-                legacy_lossy(
-                    &self
-                        .config
-                        .borrow_mut()
-                        .get("vendor-dir")
-                        .as_string()
-                        .unwrap_or_default()
-                ),
-                legacy_lossy(&hash(
+        PathBuf::from(path_from_bytes(&rtrim2(
+            bconcat!(
+                self.config
+                    .borrow_mut()
+                    .get("vendor-dir")
+                    .as_string()
+                    .unwrap_or_default(),
+                "/composer/tmp-",
+                hash(
                     "md5",
-                    format!(
-                        "{}{}",
-                        legacy_lossy(&package.to_php_string()),
-                        spl_object_hash(&PhpMixed::Null)
-                    )
-                )),
-                legacy_lossy(&extension)
+                    bconcat!(package.to_php_string(), spl_object_hash(&PhpMixed::Null))
+                ),
+                ".",
+                extension,
             ),
             ".",
-        ))
-        .into_owned()
+        )))
     }
 
     /// Gets appendix message to add to the "- Upgrading x" string being output on update
     fn get_install_operation_appendix(
         &self,
         _package: PackageInterfaceHandle,
-        _path: &str,
+        _path: &Path,
     ) -> String {
         String::new()
     }
 
     /// For testing only: invoke the crate-private `get_file_name`.
-    pub fn __get_file_name(&self, package: PackageInterfaceHandle, path: &str) -> String {
+    pub fn __get_file_name(&self, package: PackageInterfaceHandle, path: &Path) -> PathBuf {
         self.get_file_name(package, path)
     }
 
@@ -374,7 +359,7 @@ impl DownloaderInterface for FileDownloader {
     async fn download(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _prev_package: Option<PackageInterfaceHandle>,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
@@ -385,14 +370,15 @@ impl DownloaderInterface for FileDownloader {
             .into());
         }
 
-        let cache_key_generator = |package: PackageInterfaceHandle, key: &str| -> String {
+        let cache_key_generator = |package: PackageInterfaceHandle, key: &str| -> BString {
             let cache_key = hash("sha1", key);
 
-            format!(
-                "{}/{}.{}",
-                legacy_lossy(&package.get_name()),
-                legacy_lossy(&cache_key),
-                legacy_lossy(&package.get_dist_type().unwrap_or_default())
+            bconcat!(
+                package.get_name(),
+                "/",
+                cache_key,
+                ".",
+                package.get_dist_type().unwrap_or_default()
             )
         };
 
@@ -404,7 +390,7 @@ impl DownloaderInterface for FileDownloader {
             let processed_url = self.process_url(package.clone(), &legacy_lossy(&url))?;
             let cache_key = cache_key_generator(package.clone(), &processed_url);
             urls.push(UrlEntry {
-                base: legacy_lossy(&url).into_owned(),
+                base: url,
                 processed: processed_url,
                 // we use the complete download url here to avoid conflicting entries
                 // from different packages, which would potentially allow a given package
@@ -417,10 +403,10 @@ impl DownloaderInterface for FileDownloader {
 
         let file_name = self.get_file_name(package.clone(), path);
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
-        let dir_of_file = legacy_lossy(&dirname(&file_name)).into_owned();
+        let dir_of_file = dirname(path_to_bytes(&file_name));
         self.filesystem
             .borrow_mut()
-            .ensure_directory_exists(&dir_of_file)?;
+            .ensure_directory_exists(path_from_bytes(&dir_of_file))?;
 
         // The PHP $download/$accept/$reject closures form a retry loop driven by recursion; here it
         // is expressed as a loop. $reject's "return $download()" maps to `continue`, "throw" to
@@ -494,10 +480,10 @@ impl DownloaderInterface for FileDownloader {
                 if let Some(cache) = self.cache.as_ref()
                     && !cache.borrow().is_read_only()
                 {
-                    self.last_cache_writes.lock().unwrap().insert(
-                        legacy_lossy(&package.get_name()).into_owned(),
-                        cache_key.clone(),
-                    );
+                    self.last_cache_writes
+                        .lock()
+                        .unwrap()
+                        .insert(package.get_name(), cache_key.clone());
                 }
             } else {
                 if output {
@@ -516,7 +502,11 @@ impl DownloaderInterface for FileDownloader {
                 let add_copy_result = self
                     .http_downloader
                     .borrow()
-                    .add_copy(&url.processed, &file_name, package.get_transport_options())
+                    .add_copy(
+                        &url.processed,
+                        &legacy_lossy(path_to_bytes(&file_name)),
+                        package.get_transport_options(),
+                    )
                     .await;
                 match add_copy_result {
                     Ok(mut response) => {
@@ -538,19 +528,19 @@ impl DownloaderInterface for FileDownloader {
                         if Platform::get_env("GITHUB_ACTIONS").is_some()
                             && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()
                         {
-                            RESPONSE_HEADERS.lock().unwrap().insert(
-                                legacy_lossy(&package.get_name()).into_owned(),
-                                response.get_headers().clone(),
-                            );
+                            RESPONSE_HEADERS
+                                .lock()
+                                .unwrap()
+                                .insert(package.get_name(), response.get_headers().clone());
                         }
 
                         if let Some(cache) = self.cache.as_ref()
                             && !cache.borrow().is_read_only()
                         {
-                            self.last_cache_writes.lock().unwrap().insert(
-                                legacy_lossy(&package.get_name()).into_owned(),
-                                cache_key.clone(),
-                            );
+                            self.last_cache_writes
+                                .lock()
+                                .unwrap()
+                                .insert(package.get_name(), cache_key.clone());
                             cache.borrow_mut().copy_from(&cache_key, &file_name);
                         }
 
@@ -636,7 +626,8 @@ impl DownloaderInterface for FileDownloader {
             if !file_exists(&file_name) {
                 return Err(UnexpectedValueException::new(format!(
                     "{} could not be saved to {}, make sure the directory is writable and you have internet connectivity",
-                    url.base, file_name
+                    url.base.display_lossy(),
+                    file_name.display()
                 ))
                 .into());
             }
@@ -648,7 +639,7 @@ impl DownloaderInterface for FileDownloader {
             {
                 return Err(UnexpectedValueException::new(format!(
                     "The checksum verification of the file failed (downloaded from {})",
-                    url.base
+                    url.base.display_lossy()
                 ))
                 .into());
             }
@@ -656,7 +647,7 @@ impl DownloaderInterface for FileDownloader {
             if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
                 let mut post_file_download_event = PostFileDownloadEvent::new(
                     PluginEvents::POST_FILE_DOWNLOAD.to_string(),
-                    Some(file_name.clone()),
+                    Some(legacy_lossy(path_to_bytes(&file_name)).into_owned()),
                     checksum.clone().map(|s| legacy_lossy(&s).into_owned()),
                     url.processed.clone(),
                     "package".to_string(),
@@ -669,7 +660,7 @@ impl DownloaderInterface for FileDownloader {
                 )?;
             }
 
-            return Ok(Some(PhpMixed::string(file_name)));
+            return Ok(Some(PhpMixed::string(path_to_bytes(&file_name))));
         }
     }
 
@@ -677,7 +668,7 @@ impl DownloaderInterface for FileDownloader {
         &self,
         _type: &str,
         _package: PackageInterfaceHandle,
-        _path: &str,
+        _path: &Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         Ok(Some(PhpMixed::Null))
@@ -687,7 +678,7 @@ impl DownloaderInterface for FileDownloader {
         &self,
         _type: &str,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         _prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let file_name = self.get_file_name(package.clone(), path);
@@ -695,32 +686,28 @@ impl DownloaderInterface for FileDownloader {
             self.filesystem.borrow_mut().unlink(&file_name)?;
         }
 
-        let vendor_dir = legacy_lossy(
-            self.config
-                .borrow_mut()
-                .get("vendor-dir")
-                .as_string()
-                .unwrap_or_default(),
-        )
-        .into_owned();
-        let first_segment = legacy_lossy(
-            explode("/", package.get_pretty_name())
-                .first()
-                .map(|s| s.as_slice())
-                .unwrap_or_default(),
-        )
-        .into_owned();
-        let dirs_to_clean_up: Vec<String> = vec![
-            path.to_string(),
-            format!("{}/{}", vendor_dir, first_segment),
-            format!("{}/composer/", vendor_dir),
-            vendor_dir,
+        let vendor_dir = self
+            .config
+            .borrow_mut()
+            .get("vendor-dir")
+            .as_string()
+            .unwrap_or_default()
+            .to_owned();
+        let first_segment = explode("/", package.get_pretty_name())
+            .first()
+            .cloned()
+            .unwrap_or_default();
+        let dirs_to_clean_up: Vec<PathBuf> = vec![
+            path.to_path_buf(),
+            PathBuf::from(path_from_bytes(&bconcat!(vendor_dir, "/", first_segment))),
+            PathBuf::from(path_from_bytes(&bconcat!(vendor_dir, "/composer/"))),
+            PathBuf::from(path_from_bytes(&vendor_dir)),
         ];
 
         if let Some(paths) = self
             .additional_cleanup_paths
             .borrow()
-            .get(&*legacy_lossy(&package.get_name()))
+            .get(package.get_name().as_bstr())
             .cloned()
         {
             for path_to_clean in &paths {
@@ -731,12 +718,8 @@ impl DownloaderInterface for FileDownloader {
         for dir in &dirs_to_clean_up {
             if is_dir(dir)
                 && self.filesystem.borrow_mut().is_dir_empty(dir)
-                && realpath(dir)
-                    .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-                    .as_deref()
-                    != Some(&*legacy_lossy(path_to_bytes(
-                        &Platform::get_cwd(false).unwrap_or_default(),
-                    )))
+                && realpath(dir).as_deref().map(Path::as_os_str)
+                    != Some(Platform::get_cwd(false).unwrap_or_default().as_os_str())
             {
                 self.filesystem.borrow_mut().remove_directory_php(dir)?;
             }
@@ -748,7 +731,7 @@ impl DownloaderInterface for FileDownloader {
     async fn install(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
@@ -758,25 +741,29 @@ impl DownloaderInterface for FileDownloader {
             ));
         }
 
-        let vendor_dir = legacy_lossy(
-            self.config
-                .borrow_mut()
-                .get("vendor-dir")
-                .as_string()
-                .unwrap_or_default(),
-        )
-        .into_owned();
+        let vendor_dir = self
+            .config
+            .borrow_mut()
+            .get("vendor-dir")
+            .as_string()
+            .unwrap_or_default()
+            .to_owned();
 
         // clean up the target directory, unless it contains the vendor dir, as the vendor dir contains
         // the file to be installed. This is the case when installing with create-project in the current directory
         // but in that case we ensure the directory is empty already in ProjectInstaller so no need to empty it here.
         if !{
-            let normalized_vendor = self.filesystem.borrow_mut().normalize_path(&vendor_dir);
-            let normalized_path = self.filesystem.borrow().normalize_path(format!(
-                "{}{}",
-                path,
-                std::path::MAIN_SEPARATOR
-            ));
+            let normalized_vendor = self
+                .filesystem
+                .borrow_mut()
+                .normalize_path(path_from_bytes(&vendor_dir));
+            let normalized_path =
+                self.filesystem
+                    .borrow()
+                    .normalize_path(path_from_bytes(&bconcat!(
+                        path,
+                        std::path::MAIN_SEPARATOR_STR
+                    )));
             strpos(
                 path_to_bytes(&normalized_vendor),
                 path_to_bytes(&normalized_path),
@@ -788,17 +775,17 @@ impl DownloaderInterface for FileDownloader {
         self.filesystem.borrow_mut().ensure_directory_exists(path)?;
         self.filesystem.borrow_mut().rename(
             self.get_file_name(package.clone(), path),
-            format!(
-                "{}/{}",
+            path_from_bytes(&bconcat!(
                 path,
+                "/",
                 self.get_dist_path(package.clone(), PATHINFO_BASENAME)
-            ),
+            )),
         )?;
 
         // Single files can not have a mode set like files in archives
         // so we make sure if the file is a binary that it is executable
         for bin in package.get_binaries() {
-            let bin_path = format!("{}/{}", path, legacy_lossy(&bin));
+            let bin_path = PathBuf::from(path_from_bytes(&bconcat!(path, "/", bin)));
             if file_exists(&bin_path) && !is_executable(&bin_path) {
                 chmod(&bin_path, 0o777 & !umask());
             }
@@ -811,7 +798,7 @@ impl DownloaderInterface for FileDownloader {
         &self,
         initial: PackageInterfaceHandle,
         target: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         let appendix = self.get_install_operation_appendix(target.clone(), path);
         self.base_update(self, &appendix, initial, target, path)
@@ -821,7 +808,7 @@ impl DownloaderInterface for FileDownloader {
     async fn remove(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
+        path: &Path,
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
@@ -834,7 +821,7 @@ impl DownloaderInterface for FileDownloader {
         if !result {
             return Err(RuntimeException::new(format!(
                 "Could not completely delete {}, aborting.",
-                path
+                path.display()
             ))
             .into());
         }
@@ -848,15 +835,15 @@ impl ChangeReportInterface for FileDownloader {
     async fn get_local_changes(
         &self,
         package: PackageInterfaceHandle,
-        path: &str,
-    ) -> anyhow::Result<Option<String>> {
+        path: &Path,
+    ) -> anyhow::Result<Option<bstr::BString>> {
         self.base_get_local_changes(self, package, path).await
     }
 }
 
 #[derive(Debug, Clone)]
 struct UrlEntry {
-    base: String,
+    base: BString,
     processed: String,
-    cache_key: String,
+    cache_key: BString,
 }

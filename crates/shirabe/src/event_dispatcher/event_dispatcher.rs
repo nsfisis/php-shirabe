@@ -26,11 +26,12 @@ use shirabe_php_rpc::{
 };
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
-    array_search_in_vec, array_splice, file_exists, get_class, hash, implode, ini_get, is_array,
-    is_callable, is_dir, is_object, is_string, krsort, legacy_lossy, path_to_bytes, php_regex,
-    preg_is_match, preg_match, preg_quote, preg_replace, preg_replace_callback, realpath,
-    spl_autoload_functions, spl_autoload_register, spl_autoload_unregister, spl_object_hash,
-    str_replace, strlen, strpos, strtoupper, substr, trim2,
+    array_search_in_vec, array_splice, bconcat, file_exists, get_class, hash, implode, ini_get,
+    is_array, is_callable, is_dir, is_object, is_string, krsort, legacy_lossy, path_from_bytes,
+    path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote, preg_replace,
+    preg_replace_callback, realpath, spl_autoload_functions, spl_autoload_register,
+    spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos, strtoupper, substr,
+    trim2,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
@@ -917,11 +918,11 @@ try {{
                                     local_exec,
                                 ) {
                                     let caller = BinaryInstaller::determine_binary_caller(
-                                        &legacy_lossy(local_exec),
+                                        path_from_bytes(local_exec),
                                     );
                                     exec = legacy_lossy(&preg_replace(
                                         format!("{{^{}}}", preg_quote(&callable_str, None)),
-                                        format!("{} {}", caller, legacy_lossy(&local_exec)),
+                                        bconcat!(caller, " ", local_exec),
                                         &exec,
                                     ))
                                     .into_owned();

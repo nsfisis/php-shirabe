@@ -36,37 +36,37 @@ mockall::mock! {
         async fn download(
             &self,
             package: PackageInterfaceHandle,
-            target_dir: &str,
+            target_dir: &std::path::Path,
             prev_package: Option<PackageInterfaceHandle>,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn prepare(
             &self,
             r#type: &str,
             package: PackageInterfaceHandle,
-            target_dir: &str,
+            target_dir: &std::path::Path,
             prev_package: Option<PackageInterfaceHandle>,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn install(
             &self,
             package: PackageInterfaceHandle,
-            target_dir: &str,
+            target_dir: &std::path::Path,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn update(
             &self,
             initial: PackageInterfaceHandle,
             target: PackageInterfaceHandle,
-            target_dir: &str,
+            target_dir: &std::path::Path,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn remove(
             &self,
             package: PackageInterfaceHandle,
-            target_dir: &str,
+            target_dir: &std::path::Path,
         ) -> anyhow::Result<Option<PhpMixed>>;
         async fn cleanup(
             &self,
             r#type: &str,
             package: PackageInterfaceHandle,
-            target_dir: &str,
+            target_dir: &std::path::Path,
             prev_package: Option<PackageInterfaceHandle>,
         ) -> anyhow::Result<Option<PhpMixed>>;
     }
@@ -80,7 +80,7 @@ mockall::mock! {
         fn install_binaries(
             &mut self,
             package: PackageInterfaceHandle,
-            install_path: &str,
+            install_path: &std::path::Path,
             warn_on_overwrite: bool,
         ) -> anyhow::Result<()>;
         fn remove_binaries(&mut self, package: PackageInterfaceHandle);
@@ -244,7 +244,7 @@ fn test_install() {
         .times(1)
         .withf_st(move |package, target_dir| {
             std::rc::Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
-                && target_dir == expected_path.as_str()
+                && target_dir.as_os_str() == expected_path.as_str()
         })
         .returning(|_, _| Ok(None));
     set_download_manager(&setup, dm);
@@ -293,7 +293,7 @@ fn test_update() {
         .withf_st(move |initial, target, target_dir| {
             std::rc::Rc::ptr_eq(initial.as_rc(), expected_initial.as_rc())
                 && std::rc::Rc::ptr_eq(target.as_rc(), expected_target.as_rc())
-                && target_dir == expected_path.as_str()
+                && target_dir.as_os_str() == expected_path.as_str()
         })
         .returning(|_, _, _| Ok(None));
     set_download_manager(&setup, dm);
@@ -352,7 +352,7 @@ fn test_uninstall() {
         .times(1)
         .withf_st(move |package, target_dir| {
             std::rc::Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
-                && target_dir == expected_path.as_str()
+                && target_dir.as_os_str() == expected_path.as_str()
         })
         .returning(|_, _| Ok(None));
     set_download_manager(&setup, dm);
@@ -394,9 +394,8 @@ fn test_get_install_path_without_target_dir() {
         setup
             .vendor_dir
             .join(path_from_bytes(&package.get_pretty_name()))
-            .to_str()
-            .unwrap(),
-        library.get_install_path(package).unwrap()
+            .as_os_str(),
+        library.get_install_path(package).unwrap().as_os_str()
     );
 
     tear_down(&mut setup);
@@ -414,9 +413,8 @@ fn test_get_install_path_with_target_dir() {
             .vendor_dir
             .join(path_from_bytes(&package.get_pretty_name()))
             .join("Some/Namespace")
-            .to_str()
-            .unwrap(),
-        library.get_install_path(package).unwrap()
+            .as_os_str(),
+        library.get_install_path(package).unwrap().as_os_str()
     );
 
     tear_down(&mut setup);
@@ -428,7 +426,7 @@ fn test_ensure_binaries_installed() {
     let mut library = LibraryInstaller::new(
         setup.io.clone(),
         setup.composer.clone(),
-        Some("library".to_string()),
+        Some(bstr::BString::from("library".to_string())),
         None,
         None,
     );
@@ -446,7 +444,7 @@ fn test_ensure_binaries_installed() {
         .times(1)
         .withf_st(move |package, install_path, warn_on_overwrite| {
             std::rc::Rc::ptr_eq(package.as_rc(), expected_package.as_rc())
-                && install_path == expected_install_path.as_str()
+                && install_path.as_os_str() == expected_install_path.as_os_str()
                 && !*warn_on_overwrite
         })
         .returning(|_, _, _| Ok(()));

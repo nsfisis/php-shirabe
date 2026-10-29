@@ -7,7 +7,7 @@ use shirabe_php_shim::PhpMixed;
 
 #[async_trait::async_trait(?Send)]
 pub trait InstallerInterface: std::fmt::Debug {
-    fn supports(&self, package_type: &str) -> anyhow::Result<bool>;
+    fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool>;
 
     fn is_installed(
         &self,
@@ -54,7 +54,7 @@ pub trait InstallerInterface: std::fmt::Debug {
         prev_package: Option<PackageInterfaceHandle>,
     ) -> anyhow::Result<Option<PhpMixed>>;
 
-    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<String>;
+    fn get_install_path(&self, package: PackageInterfaceHandle) -> Option<std::path::PathBuf>;
 
     fn as_binary_presence_interface(&self) -> Option<&dyn BinaryPresenceInterface> {
         None

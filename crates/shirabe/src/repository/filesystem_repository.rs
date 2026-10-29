@@ -228,16 +228,16 @@ impl FilesystemRepository {
             let path = installation_manager.get_install_path(package.clone());
             let mut install_path: Option<BString> = None;
             if let Some(path_str) = &path
-                && !path_str.is_empty()
+                && !path_str.as_os_str().is_empty()
             {
                 let path_to_normalize = if self.filesystem.borrow().is_absolute_path(path_str) {
                     path_str.clone()
                 } else {
-                    format!(
-                        "{}/{}",
-                        Platform::get_cwd(false).unwrap_or_default().display(),
+                    std::path::PathBuf::from(path_from_bytes(&bconcat!(
+                        Platform::get_cwd(false).unwrap_or_default(),
+                        "/",
                         path_str
-                    )
+                    )))
                 };
                 let normalized_path = self
                     .filesystem

@@ -108,23 +108,18 @@ impl HgDriver {
                 fs2.remove_directory(path_from_bytes(&self.repo_dir))?;
 
                 let repo_dir = self.repo_dir.clone();
-                // TODO(bytes): Hg::run_command builds commands as Strings.
-                let command = move |url: String| -> Vec<String> {
+                let command = move |url: BString| -> Vec<BString> {
                     vec![
-                        "hg".to_string(),
-                        "clone".to_string(),
-                        "--noupdate".to_string(),
-                        "--".to_string(),
+                        "hg".into(),
+                        "clone".into(),
+                        "--noupdate".into(),
+                        "--".into(),
                         url,
-                        legacy_lossy(&repo_dir).into_owned(),
+                        repo_dir.clone(),
                     ]
                 };
 
-                hg_utils.run_command(
-                    command,
-                    legacy_lossy(&self.inner.url.clone()).into_owned(),
-                    None,
-                )?;
+                hg_utils.run_command(command, self.inner.url.as_bstr(), None)?;
             }
         }
 

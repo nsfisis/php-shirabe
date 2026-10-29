@@ -22,7 +22,7 @@ impl MetapackageInstaller {
 
 #[async_trait::async_trait(?Send)]
 impl InstallerInterface for MetapackageInstaller {
-    fn supports(&self, package_type: &str) -> anyhow::Result<bool> {
+    fn supports(&self, package_type: &bstr::BStr) -> anyhow::Result<bool> {
         Ok(package_type == "metapackage")
     }
 
@@ -131,7 +131,7 @@ impl InstallerInterface for MetapackageInstaller {
         Ok(None)
     }
 
-    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<String> {
+    fn get_install_path(&self, _package: PackageInterfaceHandle) -> Option<std::path::PathBuf> {
         None
     }
 }
