@@ -211,7 +211,11 @@ fn test_request_access_token_with_valid_oauth_consumer() {
 
     assert_eq!(
         f.bitbucket
-            .request_token(ORIGIN, CONSUMER_KEY, CONSUMER_SECRET)
+            .request_token(
+                bstr::BStr::new(ORIGIN),
+                bstr::BStr::new(CONSUMER_KEY),
+                bstr::BStr::new(CONSUMER_SECRET),
+            )
             .unwrap(),
         TOKEN
     );
@@ -242,7 +246,11 @@ fn test_request_access_token_with_valid_oauth_consumer_and_valid_stored_access_t
 
     assert_eq!(
         f.bitbucket
-            .request_token(ORIGIN, CONSUMER_KEY, CONSUMER_SECRET)
+            .request_token(
+                bstr::BStr::new(ORIGIN),
+                bstr::BStr::new(CONSUMER_KEY),
+                bstr::BStr::new(CONSUMER_SECRET),
+            )
             .unwrap(),
         TOKEN
     );
@@ -301,7 +309,11 @@ fn test_request_access_token_with_valid_oauth_consumer_and_expired_access_token(
 
     assert_eq!(
         f.bitbucket
-            .request_token(ORIGIN, CONSUMER_KEY, CONSUMER_SECRET)
+            .request_token(
+                bstr::BStr::new(ORIGIN),
+                bstr::BStr::new(CONSUMER_KEY),
+                bstr::BStr::new(CONSUMER_SECRET),
+            )
             .unwrap(),
         TOKEN
     );
@@ -346,7 +358,11 @@ fn test_request_access_token_with_username_and_password() {
 
     assert_eq!(
         f.bitbucket
-            .request_token(ORIGIN, USERNAME, PASSWORD)
+            .request_token(
+                bstr::BStr::new(ORIGIN),
+                bstr::BStr::new(USERNAME),
+                bstr::BStr::new(PASSWORD),
+            )
             .unwrap(),
         ""
     );
@@ -382,7 +398,11 @@ fn test_request_access_token_with_username_and_password_with_unauthorized_respon
 
     assert_eq!(
         f.bitbucket
-            .request_token(ORIGIN, USERNAME, PASSWORD)
+            .request_token(
+                bstr::BStr::new(ORIGIN),
+                bstr::BStr::new(USERNAME),
+                bstr::BStr::new(PASSWORD),
+            )
             .unwrap(),
         ""
     );
@@ -413,7 +433,11 @@ fn test_request_access_token_with_username_and_password_with_not_found_response(
         )
         .unwrap();
 
-    let result = f.bitbucket.request_token(ORIGIN, USERNAME, PASSWORD);
+    let result = f.bitbucket.request_token(
+        bstr::BStr::new(ORIGIN),
+        bstr::BStr::new(USERNAME),
+        bstr::BStr::new(PASSWORD),
+    );
     assert!(
         result.is_err(),
         "expected a TransportException to propagate"
@@ -447,7 +471,7 @@ fn test_username_password_authentication_flow() {
 
     assert!(
         f.bitbucket
-            .authorize_oauth_interactively(ORIGIN, Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(MESSAGE))
             .unwrap()
     );
 }
@@ -468,7 +492,7 @@ fn test_authorize_oauth_interactively_with_empty_username() {
 
     assert!(
         !f.bitbucket
-            .authorize_oauth_interactively(ORIGIN, Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(MESSAGE))
             .unwrap()
     );
 }
@@ -495,7 +519,7 @@ fn test_authorize_oauth_interactively_with_empty_password() {
 
     assert!(
         !f.bitbucket
-            .authorize_oauth_interactively(ORIGIN, Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(MESSAGE))
             .unwrap()
     );
 }
@@ -524,7 +548,7 @@ fn test_authorize_oauth_interactively_with_request_access_token_failure() {
 
     assert!(
         !f.bitbucket
-            .authorize_oauth_interactively(ORIGIN, Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(MESSAGE))
             .unwrap()
     );
 }
@@ -542,7 +566,7 @@ fn test_authorize_oauth_with_wrong_origin_url() {
     let mut f = set_up_with_config_and_http(config, vec![]);
     assert!(
         !f.bitbucket
-            .authorize_oauth(&format!("non-{}", ORIGIN))
+            .authorize_oauth(bstr::BStr::new(&format!("non-{}", ORIGIN)))
             .unwrap()
     );
 }
@@ -567,7 +591,7 @@ fn test_authorize_oauth_without_available_git_config_token() {
     let mut bitbucket =
         Bitbucket::new(io, config, Some(process), Some(http_downloader), Some(time)).unwrap();
 
-    assert!(!bitbucket.authorize_oauth(ORIGIN).unwrap());
+    assert!(!bitbucket.authorize_oauth(bstr::BStr::new(ORIGIN)).unwrap());
 }
 
 #[test]
@@ -584,5 +608,5 @@ fn test_authorize_oauth_with_available_git_config_token() {
     let mut bitbucket =
         Bitbucket::new(io, config, Some(process), Some(http_downloader), Some(time)).unwrap();
 
-    assert!(bitbucket.authorize_oauth(ORIGIN).unwrap());
+    assert!(bitbucket.authorize_oauth(bstr::BStr::new(ORIGIN)).unwrap());
 }

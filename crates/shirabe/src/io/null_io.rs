@@ -5,7 +5,8 @@ use shirabe_php_shim::PhpMixed;
 
 #[derive(Debug)]
 pub struct NullIO {
-    authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
+    authentications:
+        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>,
 }
 
 impl Default for NullIO {
@@ -98,18 +99,18 @@ impl IOInterfaceImmutable for NullIO {
 
     fn get_authentications(
         &self,
-    ) -> indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
         <Self as BaseIO>::get_authentications(self)
     }
 
-    fn has_authentication(&self, repository_name: &str) -> bool {
+    fn has_authentication(&self, repository_name: &bstr::BStr) -> bool {
         <Self as BaseIO>::has_authentication(self, repository_name)
     }
 
     fn get_authentication(
         &self,
-        repository_name: &str,
-    ) -> indexmap::IndexMap<String, Option<String>> {
+        repository_name: &bstr::BStr,
+    ) -> indexmap::IndexMap<String, Option<bstr::BString>> {
         <Self as BaseIO>::get_authentication(self, repository_name)
     }
 
@@ -129,9 +130,9 @@ impl IOInterfaceImmutable for NullIO {
 impl IOInterfaceMutable for NullIO {
     fn set_authentication(
         &mut self,
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: bstr::BString,
+        username: bstr::BString,
+        password: Option<bstr::BString>,
     ) {
         <Self as BaseIO>::set_authentication(self, repository_name, username, password)
     }
@@ -154,13 +155,14 @@ impl IOInterface for NullIO {
 impl BaseIO for NullIO {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
         &self.authentications
     }
 
     fn authentications_mut(
         &mut self,
-    ) -> &mut indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &mut indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>
+    {
         &mut self.authentications
     }
 }

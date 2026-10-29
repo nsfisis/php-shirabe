@@ -260,38 +260,44 @@ fn test_select() {
 fn test_set_and_get_authentication() {
     let mut console_io = make_console_io();
     console_io.set_authentication(
-        "repoName".to_string(),
-        "l3l0".to_string(),
-        Some("passwd".to_string()),
+        bstr::BString::from("repoName"),
+        bstr::BString::from("l3l0"),
+        Some(bstr::BString::from("passwd")),
     );
 
-    let mut expected: IndexMap<String, Option<String>> = IndexMap::new();
-    expected.insert("username".to_string(), Some("l3l0".to_string()));
-    expected.insert("password".to_string(), Some("passwd".to_string()));
-    assert_eq!(expected, console_io.get_authentication("repoName"));
+    let mut expected: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
+    expected.insert("username".to_string(), Some(bstr::BString::from("l3l0")));
+    expected.insert("password".to_string(), Some(bstr::BString::from("passwd")));
+    assert_eq!(
+        expected,
+        console_io.get_authentication(bstr::BStr::new("repoName"))
+    );
 }
 
 #[test]
 fn test_get_authentication_when_did_not_set() {
     let console_io = make_console_io();
 
-    let mut expected: IndexMap<String, Option<String>> = IndexMap::new();
+    let mut expected: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
     expected.insert("username".to_string(), None);
     expected.insert("password".to_string(), None);
-    assert_eq!(expected, console_io.get_authentication("repoName"));
+    assert_eq!(
+        expected,
+        console_io.get_authentication(bstr::BStr::new("repoName"))
+    );
 }
 
 #[test]
 fn test_has_authentication() {
     let mut console_io = make_console_io();
     console_io.set_authentication(
-        "repoName".to_string(),
-        "l3l0".to_string(),
-        Some("passwd".to_string()),
+        bstr::BString::from("repoName"),
+        bstr::BString::from("l3l0"),
+        Some(bstr::BString::from("passwd")),
     );
 
-    assert!(console_io.has_authentication("repoName"));
-    assert!(!console_io.has_authentication("repoName2"));
+    assert!(console_io.has_authentication(bstr::BStr::new("repoName")));
+    assert!(!console_io.has_authentication(bstr::BStr::new("repoName2")));
 }
 
 #[ignore = "data provider includes malformed-UTF-8 inputs (e.g. \\xFF, \\xC3\\x28); sanitize() takes a &str which is UTF-8-only and cannot carry invalid bytes, so those cases are unrepresentable"]

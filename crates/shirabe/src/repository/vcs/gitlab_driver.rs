@@ -888,14 +888,14 @@ impl GitLabDriver {
                     return Ok(Err(e));
                 }
 
-                if git_lab_util.authorize_oauth(&legacy_lossy(&self.inner.origin_url))? {
+                if git_lab_util.authorize_oauth(self.inner.origin_url.as_bstr())? {
                     return self.inner.get_contents(url);
                 }
 
-                if git_lab_util.is_oauth_expired(&legacy_lossy(&self.inner.origin_url))
+                if git_lab_util.is_oauth_expired(self.inner.origin_url.as_bstr())
                     && git_lab_util.authorize_oauth_refresh(
-                        &legacy_lossy(&self.scheme),
-                        &legacy_lossy(&self.inner.origin_url),
+                        self.scheme.as_bstr(),
+                        self.inner.origin_url.as_bstr(),
                     )?
                 {
                     return self.inner.get_contents(url);
@@ -922,8 +922,8 @@ impl GitLabDriver {
                     io_interface::NORMAL,
                 );
                 git_lab_util.authorize_oauth_interactively(
-                    &legacy_lossy(&self.scheme),
-                    &legacy_lossy(&self.inner.origin_url),
+                    self.scheme.as_bstr(),
+                    self.inner.origin_url.as_bstr(),
                     Some(&*legacy_lossy(&bconcat!("Your credentials are required to fetch private repository metadata (<info>", self.inner.url, "</info>)"))),
                 )?;
 
@@ -933,8 +933,8 @@ impl GitLabDriver {
                 if !self
                     .inner
                     .io
-                    .has_authentication(&legacy_lossy(&self.inner.origin_url))
-                    && git_lab_util.authorize_oauth(&legacy_lossy(&self.inner.origin_url))?
+                    .has_authentication(self.inner.origin_url.as_bstr())
+                    && git_lab_util.authorize_oauth(self.inner.origin_url.as_bstr())?
                 {
                     return self.inner.get_contents(url);
                 }

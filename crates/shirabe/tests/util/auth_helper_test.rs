@@ -2,7 +2,7 @@
 
 use crate::config_stub::ConfigStubBuilder;
 use crate::io_mock::{Expectation, IOMock, get_io_mock};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe::config::ConfigSourceInterface;
 use shirabe::io::{IOInterface, io_interface};
@@ -44,9 +44,9 @@ fn expects_authentication(
 ) {
     use shirabe::io::IOInterfaceMutable;
     io.borrow_mut().set_authentication(
-        origin.to_string(),
-        username.to_string(),
-        Some(password.to_string()),
+        BString::from(origin),
+        BString::from(username),
+        Some(BString::from(password)),
     );
 }
 
@@ -88,7 +88,7 @@ fn test_add_authentication_header_without_auth_credentials() {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options, origin, url)
+        .add_authentication_options(options, BStr::new(origin), BStr::new(url))
         .unwrap();
 
     assert_eq!(
@@ -107,7 +107,7 @@ fn test_add_authentication_header_with_bearer_password() {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options, origin, url)
+        .add_authentication_options(options, BStr::new(origin), BStr::new(url))
         .unwrap();
 
     assert_eq!(
@@ -136,7 +136,7 @@ fn test_add_authentication_header_with_github_token() {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options, origin, url)
+        .add_authentication_options(options, BStr::new(origin), BStr::new(url))
         .unwrap();
 
     assert_eq!(
@@ -171,7 +171,7 @@ fn test_add_authentication_header_with_gitlab_oath_token() {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options, origin, url)
+        .add_authentication_options(options, BStr::new(origin), BStr::new(url))
         .unwrap();
 
     assert_eq!(
@@ -206,7 +206,7 @@ fn test_add_authentication_options_for_client_certificate() {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options, origin, url)
+        .add_authentication_options(options, BStr::new(origin), BStr::new(url))
         .unwrap();
 
     assert_eq!(
@@ -238,7 +238,7 @@ fn add_authentication_header_with_gitlab_private_token(password: &str) {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options, origin, url)
+        .add_authentication_options(options, BStr::new(origin), BStr::new(url))
         .unwrap();
 
     assert_eq!(
@@ -275,7 +275,7 @@ fn test_add_authentication_header_with_bitbucket_oath_token() {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options, origin, url)
+        .add_authentication_options(options, BStr::new(origin), BStr::new(url))
         .unwrap();
 
     assert_eq!(
@@ -296,7 +296,7 @@ fn add_authentication_header_with_bitbucket_public_url(url: &str) {
 
     let options = f
         .auth_helper
-        .add_authentication_options(options, origin, url)
+        .add_authentication_options(options, BStr::new(origin), BStr::new(url))
         .unwrap();
 
     assert_eq!(
@@ -341,7 +341,7 @@ fn add_authentication_header_with_basic_http_authentication(
 
     let options = f
         .auth_helper
-        .add_authentication_options(options, origin, url)
+        .add_authentication_options(options, BStr::new(origin), BStr::new(url))
         .unwrap();
 
     assert_eq!(
@@ -379,12 +379,11 @@ fn test_add_authentication_header_with_basic_http_authentication() {
 #[test]
 fn test_is_public_bit_bucket_download_with_bitbucket_public_url() {
     let f = set_up();
-    assert!(
-        f.auth_helper
-            .is_public_bit_bucket_download("https://bitbucket.org/user/repo/downloads/whatever")
-    );
+    assert!(f.auth_helper.is_public_bit_bucket_download(BStr::new(
+        "https://bitbucket.org/user/repo/downloads/whatever"
+    )));
     assert!(f.auth_helper.is_public_bit_bucket_download(
-        "https://bbuseruploads.s3.amazonaws.com/9421ee72-638e-43a9-82ea-39cfaae2bfaa/downloads/b87c59d9-54f3-4922-b711-d89059ec3bcf",
+        BStr::new("https://bbuseruploads.s3.amazonaws.com/9421ee72-638e-43a9-82ea-39cfaae2bfaa/downloads/b87c59d9-54f3-4922-b711-d89059ec3bcf"),
     ));
 }
 
@@ -392,8 +391,9 @@ fn test_is_public_bit_bucket_download_with_bitbucket_public_url() {
 fn test_is_public_bit_bucket_download_with_non_bitbucket_public_url() {
     let f = set_up();
     assert!(
-        !f.auth_helper
-            .is_public_bit_bucket_download("https://bitbucket.org/site/oauth2/authorize")
+        !f.auth_helper.is_public_bit_bucket_download(BStr::new(
+            "https://bitbucket.org/site/oauth2/authorize"
+        ))
     );
 }
 
@@ -445,7 +445,7 @@ fn test_store_auth_automatically() {
         .set_auth_config_source(Box::new(source));
 
     f.auth_helper
-        .store_auth(origin, StoreAuth::Bool(true))
+        .store_auth(BStr::new(origin), StoreAuth::Bool(true))
         .unwrap();
 }
 
@@ -484,7 +484,9 @@ fn test_store_auth_with_prompt_yes_answer() {
         .borrow_mut()
         .set_auth_config_source(Box::new(source));
 
-    f.auth_helper.store_auth(origin, StoreAuth::Prompt).unwrap();
+    f.auth_helper
+        .store_auth(BStr::new(origin), StoreAuth::Prompt)
+        .unwrap();
 }
 
 #[test]
@@ -516,7 +518,9 @@ fn test_store_auth_with_prompt_no_answer() {
         .borrow_mut()
         .set_auth_config_source(Box::new(source));
 
-    f.auth_helper.store_auth(origin, StoreAuth::Prompt).unwrap();
+    f.auth_helper
+        .store_auth(BStr::new(origin), StoreAuth::Prompt)
+        .unwrap();
 }
 
 // Mirrors AuthHelperTest::testStoreAuthWithPromptInvalidAnswer. The PHP test mocks
@@ -549,7 +553,7 @@ fn test_store_auth_with_prompt_invalid_answer() {
     );
 
     let err = auth_helper
-        .store_auth(origin, StoreAuth::Prompt)
+        .store_auth(BStr::new(origin), StoreAuth::Prompt)
         .expect_err("expected a RuntimeException");
     assert!(err.is_instanceof::<RuntimeException>());
 
@@ -585,8 +589,14 @@ fn test_prompt_auth_if_needed_git_lab_no_auth_change() {
     let origin = "gitlab.com";
 
     let mut auth = IndexMap::new();
-    auth.insert("username".to_string(), Some("gitlab-user".to_string()));
-    auth.insert("password".to_string(), Some("gitlab-password".to_string()));
+    auth.insert(
+        "username".to_string(),
+        Some(bstr::BString::from("gitlab-user")),
+    );
+    auth.insert(
+        "password".to_string(),
+        Some(bstr::BString::from("gitlab-password")),
+    );
     let io = std::rc::Rc::new(std::cell::RefCell::new(
         IOStub::new()
             .with_has_authentication(true)
@@ -620,10 +630,12 @@ fn test_prompt_auth_if_needed_git_lab_no_auth_change() {
     );
 
     let result = auth_helper.prompt_auth_if_needed(
-        "https://gitlab.com/acme/archive.zip",
-        origin,
+        BStr::new("https://gitlab.com/acme/archive.zip"),
+        BStr::new(origin),
         404,
-        Some("GitLab requires authentication and it was not provided"),
+        Some(BStr::new(
+            "GitLab requires authentication and it was not provided",
+        )),
         vec![],
         0,
         None,
@@ -634,9 +646,9 @@ fn test_prompt_auth_if_needed_git_lab_no_auth_change() {
 
     assert_eq!(
         vec![(
-            "gitlab.com".to_string(),
-            "gitlab-user".to_string(),
-            Some("gitlab-password".to_string())
+            BString::from("gitlab.com"),
+            BString::from("gitlab-user"),
+            Some(BString::from("gitlab-password"))
         )],
         io.borrow().set_authentication_calls()
     );
@@ -672,11 +684,11 @@ fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
     let mut first_auth = IndexMap::new();
     first_auth.insert(
         "username".to_string(),
-        Some("bitbucket_client_id".to_string()),
+        Some(BString::from("bitbucket_client_id")),
     );
     first_auth.insert(
         "password".to_string(),
-        Some("bitbucket_client_secret".to_string()),
+        Some(BString::from("bitbucket_client_secret")),
     );
     let io = std::rc::Rc::new(std::cell::RefCell::new(
         IOStub::new()
@@ -691,10 +703,10 @@ fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
 
     let result1 = auth_helper
         .prompt_auth_if_needed(
-            "https://bitbucket.org/workspace/repo1/get/hash1.zip",
-            origin,
+            BStr::new("https://bitbucket.org/workspace/repo1/get/hash1.zip"),
+            BStr::new(origin),
             401,
-            Some("HTTP/2 401 "),
+            Some(BStr::new("HTTP/2 401 ")),
             vec![],
             0,
             None,
@@ -702,19 +714,22 @@ fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
         .unwrap();
 
     let mut second_auth = IndexMap::new();
-    second_auth.insert("username".to_string(), Some("x-token-auth".to_string()));
+    second_auth.insert(
+        "username".to_string(),
+        Some(bstr::BString::from("x-token-auth")),
+    );
     second_auth.insert(
         "password".to_string(),
-        Some("bitbucket_access_token".to_string()),
+        Some(BString::from("bitbucket_access_token")),
     );
     io.borrow_mut().set_get_authentication(second_auth);
 
     let result2 = auth_helper
         .prompt_auth_if_needed(
-            "https://bitbucket.org/workspace/repo2/get/hash2.zip",
-            origin,
+            BStr::new("https://bitbucket.org/workspace/repo2/get/hash2.zip"),
+            BStr::new(origin),
             401,
-            Some("HTTP/2 401 "),
+            Some(BStr::new("HTTP/2 401 ")),
             vec![],
             0,
             None,
@@ -728,9 +743,9 @@ fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
 
     assert_eq!(
         vec![(
-            "bitbucket.org".to_string(),
-            "x-token-auth".to_string(),
-            Some("bitbucket_access_token".to_string())
+            BString::from("bitbucket.org"),
+            BString::from("x-token-auth"),
+            Some(BString::from("bitbucket_access_token"))
         )],
         io.borrow().set_authentication_calls()
     );
@@ -738,11 +753,11 @@ fn test_prompt_auth_if_needed_multiple_bitbucket_downloads() {
     // Mirrors PHP's `->expects($this->exactly(2))->method('hasAuthentication')->with($origin)`
     // and `->expects($this->exactly(2))->method('getAuthentication')` verification.
     assert_eq!(
-        vec![origin.to_string(), origin.to_string()],
+        vec![BString::from(origin), BString::from(origin)],
         io.borrow().has_authentication_calls()
     );
     assert_eq!(
-        vec![origin.to_string(), origin.to_string()],
+        vec![BString::from(origin), BString::from(origin)],
         io.borrow().get_authentication_calls()
     );
 }
@@ -753,14 +768,14 @@ shirabe_php_shim::trigger_error is a todo!()"]
 fn test_add_authentication_header_with_custom_headers() {
     let mut f = set_up();
     let headers = vec![
-        "Accept-Encoding: gzip".to_string(),
-        "Connection: close".to_string(),
+        BString::from("Accept-Encoding: gzip"),
+        BString::from("Connection: close"),
     ];
     let origin = "example.org";
     let url = "https://example.org/packages.json";
     let custom_headers = vec![
-        "API-TOKEN: abc123".to_string(),
-        "X-CUSTOM-HEADER: value".to_string(),
+        BString::from("API-TOKEN: abc123"),
+        BString::from("X-CUSTOM-HEADER: value"),
     ];
     let headers_json = json_encode(&PhpMixed::List(
         custom_headers
@@ -787,7 +802,7 @@ fn test_add_authentication_header_with_custom_headers() {
     assert_eq!(
         expected_headers,
         f.auth_helper
-            .add_authentication_header(headers, origin, url)
+            .add_authentication_header(headers, BStr::new(origin), BStr::new(url))
             .unwrap()
     );
 }

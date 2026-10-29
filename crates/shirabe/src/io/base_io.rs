@@ -3,12 +3,12 @@
 use crate::config::Config;
 use crate::io::{IOInterface, io_interface};
 use crate::util::ProcessExecutor;
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     JSON_INVALID_UTF8_IGNORE, JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed,
-    UnexpectedValueException, array_merge, in_array_strict, json_encode_ex, legacy_lossy,
-    php_regex, preg_is_match,
+    UnexpectedValueException, array_merge, in_array_strict, json_encode_ex, php_regex,
+    preg_is_match,
 };
 
 /// ref: composer/vendor/psr/log/Psr/Log/LogLevel.php
@@ -34,10 +34,10 @@ fn log_context(context: &[(&str, &str)]) -> IndexMap<BString, PhpMixed> {
 }
 
 pub trait BaseIO: IOInterface {
-    fn authentications(&self) -> &IndexMap<String, IndexMap<String, Option<String>>>;
-    fn authentications_mut(&mut self) -> &mut IndexMap<String, IndexMap<String, Option<String>>>;
+    fn authentications(&self) -> &IndexMap<BString, IndexMap<String, Option<BString>>>;
+    fn authentications_mut(&mut self) -> &mut IndexMap<BString, IndexMap<String, Option<BString>>>;
 
-    fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>> {
+    fn get_authentications(&self) -> IndexMap<BString, IndexMap<String, Option<BString>>> {
         self.authentications().clone()
     }
 
@@ -45,11 +45,11 @@ pub trait BaseIO: IOInterface {
         *self.authentications_mut() = IndexMap::new();
     }
 
-    fn has_authentication(&self, repository_name: &str) -> bool {
+    fn has_authentication(&self, repository_name: &BStr) -> bool {
         self.authentications().contains_key(repository_name)
     }
 
-    fn get_authentication(&self, repository_name: &str) -> IndexMap<String, Option<String>> {
+    fn get_authentication(&self, repository_name: &BStr) -> IndexMap<String, Option<BString>> {
         if let Some(auth) = self.authentications().get(repository_name) {
             return auth.clone();
         }
@@ -61,9 +61,9 @@ pub trait BaseIO: IOInterface {
 
     fn set_authentication(
         &mut self,
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: BString,
+        username: BString,
+        password: Option<BString>,
     ) {
         let mut auth = IndexMap::new();
         auth.insert("username".to_string(), Some(username));
@@ -73,13 +73,13 @@ pub trait BaseIO: IOInterface {
 
     fn check_and_set_authentication(
         &mut self,
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: BString,
+        username: BString,
+        password: Option<BString>,
     ) {
-        if BaseIO::has_authentication(self, &repository_name) {
-            let auth = BaseIO::get_authentication(self, &repository_name);
-            if auth.get("username").and_then(|v| v.as_deref()) == Some(username.as_str())
+        if BaseIO::has_authentication(self, repository_name.as_ref()) {
+            let auth = BaseIO::get_authentication(self, repository_name.as_ref());
+            if *auth.get("username").unwrap_or(&None) == Some(username.clone())
                 && *auth.get("password").unwrap_or(&None) == password
             {
                 return;
@@ -87,7 +87,7 @@ pub trait BaseIO: IOInterface {
             self.write_error3(
                 &format!(
                     "<warning>Warning: You should avoid overwriting already defined auth settings for {}.</warning>",
-                    repository_name
+                    repository_name.display_lossy()
                 ),
                 true,
                 io_interface::NORMAL,
@@ -109,21 +109,17 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = bitbucket_oauth.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
-                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
-                // replaced.
-                let domain = domain.to_str_lossy().into_owned();
                 if let Some(cred_map) = cred.as_array() {
-                    let consumer_key = legacy_lossy(
+                    let consumer_key = BString::from(
                         cred_map
                             .get(B("consumer-key"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
-                    )
-                    .into_owned();
+                    );
                     let consumer_secret = cred_map
                         .get(B("consumer-secret"))
                         .and_then(|v| v.as_string())
-                        .map(|s| legacy_lossy(s).into_owned());
+                        .map(BString::from);
                     self.check_and_set_authentication(domain, consumer_key, consumer_secret);
                 }
             }
@@ -131,14 +127,11 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = github_oauth.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
-                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
-                // replaced.
-                let domain = domain.to_str_lossy().into_owned();
-                let token_str = legacy_lossy(token.as_string().unwrap_or_default()).into_owned();
+                let token_str = BString::from(token.as_string().unwrap_or_default());
                 let github_domains = config.get("github-domains");
                 if domain != "github.com"
                     && !in_array_strict(
-                        domain.clone(),
+                        PhpMixed::string(domain.clone()),
                         github_domains
                             .clone()
                             .unwrap_or(PhpMixed::List(vec![]))
@@ -149,7 +142,7 @@ pub trait BaseIO: IOInterface {
                         self,
                         &format!(
                             "{} is not in the configured github-domains, adding it implicitly as authentication is configured for this domain",
-                            domain
+                            domain.display_lossy()
                         ),
                         &[],
                     );
@@ -164,30 +157,28 @@ pub trait BaseIO: IOInterface {
                     config.merge(&config_outer, "implicit-due-to-auth");
                 }
 
-                if !preg_is_match(php_regex!(r"{^[.A-Za-z0-9_]+$}"), &token_str) {
+                if !preg_is_match(php_regex!(r"{^[.A-Za-z0-9_]+$}"), token_str.as_bstr()) {
                     return Err(UnexpectedValueException::new(format!(
                         "Your github oauth token for {} contains invalid characters: \"{}\"",
-                        domain, token_str
+                        domain.display_lossy(),
+                        token_str.display_lossy()
                     ))
                     .into());
                 }
                 self.check_and_set_authentication(
                     domain,
                     token_str,
-                    Some("x-oauth-basic".to_string()),
+                    Some(BString::from("x-oauth-basic")),
                 );
             }
         }
 
         if let Some(map) = gitlab_oauth.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
-                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
-                // replaced.
-                let domain = domain.to_str_lossy().into_owned();
                 let gitlab_domains = config.get("gitlab-domains");
                 if domain != "gitlab.com"
                     && !in_array_strict(
-                        domain.clone(),
+                        PhpMixed::string(domain.clone()),
                         gitlab_domains
                             .clone()
                             .unwrap_or(PhpMixed::List(vec![]))
@@ -198,7 +189,7 @@ pub trait BaseIO: IOInterface {
                         self,
                         &format!(
                             "{} is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain",
-                            domain
+                            domain.display_lossy()
                         ),
                         &[],
                     );
@@ -214,28 +205,24 @@ pub trait BaseIO: IOInterface {
                 }
 
                 let token_str = if let Some(arr) = token.as_array() {
-                    legacy_lossy(
+                    BString::from(
                         arr.get(B("token"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
                     )
-                    .into_owned()
                 } else {
-                    legacy_lossy(token.as_string().unwrap_or_default()).into_owned()
+                    BString::from(token.as_string().unwrap_or_default())
                 };
-                self.check_and_set_authentication(domain, token_str, Some("oauth2".to_string()));
+                self.check_and_set_authentication(domain, token_str, Some(BString::from("oauth2")));
             }
         }
 
         if let Some(map) = gitlab_token.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
-                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
-                // replaced.
-                let domain = domain.to_str_lossy().into_owned();
                 let gitlab_domains = config.get("gitlab-domains");
                 if domain != "gitlab.com"
                     && !in_array_strict(
-                        domain.clone(),
+                        PhpMixed::string(domain.clone()),
                         gitlab_domains
                             .clone()
                             .unwrap_or(PhpMixed::List(vec![]))
@@ -246,7 +233,7 @@ pub trait BaseIO: IOInterface {
                         self,
                         &format!(
                             "{} is not in the configured gitlab-domains, adding it implicitly as authentication is configured for this domain",
-                            domain
+                            domain.display_lossy()
                         ),
                         &[],
                     );
@@ -263,23 +250,21 @@ pub trait BaseIO: IOInterface {
 
                 let (username, password) = if let Some(arr) = token.as_array() {
                     (
-                        legacy_lossy(
+                        BString::from(
                             arr.get(B("username"))
                                 .and_then(|v| v.as_string())
                                 .unwrap_or_default(),
-                        )
-                        .into_owned(),
-                        legacy_lossy(
+                        ),
+                        BString::from(
                             arr.get(B("token"))
                                 .and_then(|v| v.as_string())
                                 .unwrap_or_default(),
-                        )
-                        .into_owned(),
+                        ),
                     )
                 } else {
                     (
-                        legacy_lossy(token.as_string().unwrap_or_default()).into_owned(),
-                        "private-token".to_string(),
+                        BString::from(token.as_string().unwrap_or_default()),
+                        BString::from("private-token"),
                     )
                 };
                 self.check_and_set_authentication(domain, username, Some(password));
@@ -288,12 +273,9 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = forgejo_token.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
-                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
-                // replaced.
-                let domain = domain.to_str_lossy().into_owned();
                 let forgejo_domains = config.get("forgejo-domains");
                 if !in_array_strict(
-                    domain.clone(),
+                    PhpMixed::string(domain.clone()),
                     forgejo_domains
                         .clone()
                         .unwrap_or(PhpMixed::List(vec![]))
@@ -303,7 +285,7 @@ pub trait BaseIO: IOInterface {
                         self,
                         &format!(
                             "{} is not in the configured forgejo-domains, adding it implicitly as authentication is configured for this domain",
-                            domain
+                            domain.display_lossy()
                         ),
                         &[],
                     );
@@ -319,17 +301,16 @@ pub trait BaseIO: IOInterface {
                 }
 
                 if let Some(cred_map) = cred.as_array() {
-                    let username = legacy_lossy(
+                    let username = BString::from(
                         cred_map
                             .get(B("username"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
-                    )
-                    .into_owned();
+                    );
                     let token = cred_map
                         .get(B("token"))
                         .and_then(|v| v.as_string())
-                        .map(|s| legacy_lossy(s).into_owned());
+                        .map(BString::from);
                     self.check_and_set_authentication(domain, username, token);
                 }
             }
@@ -337,21 +318,17 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = http_basic.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
-                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
-                // replaced.
-                let domain = domain.to_str_lossy().into_owned();
                 if let Some(cred_map) = cred.as_array() {
-                    let username = legacy_lossy(
+                    let username = BString::from(
                         cred_map
                             .get(B("username"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
-                    )
-                    .into_owned();
+                    );
                     let password = cred_map
                         .get(B("password"))
                         .and_then(|v| v.as_string())
-                        .map(|s| legacy_lossy(s).into_owned());
+                        .map(BString::from);
                     self.check_and_set_authentication(domain, username, password);
                 }
             }
@@ -359,25 +336,19 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = bearer_token.as_opt().and_then(|v| v.as_array()) {
             for (domain, token) in map.clone() {
-                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
-                // replaced.
-                let domain = domain.to_str_lossy().into_owned();
-                let token_str = legacy_lossy(token.as_string().unwrap_or_default()).into_owned();
-                self.check_and_set_authentication(domain, token_str, Some("bearer".to_string()));
+                let token_str = BString::from(token.as_string().unwrap_or_default());
+                self.check_and_set_authentication(domain, token_str, Some(BString::from("bearer")));
             }
         }
 
         if let Some(map) = custom_headers.as_opt().and_then(|v| v.as_array()) {
             for (domain, headers) in map.clone() {
-                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
-                // replaced.
-                let domain = domain.to_str_lossy().into_owned();
                 if !headers.is_null() {
                     let json_str = json_encode_ex(&headers, 0).unwrap_or_default();
                     self.check_and_set_authentication(
                         domain,
-                        json_str,
-                        Some("custom-headers".to_string()),
+                        BString::from(json_str),
+                        Some(BString::from("custom-headers")),
                     );
                 }
             }
@@ -385,22 +356,19 @@ pub trait BaseIO: IOInterface {
 
         if let Some(map) = client_certificate.as_opt().and_then(|v| v.as_array()) {
             for (domain, cred) in map.clone() {
-                // TODO(bytes): check_and_set_authentication takes a String, so non-UTF-8 bytes are
-                // replaced.
-                let domain = domain.to_str_lossy().into_owned();
                 if let Some(cred_map) = cred.as_array() {
                     let local_cert = cred_map
                         .get(B("local_cert"))
                         .and_then(|v| v.as_string())
-                        .map(|s| legacy_lossy(s).into_owned());
+                        .map(BString::from);
                     let local_pk = cred_map
                         .get(B("local_pk"))
                         .and_then(|v| v.as_string())
-                        .map(|s| legacy_lossy(s).into_owned());
+                        .map(BString::from);
                     let passphrase = cred_map
                         .get(B("passphrase"))
                         .and_then(|v| v.as_string())
-                        .map(|s| legacy_lossy(s).into_owned());
+                        .map(BString::from);
 
                     let mut ssl_options = IndexMap::new();
                     if let Some(cert) = local_cert {
@@ -416,7 +384,7 @@ pub trait BaseIO: IOInterface {
                     if !ssl_options.contains_key(B("local_cert")) {
                         self.write_error3(&format!(
                             "<warning>Warning: Client certificate configuration is missing key `local_cert` for {}.</warning>",
-                            domain
+                            domain.display_lossy()
                         ), true, io_interface::NORMAL);
                         continue;
                     }
@@ -425,8 +393,8 @@ pub trait BaseIO: IOInterface {
                         json_encode_ex(&PhpMixed::Array(ssl_options), 0).unwrap_or_default();
                     self.check_and_set_authentication(
                         domain,
-                        "client-certificate".to_string(),
-                        Some(json_str),
+                        BString::from("client-certificate"),
+                        Some(BString::from(json_str)),
                     );
                 }
             }

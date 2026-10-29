@@ -21,7 +21,8 @@ use shirabe_symfony_console::question::{ChoiceQuestion, Question, QuestionInterf
 /// The Input/Output helper.
 #[derive(Debug)]
 pub struct ConsoleIO {
-    authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
+    authentications:
+        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>,
 
     pub(crate) input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     pub(crate) output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
@@ -508,15 +509,20 @@ impl IOInterfaceImmutable for ConsoleIO {
         ))
     }
 
-    fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>> {
+    fn get_authentications(
+        &self,
+    ) -> IndexMap<bstr::BString, IndexMap<String, Option<bstr::BString>>> {
         <Self as BaseIO>::get_authentications(self)
     }
 
-    fn has_authentication(&self, repository_name: &str) -> bool {
+    fn has_authentication(&self, repository_name: &bstr::BStr) -> bool {
         <Self as BaseIO>::has_authentication(self, repository_name)
     }
 
-    fn get_authentication(&self, repository_name: &str) -> IndexMap<String, Option<String>> {
+    fn get_authentication(
+        &self,
+        repository_name: &bstr::BStr,
+    ) -> IndexMap<String, Option<bstr::BString>> {
         <Self as BaseIO>::get_authentication(self, repository_name)
     }
 
@@ -536,9 +542,9 @@ impl IOInterfaceImmutable for ConsoleIO {
 impl IOInterfaceMutable for ConsoleIO {
     fn set_authentication(
         &mut self,
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: bstr::BString,
+        username: bstr::BString,
+        password: Option<bstr::BString>,
     ) {
         <Self as BaseIO>::set_authentication(self, repository_name, username, password)
     }
@@ -565,13 +571,14 @@ impl IOInterface for ConsoleIO {
 impl BaseIO for ConsoleIO {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
         &self.authentications
     }
 
     fn authentications_mut(
         &mut self,
-    ) -> &mut indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &mut indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>
+    {
         &mut self.authentications
     }
 }

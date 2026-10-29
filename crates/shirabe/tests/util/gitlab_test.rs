@@ -96,7 +96,11 @@ fn test_username_password_authentication_flow() {
 
     assert!(
         gitlab
-            .authorize_oauth_interactively("http", ORIGIN, Some(MESSAGE))
+            .authorize_oauth_interactively(
+                bstr::BStr::new("http"),
+                bstr::BStr::new(ORIGIN),
+                Some(MESSAGE)
+            )
             .unwrap()
     );
 }
@@ -142,7 +146,7 @@ fn test_username_password_failure() {
     let mut gitlab = GitLab::new(io, config, None, Some(http_downloader)).unwrap();
 
     let err = gitlab
-        .authorize_oauth_interactively("https", ORIGIN, None)
+        .authorize_oauth_interactively(bstr::BStr::new("https"), bstr::BStr::new(ORIGIN), None)
         .unwrap_err();
     assert_eq!(
         err.to_string(),

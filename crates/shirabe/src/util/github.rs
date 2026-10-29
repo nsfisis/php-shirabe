@@ -4,11 +4,11 @@ use crate::config::Config;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, date_local, in_array_loose, legacy_lossy, php_regex, preg_is_match,
-    preg_match, rawurlencode, str_replace, stripos, strtolower,
+    Catch as _, PhpMixed, bconcat, date_local, explode_limit, in_array_loose, intval, legacy_lossy,
+    php_regex, preg_is_match, preg_match, rawurlencode, str_replace, stripos, strtolower, trim,
 };
 
 #[derive(Debug)]
@@ -50,13 +50,13 @@ impl GitHub {
         })
     }
 
-    pub fn authorize_oauth(&mut self, origin_url: &str) -> anyhow::Result<bool> {
+    pub fn authorize_oauth(&mut self, origin_url: &BStr) -> anyhow::Result<bool> {
         let github_domains = self.config.borrow_mut().get("github-domains");
-        if !in_array_loose(origin_url.to_string(), github_domains.values()) {
+        if !in_array_loose(PhpMixed::string(origin_url), github_domains.values()) {
             return Ok(false);
         }
 
-        let mut output = String::new();
+        let mut output = BString::default();
         if self.process.borrow_mut().execute(
             &[
                 "git".to_string(),
@@ -68,9 +68,9 @@ impl GitHub {
         )? == 0
         {
             self.io.borrow_mut().set_authentication(
-                origin_url.to_string(),
-                output.trim().to_string(),
-                Some("x-oauth-basic".to_string()),
+                origin_url.into(),
+                trim(&output),
+                Some(BString::from("x-oauth-basic")),
             );
             return Ok(true);
         }
@@ -80,7 +80,7 @@ impl GitHub {
 
     pub fn authorize_oauth_interactively(
         &mut self,
-        origin_url: &str,
+        origin_url: &BStr,
         message: Option<&str>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
@@ -95,14 +95,14 @@ impl GitHub {
             .as_bool()
             .unwrap_or(false);
         if expose_hostname {
-            let mut output = String::new();
+            let mut output = BString::default();
             if self
                 .process
                 .borrow_mut()
                 .execute(&["hostname".to_string()], &mut output, None)?
                 == 0
             {
-                note += &format!(" on {}", output.trim());
+                note += &format!(" on {}", legacy_lossy(&trim(&output)));
             }
         }
         note += &format!(" {}", date_local("Y-m-d Hi", None));
@@ -139,7 +139,8 @@ impl GitHub {
             "Use the following URL to create such a token:".to_string(),
             format!(
                 "https://{}/settings/personal-access-tokens/new?name={}",
-                origin_url, legacy_lossy(&encoded_note)
+                origin_url.display_lossy(),
+                encoded_note.display_lossy()
             ),
             String::new(),
         ];
@@ -152,7 +153,8 @@ impl GitHub {
             "to the right user or organisation. Additionally, you can scope permissions down to apply only to selected repositories.".to_string(),
             format!(
                 "https://{}/settings/personal-access-tokens/new?contents=read&name={}",
-                origin_url, legacy_lossy(&encoded_note)
+                origin_url.display_lossy(),
+                encoded_note.display_lossy()
             ),
             String::new(),
         ];
@@ -166,7 +168,8 @@ impl GitHub {
             "is not an option. You can generate a classic token here:".to_string(),
             format!(
                 "https://{}/settings/tokens/new?scopes=repo&description={}",
-                origin_url, legacy_lossy(&encoded_note)
+                origin_url.display_lossy(),
+                encoded_note.display_lossy()
             ),
             String::new(),
         ];
@@ -189,12 +192,11 @@ impl GitHub {
             )?;
         }
 
-        let token = self
-            .io
-            .ask_and_hide_answer("Token (hidden): ".to_string())?
-            .unwrap_or_default()
-            .trim()
-            .to_string();
+        let token = trim(
+            self.io
+                .ask_and_hide_answer("Token (hidden): ".to_string())?
+                .unwrap_or_default(),
+        );
 
         if token.is_empty() {
             self.io.write_error3(
@@ -211,15 +213,15 @@ impl GitHub {
         }
 
         self.io.borrow_mut().set_authentication(
-            origin_url.to_string(),
+            origin_url.into(),
             token.clone(),
-            Some("x-oauth-basic".to_string()),
+            Some(BString::from("x-oauth-basic")),
         );
 
         let api_url = if origin_url == "github.com" {
-            "api.github.com/".to_string()
+            BString::from("api.github.com/")
         } else {
-            format!("{}/api/v3/", origin_url)
+            bconcat!(origin_url, "/api/v3/")
         };
 
         let mut http_options: indexmap::IndexMap<BString, PhpMixed> = indexmap::IndexMap::new();
@@ -228,7 +230,7 @@ impl GitHub {
         match self
             .http_downloader
             .borrow_mut()
-            .get(&format!("https://{}", api_url), http_options)
+            .get(&legacy_lossy(&bconcat!("https://", api_url)), http_options)
         {
             Ok(_) => {}
             Err(te) => {
@@ -259,7 +261,7 @@ impl GitHub {
                 .borrow()
                 .get_local_auth_config_source()
                 .is_some();
-        let key = format!("github-oauth.{}", origin_url);
+        let key = legacy_lossy(&bconcat!("github-oauth.", origin_url)).into_owned();
         {
             let mut cfg = self.config.borrow_mut();
             cfg.get_config_source_mut().remove_config_setting(&key)?;
@@ -284,28 +286,27 @@ impl GitHub {
         Ok(true)
     }
 
-    pub fn get_rate_limit(&self, headers: &[String]) -> indexmap::IndexMap<BString, PhpMixed> {
+    pub fn get_rate_limit(&self, headers: &[BString]) -> indexmap::IndexMap<BString, PhpMixed> {
         let mut rate_limit = indexmap::IndexMap::new();
-        rate_limit.insert("limit".into(), PhpMixed::string("?".to_string()));
-        rate_limit.insert("reset".into(), PhpMixed::string("?".to_string()));
+        rate_limit.insert("limit".into(), PhpMixed::string("?"));
+        rate_limit.insert("reset".into(), PhpMixed::string("?"));
 
         for header in headers {
-            let header = header.trim();
-            if stripos(header, "x-ratelimit-").is_none() {
+            let header = trim(header);
+            if stripos(&header, "x-ratelimit-").is_none() {
                 continue;
             }
-            let parts: Vec<&str> = header.splitn(2, ':').collect();
-            if parts.len() < 2 {
-                continue;
-            }
-            let (r#type, value) = (parts[0], parts[1]);
+            let parts = explode_limit(":", &header, 2);
+            let [r#type, value] = parts.as_slice() else {
+                panic!("explode() of a header containing no ':' yields a single part");
+            };
             match strtolower(r#type).as_slice() {
                 b"x-ratelimit-limit" => {
-                    let v: i64 = value.trim().parse().unwrap_or(0);
+                    let v = intval(&PhpMixed::string(trim(value)));
                     rate_limit.insert("limit".into(), PhpMixed::Int(v));
                 }
                 b"x-ratelimit-reset" => {
-                    let ts: i64 = value.trim().parse().unwrap_or(0);
+                    let ts = intval(&PhpMixed::string(trim(value)));
                     rate_limit.insert(
                         "reset".into(),
                         PhpMixed::string(date_local("Y-m-d H:i:s", Some(ts))),
@@ -318,23 +319,23 @@ impl GitHub {
         rate_limit
     }
 
-    pub fn get_sso_url(&self, headers: &[String]) -> Option<String> {
+    pub fn get_sso_url(&self, headers: &[BString]) -> Option<BString> {
         for header in headers {
-            let header = header.trim();
-            if stripos(header, "x-github-sso: required").is_none() {
+            let header = trim(header);
+            if stripos(&header, "x-github-sso: required").is_none() {
                 continue;
             }
-            if let Some(caps) = preg_match(php_regex!(r"{\burl=(?P<url>[^\s;]+)}"), header) {
-                return caps.name("url").map(|s| legacy_lossy(s).into_owned());
+            if let Some(caps) = preg_match(php_regex!(r"{\burl=(?P<url>[^\s;]+)}"), &header) {
+                return caps.name("url").map(BString::from);
             }
         }
 
         None
     }
 
-    pub fn is_rate_limited(&self, headers: &[String]) -> bool {
+    pub fn is_rate_limited(&self, headers: &[BString]) -> bool {
         for header in headers {
-            if preg_is_match(php_regex!(r"{^x-ratelimit-remaining: *0$}i"), header.trim()) {
+            if preg_is_match(php_regex!(r"{^x-ratelimit-remaining: *0$}i"), trim(header)) {
                 return true;
             }
         }
@@ -342,9 +343,9 @@ impl GitHub {
         false
     }
 
-    pub fn requires_sso(&self, headers: &[String]) -> bool {
+    pub fn requires_sso(&self, headers: &[BString]) -> bool {
         for header in headers {
-            if preg_is_match(php_regex!(r"{^x-github-sso: required}i"), header.trim()) {
+            if preg_is_match(php_regex!(r"{^x-github-sso: required}i"), trim(header)) {
                 return true;
             }
         }

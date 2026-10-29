@@ -12,7 +12,7 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, base64_decode, bconcat, date_create, explode,
-    extension_loaded, legacy_lossy, php_regex, preg_match, urlencode,
+    extension_loaded, legacy_lossy, path_from_bytes, php_regex, preg_match, strtolower, urlencode,
 };
 
 #[derive(Debug)]
@@ -44,29 +44,28 @@ impl ForgejoDriver {
     }
 
     pub fn initialize(&mut self) -> anyhow::Result<()> {
-        let forgejo_url = ForgejoUrl::create(&legacy_lossy(&self.inner.url))?;
-        self.inner.origin_url = bstr::BString::from(forgejo_url.origin_url.clone());
+        let forgejo_url = ForgejoUrl::create(self.inner.url.as_bstr())?;
+        self.inner.origin_url = forgejo_url.origin_url.clone();
 
-        let cache_dir = format!(
-            "{}/{}/{}/{}",
-            legacy_lossy(
-                &self
-                    .inner
-                    .config
-                    .borrow_mut()
-                    .get(&legacy_lossy(b"cache-repo-dir".as_slice()))
-                    .as_string()
-                    .unwrap_or_default()
-            ),
+        let cache_dir = bconcat!(
+            self.inner
+                .config
+                .borrow_mut()
+                .get(&legacy_lossy(b"cache-repo-dir".as_slice()))
+                .as_string()
+                .unwrap_or_default(),
+            "/",
             forgejo_url.origin_url,
+            "/",
             forgejo_url.owner,
+            "/",
             forgejo_url.repository
         );
         self.forgejo_url = Some(forgejo_url);
 
         self.inner.cache = Some(Cache::new(
             self.inner.io.clone(),
-            &cache_dir,
+            path_from_bytes(&cache_dir),
             None,
             None,
             false,
@@ -97,13 +96,8 @@ impl ForgejoDriver {
         }
 
         let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-        let resource_url = format!(
-            "{}/contents/{}?ref={}",
-            api_url,
-            legacy_lossy(&file),
-            legacy_lossy(&urlencode(identifier))
-        );
-        let response = self.get_contents(bstr::BStr::new(&resource_url), false)??;
+        let resource_url = bconcat!(api_url, "/contents/", file, "?ref=", urlencode(identifier));
+        let response = self.get_contents(resource_url.as_bstr(), false)??;
         let mut resource = response.decode_json()?;
 
         // The Forgejo contents API only returns files up to 1MB as base64 encoded files;
@@ -180,13 +174,14 @@ impl ForgejoDriver {
         }
 
         let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-        let resource_url = format!(
-            "{}/git/commits/{}?verification=false&files=false",
+        let resource_url = bconcat!(
             api_url,
-            legacy_lossy(&urlencode(identifier))
+            "/git/commits/",
+            urlencode(identifier),
+            "?verification=false&files=false"
         );
         let commit = self
-            .get_contents(bstr::BStr::new(&resource_url), false)??
+            .get_contents(resource_url.as_bstr(), false)??
             .decode_json()?;
 
         let date_str = if let PhpMixed::Array(ref arr) = commit {
@@ -233,10 +228,10 @@ impl ForgejoDriver {
         if self.branches.is_none() {
             let mut branches = IndexMap::new();
             let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-            let mut resource: Option<String> = Some(format!("{}/branches?per_page=100", api_url));
+            let mut resource: Option<BString> = Some(bconcat!(api_url, "/branches?per_page=100"));
 
             while let Some(url) = resource {
-                let response = self.get_contents(bstr::BStr::new(&url), false)??;
+                let response = self.get_contents(url.as_bstr(), false)??;
                 let branch_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = branch_data {
                     for branch in list {
@@ -257,9 +252,7 @@ impl ForgejoDriver {
                         }
                     }
                 }
-                resource = self
-                    .get_next_page(&response)
-                    .map(|s| legacy_lossy(&s).into_owned());
+                resource = self.get_next_page(&response);
             }
 
             self.branches = Some(branches);
@@ -276,10 +269,10 @@ impl ForgejoDriver {
         if self.tags.is_none() {
             let mut tags = IndexMap::new();
             let api_url = self.forgejo_url.as_ref().unwrap().api_url.clone();
-            let mut resource: Option<String> = Some(format!("{}/tags?per_page=100", api_url));
+            let mut resource: Option<BString> = Some(bconcat!(api_url, "/tags?per_page=100"));
 
             while let Some(url) = resource {
-                let response = self.get_contents(bstr::BStr::new(&url), false)??;
+                let response = self.get_contents(url.as_bstr(), false)??;
                 let tags_data = response.decode_json()?;
                 if let PhpMixed::List(ref list) = tags_data {
                     for tag in list {
@@ -300,9 +293,7 @@ impl ForgejoDriver {
                         }
                     }
                 }
-                resource = self
-                    .get_next_page(&response)
-                    .map(|s| legacy_lossy(&s).into_owned());
+                resource = self.get_next_page(&response);
             }
 
             self.tags = Some(tags);
@@ -312,12 +303,11 @@ impl ForgejoDriver {
     }
 
     pub fn get_dist(&self, identifier: &BStr) -> Option<IndexMap<BString, BString>> {
-        let url = BString::from(
-            &format!(
-                "{}/archive/{}.zip",
-                self.forgejo_url.as_ref().unwrap().api_url,
-                legacy_lossy(&identifier)
-            )[..],
+        let url = bconcat!(
+            self.forgejo_url.as_ref().unwrap().api_url,
+            "/archive/",
+            identifier,
+            ".zip"
         );
         let mut map = IndexMap::new();
         map.insert(BString::from("type"), BString::from("zip"));
@@ -498,7 +488,7 @@ impl ForgejoDriver {
         url: &BStr,
         _deep: bool,
     ) -> anyhow::Result<bool> {
-        let forgejo_url = ForgejoUrl::try_from(Some(&*legacy_lossy(url)));
+        let forgejo_url = ForgejoUrl::try_from(Some(url));
         if forgejo_url.is_none() {
             return Ok(false);
         }
@@ -509,9 +499,8 @@ impl ForgejoDriver {
             .get(&legacy_lossy(b"forgejo-domains".as_slice()));
         let in_domains = if let Some(list) = forgejo_domains.as_list() {
             list.iter().any(|d| {
-                d.as_string().is_some_and(|s| {
-                    s.to_str_lossy().to_lowercase() == forgejo_url.origin_url.to_lowercase()
-                })
+                d.as_string()
+                    .is_some_and(|s| s == strtolower(&forgejo_url.origin_url))
             })
         } else {
             false
@@ -631,7 +620,7 @@ impl ForgejoDriver {
                 if !self
                     .inner
                     .io
-                    .has_authentication(&legacy_lossy(&self.inner.origin_url))
+                    .has_authentication(self.inner.origin_url.as_bstr())
                 {
                     let origin_url = self.forgejo_url.as_ref().unwrap().origin_url.clone();
                     let message = if e.get_code() == 429 {
@@ -650,7 +639,7 @@ impl ForgejoDriver {
                         self.inner.http_downloader.clone(),
                     );
                     let auth_result = forgejo.authorize_o_auth_interactively(
-                        &origin_url,
+                        origin_url.as_bstr(),
                         message.as_ref().map(|m| legacy_lossy(m)).as_deref(),
                     )?;
 
@@ -668,13 +657,13 @@ impl ForgejoDriver {
     // Returns true on success, throws on failure.
     fn attempt_clone_fallback(&mut self) -> anyhow::Result<bool> {
         let ssh_url = self.forgejo_url.as_ref().unwrap().generate_ssh_url();
-        match self.setup_git_driver(bstr::BStr::new(&ssh_url)) {
+        match self.setup_git_driver(ssh_url.as_bstr()) {
             Ok(()) => Ok(true),
             Err(e) => {
                 self.git_driver = None;
                 self.inner.io.write_error3(&format!(
                     "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your Forgejo credentials</error>",
-                    ssh_url
+                    ssh_url.display_lossy()
                 ), true, io_interface::NORMAL);
                 Err(e)
             }

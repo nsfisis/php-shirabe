@@ -269,30 +269,18 @@ impl HttpDownloader {
         options: IndexMap<BString, PhpMixed>,
     ) -> (IndexMap<BString, PhpMixed>, String) {
         let options = array_replace_recursive(self.options.clone(), options);
-        let origin = legacy_lossy(&Url::get_origin(&self.config.borrow(), url)).into_owned();
+        let origin = Url::get_origin(&self.config.borrow(), url);
 
         // capture username/password from URL if there is one
         if let Some(m) = preg_match(php_regex!(r"{^https?://([^:/]+):([^@/]+)@([^/]+)}i"), url) {
             self.io.borrow_mut().set_authentication(
                 origin.clone(),
-                legacy_lossy(&rawurldecode(
-                    legacy_lossy(m.get(1).unwrap_or_default())
-                        .into_owned()
-                        .as_str(),
-                ))
-                .into_owned(),
-                Some(
-                    legacy_lossy(&rawurldecode(
-                        legacy_lossy(m.get(2).unwrap_or_default())
-                            .into_owned()
-                            .as_str(),
-                    ))
-                    .into_owned(),
-                ),
+                rawurldecode(m.get(1).unwrap_or_default()),
+                Some(rawurldecode(m.get(2).unwrap_or_default())),
             );
         }
 
-        (options, origin)
+        (options, legacy_lossy(&origin).into_owned())
     }
 
     /// The job behind `add()` / `add_copy()` for a caller that registers it instead of awaiting it

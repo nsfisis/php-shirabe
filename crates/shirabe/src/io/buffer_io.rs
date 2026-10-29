@@ -214,16 +214,16 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
     }
     fn get_authentications(
         &self,
-    ) -> indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
         self.inner.get_authentications()
     }
-    fn has_authentication(&self, repository_name: &str) -> bool {
+    fn has_authentication(&self, repository_name: &bstr::BStr) -> bool {
         self.inner.has_authentication(repository_name)
     }
     fn get_authentication(
         &self,
-        repository_name: &str,
-    ) -> indexmap::IndexMap<String, Option<String>> {
+        repository_name: &bstr::BStr,
+    ) -> indexmap::IndexMap<String, Option<bstr::BString>> {
         self.inner.get_authentication(repository_name)
     }
     fn error(&self, message: &str, context: &[(&str, &str)]) {
@@ -242,9 +242,9 @@ impl crate::io::IOInterfaceImmutable for BufferIO {
 impl crate::io::IOInterfaceMutable for BufferIO {
     fn set_authentication(
         &mut self,
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: bstr::BString,
+        username: bstr::BString,
+        password: Option<bstr::BString>,
     ) {
         self.inner
             .set_authentication(repository_name, username, password)
@@ -271,12 +271,13 @@ impl crate::io::IOInterface for BufferIO {
 impl crate::io::BaseIO for BufferIO {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
         self.inner.authentications()
     }
     fn authentications_mut(
         &mut self,
-    ) -> &mut indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &mut indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>
+    {
         self.inner.authentications_mut()
     }
 }

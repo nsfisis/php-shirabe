@@ -114,7 +114,7 @@ fn test_username_password_authentication_flow() {
 
     assert!(
         github
-            .authorize_oauth_interactively(ORIGIN, Some(MESSAGE))
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), Some(MESSAGE))
             .unwrap()
     );
     // removeConfigSetting('github-oauth.<origin>') verified on the conf source mock drop.
@@ -147,5 +147,9 @@ fn test_username_password_failure() {
 
     let mut github = build_github(&io_mock, config, http_downloader);
 
-    assert!(!github.authorize_oauth_interactively(ORIGIN, None).unwrap());
+    assert!(
+        !github
+            .authorize_oauth_interactively(bstr::BStr::new(ORIGIN), None)
+            .unwrap()
+    );
 }

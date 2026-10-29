@@ -78,9 +78,12 @@ fn test_get_options_for_url_with_authorization() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let mut auth: IndexMap<String, Option<String>> = IndexMap::new();
-    auth.insert("username".to_string(), Some("login".to_string()));
-    auth.insert("password".to_string(), Some("password".to_string()));
+    let mut auth: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
+    auth.insert("username".to_string(), Some(bstr::BString::from("login")));
+    auth.insert(
+        "password".to_string(),
+        Some(bstr::BString::from("password")),
+    );
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(
             IOStub::new()
@@ -111,7 +114,7 @@ fn test_get_options_for_url_with_stream_options() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let mut auth: IndexMap<String, Option<String>> = IndexMap::new();
+    let mut auth: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
     auth.insert("username".to_string(), None);
     auth.insert("password".to_string(), None);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =
@@ -152,7 +155,7 @@ fn test_get_options_for_url_with_call_options_keeps_header() {
     // TODO(plugin): the PHP RemoteFilesystem instance cannot be built in the worker yet: the
     // IOStub mock has no proxy stub, IOInterface::debug is not served over RPC, and the
     // AuthHelper the constructor builds is guarded there.
-    let mut auth: IndexMap<String, Option<String>> = IndexMap::new();
+    let mut auth: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
     auth.insert("username".to_string(), None);
     auth.insert("password".to_string(), None);
     let io: std::rc::Rc<std::cell::RefCell<dyn IOInterface>> =

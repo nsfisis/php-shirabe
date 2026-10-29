@@ -25,7 +25,7 @@ use crate::downloader::{MaxFileSizeExceededException, TransportException};
 use crate::io::{IOInterface, IOInterfaceImmutable};
 use crate::util::http::{NativeHttpResponse, ProxyManager, Response};
 use crate::util::{AuthHelper, HttpDownloader, Platform, PromptAuthResult, StoreAuth, Url};
-use bstr::{B, BString};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     PHP_EOL, PhpMixed, bconcat, implode, in_array_loose, in_array_strict, json_decode_assoc,
@@ -223,8 +223,8 @@ impl NativeHttpDownloader {
             // resulting header/method/content/timeout/ssl/max_file_size, so do it here per send.
             let send_options = self.auth_helper.borrow_mut().add_authentication_options(
                 options.clone(),
-                &current_origin,
-                &current_url,
+                BStr::new(&current_origin),
+                BStr::new(&current_url),
             )?;
             let send_options =
                 crate::util::StreamContextFactory::init_options(&current_url, send_options, true)
@@ -485,7 +485,9 @@ impl NativeHttpDownloader {
                 Some(PhpMixed::Bool(b)) => StoreAuth::Bool(b),
                 _ => StoreAuth::Bool(false),
             };
-            self.auth_helper.borrow().store_auth(origin, store_auth)?;
+            self.auth_helper
+                .borrow()
+                .store_auth(BStr::new(origin), store_auth)?;
         }
 
         // Atomic rename of the `~` temp file to its final name (file mode).
@@ -767,13 +769,18 @@ impl NativeHttpDownloader {
             let status_message = response.inner.get_status_message();
             let body = response.inner.get_body().map(|s| s.to_string());
             let result = self.auth_helper.borrow_mut().prompt_auth_if_needed(
-                url,
-                origin,
+                BStr::new(url),
+                BStr::new(origin),
                 response.inner.get_status_code(),
-                status_message.as_deref(),
-                response.inner.get_headers().clone(),
+                status_message.as_deref().map(BStr::new),
+                response
+                    .inner
+                    .get_headers()
+                    .iter()
+                    .map(|header| BString::from(header.as_str()))
+                    .collect(),
                 retries,
-                body.as_deref(),
+                body.as_deref().map(BStr::new),
             )?;
 
             if result.retry {
@@ -786,7 +793,10 @@ impl NativeHttpDownloader {
 
         // check for bitbucket login page asking to authenticate
         if origin == "bitbucket.org"
-            && !self.auth_helper.borrow().is_public_bit_bucket_download(url)
+            && !self
+                .auth_helper
+                .borrow()
+                .is_public_bit_bucket_download(BStr::new(url))
             && substr(url, -4, None) == ".zip"
             && (location_header.is_none()
                 || substr(location_header.as_deref().unwrap_or_default(), -4, None) != ".zip")
@@ -817,8 +827,8 @@ impl NativeHttpDownloader {
         if let Some(msg) = needs_auth_retry {
             if retry_auth_failure {
                 let result = self.auth_helper.borrow_mut().prompt_auth_if_needed(
-                    url,
-                    origin,
+                    BStr::new(url),
+                    BStr::new(origin),
                     401,
                     None,
                     Vec::new(),

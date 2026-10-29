@@ -5,11 +5,11 @@ use crate::downloader::TransportException;
 use crate::factory::Factory;
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    Catch as _, PhpMixed, RuntimeException, http_build_query, in_array_strict, json_decode_assoc,
-    legacy_lossy, php_regex, preg_replace, time,
+    Catch as _, PhpMixed, RuntimeException, bconcat, http_build_query, in_array_strict,
+    json_decode_assoc, legacy_lossy, php_regex, preg_replace, time, trim,
 };
 
 #[derive(Debug)]
@@ -48,19 +48,22 @@ impl GitLab {
         })
     }
 
-    pub fn authorize_oauth(&mut self, origin_url: &str) -> anyhow::Result<bool> {
+    pub fn authorize_oauth(&mut self, origin_url: &BStr) -> anyhow::Result<bool> {
         // before composer 1.9, origin URLs had no port number in them
         let bc_origin_url = preg_replace(php_regex!("{:\\d+}"), "", origin_url);
 
         let gitlab_domains = self.config.borrow_mut().get("gitlab-domains");
-        if !in_array_strict(origin_url.to_string(), gitlab_domains.values())
-            && !in_array_strict(bc_origin_url.clone(), gitlab_domains.values())
+        if !in_array_strict(PhpMixed::string(origin_url), gitlab_domains.values())
+            && !in_array_strict(
+                PhpMixed::string(bc_origin_url.clone()),
+                gitlab_domains.values(),
+            )
         {
             return Ok(false);
         }
 
         // if available use token from git config
-        let mut output = String::new();
+        let mut output = BString::default();
         if self.process.borrow_mut().execute(
             &[
                 "git".to_string(),
@@ -72,16 +75,16 @@ impl GitLab {
         )? == 0
         {
             self.io.borrow_mut().set_authentication(
-                origin_url.to_string(),
-                output.trim().to_string(),
-                Some("oauth2".to_string()),
+                origin_url.into(),
+                trim(&output),
+                Some(BString::from("oauth2")),
             );
             return Ok(true);
         }
 
         // if available use deploy token from git config
-        let mut token_user = String::new();
-        let mut token_password = String::new();
+        let mut token_user = BString::default();
+        let mut token_password = BString::default();
         if self.process.borrow_mut().execute(
             &[
                 "git".to_string(),
@@ -102,9 +105,9 @@ impl GitLab {
             )? == 0
         {
             self.io.borrow_mut().set_authentication(
-                origin_url.to_string(),
-                token_user.trim().to_string(),
-                Some(token_password.trim().to_string()),
+                origin_url.into(),
+                trim(&token_user),
+                Some(trim(&token_password)),
             );
             return Ok(true);
         }
@@ -115,10 +118,10 @@ impl GitLab {
         let mut token: Option<PhpMixed> = None;
 
         if let Some(map) = auth_tokens.as_array() {
-            if let Some(t) = map.get(B(origin_url)) {
+            if let Some(t) = map.get(origin_url) {
                 token = Some(t.clone());
             }
-            if let Some(t) = map.get(B(&bc_origin_url)) {
+            if let Some(t) = map.get(&bc_origin_url) {
                 token = Some(t.clone());
             }
         }
@@ -126,23 +129,21 @@ impl GitLab {
         if let Some(token) = token {
             let (username, password) = match &token {
                 PhpMixed::Array(arr) => {
-                    let username = legacy_lossy(
+                    let username = BString::from(
                         arr.get(B("username"))
                             .and_then(|v| v.as_string())
                             .unwrap_or_default(),
-                    )
-                    .into_owned();
-                    let password = legacy_lossy(
+                    );
+                    let password = BString::from(
                         arr.get(B("token"))
                             .and_then(|v| v.as_string())
                             .unwrap_or("private-token".into()),
-                    )
-                    .into_owned();
+                    );
                     (username, password)
                 }
                 _ => {
-                    let username = legacy_lossy(token.as_string().unwrap_or_default()).into_owned();
-                    let password = "private-token".to_string();
+                    let username = BString::from(token.as_string().unwrap_or_default());
+                    let password = BString::from("private-token");
                     (username, password)
                 }
             };
@@ -150,15 +151,17 @@ impl GitLab {
             // Composer expects the GitLab token to be stored as username and 'private-token' or
             // 'gitlab-ci-token' to be stored as password. Detect cases where this is reversed
             // and automatically resolve it.
-            if ["private-token", "gitlab-ci-token", "oauth2"].contains(&username.as_str()) {
+            if [B("private-token"), B("gitlab-ci-token"), B("oauth2")]
+                .contains(&username.as_slice())
+            {
                 self.io.borrow_mut().set_authentication(
-                    origin_url.to_string(),
+                    origin_url.into(),
                     password,
                     Some(username),
                 );
             } else {
                 self.io.borrow_mut().set_authentication(
-                    origin_url.to_string(),
+                    origin_url.into(),
                     username,
                     Some(password),
                 );
@@ -172,8 +175,8 @@ impl GitLab {
 
     pub fn authorize_oauth_interactively(
         &mut self,
-        scheme: &str,
-        origin_url: &str,
+        scheme: &BStr,
+        origin_url: &BStr,
         message: Option<&str>,
     ) -> anyhow::Result<bool> {
         if let Some(msg) = message {
@@ -188,9 +191,14 @@ impl GitLab {
         let has_local_auth_config = local_auth_config_name.is_some();
         let personal_access_token_link = format!(
             "{}://{}/-/user_settings/personal_access_tokens",
-            scheme, origin_url
+            scheme.display_lossy(),
+            origin_url.display_lossy()
         );
-        let revoke_link = format!("{}://{}/-/user_settings/applications", scheme, origin_url);
+        let revoke_link = format!(
+            "{}://{}/-/user_settings/applications",
+            scheme.display_lossy(),
+            origin_url.display_lossy()
+        );
         self.io.write_error3(
             &format!(
                 "A token will be created and stored in \"{}\", your password will never be stored",
@@ -293,7 +301,7 @@ impl GitLab {
                             self.io.write_error3(
                                 &format!(
                                     "Add it using \"shirabe config --global --auth gitlab-token.{} <token>\"",
-                                    origin_url
+                                    origin_url.display_lossy()
                                 ),
                                 true,
                                 io_interface::NORMAL,
@@ -306,19 +314,18 @@ impl GitLab {
                 }
             };
 
-            let access_token = legacy_lossy(
+            let access_token = BString::from(
                 response
                     .as_array()
                     .and_then(|arr| arr.get(B("access_token")))
                     .and_then(|v| v.as_string())
                     .unwrap_or_default(),
-            )
-            .into_owned();
+            );
 
             self.io.borrow_mut().set_authentication(
-                origin_url.to_string(),
+                origin_url.into(),
                 access_token.clone(),
-                Some("oauth2".to_string()),
+                Some(BString::from("oauth2")),
             );
 
             // store value in user config in auth file
@@ -333,12 +340,12 @@ impl GitLab {
                 let auth_config_source = config.get_local_auth_config_source_mut().unwrap();
                 if has_expires_in {
                     auth_config_source.add_config_setting(
-                        &format!("gitlab-oauth.{}", origin_url),
-                        Self::build_oauth_config(&response, &access_token),
+                        &legacy_lossy(&bconcat!("gitlab-oauth.", origin_url)),
+                        Self::build_oauth_config(&response, access_token.as_ref()),
                     )?;
                 } else {
                     auth_config_source.add_config_setting(
-                        &format!("gitlab-oauth.{}", origin_url),
+                        &legacy_lossy(&bconcat!("gitlab-oauth.", origin_url)),
                         PhpMixed::string(access_token),
                     )?;
                 }
@@ -347,12 +354,12 @@ impl GitLab {
                 let auth_config_source = config.get_auth_config_source_mut();
                 if has_expires_in {
                     auth_config_source.add_config_setting(
-                        &format!("gitlab-oauth.{}", origin_url),
-                        Self::build_oauth_config(&response, &access_token),
+                        &legacy_lossy(&bconcat!("gitlab-oauth.", origin_url)),
+                        Self::build_oauth_config(&response, access_token.as_ref()),
                     )?;
                 } else {
                     auth_config_source.add_config_setting(
-                        &format!("gitlab-oauth.{}", origin_url),
+                        &legacy_lossy(&bconcat!("gitlab-oauth.", origin_url)),
                         PhpMixed::string(access_token),
                     )?;
                 }
@@ -369,8 +376,8 @@ impl GitLab {
 
     pub fn authorize_oauth_refresh(
         &mut self,
-        scheme: &str,
-        origin_url: &str,
+        scheme: &BStr,
+        origin_url: &BStr,
     ) -> anyhow::Result<bool> {
         let response = match self.refresh_token(scheme, origin_url) {
             Ok(r) => r,
@@ -388,19 +395,18 @@ impl GitLab {
             },
         };
 
-        let access_token = legacy_lossy(
+        let access_token = BString::from(
             response
                 .as_array()
                 .and_then(|arr| arr.get(B("access_token")))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default(),
-        )
-        .into_owned();
+        );
 
         self.io.borrow_mut().set_authentication(
-            origin_url.to_string(),
+            origin_url.into(),
             access_token.clone(),
-            Some("oauth2".to_string()),
+            Some(BString::from("oauth2")),
         );
 
         // store value in user config in auth file
@@ -408,17 +414,17 @@ impl GitLab {
             .borrow_mut()
             .get_auth_config_source_mut()
             .add_config_setting(
-                &format!("gitlab-oauth.{}", origin_url),
-                Self::build_oauth_config(&response, &access_token),
+                &legacy_lossy(&bconcat!("gitlab-oauth.", origin_url)),
+                Self::build_oauth_config(&response, access_token.as_ref()),
             )?;
 
         Ok(true)
     }
 
-    fn create_token(&mut self, scheme: &str, origin_url: &str) -> anyhow::Result<PhpMixed> {
+    fn create_token(&mut self, scheme: &BStr, origin_url: &BStr) -> anyhow::Result<PhpMixed> {
         let username = match self.io.ask("Username: ".into(), PhpMixed::Null)? {
-            PhpMixed::String(s) => s.to_str_lossy().into_owned(),
-            _ => String::new(),
+            PhpMixed::String(s) => s,
+            _ => BString::default(),
         };
         let password = self
             .io
@@ -429,9 +435,9 @@ impl GitLab {
 
         let api_url = origin_url;
         let data = http_build_query(&[
-            ("username", username.as_str()),
-            ("password", password.as_str()),
-            ("grant_type", "password"),
+            (B("username"), username.as_slice()),
+            (B("password"), password.as_bytes()),
+            (B("grant_type"), B("password")),
         ]);
         let mut http_inner: IndexMap<BString, PhpMixed> = IndexMap::new();
         http_inner.insert("method".into(), PhpMixed::string("POST".to_string()));
@@ -448,7 +454,7 @@ impl GitLab {
             .http_downloader
             .borrow_mut()
             .get(
-                &format!("{}://{}/oauth/token", scheme, api_url),
+                &legacy_lossy(&bconcat!(scheme, "://", api_url, "/oauth/token")),
                 options.into_iter().collect(),
             )?
             .decode_json()?;
@@ -459,10 +465,10 @@ impl GitLab {
         Ok(token)
     }
 
-    pub fn is_oauth_expired(&self, origin_url: &str) -> bool {
+    pub fn is_oauth_expired(&self, origin_url: &BStr) -> bool {
         let auth_tokens = self.config.borrow_mut().get("gitlab-oauth");
         if let Some(map) = auth_tokens.as_array()
-            && let Some(token_info) = map.get(B(origin_url))
+            && let Some(token_info) = map.get(origin_url)
             && let Some(token_map) = token_info.as_array()
             && let Some(expires_at) = token_map.get(B("expires-at"))
             && let Some(expires_at_int) = expires_at.as_int()
@@ -474,22 +480,22 @@ impl GitLab {
         false
     }
 
-    fn refresh_token(&mut self, scheme: &str, origin_url: &str) -> anyhow::Result<PhpMixed> {
+    fn refresh_token(&mut self, scheme: &BStr, origin_url: &BStr) -> anyhow::Result<PhpMixed> {
         let auth_tokens = self.config.borrow_mut().get("gitlab-oauth");
         let refresh_token = auth_tokens
             .as_array()
-            .and_then(|map| map.get(B(origin_url)))
+            .and_then(|map| map.get(origin_url))
             .and_then(|v| v.as_array())
             .and_then(|token_map| token_map.get(B("refresh-token")))
             .and_then(|v| v.as_string())
-            .map(|s| legacy_lossy(s).into_owned());
+            .map(BString::from);
 
         let refresh_token = match refresh_token {
             Some(t) => t,
             None => {
                 return Err(RuntimeException::new(format!(
                     "No GitLab refresh token present for {}.",
-                    origin_url
+                    origin_url.display_lossy()
                 ))
                 .into());
             }
@@ -498,8 +504,8 @@ impl GitLab {
         let headers = vec!["Content-Type: application/x-www-form-urlencoded".to_string()];
 
         let data = http_build_query(&[
-            ("refresh_token", refresh_token.as_str()),
-            ("grant_type", "refresh_token"),
+            (B("refresh_token"), refresh_token.as_slice()),
+            (B("grant_type"), B("refresh_token")),
         ]);
         let mut http_inner = IndexMap::new();
         http_inner.insert("method".into(), PhpMixed::string("POST".to_string()));
@@ -516,7 +522,7 @@ impl GitLab {
             .http_downloader
             .borrow_mut()
             .get(
-                &format!("{}://{}/oauth/token", scheme, origin_url),
+                &legacy_lossy(&bconcat!(scheme, "://", origin_url, "/oauth/token")),
                 options.into_iter().collect(),
             )?
             .decode_json()?;
@@ -529,7 +535,8 @@ impl GitLab {
         self.io.write_error3(
             &format!(
                 "To revoke access to this token you can visit {}://{}/-/user_settings/applications",
-                scheme, origin_url
+                scheme.display_lossy(),
+                origin_url.display_lossy()
             ),
             true,
             io_interface::VERY_VERBOSE,
@@ -538,7 +545,7 @@ impl GitLab {
         Ok(token)
     }
 
-    fn build_oauth_config(response: &PhpMixed, access_token: &str) -> PhpMixed {
+    fn build_oauth_config(response: &PhpMixed, access_token: &BStr) -> PhpMixed {
         let created_at = response
             .as_array()
             .and_then(|arr| arr.get(B("created_at")))
@@ -549,18 +556,17 @@ impl GitLab {
             .and_then(|arr| arr.get(B("expires_in")))
             .and_then(|v| v.as_int())
             .unwrap_or(0);
-        let refresh_token = legacy_lossy(
+        let refresh_token = BString::from(
             response
                 .as_array()
                 .and_then(|arr| arr.get(B("refresh_token")))
                 .and_then(|v| v.as_string())
                 .unwrap_or_default(),
-        )
-        .into_owned();
+        );
         let mut setting = IndexMap::new();
         setting.insert("expires-at".into(), PhpMixed::Int(created_at + expires_in));
         setting.insert("refresh-token".into(), PhpMixed::string(refresh_token));
-        setting.insert("token".into(), PhpMixed::string(access_token.to_string()));
+        setting.insert("token".into(), PhpMixed::string(access_token));
         PhpMixed::Array(setting)
     }
 }

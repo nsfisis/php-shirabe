@@ -16,7 +16,7 @@ fn test_is_interactive() {
 fn test_has_authentication() {
     let io = NullIO::new();
 
-    assert!(!io.has_authentication("foo"));
+    assert!(!io.has_authentication(bstr::BStr::new("foo")));
 }
 
 #[test]
@@ -32,10 +32,10 @@ fn test_get_authentications() {
 
     assert!(io.get_authentications().is_empty());
 
-    let mut expected: IndexMap<String, Option<String>> = IndexMap::new();
+    let mut expected: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
     expected.insert("username".to_string(), None);
     expected.insert("password".to_string(), None);
-    assert_eq!(expected, io.get_authentication("foo"));
+    assert_eq!(expected, io.get_authentication(bstr::BStr::new("foo")));
 }
 
 #[test]

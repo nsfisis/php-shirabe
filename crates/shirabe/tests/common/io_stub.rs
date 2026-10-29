@@ -27,7 +27,8 @@ impl<T: Clone> CallRecorder<T> {
 
 #[derive(Debug, Default)]
 pub struct IOStub {
-    authentications: indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>>,
+    authentications:
+        indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>,
 
     is_interactive: Option<bool>,
     is_decorated: Option<bool>,
@@ -39,7 +40,7 @@ pub struct IOStub {
     // willReturn that applies to any argument, so a single Option<bool> matches.
     has_authentication: Option<bool>,
     // `getAuthentication` willReturn is a `['username' => ..., 'password' => ...]` array.
-    get_authentication: Option<indexmap::IndexMap<String, Option<String>>>,
+    get_authentication: Option<indexmap::IndexMap<String, Option<bstr::BString>>>,
 
     ask: Option<PhpMixed>,
     // When set, `askAndValidate` invokes the caller's validator with this value and returns/
@@ -60,13 +61,13 @@ pub struct IOStub {
     // Records `setAuthentication` calls. Kept separate from `authentications` so
     // `with_has_authentication`/`with_get_authentication` stay static (matching a PHPUnit
     // `willReturn`) even while `setAuthentication` is invoked.
-    set_authentication_calls: CallRecorder<(String, String, Option<String>)>,
+    set_authentication_calls: CallRecorder<(bstr::BString, bstr::BString, Option<bstr::BString>)>,
     // Records `askAndValidate` calls (question, attempts, default).
     ask_and_validate_calls: CallRecorder<(String, Option<i64>, PhpMixed)>,
     // Records `hasAuthentication` calls.
-    has_authentication_calls: CallRecorder<String>,
+    has_authentication_calls: CallRecorder<bstr::BString>,
     // Records `getAuthentication` calls.
-    get_authentication_calls: CallRecorder<String>,
+    get_authentication_calls: CallRecorder<bstr::BString>,
 }
 
 impl IOStub {
@@ -100,7 +101,7 @@ impl IOStub {
     }
     pub fn with_get_authentication(
         mut self,
-        value: indexmap::IndexMap<String, Option<String>>,
+        value: indexmap::IndexMap<String, Option<bstr::BString>>,
     ) -> Self {
         self.get_authentication = Some(value);
         self
@@ -108,7 +109,10 @@ impl IOStub {
     // Mutator counterpart of `with_get_authentication`, for tests that reconfigure the stub's
     // response between calls (equivalent to PHPUnit's `willReturnCallback` sequencing via
     // `array_shift`).
-    pub fn set_get_authentication(&mut self, value: indexmap::IndexMap<String, Option<String>>) {
+    pub fn set_get_authentication(
+        &mut self,
+        value: indexmap::IndexMap<String, Option<bstr::BString>>,
+    ) {
         self.get_authentication = Some(value);
     }
     pub fn with_ask(mut self, value: PhpMixed) -> Self {
@@ -140,13 +144,13 @@ impl IOStub {
     // `with_has_authentication`/`with_get_authentication` overrides are left unset.
     pub fn with_authentication(
         mut self,
-        repository_name: impl Into<String>,
-        username: impl Into<String>,
+        repository_name: impl Into<bstr::BString>,
+        username: impl Into<bstr::BString>,
         password: Option<String>,
     ) -> Self {
         let mut auth = indexmap::IndexMap::new();
         auth.insert("username".to_string(), Some(username.into()));
-        auth.insert("password".to_string(), password);
+        auth.insert("password".to_string(), password.map(bstr::BString::from));
         self.authentications.insert(repository_name.into(), auth);
         self
     }
@@ -162,7 +166,9 @@ impl IOStub {
     }
 
     // For testing only. Returns the recorded `setAuthentication` calls in call order.
-    pub fn set_authentication_calls(&self) -> Vec<(String, String, Option<String>)> {
+    pub fn set_authentication_calls(
+        &self,
+    ) -> Vec<(bstr::BString, bstr::BString, Option<bstr::BString>)> {
         self.set_authentication_calls.calls()
     }
 
@@ -172,12 +178,12 @@ impl IOStub {
     }
 
     // For testing only. Returns the recorded `hasAuthentication` calls in call order.
-    pub fn has_authentication_calls(&self) -> Vec<String> {
+    pub fn has_authentication_calls(&self) -> Vec<bstr::BString> {
         self.has_authentication_calls.calls()
     }
 
     // For testing only. Returns the recorded `getAuthentication` calls in call order.
-    pub fn get_authentication_calls(&self) -> Vec<String> {
+    pub fn get_authentication_calls(&self) -> Vec<bstr::BString> {
         self.get_authentication_calls.calls()
     }
 }
@@ -257,12 +263,12 @@ impl IOInterfaceImmutable for IOStub {
 
     fn get_authentications(
         &self,
-    ) -> indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
         <Self as BaseIO>::get_authentications(self)
     }
-    fn has_authentication(&self, repository_name: &str) -> bool {
+    fn has_authentication(&self, repository_name: &bstr::BStr) -> bool {
         self.has_authentication_calls
-            .push(repository_name.to_string());
+            .push(repository_name.to_owned());
         match self.has_authentication {
             Some(value) => value,
             None => <Self as BaseIO>::has_authentication(self, repository_name),
@@ -270,10 +276,10 @@ impl IOInterfaceImmutable for IOStub {
     }
     fn get_authentication(
         &self,
-        repository_name: &str,
-    ) -> indexmap::IndexMap<String, Option<String>> {
+        repository_name: &bstr::BStr,
+    ) -> indexmap::IndexMap<String, Option<bstr::BString>> {
         self.get_authentication_calls
-            .push(repository_name.to_string());
+            .push(repository_name.to_owned());
         match &self.get_authentication {
             Some(value) => value.clone(),
             None => <Self as BaseIO>::get_authentication(self, repository_name),
@@ -294,9 +300,9 @@ impl IOInterfaceImmutable for IOStub {
 impl IOInterfaceMutable for IOStub {
     fn set_authentication(
         &mut self,
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: bstr::BString,
+        username: bstr::BString,
+        password: Option<bstr::BString>,
     ) {
         self.set_authentication_calls.push((
             repository_name.clone(),
@@ -322,12 +328,13 @@ impl IOInterface for IOStub {
 impl BaseIO for IOStub {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
         &self.authentications
     }
     fn authentications_mut(
         &mut self,
-    ) -> &mut indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &mut indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>
+    {
         &mut self.authentications
     }
 }

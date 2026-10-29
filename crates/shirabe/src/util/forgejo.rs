@@ -4,8 +4,8 @@ use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
 use crate::util::HttpDownloader;
-use bstr::ByteSlice;
-use shirabe_php_shim::{Catch as _, PhpMixed};
+use bstr::BStr;
+use shirabe_php_shim::{Catch as _, PhpMixed, bconcat, legacy_lossy, trim};
 
 #[derive(Debug)]
 pub struct Forgejo {
@@ -30,14 +30,17 @@ impl Forgejo {
     /// Authorizes a Forgejo domain interactively
     pub fn authorize_o_auth_interactively(
         &mut self,
-        origin_url: &str,
+        origin_url: &BStr,
         message: Option<&str>,
     ) -> anyhow::Result<Result<bool, TransportException>> {
         if let Some(message) = message {
             self.io.write_error3(message, true, io_interface::NORMAL);
         }
 
-        let url = format!("https://{}/user/settings/applications", origin_url);
+        let url = format!(
+            "https://{}/user/settings/applications",
+            origin_url.display_lossy()
+        );
         self.io.write_error3(
             "Setup a personal access token with repository:read permissions on:",
             true,
@@ -82,17 +85,17 @@ impl Forgejo {
             .io
             .ask("Username: ".into(), PhpMixed::Null)?
             .as_string()
-            .map(|s| s.to_str_lossy().trim().to_string())
+            .map(trim)
             .unwrap_or_default();
         let token = self
             .io
             .ask_and_hide_answer("Token (hidden): ".to_string())?
-            .map(|s| s.trim().to_string())
+            .map(trim)
             .unwrap_or_default();
 
         let add_token_manually = format!(
             "You can also add it manually later by using \"shirabe config --global --auth forgejo-token.{} <username> <token>\"",
-            origin_url
+            origin_url.display_lossy()
         );
         if token.is_empty() || username.is_empty() {
             self.io.write_error3(
@@ -107,13 +110,13 @@ impl Forgejo {
         }
 
         self.io.borrow_mut().set_authentication(
-            origin_url.to_string(),
+            origin_url.into(),
             username.clone(),
             Some(token.clone()),
         );
 
         match self.http_downloader.borrow_mut().get(
-            &format!("https://{}/api/v1/version", origin_url),
+            &legacy_lossy(&bconcat!("https://", origin_url, "/api/v1/version")),
             indexmap::indexmap! {
                 "retry-auth-failure".into() => false.into(),
             },
@@ -141,15 +144,15 @@ impl Forgejo {
         }
 
         // store value in local/user config
-        let setting_key = format!("forgejo-token.{}", origin_url);
+        let setting_key = legacy_lossy(&bconcat!("forgejo-token.", origin_url)).into_owned();
         {
             let mut cfg = self.config.borrow_mut();
             cfg.get_config_source_mut()
                 .remove_config_setting(&setting_key)?;
         }
         let value = PhpMixed::Array(indexmap::indexmap! {
-            "username".into() => username.into(),
-            "token".into() => token.into(),
+            "username".into() => PhpMixed::string(username),
+            "token".into() => PhpMixed::string(token),
         });
         if store_in_local_auth_config && has_local_auth {
             let mut cfg = self.config.borrow_mut();

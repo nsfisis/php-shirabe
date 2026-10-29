@@ -390,9 +390,9 @@ impl DiagnoseCommand {
         }
 
         self.get_io().borrow_mut().set_authentication(
-            domain.to_string(),
-            token.to_string(),
-            Some("x-oauth-basic".to_string()),
+            BString::from(domain),
+            BString::from(token),
+            Some(BString::from("x-oauth-basic")),
         );
         let url = if domain == "github.com" {
             format!("https://api.{}/", domain)
@@ -451,9 +451,9 @@ impl DiagnoseCommand {
 
         if let Some(t) = token {
             self.get_io().borrow_mut().set_authentication(
-                domain.to_string(),
-                t.to_string(),
-                Some("x-oauth-basic".to_string()),
+                BString::from(domain),
+                BString::from(t),
+                Some(BString::from("x-oauth-basic")),
             );
         }
 

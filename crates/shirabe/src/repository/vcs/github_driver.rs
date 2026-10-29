@@ -1029,7 +1029,7 @@ impl GitHubDriver {
                             return Ok(Err(e));
                         }
 
-                        if git_hub_util.authorize_oauth(&legacy_lossy(&self.inner.origin_url))? {
+                        if git_hub_util.authorize_oauth(self.inner.origin_url.as_bstr())? {
                             return self.inner.get_contents(url);
                         }
 
@@ -1067,7 +1067,7 @@ impl GitHubDriver {
                             || !scopes_failed.is_empty()
                         {
                             git_hub_util.authorize_oauth_interactively(
-                                &legacy_lossy(&self.inner.origin_url),
+                                self.inner.origin_url.as_bstr(),
                                 Some(&*legacy_lossy(&bconcat!("Your GitHub credentials are required to fetch private repository metadata (<info>", self.inner.url, "</info>)"))),
                             )?;
                         }
@@ -1078,9 +1078,8 @@ impl GitHubDriver {
                         if !self
                             .inner
                             .io
-                            .has_authentication(&legacy_lossy(&self.inner.origin_url))
-                            && git_hub_util
-                                .authorize_oauth(&legacy_lossy(&self.inner.origin_url))?
+                            .has_authentication(self.inner.origin_url.as_bstr())
+                            && git_hub_util.authorize_oauth(self.inner.origin_url.as_bstr())?
                         {
                             return self.inner.get_contents(url);
                         }
@@ -1096,13 +1095,17 @@ impl GitHubDriver {
                             )));
                         }
 
-                        let rate_limited = git_hub_util
-                            .is_rate_limited(e.get_headers().map(|h| h.as_slice()).unwrap_or(&[]));
+                        // TODO(bytes): TransportException holds the response headers as Strings.
+                        let headers: Vec<BString> = e
+                            .get_headers()
+                            .map(|h| h.iter().map(|x| BString::from(x.as_str())).collect())
+                            .unwrap_or_default();
+                        let rate_limited = git_hub_util.is_rate_limited(&headers);
 
                         if !self
                             .inner
                             .io
-                            .has_authentication(&legacy_lossy(&self.inner.origin_url))
+                            .has_authentication(self.inner.origin_url.as_bstr())
                         {
                             if !self.inner.io.is_interactive() {
                                 self.inner.io.write_error3(
@@ -1117,7 +1120,7 @@ impl GitHubDriver {
                             }
 
                             git_hub_util.authorize_oauth_interactively(
-                                &legacy_lossy(&self.inner.origin_url),
+                                self.inner.origin_url.as_bstr(),
                                 Some(&*legacy_lossy(&bconcat!("API limit exhausted. Enter your GitHub credentials to get a larger API limit (<info>", self.inner.url, "</info>)"))),
                             )?;
 
@@ -1125,9 +1128,7 @@ impl GitHubDriver {
                         }
 
                         if rate_limited {
-                            let rate_limit = git_hub_util.get_rate_limit(
-                                e.get_headers().map(|h| h.as_slice()).unwrap_or(&[]),
-                            );
+                            let rate_limit = git_hub_util.get_rate_limit(&headers);
                             self.inner.io.write_error3(
                                 &format!(
                                     "<error>GitHub API limit ({} calls/hr) is exhausted. You are already authorized so you have to wait until {} before doing more requests</error>",

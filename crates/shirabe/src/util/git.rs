@@ -11,9 +11,9 @@ use indexmap::IndexMap;
 use shirabe_php_shim::{
     AnyThrowable, CmpOp, InvalidArgumentException, PHP_EOL, PhpMixed, PregMatches,
     RuntimeException, array_map, bconcat, clearstatcache, explode, explode_with_limit, implode,
-    in_array_loose, in_array_strict, is_dir, legacy_lossy, path_to_bytes, php_regex, preg_is_match,
-    preg_match, preg_quote, preg_replace, rawurldecode, rawurlencode, str_replace_array, strlen,
-    strpos, substr, trim, version_compare,
+    in_array_loose, in_array_strict, is_dir, path_to_bytes, php_regex, preg_is_match, preg_match,
+    preg_quote, preg_replace, rawurldecode, rawurlencode, str_replace_array, strlen, strpos,
+    substr, trim, version_compare,
 };
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -213,14 +213,12 @@ impl Git {
                 php_regex!(r"{^(?:composer|origin)\s+https?://(.+):(.+)@([^/]+)}im"),
                 &output,
             ) {
-                let m3 = legacy_lossy(m.get(3).unwrap_or_default()).into_owned();
-                if !self.io.has_authentication(&m3) {
+                let m3 = m.get(3).unwrap_or_default();
+                if !self.io.has_authentication(m3) {
                     self.io.borrow_mut().set_authentication(
-                        m3,
-                        legacy_lossy(&rawurldecode(m.get(1).unwrap_or_default())).into_owned(),
-                        Some(
-                            legacy_lossy(&rawurldecode(m.get(2).unwrap_or_default())).into_owned(),
-                        ),
+                        m3.to_owned(),
+                        rawurldecode(m.get(1).unwrap_or_default()),
+                        Some(rawurldecode(m.get(2).unwrap_or_default())),
                     );
                 }
             }
@@ -274,8 +272,8 @@ impl Git {
             }
 
             // failed to checkout, first check git accessibility
-            let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
-            if !self.io.has_authentication(&m1) && !self.io.is_interactive() {
+            let m1 = m.get(1).unwrap_or_default();
+            if !self.io.has_authentication(m1) && !self.io.is_interactive() {
                 self.throw_exception(
                     bconcat!(
                         "Failed to clone ",
@@ -301,7 +299,7 @@ impl Git {
             url,
         ) && !in_array_strict("ssh".to_string(), protocols.values());
 
-        let mut auth: Option<IndexMap<String, Option<String>>> = None;
+        let mut auth: Option<IndexMap<String, Option<BString>>> = None;
         let mut credentials: Vec<BString> = vec![];
         if bypass_ssh_for_github
             || 0 != run_commands_inline(
@@ -332,8 +330,8 @@ impl Git {
             if let Some(m) = github_matched {
                 let m1 = m.get(1).unwrap_or_default();
                 let m2 = m.get(2).unwrap_or_default();
-                let origin = legacy_lossy(m1).into_owned();
-                if !self.io.has_authentication(&origin) {
+                let origin = m1;
+                if !self.io.has_authentication(origin) {
                     let mut git_hub_util = GitHub::new(
                         self.io.clone(),
                         self.config.clone(),
@@ -342,13 +340,13 @@ impl Git {
                     )?;
                     let message = "Cloning failed using an ssh key for authentication, enter your GitHub credentials to access private repos";
 
-                    if !git_hub_util.authorize_oauth(&origin)? && self.io.is_interactive() {
-                        git_hub_util.authorize_oauth_interactively(&origin, Some(message))?;
+                    if !git_hub_util.authorize_oauth(origin)? && self.io.is_interactive() {
+                        git_hub_util.authorize_oauth_interactively(origin, Some(message))?;
                     }
                 }
 
-                if self.io.has_authentication(&origin) {
-                    auth = Some(self.io.get_authentication(&origin));
+                if self.io.has_authentication(origin) {
+                    auth = Some(self.io.get_authentication(origin));
                     let auth_inner = auth.as_ref().unwrap();
                     let username = auth_inner
                         .get("username")
@@ -400,28 +398,28 @@ impl Git {
                 )?;
 
                 let domain_bytes = m.get(2).unwrap_or_default();
-                let domain = legacy_lossy(domain_bytes).into_owned();
+                let domain = domain_bytes;
                 let mut repo_with_git_part = m.get(3).unwrap_or_default().to_owned();
                 if !repo_with_git_part.ends_with(b".git") {
                     repo_with_git_part.extend_from_slice(b".git");
                 }
-                if !self.io.has_authentication(&domain) {
+                if !self.io.has_authentication(domain) {
                     let message = "Enter your Bitbucket credentials to access private repos";
 
-                    if !bitbucket_util.authorize_oauth(&domain)? && self.io.is_interactive() {
-                        bitbucket_util.authorize_oauth_interactively(&domain, Some(message))?;
+                    if !bitbucket_util.authorize_oauth(domain)? && self.io.is_interactive() {
+                        bitbucket_util.authorize_oauth_interactively(domain, Some(message))?;
                         let access_token = bitbucket_util.get_token();
                         self.io.borrow_mut().set_authentication(
-                            domain.clone(),
-                            "x-token-auth".to_string(),
+                            domain.to_owned(),
+                            BString::from("x-token-auth"),
                             Some(access_token),
                         );
                     }
                 }
 
                 // First we try to authenticate with whatever we have stored.
-                if self.io.has_authentication(&domain) {
-                    auth = Some(self.io.get_authentication(&domain));
+                if self.io.has_authentication(domain) {
+                    auth = Some(self.io.get_authentication(domain));
                     let mut username = auth
                         .as_ref()
                         .unwrap()
@@ -439,7 +437,7 @@ impl Git {
                     // Bitbucket API tokens use the email address as the username for HTTP API calls and
                     // either the Bitbucket username or 'x-bitbucket-api-token-auth' as the username for git operations.
                     if strpos(&password, "ATAT") == Some(0) {
-                        username = "x-bitbucket-api-token-auth".to_string();
+                        username = BString::from("x-bitbucket-api-token-auth");
                     }
 
                     let auth_url = bconcat!(
@@ -465,20 +463,23 @@ impl Git {
 
                     // We already have an access_token from a previous request.
                     if username != "x-token-auth" {
-                        let access_token =
-                            bitbucket_util.request_token(&domain, &username, &password)?;
+                        let access_token = bitbucket_util.request_token(
+                            domain,
+                            username.as_bstr(),
+                            password.as_bstr(),
+                        )?;
                         if !access_token.is_empty() {
                             self.io.borrow_mut().set_authentication(
-                                domain.clone(),
-                                "x-token-auth".to_string(),
+                                domain.to_owned(),
+                                BString::from("x-token-auth"),
                                 Some(access_token),
                             );
                         }
                     }
                 }
 
-                if self.io.has_authentication(&domain) {
-                    auth = Some(self.io.get_authentication(&domain));
+                if self.io.has_authentication(domain) {
+                    auth = Some(self.io.get_authentication(domain));
                     let username = auth
                         .as_ref()
                         .unwrap()
@@ -556,8 +557,8 @@ impl Git {
                     m1 = "https".into();
                 }
 
-                let origin = legacy_lossy(m2).into_owned();
-                if !self.io.has_authentication(&origin) {
+                let origin = m2;
+                if !self.io.has_authentication(origin) {
                     let mut git_lab_util = GitLab::new(
                         self.io.clone(),
                         self.config.clone(),
@@ -567,17 +568,17 @@ impl Git {
                     let message =
                         "Cloning failed, enter your GitLab credentials to access private repos";
 
-                    if !git_lab_util.authorize_oauth(&origin)? && self.io.is_interactive() {
+                    if !git_lab_util.authorize_oauth(origin)? && self.io.is_interactive() {
                         git_lab_util.authorize_oauth_interactively(
-                            &legacy_lossy(&m1),
-                            &origin,
+                            m1.as_bstr(),
+                            origin,
                             Some(message),
                         )?;
                     }
                 }
 
-                if self.io.has_authentication(&origin) {
-                    auth = Some(self.io.get_authentication(&origin));
+                if self.io.has_authentication(origin) {
+                    auth = Some(self.io.get_authentication(origin));
                     let username = auth
                         .as_ref()
                         .unwrap()
@@ -646,10 +647,10 @@ impl Git {
                     m2 = parts.next().unwrap_or_default();
                 }
 
-                let origin = legacy_lossy(&m2).into_owned();
+                let origin = m2.clone();
                 let mut store_auth: PhpMixed = PhpMixed::Bool(false);
-                if self.io.has_authentication(&origin) {
-                    auth = Some(self.io.get_authentication(&origin));
+                if self.io.has_authentication(origin.as_bstr()) {
+                    auth = Some(self.io.get_authentication(origin.as_bstr()));
                 } else if self.io.is_interactive() {
                     let mut default_username: Option<BString> = None;
                     if let Some(ref parts) = auth_parts
@@ -675,7 +676,7 @@ impl Git {
                         true,
                         io_interface::VERBOSE,
                     );
-                    let mut auth_map: IndexMap<String, Option<String>> = IndexMap::new();
+                    let mut auth_map: IndexMap<String, Option<BString>> = IndexMap::new();
                     auth_map.insert(
                         "username".to_string(),
                         self.io
@@ -686,12 +687,13 @@ impl Git {
                                     .unwrap_or(PhpMixed::Null),
                             )?
                             .as_string()
-                            .map(|s| legacy_lossy(s).into_owned()),
+                            .map(BString::from),
                     );
                     auth_map.insert(
                         "password".to_string(),
                         self.io
-                            .ask_and_hide_answer("      Password: ".to_string())?,
+                            .ask_and_hide_answer("      Password: ".to_string())?
+                            .map(BString::from),
                     );
                     auth = Some(auth_map);
                     store_auth = self.config.borrow_mut().get("store-auths");
@@ -736,7 +738,7 @@ impl Git {
                             PhpMixed::Bool(b) => StoreAuth::Bool(*b),
                             _ => StoreAuth::Bool(false),
                         };
-                        auth_helper.store_auth(&origin, store_auth_enum)?;
+                        auth_helper.store_auth(origin.as_bstr(), store_auth_enum)?;
 
                         return Ok(());
                     }

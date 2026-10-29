@@ -685,8 +685,8 @@ impl GitBitbucketDriver {
             if !self
                 .inner
                 .io
-                .has_authentication(&legacy_lossy(&self.inner.origin_url))
-                && bitbucket_util.authorize_oauth(&legacy_lossy(&self.inner.origin_url))?
+                .has_authentication(self.inner.origin_url.as_bstr())
+                && bitbucket_util.authorize_oauth(self.inner.origin_url.as_bstr())?
             {
                 return Ok(self.inner.get_contents(url)??);
             }

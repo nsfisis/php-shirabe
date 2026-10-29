@@ -62,11 +62,10 @@ impl Hg {
             url,
         );
 
-        // TODO(bytes): IOInterface authentications are keyed and valued by Strings.
         if let Some(matches) = matched
             && self
                 .io
-                .has_authentication(&legacy_lossy(matches.name("host").unwrap_or_default()))
+                .has_authentication(matches.name("host").unwrap_or_default())
         {
             let authenticated_url = if matches.name("proto") == Some(BStr::new("ssh")) {
                 let user = if let Some(u) = matches.name("user") {
@@ -84,19 +83,19 @@ impl Hg {
             } else {
                 let auth = self
                     .io
-                    .get_authentication(&legacy_lossy(matches.name("host").unwrap_or_default()));
+                    .get_authentication(matches.name("host").unwrap_or_default());
                 bconcat!(
                     matches.name("proto").unwrap_or_default(),
                     "://",
                     rawurlencode(
                         auth.get("username")
-                            .and_then(|s| s.as_deref())
+                            .and_then(|s| s.as_ref().map(|s| s.as_slice()))
                             .unwrap_or_default()
                     ),
                     ":",
                     rawurlencode(
                         auth.get("password")
-                            .and_then(|s| s.as_deref())
+                            .and_then(|s| s.as_ref().map(|s| s.as_slice()))
                             .unwrap_or_default()
                     ),
                     "@",

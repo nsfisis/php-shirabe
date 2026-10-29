@@ -71,7 +71,7 @@ pub struct IOMock {
     inner: BufferIO,
     expectations: Option<Vec<Expectation>>,
     strict: bool,
-    auth_log: Vec<(String, String, Option<String>)>,
+    auth_log: Vec<(bstr::BString, bstr::BString, Option<bstr::BString>)>,
 }
 
 impl IOMock {
@@ -130,7 +130,7 @@ impl IOMock {
                 .iter()
                 .map(|line| legacy_lossy(line).into_owned())
                 .collect();
-            let mut auth_log: VecDeque<(String, String, Option<String>)> =
+            let mut auth_log: VecDeque<(bstr::BString, bstr::BString, Option<bstr::BString>)> =
                 self.auth_log.clone().into();
 
             'expects: for expect in expectations {
@@ -140,7 +140,11 @@ impl IOMock {
                     password,
                 } = expect
                 {
-                    let expected = (repository_name.clone(), username.clone(), password.clone());
+                    let expected = (
+                        bstr::BString::from(repository_name.as_str()),
+                        bstr::BString::from(username.as_str()),
+                        password.as_deref().map(bstr::BString::from),
+                    );
                     while let Some(auth) = auth_log.pop_front() {
                         if auth == expected {
                             continue 'expects;
@@ -279,16 +283,16 @@ impl IOInterfaceImmutable for IOMock {
 
     fn get_authentications(
         &self,
-    ) -> indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
         self.inner.get_authentications()
     }
-    fn has_authentication(&self, repository_name: &str) -> bool {
+    fn has_authentication(&self, repository_name: &bstr::BStr) -> bool {
         self.inner.has_authentication(repository_name)
     }
     fn get_authentication(
         &self,
-        repository_name: &str,
-    ) -> indexmap::IndexMap<String, Option<String>> {
+        repository_name: &bstr::BStr,
+    ) -> indexmap::IndexMap<String, Option<bstr::BString>> {
         self.inner.get_authentication(repository_name)
     }
     fn error(&self, message: &str, context: &[(&str, &str)]) {
@@ -305,9 +309,9 @@ impl IOInterfaceImmutable for IOMock {
 impl IOInterfaceMutable for IOMock {
     fn set_authentication(
         &mut self,
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: bstr::BString,
+        username: bstr::BString,
+        password: Option<bstr::BString>,
     ) {
         self.auth_log
             .push((repository_name.clone(), username.clone(), password.clone()));
@@ -331,12 +335,13 @@ impl IOInterface for IOMock {
 impl shirabe::io::BaseIO for IOMock {
     fn authentications(
         &self,
-    ) -> &indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>> {
         self.inner.authentications()
     }
     fn authentications_mut(
         &mut self,
-    ) -> &mut indexmap::IndexMap<String, indexmap::IndexMap<String, Option<String>>> {
+    ) -> &mut indexmap::IndexMap<bstr::BString, indexmap::IndexMap<String, Option<bstr::BString>>>
+    {
         self.inner.authentications_mut()
     }
 }

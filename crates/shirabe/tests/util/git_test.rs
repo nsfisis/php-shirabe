@@ -223,9 +223,12 @@ fn run_command_private_github_with_authentication(
 
     let (process, _guard) = get_process_executor_mock(expected_calls, true, MockHandler::default());
 
-    let mut auth: IndexMap<String, Option<String>> = IndexMap::new();
-    auth.insert("username".to_string(), Some("token".to_string()));
-    auth.insert("password".to_string(), Some(git_hub_token.to_string()));
+    let mut auth: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
+    auth.insert("username".to_string(), Some(bstr::BString::from("token")));
+    auth.insert(
+        "password".to_string(),
+        Some(bstr::BString::from(git_hub_token)),
+    );
 
     let io = IOStub::new()
         .with_is_interactive(false)
@@ -310,9 +313,9 @@ fn run_command_private_bitbucket_with_authentication(
 
     let mut io = IOStub::new().with_is_interactive(false);
     if let Some(token) = bitbucket_token {
-        let mut auth: IndexMap<String, Option<String>> = IndexMap::new();
-        auth.insert("username".to_string(), Some("token".to_string()));
-        auth.insert("password".to_string(), Some(token.to_string()));
+        let mut auth: IndexMap<String, Option<bstr::BString>> = IndexMap::new();
+        auth.insert("username".to_string(), Some(bstr::BString::from("token")));
+        auth.insert("password".to_string(), Some(bstr::BString::from(token)));
         io = io
             .with_has_authentication(true)
             .with_get_authentication(auth);

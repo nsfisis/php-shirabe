@@ -1,6 +1,7 @@
 //! ref: composer/src/Composer/IO/IOInterface.php
 
 use crate::config::Config;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::PhpMixed;
 
@@ -120,11 +121,11 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
         multiselect: bool,
     ) -> anyhow::Result<PhpMixed>;
 
-    fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>>;
+    fn get_authentications(&self) -> IndexMap<BString, IndexMap<String, Option<BString>>>;
 
-    fn has_authentication(&self, repository_name: &str) -> bool;
+    fn has_authentication(&self, repository_name: &BStr) -> bool;
 
-    fn get_authentication(&self, repository_name: &str) -> IndexMap<String, Option<String>>;
+    fn get_authentication(&self, repository_name: &BStr) -> IndexMap<String, Option<BString>>;
 
     // From PHP `LoggerInterface` (which `IOInterface` extends). Only the
     // variants Composer actually calls through an IO are kept.
@@ -139,9 +140,9 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
 pub trait IOInterfaceMutable {
     fn set_authentication(
         &mut self,
-        repository_name: String,
-        username: String,
-        password: Option<String>,
+        repository_name: BString,
+        username: BString,
+        password: Option<BString>,
     );
 
     fn load_configuration(&mut self, config: &mut Config) -> anyhow::Result<()>;
@@ -314,15 +315,15 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         )
     }
 
-    fn get_authentications(&self) -> IndexMap<String, IndexMap<String, Option<String>>> {
+    fn get_authentications(&self) -> IndexMap<BString, IndexMap<String, Option<BString>>> {
         self.borrow().get_authentications()
     }
 
-    fn has_authentication(&self, repository_name: &str) -> bool {
+    fn has_authentication(&self, repository_name: &BStr) -> bool {
         self.borrow().has_authentication(repository_name)
     }
 
-    fn get_authentication(&self, repository_name: &str) -> IndexMap<String, Option<String>> {
+    fn get_authentication(&self, repository_name: &BStr) -> IndexMap<String, Option<BString>> {
         self.borrow().get_authentication(repository_name)
     }
 
