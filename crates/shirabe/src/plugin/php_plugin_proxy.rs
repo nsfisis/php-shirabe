@@ -2734,9 +2734,21 @@ impl ToPluginValue for BString {
     }
 }
 
+impl ToPluginValue for &bstr::BStr {
+    fn to_plugin_value(self) -> PluginValue {
+        PluginValue::String(BString::from(self))
+    }
+}
+
 impl ToPluginValue for std::path::PathBuf {
     fn to_plugin_value(self) -> PluginValue {
         PluginValue::string(path_to_bytes(&self))
+    }
+}
+
+impl ToPluginValue for &std::path::Path {
+    fn to_plugin_value(self) -> PluginValue {
+        PluginValue::string(path_to_bytes(self))
     }
 }
 
@@ -3402,12 +3414,12 @@ pub(crate) fn dispatch_pre_file_download_event_method(
         )),
         "getProcessedUrl" => Ok(event.get_processed_url().to_plugin_value()),
         "setProcessedUrl" => {
-            event.set_processed_url(arg::<String>(method_name, args, 0)?);
+            event.set_processed_url(arg::<BString>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
         "getCustomCacheKey" => Ok(event.get_custom_cache_key().to_plugin_value()),
         "setCustomCacheKey" => {
-            event.set_custom_cache_key(arg::<Option<String>>(method_name, args, 0)?);
+            event.set_custom_cache_key(arg::<Option<BString>>(method_name, args, 0)?);
             Ok(PluginValue::Null)
         }
         "getType" => Ok(event.get_type().to_plugin_value()),

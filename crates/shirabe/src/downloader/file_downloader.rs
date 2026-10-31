@@ -17,14 +17,14 @@ use crate::plugin::{
     FileDownloadContext, PluginEvents, PostFileDownloadEvent, PreFileDownloadEvent,
 };
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor, Url as UrlUtil};
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_BASENAME, PATHINFO_EXTENSION, PhpMixed,
     RuntimeException, UnexpectedValueException, bconcat, chmod, dirname, explode, extension_loaded,
     file_exists, filesize, get_class, hash, hash_file, impl_php_class, is_dir, is_executable,
-    legacy_lossy, parse_url, path_from_bytes, path_to_bytes, pathinfo, realpath, rtrim2,
-    spl_object_hash, strlen, strpos, strtr, trim, umask, usleep,
+    parse_url, path_from_bytes, path_to_bytes, pathinfo, realpath, rtrim2, spl_object_hash, strlen,
+    strpos, strtr, trim, umask, usleep,
 };
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex};
@@ -310,8 +310,8 @@ impl FileDownloader {
     pub fn __process_url(
         &self,
         package: PackageInterfaceHandle,
-        url: &str,
-    ) -> anyhow::Result<String> {
+        url: impl AsRef<[u8]>,
+    ) -> anyhow::Result<BString> {
         self.process_url(package, url)
     }
 
@@ -319,8 +319,9 @@ impl FileDownloader {
     pub(crate) fn process_url(
         &self,
         package: PackageInterfaceHandle,
-        url: &str,
-    ) -> anyhow::Result<String> {
+        url: impl AsRef<[u8]>,
+    ) -> anyhow::Result<BString> {
+        let url = url.as_ref();
         if !extension_loaded("openssl") && Some(0) == strpos(url, "https:") {
             return Err(RuntimeException::new(
                 "You must enable the openssl extension to download files via https".to_string(),
@@ -328,14 +329,9 @@ impl FileDownloader {
             .into());
         }
 
-        let mut url = url.to_string();
+        let mut url = BString::from(url);
         if let Some(dist_reference) = package.get_dist_reference() {
-            url = legacy_lossy(&UrlUtil::update_dist_reference(
-                &self.config.borrow(),
-                &url,
-                &dist_reference,
-            ))
-            .into_owned();
+            url = UrlUtil::update_dist_reference(&self.config.borrow(), &url, &dist_reference);
         }
 
         Ok(url)
@@ -366,7 +362,7 @@ impl DownloaderInterface for FileDownloader {
             .into());
         }
 
-        let cache_key_generator = |package: PackageInterfaceHandle, key: &str| -> BString {
+        let cache_key_generator = |package: PackageInterfaceHandle, key: &BStr| -> BString {
             let cache_key = hash("sha1", key);
 
             bconcat!(
@@ -383,8 +379,8 @@ impl DownloaderInterface for FileDownloader {
         // @var array<array{base: non-empty-string, processed: non-empty-string, cacheKey: string}> $urls
         let mut urls: Vec<UrlEntry> = vec![];
         for url in dist_urls {
-            let processed_url = self.process_url(package.clone(), &legacy_lossy(&url))?;
-            let cache_key = cache_key_generator(package.clone(), &processed_url);
+            let processed_url = self.process_url(package.clone(), &url)?;
+            let cache_key = cache_key_generator(package.clone(), processed_url.as_bstr());
             urls.push(UrlEntry {
                 base: url,
                 processed: processed_url,
@@ -416,7 +412,7 @@ impl DownloaderInterface for FileDownloader {
                     PluginEvents::PRE_FILE_DOWNLOAD.to_string(),
                     self.http_downloader.clone(),
                     url.processed.clone(),
-                    "package".to_string(),
+                    "package".into(),
                     Some(FileDownloadContext::Package(package.clone())),
                 );
                 let pre_file_download_event_name = pre_file_download_event.get_name().to_string();
@@ -432,7 +428,7 @@ impl DownloaderInterface for FileDownloader {
                         pre_file_download_event.get_processed_url(),
                     );
                 }
-                url.processed = pre_file_download_event.get_processed_url().to_string();
+                url.processed = BString::from(pre_file_download_event.get_processed_url());
             }
 
             urls[0] = url.clone();
@@ -639,10 +635,10 @@ impl DownloaderInterface for FileDownloader {
             if let Some(event_dispatcher) = self.event_dispatcher.as_ref() {
                 let mut post_file_download_event = PostFileDownloadEvent::new(
                     PluginEvents::POST_FILE_DOWNLOAD.to_string(),
-                    Some(legacy_lossy(path_to_bytes(&file_name)).into_owned()),
-                    checksum.clone().map(|s| legacy_lossy(&s).into_owned()),
+                    Some(file_name.clone()),
+                    checksum.clone(),
                     url.processed.clone(),
-                    "package".to_string(),
+                    "package".into(),
                     Some(FileDownloadContext::Package(package.clone())),
                 );
                 let post_file_download_event_name = post_file_download_event.get_name().to_string();
@@ -836,6 +832,6 @@ impl ChangeReportInterface for FileDownloader {
 #[derive(Debug, Clone)]
 struct UrlEntry {
     base: BString,
-    processed: String,
+    processed: BString,
     cache_key: BString,
 }

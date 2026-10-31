@@ -258,10 +258,12 @@ impl ZipDownloader {
                 if strlen(package.get_dist_url().unwrap_or_default()) > 0 {
                     self.inner.io.borrow().write_error(&format!(
                         "Origin URL: {}",
-                        self.inner.process_url(
-                            package.clone(),
-                            &legacy_lossy(&package.get_dist_url().unwrap_or_default())
-                        )?
+                        self.inner
+                            .process_url(
+                                package.clone(),
+                                package.get_dist_url().unwrap_or_default()
+                            )?
+                            .display_lossy()
                     ));
                     let headers = {
                         let response_headers = crate::downloader::file_downloader::RESPONSE_HEADERS

@@ -248,22 +248,27 @@ fn test_what_provides() {
     let rc_dyn: std::rc::Rc<std::cell::RefCell<dyn RepositoryInterface>> = rc.clone();
     rc.borrow().set_self_handle(std::rc::Rc::downgrade(&rc_dyn));
 
-    let mut provider_listing: IndexMap<String, ProviderListingEntry> = IndexMap::new();
-    provider_listing.insert("a".to_string(), ProviderListingEntry { sha256 });
+    let mut provider_listing: IndexMap<BString, ProviderListingEntry> = IndexMap::new();
+    provider_listing.insert(
+        "a".into(),
+        ProviderListingEntry {
+            sha256: sha256.into(),
+        },
+    );
     rc.borrow_mut().__set_provider_listing(provider_listing);
     rc.borrow_mut()
         .__set_providers_url("https://dummy.test.link/to/%package%/file");
 
-    let packages = rc.borrow_mut().__what_provides("a").unwrap();
+    let packages = rc.borrow_mut().__what_provides("a".into()).unwrap();
 
     assert_eq!(5, packages.len());
     assert_eq!(
         vec!["1", "1-alias", "2", "2-alias", "3"],
         packages.keys().cloned().collect::<Vec<_>>()
     );
-    let alias = packages["2-alias"].as_alias().unwrap();
+    let alias = packages[B("2-alias")].as_alias().unwrap();
     let aliased: shirabe::package::handle::PackageInterfaceHandle = alias.get_alias_of().into();
-    assert!(packages["2"].ptr_eq(&aliased));
+    assert!(packages[B("2")].ptr_eq(&aliased));
 }
 
 #[test]
@@ -311,9 +316,9 @@ fn test_search_with_type() {
 
     let plugin_results = repository
         .search(
-            "foo".to_string(),
+            "foo".into(),
             SEARCH_FULLTEXT,
-            Some("composer-plugin".to_string()),
+            Some("composer-plugin".into()),
         )
         .unwrap();
     assert_eq!(1, plugin_results.len());
@@ -327,11 +332,7 @@ fn test_search_with_type() {
     ));
 
     let library_results = repository
-        .search(
-            "foo".to_string(),
-            SEARCH_FULLTEXT,
-            Some("library".to_string()),
-        )
+        .search("foo".into(), SEARCH_FULLTEXT, Some("library".into()))
         .unwrap();
     assert!(library_results.is_empty());
 }
@@ -368,7 +369,7 @@ fn test_search_with_special_chars() {
     .unwrap();
 
     let results = repository
-        .search("foo bar".to_string(), SEARCH_FULLTEXT, None)
+        .search("foo bar".into(), SEARCH_FULLTEXT, None)
         .unwrap();
     assert!(results.is_empty());
 }
@@ -418,7 +419,7 @@ fn test_search_with_abandoned_packages() {
     .unwrap();
 
     let results = repository
-        .search("foo".to_string(), SEARCH_FULLTEXT, None)
+        .search("foo".into(), SEARCH_FULLTEXT, None)
         .unwrap();
 
     assert_eq!(2, results.len());
@@ -498,7 +499,7 @@ fn test_canonicalize_url() {
         // order to test all cases.
         repository.__set_url(repository_url);
 
-        assert_eq!(expected, repository.__canonicalize_url(url).unwrap());
+        assert_eq!(expected, repository.__canonicalize_url(url.into()).unwrap());
     }
 }
 
@@ -609,8 +610,8 @@ fn test_get_security_advisories_assert_repository_http_options_are_used() {
         ComposerRepository::new(repo_config, null_io(), &config, http_downloader, None).unwrap();
 
     let constraint: AnyConstraint = SimpleConstraint::new("=", "1.0.0.0".to_string(), None).into();
-    let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
-    map.insert("foo/bar".to_string(), constraint);
+    let mut map: IndexMap<BString, AnyConstraint> = IndexMap::new();
+    map.insert("foo/bar".into(), constraint);
 
     let result = repository.get_security_advisories(map, false).unwrap();
     assert!(result.names_found.is_empty());
@@ -742,8 +743,8 @@ fn test_get_security_advisories_assert_repository_advisories_is_zero_indexed_arr
         ComposerRepository::new(repo_config, null_io(), &config, http_downloader, None).unwrap();
 
     let constraint: AnyConstraint = SimpleConstraint::new("=", "1.0.0.0".to_string(), None).into();
-    let mut map: IndexMap<String, AnyConstraint> = IndexMap::new();
-    map.insert(package_name.to_string(), constraint);
+    let mut map: IndexMap<BString, AnyConstraint> = IndexMap::new();
+    map.insert(package_name.into(), constraint);
 
     let result = repository.get_security_advisories(map, false).unwrap();
 

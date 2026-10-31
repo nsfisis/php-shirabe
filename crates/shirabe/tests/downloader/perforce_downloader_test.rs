@@ -14,7 +14,7 @@ use shirabe::io::io_interface::NORMAL;
 use shirabe::package::handle::{CompletePackageHandle, PackageInterfaceHandle};
 use shirabe::util::filesystem::Filesystem;
 use shirabe::util::process_executor::MockHandler;
-use shirabe_php_shim::{PhpMixed, legacy_lossy};
+use shirabe_php_shim::{PhpMixed, legacy_lossy, path_to_bytes};
 use shirabe_semver::VersionParser;
 use tempfile::TempDir;
 
@@ -153,9 +153,7 @@ fn do_install_workflow(source_ref: &'static str, expected_label: Option<BString>
     perforce
         .expect_initialize_path()
         .times(1)
-        .withf(move |path: &std::path::Path| {
-            bstr::BStr::new(shirabe_php_shim::path_to_bytes(path)) == expected_path
-        })
+        .withf(move |path: &std::path::Path| bstr::BStr::new(path_to_bytes(path)) == expected_path)
         .returning(|_| ());
     perforce
         .expect_set_stream()

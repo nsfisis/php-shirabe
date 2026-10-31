@@ -66,7 +66,6 @@
 2 crates/shirabe/src/plugin/plugin_manager.rs
 1 crates/shirabe/src/plugin/throwable_bridge.rs
 7 crates/shirabe/src/repository/artifact_repository.rs
-9 crates/shirabe/src/repository/composer_repository.rs
 2 crates/shirabe/src/repository/repository_factory.rs
 1 crates/shirabe/src/repository/vcs/forgejo_driver.rs
 2 crates/shirabe/src/repository/vcs/github_driver.rs

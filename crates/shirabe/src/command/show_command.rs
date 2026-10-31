@@ -2189,10 +2189,10 @@ impl Command for ShowCommand {
             if let Some(cr_rc) = repo.downcast_rc::<ComposerRepository>() {
                 let names = cr_rc
                     .borrow_mut()
-                    .get_package_names(package_filter.as_deref())?;
+                    .get_package_names(package_filter.as_deref().map(bstr::BStr::new))?;
                 for name in names {
                     packages.entry(type_owned.clone()).or_default().insert(
-                        legacy_lossy(&name.clone()).into_owned(),
+                        legacy_lossy(&name).into_owned(),
                         PackageOrName::Name(legacy_lossy(&name).into_owned()),
                     );
                 }
