@@ -658,11 +658,7 @@ impl RequireCommand {
         remove_key: &str,
         sort_packages: bool,
     ) -> bool {
-        // TODO(bytes): JsonManipulator takes the JSON as a String.
-        let contents = String::from_utf8_lossy(
-            &file_get_contents(json.borrow().get_path()).unwrap_or_default(),
-        )
-        .into_owned();
+        let contents = file_get_contents(json.borrow().get_path()).unwrap_or_default();
 
         let mut manipulator = match JsonManipulator::new(contents) {
             Ok(m) => m,

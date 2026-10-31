@@ -197,10 +197,14 @@ impl CreateProjectCommand {
                             .and_then(|v| v.as_bool())
                             == Some(false));
                 if is_packagist_disabled {
-                    config_source.add_repository("packagist.org", PhpMixed::Bool(false), false);
+                    config_source.add_repository(
+                        bstr::BStr::new("packagist.org"),
+                        PhpMixed::Bool(false),
+                        false,
+                    );
                 } else {
                     config_source.add_repository(
-                        &name,
+                        bstr::BStr::new(&name),
                         PhpMixed::Array(
                             repo_config
                                 .iter()
@@ -389,9 +393,9 @@ impl CreateProjectCommand {
                 for link in package.get_links_for_type(meta.method).values() {
                     if link.get_pretty_constraint() == "self.version" {
                         config_source.add_link(
-                            r#type,
-                            &legacy_lossy(link.get_target()),
-                            &legacy_lossy(&package.get_pretty_version()),
+                            bstr::BStr::new(r#type),
+                            link.get_target(),
+                            package.get_pretty_version().as_bstr(),
                         )?;
                     }
                 }

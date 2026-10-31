@@ -8,9 +8,8 @@ use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     E_USER_DEPRECATED, PhpMixed, RuntimeException, array_merge, base64_encode, bconcat, explode,
-    in_array_loose, in_array_strict, is_array, is_string, json_decode_assoc, legacy_lossy,
-    parse_url, php_regex, php_to_string, preg_is_match, str_replace, strpos, strtolower, substr,
-    trigger_error, trim,
+    in_array_loose, in_array_strict, is_array, is_string, json_decode_assoc, parse_url, php_regex,
+    php_to_string, preg_is_match, str_replace, strpos, strtolower, substr, trigger_error, trim,
 };
 
 #[derive(Debug)]
@@ -86,7 +85,7 @@ impl AuthHelper {
         }
         if store.is_some() {
             config_source.add_config_setting(
-                &legacy_lossy(&bconcat!("http-basic.", origin)),
+                bstr::BStr::new(&bconcat!("http-basic.", origin)),
                 PhpMixed::Array(
                     self.io
                         .borrow()

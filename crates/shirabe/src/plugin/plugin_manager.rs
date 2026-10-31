@@ -1345,7 +1345,7 @@ impl PluginManager {
                                     .borrow_mut()
                                     .get_config_source_mut()
                                     .add_config_setting(
-                                        "allow-plugins",
+                                        bstr::BStr::new("allow-plugins"),
                                         PhpMixed::Array(allow_plugins.clone()),
                                     )?;
                                 let mut inner = IndexMap::new();

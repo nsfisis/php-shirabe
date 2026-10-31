@@ -3,11 +3,11 @@
 use crate::config::ConfigSourceInterface;
 use crate::json::{JsonFile, JsonManipulator, JsonValidationException};
 use crate::util::Filesystem;
-use bstr::{B, BString};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PHP_EOL, PhpMixed, RuntimeException, chmod, explode, file_get_contents,
-    file_put_contents, implode, is_writable, legacy_lossy,
+    file_put_contents, implode, is_writable,
 };
 
 /// JSON Configuration Source
@@ -45,18 +45,14 @@ impl JsonConfigSource {
                 .into());
             }
 
-            // TODO(bytes): JsonManipulator takes the JSON as a String.
-            contents = String::from_utf8_lossy(
-                &file_get_contents(self.file.borrow().get_path()).unwrap_or_default(),
-            )
-            .into_owned();
+            contents = file_get_contents(self.file.borrow().get_path()).unwrap_or_default();
         } else if self.auth_config {
-            contents = "{\n}\n".to_string();
+            contents = b"{\n}\n".to_vec();
         } else {
-            contents = "{\n    \"config\": {\n    }\n}\n".to_string();
+            contents = b"{\n    \"config\": {\n    }\n}\n".to_vec();
         }
 
-        let mut manipulator = JsonManipulator::new(contents.clone())?;
+        let mut manipulator = JsonManipulator::new(&contents)?;
 
         let new_file = !self.file.borrow().exists();
 
@@ -146,11 +142,11 @@ impl JsonConfigSource {
                     return Err(e);
                 };
                 // restore contents to the original state
-                file_put_contents(self.file.borrow().get_path(), contents.as_bytes());
+                file_put_contents(self.file.borrow().get_path(), &contents);
                 let message = format!(
                     "Failed to update composer.json with a valid format, reverting to the original content. Please report an issue to us with details (command you run and a copy of your composer.json). {}{}",
                     PHP_EOL,
-                    legacy_lossy(&implode(PHP_EOL, jve.get_errors())),
+                    implode(PHP_EOL, jve.get_errors()).display_lossy(),
                 );
                 return Err(RuntimeException::with_code_and_previous(
                     message,
@@ -212,7 +208,7 @@ impl JsonConfigSource {
     ///     ),
     /// );
     /// ```
-    fn dedupe_repositories_by_name(root: &mut IndexMap<BString, PhpMixed>, name: &str) {
+    fn dedupe_repositories_by_name(root: &mut IndexMap<BString, PhpMixed>, name: &BStr) {
         let items: Vec<PhpMixed> = match root.get(B("repositories")) {
             Some(PhpMixed::List(items)) => items.clone(),
             Some(PhpMixed::Array(map)) => map.values().cloned().collect(),
@@ -222,9 +218,9 @@ impl JsonConfigSource {
             .into_iter()
             .filter(|val| {
                 let name_set = val.get("name").is_some();
-                let name_eq = val.get("name").and_then(|v| v.as_string()) == Some(name.into());
+                let name_eq = val.get("name").and_then(|v| v.as_string()) == Some(name);
                 let is_repo_false = matches!(val, PhpMixed::Array(m)
-                    if m.len() == 1 && matches!(m.get(B(name)), Some(PhpMixed::Bool(false))));
+                    if m.len() == 1 && matches!(m.get(name), Some(PhpMixed::Bool(false))));
                 !name_set || !name_eq || !is_repo_false
             })
             .collect();
@@ -232,12 +228,12 @@ impl JsonConfigSource {
     }
 
     /// Set a value at a nested key path, creating intermediate maps as needed.
-    fn set_nested(root: &mut IndexMap<BString, PhpMixed>, path: &[&str], value: PhpMixed) {
+    fn set_nested(root: &mut IndexMap<BString, PhpMixed>, path: &[&BStr], value: PhpMixed) {
         let (last, heads) = path.split_last().unwrap();
         let mut cursor = root;
         for seg in heads {
             let entry = cursor
-                .entry(seg.to_string().into())
+                .entry(BString::from(*seg))
                 .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
             if !matches!(entry, PhpMixed::Array(_)) {
                 *entry = PhpMixed::Array(IndexMap::new());
@@ -247,23 +243,23 @@ impl JsonConfigSource {
                 _ => unreachable!(),
             };
         }
-        cursor.insert(last.to_string().into(), value);
+        cursor.insert(BString::from(*last), value);
     }
 
     /// Unset a value at a nested key path; a no-op if the path is absent.
-    fn unset_nested(root: &mut IndexMap<BString, PhpMixed>, path: &[&str]) {
+    fn unset_nested(root: &mut IndexMap<BString, PhpMixed>, path: &[&BStr]) {
         let (last, heads) = path.split_last().unwrap();
         let mut cursor = root;
         for seg in heads {
-            cursor = match cursor.get_mut(B(seg)) {
+            cursor = match cursor.get_mut(*seg) {
                 Some(PhpMixed::Array(m)) => m,
                 _ => return,
             };
         }
-        cursor.shift_remove(B(last));
+        cursor.shift_remove(*last);
     }
 
-    fn is_auth_config_key(key: &str) -> bool {
+    fn is_auth_config_key(key: &BStr) -> bool {
         const PREFIXES: &[&str] = &[
             "bitbucket-oauth.",
             "github-oauth.",
@@ -275,7 +271,7 @@ impl JsonConfigSource {
             "forgejo-token.",
             "platform.",
         ];
-        PREFIXES.iter().any(|p| key.starts_with(p))
+        PREFIXES.iter().any(|p| key.starts_with(p.as_bytes()))
     }
 }
 
@@ -284,7 +280,12 @@ impl ConfigSourceInterface for JsonConfigSource {
         self.file.borrow().get_path().to_string()
     }
 
-    fn add_repository(&mut self, name: &str, config: PhpMixed, append: bool) -> anyhow::Result<()> {
+    fn add_repository(
+        &mut self,
+        name: &BStr,
+        config: PhpMixed,
+        append: bool,
+    ) -> anyhow::Result<()> {
         let config_cloned = config.clone();
         self.manipulate_json(
             move |m| m.add_repository(name, config_cloned, append),
@@ -297,17 +298,15 @@ impl ConfigSourceInterface for JsonConfigSource {
                 if matches!(config, PhpMixed::Bool(false)) {
                     if let Some(PhpMixed::List(list)) = root.get_mut(B("repositories")) {
                         for repository in list.iter_mut() {
-                            if repository.get("name").and_then(|v| v.as_string())
-                                == Some(name.into())
-                            {
+                            if repository.get("name").and_then(|v| v.as_string()) == Some(name) {
                                 let mut replaced = IndexMap::new();
-                                replaced.insert(name.into(), PhpMixed::Bool(false));
+                                replaced.insert(BString::from(name), PhpMixed::Bool(false));
                                 *repository = PhpMixed::Array(replaced);
                                 return Ok(());
                             }
                             if let PhpMixed::Array(m) = &*repository
                                 && m.len() == 1
-                                && matches!(m.get(B(name)), Some(PhpMixed::Bool(false)))
+                                && matches!(m.get(name), Some(PhpMixed::Bool(false)))
                             {
                                 return Ok(());
                             }
@@ -316,7 +315,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                         root.insert("repositories".into(), PhpMixed::List(Vec::new()));
                     }
                     let mut entry = IndexMap::new();
-                    entry.insert(name.into(), PhpMixed::Bool(false));
+                    entry.insert(BString::from(name), PhpMixed::Bool(false));
                     if let Some(PhpMixed::List(list)) = root.get_mut(B("repositories")) {
                         list.push(PhpMixed::Array(entry));
                     }
@@ -329,7 +328,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                     && !rc.contains_key(B("name"))
                 {
                     let mut with_name = IndexMap::new();
-                    with_name.insert("name".into(), PhpMixed::string(name.to_string()));
+                    with_name.insert("name".into(), PhpMixed::string(name));
                     for (k, v) in rc.clone() {
                         with_name.insert(k, v);
                     }
@@ -355,9 +354,9 @@ impl ConfigSourceInterface for JsonConfigSource {
 
     fn insert_repository(
         &mut self,
-        name: &str,
+        name: &BStr,
         config: PhpMixed,
-        reference_name: &str,
+        reference_name: &BStr,
         offset: i64,
     ) -> anyhow::Result<()> {
         let config_cloned = config.clone();
@@ -374,14 +373,14 @@ impl ConfigSourceInterface for JsonConfigSource {
                 if let Some(PhpMixed::List(list)) = root.get(B("repositories")) {
                     for (i, repository) in list.iter().enumerate() {
                         if repository.get("name").and_then(|v| v.as_string())
-                            == Some(reference_name.into())
+                            == Some(reference_name)
                         {
                             index_to_insert = Some(i);
                             break;
                         }
                         if let PhpMixed::Array(m) = repository
                             && m.len() == 1
-                            && matches!(m.get(B(reference_name)), Some(PhpMixed::Bool(false)))
+                            && matches!(m.get(reference_name), Some(PhpMixed::Bool(false)))
                         {
                             index_to_insert = Some(i);
                             break;
@@ -391,7 +390,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                 let Some(index_to_insert) = index_to_insert else {
                     return Err(RuntimeException::new(format!(
                         "The referenced repository \"{}\" does not exist.",
-                        reference_name,
+                        reference_name.display_lossy(),
                     ))
                     .into());
                 };
@@ -402,7 +401,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                     && !rc.contains_key(B("name"))
                 {
                     let mut with_name = IndexMap::new();
-                    with_name.insert("name".into(), PhpMixed::string(name.to_string()));
+                    with_name.insert("name".into(), PhpMixed::string(name));
                     for (k, v) in rc.clone() {
                         with_name.insert(k, v);
                     }
@@ -423,7 +422,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn set_repository_url(&mut self, name: &str, url: &str) -> anyhow::Result<()> {
+    fn set_repository_url(&mut self, name: &BStr, url: &BStr) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.set_repository_url(name, url),
             move |cfg| {
@@ -433,11 +432,9 @@ impl ConfigSourceInterface for JsonConfigSource {
                 match root.get_mut(B("repositories")) {
                     Some(PhpMixed::List(list)) => {
                         for repository in list.iter_mut() {
-                            if repository.get("name").and_then(|v| v.as_string())
-                                == Some(name.into())
-                            {
+                            if repository.get("name").and_then(|v| v.as_string()) == Some(name) {
                                 if let PhpMixed::Array(m) = repository {
-                                    m.insert("url".into(), PhpMixed::string(url.to_string()));
+                                    m.insert("url".into(), PhpMixed::string(url));
                                 }
                                 return Ok(());
                             }
@@ -446,9 +443,8 @@ impl ConfigSourceInterface for JsonConfigSource {
                     Some(PhpMixed::Array(map)) => {
                         let mut target: Option<BString> = None;
                         for (index, repository) in map.iter() {
-                            if index == name
-                                || repository.get("name").and_then(|v| v.as_string())
-                                    == Some(name.into())
+                            if index.as_bstr() == name
+                                || repository.get("name").and_then(|v| v.as_string()) == Some(name)
                             {
                                 target = Some(index.clone());
                                 break;
@@ -457,7 +453,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                         if let Some(k) = target
                             && let Some(PhpMixed::Array(m)) = map.get_mut(&k)
                         {
-                            m.insert("url".into(), PhpMixed::string(url.to_string()));
+                            m.insert("url".into(), PhpMixed::string(url));
                         }
                     }
                     _ => {}
@@ -467,7 +463,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn remove_repository(&mut self, name: &str) -> anyhow::Result<()> {
+    fn remove_repository(&mut self, name: &BStr) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.remove_repository(name),
             move |cfg| {
@@ -476,11 +472,11 @@ impl ConfigSourceInterface for JsonConfigSource {
                 };
                 let had_key = matches!(
                     root.get(B("repositories")),
-                    Some(PhpMixed::Array(m)) if m.contains_key(B(name))
+                    Some(PhpMixed::Array(m)) if m.contains_key(name)
                 );
                 if had_key {
                     if let Some(PhpMixed::Array(m)) = root.get_mut(B("repositories")) {
-                        m.shift_remove(B(name));
+                        m.shift_remove(name);
                     }
                 } else {
                     Self::dedupe_repositories_by_name(root, name);
@@ -498,7 +494,7 @@ impl ConfigSourceInterface for JsonConfigSource {
         )
     }
 
-    fn add_config_setting(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+    fn add_config_setting(&mut self, name: &BStr, value: PhpMixed) -> anyhow::Result<()> {
         let auth_config = self.auth_config;
         let value_cloned = value.clone();
         self.manipulate_json(
@@ -507,7 +503,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                 if auth_config {
                     let parts = explode(".", name);
                     m.add_sub_node(
-                        &legacy_lossy(parts.first().map(|p| p.as_slice()).unwrap_or(b"")),
+                        parts.first().map(|p| p.as_slice()).unwrap_or(b""),
                         parts.get(1).map(|p| p.as_slice()).unwrap_or(b""),
                         value_cloned,
                         false,
@@ -521,23 +517,23 @@ impl ConfigSourceInterface for JsonConfigSource {
                     return Ok(());
                 };
                 if Self::is_auth_config_key(name) {
-                    let mut it = name.splitn(2, '.');
-                    let key = it.next().unwrap_or_default();
-                    let host = it.next().unwrap_or_default();
+                    let mut it = name.splitn_str(2, ".");
+                    let key = BStr::new(it.next().unwrap_or_default());
+                    let host = BStr::new(it.next().unwrap_or_default());
                     if auth_config {
                         Self::set_nested(root, &[key, host], value);
                     } else {
-                        Self::set_nested(root, &["config", key, host], value);
+                        Self::set_nested(root, &["config".into(), key, host], value);
                     }
                 } else {
-                    Self::set_nested(root, &["config", name], value);
+                    Self::set_nested(root, &["config".into(), name], value);
                 }
                 Ok(())
             },
         )
     }
 
-    fn remove_config_setting(&mut self, name: &str) -> anyhow::Result<()> {
+    fn remove_config_setting(&mut self, name: &BStr) -> anyhow::Result<()> {
         let auth_config = self.auth_config;
         self.manipulate_json(
             // override manipulator method for auth config files
@@ -545,7 +541,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                 if auth_config {
                     let parts = explode(".", name);
                     m.remove_sub_node(
-                        &legacy_lossy(parts.first().map(|p| p.as_slice()).unwrap_or(b"")),
+                        parts.first().map(|p| p.as_slice()).unwrap_or(b""),
                         parts.get(1).map(|p| p.as_slice()).unwrap_or(b""),
                     )
                 } else {
@@ -557,23 +553,23 @@ impl ConfigSourceInterface for JsonConfigSource {
                     return Ok(());
                 };
                 if Self::is_auth_config_key(name) {
-                    let mut it = name.splitn(2, '.');
-                    let key = it.next().unwrap_or_default();
-                    let host = it.next().unwrap_or_default();
+                    let mut it = name.splitn_str(2, ".");
+                    let key = BStr::new(it.next().unwrap_or_default());
+                    let host = BStr::new(it.next().unwrap_or_default());
                     if auth_config {
                         Self::unset_nested(root, &[key, host]);
                     } else {
-                        Self::unset_nested(root, &["config", key, host]);
+                        Self::unset_nested(root, &["config".into(), key, host]);
                     }
                 } else {
-                    Self::unset_nested(root, &["config", name]);
+                    Self::unset_nested(root, &["config".into(), name]);
                 }
                 Ok(())
             },
         )
     }
 
-    fn add_property(&mut self, name: &str, value: PhpMixed) -> anyhow::Result<()> {
+    fn add_property(&mut self, name: &BStr, value: PhpMixed) -> anyhow::Result<()> {
         let value_cloned = value.clone();
         self.manipulate_json(
             move |m| m.add_property(name, value_cloned),
@@ -581,12 +577,12 @@ impl ConfigSourceInterface for JsonConfigSource {
                 let Some(root) = cfg.as_array_mut() else {
                     return Ok(());
                 };
-                if name.starts_with("extra.") || name.starts_with("scripts.") {
-                    let mut bits: Vec<&str> = name.split('.').collect();
+                if name.starts_with(b"extra.") || name.starts_with(b"scripts.") {
+                    let mut bits: Vec<&[u8]> = name.split_str(".").collect();
                     let last = bits.pop().unwrap();
                     let first = bits[0];
                     let entry = root
-                        .entry(first.to_string().into())
+                        .entry(BString::from(first))
                         .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
                     if !matches!(entry, PhpMixed::Array(_)) {
                         *entry = PhpMixed::Array(IndexMap::new());
@@ -597,7 +593,7 @@ impl ConfigSourceInterface for JsonConfigSource {
                     };
                     for bit in &bits {
                         let e = cursor
-                            .entry(bit.to_string().into())
+                            .entry(BString::from(*bit))
                             .or_insert_with(|| PhpMixed::Array(IndexMap::new()));
                         if !matches!(e, PhpMixed::Array(_)) {
                             *e = PhpMixed::Array(IndexMap::new());
@@ -607,16 +603,16 @@ impl ConfigSourceInterface for JsonConfigSource {
                             _ => unreachable!(),
                         };
                     }
-                    cursor.insert(last.to_string().into(), value);
+                    cursor.insert(BString::from(last), value);
                 } else {
-                    root.insert(name.to_string().into(), value);
+                    root.insert(BString::from(name), value);
                 }
                 Ok(())
             },
         )
     }
 
-    fn remove_property(&mut self, name: &str) -> anyhow::Result<()> {
+    fn remove_property(&mut self, name: &BStr) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.remove_property(name),
             move |cfg| {
@@ -624,51 +620,49 @@ impl ConfigSourceInterface for JsonConfigSource {
                     return Ok(());
                 };
                 let lower = name.to_ascii_lowercase();
-                if name.starts_with("extra.")
-                    || name.starts_with("scripts.")
-                    || lower.starts_with("autoload.")
-                    || lower.starts_with("autoload-dev.")
+                if name.starts_with(b"extra.")
+                    || name.starts_with(b"scripts.")
+                    || lower.starts_with(b"autoload.")
+                    || lower.starts_with(b"autoload-dev.")
                 {
-                    let mut bits: Vec<&str> = name.split('.').collect();
+                    let mut bits: Vec<&[u8]> = name.split_str(".").collect();
                     let last = bits.pop().unwrap();
                     let first = bits[0];
-                    let Some(entry) = root.get_mut(B(first)) else {
+                    let Some(entry) = root.get_mut(first) else {
                         return Ok(());
                     };
                     let mut cursor: &mut PhpMixed = entry;
                     for bit in &bits {
                         cursor = match cursor {
-                            PhpMixed::Array(m) if m.contains_key(B(bit)) => {
-                                m.get_mut(B(bit)).unwrap()
-                            }
+                            PhpMixed::Array(m) if m.contains_key(*bit) => m.get_mut(*bit).unwrap(),
                             _ => return Ok(()),
                         };
                     }
                     if let PhpMixed::Array(m) = cursor {
-                        m.shift_remove(B(last));
+                        m.shift_remove(last);
                     }
                 } else {
-                    root.shift_remove(B(name));
+                    root.shift_remove(name);
                 }
                 Ok(())
             },
         )
     }
 
-    fn add_link(&mut self, r#type: &str, name: &str, value: &str) -> anyhow::Result<()> {
+    fn add_link(&mut self, r#type: &BStr, name: &BStr, value: &BStr) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.add_link(r#type, name, value, false),
             move |cfg| {
                 let Some(root) = cfg.as_array_mut() else {
                     return Ok(());
                 };
-                Self::set_nested(root, &[r#type, name], PhpMixed::string(value.to_string()));
+                Self::set_nested(root, &[r#type, name], PhpMixed::string(value));
                 Ok(())
             },
         )
     }
 
-    fn remove_link(&mut self, r#type: &str, name: &str) -> anyhow::Result<()> {
+    fn remove_link(&mut self, r#type: &BStr, name: &BStr) -> anyhow::Result<()> {
         self.manipulate_json(
             move |m| m.remove_sub_node(r#type, name),
             move |cfg| {
@@ -685,13 +679,13 @@ impl ConfigSourceInterface for JsonConfigSource {
                 let Some(root) = cfg.as_array_mut() else {
                     return Ok(());
                 };
-                let empty = match root.get(B(r#type)) {
+                let empty = match root.get(r#type) {
                     Some(PhpMixed::Array(m)) => m.is_empty(),
                     Some(PhpMixed::List(l)) => l.is_empty(),
                     _ => false,
                 };
                 if empty {
-                    root.shift_remove(B(r#type));
+                    root.shift_remove(r#type);
                 }
                 Ok(())
             },

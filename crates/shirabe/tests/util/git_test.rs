@@ -23,7 +23,7 @@ struct NullConfigSource;
 impl ConfigSourceInterface for NullConfigSource {
     fn add_repository(
         &mut self,
-        _name: &str,
+        _name: &bstr::BStr,
         _config: PhpMixed,
         _append: bool,
     ) -> anyhow::Result<()> {
@@ -31,35 +31,40 @@ impl ConfigSourceInterface for NullConfigSource {
     }
     fn insert_repository(
         &mut self,
-        _name: &str,
+        _name: &bstr::BStr,
         _config: PhpMixed,
-        _reference_name: &str,
+        _reference_name: &bstr::BStr,
         _offset: i64,
     ) -> anyhow::Result<()> {
         unreachable!()
     }
-    fn set_repository_url(&mut self, _name: &str, _url: &str) -> anyhow::Result<()> {
+    fn set_repository_url(&mut self, _name: &bstr::BStr, _url: &bstr::BStr) -> anyhow::Result<()> {
         unreachable!()
     }
-    fn remove_repository(&mut self, _name: &str) -> anyhow::Result<()> {
+    fn remove_repository(&mut self, _name: &bstr::BStr) -> anyhow::Result<()> {
         unreachable!()
     }
-    fn add_config_setting(&mut self, _name: &str, _value: PhpMixed) -> anyhow::Result<()> {
+    fn add_config_setting(&mut self, _name: &bstr::BStr, _value: PhpMixed) -> anyhow::Result<()> {
         Ok(())
     }
-    fn remove_config_setting(&mut self, _name: &str) -> anyhow::Result<()> {
+    fn remove_config_setting(&mut self, _name: &bstr::BStr) -> anyhow::Result<()> {
         Ok(())
     }
-    fn add_property(&mut self, _name: &str, _value: PhpMixed) -> anyhow::Result<()> {
+    fn add_property(&mut self, _name: &bstr::BStr, _value: PhpMixed) -> anyhow::Result<()> {
         unreachable!()
     }
-    fn remove_property(&mut self, _name: &str) -> anyhow::Result<()> {
+    fn remove_property(&mut self, _name: &bstr::BStr) -> anyhow::Result<()> {
         unreachable!()
     }
-    fn add_link(&mut self, _type: &str, _name: &str, _value: &str) -> anyhow::Result<()> {
+    fn add_link(
+        &mut self,
+        _type: &bstr::BStr,
+        _name: &bstr::BStr,
+        _value: &bstr::BStr,
+    ) -> anyhow::Result<()> {
         unreachable!()
     }
-    fn remove_link(&mut self, _type: &str, _name: &str) -> anyhow::Result<()> {
+    fn remove_link(&mut self, _type: &bstr::BStr, _name: &bstr::BStr) -> anyhow::Result<()> {
         unreachable!()
     }
     fn get_name(&self) -> String {

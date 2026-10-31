@@ -9,7 +9,7 @@ use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
     Catch as _, PhpMixed, RuntimeException, bconcat, http_build_query, in_array_strict,
-    json_decode_assoc, legacy_lossy, php_regex, preg_replace, time, trim,
+    json_decode_assoc, php_regex, preg_replace, time, trim,
 };
 
 #[derive(Debug)]
@@ -340,12 +340,12 @@ impl GitLab {
                 let auth_config_source = config.get_local_auth_config_source_mut().unwrap();
                 if has_expires_in {
                     auth_config_source.add_config_setting(
-                        &legacy_lossy(&bconcat!("gitlab-oauth.", origin_url)),
+                        bstr::BStr::new(&bconcat!("gitlab-oauth.", origin_url)),
                         Self::build_oauth_config(&response, access_token.as_ref()),
                     )?;
                 } else {
                     auth_config_source.add_config_setting(
-                        &legacy_lossy(&bconcat!("gitlab-oauth.", origin_url)),
+                        bstr::BStr::new(&bconcat!("gitlab-oauth.", origin_url)),
                         PhpMixed::string(access_token),
                     )?;
                 }
@@ -354,12 +354,12 @@ impl GitLab {
                 let auth_config_source = config.get_auth_config_source_mut();
                 if has_expires_in {
                     auth_config_source.add_config_setting(
-                        &legacy_lossy(&bconcat!("gitlab-oauth.", origin_url)),
+                        bstr::BStr::new(&bconcat!("gitlab-oauth.", origin_url)),
                         Self::build_oauth_config(&response, access_token.as_ref()),
                     )?;
                 } else {
                     auth_config_source.add_config_setting(
-                        &legacy_lossy(&bconcat!("gitlab-oauth.", origin_url)),
+                        bstr::BStr::new(&bconcat!("gitlab-oauth.", origin_url)),
                         PhpMixed::string(access_token),
                     )?;
                 }
@@ -414,7 +414,7 @@ impl GitLab {
             .borrow_mut()
             .get_auth_config_source_mut()
             .add_config_setting(
-                &legacy_lossy(&bconcat!("gitlab-oauth.", origin_url)),
+                bstr::BStr::new(&bconcat!("gitlab-oauth.", origin_url)),
                 Self::build_oauth_config(&response, access_token.as_ref()),
             )?;
 

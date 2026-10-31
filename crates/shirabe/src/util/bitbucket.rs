@@ -7,9 +7,7 @@ use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interfac
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{
-    Catch as _, LogicException, PhpMixed, bconcat, json_encode, legacy_lossy, time, trim,
-};
+use shirabe_php_shim::{Catch as _, LogicException, PhpMixed, bconcat, json_encode, time, trim};
 
 fn transport_error_code(err: &anyhow::Error) -> Option<i64> {
     err.catch::<TransportException>().map(|te| te.get_code())
@@ -287,7 +285,7 @@ impl Bitbucket {
         self.config
             .borrow_mut()
             .get_auth_config_source_mut()
-            .remove_config_setting(&legacy_lossy(&bconcat!("http-basic.", origin_url)))?;
+            .remove_config_setting(bstr::BStr::new(&bconcat!("http-basic.", origin_url)))?;
 
         self.io.write_error3(
             "<info>Consumer stored successfully.</info>",
@@ -351,7 +349,7 @@ impl Bitbucket {
         self.config
             .borrow_mut()
             .get_config_source_mut()
-            .remove_config_setting(&legacy_lossy(&bconcat!("bitbucket-oauth.", origin_url)))?;
+            .remove_config_setting(bstr::BStr::new(&bconcat!("bitbucket-oauth.", origin_url)))?;
 
         let token = self.token.as_ref().ok_or_else(|| {
             LogicException::new(
@@ -390,7 +388,7 @@ impl Bitbucket {
             .borrow_mut()
             .get_auth_config_source_mut()
             .add_config_setting(
-                &legacy_lossy(&bconcat!("bitbucket-oauth.", origin_url)),
+                bstr::BStr::new(&bconcat!("bitbucket-oauth.", origin_url)),
                 PhpMixed::Array(consumer),
             )?;
 

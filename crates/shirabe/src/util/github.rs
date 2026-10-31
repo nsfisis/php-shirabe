@@ -264,17 +264,18 @@ impl GitHub {
         let key = legacy_lossy(&bconcat!("github-oauth.", origin_url)).into_owned();
         {
             let mut cfg = self.config.borrow_mut();
-            cfg.get_config_source_mut().remove_config_setting(&key)?;
+            cfg.get_config_source_mut()
+                .remove_config_setting(bstr::BStr::new(&key))?;
         }
         if use_local {
             let mut cfg = self.config.borrow_mut();
             if let Some(local) = cfg.get_local_auth_config_source_mut() {
-                local.add_config_setting(&key, PhpMixed::string(token))?;
+                local.add_config_setting(bstr::BStr::new(&key), PhpMixed::string(token))?;
             }
         } else {
             let mut cfg = self.config.borrow_mut();
             cfg.get_auth_config_source_mut()
-                .add_config_setting(&key, PhpMixed::string(token))?;
+                .add_config_setting(bstr::BStr::new(&key), PhpMixed::string(token))?;
         }
 
         self.io.write_error3(

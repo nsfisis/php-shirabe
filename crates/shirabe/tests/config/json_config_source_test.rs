@@ -67,7 +67,7 @@ fn test_add_repository() {
     repo.insert("type".into(), PhpMixed::string("git".to_string()));
     repo.insert("url".into(), PhpMixed::string("example.tld".to_string()));
     json_config_source
-        .add_repository("example_tld", PhpMixed::Array(repo), true)
+        .add_repository(bstr::BStr::new("example_tld"), PhpMixed::Array(repo), true)
         .unwrap();
 
     assert_file_equals(
@@ -87,7 +87,7 @@ fn test_add_repository_as_list() {
     repo.insert("type".into(), PhpMixed::string("git".to_string()));
     repo.insert("url".into(), PhpMixed::string("example.tld".to_string()));
     json_config_source
-        .add_repository("", PhpMixed::Array(repo), true)
+        .add_repository(bstr::BStr::new(""), PhpMixed::Array(repo), true)
         .unwrap();
 
     assert_file_equals(
@@ -121,7 +121,7 @@ fn test_add_repository_with_options() {
     }
 
     json_config_source
-        .add_repository("example_tld", PhpMixed::Array(repo), true)
+        .add_repository(bstr::BStr::new("example_tld"), PhpMixed::Array(repo), true)
         .unwrap();
 
     assert_file_equals(
@@ -140,7 +140,9 @@ fn test_remove_repository() {
     )
     .unwrap();
     let mut json_config_source = json_config_source(&config);
-    json_config_source.remove_repository("example_tld").unwrap();
+    json_config_source
+        .remove_repository(bstr::BStr::new("example_tld"))
+        .unwrap();
 
     assert_file_equals(&fixture_path("composer-empty.json"), &config);
 }
@@ -152,7 +154,7 @@ fn test_add_packagist_repository_with_false_value() {
     std::fs::copy(fixture_path("composer-repositories.json"), &config).unwrap();
     let mut json_config_source = json_config_source(&config);
     json_config_source
-        .add_repository("packagist", PhpMixed::Bool(false), true)
+        .add_repository(bstr::BStr::new("packagist"), PhpMixed::Bool(false), true)
         .unwrap();
 
     assert_file_equals(
@@ -171,7 +173,9 @@ fn test_remove_packagist() {
     )
     .unwrap();
     let mut json_config_source = json_config_source(&config);
-    json_config_source.remove_repository("packagist").unwrap();
+    json_config_source
+        .remove_repository(bstr::BStr::new("packagist"))
+        .unwrap();
 
     assert_file_equals(&fixture_path("composer-empty.json"), &config);
 }
@@ -334,7 +338,13 @@ fn test_add_link() {
         std::fs::copy(&source_file, &composer_json).unwrap();
         let mut json_config_source = json_config_source(&composer_json);
 
-        json_config_source.add_link(r#type, name, value).unwrap();
+        json_config_source
+            .add_link(
+                bstr::BStr::new(r#type),
+                bstr::BStr::new(name),
+                bstr::BStr::new(value),
+            )
+            .unwrap();
 
         assert_file_equals(&compare_against, &composer_json);
     }
@@ -466,7 +476,9 @@ fn test_remove_link() {
         std::fs::copy(&source_file, &composer_json).unwrap();
         let mut json_config_source = json_config_source(&composer_json);
 
-        json_config_source.remove_link(r#type, name).unwrap();
+        json_config_source
+            .remove_link(bstr::BStr::new(r#type), bstr::BStr::new(name))
+            .unwrap();
 
         assert_file_equals(&compare_against, &composer_json);
     }

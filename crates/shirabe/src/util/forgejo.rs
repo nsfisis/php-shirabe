@@ -148,7 +148,7 @@ impl Forgejo {
         {
             let mut cfg = self.config.borrow_mut();
             cfg.get_config_source_mut()
-                .remove_config_setting(&setting_key)?;
+                .remove_config_setting(bstr::BStr::new(&setting_key))?;
         }
         let value = PhpMixed::Array(indexmap::indexmap! {
             "username".into() => PhpMixed::string(username),
@@ -157,12 +157,12 @@ impl Forgejo {
         if store_in_local_auth_config && has_local_auth {
             let mut cfg = self.config.borrow_mut();
             if let Some(local) = cfg.get_local_auth_config_source_mut() {
-                local.add_config_setting(&setting_key, value)?;
+                local.add_config_setting(bstr::BStr::new(&setting_key), value)?;
             }
         } else {
             let mut cfg = self.config.borrow_mut();
             cfg.get_auth_config_source_mut()
-                .add_config_setting(&setting_key, value)?;
+                .add_config_setting(bstr::BStr::new(&setting_key), value)?;
         }
 
         self.io.write_error3(

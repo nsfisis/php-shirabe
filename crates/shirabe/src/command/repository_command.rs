@@ -421,9 +421,9 @@ impl Command for RepositoryCommand {
                         .as_mut()
                         .unwrap()
                         .insert_repository(
-                            name.as_deref().unwrap(),
+                            bstr::BStr::new(name.as_deref().unwrap()),
                             repo_config,
-                            reference_name,
+                            bstr::BStr::new(reference_name),
                             offset,
                         )?;
                     return Ok(0);
@@ -438,7 +438,11 @@ impl Command for RepositoryCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .add_repository(name.as_deref().unwrap(), repo_config, append)?;
+                    .add_repository(
+                        bstr::BStr::new(name.as_deref().unwrap()),
+                        repo_config,
+                        append,
+                    )?;
                 Ok(0)
             }
             b"remove" | b"rm" | b"delete" => {
@@ -453,13 +457,13 @@ impl Command for RepositoryCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_repository(name_str)?;
+                    .remove_repository(bstr::BStr::new(name_str))?;
                 if ["packagist", "packagist.org"].contains(&name_str) {
                     self.config_source
                         .borrow_mut()
                         .as_mut()
                         .unwrap()
-                        .add_repository("packagist.org", PhpMixed::Null, false)?;
+                        .add_repository(bstr::BStr::new("packagist.org"), PhpMixed::Null, false)?;
                 }
                 Ok(0)
             }
@@ -474,7 +478,10 @@ impl Command for RepositoryCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .set_repository_url(name.as_deref().unwrap(), arg1.as_deref().unwrap());
+                    .set_repository_url(
+                        bstr::BStr::new(name.as_deref().unwrap()),
+                        bstr::BStr::new(arg1.as_deref().unwrap()),
+                    );
                 Ok(0)
             }
             b"get-url" | b"geturl" => {
@@ -540,7 +547,11 @@ impl Command for RepositoryCommand {
                         .borrow_mut()
                         .as_mut()
                         .unwrap()
-                        .add_repository("packagist.org", PhpMixed::Bool(false), append);
+                        .add_repository(
+                            bstr::BStr::new("packagist.org"),
+                            PhpMixed::Bool(false),
+                            append,
+                        );
                     return Ok(0);
                 }
                 Err(RuntimeException::new("Only packagist.org can be enabled/disabled using this command. Use add/remove for other repositories.".to_string()).into())
@@ -558,7 +569,7 @@ impl Command for RepositoryCommand {
                         .borrow_mut()
                         .as_mut()
                         .unwrap()
-                        .remove_repository("packagist.org");
+                        .remove_repository(bstr::BStr::new("packagist.org"));
                     return Ok(0);
                 }
                 Err(RuntimeException::new(

@@ -370,7 +370,7 @@ impl Command for RemoveCommand {
                         .or_default()
                         .push(canonical_name.clone());
                 } else {
-                    json.remove_link(r#type, &canonical_name);
+                    json.remove_link(bstr::BStr::new(r#type), bstr::BStr::new(&canonical_name));
                 }
             } else if let Some(canonical_name) = in_alt_type {
                 io.write_error(format!(
@@ -392,7 +392,10 @@ impl Command for RemoveCommand {
                             .or_default()
                             .push(canonical_name.clone());
                     } else {
-                        json.remove_link(alt_type, &canonical_name);
+                        json.remove_link(
+                            bstr::BStr::new(alt_type),
+                            bstr::BStr::new(&canonical_name),
+                        );
                     }
                 }
             } else {
@@ -432,7 +435,10 @@ impl Command for RemoveCommand {
                                 .or_default()
                                 .push(matched_package.clone());
                         } else {
-                            json.remove_link(r#type, matched_package);
+                            json.remove_link(
+                                bstr::BStr::new(r#type),
+                                bstr::BStr::new(matched_package),
+                            );
                         }
                     }
                 } else if !alt_type_keys.is_empty() && !matches_in_alt_type.is_empty() {
@@ -456,7 +462,10 @@ impl Command for RemoveCommand {
                                     .or_default()
                                     .push(matched_package.clone());
                             } else {
-                                json.remove_link(alt_type, matched_package);
+                                json.remove_link(
+                                    bstr::BStr::new(alt_type),
+                                    bstr::BStr::new(matched_package),
+                                );
                             }
                         }
                     }
@@ -549,10 +558,13 @@ impl Command for RemoveCommand {
                 .map(|m| m.len())
                 .unwrap_or(0);
             if allow_map_len == removed_plugins.len() {
-                json.remove_config_setting("allow-plugins");
+                json.remove_config_setting(bstr::BStr::new("allow-plugins"));
             } else {
                 for plugin in &removed_plugins {
-                    json.remove_config_setting(&format!("allow-plugins.{}", plugin));
+                    json.remove_config_setting(bstr::BStr::new(&format!(
+                        "allow-plugins.{}",
+                        plugin
+                    )));
                 }
             }
         }

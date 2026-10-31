@@ -298,8 +298,7 @@ impl BumpCommand {
         updates: &indexmap::IndexMap<&str, indexmap::IndexMap<String, String>>,
     ) -> anyhow::Result<bool> {
         let contents = match file_get_contents(json.get_path()) {
-            // TODO(bytes): JsonManipulator takes the JSON as a String.
-            Ok(c) => String::from_utf8_lossy(&c).into_owned(),
+            Ok(c) => c,
             Err(_) => {
                 return Err(RuntimeException::new(format!(
                     "Unable to read {} contents.",

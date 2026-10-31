@@ -132,8 +132,10 @@ impl ConfigCommand {
         let mut config_source = self.config_source.borrow_mut();
         let config_source = config_source.as_mut().unwrap();
         match method {
-            "addConfigSetting" => config_source.add_config_setting(key, normalized_value)?,
-            "addProperty" => config_source.add_property(key, normalized_value)?,
+            "addConfigSetting" => {
+                config_source.add_config_setting(bstr::BStr::new(key), normalized_value)?
+            }
+            "addProperty" => config_source.add_property(bstr::BStr::new(key), normalized_value)?,
             _ => unreachable!(),
         }
         Ok(())
@@ -171,9 +173,11 @@ impl ConfigCommand {
         let config_source = config_source.as_mut().unwrap();
         match method {
             "addConfigSetting" => {
-                config_source.add_config_setting(key, normalizer(&values_mixed))?
+                config_source.add_config_setting(bstr::BStr::new(key), normalizer(&values_mixed))?
             }
-            "addProperty" => config_source.add_property(key, normalizer(&values_mixed))?,
+            "addProperty" => {
+                config_source.add_property(bstr::BStr::new(key), normalizer(&values_mixed))?
+            }
             _ => unreachable!(),
         }
         Ok(())
@@ -886,7 +890,7 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .remove_config_setting(&setting_key);
+                .remove_config_setting(bstr::BStr::new(&setting_key));
 
             return Ok(0);
         }
@@ -911,7 +915,7 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .remove_config_setting(&setting_key);
+                .remove_config_setting(bstr::BStr::new(&setting_key));
 
             return Ok(0);
         }
@@ -932,7 +936,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(&setting_key);
+                    .remove_config_setting(bstr::BStr::new(&setting_key));
 
                 return Ok(0);
             }
@@ -953,7 +957,10 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .add_config_setting(&setting_key, PhpMixed::string(values[0].clone()));
+                .add_config_setting(
+                    bstr::BStr::new(&setting_key),
+                    PhpMixed::string(values[0].clone()),
+                );
 
             return Ok(0);
         }
@@ -968,7 +975,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(&setting_key);
+                    .remove_config_setting(bstr::BStr::new(&setting_key));
 
                 return Ok(0);
             }
@@ -987,7 +994,7 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .add_config_setting(&setting_key, normalized_value);
+                .add_config_setting(bstr::BStr::new(&setting_key), normalized_value);
 
             return Ok(0);
         }
@@ -1011,7 +1018,7 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .remove_property(&setting_key);
+                .remove_property(bstr::BStr::new(&setting_key));
 
             return Ok(0);
         }
@@ -1034,7 +1041,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_repository(&legacy_lossy(matches.get(1).unwrap()));
+                    .remove_repository(bstr::BStr::new(matches.get(1).unwrap()));
 
                 return Ok(0);
             }
@@ -1048,7 +1055,7 @@ impl Command for ConfigCommand {
                     .as_mut()
                     .unwrap()
                     .add_repository(
-                        &legacy_lossy(matches.get(1).unwrap()),
+                        bstr::BStr::new(matches.get(1).unwrap()),
                         PhpMixed::Array(repo),
                         input.borrow().get_option("append")?.as_bool() == Some(true),
                     );
@@ -1068,7 +1075,7 @@ impl Command for ConfigCommand {
                             .as_mut()
                             .unwrap()
                             .add_repository(
-                                &legacy_lossy(matches.get(1).unwrap()),
+                                bstr::BStr::new(matches.get(1).unwrap()),
                                 PhpMixed::Bool(false),
                                 input.borrow().get_option("append")?.as_bool() == Some(true),
                             );
@@ -1082,7 +1089,7 @@ impl Command for ConfigCommand {
                         .as_mut()
                         .unwrap()
                         .add_repository(
-                            &legacy_lossy(matches.get(1).unwrap()),
+                            bstr::BStr::new(matches.get(1).unwrap()),
                             value,
                             input.borrow().get_option("append")?.as_bool() == Some(true),
                         );
@@ -1102,7 +1109,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_property(&setting_key);
+                    .remove_property(bstr::BStr::new(&setting_key));
 
                 return Ok(0);
             }
@@ -1162,7 +1169,7 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .add_property(&setting_key, value);
+                .add_property(bstr::BStr::new(&setting_key), value);
 
             return Ok(0);
         }
@@ -1174,7 +1181,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_property(&setting_key);
+                    .remove_property(bstr::BStr::new(&setting_key));
 
                 return Ok(0);
             }
@@ -1183,7 +1190,10 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .add_property(&setting_key, PhpMixed::string(implode(" ", &values)));
+                .add_property(
+                    bstr::BStr::new(&setting_key),
+                    PhpMixed::string(implode(" ", &values)),
+                );
 
             return Ok(0);
         }
@@ -1196,7 +1206,7 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .remove_property(&setting_key);
+                .remove_property(bstr::BStr::new(&setting_key));
 
             return Ok(0);
         }
@@ -1208,7 +1218,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(&setting_key);
+                    .remove_config_setting(bstr::BStr::new(&setting_key));
 
                 return Ok(0);
             }
@@ -1222,7 +1232,7 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .add_config_setting(&setting_key, value);
+                .add_config_setting(bstr::BStr::new(&setting_key), value);
 
             return Ok(0);
         }
@@ -1234,7 +1244,7 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .remove_config_setting(&setting_key);
+                .remove_config_setting(bstr::BStr::new(&setting_key));
 
             return Ok(0);
         }
@@ -1249,7 +1259,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(&setting_key);
+                    .remove_config_setting(bstr::BStr::new(&setting_key));
 
                 return Ok(0);
             }
@@ -1313,7 +1323,7 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .add_config_setting(&setting_key, value);
+                .add_config_setting(bstr::BStr::new(&setting_key), value);
 
             return Ok(0);
         }
@@ -1330,20 +1340,20 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(&format!(
+                    .remove_config_setting(bstr::BStr::new(&format!(
                         "{}.{}",
                         legacy_lossy(&matches.get(1).unwrap()),
                         legacy_lossy(&matches.get(2).unwrap())
-                    ));
+                    )));
                 self.config_source
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(&format!(
+                    .remove_config_setting(bstr::BStr::new(&format!(
                         "{}.{}",
                         legacy_lossy(&matches.get(1).unwrap()),
                         legacy_lossy(&matches.get(2).unwrap())
-                    ));
+                    )));
 
                 return Ok(0);
             }
@@ -1365,7 +1375,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(&key);
+                    .remove_config_setting(bstr::BStr::new(&key));
                 let mut obj: IndexMap<BString, PhpMixed> = IndexMap::new();
                 obj.insert("consumer-key".into(), PhpMixed::string(values[0].clone()));
                 obj.insert(
@@ -1376,13 +1386,13 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .add_config_setting(&key, PhpMixed::Array(obj));
+                    .add_config_setting(bstr::BStr::new(&key), PhpMixed::Array(obj));
             } else if matches.get(1).unwrap() == "gitlab-token" && 2 == values.len() {
                 self.config_source
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(&key);
+                    .remove_config_setting(bstr::BStr::new(&key));
                 let mut obj: IndexMap<BString, PhpMixed> = IndexMap::new();
                 obj.insert("username".into(), PhpMixed::string(values[0].clone()));
                 obj.insert("token".into(), PhpMixed::string(values[1].clone()));
@@ -1390,7 +1400,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .add_config_setting(&key, PhpMixed::Array(obj));
+                    .add_config_setting(bstr::BStr::new(&key), PhpMixed::Array(obj));
             } else if matches!(
                 matches.get(1).unwrap().as_bytes(),
                 b"github-oauth" | b"gitlab-oauth" | b"gitlab-token" | b"bearer"
@@ -1405,12 +1415,12 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(&key);
+                    .remove_config_setting(bstr::BStr::new(&key));
                 self.auth_config_source
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .add_config_setting(&key, PhpMixed::string(values[0].clone()));
+                    .add_config_setting(bstr::BStr::new(&key), PhpMixed::string(values[0].clone()));
             } else if matches.get(1).unwrap() == "http-basic" {
                 if 2 != values.len() {
                     return Err(RuntimeException::new(format!(
@@ -1423,7 +1433,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(&key);
+                    .remove_config_setting(bstr::BStr::new(&key));
                 let mut obj: IndexMap<BString, PhpMixed> = IndexMap::new();
                 obj.insert("username".into(), PhpMixed::string(values[0].clone()));
                 obj.insert("password".into(), PhpMixed::string(values[1].clone()));
@@ -1431,7 +1441,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .add_config_setting(&key, PhpMixed::Array(obj));
+                    .add_config_setting(bstr::BStr::new(&key), PhpMixed::Array(obj));
             } else if matches.get(1).unwrap() == "custom-headers" {
                 if values.is_empty() {
                     return Err(RuntimeException::new(
@@ -1467,12 +1477,12 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(&key);
+                    .remove_config_setting(bstr::BStr::new(&key));
                 self.auth_config_source
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .add_config_setting(&key, PhpMixed::List(formatted_headers));
+                    .add_config_setting(bstr::BStr::new(&key), PhpMixed::List(formatted_headers));
             } else if matches.get(1).unwrap() == "forgejo-token" {
                 if 2 != values.len() {
                     return Err(RuntimeException::new(format!(
@@ -1485,7 +1495,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_config_setting(&key);
+                    .remove_config_setting(bstr::BStr::new(&key));
                 let mut obj: IndexMap<BString, PhpMixed> = IndexMap::new();
                 obj.insert("username".into(), PhpMixed::string(values[0].clone()));
                 obj.insert("token".into(), PhpMixed::string(values[1].clone()));
@@ -1493,7 +1503,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .add_config_setting(&key, PhpMixed::Array(obj));
+                    .add_config_setting(bstr::BStr::new(&key), PhpMixed::Array(obj));
             }
 
             return Ok(0);
@@ -1506,7 +1516,7 @@ impl Command for ConfigCommand {
                     .borrow_mut()
                     .as_mut()
                     .unwrap()
-                    .remove_property(&setting_key);
+                    .remove_property(bstr::BStr::new(&setting_key));
 
                 return Ok(0);
             }
@@ -1520,7 +1530,7 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .add_property(&setting_key, value);
+                .add_property(bstr::BStr::new(&setting_key), value);
 
             return Ok(0);
         }
@@ -1531,7 +1541,7 @@ impl Command for ConfigCommand {
                 .borrow_mut()
                 .as_mut()
                 .unwrap()
-                .remove_property(&setting_key);
+                .remove_property(bstr::BStr::new(&setting_key));
 
             return Ok(0);
         }
