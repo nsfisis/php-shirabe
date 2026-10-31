@@ -5,7 +5,7 @@ use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
     VcsDownloaderBase,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, ProcessExecutor};
 use bstr::BString;
@@ -109,7 +109,7 @@ impl VcsDownloader for FossilDownloader {
         let repo_file = bconcat!(path, ".fossil");
         let real_path: Option<PathBuf> = realpath(path);
 
-        self.inner.io.write_error(&format!(
+        self.inner.io.write_error(format!(
             "Cloning {}",
             package
                 .get_source_reference()
@@ -167,7 +167,7 @@ impl VcsDownloader for FossilDownloader {
             &indexmap::IndexMap::new(),
         )?;
 
-        self.inner.io.write_error(&format!(
+        self.inner.io.write_error(format!(
             " Updating to {}",
             target
                 .get_source_reference()

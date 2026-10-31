@@ -10,7 +10,7 @@ use crate::filter::platform_requirement_filter::{
     PlatformRequirementFilterInterface,
 };
 use crate::installer::InstallationManagerInterface;
-use crate::io::{IOInterface, IOInterfaceImmutable, NullIO};
+use crate::io::{IOInterface, IOInterfaceWrite, NullIO};
 use crate::json::JsonFile;
 use crate::package::{LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle};
 use crate::script::ScriptEvents;
@@ -500,7 +500,7 @@ impl AutoloadGenerator {
         };
         for (class_name, ambiguous_paths) in &ambiguous_classes {
             if ambiguous_paths.len() > 1 {
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<warning>Warning: Ambiguous class resolution, \"{}\" was found {}x: in \"{}\" and \"{}\", the first will be used.</warning>",
                     class_name.display_lossy(),
                     ambiguous_paths.len() + 1,
@@ -508,7 +508,7 @@ impl AutoloadGenerator {
                     implode("\", \"", ambiguous_paths).display_lossy()
                 ));
             } else {
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<warning>Warning: Ambiguous class resolution, \"{}\" was found in both \"{}\" and \"{}\", the first will be used.</warning>",
                     class_name.display_lossy(),
                     class_map.get_class_path(class_name)?.display_lossy(),
@@ -517,7 +517,7 @@ impl AutoloadGenerator {
             }
         }
         if !ambiguous_classes.is_empty() {
-            self.io.write_error(&format!(
+            self.io.write_error(format!(
                 "<info>To resolve ambiguity in classes not under your control you can ignore them by path using <href={}>exclude-from-classmap</>",
                 OutputFormatter::escape("https://getcomposer.org/doc/04-schema.md#exclude-files-from-classmaps")?.display_lossy()
             ));
@@ -526,7 +526,7 @@ impl AutoloadGenerator {
         // output PSR violations which are not coming from the vendor dir
         class_map.clear_psr_violations_by_path(path_to_bytes(&vendor_path));
         for msg in class_map.get_psr_violations() {
-            self.io.write_error(&format!("<warning>{}</warning>", msg));
+            self.io.write_error(format!("<warning>{}</warning>", msg));
         }
 
         class_map.add_class(
@@ -967,7 +967,7 @@ impl AutoloadGenerator {
                     let Some(runtime_exception) = e.catch::<RuntimeException>() else {
                         return Err(e);
                     };
-                    self.io.write_error(&format!(
+                    self.io.write_error(format!(
                         "<warning>{}</warning>",
                         runtime_exception.get_message()
                     ));
@@ -1077,7 +1077,7 @@ impl AutoloadGenerator {
                 }
             }
             for duplicate_file in array_unique(&duplicates) {
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<warning> - {}</warning>",
                     duplicate_file.display_lossy()
                 ));

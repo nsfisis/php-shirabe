@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Advisory/Auditor.php
 
 use crate::advisory::{AnySecurityAdvisory, SecurityAdvisory};
-use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable};
+use crate::io::{ConsoleIO, IOInterface, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::{CompletePackageInterfaceHandle, PackageInterfaceHandle, base_package};
 use crate::repository::RepositorySet;
@@ -215,7 +215,7 @@ impl Auditor {
                     };
                     let pkg_plurality = if pkg_count == 1 { "" } else { "s" };
                     let punctuation = if format == "summary" { "." } else { ":" };
-                    io.write_error(&format!(
+                    io.write_error(format!(
                         "<{tag}>Found {total_advisory_count} {ignored}security vulnerability advisor{plurality} affecting {pkg_count} package{pkg_plurality}{punctuation}</{tag}>"
                     ));
                     self.output_advisories(io, advisories_to_output, format)?;
@@ -232,7 +232,7 @@ impl Auditor {
         if !unreachable_repos.is_empty() {
             io.write_error("<warning>The following repositories were unreachable:</warning>");
             for repo in &unreachable_repos {
-                io.write_error(&format!("  - {}", repo.display_lossy()));
+                io.write_error(format!("  - {}", repo.display_lossy()));
             }
         }
 
@@ -494,7 +494,9 @@ impl Auditor {
                 table.add_row(
                     row.iter()
                         .map(|cell| {
-                            ConsoleIO::sanitize(&cell.display_lossy().to_string(), true).into()
+                            legacy_lossy(&ConsoleIO::sanitize(cell, true))
+                                .into_owned()
+                                .into()
                         })
                         .collect::<Vec<Cell>>()
                         .into(),
@@ -571,7 +573,7 @@ impl Auditor {
         packages: &[CompletePackageInterfaceHandle],
         format: &BStr,
     ) -> anyhow::Result<()> {
-        io.write_error(&format!(
+        io.write_error(format!(
             "<error>Found {} abandoned package{}:</error>",
             packages.len() as i64,
             if packages.len() > 1 {
@@ -588,7 +590,7 @@ impl Auditor {
                 } else {
                     bstr::BString::from("No replacement was suggested".to_string())
                 };
-                io.write_error(&format!(
+                io.write_error(format!(
                     "{} is abandoned. {}.",
                     self.get_package_name_with_link(pkg.clone().into())
                         .display_lossy(),
@@ -633,12 +635,15 @@ impl Auditor {
             })
             .into_owned();
             let row: Vec<Cell> = vec![
-                ConsoleIO::sanitize(
-                    &legacy_lossy(&self.get_package_name_with_link(pkg.clone().into())),
+                legacy_lossy(&ConsoleIO::sanitize(
+                    self.get_package_name_with_link(pkg.clone().into()),
                     true,
-                )
+                ))
+                .into_owned()
                 .into(),
-                ConsoleIO::sanitize(&replacement, true).into(),
+                legacy_lossy(&ConsoleIO::sanitize(&replacement, true))
+                    .into_owned()
+                    .into(),
             ];
             table.add_row(row.into());
         }

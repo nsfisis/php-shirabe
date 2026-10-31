@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{FilterRepository, RepositoryInterfaceHandle};
 use crate::util::{HttpDownloader, ProcessExecutor};
@@ -112,7 +112,7 @@ impl RepositoryManager {
                 config.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
             ))
             .unwrap_or_default();
-            self.io.write_error(&format!("<warning>Repository \"{}\" ({}) has a packagist key which should be in its own repository definition</warning>", name.unwrap_or_default(), config_json));
+            self.io.write_error(format!("<warning>Repository \"{}\" ({}) has a packagist key which should be in its own repository definition</warning>", name.unwrap_or_default(), config_json));
         }
 
         let class = legacy_lossy(&self.repository_classes[r#type].clone()).into_owned();

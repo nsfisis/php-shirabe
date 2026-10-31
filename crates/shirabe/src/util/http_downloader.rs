@@ -4,7 +4,7 @@ use crate::composer;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::version::VersionParser;
 use crate::util::http::{NativeHttpDownloader, Response};
 use crate::util::{
@@ -532,7 +532,7 @@ impl HttpDownloader {
                 }
             }
 
-            io.write_error(&format!(
+            io.write_error(format!(
                 "<{tp}>{capitalized} from {url}: {msg}</{tp}>",
                 tp = r#type,
                 capitalized = ucfirst(r#type).display_lossy(),
@@ -570,7 +570,7 @@ impl HttpDownloader {
                             continue;
                         }
 
-                        io.write_error(&format!(
+                        io.write_error(format!(
                             "<{tp}>{capitalized} from {url}: {msg}</{tp}>",
                             tp = r#type.display_lossy(),
                             capitalized = ucfirst(&r#type).display_lossy(),

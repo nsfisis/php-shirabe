@@ -7,7 +7,7 @@ use crate::composer;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::{BufferIO, IOInterface, IOInterfaceImmutable, NullIO};
+use crate::io::{BufferIO, IOInterface, IOInterfaceWrite, NullIO};
 use crate::json::{JsonFile, JsonValidationException};
 use crate::package::version::VersionParser;
 use crate::package::{LockerInterface, RootPackage};
@@ -531,7 +531,7 @@ impl DiagnoseCommand {
         }
 
         if file_exists(format!("{}/keys.tags.pub", home)) {
-            io.write(&format!(
+            io.write(format!(
                 "Tags Public Key Fingerprint: {}",
                 Keys::fingerprint(&format!("{}/keys.tags.pub", home))?
             ));
@@ -540,7 +540,7 @@ impl DiagnoseCommand {
         }
 
         if file_exists(format!("{}/keys.dev.pub", home)) {
-            io.write(&format!(
+            io.write(format!(
                 "Dev Public Key Fingerprint: {}",
                 Keys::fingerprint(&format!("{}/keys.dev.pub", home))?
             ));
@@ -806,7 +806,7 @@ impl DiagnoseCommand {
         }
 
         for message in &messages {
-            io.write(&legacy_lossy(&trim2(message, " \t\n\r\0\u{0B}")));
+            io.write(trim2(message, " \t\n\r\0\u{0B}"));
         }
     }
 
@@ -1233,7 +1233,7 @@ impl Command for DiagnoseCommand {
             self.output_result(r);
         }
 
-        io.write(&format!(
+        io.write(format!(
             "Shirabe version: <comment>{}</comment> (based on Composer <comment>{}</comment>)",
             composer::SHIRABE_VERSION,
             composer::VERSION
@@ -1269,7 +1269,7 @@ impl Command for DiagnoseCommand {
             php_version = bconcat!(php_version, " - ", cp.get_description().unwrap_or_default());
         }
 
-        io.write(&format!(
+        io.write(format!(
             "PHP version: <comment>{}</comment>",
             legacy_lossy(&php_version)
         ));
@@ -1277,20 +1277,20 @@ impl Command for DiagnoseCommand {
         let diagnostics = shirabe_php_rpc::get_diagnostics();
 
         if let Some(php_binary) = &diagnostics.php_binary {
-            io.write(&format!(
+            io.write(format!(
                 "PHP binary path: <comment>{}</comment>",
                 php_binary.display()
             ));
         }
 
-        io.write(&format!(
+        io.write(format!(
             "OpenSSL version: {}",
             match &diagnostics.openssl_version_text {
                 Some(text) => format!("<comment>{}</comment>", legacy_lossy(&text)),
                 None => "<error>missing</error>".to_string(),
             }
         ));
-        io.write(&format!("curl version: {}", self.get_curl_version()));
+        io.write(format!("curl version: {}", self.get_curl_version()));
 
         let finder = ExecutableFinder::new();
         let has_system_unzip = finder.find("unzip", None, &[]).is_some();
@@ -1311,7 +1311,7 @@ impl Command for DiagnoseCommand {
             false
         };
 
-        io.write(&format!(
+        io.write(format!(
             "zip: {}, {}, {}{}",
             if diagnostics.extension_loaded("zip") {
                 "<comment>extension present</comment>"
@@ -1337,7 +1337,7 @@ impl Command for DiagnoseCommand {
 
         if let Some(ref mut c) = composer {
             let c = crate::composer::composer_full(c);
-            io.write(&format!(
+            io.write(format!(
                 "Active plugins: {}",
                 legacy_lossy(&implode(
                     ", ",
@@ -1402,7 +1402,7 @@ impl Command for DiagnoseCommand {
                 if url.starts_with("https://repo.packagist.org") {
                     continue;
                 }
-                io.write_no_newline(&format!(
+                io.write_no_newline(format!(
                     "Checking connectivity to {}: ",
                     legacy_lossy(
                         &repo_arr
@@ -1430,7 +1430,7 @@ impl Command for DiagnoseCommand {
                     .map_err(|e| anyhow::anyhow!(e))?;
                 if !proxy.get_status(None)?.is_empty() {
                     let r#type = if proxy.is_secure() { "HTTPS" } else { "HTTP" };
-                    io.write_no_newline(&format!("Checking {} proxy with {}: ", r#type, proto));
+                    io.write_no_newline(format!("Checking {} proxy with {}: ", r#type, proto));
                     let r = self.check_http_proxy(&proxy, proto)?;
                     self.output_result(r);
                 }
@@ -1459,10 +1459,7 @@ impl Command for DiagnoseCommand {
             .unwrap_or_default();
         if oauth.len() as i64 > 0 {
             for (domain, token) in &oauth {
-                io.write_no_newline(&format!(
-                    "Checking {} oauth access: ",
-                    legacy_lossy(&domain)
-                ));
+                io.write_no_newline(format!("Checking {} oauth access: ", legacy_lossy(&domain)));
                 let r = self.check_github_oauth(
                     // TODO(bytes): domains are Strings, so non-UTF-8 bytes are replaced.
                     &domain.to_str_lossy(),
@@ -1477,7 +1474,7 @@ impl Command for DiagnoseCommand {
                 Ok(GithubRateLimit::Core { limit, remaining }) => {
                     if 10 > remaining {
                         io.write("<warning>WARNING</warning>");
-                        io.write(&format!(
+                        io.write(format!(
                             "<comment>GitHub has a rate limit on their API. You currently have <options=bold>{}</options=bold> out of <options=bold>{}</options=bold> requests left.\nSee https://developer.github.com/v3/#rate-limiting and also\n    https://getcomposer.org/doc/articles/troubleshooting.md#api-rate-limit-and-oauth-tokens</comment>",
                             remaining, limit,
                         ));

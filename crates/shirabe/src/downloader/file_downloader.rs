@@ -10,7 +10,7 @@ use crate::downloader::{
 };
 use crate::event_dispatcher::EventDispatcher;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::{IOInterface, IOInterfaceImmutable, NullIO, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::package::comparer::Comparer;
 use crate::plugin::{
@@ -208,7 +208,7 @@ impl FileDownloader {
         target: PackageInterfaceHandle,
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
-        self.io.borrow().write_error(&format!(
+        self.io.borrow().write_error(format!(
             "  - {}{}",
             UpdateOperation::format(initial.clone(), target.clone(), false),
             install_operation_appendix
@@ -452,7 +452,7 @@ impl DownloaderInterface for FileDownloader {
             if from_cache {
                 if output {
                     self.io.borrow().write_error3(
-                        &format!(
+                        format!(
                             "  - Loading <info>{}</info> (<comment>{}</comment>) from cache",
                             package.get_name().display_lossy(),
                             package
@@ -479,7 +479,7 @@ impl DownloaderInterface for FileDownloader {
                 }
             } else {
                 if output {
-                    self.io.borrow().write_error(&format!(
+                    self.io.borrow().write_error(format!(
                         "  - Downloading <info>{}</info> (<comment>{}</comment>)",
                         package.get_name().display_lossy(),
                         package
@@ -579,19 +579,19 @@ impl DownloaderInterface for FileDownloader {
                                 .catch::<TransportException>()
                                 .map_or(0, |te| te.get_code());
                             if self.io.borrow().is_debug() {
-                                self.io.borrow().write_error(&format!(
+                                self.io.borrow().write_error(format!(
                                     "    Failed downloading {}: [{}] {}: {}",
                                     package.get_name().display_lossy(),
                                     get_class(&PhpMixed::Null).display_lossy(),
                                     code,
                                     e
                                 ));
-                                self.io.borrow().write_error(&format!(
+                                self.io.borrow().write_error(format!(
                                     "    Trying the next URL for {}",
                                     package.get_name().display_lossy()
                                 ));
                             } else {
-                                self.io.borrow().write_error(&format!(
+                                self.io.borrow().write_error(format!(
                                     "    Failed downloading {}, trying the next URL ({}: {})",
                                     package.get_name().display_lossy(),
                                     code,
@@ -723,7 +723,7 @@ impl DownloaderInterface for FileDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.io.borrow().write_error(&format!(
+            self.io.borrow().write_error(format!(
                 "  - {}",
                 InstallOperation::format(package.clone(), false)
             ));
@@ -800,7 +800,7 @@ impl DownloaderInterface for FileDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.io.borrow().write_error(&format!(
+            self.io.borrow().write_error(format!(
                 "  - {}",
                 UninstallOperation::format(package, false)
             ));

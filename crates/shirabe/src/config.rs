@@ -6,7 +6,7 @@ mod json_config_source;
 pub use config_source_interface::*;
 pub use json_config_source::*;
 
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
@@ -1041,7 +1041,7 @@ impl Config {
             {
                 if !self.warned_hosts.contains_key(hostname) {
                     io.write_error3(
-                            &format!(
+                            format!(
                                 "<warning>Warning: Accessing {} over {} which is an insecure protocol.</warning>",
                                 hostname.display_lossy(),
                                 scheme.as_ref().map_or(B(""), |scheme| scheme.as_slice()).as_bstr().display_lossy()
@@ -1084,7 +1084,7 @@ impl Config {
 
             if let Some(w) = warning {
                 io.write_error3(
-                    &format!(
+                    format!(
                         "<warning>Warning: Accessing {} with {} disabled.</warning>",
                         hostname.display_lossy(),
                         w

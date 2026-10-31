@@ -13,7 +13,7 @@
 
 use indexmap::IndexMap;
 use shirabe::io::io_interface::NORMAL;
-use shirabe::io::{ConsoleIO, IOInterfaceImmutable, IOInterfaceMutable};
+use shirabe::io::{ConsoleIO, IOInterfaceImmutable, IOInterfaceMutable, IOInterfaceWrite};
 use shirabe_php_shim::{PhpMixed, PhpResource, fwrite_resource, php_fopen_resource, rewind};
 use shirabe_symfony_console::helper::QuestionHelper;
 use shirabe_symfony_console::input::{ArrayInput, InputInterface, StreamableInputInterface};
@@ -300,11 +300,256 @@ fn test_has_authentication() {
     assert!(!console_io.has_authentication(bstr::BStr::new("repoName2")));
 }
 
-#[ignore = "data provider includes malformed-UTF-8 inputs (e.g. \\xFF, \\xC3\\x28); sanitize() takes a &str which is UTF-8-only and cannot carry invalid bytes, so those cases are unrepresentable"]
 #[test]
 fn test_sanitize() {
-    // TODO(bytes): the data provider includes malformed-UTF-8 inputs (e.g. \xFF, \xC3\x28);
-    // sanitize() takes a &str which is UTF-8-only and cannot carry invalid bytes, so those cases
-    // are unrepresentable.
-    todo!()
+    // A PHP `string|string[]` input is sanitized element by element, so each case holds a list.
+    let cases: Vec<(&str, Vec<&[u8]>, bool, Vec<&[u8]>)> = vec![
+        (
+            "string with \\n allowed",
+            vec![b"Hello\nWorld".as_slice()],
+            true,
+            vec![b"Hello\nWorld".as_slice()],
+        ),
+        (
+            "string with \\r\\n allowed",
+            vec![b"Hello\r\nWorld".as_slice()],
+            true,
+            vec![b"Hello\r\nWorld".as_slice()],
+        ),
+        (
+            "string with standalone \\r removed",
+            vec![b"Hello\rWorld".as_slice()],
+            true,
+            vec![b"HelloWorld".as_slice()],
+        ),
+        (
+            "string with escape sequence removed",
+            vec![b"Hello\x1B[31mWorld".as_slice()],
+            true,
+            vec![b"HelloWorld".as_slice()],
+        ),
+        (
+            "string with control chars removed",
+            vec![b"Hello\x01\x08\x09World".as_slice()],
+            true,
+            vec![b"HelloWorld".as_slice()],
+        ),
+        (
+            "string with mixed control chars and newlines",
+            vec![b"Line1\n\x1B[32mLine2\x08\rLine3".as_slice()],
+            true,
+            vec![b"Line1\nLine2Line3".as_slice()],
+        ),
+        (
+            "string with null bytes are allowed",
+            vec![b"Hello\x00World".as_slice()],
+            true,
+            vec![b"Hello\x00World".as_slice()],
+        ),
+        (
+            "string with \\n removed",
+            vec![b"Hello\nWorld".as_slice()],
+            false,
+            vec![b"HelloWorld".as_slice()],
+        ),
+        (
+            "string with \\r\\n removed",
+            vec![b"Hello\r\nWorld".as_slice()],
+            false,
+            vec![b"HelloWorld".as_slice()],
+        ),
+        (
+            "string with escape sequence removed (no newlines)",
+            vec![b"Hello\x1B[31mWorld".as_slice()],
+            false,
+            vec![b"HelloWorld".as_slice()],
+        ),
+        (
+            "string with all control chars removed",
+            vec![b"Hello\x01\x08\x09\x0A\x0DWorld".as_slice()],
+            false,
+            vec![b"HelloWorld".as_slice()],
+        ),
+        (
+            "array with newlines allowed",
+            vec![b"Hello\nWorld".as_slice(), b"Foo\r\nBar".as_slice()],
+            true,
+            vec![b"Hello\nWorld".as_slice(), b"Foo\r\nBar".as_slice()],
+        ),
+        (
+            "array with control chars removed",
+            vec![b"Hello\x1B[31mWorld".as_slice(), b"Foo\x08Bar\r".as_slice()],
+            true,
+            vec![b"HelloWorld".as_slice(), b"FooBar".as_slice()],
+        ),
+        (
+            "array with newlines removed",
+            vec![b"Hello\nWorld".as_slice(), b"Foo\r\nBar".as_slice()],
+            false,
+            vec![b"HelloWorld".as_slice(), b"FooBar".as_slice()],
+        ),
+        (
+            "array with all control chars removed",
+            vec![b"Test\x01\x0A".as_slice(), b"Data\x1B[m\x0D".as_slice()],
+            false,
+            vec![b"Test".as_slice(), b"Data".as_slice()],
+        ),
+        (
+            "empty string",
+            vec![b"".as_slice()],
+            true,
+            vec![b"".as_slice()],
+        ),
+        ("empty array", vec![], true, vec![]),
+        (
+            "string with no control chars",
+            vec![b"Hello World".as_slice()],
+            true,
+            vec![b"Hello World".as_slice()],
+        ),
+        (
+            "string with unicode",
+            vec![b"Hello \xE4\xB8\x96\xE7\x95\x8C\nTest".as_slice()],
+            true,
+            vec![b"Hello \xE4\xB8\x96\xE7\x95\x8C\nTest".as_slice()],
+        ),
+        (
+            "CSI with multiple parameters",
+            vec![b"Text\x1B[1;31;40mColored\x1B[0mNormal".as_slice()],
+            true,
+            vec![b"TextColoredNormal".as_slice()],
+        ),
+        (
+            "CSI SGR reset",
+            vec![b"Before\x1B[mAfter".as_slice()],
+            true,
+            vec![b"BeforeAfter".as_slice()],
+        ),
+        (
+            "CSI cursor positioning",
+            vec![b"Line\x1B[2J\x1B[H\x1B[10;5HText".as_slice()],
+            true,
+            vec![b"LineText".as_slice()],
+        ),
+        (
+            "OSC with BEL terminator",
+            vec![b"Text\x1B]0;Window Title\x07More".as_slice()],
+            true,
+            vec![b"TextMore".as_slice()],
+        ),
+        (
+            "OSC with ST terminator",
+            vec![b"Text\x1B]2;Title\x1B\\More".as_slice()],
+            true,
+            vec![b"TextMore".as_slice()],
+        ),
+        (
+            "Simple ESC sequences",
+            vec![b"Text\x1B7Saved\x1B8Restored\x1BcReset".as_slice()],
+            true,
+            vec![b"TextSavedRestoredReset".as_slice()],
+        ),
+        (
+            "ESC D (Index)",
+            vec![b"Line1\x1BDLine2".as_slice()],
+            true,
+            vec![b"Line1Line2".as_slice()],
+        ),
+        (
+            "ESC E (Next Line)",
+            vec![b"Line1\x1BELine2".as_slice()],
+            true,
+            vec![b"Line1Line2".as_slice()],
+        ),
+        (
+            "ESC M (Reverse Index)",
+            vec![b"Text\x1BMMore".as_slice()],
+            true,
+            vec![b"TextMore".as_slice()],
+        ),
+        (
+            "ESC N (SS2) and ESC O (SS3)",
+            vec![b"Text\x1BNchar\x1BOanother".as_slice()],
+            true,
+            vec![b"Textcharanother".as_slice()],
+        ),
+        (
+            "Multiple escape sequences in sequence",
+            vec![b"\x1B[1m\x1B[31m\x1B[44mBold Red on Blue\x1B[0m".as_slice()],
+            true,
+            vec![b"Bold Red on Blue".as_slice()],
+        ),
+        (
+            "CSI with question mark (private mode)",
+            vec![b"Text\x1B[?25lHidden\x1B[?25hVisible".as_slice()],
+            true,
+            vec![b"TextHiddenVisible".as_slice()],
+        ),
+        (
+            "CSI erase sequences",
+            vec![b"Clear\x1B[2J\x1B[K\x1B[1KScreen".as_slice()],
+            true,
+            vec![b"ClearScreen".as_slice()],
+        ),
+        (
+            "Hyperlink OSC 8",
+            vec![b"Click \x1B]8;;https://example.com\x1B\\here\x1B]8;;\x1B\\ for link".as_slice()],
+            true,
+            vec![b"Click here for link".as_slice()],
+        ),
+        (
+            "Mixed content with complex sequences",
+            vec![
+                b"\x1B[1;33mWarning:\x1B[0m File\x1B[31m not\x1B[0m found\n\x1B[2KRetrying..."
+                    .as_slice(),
+            ],
+            true,
+            vec![b"Warning: File not found\nRetrying...".as_slice()],
+        ),
+        (
+            "malformed UTF-8 single byte",
+            vec![b"Hello\xFFWorld".as_slice()],
+            true,
+            vec![b"Hello?World".as_slice()],
+        ),
+        (
+            "malformed UTF-8 multiple bytes",
+            vec![b"Test\xC3\x28Data".as_slice()],
+            true,
+            vec![b"Test?(Data".as_slice()],
+        ),
+        (
+            "malformed UTF-8 with ANSI escape",
+            vec![b"Line\xFF\x1B[31mColor\xFE".as_slice()],
+            true,
+            vec![b"Line?Color?".as_slice()],
+        ),
+        (
+            "malformed UTF-8 in array",
+            vec![b"Item\xFF".as_slice(), b"Data\xC3\x28".as_slice()],
+            true,
+            vec![b"Item?".as_slice(), b"Data?(".as_slice()],
+        ),
+        (
+            "valid UTF-8 unchanged",
+            vec![b"Hello \xE4\xB8\x96\xE7\x95\x8C Test".as_slice()],
+            true,
+            vec![b"Hello \xE4\xB8\x96\xE7\x95\x8C Test".as_slice()],
+        ),
+        (
+            "mixed valid and invalid UTF-8",
+            vec![b"Hello\xFF\xE4\xB8\x96\xE7\x95\x8C\xFETest".as_slice()],
+            true,
+            vec![b"Hello?\xE4\xB8\x96\xE7\x95\x8C?Test".as_slice()],
+        ),
+    ];
+    for (name, input, allow_newlines, expected) in cases {
+        let actual: Vec<bstr::BString> = input
+            .iter()
+            .map(|message| ConsoleIO::sanitize(message, allow_newlines))
+            .collect();
+        let expected: Vec<bstr::BString> =
+            expected.iter().map(|e| bstr::BString::from(*e)).collect();
+        assert_eq!(expected, actual, "{name}");
+    }
 }

@@ -2,7 +2,7 @@
 
 use crate::dependency_resolver::{Pool, PoolOptimizer, Request, SecurityAdvisoryPoolFilter};
 use crate::event_dispatcher::EventDispatcherInterface;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::version::StabilityFilter;
 use crate::package::{
     AliasPackageHandle, BasePackageHandle, CompleteAliasPackageHandle, PackageInterfaceHandle,
@@ -721,7 +721,7 @@ impl PoolBuilder {
                         for root_require in &skipped_root_requires {
                             if !self.update_allow_warned.contains_key(root_require) {
                                 self.update_allow_warned.insert(root_require.clone(), true);
-                                self.io.write_error(&format!("<warning>Dependency {} is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>", root_require.display_lossy()));
+                                self.io.write_error(format!("<warning>Dependency {} is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>", root_require.display_lossy()));
                             }
                         }
                     }
@@ -758,7 +758,7 @@ impl PoolBuilder {
                         for root_require in &skipped_root_requires {
                             if !self.update_allow_warned.contains_key(root_require) {
                                 self.update_allow_warned.insert(root_require.clone(), true);
-                                self.io.write_error(&format!("<warning>Dependency {} is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>", root_require.display_lossy()));
+                                self.io.write_error(format!("<warning>Dependency {} is also a root requirement. Package has not been listed as an update argument, so keeping locked at old version. Use --with-all-dependencies (-W) to include root dependencies.</warning>", root_require.display_lossy()));
                             }
                         }
                     }
@@ -867,17 +867,17 @@ impl PoolBuilder {
                 }
             }
             if matched_platform_package {
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<warning>Pattern \"{}\" listed for update matches platform packages, but these cannot be updated by Shirabe.</warning>",
                     pattern.display_lossy()
                 ));
             } else if strpos(pattern, "*").is_some() {
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<warning>Pattern \"{}\" listed for update does not match any locked packages.</warning>",
                     pattern.display_lossy()
                 ));
             } else {
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<warning>Package \"{}\" listed for update is not locked.</warning>",
                     pattern.display_lossy()
                 ));
@@ -1110,7 +1110,7 @@ impl PoolBuilder {
         }
 
         self.io.write3(
-            &format!(
+            format!(
                 "Pool optimizer completed in {:.3} seconds",
                 (microtime() - before),
             ),
@@ -1118,7 +1118,7 @@ impl PoolBuilder {
             io_interface::VERY_VERBOSE,
         );
         self.io.write3(
-            &format!(
+            format!(
                 "<info>Found {} package versions referenced in your dependency graph. {} ({}%) were optimized away.</info>",
                 legacy_lossy(&number_format(total, 0, ".", ",")),
                 legacy_lossy(&number_format(filtered, 0, ".", ",")),
@@ -1160,7 +1160,7 @@ impl PoolBuilder {
         }
 
         self.io.write3(
-            &format!(
+            format!(
                 "Security advisory pool filter completed in {:.3} seconds",
                 (microtime() - before),
             ),
@@ -1168,7 +1168,7 @@ impl PoolBuilder {
             io_interface::VERY_VERBOSE,
         );
         self.io.write3(
-            &format!(
+            format!(
                 "<info>Found {} package versions referenced in your dependency graph. {} ({}%) were filtered away.</info>",
                 legacy_lossy(&number_format(total, 0, ".", ",")),
                 legacy_lossy(&number_format(filtered, 0, ".", ",")),

@@ -18,7 +18,9 @@ use crate::event_dispatcher::{EventDispatcher, ScriptExecutionException};
 use crate::exception::NoSslException;
 use crate::factory::Factory;
 use crate::installer::Installer;
-use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable, NullIO, io_interface};
+use crate::io::{
+    ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, NullIO, io_interface,
+};
 use crate::json::JsonValidationException;
 use crate::util::{ErrorHandler, Filesystem, HttpDownloader, Platform, Silencer};
 use bstr::{B, BString, ByteSlice};
@@ -355,7 +357,7 @@ impl Application {
                 Err(e) => {
                     if e.is_instanceof::<InvalidArgumentException>() {
                         if required {
-                            self.io.write_error(&e.to_string());
+                            self.io.write_error(e.to_string());
                             if self.are_exceptions_caught() {
                                 // PHP calls `exit(1)` here, terminating before parent::run() can
                                 // re-render the exception. Propagate it as an ExitException so the
@@ -1935,7 +1937,7 @@ impl ApplicationHandle {
             application.borrow_mut().initial_working_directory = getcwd();
             let cwd = Platform::get_cwd(true).unwrap_or_default();
             io.write_error3(
-                &format!(
+                format!(
                     "Changed CWD to {}",
                     if !cwd.as_os_str().is_empty() {
                         cwd
@@ -2012,14 +2014,14 @@ impl ApplicationHandle {
                     if use_parent_dir_if_no_json_available.as_bool() != Some(true)
                         && !io.is_interactive()
                     {
-                        io.write_error(&format!("<info>No composer.json in current directory, to use the one at {} run interactively or set config.use-parent-dir to true</info>", dir.display_lossy()));
+                        io.write_error(format!("<info>No composer.json in current directory, to use the one at {} run interactively or set config.use-parent-dir to true</info>", dir.display_lossy()));
                         break;
                     }
                     if use_parent_dir_if_no_json_available.as_bool() == Some(true)
                         || io.ask_confirmation(format!("<info>No composer.json in current directory, do you want to use the one at {}?</info> [<comment>y,n</comment>]? ", legacy_lossy(&dir)), true)?
                     {
                         if use_parent_dir_if_no_json_available.as_bool() == Some(true) {
-                            io.write_error(&format!("<info>No composer.json in current directory, changing working directory to {}</info>", dir.display_lossy()));
+                            io.write_error(format!("<info>No composer.json in current directory, changing working directory to {}</info>", dir.display_lossy()));
                         } else {
                             io.write_error("<info>Always want to use the parent dir? Use \"shirabe config --global use-parent-dir true\" to change the default.</info>");
                         }
@@ -2108,7 +2110,7 @@ impl ApplicationHandle {
                     let cmd_name = command.borrow().get_name().unwrap_or_default();
                     if application.borrow_mut().has(&cmd_name) {
                         let cls = command.borrow().php_class_name();
-                        io.write_error(&format!("<warning>Plugin command {} ({}) would override a Shirabe command and has been skipped</warning>", cmd_name, cls));
+                        io.write_error(format!("<warning>Plugin command {} ({}) would override a Shirabe command and has been skipped</warning>", cmd_name, cls));
                     } else {
                         self.add(command)?;
                     }
@@ -2167,7 +2169,7 @@ impl ApplicationHandle {
 
         if !is_proxy_command {
             io.write_error3(
-                &format!(
+                format!(
                     "Running Shirabe {} ({}, based on Composer {}) with PHP {} on {} / {}",
                     composer::SHIRABE_VERSION,
                     composer::SHIRABE_RELEASE_DATE,
@@ -2181,7 +2183,7 @@ impl ApplicationHandle {
             );
 
             if shirabe_php_rpc::get_php_version().version_id < 70205 {
-                io.write_error(&format!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", shirabe_php_rpc::get_php_version().version.display_lossy()));
+                io.write_error(format!("<warning>Shirabe supports PHP 7.2.5 and above, you will most likely encounter problems with your PHP {}. Upgrading is strongly recommended but you can use Composer 2.2.x LTS as a fallback.</warning>", shirabe_php_rpc::get_php_version().version.display_lossy()));
             }
 
             if shirabe_php_rpc::xdebug::is_xdebug_active()
@@ -2196,7 +2198,7 @@ impl ApplicationHandle {
                 && command_name.as_deref() != Some("selfupdate")
                 && time() > dev_warning_time
             {
-                io.write_error(&format!(
+                io.write_error(format!(
                     "<warning>Warning: This development build of Shirabe is over 60 days old. It is recommended to update it by running \"{} self-update\" to get the latest version.</warning>",
                     std::path::Path::new(
                         &PHP_SERVER
@@ -2244,7 +2246,7 @@ impl ApplicationHandle {
                 && unlink(&tempfile).is_ok()
                 && !file_exists(&tempfile))
             {
-                io.write_error(&format!("<error>PHP temp directory ({}) does not exist or is not writable to Shirabe. Set sys_temp_dir in your php.ini</error>", sys_get_temp_dir().display()));
+                io.write_error(format!("<error>PHP temp directory ({}) does not exist or is not writable to Shirabe. Set sys_temp_dir in your php.ini</error>", sys_get_temp_dir().display()));
             }
 
             // add non-standard scripts as own commands
@@ -2265,7 +2267,7 @@ impl ApplicationHandle {
                         );
                         if !defined(&script_event_const) {
                             if application.borrow_mut().has(script) {
-                                io.write_error(&format!("<warning>A script named {} would override a Shirabe command and has been skipped</warning>", script));
+                                io.write_error(format!("<warning>A script named {} would override a Shirabe command and has been skipped</warning>", script));
                             } else {
                                 let mut description = format!(
                                     "Runs the {} script as defined in composer.json",
@@ -2390,7 +2392,7 @@ impl ApplicationHandle {
                                                 shirabe_php_rpc::PluginValue::Bool(true),
                                             ],
                                         )? {
-                                            io.write_error(&format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
+                                            io.write_error(format!("<warning>The script named {} extends SingleCommandApplication which is not compatible with Composer 2.9+, make sure you extend Symfony\\Component\\Console\\Command instead.</warning>", script));
                                         }
 
                                         let handle = crate::plugin::new_php_object(
@@ -2409,7 +2411,7 @@ impl ApplicationHandle {
                                             && !bytes.is_empty()
                                             && bytes.as_slice() != script.as_bytes()
                                         {
-                                            io.write_error(&format!("<warning>The script named {} in composer.json has a mismatched name in its class definition. For consistency, either use the same name, or do not define one inside the class.</warning>", script));
+                                            io.write_error(format!("<warning>The script named {} in composer.json has a mismatched name in its class definition. For consistency, either use the same name, or do not define one inside the class.</warning>", script));
                                             // override it with the defined script name
                                             crate::plugin::call_php_entity_method(
                                                 &handle,
@@ -2485,7 +2487,7 @@ impl ApplicationHandle {
                 .borrow()
                 .has_parameter_option(&["--version", "-V"], true)
             {
-                io.write_error(&format!(
+                io.write_error(format!(
                     "<info>PHP</info> version <comment>{}</comment> ({})",
                     shirabe_php_rpc::get_php_version().version.display_lossy(),
                     shirabe_php_rpc::get_php_binary().display(),
@@ -2503,7 +2505,7 @@ impl ApplicationHandle {
             }
 
             if let Some(st) = start_time {
-                io.write_error(&format!(
+                io.write_error(format!(
                     "<info>Memory usage: {}MiB (peak: {}MiB), time: {}s</info>",
                     round((memory_get_usage() as f64) / 1024.0 / 1024.0, 2),
                     round((memory_get_peak_usage(false) as f64) / 1024.0 / 1024.0, 2),

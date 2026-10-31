@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Command/BaseDependencyCommand.php
 
 use crate::command::BaseCommand;
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::version::VersionParser;
 use crate::package::{Package, RootPackage};
 use crate::plugin::{CommandEvent, PluginEvents};
@@ -200,7 +200,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                         );
                     }
                 } else {
-                    self.get_io().write_error(&format!(
+                    self.get_io().write_error(format!(
                         "<error>Package \"{}\" could not be found with constraint \"{}\", results below will most likely be incomplete.</error>",
                         needle, text_constraint
                     ));
@@ -217,7 +217,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 } else {
                     ""
                 };
-                self.get_io().write_error(&format!(
+                self.get_io().write_error(format!(
                     "<info>Package \"{} {}\" found in version \"{}\"{}.</info>",
                     needle,
                     text_constraint,
@@ -226,7 +226,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 ));
             }
             Some(matched) if inverted => {
-                self.get_io().write(&format!(
+                self.get_io().write(format!(
                     "<comment>Package \"{}\" {} is already installed! To find out why, run `shirabe why {}`</comment>",
                     needle,
                     legacy_lossy(&matched.get_pretty_version()),
@@ -294,7 +294,7 @@ pub trait BaseDependencyCommand: BaseCommand {
             } else {
                 String::new()
             };
-            self.get_io().write_error(&format!(
+            self.get_io().write_error(format!(
                 "<info>There is no installed package depending on \"{}\"{}",
                 needle, extra
             ));
@@ -306,7 +306,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 .as_complete()
                 .and_then(|c| c.get_description())
                 .unwrap_or_default();
-            self.get_io().write(&format!(
+            self.get_io().write(format!(
                 "<info>{}</info> {} {}",
                 legacy_lossy(&root.get_pretty_name()),
                 legacy_lossy(&root.get_pretty_version()),
@@ -337,7 +337,7 @@ pub trait BaseDependencyCommand: BaseCommand {
                 }
             }
 
-            self.get_io().write_error(&format!(
+            self.get_io().write_error(format!(
                 "Not finding what you were looking for? Try calling `shirabe {} \"{}:{}\" --dry-run` to get another view on the problem.",
                 composer_command, needle, text_constraint
             ));

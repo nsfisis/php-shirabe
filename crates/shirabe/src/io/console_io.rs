@@ -3,11 +3,12 @@
 use crate::config::Config;
 use crate::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable, io_interface};
 use crate::question::StrictConfirmationQuestion;
-use bstr::{BString, ByteSlice};
+use bstr::{BStr, BString, ByteSlice};
 use indexmap::{IndexMap, indexmap};
 use shirabe_php_shim::{
-    PhpMixed, array_search, in_array_strict, is_array, is_string, legacy_lossy, memory_get_usage,
-    microtime, preg_replace, str_repeat, strip_tags, strlen,
+    PhpMixed, array_search, bconcat, in_array_strict, is_array, is_string, legacy_lossy,
+    mb_check_encoding, mb_convert_encoding, memory_get_usage, microtime, preg_replace, str_repeat,
+    strip_tags, strlen,
 };
 use shirabe_symfony_console::helper::{
     ProgressBar, QuestionHelper, QuestionHelperInterface, Table,
@@ -33,8 +34,8 @@ pub struct ConsoleIO {
     /// directly instead of a `HelperSet`.
     question_helper: std::cell::RefCell<QuestionHelper>,
 
-    last_message: std::cell::RefCell<String>,
-    last_message_err: std::cell::RefCell<String>,
+    last_message: std::cell::RefCell<BString>,
+    last_message_err: std::cell::RefCell<BString>,
 
     start_time: Option<f64>,
     verbosity_map: IndexMap<i64, i64>,
@@ -60,8 +61,8 @@ impl ConsoleIO {
             input,
             output,
             question_helper: std::cell::RefCell::new(question_helper),
-            last_message: std::cell::RefCell::new(String::new()),
-            last_message_err: std::cell::RefCell::new(String::new()),
+            last_message: std::cell::RefCell::new(BString::default()),
+            last_message_err: std::cell::RefCell::new(BString::default()),
             start_time: None,
             verbosity_map,
         }
@@ -71,7 +72,7 @@ impl ConsoleIO {
         self.start_time = Some(start_time);
     }
 
-    fn do_write(&self, messages: &str, newline: bool, stderr: bool, verbosity: i64, raw: bool) {
+    fn do_write(&self, messages: &BStr, newline: bool, stderr: bool, verbosity: i64, raw: bool) {
         let mut sf_verbosity = *self.verbosity_map.get(&verbosity).unwrap_or(&0);
         if sf_verbosity > self.output.borrow().get_verbosity() {
             return;
@@ -84,9 +85,12 @@ impl ConsoleIO {
         let messages = if let Some(start_time) = self.start_time {
             let memory_usage = (memory_get_usage() as f64) / 1024.0 / 1024.0;
             let time_spent = microtime() - start_time;
-            format!("[{:.1}MiB/{:.2}s] {}", memory_usage, time_spent, messages)
+            bconcat!(
+                format!("[{:.1}MiB/{:.2}s] ", memory_usage, time_spent),
+                messages
+            )
         } else {
-            messages.to_string()
+            BString::from(messages)
         };
 
         let error_output = if stderr {
@@ -99,27 +103,23 @@ impl ConsoleIO {
             None
         };
         if let Some(error_output) = error_output {
-            error_output.borrow().write(
-                std::slice::from_ref(&bstr::BString::from(messages.clone())),
-                newline,
-                sf_verbosity,
-            );
+            error_output
+                .borrow()
+                .write(std::slice::from_ref(&messages), newline, sf_verbosity);
             *self.last_message_err.borrow_mut() = messages;
 
             return;
         }
 
-        self.output.borrow().write(
-            std::slice::from_ref(&bstr::BString::from(messages.clone())),
-            newline,
-            sf_verbosity,
-        );
+        self.output
+            .borrow()
+            .write(std::slice::from_ref(&messages), newline, sf_verbosity);
         *self.last_message.borrow_mut() = messages;
     }
 
     fn do_overwrite(
         &self,
-        messages: &str,
+        messages: &BStr,
         newline: bool,
         size: Option<i64>,
         stderr: bool,
@@ -137,7 +137,7 @@ impl ConsoleIO {
         });
         // ...let's fill its length with backspaces
         self.do_write(
-            &legacy_lossy(&str_repeat("\x08", size as usize)),
+            str_repeat("\x08", size as usize).as_bstr(),
             false,
             stderr,
             verbosity,
@@ -154,7 +154,7 @@ impl ConsoleIO {
         if fill > 0 {
             // whitespace whatever has left
             self.do_write(
-                &legacy_lossy(&str_repeat(" ", fill as usize)),
+                str_repeat(" ", fill as usize).as_bstr(),
                 false,
                 stderr,
                 verbosity,
@@ -162,7 +162,7 @@ impl ConsoleIO {
             );
             // move the cursor back
             self.do_write(
-                &legacy_lossy(&str_repeat("\x08", fill as usize)),
+                str_repeat("\x08", fill as usize).as_bstr(),
                 false,
                 stderr,
                 verbosity,
@@ -171,13 +171,13 @@ impl ConsoleIO {
         }
 
         if newline {
-            self.do_write("", true, stderr, verbosity, false);
+            self.do_write("".into(), true, stderr, verbosity, false);
         }
 
         if stderr {
-            *self.last_message_err.borrow_mut() = messages.to_string();
+            *self.last_message_err.borrow_mut() = BString::from(messages);
         } else {
-            *self.last_message.borrow_mut() = messages.to_string();
+            *self.last_message.borrow_mut() = BString::from(messages);
         }
     }
 
@@ -210,7 +210,7 @@ impl ConsoleIO {
     /// All other control chars (except NULL bytes) as well as ANSI escape sequences are removed.
     ///
     /// Invalid unicode sequences are turned into question marks.
-    pub fn sanitize(messages: &str, allow_newlines: bool) -> String {
+    pub fn sanitize(messages: impl AsRef<[u8]>, allow_newlines: bool) -> BString {
         // Match ANSI escape sequences:
         // - CSI (Control Sequence Introducer): ESC [ params intermediate final
         // - OSC (Operating System Command): ESC ] ... ESC \ or BEL
@@ -232,17 +232,21 @@ impl ConsoleIO {
         } else {
             (format!("{{{}|[\\x01-\\x1A]}}u", escape_pattern), "")
         };
-        let messages = Self::ensure_valid_utf8(messages);
+        let messages = Self::ensure_valid_utf8(messages.as_ref());
 
-        legacy_lossy(&preg_replace(&pattern, replacement, &messages)).into_owned()
+        preg_replace(&pattern, replacement, &messages)
     }
 
     /// Ensures a string is valid UTF-8, replacing invalid byte sequences with '?'
-    // TODO(bytes): PHP sanitizes invalid byte sequences here, but `&str` is always valid UTF-8
-    // so this is a no-op for now. The codebase does not yet strictly distinguish `BString` from
-    // `String`; once it does, this should take `&BStr` and lossily convert it to `String`.
-    fn ensure_valid_utf8(string: &str) -> String {
-        string.to_string()
+    fn ensure_valid_utf8(string: &[u8]) -> BString {
+        // Quick check: if string is already valid UTF-8, return as-is
+        if mb_check_encoding(string, "UTF-8") {
+            return BString::from(string);
+        }
+
+        // Use mb_convert_encoding to replace invalid sequences with '?'
+        // This makes it visible when data quality issues occur
+        mb_convert_encoding(string, "UTF-8", "UTF-8")
     }
 
     /// Delegates to `QuestionHelper::ask`.
@@ -283,31 +287,43 @@ impl IOInterfaceImmutable for ConsoleIO {
         self.output.borrow().is_decorated()
     }
 
-    fn write3(&self, message: &str, newline: bool, verbosity: i64) {
+    fn write_bytes(&self, message: &bstr::BStr, newline: bool, verbosity: i64) {
         let message = Self::sanitize(message, true);
 
-        self.do_write(&message, newline, false, verbosity, false);
+        self.do_write(message.as_bstr(), newline, false, verbosity, false);
     }
 
-    fn write_error3(&self, message: &str, newline: bool, verbosity: i64) {
+    fn write_error_bytes(&self, message: &bstr::BStr, newline: bool, verbosity: i64) {
         let message = Self::sanitize(message, true);
 
-        self.do_write(&message, newline, true, verbosity, false);
+        self.do_write(message.as_bstr(), newline, true, verbosity, false);
     }
 
-    fn write_raw3(&self, message: &str, newline: bool, verbosity: i64) {
+    fn write_raw_bytes(&self, message: &bstr::BStr, newline: bool, verbosity: i64) {
         self.do_write(message, newline, false, verbosity, true);
     }
 
-    fn write_error_raw3(&self, message: &str, newline: bool, verbosity: i64) {
+    fn write_error_raw_bytes(&self, message: &bstr::BStr, newline: bool, verbosity: i64) {
         self.do_write(message, newline, true, verbosity, true);
     }
 
-    fn overwrite4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
+    fn overwrite_bytes(
+        &self,
+        message: &bstr::BStr,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
         self.do_overwrite(message, newline, size, false, verbosity);
     }
 
-    fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
+    fn overwrite_error_bytes(
+        &self,
+        message: &bstr::BStr,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
         self.do_overwrite(message, newline, size, true, verbosity);
     }
 
@@ -315,13 +331,16 @@ impl IOInterfaceImmutable for ConsoleIO {
         let sanitized_question = Self::sanitize(&question, true);
         let sanitized_default = if is_string(&default) {
             Some(PhpMixed::string(Self::sanitize(
-                &default.as_string().unwrap_or_default().to_str_lossy(),
+                default.as_string().unwrap_or_default(),
                 true,
             )))
         } else {
             Some(default)
         };
-        let question = Question::new(sanitized_question, sanitized_default);
+        let question = Question::new(
+            legacy_lossy(&sanitized_question).into_owned(),
+            sanitized_default,
+        );
 
         self.ask_question(&question)
     }
@@ -329,7 +348,7 @@ impl IOInterfaceImmutable for ConsoleIO {
     fn ask_confirmation(&self, question: String, default: bool) -> anyhow::Result<bool> {
         let sanitized = Self::sanitize(&question, true);
         let question = StrictConfirmationQuestion::new(
-            sanitized,
+            legacy_lossy(&sanitized).into_owned(),
             default,
             "/^y(?:es)?$/i".to_string(),
             "/^no?$/i".to_string(),
@@ -349,13 +368,16 @@ impl IOInterfaceImmutable for ConsoleIO {
         let sanitized_question = Self::sanitize(&question, true);
         let sanitized_default = if is_string(&default) {
             Some(PhpMixed::string(Self::sanitize(
-                &default.as_string().unwrap_or_default().to_str_lossy(),
+                default.as_string().unwrap_or_default(),
                 true,
             )))
         } else {
             Some(default)
         };
-        let mut question = Question::new(sanitized_question, sanitized_default);
+        let mut question = Question::new(
+            legacy_lossy(&sanitized_question).into_owned(),
+            sanitized_default,
+        );
         // Question::set_validator takes Fn(Option<PhpMixed>) -> Result<PhpMixed, InvalidArgumentException>;
         // adapt the None answer to PHP's null and translate the validator's anyhow error into the
         // InvalidArgumentException the Question validator type expects (QuestionHelper retries on it).
@@ -381,7 +403,10 @@ impl IOInterfaceImmutable for ConsoleIO {
 
     fn ask_and_hide_answer(&self, question: String) -> anyhow::Result<Option<String>> {
         let sanitized_question = Self::sanitize(&question, true);
-        let mut question = Question::new(sanitized_question, Some(PhpMixed::Null));
+        let mut question = Question::new(
+            legacy_lossy(&sanitized_question).into_owned(),
+            Some(PhpMixed::Null),
+        );
         // setHidden only throws when an autocompleter is set, which is not the case here.
         question
             .set_hidden(true)
@@ -404,10 +429,7 @@ impl IOInterfaceImmutable for ConsoleIO {
         // ChoiceQuestion::new expects an IndexMap<BString, PhpMixed>; project the
         // sanitized choice list/map into the keyed form, preserving keys.
         let sanitize_choice = |choice: &PhpMixed| {
-            PhpMixed::string(Self::sanitize(
-                &choice.as_string().unwrap_or_default().to_str_lossy(),
-                true,
-            ))
+            PhpMixed::string(Self::sanitize(choice.as_string().unwrap_or_default(), true))
         };
         let sanitized_choices: IndexMap<BString, PhpMixed> = match &choices {
             PhpMixed::List(l) => l
@@ -423,16 +445,19 @@ impl IOInterfaceImmutable for ConsoleIO {
         };
         let sanitized_default = if is_string(&default) {
             Some(PhpMixed::string(Self::sanitize(
-                &default.as_string().unwrap_or_default().to_str_lossy(),
+                default.as_string().unwrap_or_default(),
                 true,
             )))
         } else {
             Some(default)
         };
         // Empty choices raise a LogicException (programmer error in PHP).
-        let mut question =
-            ChoiceQuestion::new(sanitized_question, sanitized_choices, sanitized_default)
-                .expect("select() always provides at least one choice");
+        let mut question = ChoiceQuestion::new(
+            legacy_lossy(&sanitized_question).into_owned(),
+            sanitized_choices,
+            sanitized_default,
+        )
+        .expect("select() always provides at least one choice");
         // PHP: IOInterface requires false, and Question requires null or int
         let max_attempts = match attempts {
             PhpMixed::Bool(false) => None,

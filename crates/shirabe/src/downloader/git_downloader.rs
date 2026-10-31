@@ -6,7 +6,7 @@ use crate::downloader::{
     ChangeReportInterface, DvcsDownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
     VcsDownloaderBase,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Git as GitUtil, Platform, ProcessExecutor, Url};
 use bstr::{B, BStr, BString, ByteSlice};
@@ -462,7 +462,7 @@ impl GitDownloader {
         // reference was not found (prints "fatal: reference is not a tree: $ref")
         if strpos(self.inner.process.borrow().get_error_output(), reference).is_some() {
             self.inner.io.write_error3(
-                &format!(
+                format!(
                     "    <warning>{} is gone (history was rewritten?)</warning>",
                     reference.display_lossy()
                 ),
@@ -627,7 +627,7 @@ impl GitDownloader {
         }
 
         self.inner.io.write_error3(
-            &output.display_lossy().to_string(),
+            output.display_lossy().to_string(),
             true,
             io_interface::NORMAL,
         );
@@ -834,7 +834,7 @@ impl VcsDownloader for GitDownloader {
             && Cache::is_usable(&cache_path)
         {
             self.inner.io.write_error3(
-                &format!(
+                format!(
                     "  - Syncing <info>{}</info> (<comment>{}</comment>) into cache",
                     package.get_name().display_lossy(),
                     package
@@ -845,7 +845,7 @@ impl VcsDownloader for GitDownloader {
                 io_interface::NORMAL,
             );
             self.inner.io.write_error3(
-                &format!("    Cloning to cache at {}", cache_path.display()),
+                format!("    Cloning to cache at {}", cache_path.display()),
                 true,
                 io_interface::DEBUG,
             );
@@ -1230,7 +1230,7 @@ impl VcsDownloader for GitDownloader {
             &preg_split(php_regex!(r"{\s*\r?\n\s*}"), &changes),
         );
         self.inner.io.write_error3(
-            &format!(
+            format!(
                 "    <error>{} has modified files:</error>",
                 package.get_pretty_name().display_lossy()
             ),
@@ -1239,7 +1239,7 @@ impl VcsDownloader for GitDownloader {
         );
         let slice_end = 10_usize.min(changes.len());
         self.inner.io.write_error3(
-            &implode("\n", &changes[..slice_end])
+            implode("\n", &changes[..slice_end])
                 .display_lossy()
                 .to_string(),
             true,
@@ -1247,7 +1247,7 @@ impl VcsDownloader for GitDownloader {
         );
         if (changes.len() as i64) > 10 {
             self.inner.io.write_error3(
-                &format!(
+                format!(
                     "    <info>{} more files modified, choose \"v\" to view the full list</info>",
                     changes.len() as i64 - 10
                 ),
@@ -1289,7 +1289,7 @@ impl VcsDownloader for GitDownloader {
                 }
                 Some("v") => {
                     self.inner.io.write_error3(
-                        &implode("\n", &changes).display_lossy().to_string(),
+                        implode("\n", &changes).display_lossy().to_string(),
                         true,
                         io_interface::NORMAL,
                     );
@@ -1306,7 +1306,7 @@ impl VcsDownloader for GitDownloader {
             if do_help {
                 // help:
                 self.inner.io.write_error3(
-                    &[
+                    [
                         format!(
                             "    y - discard changes and apply the {}",
                             if update { "update" } else { "uninstall" }

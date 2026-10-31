@@ -6,7 +6,7 @@ use crate::composer::PartialComposerHandle;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::{DefaultPolicy, PolicyInterface};
 use crate::filter::platform_requirement_filter::PlatformRequirementFilterInterface;
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
@@ -123,7 +123,7 @@ impl ShowCommand {
                 } else {
                     0
                 };
-                io.write_no_newline(&format!(
+                io.write_no_newline(format!(
                     "{}<href={}>{}</>{}",
                     indent,
                     legacy_lossy(
@@ -134,13 +134,13 @@ impl ShowCommand {
                 ));
             } else {
                 let width_pad = if pad_name { name_length } else { 0 };
-                io.write_no_newline(&format!("{}{:<width$}", indent, name, width = width_pad));
+                io.write_no_newline(format!("{}{:<width$}", indent, name, width = width_pad));
             }
             if let Some(version) = &package.version
                 && write_version
             {
                 let width_pad = if pad_version { version_length } else { 0 };
-                io.write_no_newline(&format!(" {:<width$}", version, width = width_pad));
+                io.write_no_newline(format!(" {:<width$}", version, width = width_pad));
             }
             if let (Some(latest_version), Some(update_status)) =
                 (&package.latest, &package.latest_status)
@@ -156,7 +156,7 @@ impl ShowCommand {
                     latest_version = format!("{} {}", marker, latest_version);
                 }
                 let width_pad = if pad_latest { latest_length } else { 0 };
-                io.write_no_newline(&format!(
+                io.write_no_newline(format!(
                     " <{}>{:<width$}</{}>",
                     style,
                     latest_version,
@@ -169,7 +169,7 @@ impl ShowCommand {
                     } else {
                         0
                     };
-                    io.write_no_newline(&format!(" {:<width$}", age, width = width_pad));
+                    io.write_no_newline(format!(" {:<width$}", age, width = width_pad));
                 }
             }
             if let Some(Some(description)) = &package.description
@@ -216,18 +216,18 @@ impl ShowCommand {
                     }
                 }
 
-                io.write_no_newline(&format!(" {}", description));
+                io.write_no_newline(format!(" {}", description));
             }
             if let Some(path) = &package.path {
                 let path_str = match path {
                     Some(s) => s.clone(),
                     None => "null".to_string(),
                 };
-                io.write_no_newline(&format!(" {}", path_str));
+                io.write_no_newline(format!(" {}", path_str));
             }
             io.write("");
             if let Some(warning) = &package.warning {
-                io.write(&format!("<warning>{}</warning>", warning));
+                io.write(format!("<warning>{}</warning>", warning));
             }
         }
     }
@@ -368,7 +368,7 @@ impl ShowCommand {
         if !package.get_suggests().is_empty() {
             self.get_io().write("\n<info>suggests</info>");
             for (suggested, reason) in package.get_suggests().iter() {
-                self.get_io().write(&format!(
+                self.get_io().write(format!(
                     "{} <comment>{}</comment>",
                     legacy_lossy(&suggested),
                     legacy_lossy(&reason)
@@ -393,23 +393,23 @@ impl ShowCommand {
         let is_installed_package = !PlatformRepository::is_platform_package(package.get_name())
             && installed_repo.has_package(package.clone().into())?;
 
-        self.get_io().write(&format!(
+        self.get_io().write(format!(
             "<info>name</info>     : {}",
             legacy_lossy(&package.get_pretty_name())
         ));
-        self.get_io().write(&format!(
+        self.get_io().write(format!(
             "<info>descrip.</info> : {}",
             legacy_lossy(&package.get_description().unwrap_or_default())
         ));
         let keywords = package.get_keywords();
-        self.get_io().write(&format!(
+        self.get_io().write(format!(
             "<info>keywords</info> : {}",
             implode(", ", &keywords).display_lossy()
         ));
         self.print_versions(package.clone(), versions, installed_repo)?;
         if is_installed_package && let Some(rd) = package.get_release_date() {
             let rel = self.get_relative_time(&rd);
-            self.get_io().write(&format!(
+            self.get_io().write(format!(
                 "<info>released</info> : {}, {}",
                 rd.format(date_format_to_strftime("Y-m-d")),
                 rel
@@ -428,7 +428,7 @@ impl ShowCommand {
                     )
                 }
             };
-            self.get_io().write(&format!(
+            self.get_io().write(format!(
                 "<info>latest</info>   : <{}>{}</{}>{}",
                 style,
                 legacy_lossy(&latest.get_pretty_version()),
@@ -439,22 +439,22 @@ impl ShowCommand {
         } else {
             package.clone().into()
         };
-        self.get_io().write(&format!(
+        self.get_io().write(format!(
             "<info>type</info>     : {}",
             legacy_lossy(&package.get_type())
         ));
         self.print_licenses(package.clone());
-        self.get_io().write(&format!(
+        self.get_io().write(format!(
             "<info>homepage</info> : {}",
             legacy_lossy(&package.get_homepage().unwrap_or_default())
         ));
-        self.get_io().write(&format!(
+        self.get_io().write(format!(
             "<info>source</info>   : [{}] <comment>{}</comment> {}",
             legacy_lossy(&package.get_source_type().unwrap_or_default()),
             legacy_lossy(&package.get_source_url().unwrap_or_default()),
             legacy_lossy(&package.get_source_reference().unwrap_or_default())
         ));
-        self.get_io().write(&format!(
+        self.get_io().write(format!(
             "<info>dist</info>     : [{}] <comment>{}</comment> {}",
             legacy_lossy(&package.get_dist_type().unwrap_or_default()),
             legacy_lossy(&package.get_dist_url().unwrap_or_default()),
@@ -473,7 +473,7 @@ impl ShowCommand {
                 })
                 .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned());
             if let Some(p) = path {
-                self.get_io().write(&format!(
+                self.get_io().write(format!(
                     "<info>path</info>     : {}",
                     realpath(&p)
                         .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
@@ -483,7 +483,7 @@ impl ShowCommand {
                 self.get_io().write("<info>path</info>     : null");
             }
         }
-        self.get_io().write(&format!(
+        self.get_io().write(format!(
             "<info>names</info>    : {}",
             legacy_lossy(&implode(", ", &package.get_names(true))).into_owned()
         ));
@@ -499,7 +499,7 @@ impl ShowCommand {
                 None => String::new(),
             };
 
-            self.get_io().write_error(&format!(
+            self.get_io().write_error(format!(
                     "<warning>Attention: This package is abandoned and no longer maintained.{}</warning>",
                     replacement
                 ));
@@ -509,7 +509,7 @@ impl ShowCommand {
         if !support.is_empty() {
             self.get_io().write("\n<info>support</info>");
             for (r#type, value) in support.iter() {
-                self.get_io().write(&format!(
+                self.get_io().write(format!(
                     "<comment>{}</comment> : {}",
                     legacy_lossy(&r#type),
                     legacy_lossy(&value)
@@ -522,7 +522,7 @@ impl ShowCommand {
             self.get_io().write("\n<info>autoload</info>");
             for (r#type, autoloads) in autoload_config.iter() {
                 self.get_io()
-                    .write(&format!("<comment>{}</comment>", legacy_lossy(&r#type)));
+                    .write(format!("<comment>{}</comment>", legacy_lossy(&r#type)));
 
                 if r#type == "psr-0" || r#type == "psr-4" {
                     if let PhpMixed::Array(map) = autoloads {
@@ -545,7 +545,7 @@ impl ShowCommand {
                             } else {
                                 name.as_bstr()
                             };
-                            self.get_io().write(&format!(
+                            self.get_io().write(format!(
                                 "{} => {}",
                                 legacy_lossy(&name_disp),
                                 path_str
@@ -559,14 +559,13 @@ impl ShowCommand {
                         .iter()
                         .filter_map(|v| v.as_string().map(|s| legacy_lossy(s).into_owned()))
                         .collect();
-                    self.get_io().write(&joined.join(", "));
+                    self.get_io().write(joined.join(", "));
                 }
             }
             let include_paths = package.get_include_paths();
             if !include_paths.is_empty() {
                 self.get_io().write("<comment>include-path</comment>");
-                self.get_io()
-                    .write(&legacy_lossy(&implode(", ", &include_paths)));
+                self.get_io().write(implode(", ", &include_paths));
             }
         }
 
@@ -605,7 +604,7 @@ impl ShowCommand {
         let versions_str = versions_keys.join(", ");
 
         self.get_io()
-            .write(&format!("<info>versions</info> : {}", versions_str));
+            .write(format!("<info>versions</info> : {}", versions_str));
 
         Ok(())
     }
@@ -621,10 +620,10 @@ impl ShowCommand {
         let io = self.get_io();
         let links = package.get_links_for_type(link_type);
         if !links.is_empty() {
-            io.write(&format!("\n<info>{}</info>", title));
+            io.write(format!("\n<info>{}</info>", title));
 
             for link in links.iter() {
-                io.write(&format!(
+                io.write(format!(
                     "{} <comment>{}</comment>",
                     legacy_lossy(&link.1.get_target()),
                     legacy_lossy(&link.1.get_pretty_constraint()),
@@ -662,7 +661,7 @@ impl ShowCommand {
                 }),
             };
 
-            io.write(&format!("<info>license</info>  : {}", legacy_lossy(&out)));
+            io.write(format!("<info>license</info>  : {}", legacy_lossy(&out)));
         }
     }
 
@@ -951,12 +950,12 @@ impl ShowCommand {
     fn display_package_tree(&self, array_tree: Vec<PackageTree>) {
         for package in array_tree.iter() {
             self.get_io()
-                .write_no_newline(&format!("<info>{}</info>", package.name));
+                .write_no_newline(format!("<info>{}</info>", package.name));
             self.get_io()
-                .write_no_newline(&format!(" {}", package.version));
+                .write_no_newline(format!(" {}", package.version));
             if let Some(description) = &package.description {
                 let trimmed = description.split(['\r', '\n']).next().unwrap_or_default();
-                self.get_io().write(&format!(" {}", trimmed));
+                self.get_io().write(format!(" {}", trimmed));
             } else {
                 // output newline
                 self.get_io().write("");
@@ -1630,7 +1629,7 @@ impl Command for ShowCommand {
                 PhpMixed::string("json".to_string()),
             ],
         ) {
-            self.get_io().write_error(&format!(
+            self.get_io().write_error(format!(
                 "Unsupported format \"{}\". See help for supported formats.",
                 format
             ));
@@ -1677,7 +1676,7 @@ impl Command for ShowCommand {
                 composer.borrow_partial().get_package(),
             );
             if input.borrow().get_option("name-only")?.as_bool() == Some(true) {
-                self.get_io().write(&legacy_lossy(&package.get_name()));
+                self.get_io().write(package.get_name());
 
                 return Ok(0);
             }
@@ -1734,7 +1733,7 @@ impl Command for ShowCommand {
                 repos = RepositoryInterfaceHandle::new(CompositeRepository::new(
                     default_repos.into_values().collect(),
                 ));
-                self.get_io().write_error(&format!(
+                self.get_io().write_error(format!(
                     "No composer.json found in the current directory, showing available packages from {}",
                     names.join(", ")
                 ));
@@ -1787,7 +1786,7 @@ impl Command for ShowCommand {
                 .keys()
                 .map(|s| legacy_lossy(s).into_owned())
                 .collect();
-            self.get_io().write_error(&format!(
+            self.get_io().write_error(format!(
                 "No composer.json found in the current directory, showing available packages from {}",
                 names.join(", ")
             ));
@@ -2065,8 +2064,7 @@ impl Command for ShowCommand {
                 exit_code = 1;
             }
             if input.borrow().get_option("path")?.as_bool() == Some(true) {
-                self.get_io()
-                    .write_no_newline(&legacy_lossy(&package.get_name()));
+                self.get_io().write_no_newline(package.get_name());
                 let path = {
                     let composer_ref = composer.as_ref().unwrap();
                     composer_ref
@@ -2080,7 +2078,7 @@ impl Command for ShowCommand {
                         .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                         .unwrap_or_default();
                     let trimmed = real.split(['\r', '\n']).next().unwrap_or_default();
-                    self.get_io().write(&format!(" {}", trimmed));
+                    self.get_io().write(format!(" {}", trimmed));
                 } else {
                     self.get_io().write(" null");
                 }
@@ -2599,9 +2597,9 @@ impl Command for ShowCommand {
                 if show_all_types {
                     if r#type == "available" {
                         self.get_io()
-                            .write(&format!("<comment>{}</comment>:", r#type));
+                            .write(format!("<comment>{}</comment>:", r#type));
                     } else {
-                        self.get_io().write(&format!("<info>{}</info>:", r#type));
+                        self.get_io().write(format!("<info>{}</info>:", r#type));
                     }
                 }
 

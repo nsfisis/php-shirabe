@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{BStr, BString};
 use indexmap::IndexMap;
@@ -130,7 +130,7 @@ impl GitHub {
             String::new(),
         ];
         self.io
-            .write_error3(&lines.join("\n"), true, io_interface::NORMAL);
+            .write_error3(lines.join("\n"), true, io_interface::NORMAL);
 
         let encoded_note = str_replace("%20", "+", rawurlencode(&note));
         let lines = [
@@ -145,7 +145,7 @@ impl GitHub {
             String::new(),
         ];
         self.io
-            .write_error3(&lines.join("\n"), true, io_interface::NORMAL);
+            .write_error3(lines.join("\n"), true, io_interface::NORMAL);
 
         let lines = [
             "2. When all relevant _private_ GitHub repositories belong to a single user or organisation, use a fine-grained token with".to_string(),
@@ -159,7 +159,7 @@ impl GitHub {
             String::new(),
         ];
         self.io
-            .write_error3(&lines.join("\n"), true, io_interface::NORMAL);
+            .write_error3(lines.join("\n"), true, io_interface::NORMAL);
 
         let mut lines3 = vec![
             "3. A \"classic\" token grants broad permissions on your behalf to all repositories accessible by you.".to_string(),
@@ -175,7 +175,7 @@ impl GitHub {
         ];
         let _ = &mut lines3;
         self.io
-            .write_error3(&lines3.join("\n"), true, io_interface::NORMAL);
+            .write_error3(lines3.join("\n"), true, io_interface::NORMAL);
 
         self.io.write_error3(
             "For additional information, check https://getcomposer.org/doc/articles/authentication-for-private-packages.md#github-oauth",

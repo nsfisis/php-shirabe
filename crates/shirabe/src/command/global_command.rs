@@ -5,6 +5,7 @@ use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::Application;
 use crate::console::input::InputArgument;
 use crate::factory::Factory;
+use crate::io::IOInterfaceWrite;
 use crate::util::{Filesystem, Platform};
 use shirabe_php_shim::{
     LogicException, RuntimeException, chdir, impl_php_class, legacy_lossy, php_regex,
@@ -95,7 +96,7 @@ impl GlobalCommand {
         })?;
 
         if !quiet {
-            self.get_io().borrow().write_error(&format!(
+            self.get_io().borrow().write_error(format!(
                 "<info>Changed current directory to {}</info>",
                 home
             ));

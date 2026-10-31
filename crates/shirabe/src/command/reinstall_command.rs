@@ -5,7 +5,7 @@ use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption};
 use crate::dependency_resolver::Transaction;
 use crate::dependency_resolver::operation::{AnyOperation, UninstallOperation};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::package::base_package;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::script::ScriptEvents;
@@ -132,7 +132,7 @@ impl Command for ReinstallCommand {
                     }
                 }
                 if !matched {
-                    io.write_error(&format!("<warning>Pattern \"{}\" does not match any currently installed packages.</warning>", pattern));
+                    io.write_error(format!("<warning>Pattern \"{}\" does not match any currently installed packages.</warning>", pattern));
                 }
             }
         }

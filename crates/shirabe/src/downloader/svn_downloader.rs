@@ -5,7 +5,7 @@ use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
     VcsDownloaderBase,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::{Filesystem, ProcessExecutor, Svn as SvnUtil};
@@ -173,7 +173,7 @@ impl VcsDownloader for SvnDownloader {
         }
 
         self.inner.io.write_error3(
-            &format!(
+            format!(
                 " Checking out {}",
                 package
                     .get_source_reference()
@@ -229,7 +229,7 @@ impl VcsDownloader for SvnDownloader {
         }
 
         self.inner.io.write_error3(
-            &format!(
+            format!(
                 " Checking out {}",
                 r#ref.clone().unwrap_or_default().display_lossy()
             ),
@@ -284,7 +284,7 @@ impl VcsDownloader for SvnDownloader {
             .collect();
         let count_changes = changes.len() as i64;
         self.inner.io.write_error3(
-            &format!(
+            format!(
                 "    <error>{} has modified file{}:</error>",
                 package.get_pretty_name().display_lossy(),
                 if count_changes == 1 { "" } else { "s" }
@@ -299,7 +299,7 @@ impl VcsDownloader for SvnDownloader {
         if count_changes > 10 {
             let remaining_changes = count_changes - 10;
             self.inner.io.write_error3(
-                &format!(
+                format!(
                     "    <info>{} more file{} modified, choose \"v\" to view the full list</info>",
                     remaining_changes,
                     if remaining_changes == 1 { "" } else { "s" }

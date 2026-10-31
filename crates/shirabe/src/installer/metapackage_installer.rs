@@ -4,7 +4,7 @@ use crate::dependency_resolver::operation::{
     InstallOperation, UninstallOperation, UpdateOperation,
 };
 use crate::installer::InstallerInterface;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::InstalledRepositoryInterfaceHandle;
 use shirabe_php_shim::{InvalidArgumentException, PhpMixed};
@@ -66,7 +66,7 @@ impl InstallerInterface for MetapackageInstaller {
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io.write_error3(
-            &format!("  - {}", InstallOperation::format(package.clone(), false)),
+            format!("  - {}", InstallOperation::format(package.clone(), false)),
             true,
             io_interface::NORMAL,
         );
@@ -92,7 +92,7 @@ impl InstallerInterface for MetapackageInstaller {
         }
 
         self.io.write_error3(
-            &format!(
+            format!(
                 "  - {}",
                 UpdateOperation::format(initial.clone(), target.clone(), false)
             ),
@@ -121,7 +121,7 @@ impl InstallerInterface for MetapackageInstaller {
         }
 
         self.io.write_error3(
-            &format!("  - {}", UninstallOperation::format(package.clone(), false)),
+            format!("  - {}", UninstallOperation::format(package.clone(), false)),
             true,
             io_interface::NORMAL,
         );

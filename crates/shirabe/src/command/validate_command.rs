@@ -4,7 +4,7 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::loader::ValidatingArrayLoader;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::util::{ConfigValidator, Filesystem};
@@ -53,12 +53,12 @@ impl ValidateCommand {
         let mut do_print_schema_url = false;
 
         if !errors.is_empty() {
-            io.write_error(&format!(
+            io.write_error(format!(
                 "<error>{} is invalid, the following errors/warnings were found:</error>",
                 name
             ));
         } else if !publish_errors.is_empty() && check_publish {
-            io.write_error(&format!(
+            io.write_error(format!(
                 "<info>{} is valid for simple usage with Composer but has</info>",
                 name
             ));
@@ -67,19 +67,19 @@ impl ValidateCommand {
             );
             do_print_schema_url = print_schema_url;
         } else if !warnings.is_empty() {
-            io.write_error(&format!(
+            io.write_error(format!(
                 "<info>{} is valid, but with a few warnings</info>",
                 name
             ));
             do_print_schema_url = print_schema_url;
         } else if !lock_errors.is_empty() {
-            io.write(&format!(
+            io.write(format!(
                 "<info>{} is valid but your composer.lock has some {}</info>",
                 name,
                 if check_lock { "errors" } else { "warnings" }
             ));
         } else {
-            io.write(&format!("<info>{} is valid</info>", name));
+            io.write(format!("<info>{} is valid</info>", name));
         }
 
         if do_print_schema_url {
@@ -117,14 +117,14 @@ impl ValidateCommand {
 
         for msg in errors.iter() {
             if msg.starts_with('#') {
-                io.write_error(&format!("<error>{}</error>", msg));
+                io.write_error(format!("<error>{}</error>", msg));
             } else {
                 io.write_error(msg);
             }
         }
         for msg in &all_warnings {
             if msg.starts_with('#') {
-                io.write_error(&format!("<warning>{}</warning>", msg));
+                io.write_error(format!("<warning>{}</warning>", msg));
             } else {
                 io.write_error(msg);
             }
@@ -236,11 +236,11 @@ impl Command for ValidateCommand {
         let io = self.get_io().clone();
 
         if !std::path::Path::new(&file).exists() {
-            io.write_error(&format!("<error>{} not found.</error>", file));
+            io.write_error(format!("<error>{} not found.</error>", file));
             return Ok(3);
         }
         if !Filesystem::is_readable(&file) {
-            io.write_error(&format!("<error>{} is not readable.</error>", file));
+            io.write_error(format!("<error>{} is not readable.</error>", file));
             return Ok(3);
         }
 

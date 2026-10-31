@@ -4,7 +4,7 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait, PackageDiscoveryTrait};
 use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::io::{IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::{JsonFile, JsonValidationException};
 use crate::package::base_package::{self};
 use crate::repository::{
@@ -671,7 +671,7 @@ impl Command for InitCommand {
         let json = JsonFile::encode(&PhpMixed::Array(options_for_encode.clone()))?;
 
         if input.borrow().is_interactive() {
-            io.write_error3(&format!("\n{}\n", json), true, io_interface::NORMAL);
+            io.write_error3(format!("\n{}\n", json), true, io_interface::NORMAL);
             if !io.ask_confirmation(
                 "Do you confirm generation [<comment>yes</comment>]? ".to_string(),
                 true,
@@ -682,7 +682,7 @@ impl Command for InitCommand {
             }
         } else {
             io.write_error3(
-                &format!("Writing {}", file_obj.get_path()),
+                format!("Writing {}", file_obj.get_path()),
                 true,
                 io_interface::NORMAL,
             );
@@ -703,7 +703,7 @@ impl Command for InitCommand {
                     legacy_lossy(&implode(format!("{} - ", PHP_EOL), json_err.get_errors()))
                 );
                 io.write_error3(
-                    &format!("{}:{}{}", json_err.get_message(), PHP_EOL, errors),
+                    format!("{}:{}{}", json_err.get_message(), PHP_EOL, errors),
                     true,
                     io_interface::NORMAL,
                 );
@@ -768,7 +768,7 @@ impl Command for InitCommand {
             let namespace = self.namespace_from_package_name(&name).unwrap_or_default();
 
             io.write_error3(
-                &format!(
+                format!(
                     "PSR-4 autoloading configured. Use \"<comment>namespace {};</comment>\" in {}",
                     namespace,
                     autoload_path.as_deref().unwrap_or_default()
@@ -893,7 +893,7 @@ impl Command for InitCommand {
             }
 
             io.write_error3(
-                &format!(
+                format!(
                     "\n{}\n",
                     formatter.borrow().format_block(
                         FormatBlockMessages::String(

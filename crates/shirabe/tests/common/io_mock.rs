@@ -211,24 +211,38 @@ impl IOInterfaceImmutable for IOMock {
     fn is_decorated(&self) -> bool {
         self.inner.is_decorated()
     }
-    fn write3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.inner.write3(message, newline, verbosity)
+    fn write_bytes(&self, message: &bstr::BStr, newline: bool, verbosity: i64) {
+        self.inner.write_bytes(message, newline, verbosity)
     }
-    fn write_error3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.inner.write_error3(message, newline, verbosity)
+    fn write_error_bytes(&self, message: &bstr::BStr, newline: bool, verbosity: i64) {
+        self.inner.write_error_bytes(message, newline, verbosity)
     }
-    fn write_raw3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.inner.write_raw3(message, newline, verbosity)
+    fn write_raw_bytes(&self, message: &bstr::BStr, newline: bool, verbosity: i64) {
+        self.inner.write_raw_bytes(message, newline, verbosity)
     }
-    fn write_error_raw3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.inner.write_error_raw3(message, newline, verbosity)
-    }
-    fn overwrite4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
-        self.inner.overwrite4(message, newline, size, verbosity)
-    }
-    fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
+    fn write_error_raw_bytes(&self, message: &bstr::BStr, newline: bool, verbosity: i64) {
         self.inner
-            .overwrite_error4(message, newline, size, verbosity)
+            .write_error_raw_bytes(message, newline, verbosity)
+    }
+    fn overwrite_bytes(
+        &self,
+        message: &bstr::BStr,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
+        self.inner
+            .overwrite_bytes(message, newline, size, verbosity)
+    }
+    fn overwrite_error_bytes(
+        &self,
+        message: &bstr::BStr,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
+        self.inner
+            .overwrite_error_bytes(message, newline, size, verbosity)
     }
 
     fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {

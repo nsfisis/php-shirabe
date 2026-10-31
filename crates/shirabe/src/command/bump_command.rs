@@ -4,7 +4,7 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption};
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::json::{JsonFile, JsonManipulator};
 use crate::package::base_package;
 use crate::package::version::VersionBumper;
@@ -59,7 +59,7 @@ impl BumpCommand {
 
         if !Filesystem::is_readable(&composer_json_path) {
             io.write_error3(
-                &format!("<error>{} is not readable.</error>", composer_json_path),
+                format!("<error>{} is not readable.</error>", composer_json_path),
                 true,
                 io_interface::NORMAL,
             );
@@ -71,7 +71,7 @@ impl BumpCommand {
             Ok(c) => c,
             Err(_) => {
                 io.write_error3(
-                    &format!("<error>{} is not readable.</error>", composer_json_path),
+                    format!("<error>{} is not readable.</error>", composer_json_path),
                     true,
                     io_interface::NORMAL,
                 );
@@ -83,7 +83,7 @@ impl BumpCommand {
             && file_put_contents(&composer_json_path, &contents).is_none()
         {
             io.write_error3(
-                &format!("<error>{} is not writable.</error>", composer_json_path),
+                format!("<error>{} is not writable.</error>", composer_json_path),
                 true,
                 io_interface::NORMAL,
             );
@@ -144,7 +144,7 @@ impl BumpCommand {
                     io_interface::NORMAL,
                 );
                 io.write_error3(
-                    &format!(
+                    format!(
                         "<warning>Alternatively you can use {} to only bump dependencies within \"require-dev\".</warning>",
                         dev_only_flag_hint
                     ),
@@ -244,26 +244,26 @@ impl BumpCommand {
         let change_count: usize = updates.values().map(|m| m.len()).sum();
         if change_count > 0 {
             if dry_run {
-                io.write(&format!(
+                io.write(format!(
                     "<info>{} would be updated with:</info>",
                     composer_json_path
                 ));
                 for (require_type, packages) in &updates {
                     for (package, version) in packages {
-                        io.write(&format!(
+                        io.write(format!(
                             "<info> - {}.{}: {}</info>",
                             require_type, package, version
                         ));
                     }
                 }
             } else {
-                io.write(&format!(
+                io.write(format!(
                     "<info>{} has been updated ({} changes).</info>",
                     composer_json_path, change_count
                 ));
             }
         } else {
-            io.write(&format!(
+            io.write(format!(
                 "<info>No requirements to update in {}.</info>",
                 composer_json_path
             ));

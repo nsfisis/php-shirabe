@@ -12,7 +12,7 @@ use crate::filter::platform_requirement_filter::{
     PlatformRequirementFilterInterface,
 };
 use crate::installer::{Installer, ProjectInstaller, SuggestedPackagesReporter};
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
@@ -307,7 +307,7 @@ impl CreateProjectCommand {
                 Err(e) => {
                     if e.is_instanceof::<PluginBlockedException>() {
                         io.write_error("<error>Hint: To allow running the config command recommended below before dependencies are installed, run create-project with --no-install.</error>");
-                        io.write_error(&format!(
+                        io.write_error(format!(
                             "<error>You can then cd into {}, configure allow-plugins, and finally run a shirabe install to complete the process.</error>",
                             getcwd().unwrap_or_default().display()
                         ));
@@ -365,7 +365,7 @@ impl CreateProjectCommand {
                 }
             }
             if let Some(e) = had_error {
-                io.write_error(&format!(
+                io.write_error(format!(
                     "<error>An error occurred while removing the VCS metadata: {}</error>",
                     e
                 ));
@@ -494,7 +494,7 @@ impl CreateProjectCommand {
                 .merge(&merge_map, Config::SOURCE_COMMAND);
         }
 
-        io.write_error(&format!(
+        io.write_error(format!(
             "<info>Creating a \"{}\" project at \"{}\"</info>",
             package_name,
             fs.borrow()
@@ -728,7 +728,7 @@ impl CreateProjectCommand {
         let signals = real_dir.as_ref().map(|_| SignalSubscription::new());
         let abort_on_signal = |signals: &SignalSubscription| {
             io.write_error3(
-                &format!("Received {}, aborting", signals.last_signal().as_str()),
+                format!("Received {}, aborting", signals.last_signal().as_str()),
                 true,
                 crate::io::DEBUG,
             );
@@ -749,7 +749,7 @@ impl CreateProjectCommand {
             package = alias.get_alias_of().into();
         }
 
-        io.write_error(&format!(
+        io.write_error(format!(
             "<info>Installing {} ({})</info>",
             package.get_name().display_lossy(),
             package
@@ -815,7 +815,7 @@ impl CreateProjectCommand {
             .get_installation_source()
             .is_some_and(|s| s == "source");
 
-        io.write_error(&format!("<info>Created project in {}</info>", directory));
+        io.write_error(format!("<info>Created project in {}</info>", directory));
         chdir(&directory);
 
         // ensure that the env var being set does not interfere with create-project

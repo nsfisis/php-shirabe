@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Installer/SuggestedPackagesReporter.php
 
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepository, RepositoryInterface};
 use bstr::BString;
@@ -83,7 +83,7 @@ impl SuggestedPackagesReporter {
         if mode & Self::MODE_LIST != 0 {
             for name in suggested.keys() {
                 self.io
-                    .write(&format!("<info>{}</info>", legacy_lossy(&name)));
+                    .write(format!("<info>{}</info>", legacy_lossy(&name)));
             }
 
             return Ok(());
@@ -92,13 +92,13 @@ impl SuggestedPackagesReporter {
         // Grouped by package
         if mode & Self::MODE_BY_PACKAGE != 0 {
             for (suggester, suggestions) in &suggesters {
-                self.io.write(&format!(
+                self.io.write(format!(
                     "<comment>{}</comment> suggests:",
                     legacy_lossy(&suggester)
                 ));
 
                 for (suggestion, reason) in suggestions {
-                    self.io.write(&format!(
+                    self.io.write(format!(
                         " - <info>{}</info>{}",
                         legacy_lossy(&suggestion),
                         if !reason.is_empty() {
@@ -116,16 +116,16 @@ impl SuggestedPackagesReporter {
         if mode & Self::MODE_BY_SUGGESTION != 0 {
             // Improve readability in full mode
             if mode & Self::MODE_BY_PACKAGE != 0 {
-                self.io.write(&"-".repeat(78));
+                self.io.write("-".repeat(78));
             }
             for (suggestion, suggesters) in &suggested {
-                self.io.write(&format!(
+                self.io.write(format!(
                     "<comment>{}</comment> is suggested by:",
                     legacy_lossy(&suggestion)
                 ));
 
                 for (suggester, reason) in suggesters {
-                    self.io.write(&format!(
+                    self.io.write(format!(
                         " - <info>{}</info>{}",
                         legacy_lossy(&suggester),
                         if !reason.is_empty() {
@@ -143,7 +143,7 @@ impl SuggestedPackagesReporter {
             let all_suggested_packages = self.get_filtered_suggestions(installed_repo, None)?;
             let diff = all_suggested_packages.len() as i64 - suggested_packages.len() as i64;
             if diff != 0 {
-                self.io.write(&format!("<info>{} additional suggestions</info> by transitive dependencies can be shown with <info>--all</info>", diff));
+                self.io.write(format!("<info>{} additional suggestions</info> by transitive dependencies can be shown with <info>--all</info>", diff));
             }
         }
 
@@ -158,7 +158,7 @@ impl SuggestedPackagesReporter {
         let suggested_packages =
             self.get_filtered_suggestions(installed_repo, only_dependents_of)?;
         if !suggested_packages.is_empty() {
-            self.io.write_error(&format!(
+            self.io.write_error(format!(
                 "<info>{} package suggestions were added by new dependencies, use `shirabe suggest` to see details.</info>",
                 suggested_packages.len()
             ));

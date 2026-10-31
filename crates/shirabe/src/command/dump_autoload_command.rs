@@ -3,7 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputOption;
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
 use shirabe_php_shim::{InvalidArgumentException, file_exists, impl_php_class};
 use shirabe_symfony_console::command::Command;
@@ -257,9 +257,9 @@ impl Command for DumpAutoloadCommand {
         let number_of_classes = class_map.map.len();
 
         if authoritative {
-            self.get_io().write(&format!("<info>Generated optimized autoload files (authoritative) containing {} classes</info>", number_of_classes));
+            self.get_io().write(format!("<info>Generated optimized autoload files (authoritative) containing {} classes</info>", number_of_classes));
         } else if optimize {
-            self.get_io().write(&format!(
+            self.get_io().write(format!(
                 "<info>Generated optimized autoload files containing {} classes</info>",
                 number_of_classes
             ));

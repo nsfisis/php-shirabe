@@ -3,7 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
-use crate::io::{IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterfaceWrite, io_interface};
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;

@@ -3,7 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputOption, SuggestedValues};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::{RepositoryInterface, RepositoryUtils};
@@ -174,18 +174,18 @@ impl Command for LicensesCommand {
                 } else {
                     legacy_lossy(&implode(", ", &root_licenses)).into_owned()
                 };
-                io.write(&format!(
+                io.write(format!(
                     "Name: <comment>{}</comment>",
                     legacy_lossy(&root.get_pretty_name())
                 ));
-                io.write(&format!(
+                io.write(format!(
                     "Version: <comment>{}</comment>",
                     legacy_lossy(&root.get_full_pretty_version(
                         true,
                         crate::package::DisplayMode::SourceRefIfDev
                     ))
                 ));
-                io.write(&format!("Licenses: <comment>{}</comment>", licenses_str));
+                io.write(format!("Licenses: <comment>{}</comment>", licenses_str));
                 io.write("Dependencies:");
                 io.write("");
 

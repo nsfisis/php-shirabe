@@ -3586,9 +3586,9 @@ fn dispatch_io_method(
             let borrowed = io.borrow();
             for message in &messages {
                 if method_name == "write" {
-                    borrowed.write3(message, newline, verbosity);
+                    borrowed.write_bytes(message.as_bstr(), newline, verbosity);
                 } else {
-                    borrowed.write_error3(message, newline, verbosity);
+                    borrowed.write_error_bytes(message.as_bstr(), newline, verbosity);
                 }
             }
             Ok(PluginValue::Null)
@@ -3611,10 +3611,10 @@ fn dispatch_io_method(
 fn decode_write_args(
     method_name: &str,
     args: &[PluginValue],
-) -> Result<(Vec<String>, bool, i64), PhpThrow> {
+) -> Result<(Vec<BString>, bool, i64), PhpThrow> {
     let messages = match args.first() {
-        Some(PluginValue::String(_)) => vec![arg::<String>(method_name, args, 0)?],
-        _ => arg::<Vec<String>>(method_name, args, 0)?,
+        Some(PluginValue::String(_)) => vec![arg::<BString>(method_name, args, 0)?],
+        _ => arg::<Vec<BString>>(method_name, args, 0)?,
     };
     let newline = arg_or::<bool>(method_name, args, 1, true)?;
     let verbosity = arg_or::<i64>(method_name, args, 2, crate::io::NORMAL)?;

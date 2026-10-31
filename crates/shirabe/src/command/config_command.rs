@@ -5,7 +5,7 @@ use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand};
 use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
 use crate::console::input::{InputArgument, InputOption};
 use crate::factory::Factory;
-use crate::io::{IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::package::base_package::{self};
 use crate::util::{Filesystem, Platform};
@@ -284,7 +284,7 @@ impl ConfigCommand {
                 };
             if is_string(&raw_val) && raw_val.as_string() != value_inner.as_string() {
                 self.get_io().write3(
-                    &format!(
+                    format!(
                         "[<fg=yellow;href={}>{}{}</>] <info>{} ({})</info>{}",
                         link,
                         k.clone().unwrap_or_default(),
@@ -298,7 +298,7 @@ impl ConfigCommand {
                 );
             } else {
                 self.get_io().write3(
-                    &format!(
+                    format!(
                         "[<fg=yellow;href={}>{}{}</>] <info>{}</info>{}",
                         link,
                         k.clone().unwrap_or_default(),
@@ -855,7 +855,7 @@ impl Command for ConfigCommand {
             }
 
             self.get_io().write3(
-                &format!("{}{}", value_str, source_of_config_value),
+                format!("{}{}", value_str, source_of_config_value),
                 true,
                 io_interface::QUIET,
             );

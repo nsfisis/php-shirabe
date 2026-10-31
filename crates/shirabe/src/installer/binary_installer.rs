@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Installer/BinaryInstaller.php
 
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Platform, ProcessExecutor};
 use bstr::{BStr, BString, ByteSlice};
@@ -86,7 +86,7 @@ impl BinaryInstaller {
             let mut bin_path = PathBuf::from(path_from_bytes(&bconcat!(install_path, "/", bin)));
             if !file_exists(&bin_path) {
                 self.io.write_error3(
-                    &format!(
+                    format!(
                         "    <warning>Skipped installation of bin {} for package {}: file not found in package</warning>",
                         bin.display_lossy(),
                         package.get_name().display_lossy(),
@@ -98,7 +98,7 @@ impl BinaryInstaller {
             }
             if is_dir(&bin_path) {
                 self.io.write_error3(
-                    &format!(
+                    format!(
                         "    <warning>Skipped installation of bin {} for package {}: found a directory at that path</warning>",
                         bin.display_lossy(),
                         package.get_name().display_lossy(),
@@ -121,7 +121,7 @@ impl BinaryInstaller {
                 if !is_link(&link) {
                     if warn_on_overwrite {
                         self.io.write_error3(
-                            &format!(
+                            format!(
                                 "    Skipped installation of bin {} for package {}: name conflicts with an existing file",
                                 bin.display_lossy(),
                                 package.get_name().display_lossy(),
@@ -223,7 +223,7 @@ impl BinaryInstaller {
             link = PathBuf::from(path_from_bytes(&bconcat!(link, ".bat")));
             if file_exists(&link) {
                 self.io.write_error3(
-                    &format!(
+                    format!(
                         "    Skipped installation of bin {}.bat proxy for package {}: a .bat proxy was already installed",
                         bin.display_lossy(),
                         package.get_name().display_lossy(),

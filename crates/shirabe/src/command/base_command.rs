@@ -10,7 +10,7 @@ use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::{
     PlatformRequirementFilterFactory, PlatformRequirementFilterInterface,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, NullIO};
+use crate::io::{IOInterface, IOInterfaceWrite, NullIO};
 use crate::package::version::VersionParser;
 use crate::plugin::{PluginEvents, PreCommandRunEvent};
 use crate::util::Platform;
@@ -940,7 +940,7 @@ pub fn base_command_initialize(
                 ),
             );
 
-            io.write_error(&format!(
+            io.write_error(format!(
                 "<warning>COMPOSER_IGNORE_PLATFORM_REQ is set to ignore {}. You may experience unexpected errors.</warning>",
                 ignore_str
             ));

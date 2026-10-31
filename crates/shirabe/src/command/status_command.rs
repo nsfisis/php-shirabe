@@ -3,7 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::InputOption;
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
 use crate::plugin::{CommandEvent, PluginEvents};
@@ -193,7 +193,7 @@ impl StatusCommand {
                         .map(|line| format!("    {}", line.trim_start()))
                         .collect::<Vec<_>>()
                         .join("\n");
-                    io.write(&format!("<info>{}</info>:", path));
+                    io.write(format!("<info>{}</info>:", path));
                     io.write(&indented_changes);
                 } else {
                     io.write(path);
@@ -216,7 +216,7 @@ impl StatusCommand {
                         .map(|line| format!("    {}", line.trim_start()))
                         .collect::<Vec<_>>()
                         .join("\n");
-                    io.write(&format!("<info>{}</info>:", path));
+                    io.write(format!("<info>{}</info>:", path));
                     io.write(&indented_changes);
                 } else {
                     io.write(path);
@@ -284,8 +284,8 @@ impl StatusCommand {
                         (current_version, previous_version)
                     };
 
-                    io.write(&format!("<info>{}</info>:", path));
-                    io.write(&format!(
+                    io.write(format!("<info>{}</info>:", path));
+                    io.write(format!(
                         "    From <comment>{}</comment> to <comment>{}</comment>",
                         previous_display, current_display
                     ));

@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Cache.php
 
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::util::{Filesystem, Platform};
 use bstr::BString;
 use chrono::Utc;
@@ -104,7 +104,7 @@ impl Cache {
                 && ((!is_dir(&self.root) && mkdir(&self.root, 0o777, true).is_err())
                     || !is_writable(&self.root))
             {
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<warning>Cannot create cache directory {}, or directory is not writable. Proceeding without cache. See also cache-read-only config if your filesystem is read-only.</warning>",
                     self.root.display(),
                 ));
@@ -130,7 +130,7 @@ impl Cache {
             let full_path = self.full_path(file);
             if file_exists(&full_path) {
                 self.io.write_error3(
-                    &format!("Reading {} from cache", full_path.display()),
+                    format!("Reading {} from cache", full_path.display()),
                     true,
                     crate::io::DEBUG,
                 );
@@ -155,7 +155,7 @@ impl Cache {
             let dest = self.full_path(file);
 
             self.io.write_error3(
-                &format!("Writing {} into cache", dest.display()),
+                format!("Writing {} into cache", dest.display()),
                 true,
                 crate::io::DEBUG,
             );
@@ -187,7 +187,7 @@ impl Cache {
                     }
 
                     self.io.write_error3(
-                        &format!("<warning>Failed to write into cache: {}</warning>", e),
+                        format!("<warning>Failed to write into cache: {}</warning>", e),
                         true,
                         crate::io::DEBUG,
                     );
@@ -237,12 +237,12 @@ impl Cache {
                 .ensure_directory_exists(path_from_bytes(&dirname(path_to_bytes(&full_path))));
 
             if !file_exists(source) {
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<error>{} does not exist, can not write into cache</error>",
                     source.display(),
                 ));
             } else if self.io.is_debug() {
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "Writing {} into cache from {}",
                     full_path.display(),
                     source.display()
@@ -275,7 +275,7 @@ impl Cache {
                 }
 
                 self.io.write_error3(
-                    &format!("Reading {} from cache", full_path.display()),
+                    format!("Reading {} from cache", full_path.display()),
                     true,
                     crate::io::DEBUG,
                 );

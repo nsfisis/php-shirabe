@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Repository/ArtifactRepository.php
 
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::json::JsonFile;
 use crate::package::loader::{ArrayLoader, LoaderInterface};
 use crate::package::{BasePackageHandle, PackageInterfaceHandle};
@@ -131,7 +131,7 @@ impl ArtifactRepository {
             match package {
                 None => {
                     self.io.write_error3(
-                        &format!(
+                        format!(
                             "File <comment>{}</comment> doesn't seem to hold a package",
                             basename
                         ),
@@ -140,7 +140,7 @@ impl ArtifactRepository {
                     );
                 }
                 Some(package) => {
-                    self.io.write_error3(&format!(
+                    self.io.write_error3(format!(
                         "Found package <info>{}</info> (<comment>{}</comment>) in file <info>{}</info>",
                         package.get_name().display_lossy(),
                         package.get_pretty_version().display_lossy(),
@@ -187,7 +187,7 @@ impl ArtifactRepository {
             Ok(j) => json = j.map(bstr::BString::from),
             Err(exception) => {
                 self.io.write3(
-                    &format!("Failed loading package {}: {}", pathname, exception),
+                    format!("Failed loading package {}: {}", pathname, exception),
                     false,
                     io_interface::VERBOSE,
                 );

@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/SelfUpdate/Versions.php
 
 use crate::config::Config;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::HttpDownloader;
 use bstr::{B, BString};
 use indexmap::IndexMap;
@@ -112,7 +112,7 @@ impl Versions {
         if let Some(io) = io
             && previously_stored.as_deref() != Some(&stored_channel)
         {
-            io.write_error(&format!(
+            io.write_error(format!(
                     "Storing \"<info>{}</info>\" as default update channel for the next self-update run.",
                     stored_channel
                 ));

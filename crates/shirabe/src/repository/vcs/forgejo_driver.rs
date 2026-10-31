@@ -3,7 +3,7 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase};
 use crate::util::http::Response;
@@ -511,7 +511,7 @@ impl ForgejoDriver {
 
         if !extension_loaded("openssl") {
             io.write_error3(
-                &format!(
+                format!(
                     "Skipping Forgejo driver for {} because the OpenSSL PHP extension is missing.",
                     url.display_lossy()
                 ),
@@ -661,7 +661,7 @@ impl ForgejoDriver {
             Ok(()) => Ok(true),
             Err(e) => {
                 self.git_driver = None;
-                self.inner.io.write_error3(&format!(
+                self.inner.io.write_error3(format!(
                     "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your Forgejo credentials</error>",
                     ssh_url.display_lossy()
                 ), true, io_interface::NORMAL);

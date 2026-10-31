@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Util/Git.php
 
 use crate::config::Config;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::util::{
     AuthHelper, Bitbucket, CommandLine, Filesystem, GitHub, GitLab, HttpDownloader, Platform,
     ProcessExecutor, StoreAuth, Url,
@@ -64,7 +64,7 @@ impl Git {
                 }
                 Some(io) => {
                     io.write_error3(
-                        &format!("<warning>{}</warning>", msg),
+                        format!("<warning>{}</warning>", msg),
                         true,
                         io_interface::NORMAL,
                     );
@@ -664,7 +664,7 @@ impl Git {
                     }
 
                     self.io.write_error3(
-                        &format!(
+                        format!(
                             "    Authentication required (<info>{}</info>):",
                             m2.display_lossy()
                         ),
@@ -672,7 +672,7 @@ impl Git {
                         io_interface::NORMAL,
                     );
                     self.io.write_error3(
-                        &format!("<warning>{}</warning>", trim(&error_msg).display_lossy()),
+                        format!("<warning>{}</warning>", trim(&error_msg).display_lossy()),
                         true,
                         io_interface::VERBOSE,
                     );
@@ -778,7 +778,7 @@ impl Git {
             && composer_disable_network.as_deref() != Some("prime")
         {
             self.io.write_error3(
-                &format!(
+                format!(
                     "<warning>Aborting git mirror sync of {} as network is disabled</warning>",
                     url.display_lossy()
                 ),
@@ -853,7 +853,7 @@ impl Git {
 
             if let Err(e) = outcome {
                 self.io.write_error3(
-                    &format!("<error>Sync mirror failed: {}</error>", e),
+                    format!("<error>Sync mirror failed: {}</error>", e),
                     true,
                     io_interface::DEBUG,
                 );
@@ -1173,7 +1173,7 @@ impl Git {
             Ok(v) => v,
             Err(e) => {
                 self.io.write_error3(
-                    &format!(
+                    format!(
                         "<error>Failed to fetch root identifier from remote: {}</error>",
                         e
                     ),

@@ -27,65 +27,23 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
 
     fn is_decorated(&self) -> bool;
 
-    fn write(&self, message: &str) {
-        self.write3(message, true, NORMAL)
-    }
-    fn write2(&self, message: &str, newline: bool) {
-        self.write3(message, newline, NORMAL)
-    }
-    fn write_no_newline(&self, message: &str) {
-        self.write3(message, false, NORMAL)
-    }
-    fn write3(&self, message: &str, newline: bool, verbosity: i64);
+    fn write_bytes(&self, message: &BStr, newline: bool, verbosity: i64);
 
-    fn write_error(&self, message: &str) {
-        self.write_error3(message, true, NORMAL)
-    }
-    fn write_error2(&self, message: &str, newline: bool) {
-        self.write_error3(message, newline, NORMAL)
-    }
-    fn write_error_no_newline(&self, message: &str) {
-        self.write_error3(message, false, NORMAL)
-    }
-    fn write_error3(&self, message: &str, newline: bool, verbosity: i64);
+    fn write_error_bytes(&self, message: &BStr, newline: bool, verbosity: i64);
 
-    fn write_raw(&self, message: &str) {
-        self.write_raw3(message, true, NORMAL)
-    }
-    fn write_raw2(&self, message: &str, newline: bool) {
-        self.write_raw3(message, newline, NORMAL)
-    }
-    fn write_raw3(&self, message: &str, newline: bool, verbosity: i64);
+    fn write_raw_bytes(&self, message: &BStr, newline: bool, verbosity: i64);
 
-    fn write_error_raw(&self, message: &str) {
-        self.write_error_raw3(message, true, NORMAL)
-    }
-    fn write_error_raw2(&self, message: &str, newline: bool) {
-        self.write_error_raw3(message, newline, NORMAL)
-    }
-    fn write_error_raw3(&self, message: &str, newline: bool, verbosity: i64);
+    fn write_error_raw_bytes(&self, message: &BStr, newline: bool, verbosity: i64);
 
-    fn overwrite(&self, message: &str) {
-        self.overwrite4(message, true, None, NORMAL)
-    }
-    fn overwrite2(&self, message: &str, newline: bool) {
-        self.overwrite4(message, newline, None, NORMAL)
-    }
-    fn overwrite3(&self, message: &str, newline: bool, size: Option<i64>) {
-        self.overwrite4(message, newline, size, NORMAL)
-    }
-    fn overwrite4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64);
+    fn overwrite_bytes(&self, message: &BStr, newline: bool, size: Option<i64>, verbosity: i64);
 
-    fn overwrite_error(&self, message: &str) {
-        self.overwrite_error4(message, true, None, NORMAL)
-    }
-    fn overwrite_error2(&self, message: &str, newline: bool) {
-        self.overwrite_error4(message, newline, None, NORMAL)
-    }
-    fn overwrite_error3(&self, message: &str, newline: bool, size: Option<i64>) {
-        self.overwrite_error4(message, newline, size, NORMAL)
-    }
-    fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64);
+    fn overwrite_error_bytes(
+        &self,
+        message: &BStr,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    );
 
     /// PHP: `@throws \RuntimeException If there is no data to read in the input stream`.
     /// `QuestionHelper::ask` exceptions (validator errors, `MissingInputException`) propagate
@@ -136,6 +94,92 @@ pub trait IOInterfaceImmutable: std::fmt::Debug {
     fn debug(&self, message: &str, context: &[(&str, &str)]);
 }
 
+// The overloads of PHP's `write()`, `writeError()`, `writeRaw()`, `writeErrorRaw()`, `overwrite()`
+// and `overwriteError()`, which take any byte string. They are generic, so they live outside the
+// `dyn IOInterface` vtable.
+pub trait IOInterfaceWrite: IOInterfaceImmutable {
+    fn write(&self, message: impl AsRef<[u8]>) {
+        self.write_bytes(BStr::new(message.as_ref()), true, NORMAL)
+    }
+    fn write2(&self, message: impl AsRef<[u8]>, newline: bool) {
+        self.write_bytes(BStr::new(message.as_ref()), newline, NORMAL)
+    }
+    fn write3(&self, message: impl AsRef<[u8]>, newline: bool, verbosity: i64) {
+        self.write_bytes(BStr::new(message.as_ref()), newline, verbosity)
+    }
+    fn write_no_newline(&self, message: impl AsRef<[u8]>) {
+        self.write_bytes(BStr::new(message.as_ref()), false, NORMAL)
+    }
+    fn write_error(&self, message: impl AsRef<[u8]>) {
+        self.write_error_bytes(BStr::new(message.as_ref()), true, NORMAL)
+    }
+    fn write_error2(&self, message: impl AsRef<[u8]>, newline: bool) {
+        self.write_error_bytes(BStr::new(message.as_ref()), newline, NORMAL)
+    }
+    fn write_error3(&self, message: impl AsRef<[u8]>, newline: bool, verbosity: i64) {
+        self.write_error_bytes(BStr::new(message.as_ref()), newline, verbosity)
+    }
+    fn write_error_no_newline(&self, message: impl AsRef<[u8]>) {
+        self.write_error_bytes(BStr::new(message.as_ref()), false, NORMAL)
+    }
+    fn write_raw(&self, message: impl AsRef<[u8]>) {
+        self.write_raw_bytes(BStr::new(message.as_ref()), true, NORMAL)
+    }
+    fn write_raw2(&self, message: impl AsRef<[u8]>, newline: bool) {
+        self.write_raw_bytes(BStr::new(message.as_ref()), newline, NORMAL)
+    }
+    fn write_raw3(&self, message: impl AsRef<[u8]>, newline: bool, verbosity: i64) {
+        self.write_raw_bytes(BStr::new(message.as_ref()), newline, verbosity)
+    }
+    fn write_error_raw(&self, message: impl AsRef<[u8]>) {
+        self.write_error_raw_bytes(BStr::new(message.as_ref()), true, NORMAL)
+    }
+    fn write_error_raw2(&self, message: impl AsRef<[u8]>, newline: bool) {
+        self.write_error_raw_bytes(BStr::new(message.as_ref()), newline, NORMAL)
+    }
+    fn write_error_raw3(&self, message: impl AsRef<[u8]>, newline: bool, verbosity: i64) {
+        self.write_error_raw_bytes(BStr::new(message.as_ref()), newline, verbosity)
+    }
+    fn overwrite(&self, message: impl AsRef<[u8]>) {
+        self.overwrite_bytes(BStr::new(message.as_ref()), true, None, NORMAL)
+    }
+    fn overwrite2(&self, message: impl AsRef<[u8]>, newline: bool) {
+        self.overwrite_bytes(BStr::new(message.as_ref()), newline, None, NORMAL)
+    }
+    fn overwrite3(&self, message: impl AsRef<[u8]>, newline: bool, size: Option<i64>) {
+        self.overwrite_bytes(BStr::new(message.as_ref()), newline, size, NORMAL)
+    }
+    fn overwrite4(
+        &self,
+        message: impl AsRef<[u8]>,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
+        self.overwrite_bytes(BStr::new(message.as_ref()), newline, size, verbosity)
+    }
+    fn overwrite_error(&self, message: impl AsRef<[u8]>) {
+        self.overwrite_error_bytes(BStr::new(message.as_ref()), true, None, NORMAL)
+    }
+    fn overwrite_error2(&self, message: impl AsRef<[u8]>, newline: bool) {
+        self.overwrite_error_bytes(BStr::new(message.as_ref()), newline, None, NORMAL)
+    }
+    fn overwrite_error3(&self, message: impl AsRef<[u8]>, newline: bool, size: Option<i64>) {
+        self.overwrite_error_bytes(BStr::new(message.as_ref()), newline, size, NORMAL)
+    }
+    fn overwrite_error4(
+        &self,
+        message: impl AsRef<[u8]>,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
+        self.overwrite_error_bytes(BStr::new(message.as_ref()), newline, size, verbosity)
+    }
+}
+
+impl<T: IOInterfaceImmutable + ?Sized> IOInterfaceWrite for T {}
+
 // The `&mut self` part of PHP `IOInterface`.
 pub trait IOInterfaceMutable {
     fn set_authentication(
@@ -184,93 +228,37 @@ impl IOInterfaceImmutable for std::rc::Rc<std::cell::RefCell<dyn IOInterface>> {
         self.borrow().is_decorated()
     }
 
-    fn write(&self, message: &str) {
-        self.borrow().write(message)
+    fn write_bytes(&self, message: &BStr, newline: bool, verbosity: i64) {
+        self.borrow().write_bytes(message, newline, verbosity)
     }
 
-    fn write2(&self, message: &str, newline: bool) {
-        self.borrow().write2(message, newline)
+    fn write_error_bytes(&self, message: &BStr, newline: bool, verbosity: i64) {
+        self.borrow().write_error_bytes(message, newline, verbosity)
     }
 
-    fn write_no_newline(&self, message: &str) {
-        self.borrow().write_no_newline(message)
+    fn write_raw_bytes(&self, message: &BStr, newline: bool, verbosity: i64) {
+        self.borrow().write_raw_bytes(message, newline, verbosity)
     }
 
-    fn write3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.borrow().write3(message, newline, verbosity)
-    }
-
-    fn write_error(&self, message: &str) {
-        self.borrow().write_error(message)
-    }
-
-    fn write_error2(&self, message: &str, newline: bool) {
-        self.borrow().write_error2(message, newline)
-    }
-
-    fn write_error_no_newline(&self, message: &str) {
-        self.borrow().write_error_no_newline(message)
-    }
-
-    fn write_error3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.borrow().write_error3(message, newline, verbosity)
-    }
-
-    fn write_raw(&self, message: &str) {
-        self.borrow().write_raw(message)
-    }
-
-    fn write_raw2(&self, message: &str, newline: bool) {
-        self.borrow().write_raw2(message, newline)
-    }
-
-    fn write_raw3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.borrow().write_raw3(message, newline, verbosity)
-    }
-
-    fn write_error_raw(&self, message: &str) {
-        self.borrow().write_error_raw(message)
-    }
-
-    fn write_error_raw2(&self, message: &str, newline: bool) {
-        self.borrow().write_error_raw2(message, newline)
-    }
-
-    fn write_error_raw3(&self, message: &str, newline: bool, verbosity: i64) {
-        self.borrow().write_error_raw3(message, newline, verbosity)
-    }
-
-    fn overwrite(&self, message: &str) {
-        self.borrow().overwrite(message)
-    }
-
-    fn overwrite2(&self, message: &str, newline: bool) {
-        self.borrow().overwrite2(message, newline)
-    }
-
-    fn overwrite3(&self, message: &str, newline: bool, size: Option<i64>) {
-        self.borrow().overwrite3(message, newline, size)
-    }
-
-    fn overwrite4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
-        self.borrow().overwrite4(message, newline, size, verbosity)
-    }
-
-    fn overwrite_error(&self, message: &str) {
-        self.borrow().overwrite_error(message)
-    }
-
-    fn overwrite_error2(&self, message: &str, newline: bool) {
-        self.borrow().overwrite_error2(message, newline)
-    }
-
-    fn overwrite_error3(&self, message: &str, newline: bool, size: Option<i64>) {
-        self.borrow().overwrite_error3(message, newline, size)
-    }
-
-    fn overwrite_error4(&self, message: &str, newline: bool, size: Option<i64>, verbosity: i64) {
+    fn write_error_raw_bytes(&self, message: &BStr, newline: bool, verbosity: i64) {
         self.borrow()
-            .overwrite_error4(message, newline, size, verbosity)
+            .write_error_raw_bytes(message, newline, verbosity)
+    }
+
+    fn overwrite_bytes(&self, message: &BStr, newline: bool, size: Option<i64>, verbosity: i64) {
+        self.borrow()
+            .overwrite_bytes(message, newline, size, verbosity)
+    }
+
+    fn overwrite_error_bytes(
+        &self,
+        message: &BStr,
+        newline: bool,
+        size: Option<i64>,
+        verbosity: i64,
+    ) {
+        self.borrow()
+            .overwrite_error_bytes(message, newline, size, verbosity)
     }
 
     fn ask(&self, question: String, default: PhpMixed) -> anyhow::Result<PhpMixed> {

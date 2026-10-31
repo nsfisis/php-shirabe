@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::util::{Bitbucket, GitHub, GitLab};
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -421,7 +421,7 @@ impl AuthHelper {
             }
 
             self.io.write_error3(
-                &format!(
+                format!(
                     "    Authentication required (<info>{}</info>):",
                     origin.display_lossy()
                 ),

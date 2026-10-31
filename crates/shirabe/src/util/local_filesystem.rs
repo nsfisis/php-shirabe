@@ -6,7 +6,7 @@
 
 use crate::config::Config;
 use crate::downloader::{MaxFileSizeExceededException, TransportException};
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::http::ProxyManager;
 use crate::util::{GetResult, Url};
 use bstr::{B, BStr, BString, ByteSlice};
@@ -128,7 +128,7 @@ impl LocalFilesystem {
                 .unwrap_or_default()
         };
         self.io.write_error3(
-            &format!(
+            format!(
                 "{}{}{}",
                 if strpos(&orig_file_url, "http") == Some(0) {
                     "Downloading "
@@ -188,7 +188,7 @@ impl LocalFilesystem {
 
         if progress && !is_redirect {
             self.io.overwrite_error4(
-                &format!(
+                format!(
                     "Downloading ({})",
                     if result.is_none() {
                         "<error>failed</error>"

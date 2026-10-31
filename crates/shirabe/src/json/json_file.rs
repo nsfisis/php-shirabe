@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Json/JsonFile.php
 
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::JsonValidationException;
 use crate::util::{Filesystem, HttpDownloader};
 use bstr::ByteSlice;
@@ -145,7 +145,7 @@ impl JsonFile {
                         realpath_info = format!(" ({})", realpath);
                     }
                     io.write_error3(
-                        &format!("Reading {}{}", self.path, realpath_info),
+                        format!("Reading {}{}", self.path, realpath_info),
                         true,
                         io_interface::NORMAL,
                     );

@@ -5,7 +5,7 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::installer::Installer;
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
 use shirabe_php_shim::impl_php_class;
 use shirabe_symfony_console::command::Command;
@@ -100,7 +100,7 @@ impl Command for InstallCommand {
         let args = input.borrow().get_argument("packages")?;
         let args_vec: Vec<String> = args.as_array().map(<[String]>::to_vec).unwrap_or_default();
         if !args_vec.is_empty() {
-            io.write_error(&format!(
+            io.write_error(format!(
                 "<error>Invalid argument {}. Use \"shirabe require {}\" instead to add packages to your composer.json.</error>",
                 args_vec.join(" "),
                 args_vec.join(" ")

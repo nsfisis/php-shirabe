@@ -2,7 +2,7 @@
 
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::util::HttpDownloader;
 use bstr::BStr;
 use shirabe_php_shim::{Catch as _, PhpMixed, bconcat, legacy_lossy, trim};
@@ -59,7 +59,7 @@ impl Forgejo {
             String::new()
         };
         self.io.write_error3(
-            &format!(
+            format!(
                 "Tokens will be stored in plain text in \"{}{}\" for future use by Composer.",
                 local_prefix, auth_name
             ),

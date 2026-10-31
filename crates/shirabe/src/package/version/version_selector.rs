@@ -4,7 +4,7 @@ use crate::filter::platform_requirement_filter::{
     IgnoreAllPlatformRequirementFilter, IgnoreListPlatformRequirementFilter,
     PlatformRequirementFilterFactory, PlatformRequirementFilterInterface,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::dumper::ArrayDumper;
 use crate::package::loader::ArrayLoader;
 use crate::package::version::VersionParser;
@@ -185,7 +185,7 @@ impl VersionSelector {
                                 ""
                             };
                             io.write_error3(
-                                &format!(
+                                format!(
                                     "<warning>Cannot use {}{} {} as it {} {} {} which {}.</>",
                                     pkg.get_pretty_name().display_lossy(),
                                     latest,

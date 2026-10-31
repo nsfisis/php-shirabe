@@ -8,7 +8,7 @@
 
 use shirabe::config::Config;
 use shirabe::io::{BaseIO, IOInterface, IOInterfaceImmutable, IOInterfaceMutable};
-use shirabe_php_shim::PhpMixed;
+use shirabe_php_shim::{PhpMixed, legacy_lossy};
 
 // Records call arguments for a stubbed method, equivalent to PHPUnit's
 // `->expects($this->once())->method(...)->with(...)` call-count/argument verification.
@@ -205,18 +205,27 @@ impl IOInterfaceImmutable for IOStub {
         self.is_decorated.unwrap_or(false)
     }
 
-    fn write3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
-    fn write_error3(&self, message: &str, newline: bool, _verbosity: i64) {
-        self.write_error_calls.push((message.to_string(), newline));
+    fn write_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
+    fn write_error_bytes(&self, message: &bstr::BStr, newline: bool, _verbosity: i64) {
+        self.write_error_calls
+            .push((legacy_lossy(message).into_owned(), newline));
     }
-    fn write_raw3(&self, message: &str, newline: bool, _verbosity: i64) {
-        self.write_raw_calls.push((message.to_string(), newline));
+    fn write_raw_bytes(&self, message: &bstr::BStr, newline: bool, _verbosity: i64) {
+        self.write_raw_calls
+            .push((legacy_lossy(message).into_owned(), newline));
     }
-    fn write_error_raw3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
-    fn overwrite4(&self, _message: &str, _newline: bool, _size: Option<i64>, _verbosity: i64) {}
-    fn overwrite_error4(
+    fn write_error_raw_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
+    fn overwrite_bytes(
         &self,
-        _message: &str,
+        _message: &bstr::BStr,
+        _newline: bool,
+        _size: Option<i64>,
+        _verbosity: i64,
+    ) {
+    }
+    fn overwrite_error_bytes(
+        &self,
+        _message: &bstr::BStr,
         _newline: bool,
         _size: Option<i64>,
         _verbosity: i64,

@@ -9,7 +9,7 @@ use crate::filter::platform_requirement_filter::{
     IgnoreListPlatformRequirementFilter, PlatformRequirementFilterFactory,
     PlatformRequirementFilterInterface,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::BasePackageHandle;
 use bstr::{BString, ByteSlice};
 use indexmap::IndexMap;
@@ -252,7 +252,7 @@ impl Solver {
         self.run_sat()?;
         self.io.write_error3("", true, crate::io::DEBUG);
         self.io.write_error3(
-            &format!(
+            format!(
                 "Dependency resolution completed in {:.3} seconds",
                 microtime() - before,
             ),
@@ -767,7 +767,7 @@ impl Solver {
                 if i == rules_count {
                     if 1 == pass {
                         self.io.write_error3(
-                            &format!(
+                            format!(
                                 "Something's changed, looking at all rules again (pass #{})",
                                 pass
                             ),
@@ -776,7 +776,7 @@ impl Solver {
                         );
                     } else {
                         self.io.overwrite_error4(
-                            &format!(
+                            format!(
                                 "Something's changed, looking at all rules again (pass #{})",
                                 pass
                             ),

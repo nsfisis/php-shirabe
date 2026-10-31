@@ -3,7 +3,7 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase, VcsDriverInterface};
 use crate::util::Bitbucket;
@@ -725,7 +725,7 @@ impl GitBitbucketDriver {
                 if e.is_instanceof::<RuntimeException>() {
                     self.fallback_driver = None;
 
-                    self.inner.io.write_error(&format!(
+                    self.inner.io.write_error(format!(
                         "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your Bitbucket OAuth consumer credentials</error>",
                         self.generate_ssh_url().display_lossy()
                     ));
@@ -830,7 +830,7 @@ impl GitBitbucketDriver {
 
         if !extension_loaded("openssl") {
             io.write_error3(
-                &format!(
+                format!(
                     "Skipping Bitbucket git driver for {} because the OpenSSL PHP extension is missing.",
                     url.display_lossy()
                 ),

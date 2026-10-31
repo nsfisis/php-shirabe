@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Console/GithubActionError.php
 
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::Platform;
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ impl GithubActionError {
 
             if file_truthy && line_truthy {
                 let file = self.escape_property(file.unwrap());
-                self.io.write(&format!(
+                self.io.write(format!(
                     "::error file={},line={}::{}",
                     file,
                     line.unwrap(),
@@ -32,10 +32,9 @@ impl GithubActionError {
                 ));
             } else if file_truthy {
                 let file = self.escape_property(file.unwrap());
-                self.io
-                    .write(&format!("::error file={}::{}", file, message));
+                self.io.write(format!("::error file={}::{}", file, message));
             } else {
-                self.io.write(&format!("::error ::{}", message));
+                self.io.write(format!("::error ::{}", message));
             }
         }
     }

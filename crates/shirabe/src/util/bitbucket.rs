@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
@@ -207,7 +207,7 @@ impl Bitbucket {
             .map(|name| format!("{} OR ", name))
             .unwrap_or_default();
         self.io.write_error3(
-            &format!(
+            format!(
                 "to create a consumer. It will be stored in \"{}\" for future use by Composer.",
                 local_name_prefix + &auth_config_source_name
             ),

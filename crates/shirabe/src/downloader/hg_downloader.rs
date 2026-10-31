@@ -5,7 +5,7 @@ use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
     VcsDownloaderBase,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Hg as HgUtils, ProcessExecutor};
 use bstr::{BString, ByteSlice};
@@ -140,7 +140,7 @@ impl VcsDownloader for HgDownloader {
         );
 
         let ref_ = target.get_source_reference().unwrap_or_default();
-        self.inner.io.write_error(&format!(
+        self.inner.io.write_error(format!(
             " Updating to {}",
             target
                 .get_source_reference()

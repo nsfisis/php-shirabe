@@ -1,12 +1,12 @@
 //! ref: composer/src/Composer/Util/Svn.php
 
 use crate::config::Config;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::util::{Platform, ProcessExecutor};
 use bstr::{B, BStr, BString, ByteSlice, ByteVec};
 use shirabe_php_shim::{
-    LogicException, PhpMixed, RuntimeException, implode, legacy_lossy, parse_url, path_to_bytes,
-    php_regex, preg_match, stripos, strpos, trim,
+    LogicException, PhpMixed, RuntimeException, implode, parse_url, path_to_bytes, php_regex,
+    preg_match, stripos, strpos, trim,
 };
 use std::path::Path;
 use std::sync::Mutex;
@@ -125,7 +125,7 @@ impl Svn {
                     .get_or_insert_with(BString::default)
                     .push_str(buffer);
                 if verbose {
-                    io.borrow().write_error2(&legacy_lossy(buffer), false);
+                    io.borrow().write_error2(buffer, false);
                 }
                 Ok(false)
             });
@@ -184,7 +184,7 @@ impl Svn {
         }
 
         self.io.write_error3(
-            &format!(
+            format!(
                 "The Subversion server ({}) requested credentials:",
                 self.url.display_lossy(),
             ),

@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/ProcessExecutor.php
 
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::signal::SignalSubscription;
 use crate::util::{GitHub, Platform};
 use bstr::{BStr, BString, ByteSlice};
@@ -256,7 +256,7 @@ impl ProcessExecutor {
             && let Some(io) = &self.io
         {
             io.write_error3(
-                &format!(
+                format!(
                     "Received {}, aborting when child process is done",
                     signals.last_signal().as_str()
                 ),
@@ -654,15 +654,13 @@ impl ProcessExecutor {
         }
 
         if Process::ERR == r#type {
-            io.as_mut().unwrap().write_error_raw3(
-                &legacy_lossy(buffer),
-                false,
-                io_interface::NORMAL,
-            );
+            io.as_mut()
+                .unwrap()
+                .write_error_raw3(buffer, false, io_interface::NORMAL);
         } else {
             io.as_mut()
                 .unwrap()
-                .write_raw3(&legacy_lossy(buffer), false, io_interface::NORMAL);
+                .write_raw3(buffer, false, io_interface::NORMAL);
         }
     }
 
@@ -768,7 +766,7 @@ impl ProcessExecutor {
             "--password '***' ",
             &safe_command,
         );
-        io.as_ref().unwrap().write_error(&format!(
+        io.as_ref().unwrap().write_error(format!(
             "Executing{} command ({}): {}",
             if r#async { " async" } else { "" },
             cwd.map_or("CWD".into(), |cwd| cwd.display().to_string()),

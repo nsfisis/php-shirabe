@@ -5,7 +5,7 @@ use crate::config::Config;
 use crate::dependency_resolver::operation::{InstallOperation, UninstallOperation};
 use crate::downloader::{DownloaderInterface, FileDownloader, VcsCapableDownloaderInterface};
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::package::archiver::ArchivableFilesFinder;
 use crate::package::dumper::ArrayDumper;
@@ -297,7 +297,7 @@ impl DownloaderInterface for PathDownloader {
             if output {
                 let appendix = self.get_install_operation_appendix(package.clone(), &path)?;
                 self.inner.io.borrow().write_error3(
-                    &format!(
+                    format!(
                         "  - {}{}",
                         InstallOperation::format(package, false),
                         appendix
@@ -324,7 +324,7 @@ impl DownloaderInterface for PathDownloader {
 
         if output {
             self.inner.io.borrow().write_error3(
-                &format!("  - {}: ", InstallOperation::format(package, false)),
+                format!("  - {}: ", InstallOperation::format(package, false)),
                 false,
                 io_interface::NORMAL,
             );
@@ -337,7 +337,7 @@ impl DownloaderInterface for PathDownloader {
                     // Implement symlinks as NTFS junctions on Windows
                     if output {
                         self.inner.io.borrow().write_error3(
-                            &format!("Junctioning from {}", url.display_lossy()),
+                            format!("Junctioning from {}", url.display_lossy()),
                             false,
                             io_interface::NORMAL,
                         );
@@ -351,7 +351,7 @@ impl DownloaderInterface for PathDownloader {
                     let path = Filesystem::trim_trailing_slash(&path);
                     if output {
                         self.inner.io.borrow().write_error3(
-                            &format!("Symlinking from {}", url.display_lossy()),
+                            format!("Symlinking from {}", url.display_lossy()),
                             false,
                             io_interface::NORMAL,
                         );
@@ -421,7 +421,7 @@ impl DownloaderInterface for PathDownloader {
 
             if output {
                 self.inner.io.borrow().write_error3(
-                    &format!(
+                    format!(
                         "{}Mirroring from {}",
                         if is_fallback { "    " } else { "" },
                         url.display_lossy()
@@ -475,7 +475,7 @@ impl DownloaderInterface for PathDownloader {
         if Platform::is_windows() && self.inner.filesystem.borrow_mut().is_junction(&path) {
             if output {
                 self.inner.io.borrow().write_error3(
-                    &format!(
+                    format!(
                         "  - {}, source is still present in {}",
                         UninstallOperation::format(package.clone(), false),
                         path.display()
@@ -486,7 +486,7 @@ impl DownloaderInterface for PathDownloader {
             }
             if !self.inner.filesystem.borrow_mut().remove_junction(&path)? {
                 self.inner.io.borrow().write_error3(
-                    &format!(
+                    format!(
                         "    <warning>Could not remove junction at {} - is another process locking it?</warning>",
                         path.display()
                     ),
@@ -536,7 +536,7 @@ impl DownloaderInterface for PathDownloader {
         {
             if output {
                 self.inner.io.borrow().write_error3(
-                    &format!(
+                    format!(
                         "  - {}, source is still present in {}",
                         UninstallOperation::format(package.clone(), false),
                         path.display()

@@ -44,19 +44,26 @@ impl IOInterfaceImmutable for NullIO {
         false
     }
 
-    fn write3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
+    fn write_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
 
-    fn write_error3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
+    fn write_error_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
 
-    fn write_raw3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
+    fn write_raw_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
 
-    fn write_error_raw3(&self, _message: &str, _newline: bool, _verbosity: i64) {}
+    fn write_error_raw_bytes(&self, _message: &bstr::BStr, _newline: bool, _verbosity: i64) {}
 
-    fn overwrite4(&self, _message: &str, _newline: bool, _size: Option<i64>, _verbosity: i64) {}
-
-    fn overwrite_error4(
+    fn overwrite_bytes(
         &self,
-        _message: &str,
+        _message: &bstr::BStr,
+        _newline: bool,
+        _size: Option<i64>,
+        _verbosity: i64,
+    ) {
+    }
+
+    fn overwrite_error_bytes(
+        &self,
+        _message: &bstr::BStr,
         _newline: bool,
         _size: Option<i64>,
         _verbosity: i64,

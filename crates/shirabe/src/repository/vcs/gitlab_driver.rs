@@ -3,7 +3,7 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase};
 use crate::util::http::Response;
@@ -706,7 +706,7 @@ impl GitLabDriver {
                 self.git_driver = None;
 
                 self.inner.io.write_error3(
-                    &format!(
+                    format!(
                         "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your credentials</error>",
                         url.display_lossy()
                     ),
@@ -912,7 +912,7 @@ impl GitLabDriver {
                     )));
                 }
                 self.inner.io.write_error3(
-                    &format!(
+                    format!(
                         "<warning>Failed to download {}/{}:{}</warning>",
                         self.namespace.display_lossy(),
                         self.repository.display_lossy(),
@@ -994,7 +994,7 @@ impl GitLabDriver {
 
         if scheme == "https" && !extension_loaded("openssl") {
             io.write_error3(
-                &format!(
+                format!(
                     "Skipping GitLab driver for {} because the OpenSSL PHP extension is missing.",
                     url.display_lossy()
                 ),

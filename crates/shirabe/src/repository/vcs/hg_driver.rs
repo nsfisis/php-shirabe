@@ -3,7 +3,7 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::repository::vcs::VcsDriverBase;
 use crate::util::{Filesystem, Hg as HgUtils, Url};
 use bstr::{BStr, BString, ByteSlice};
@@ -101,7 +101,7 @@ impl HgDriver {
                     Some(path_from_bytes(&self.repo_dir)),
                 )? != 0
                 {
-                    self.inner.io.write_error3(&format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url.display_lossy(), self.inner.process.borrow().get_error_output().display_lossy()), true, crate::io::NORMAL);
+                    self.inner.io.write_error3(format!("<error>Failed to update {}, package information from this repository may be outdated ({})</error>", self.inner.url.display_lossy(), self.inner.process.borrow().get_error_output().display_lossy()), true, crate::io::NORMAL);
                 }
             } else {
                 let mut fs2 = Filesystem::new(None);

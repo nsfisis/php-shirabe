@@ -6,7 +6,7 @@ use crate::composer::PartialComposerHandle;
 use crate::config::Config;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::archiver::ArchiveManagerInterface;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
@@ -162,7 +162,7 @@ impl ArchiveCommand {
                 composer.get_package().clone().into()
             };
 
-        io.write_error(&format!(
+        io.write_error(format!(
             "<info>Creating the archive into \"{}\".</info>",
             dest
         ));
@@ -218,7 +218,7 @@ impl ArchiveCommand {
                 .keys()
                 .map(|s| legacy_lossy(s).into_owned())
                 .collect();
-            io.write_error(&format!(
+            io.write_error(format!(
                 "No composer.json found in the current directory, searching packages from {}",
                 repo_names.join(", ")
             ));
@@ -269,7 +269,7 @@ impl ArchiveCommand {
             )?;
             let p = best.unwrap_or_else(|| packages.into_iter().next().unwrap());
 
-            io.write_error(&format!(
+            io.write_error(format!(
                 "<info>Found multiple matches, selected {}.</info>",
                 p.get_pretty_string().display_lossy()
             ));
@@ -278,13 +278,13 @@ impl ArchiveCommand {
             p
         } else if packages.len() == 1 {
             let p: crate::package::PackageInterfaceHandle = packages.into_iter().next().unwrap();
-            io.write_error(&format!(
+            io.write_error(format!(
                 "<info>Found an exact match {}.</info>",
                 p.get_pretty_string().display_lossy()
             ));
             p
         } else {
-            io.write_error(&format!(
+            io.write_error(format!(
                 "<error>Could not find a package matching {}.</error>",
                 package_name
             ));

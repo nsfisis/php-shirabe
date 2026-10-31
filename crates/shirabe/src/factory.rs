@@ -15,7 +15,7 @@ use crate::downloader::{
 use crate::event_dispatcher::{Event, EventDispatcher};
 use crate::exception::NoSslException;
 use crate::installer::{BinaryInstaller, InstallationManager};
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::json::{JsonFile, JsonValidationException};
 use crate::package::archiver::{ArchiveManager, PharArchiver, ZipArchiver};
 use crate::package::loader::RootPackageLoader;
@@ -236,7 +236,7 @@ impl Factory {
         if file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error3(
-                    &format!("Loading config file {}", file.get_path()),
+                    format!("Loading config file {}", file.get_path()),
                     true,
                     crate::io::DEBUG,
                 );
@@ -286,7 +286,7 @@ impl Factory {
         if auth_file.exists() {
             if let Some(io_ref) = &io {
                 io_ref.write_error3(
-                    &format!("Loading config file {}", auth_file.get_path()),
+                    format!("Loading config file {}", auth_file.get_path()),
                     true,
                     crate::io::DEBUG,
                 );
@@ -483,7 +483,7 @@ impl Factory {
 
         if let Some(ref composer_file_path) = composer_file {
             io.write_error3(
-                &format!(
+                format!(
                     "Loading config file {} ({})",
                     composer_file_path,
                     realpath(composer_file_path)
@@ -518,7 +518,7 @@ impl Factory {
             )?;
             if local_auth_file.exists() {
                 io.write_error3(
-                    &format!("Loading config file {}", local_auth_file.get_path()),
+                    format!("Loading config file {}", local_auth_file.get_path()),
                     true,
                     crate::io::DEBUG,
                 );
@@ -733,7 +733,7 @@ impl Factory {
                                 .unwrap_or(true);
                             if !lock_enabled && file_exists(&lock_file) {
                                 io.write_error3(
-                                    &format!(
+                                    format!(
                                         "<warning>{} is present but ignored as the \"lock\" config option is disabled.</warning>",
                                         lock_file
                                     ),
@@ -959,7 +959,7 @@ impl Factory {
             Ok(c) => Some(c),
             Err(e) => {
                 io.write_error3(
-                    &format!("Failed to initialize global composer: {}", e),
+                    format!("Failed to initialize global composer: {}", e),
                     true,
                     crate::io::DEBUG,
                 );
@@ -1623,7 +1623,7 @@ impl Factory {
                     legacy_lossy(&implode(format!("{} - ", PHP_EOL), jve.get_errors()))
                 );
                 if let Some(io_ref) = io {
-                    io_ref.write_error3(&format!("<warning>{}</>", msg), true, crate::io::NORMAL);
+                    io_ref.write_error3(format!("<warning>{}</>", msg), true, crate::io::NORMAL);
                 } else {
                     return Err(UnexpectedValueException::new(msg).into());
                 }

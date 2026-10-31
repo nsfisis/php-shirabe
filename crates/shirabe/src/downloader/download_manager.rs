@@ -2,7 +2,7 @@
 
 use crate::downloader::DownloaderInterface;
 use crate::exception::IrrecoverableDownloadException;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::util::Filesystem;
 use bstr::{BString, ByteSlice};
@@ -165,7 +165,7 @@ impl DownloadManager {
             };
             if retry {
                 self.io.write_error3(
-                    &format!(
+                    format!(
                         "    <warning>Now trying to download from {}</warning>",
                         source.display_lossy(),
                     ),
@@ -199,7 +199,7 @@ impl DownloadManager {
                             .get_message()
                             .to_string();
                         self.io.write_error3(
-                            &format!(
+                            format!(
                                 "    <warning>Failed to download {} from {}: {}</warning>",
                                 package.get_pretty_name().display_lossy(),
                                 source.display_lossy(),
@@ -305,7 +305,7 @@ impl DownloadManager {
                         .get_message()
                         .to_string();
                     self.io.write_error3(
-                        &format!("<error>    Update failed ({})</error>", message),
+                        format!("<error>    Update failed ({})</error>", message),
                         true,
                         io_interface::NORMAL,
                     );

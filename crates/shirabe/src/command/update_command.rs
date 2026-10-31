@@ -7,7 +7,7 @@ use crate::composer::PartialComposerHandle;
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::request::UpdateAllowTransitiveDeps;
 use crate::installer::Installer;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::base_package;
 use crate::package::loader::RootPackageLoader;
 use crate::package::version::version_selector::ShowWarnings;
@@ -423,7 +423,7 @@ impl Command for UpdateCommand {
                 && !Intervals::have_intersections(&parsed_constraint, root_req.get_constraint())?
             {
                 io.write_error3(
-                        &format!(
+                        format!(
                             "<error>The temporary constraint \"{}\" for \"{}\" must be a subset of the constraint in your composer.json ({})</error>",
                             constraint,
                             package,
@@ -432,7 +432,7 @@ impl Command for UpdateCommand {
                         true,
                         io_interface::NORMAL,
                     );
-                io.write(&format!(
+                io.write(format!(
                         "<info>Run `shirabe require {}` or `shirabe require {}:{}` instead to replace the constraint</info>",
                         package, package, constraint,
                     ));

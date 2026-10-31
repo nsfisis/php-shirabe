@@ -2,7 +2,7 @@
 
 use crate::dependency_resolver::operation::InstallOperation;
 use crate::downloader::{DownloaderInterface, FileDownloader};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{Filesystem, Platform};
 use bstr::{BString, ByteSlice};
@@ -62,7 +62,7 @@ pub trait ArchiveDownloader {
         output: bool,
     ) -> anyhow::Result<Option<PhpMixed>> {
         if output {
-            self.inner().io.borrow().write_error(&format!(
+            self.inner().io.borrow().write_error(format!(
                 "  - {}{}",
                 InstallOperation::format(package.clone(), false),
                 self.get_install_operation_appendix(package.clone(), path)

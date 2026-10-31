@@ -8,7 +8,7 @@ use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
 use crate::installer::Installer;
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::JsonFile;
 use crate::package::base_package;
 use crate::repository::RepositoryInterface;
@@ -373,7 +373,7 @@ impl Command for RemoveCommand {
                     json.remove_link(r#type, &canonical_name);
                 }
             } else if let Some(canonical_name) = in_alt_type {
-                io.write_error(&format!(
+                io.write_error(format!(
                     "<warning>{} could not be found in {} but it is present in {}</warning>",
                     canonical_name, r#type, alt_type
                 ));
@@ -437,7 +437,7 @@ impl Command for RemoveCommand {
                     }
                 } else if !alt_type_keys.is_empty() && !matches_in_alt_type.is_empty() {
                     for matched_package in matches_in_alt_type {
-                        io.write_error(&format!(
+                        io.write_error(format!(
                             "<warning>{} could not be found in {} but it is present in {}</warning>",
                             matched_package, r#type, alt_type
                         ));
@@ -461,7 +461,7 @@ impl Command for RemoveCommand {
                         }
                     }
                 } else {
-                    io.write_error(&format!(
+                    io.write_error(format!(
                         "<warning>{} is not required in your composer.json and has not been removed</warning>",
                         package
                     ));
@@ -469,7 +469,7 @@ impl Command for RemoveCommand {
             }
         }
 
-        io.write_error(&format!("<info>{} has been updated</info>", file));
+        io.write_error(format!("<info>{} has been updated</info>", file));
 
         if input
             .borrow()
@@ -653,7 +653,7 @@ impl Command for RemoveCommand {
             flags += " --with-dependencies";
         }
 
-        io.write_error(&format!(
+        io.write_error(format!(
             "<info>Running shirabe update {}{}</info>",
             packages.join(" "),
             flags
@@ -695,7 +695,7 @@ impl Command for RemoveCommand {
 
         let status = install.run().await?;
         if status != 0 {
-            io.write_error(&format!(
+            io.write_error(format!(
                 "\n<error>Removal failed, reverting {} to its original content.</error>",
                 file
             ));
@@ -711,7 +711,7 @@ impl Command for RemoveCommand {
                     .find_packages(bstr::BStr::new(package), None)?
                     .is_empty()
                 {
-                    io.write_error(&format!(
+                    io.write_error(format!(
                         "<error>Removal failed, {} is still present, it may be required by another package. See `shirabe why {}`.</error>",
                         package, package
                     ));

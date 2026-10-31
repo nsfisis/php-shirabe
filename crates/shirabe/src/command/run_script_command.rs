@@ -3,7 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use crate::script::{Event as ScriptEvent, ScriptEvents};
 use crate::util::{Platform, ProcessExecutor};
 use indexmap::IndexMap;

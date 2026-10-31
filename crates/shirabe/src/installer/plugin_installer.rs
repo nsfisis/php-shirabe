@@ -2,7 +2,7 @@
 
 use crate::composer::PartialComposerWeakHandle;
 use crate::installer::{BinaryPresenceInterface, InstallerInterface, LibraryInstaller};
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::plugin::PluginManager;
 use crate::repository::InstalledRepositoryInterfaceHandle;
@@ -46,7 +46,7 @@ impl PluginInstaller {
         repo: &InstalledRepositoryInterfaceHandle,
         package: PackageInterfaceHandle,
     ) -> anyhow::Result<()> {
-        self.inner.io.write_error(&format!(
+        self.inner.io.write_error(format!(
             "Plugin initialization failed ({}), uninstalling plugin",
             e
         ));

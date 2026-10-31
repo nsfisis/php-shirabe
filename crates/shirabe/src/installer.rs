@@ -35,7 +35,7 @@ use shirabe_php_shim::{
 };
 pub use suggested_packages_reporter::*;
 
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use indexmap::IndexMap;
 
 use shirabe_seld_json_lint::ParsingException;
@@ -353,7 +353,7 @@ impl Installer {
                 "No replacement was suggested".to_string()
             };
 
-            self.io.write_error(&format!(
+            self.io.write_error(format!(
                 "<warning>Package {} is abandoned, you should avoid using it. {}.</warning>",
                 complete.get_pretty_name().display_lossy(),
                 replacement,
@@ -429,7 +429,7 @@ impl Installer {
                 }
             }
             if funding_count > 0 {
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<info>{} package{} you are using {} looking for funding.</info>",
                     funding_count,
                     (if 1 == funding_count { "" } else { "s" }),
@@ -525,7 +525,7 @@ impl Installer {
                 }
             } else {
                 self.io
-                    .write_error(&format!("No {} packages - skipping audit.", target));
+                    .write_error(format!("No {} packages - skipping audit.", target));
             }
         }
 
@@ -572,7 +572,7 @@ impl Installer {
         if (self.update_allow_list.is_some() || self.update_mirrors) && locked_repository.is_none()
         {
             self.io.write_error3(
-                &format!(
+                format!(
                     "<error>Cannot update {} without a lock file present. Run `shirabe update` to generate a lock file.</error>",
                     if self.update_mirrors {
                         "lock file information"
@@ -662,11 +662,8 @@ impl Installer {
                     false,
                 )?;
 
-                self.io.write_error3(
-                    &format!("<error>{}</error>", err),
-                    true,
-                    io_interface::QUIET,
-                );
+                self.io
+                    .write_error3(format!("<error>{}</error>", err), true, io_interface::QUIET);
                 self.io.write_error(&pretty_problem);
                 if !self.dev_mode {
                     self.io.write_error3(
@@ -685,7 +682,7 @@ impl Installer {
         let _ = solver;
 
         self.io.write_error3(
-            &format!(
+            format!(
                 "Analyzed {} packages to resolve dependencies",
                 pool.borrow().get_packages().len()
             ),
@@ -693,7 +690,7 @@ impl Installer {
             io_interface::VERBOSE,
         );
         self.io.write_error3(
-            &format!("Analyzed {} rules to resolve dependencies", rule_set_size),
+            format!("Analyzed {} rules to resolve dependencies", rule_set_size),
             true,
             io_interface::VERBOSE,
         );
@@ -780,7 +777,7 @@ impl Installer {
                 .as_bool()
                 .unwrap_or(false)
             {
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<info>Lock file operations: {} install{}, {} update{}, {} removal{}</info>",
                     (install_names.len() as i64),
                     (if 1 == install_names.len() { "" } else { "s" }),
@@ -791,7 +788,7 @@ impl Installer {
                 ));
                 if !install_names.is_empty() {
                     self.io.write_error3(
-                        &format!(
+                        format!(
                             "Installs: {}",
                             implode(", ", &install_names).display_lossy()
                         ),
@@ -801,14 +798,14 @@ impl Installer {
                 }
                 if !update_names.is_empty() {
                     self.io.write_error3(
-                        &format!("Updates: {}", implode(", ", &update_names).display_lossy()),
+                        format!("Updates: {}", implode(", ", &update_names).display_lossy()),
                         true,
                         io_interface::VERBOSE,
                     );
                 }
                 if !uninstalls.is_empty() {
                     self.io.write_error3(
-                        &format!(
+                        format!(
                             "Removals: {}",
                             implode(", ", &uninstall_names).display_lossy()
                         ),
@@ -857,7 +854,7 @@ impl Installer {
                     }
                 }
                 self.io
-                    .write_error(&format!("  - {}{}", operation.show(true), source_repo));
+                    .write_error(format!("  - {}{}", operation.show(true), source_repo));
             }
         }
 
@@ -964,11 +961,8 @@ impl Installer {
                     true,
                 )?;
 
-                self.io.write_error3(
-                    &format!("<error>{}</error>", err),
-                    true,
-                    io_interface::QUIET,
-                );
+                self.io
+                    .write_error3(format!("<error>{}</error>", err), true, io_interface::QUIET);
                 self.io.write_error(
                     "Your requirements can be resolved successfully when require-dev packages are present.",
                 );
@@ -1003,7 +997,7 @@ impl Installer {
             .as_bool()
             .unwrap_or(false)
         {
-            self.io.write_error(&format!(
+            self.io.write_error(format!(
                 "<info>Installing dependencies from lock file{}</info>",
                 if self.dev_mode {
                     " (including require-dev)"
@@ -1058,7 +1052,7 @@ impl Installer {
                 .borrow_mut()
                 .get_missing_requirement_info(package_for_missing, self.dev_mode)?;
             if !missing_requirement_info.is_empty() {
-                self.io.write_error(&missing_requirement_info.join("\n"));
+                self.io.write_error(missing_requirement_info.join("\n"));
 
                 if !self
                     .config
@@ -1149,7 +1143,7 @@ impl Installer {
                     )?;
 
                     self.io.write_error3(
-                        &format!("<error>{}</error>", err),
+                        format!("<error>{}</error>", err),
                         true,
                         io_interface::QUIET,
                     );
@@ -1216,7 +1210,7 @@ impl Installer {
         if installs.is_empty() && updates.is_empty() && uninstalls.is_empty() {
             self.io.write_error("Nothing to install, update or remove");
         } else {
-            self.io.write_error(&format!(
+            self.io.write_error(format!(
                 "<info>Package operations: {} install{}, {} update{}, {} removal{}</info>",
                 (installs.len() as i64),
                 (if 1 == installs.len() { "" } else { "s" }),
@@ -1227,21 +1221,21 @@ impl Installer {
             ));
             if !installs.is_empty() {
                 self.io.write_error3(
-                    &format!("Installs: {}", implode(", ", &installs).display_lossy()),
+                    format!("Installs: {}", implode(", ", &installs).display_lossy()),
                     true,
                     io_interface::VERBOSE,
                 );
             }
             if !updates.is_empty() {
                 self.io.write_error3(
-                    &format!("Updates: {}", implode(", ", &updates).display_lossy()),
+                    format!("Updates: {}", implode(", ", &updates).display_lossy()),
                     true,
                     io_interface::VERBOSE,
                 );
             }
             if !uninstalls.is_empty() {
                 self.io.write_error3(
-                    &format!("Removals: {}", implode(", ", &uninstalls).display_lossy()),
+                    format!("Removals: {}", implode(", ", &uninstalls).display_lossy()),
                     true,
                     io_interface::VERBOSE,
                 );
@@ -1284,7 +1278,7 @@ impl Installer {
                 // output op, but alias op only in debug verbosity
                 if strpos(operation.get_operation_type(), "Alias").is_none() || self.io.is_debug() {
                     self.io
-                        .write_error(&format!("  - {}", operation.show(false)));
+                        .write_error(format!("  - {}", operation.show(false)));
                 }
             }
         }

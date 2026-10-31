@@ -3,7 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputOption, SuggestedValues};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::package::Link;
 use crate::repository::{
@@ -209,7 +209,7 @@ impl Command for CheckPlatformReqsCommand {
             .as_bool()
             .unwrap_or(false)
         {
-            io.write_error(&format!(
+            io.write_error(format!(
                 "<info>Checking {}platform requirements using the lock file</info>",
                 if no_dev { "non-dev " } else { "" }
             ));
@@ -223,7 +223,7 @@ impl Command for CheckPlatformReqsCommand {
             let repository_manager = repository_manager.borrow();
             let local_repo = repository_manager.get_local_repository();
             if local_repo.get_packages()?.is_empty() {
-                io.write_error(&format!(
+                io.write_error(format!(
                     "<warning>No vendor dir present, checking {}platform requirements from the lock file</warning>",
                     if no_dev { "non-dev " } else { "" }
                 ));
@@ -240,7 +240,7 @@ impl Command for CheckPlatformReqsCommand {
                         .map(|s| legacy_lossy(s).into_owned())
                         .collect::<Vec<_>>();
                 }
-                io.write_error(&format!(
+                io.write_error(format!(
                     "<info>Checking {}platform requirements for packages in the vendor dir</info>",
                     if no_dev { "non-dev " } else { "" }
                 ));

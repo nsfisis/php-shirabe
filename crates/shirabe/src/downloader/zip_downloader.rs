@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/Downloader/ZipDownloader.php
 
 use crate::downloader::{ArchiveDownloader, ChangeReportInterface, FileDownloader};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::package::PackageInterfaceHandle;
 use crate::util::{IniHelper, Platform};
 use bstr::{BString, ByteSlice};
@@ -123,7 +123,7 @@ impl ZipDownloader {
             {
                 let m1 = legacy_lossy(m.get(1).unwrap_or_default()).into_owned();
                 if version_compare(&m1, "21.01", CmpOp::Lt) {
-                    self.inner.io.borrow().write_error(&format!(
+                    self.inner.io.borrow().write_error(format!(
                         "    <warning>Unzipping using {} {} may result in incorrect file permissions. Install {} 21.01+ or unzip to ensure you get correct permissions.</warning>",
                         executable.display_lossy(),
                         m1,
@@ -210,16 +210,16 @@ impl ZipDownloader {
             self.inner
                 .io
                 .borrow()
-                .write_error(&format!("    <warning>{}</warning>", process_error));
+                .write_error(format!("    <warning>{}</warning>", process_error));
             self.inner.io.borrow().write_error("    <warning>This most likely is due to a custom installer plugin not handling the returned Promise from the downloader</warning>");
             self.inner.io.borrow().write_error("    <warning>See https://github.com/composer/installers/commit/5006d0c28730ade233a8f42ec31ac68fb1c5c9bb for an example fix</warning>");
         } else {
             self.inner
                 .io
                 .borrow()
-                .write_error(&format!("    <warning>{}</warning>", process_error));
+                .write_error(format!("    <warning>{}</warning>", process_error));
             self.inner.io.borrow().write_error("    The archive may contain identical file names with different capitalization (which fails on case insensitive filesystems)");
-            self.inner.io.borrow().write_error(&format!(
+            self.inner.io.borrow().write_error(format!(
                 "    Unzip with {} command failed, falling back to ZipArchive class",
                 executable.display_lossy()
             ));
@@ -229,15 +229,15 @@ impl ZipDownloader {
                 && Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none()
             {
                 self.inner.io.borrow().write_error("    <warning>Additional debug info, please report to https://github.com/composer/composer/issues/11148 if you see this:</warning>");
-                self.inner.io.borrow().write_error(&format!(
+                self.inner.io.borrow().write_error(format!(
                     "File size: {}",
                     filesize(file).map(|s| s.to_string()).unwrap_or_default()
                 ));
-                self.inner.io.borrow().write_error(&format!(
+                self.inner.io.borrow().write_error(format!(
                     "File SHA1: {}",
                     hash_file("sha1", file).unwrap_or_default().display_lossy()
                 ));
-                self.inner.io.borrow().write_error(&format!(
+                self.inner.io.borrow().write_error(format!(
                     "First 100 bytes (hex): {}",
                     bin2hex(substr(
                         file_get_contents(file).unwrap_or_default(),
@@ -246,7 +246,7 @@ impl ZipDownloader {
                     ))
                     .display_lossy()
                 ));
-                self.inner.io.borrow().write_error(&format!(
+                self.inner.io.borrow().write_error(format!(
                     "Last 100 bytes (hex): {}",
                     bin2hex(substr(
                         file_get_contents(file).unwrap_or_default(),
@@ -256,7 +256,7 @@ impl ZipDownloader {
                     .display_lossy()
                 ));
                 if strlen(package.get_dist_url().unwrap_or_default()) > 0 {
-                    self.inner.io.borrow().write_error(&format!(
+                    self.inner.io.borrow().write_error(format!(
                         "Origin URL: {}",
                         self.inner
                             .process_url(
@@ -276,7 +276,7 @@ impl ZipDownloader {
                             None => PhpMixed::List(vec![]),
                         }
                     };
-                    self.inner.io.borrow().write_error(&format!(
+                    self.inner.io.borrow().write_error(format!(
                         "Response Headers: {}",
                         json_encode(&headers).unwrap_or_default()
                     ));

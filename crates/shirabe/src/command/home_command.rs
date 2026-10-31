@@ -3,7 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData, CompletionTrait};
 use crate::console::input::{InputArgument, InputOption};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::package::CompletePackageInterfaceHandle;
 use crate::repository::{RepositoryFactory, RootPackageRepository};
 use crate::util::{Platform, ProcessExecutor};
@@ -65,7 +65,7 @@ impl HomeCommand {
         }
 
         if show_only {
-            self.get_io().write(&format!("<info>{}</info>", url));
+            self.get_io().write(format!("<info>{}</info>", url));
         } else {
             self.open_browser(&url);
         }
@@ -90,7 +90,7 @@ impl HomeCommand {
         } else if osx == 0 {
             let _ = process.execute(&["open", url], (), None);
         } else {
-            self.get_io().write_error(&format!(
+            self.get_io().write_error(format!(
                 "No suitable browser opening command found, open yourself: {}",
                 url
             ));
@@ -228,7 +228,7 @@ impl Command for HomeCommand {
 
             if !package_exists {
                 return_code = 1;
-                io.write_error(&format!(
+                io.write_error(format!(
                     "<warning>Package {} not found</warning>",
                     package_name.display_lossy()
                 ));
@@ -241,7 +241,7 @@ impl Command for HomeCommand {
                 } else {
                     "Invalid or missing repository URL"
                 };
-                io.write_error(&format!(
+                io.write_error(format!(
                     "<warning>{} for {}</warning>",
                     msg,
                     package_name.display_lossy()

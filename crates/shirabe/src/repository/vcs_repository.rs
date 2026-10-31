@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::loader::{
     ArrayLoader, InvalidPackageException, LoaderInterface, ValidatingArrayLoader,
 };
@@ -356,7 +356,7 @@ impl VcsRepository {
                                     return Err(e);
                                 }
                                 if is_very_verbose {
-                                    self.io.write_error(&format!(
+                                    self.io.write_error(format!(
                                         "<error>Skipped parsing {}, {}</error>",
                                         root_identifier.display_lossy(),
                                         e
@@ -373,7 +373,7 @@ impl VcsRepository {
                         return Err(e);
                     }
                     if is_very_verbose {
-                        self.io.write_error(&format!(
+                        self.io.write_error(format!(
                             "<error>Skipped parsing {}, {}</error>",
                             root_identifier.display_lossy(),
                             e
@@ -423,7 +423,7 @@ impl VcsRepository {
             let parsed_tag = self.validate_tag(&tag);
             if parsed_tag.is_none() {
                 if is_very_verbose {
-                    self.io.write_error(&format!(
+                    self.io.write_error(format!(
                         "<warning>Skipped tag {}, invalid tag name</warning>",
                         tag
                     ));
@@ -448,7 +448,7 @@ impl VcsRepository {
                     .get_composer_information(identifier.as_bstr())?;
                 if data_opt.is_none() {
                     if is_very_verbose {
-                        self.io.write_error(&format!(
+                        self.io.write_error(format!(
                             "<warning>Skipped tag {}, no composer file</warning>",
                             tag
                         ));
@@ -511,12 +511,12 @@ impl VcsRepository {
                 if version_normalized != parsed_tag {
                     if is_very_verbose {
                         if preg_is_match(php_regex!(r"{(^dev-|[.-]?dev$)}i"), &parsed_tag) {
-                            self.io.write_error(&format!(
+                            self.io.write_error(format!(
                                 "<warning>Skipped tag {}, invalid tag name, tags can not use dev prefixes or suffixes</warning>",
                                 tag
                             ));
                         } else {
-                            self.io.write_error(&format!(
+                            self.io.write_error(format!(
                                 "<warning>Skipped tag {}, tag ({}) does not match version ({}) in composer.json</warning>",
                                 tag, parsed_tag.display_lossy(), version_normalized.display_lossy()
                             ));
@@ -545,7 +545,7 @@ impl VcsRepository {
                     ),
                 )? {
                     if is_very_verbose {
-                        self.io.write_error(&format!(
+                        self.io.write_error(format!(
                             "<warning>Skipped tag {}, it conflicts with an another tag ({}) as both resolve to {} internally</warning>",
                             tag, existing_package.get_pretty_version().display_lossy(), version_normalized.display_lossy()
                         ));
@@ -554,7 +554,7 @@ impl VcsRepository {
                 }
 
                 if is_very_verbose {
-                    self.io.write_error(&format!(
+                    self.io.write_error(format!(
                         "Importing tag {} ({})",
                         tag,
                         version_normalized.display_lossy()
@@ -598,7 +598,7 @@ impl VcsRepository {
                     } else {
                         format!("{}", e)
                     };
-                    self.io.write_error(&format!(
+                    self.io.write_error(format!(
                         "<warning>Skipped tag {}, {}</warning>",
                         tag, detail
                     ));
@@ -656,7 +656,7 @@ impl VcsRepository {
             let parsed_branch_opt = self.validate_branch(branch.as_bstr());
             if parsed_branch_opt.is_none() {
                 if is_very_verbose {
-                    self.io.write_error(&format!(
+                    self.io.write_error(format!(
                         "<warning>Skipped branch {}, invalid name</warning>",
                         branch.display_lossy()
                     ));
@@ -716,7 +716,7 @@ impl VcsRepository {
                     .get_composer_information(identifier.as_bstr())?;
                 if data_opt.is_none() {
                     if is_very_verbose {
-                        self.io.write_error(&format!(
+                        self.io.write_error(format!(
                             "<warning>Skipped branch {}, no composer file</warning>",
                             branch.display_lossy()
                         ));
@@ -746,7 +746,7 @@ impl VcsRepository {
                 }
 
                 if is_very_verbose {
-                    self.io.write_error(&format!(
+                    self.io.write_error(format!(
                         "Importing branch {} ({})",
                         branch.display_lossy(),
                         data.get(B("version"))
@@ -800,7 +800,7 @@ impl VcsRepository {
                         return Err(e);
                     }
                     if is_very_verbose {
-                        self.io.write_error(&format!(
+                        self.io.write_error(format!(
                             "<warning>Skipped branch {}, no composer file was found ({} HTTP status code)</warning>",
                             branch.display_lossy(), te.get_code()
                         ));
@@ -811,7 +811,7 @@ impl VcsRepository {
                     self.io.write_error("");
                 }
                 self.branch_error_occurred.set(true);
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<error>Skipped branch {}, {}</error>",
                     branch.display_lossy(),
                     e
@@ -964,7 +964,7 @@ impl VcsRepository {
             .get_version_package(version, identifier);
         if matches!(cached_package, VersionCacheResult::Missing) {
             if is_very_verbose {
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<warning>Skipped {}, no composer file (cached from ref {})</warning>",
                     version,
                     identifier.display_lossy()
@@ -1015,7 +1015,7 @@ impl VcsRepository {
                 ),
             )? {
                 if is_very_verbose {
-                    self.io.write_error(&format!(
+                    self.io.write_error(format!(
                         "<warning>Skipped cached version {}, it conflicts with an another tag ({}) as both resolve to {} internally</warning>",
                         version, existing_package.get_pretty_version().display_lossy(), version_normalized.display_lossy()
                     ));

@@ -4,7 +4,7 @@ use crate::composer::{ComposerHandle, ComposerWeakHandle, PartialComposerHandle}
 use crate::event_dispatcher::{EventDispatcher, unwrap_php_result};
 use crate::factory::DisablePlugins;
 use crate::installer::InstallerInterface;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::package::version::VersionParser;
 use crate::package::{
     LockerInterface, PackageInterfaceHandle, RootPackageInterfaceHandle, base_package,
@@ -206,7 +206,7 @@ impl PluginManager {
     ) -> anyhow::Result<()> {
         // TODO(plugin): registerPackage drives the actual plugin loading via eval()
         if self.are_plugins_disabled(if is_global_plugin { "global" } else { "local" }) {
-            self.io.write_error(&format!(
+            self.io.write_error(format!(
                 "<warning>The \"{}\" plugin was not loaded as plugins are disabled.</warning>",
                 package.get_name().display_lossy()
             ));
@@ -240,9 +240,9 @@ impl PluginManager {
             );
 
             if requires_composer.get_pretty_string() == self.get_plugin_api_version() {
-                self.io.write_error(&format!("<warning>The \"{}\" plugin requires composer-plugin-api {}, this *WILL* break in the future and it should be fixed ASAP (require ^{} instead for example).</warning>", package.get_name().display_lossy(), self.get_plugin_api_version(), self.get_plugin_api_version()));
+                self.io.write_error(format!("<warning>The \"{}\" plugin requires composer-plugin-api {}, this *WILL* break in the future and it should be fixed ASAP (require ^{} instead for example).</warning>", package.get_name().display_lossy(), self.get_plugin_api_version(), self.get_plugin_api_version()));
             } else if !requires_composer.matches(&current_plugin_api_constraint.into()) {
-                self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it requires a Plugin API version (\"{}\") that does not match your Shirabe installation (\"{}\"). You may need to run shirabe update with the \"--no-plugins\" option.</warning>",
+                self.io.write_error(format!("<warning>The \"{}\" plugin {}was skipped because it requires a Plugin API version (\"{}\") that does not match your Shirabe installation (\"{}\"). You may need to run shirabe update with the \"--no-plugins\" option.</warning>",
                     package.get_name().display_lossy(),
                     if is_global_plugin || self.running_in_global_dir { "(installed globally) " } else { "" },
                     requires_composer.get_pretty_string().display_lossy(),
@@ -255,7 +255,7 @@ impl PluginManager {
                 && preg_is_match(php_regex!("{^[0-9.]+$}"), package.get_version())
                 && version_compare(package.get_version(), "1.9.8", CmpOp::Lt)
             {
-                self.io.write_error(&format!("<warning>The \"{}\" plugin {}was skipped because it is not compatible with Composer 2+. Make sure to update it to version 1.9.8 or greater.</warning>",
+                self.io.write_error(format!("<warning>The \"{}\" plugin {}was skipped because it is not compatible with Composer 2+. Make sure to update it to version 1.9.8 or greater.</warning>",
                     package.get_name().display_lossy(),
                     if is_global_plugin || self.running_in_global_dir { "(installed globally) " } else { "" }
                 ));
@@ -275,7 +275,7 @@ impl PluginManager {
             true,
         )? {
             self.io.write_error3(
-                &format!(
+                format!(
                     "Skipped loading \"{}\" {}as it is not in config.allow-plugins",
                     package.get_name().display_lossy(),
                     if is_global_plugin || self.running_in_global_dir {
@@ -506,7 +506,7 @@ impl PluginManager {
                     ))
                     .into());
                 }
-                self.io.write_error(&format!(
+                self.io.write_error(format!(
                     "<warning>Loading \"{}\" {}which is a legacy composer-installer built for Composer 1.x, it is likely to cause issues as you are running Composer 2.x.</warning>",
                     package.get_name().display_lossy(),
                     if is_global_plugin || self.running_in_global_dir {
@@ -766,7 +766,7 @@ impl PluginManager {
                     true,
                 )? {
                     self.io.write_error3(
-                        &format!(
+                        format!(
                             "Skipped loading \"{} from {}\" {} as it is not in config.allow-plugins",
                             plugin.borrow().get_class_name(),
                             sp.get_name().display_lossy(),
@@ -792,7 +792,7 @@ impl PluginManager {
             details.push("installed globally".to_string());
         }
         self.io.write_error3(
-            &format!(
+            format!(
                 "Loading plugin {}{}",
                 plugin.borrow().get_class_name(),
                 if !details.is_empty() {
@@ -834,7 +834,7 @@ impl PluginManager {
         };
 
         self.io.write_error3(
-            &format!("Unloading plugin {}", plugin.borrow().get_class_name()),
+            format!("Unloading plugin {}", plugin.borrow().get_class_name()),
             true,
             crate::io::DEBUG,
         );
@@ -865,7 +865,7 @@ impl PluginManager {
         plugin: &std::rc::Rc<std::cell::RefCell<dyn PluginInterface>>,
     ) -> anyhow::Result<()> {
         self.io.write_error3(
-            &format!("Uninstalling plugin {}", plugin.borrow().get_class_name()),
+            format!("Uninstalling plugin {}", plugin.borrow().get_class_name()),
             true,
             crate::io::DEBUG,
         );
@@ -939,7 +939,7 @@ impl PluginManager {
                     false,
                 )?
             {
-                self.io.write_error(&format!("<warning>The \"{}\" plugin was not loaded as it is not listed in allow-plugins and is not required by the root package anymore.</warning>", package.get_name().display_lossy()));
+                self.io.write_error(format!("<warning>The \"{}\" plugin was not loaded as it is not listed in allow-plugins and is not required by the root package anymore.</warning>", package.get_name().display_lossy()));
                 continue;
             }
 
@@ -1297,7 +1297,7 @@ impl PluginManager {
                 .borrow()
                 .get_config();
 
-            self.io.write_error(&format!("<warning>{}{} contains a Composer plugin which is currently not in your allow-plugins config. See https://getcomposer.org/allow-plugins</warning>",
+            self.io.write_error(format!("<warning>{}{} contains a Composer plugin which is currently not in your allow-plugins config. See https://getcomposer.org/allow-plugins</warning>",
                 package,
                 if is_global_plugin || self.running_in_global_dir { " (installed globally)" } else { "" }
             ));

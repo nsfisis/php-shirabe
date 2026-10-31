@@ -5,7 +5,7 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::composer::PartialComposerHandle;
 use crate::console::input::{InputOption, SuggestedValues};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::repository::{InstalledRepository, RepositoryInterface, RepositorySet, RepositoryUtils};
 use bstr::BString;
 use shirabe_php_shim::{

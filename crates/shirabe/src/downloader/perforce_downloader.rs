@@ -5,7 +5,7 @@ use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface, VcsDownloader,
     VcsDownloaderBase,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::VcsRepository;
 use crate::util::{Filesystem, Perforce, PerforceInterface, ProcessExecutor};
@@ -122,7 +122,7 @@ impl VcsDownloader for PerforceDownloader {
         let label =
             self.get_label_from_source_reference(source_ref.clone().unwrap_or_default().as_bstr());
 
-        self.inner.io.write_error(&format!(
+        self.inner.io.write_error(format!(
             "Cloning {}",
             source_ref.clone().unwrap_or_default().display_lossy()
         ));

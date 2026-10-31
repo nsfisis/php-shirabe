@@ -6,7 +6,7 @@ use crate::command::{BaseCommand, BaseCommandData};
 use crate::config::Config;
 use crate::console::input::InputOption;
 use crate::factory::Factory;
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use shirabe_php_shim::{impl_php_class, legacy_lossy, path_to_bytes, realpath};
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::InputInterface;
@@ -120,7 +120,7 @@ impl Command for ClearCacheCommand {
                 match realpath(&cache_path).map(|p| legacy_lossy(path_to_bytes(&p)).into_owned()) {
                     Some(path) => path,
                     None => {
-                        io.write_error(&format!(
+                        io.write_error(format!(
                             "<info>Cache directory does not exist ({key}): {cache_path}</info>"
                         ));
                         continue;
@@ -129,14 +129,14 @@ impl Command for ClearCacheCommand {
             let mut cache = Cache::new(io.clone(), &cache_path, None, None, false);
             cache.set_read_only(config.get("cache-read-only").as_bool().unwrap_or(false));
             if !cache.is_enabled() {
-                io.write_error(&format!(
+                io.write_error(format!(
                     "<info>Cache is not enabled ({key}): {cache_path}</info>"
                 ));
                 continue;
             }
 
             if gc {
-                io.write_error(&format!(
+                io.write_error(format!(
                     "<info>Garbage-collecting cache ({key}): {cache_path}</info>"
                 ));
                 if key == "cache-files-dir" {
@@ -153,9 +153,7 @@ impl Command for ClearCacheCommand {
                     cache.gc_vcs_cache(config.get("cache-ttl").as_int().unwrap_or(0));
                 }
             } else {
-                io.write_error(&format!(
-                    "<info>Clearing cache ({key}): {cache_path}</info>"
-                ));
+                io.write_error(format!("<info>Clearing cache ({key}): {cache_path}</info>"));
                 cache.clear();
             }
         }

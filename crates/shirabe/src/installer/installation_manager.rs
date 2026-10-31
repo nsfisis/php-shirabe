@@ -7,7 +7,7 @@ use crate::dependency_resolver::operation::{
 use crate::downloader::FileDownloader;
 use crate::event_dispatcher::EventDispatcher;
 use crate::installer::{InstallerInterface, PackageEvents};
-use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{ConsoleIO, IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::repository::{InstalledRepositoryInterface, InstalledRepositoryInterfaceHandle};
 use crate::signal::SignalSubscription;
@@ -574,7 +574,7 @@ impl InstallationManager {
                 // output alias ops in debug verbosity as they have no output otherwise
                 if self.io.is_debug() {
                     self.io.write_error3(
-                        &format!("  - {}", operation.show(false)),
+                        format!("  - {}", operation.show(false)),
                         true,
                         io_interface::NORMAL,
                     );
@@ -658,7 +658,7 @@ impl InstallationManager {
 
                 // PHP rejects the promise with an "<op> of <name> failed" message before rethrowing.
                 if let Err(e) = chain_result {
-                    self.io.write_error(&format!(
+                    self.io.write_error(format!(
                         "    <error>{} of {} failed</error>",
                         ucfirst(op_type).display_lossy(),
                         package.get_pretty_name().display_lossy()
@@ -1036,7 +1036,7 @@ impl InstallationManager {
         >,
     ) {
         self.io.write_error3(
-            &format!("Received {}, aborting", signals.last_signal().as_str()),
+            format!("Received {}, aborting", signals.last_signal().as_str()),
             true,
             io_interface::DEBUG,
         );

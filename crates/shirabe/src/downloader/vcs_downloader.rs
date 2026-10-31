@@ -7,7 +7,7 @@ use crate::dependency_resolver::operation::{
 use crate::downloader::{
     ChangeReportInterface, DownloaderInterface, VcsCapableDownloaderInterface,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::package::dumper::ArrayDumper;
 use crate::package::version::{VersionGuesser, VersionParser};
@@ -157,7 +157,7 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            &format!(
+                            format!(
                                 "Failed: [{}] {}",
                                 AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
@@ -246,7 +246,7 @@ pub trait VcsDownloader:
         }
 
         self.io().write_error3(
-            &format!("  - {}: ", InstallOperation::format(package.clone(), false)),
+            format!("  - {}: ", InstallOperation::format(package.clone(), false)),
             false,
             io_interface::NORMAL,
         );
@@ -267,7 +267,7 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            &format!(
+                            format!(
                                 "Failed: [{}] {}",
                                 AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
@@ -309,7 +309,7 @@ pub trait VcsDownloader:
         }
 
         self.io().write_error3(
-            &format!(
+            format!(
                 "  - {}: ",
                 UpdateOperation::format(initial.clone(), target.clone(), false),
             ),
@@ -339,7 +339,7 @@ pub trait VcsDownloader:
                     }
                     if self.io().is_debug() {
                         self.io().write_error3(
-                            &format!(
+                            format!(
                                 "Failed: [{}] {}",
                                 AnyThrowable::of(&e)
                                     .expect("PHP reaches this only with a caught \\Throwable")
@@ -386,9 +386,9 @@ pub trait VcsDownloader:
                 logs = str_replace("<", "\\<", &logs);
 
                 self.io()
-                    .write_error3(&format!("    {}", message), true, io_interface::NORMAL);
+                    .write_error3(format!("    {}", message), true, io_interface::NORMAL);
                 self.io().write_error3(
-                    &logs.display_lossy().to_string(),
+                    logs.display_lossy().to_string(),
                     true,
                     io_interface::NORMAL,
                 );
@@ -410,7 +410,7 @@ pub trait VcsDownloader:
         path: &Path,
     ) -> anyhow::Result<Option<PhpMixed>> {
         self.io().write_error3(
-            &format!("  - {}", UninstallOperation::format(package, false)),
+            format!("  - {}", UninstallOperation::format(package, false)),
             true,
             io_interface::NORMAL,
         );

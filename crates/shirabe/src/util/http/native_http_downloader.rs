@@ -22,7 +22,7 @@
 
 use crate::config::Config;
 use crate::downloader::{MaxFileSizeExceededException, TransportException};
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceWrite};
 use crate::util::http::{NativeHttpResponse, ProxyManager, Response};
 use crate::util::{AuthHelper, HttpDownloader, Platform, PromptAuthResult, StoreAuth, Url};
 use bstr::{B, BStr, BString, ByteSlice};
@@ -206,7 +206,7 @@ impl NativeHttpDownloader {
         // `attributes.redirects == 0 && attributes.retries == 0` in PHP is always true here since
         // this runs exactly once, before the retry loop below has a chance to advance either.
         self.io.write_error3(
-            &format!(
+            format!(
                 "Downloading {}{}{}",
                 Url::sanitize(url).display_lossy(),
                 using_proxy,
@@ -306,7 +306,7 @@ impl NativeHttpDownloader {
                         attributes.insert("ipResolve".into(), PhpMixed::Int(4));
                     }
                     self.io.write_error3(
-                        &format!(
+                        format!(
                             "Retrying ({}) {} due to connection error",
                             retries + 1,
                             Url::sanitize(url).display_lossy()
@@ -351,7 +351,7 @@ impl NativeHttpDownloader {
         let native_response = response.into_native_http_response(url);
 
         self.io.write_error3(
-            &format!("[{}] {}", status_code, Url::sanitize(url).display_lossy()),
+            format!("[{}] {}", status_code, Url::sanitize(url).display_lossy()),
             true,
             crate::io::DEBUG,
         );
@@ -445,7 +445,7 @@ impl NativeHttpDownloader {
                 && retries < self.max_retries
             {
                 self.io.write_error3(
-                    &format!(
+                    format!(
                         "Retrying ({}) {} due to status code {}",
                         retries + 1,
                         Url::sanitize(url).display_lossy(),
@@ -721,7 +721,7 @@ impl NativeHttpDownloader {
 
         if !target_url.is_empty() {
             self.io.write_error3(
-                &format!(
+                format!(
                     "Following redirect ({}) {}",
                     attributes
                         .get(B("redirects"))

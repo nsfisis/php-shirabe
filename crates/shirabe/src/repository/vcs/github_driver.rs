@@ -3,7 +3,7 @@
 use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::repository::vcs::{GitDriver, VcsDriverBase};
 use crate::util::GitHub;
@@ -666,7 +666,7 @@ impl GitHubDriver {
                         }
 
                         self.inner.io.write_error3(
-                            &format!(
+                            format!(
                                 "<warning>Funding URL {} not in a supported format.</warning>",
                                 item_url
                             ),
@@ -960,7 +960,7 @@ impl GitHubDriver {
 
         if !extension_loaded("openssl") {
             io.write_error3(
-                &format!(
+                format!(
                     "Skipping GitHub driver for {} because the OpenSSL PHP extension is missing.",
                     url.display_lossy()
                 ),
@@ -1105,7 +1105,7 @@ impl GitHubDriver {
                         {
                             if !self.inner.io.is_interactive() {
                                 self.inner.io.write_error3(
-                                    &format!(
+                                    format!(
                                         "<error>GitHub API limit exhausted. Failed to get metadata for the {} repository, try running in interactive mode so that you can enter your GitHub credentials to increase the API limit</error>",
                                         self.inner.url.display_lossy()
                                     ),
@@ -1126,7 +1126,7 @@ impl GitHubDriver {
                         if rate_limited {
                             let rate_limit = git_hub_util.get_rate_limit(&headers);
                             self.inner.io.write_error3(
-                                &format!(
+                                format!(
                                     "<error>GitHub API limit ({} calls/hr) is exhausted. You are already authorized so you have to wait until {} before doing more requests</error>",
                                     rate_limit.get(B("limit")).map(php_to_string).unwrap_or_default().display_lossy(),
                                     rate_limit.get(B("reset")).map(php_to_string).unwrap_or_default().display_lossy(),
@@ -1256,7 +1256,7 @@ impl GitHubDriver {
                 self.git_driver = None;
 
                 self.inner.io.write_error3(
-                    &format!(
+                    format!(
                         "<error>Failed to clone the {} repository, try running in interactive mode so that you can enter your GitHub credentials</error>",
                         self.generate_ssh_url().display_lossy()
                     ),

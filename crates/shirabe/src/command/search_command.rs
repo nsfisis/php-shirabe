@@ -3,7 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption, SuggestedValues};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::plugin::{CommandEvent, PluginEvents};
 use crate::repository::repository_interface::{self, AbandonedInfo, RepositoryInterface};
@@ -124,7 +124,7 @@ impl Command for SearchCommand {
                 PhpMixed::string("json".to_string()),
             ],
         ) {
-            io.write_error(&format!(
+            io.write_error(format!(
                 "Unsupported format \"{}\". See help for supported formats.",
                 format
             ));
@@ -242,7 +242,7 @@ impl Command for SearchCommand {
 
                 let link = result.url.as_deref();
                 if let Some(link) = link {
-                    io.write(&format!(
+                    io.write(format!(
                         "<href={}>{}</>{}{}{}",
                         legacy_lossy(&OutputFormatter::escape(link)?),
                         legacy_lossy(&result.name),
@@ -251,7 +251,7 @@ impl Command for SearchCommand {
                         description
                     ));
                 } else {
-                    io.write(&format!(
+                    io.write(format!(
                         "{:<width$}{}{}",
                         legacy_lossy(&result.name),
                         warning,

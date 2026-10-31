@@ -5,7 +5,7 @@ use crate::factory::Factory;
 use crate::filter::platform_requirement_filter::{
     IgnoreAllPlatformRequirementFilter, PlatformRequirementFilterFactory,
 };
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::package::PackageInterfaceHandle;
 use crate::package::version::version_selector::ShowWarnings;
 use crate::package::version::{VersionParser, VersionSelector};
@@ -147,7 +147,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     )
                 {
                     io.write_error3(
-                        &format!(
+                        format!(
                             "<warning>The \"{}\" constraint for \"{}\" appears too strict and will likely not match what you want. See https://getcomposer.org/constraints</warning>",
                             requirement.get("version").map(|s| s.as_str()).unwrap_or_default(),
                             requirement.get("name").map(|s| s.as_str()).unwrap_or_default(),
@@ -178,7 +178,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     if use_best_version_constraint {
                         requirement.insert("version".to_string(), version.clone());
                         io.write_error3(
-                            &format!(
+                            format!(
                                 "Using version <info>{}</info> for <info>{}</info>",
                                 version,
                                 requirement.get("name").cloned().unwrap_or_default(),
@@ -306,7 +306,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
 
                     io.write_error3("", true, io_interface::NORMAL);
                     io.write_error3(
-                        &format!(
+                        format!(
                             "Found <info>{}</info> packages matching <info>{}</info>",
                             matches.len() as i64,
                             package.clone(),
@@ -411,7 +411,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                                 )?;
 
                             io.write_error3(
-                                &format!(
+                                format!(
                                     "Using version <info>{}</info> for <info>{}</info>",
                                     c.clone(),
                                     package.clone(),

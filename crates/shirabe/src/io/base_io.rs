@@ -1,7 +1,7 @@
 //! ref: composer/src/Composer/IO/BaseIO.php
 
 use crate::config::Config;
-use crate::io::{IOInterface, io_interface};
+use crate::io::{IOInterface, IOInterfaceWrite, io_interface};
 use crate::util::ProcessExecutor;
 use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -85,7 +85,7 @@ pub trait BaseIO: IOInterface {
                 return;
             }
             self.write_error3(
-                &format!(
+                format!(
                     "<warning>Warning: You should avoid overwriting already defined auth settings for {}.</warning>",
                     repository_name.display_lossy()
                 ),
@@ -382,7 +382,7 @@ pub trait BaseIO: IOInterface {
                     }
 
                     if !ssl_options.contains_key(B("local_cert")) {
-                        self.write_error3(&format!(
+                        self.write_error3(format!(
                             "<warning>Warning: Client certificate configuration is missing key `local_cert` for {}.</warning>",
                             domain.display_lossy()
                         ), true, io_interface::NORMAL);
@@ -456,25 +456,25 @@ pub trait BaseIO: IOInterface {
             LogLevel::EMERGENCY | LogLevel::ALERT | LogLevel::CRITICAL | LogLevel::ERROR
         ) {
             self.write_error3(
-                &format!("<error>{}</error>", message_str),
+                format!("<error>{}</error>", message_str),
                 true,
                 io_interface::NORMAL,
             );
         } else if level == LogLevel::WARNING {
             self.write_error3(
-                &format!("<warning>{}</warning>", message_str),
+                format!("<warning>{}</warning>", message_str),
                 true,
                 io_interface::NORMAL,
             );
         } else if level == LogLevel::NOTICE {
             self.write_error3(
-                &format!("<info>{}</info>", message_str),
+                format!("<info>{}</info>", message_str),
                 true,
                 io_interface::VERBOSE,
             );
         } else if level == LogLevel::INFO {
             self.write_error3(
-                &format!("<info>{}</info>", message_str),
+                format!("<info>{}</info>", message_str),
                 true,
                 io_interface::VERY_VERBOSE,
             );

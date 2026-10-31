@@ -4,7 +4,7 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::Application;
 use crate::console::input::{InputArgument, InputOption};
-use crate::io::IOInterfaceImmutable;
+use crate::io::{IOInterfaceImmutable, IOInterfaceWrite};
 use shirabe_php_shim::{
     PhpMixed, RuntimeException, basename, chdir, getcwd, glob, impl_php_class, legacy_lossy,
 };
@@ -196,7 +196,7 @@ impl Command for ExecCommand {
             self.get_io()
                 .write("<comment>Available binaries:</comment>");
             for bin in &bins {
-                self.get_io().write(&format!("<info>- {}</info>", bin));
+                self.get_io().write(format!("<info>- {}</info>", bin));
             }
 
             return Ok(0);

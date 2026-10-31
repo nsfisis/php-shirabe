@@ -3,7 +3,7 @@
 use crate::command::{BaseCommand, BaseCommandData, BaseConfigCommand};
 use crate::config::{Config, ConfigSourceInterface, JsonConfigSource};
 use crate::console::input::{InputArgument, InputOption};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
@@ -88,7 +88,7 @@ impl RepositoryCommand {
 
         for (key, repo) in &repos {
             if matches!(*repo, PhpMixed::Bool(false)) {
-                io.write(&format!("[{}] <info>disabled</info>", legacy_lossy(&key)));
+                io.write(format!("[{}] <info>disabled</info>", legacy_lossy(&key)));
                 continue;
             }
 
@@ -98,7 +98,7 @@ impl RepositoryCommand {
                     && matches!(*first_val, PhpMixed::Bool(false))
                 {
                     let first_key = repo_map.keys().next().unwrap();
-                    io.write(&format!(
+                    io.write(format!(
                         "[{}] <info>disabled</info>",
                         legacy_lossy(&first_key)
                     ));
@@ -121,7 +121,7 @@ impl RepositoryCommand {
                     Some(url) => url,
                     None => JsonFile::encode(repo)?,
                 };
-                io.write(&format!(
+                io.write(format!(
                     "[{}] <info>{}</info> {}",
                     legacy_lossy(&name),
                     legacy_lossy(&r#type),
@@ -490,7 +490,7 @@ impl Command for RepositoryCommand {
                 {
                     let url = repo_map.get(B("url")).and_then(|v| v.as_string());
                     if let Some(url) = url {
-                        self.get_io().write(&url.to_str_lossy());
+                        self.get_io().write(url);
                         return Ok(0);
                     }
                     return Err(InvalidArgumentException::new(format!(
@@ -506,7 +506,7 @@ impl Command for RepositoryCommand {
                     {
                         let url = repo_map.get(B("url")).and_then(|v| v.as_string());
                         if let Some(url) = url {
-                            self.get_io().write(&url.to_str_lossy());
+                            self.get_io().write(url);
                             return Ok(0);
                         }
                         return Err(InvalidArgumentException::new(format!(

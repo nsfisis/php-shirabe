@@ -8,7 +8,7 @@ use crate::event_dispatcher::{
     Event, EventInterface, EventSubscriberInterface, ScriptExecutionException, SubscribedEventEntry,
 };
 use crate::installer::{BinaryInstaller, InstallerEvent, PackageEvent};
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::plugin::php_plugin_proxy::PluginRpcDispatcher;
 use crate::plugin::post_file_download_event::PostFileDownloadEvent;
 use crate::plugin::pre_file_download_event::PreFileDownloadEvent;
@@ -298,7 +298,7 @@ impl EventDispatcher {
             // requires polymorphic dispatch; the simple Event branch is sufficient for now.
             let details: Option<String> = None;
             self.io.write_error3(
-                &format!(
+                format!(
                     "Dispatching <info>{}</info>{} event",
                     event.get_name(),
                     details
@@ -415,7 +415,7 @@ impl EventDispatcher {
                     )).into());
                 }
                 self.io.write_error3(
-                    &format!(
+                    format!(
                         "> {}: {}->{}",
                         formatted_event_name_with_args.clone(),
                         handle.class,
@@ -495,7 +495,7 @@ impl EventDispatcher {
                         "?".to_string()
                     };
                     self.io.write_error3(
-                        &format!(
+                        format!(
                             "> {}: {}->{}",
                             formatted_event_name_with_args.clone(),
                             prefix,
@@ -511,7 +511,7 @@ impl EventDispatcher {
                 match callable {
                     Callable::String(ref callable_str) if self.is_composer_script(callable_str) => {
                         self.io.write_error3(
-                            &format!(
+                            format!(
                                 "> {}: {}",
                                 formatted_event_name_with_args.clone(),
                                 callable_str.clone(),
@@ -572,7 +572,7 @@ impl EventDispatcher {
                             );
                             let exit_code = self.execute_tty(&exec)?;
                             if exit_code != 0 {
-                                self.io.write_error3(&format!(
+                                self.io.write_error3(format!(
                                     "<error>Script {} handling the {} event returned with error code {}</error>",
                                     callable_str.clone(),
                                     event.get_name(),
@@ -597,7 +597,7 @@ impl EventDispatcher {
                                 ))
                                 .is_empty()
                             {
-                                self.io.write_error3(&format!(
+                                self.io.write_error3(format!(
                                     "<warning>You made a reference to a non-existent script {}</warning>",
                                     callable_str.clone(),
                                 ), true, crate::io::QUIET);
@@ -624,7 +624,7 @@ impl EventDispatcher {
                                 Err(e) => {
                                     if e.is_instanceof::<ScriptExecutionException>() {
                                         self.io.write_error3(
-                                            &format!(
+                                            format!(
                                                 "<error>Script {} was called via {}</error>",
                                                 callable_str.clone(),
                                                 event.get_name(),
@@ -650,7 +650,7 @@ impl EventDispatcher {
                             "class_exists",
                             vec![PluginValue::string(class_name.clone())],
                         )? {
-                            self.io.write_error3(&format!(
+                            self.io.write_error3(format!(
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
                                 class_name,
                                 event.get_name()
@@ -661,7 +661,7 @@ impl EventDispatcher {
                             "is_callable",
                             vec![PluginValue::string(callable_str.clone())],
                         )? {
-                            self.io.write_error3(&format!(
+                            self.io.write_error3(format!(
                                 "<warning>Method {} is not callable, can not call {} script</warning>",
                                 callable_str,
                                 event.get_name()
@@ -675,7 +675,7 @@ impl EventDispatcher {
                             }
                             Err(e) => {
                                 self.io.write_error3(
-                                    &format!(
+                                    format!(
                                         "<error>Script {} handling the {} event terminated with an exception</error>",
                                         callable_str.clone(),
                                         event.get_name(),
@@ -711,7 +711,7 @@ impl EventDispatcher {
                             "class_exists",
                             vec![PluginValue::string(class_name.clone())],
                         )? {
-                            self.io.write_error3(&format!(
+                            self.io.write_error3(format!(
                                 "<warning>Class {} is not autoloadable, can not call {} script</warning>",
                                 class_name,
                                 event.get_name()
@@ -728,7 +728,7 @@ impl EventDispatcher {
                                 PluginValue::Bool(true),
                             ],
                         )? {
-                            self.io.write_error3(&format!(
+                            self.io.write_error3(format!(
                                 "<warning>Class {} does not extend Symfony\\Component\\Console\\Command\\Command, can not call {} script</warning>",
                                 class_name,
                                 event.get_name()
@@ -742,7 +742,7 @@ impl EventDispatcher {
                                 legacy_lossy(&str_replace("-", "_", strtoupper(event.get_name())))
                             ))],
                         )? {
-                            self.io.write_error3(&format!(
+                            self.io.write_error3(format!(
                                 "<warning>You cannot bind {} to a Command class, use a non-reserved name</warning>",
                                 event.get_name()
                             ), true, crate::io::QUIET);
@@ -847,7 +847,7 @@ try {{
                                 .is_some_and(|caught| matches!(caught, PhpMixed::Bool(true)));
                             if caught {
                                 self.io.write_error3(
-                                    &format!(
+                                    format!(
                                         "<error>Script {} handling the {} event terminated with an exception</error>",
                                         callable_str.clone(),
                                         event.get_name(),
@@ -892,13 +892,13 @@ try {{
 
                         if self.io.is_verbose() {
                             self.io.write_error3(
-                                &format!("> {}: {}", event.get_name(), exec.clone()),
+                                format!("> {}: {}", event.get_name(), exec.clone()),
                                 true,
                                 crate::io::NORMAL,
                             );
                         } else if self.event_needs_to_output(event) {
                             self.io.write_error3(
-                                &format!("> {}", exec.clone()),
+                                format!("> {}", exec.clone()),
                                 true,
                                 crate::io::NORMAL,
                             );
@@ -1044,7 +1044,7 @@ try {{
 
                         let exit_code = self.execute_tty(&exec)?;
                         if exit_code != 0 {
-                            self.io.write_error3(&format!(
+                            self.io.write_error3(format!(
                                 "<error>Script {} handling the {} event returned with error code {}</error>",
                                 callable_str,
                                 event.get_name(),
@@ -1153,13 +1153,13 @@ try {{
     ) -> anyhow::Result<PhpMixed> {
         if self.io.is_verbose() {
             self.io.write_error3(
-                &format!("> {}: {}::{}", event.get_name(), class_name, method_name),
+                format!("> {}: {}::{}", event.get_name(), class_name, method_name),
                 true,
                 crate::io::NORMAL,
             );
         } else if self.event_needs_to_output(event) {
             self.io.write_error3(
-                &format!("> {}::{}", class_name, method_name),
+                format!("> {}::{}", class_name, method_name),
                 true,
                 crate::io::NORMAL,
             );
@@ -1405,7 +1405,7 @@ try {{
 
         if self.skip_scripts.iter().any(|s| s == event.get_name()) {
             self.io.write_error3(
-                &format!(
+                format!(
                     "Skipped script listeners for <info>{}</info> because of COMPOSER_SKIP_SCRIPTS",
                     event.get_name()
                 ),

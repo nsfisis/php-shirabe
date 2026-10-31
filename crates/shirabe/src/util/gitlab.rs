@@ -3,7 +3,7 @@
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::factory::Factory;
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::util::{HttpDownloader, ProcessExecutor};
 use bstr::{B, BStr, BString};
 use indexmap::IndexMap;
@@ -200,7 +200,7 @@ impl GitLab {
             origin_url.display_lossy()
         );
         self.io.write_error3(
-            &format!(
+            format!(
                 "A token will be created and stored in \"{}\", your password will never be stored",
                 local_auth_config_name
                     .as_ref()
@@ -299,7 +299,7 @@ impl GitLab {
                                 io_interface::NORMAL,
                             );
                             self.io.write_error3(
-                                &format!(
+                                format!(
                                     "Add it using \"shirabe config --global --auth gitlab-token.{} <token>\"",
                                     origin_url.display_lossy()
                                 ),
@@ -385,7 +385,7 @@ impl GitLab {
                 Some(te) => {
                     let message = te.get_message().to_string();
                     self.io.write_error3(
-                        &format!("Couldn't refresh access token: {}", message),
+                        format!("Couldn't refresh access token: {}", message),
                         true,
                         io_interface::NORMAL,
                     );
@@ -533,7 +533,7 @@ impl GitLab {
             io_interface::VERY_VERBOSE,
         );
         self.io.write_error3(
-            &format!(
+            format!(
                 "To revoke access to this token you can visit {}://{}/-/user_settings/applications",
                 scheme.display_lossy(),
                 origin_url.display_lossy()

@@ -1,6 +1,6 @@
 //! ref: composer/src/Composer/Util/ErrorHandler.php
 
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use shirabe_php_shim::{
     E_ALL, E_DEPRECATED, E_USER_DEPRECATED, E_USER_WARNING, E_WARNING, ErrorException, PHP_EOL,
     STDERR, debug_backtrace, error_reporting, filter_var_boolean, fwrite, ini_get,
@@ -90,7 +90,7 @@ impl ErrorHandler {
     fn output_warning(message: &str, output_even_without_io: bool) {
         let io = IO.with(|cell| cell.borrow().clone());
         if let Some(io) = io {
-            io.write_error(&format!("<warning>{}</warning>", message));
+            io.write_error(format!("<warning>{}</warning>", message));
             if io.is_verbose() {
                 io.write_error("<warning>Stack trace:</warning>");
                 let frames: Vec<String> = debug_backtrace()

@@ -5,7 +5,7 @@ use crate::cache::Cache;
 use crate::config::Config;
 use crate::downloader::TransportException;
 use crate::event_dispatcher::EventDispatcher;
-use crate::io::{IOInterface, IOInterfaceImmutable};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite};
 use crate::json::{JsonEncodeOptions, JsonFile};
 use crate::package::loader::{ArrayLoader, VersionFields};
 use crate::package::version::{StabilityFilter, VersionParser};
@@ -1112,7 +1112,7 @@ impl ComposerRepository {
             for (name, list_box) in advisories_response.iter() {
                 if !package_constraint_map.contains_key(name) {
                     if !warned {
-                        self.io.write_error(&format!(
+                        self.io.write_error(format!(
                                 "<warning>{} returned names which were not requested in response to the security-advisories API. {} was not requested but is present in the response. Requested names were: {}</warning>",
                                 self.get_repo_name().display_lossy(),
                                 name.display_lossy(),
@@ -2600,7 +2600,7 @@ impl ComposerRepository {
                         && package_name != strtolower(&meta_name)
                     {
                         self.displayed_warning_about_non_matching_package_index = true;
-                        self.io.write_error(&format!(
+                        self.io.write_error(format!(
                             "<warning>Warning: the packages key '{}' doesn't match the name defined in the package metadata '{}' in repository {}</warning>",
                             package.display_lossy(), meta_name.display_lossy(), self.base_url.display_lossy()
                         ));
@@ -2880,7 +2880,7 @@ impl ComposerRepository {
                         && let Some(contents) = self.cache.borrow_mut().read(ck)
                     {
                         if !self.degraded_mode.get() {
-                            self.io.write_error(&format!(
+                            self.io.write_error(format!(
                                         "<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>",
                                         self.url.display_lossy(),
                                         e
@@ -3040,7 +3040,7 @@ impl ComposerRepository {
                 }
 
                 if !self.degraded_mode.get() {
-                    self.io.write_error(&format!(
+                    self.io.write_error(format!(
                         "<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>",
                         self.url.display_lossy(),
                         e
@@ -3237,7 +3237,7 @@ impl ComposerRepository {
         }
 
         if !self.degraded_mode.get() {
-            self.io.write_error(&format!(
+            self.io.write_error(format!(
                 "<warning>{} could not be fully loaded ({}), package information was loaded from the local cache and may be out of date</warning>",
                 self.url.display_lossy(),
                 e
@@ -3308,7 +3308,7 @@ impl ComposerRepository {
                     if !self.displayed_warning_about_non_matching_package_index
                         && version_package_name != strtolower(package)
                     {
-                        self.io.write_error(&format!(
+                        self.io.write_error(format!(
                             "<warning>Warning: the packages key '{}' doesn't match the name defined in the package metadata '{}' in repository {}</warning>",
                             package.display_lossy(), name_str.display_lossy(), self.base_url.display_lossy()
                         ));

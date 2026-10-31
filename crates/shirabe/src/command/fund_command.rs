@@ -3,7 +3,7 @@
 use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputOption, SuggestedValues};
-use crate::io::IOInterfaceImmutable;
+use crate::io::IOInterfaceWrite;
 use crate::json::JsonFile;
 use crate::package::base_package::{self};
 use crate::repository::{CompositeRepository, RepositoryInterface};
@@ -173,7 +173,7 @@ impl Command for FundCommand {
             .unwrap_or("text")
             .to_string();
         if !matches!(format.as_str(), "text" | "json") {
-            io.write_error(&format!(
+            io.write_error(format!(
                 "Unsupported format \"{}\". See help for supported formats.",
                 format
             ));
@@ -187,14 +187,14 @@ impl Command for FundCommand {
 
             for (vendor, links) in &fundings {
                 io.write("");
-                io.write(&format!("<comment>{}</comment>", vendor));
+                io.write(format!("<comment>{}</comment>", vendor));
                 for (url, packages) in links {
                     let line = format!("  <info>{}</info>", packages.join(", "));
                     if prev.as_deref() != Some(&line) {
                         io.write(&line);
                         prev = Some(line);
                     }
-                    io.write(&format!(
+                    io.write(format!(
                         "    <href={}>{}</>",
                         legacy_lossy(&OutputFormatter::escape(url)?),
                         url

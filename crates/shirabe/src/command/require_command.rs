@@ -7,7 +7,7 @@ use crate::console::input::{InputArgument, InputOption, SuggestedValues};
 use crate::dependency_resolver::UpdateAllowTransitiveDeps;
 use crate::factory::Factory;
 use crate::installer::{Installer, InstallerEvents};
-use crate::io::{IOInterface, IOInterfaceImmutable, io_interface};
+use crate::io::{IOInterface, IOInterfaceImmutable, IOInterfaceWrite, io_interface};
 use crate::json::{JsonFile, JsonManipulator};
 use crate::package::base_package;
 use crate::package::loader::{ArrayLoader, RootPackageLoader};
@@ -327,7 +327,7 @@ impl RequireCommand {
         }
 
         io.write_error3(
-            &format!(
+            format!(
                 "<info>Running shirabe update {}{}</info>",
                 implode(
                     " ",
@@ -445,7 +445,7 @@ impl RequireCommand {
                         .unwrap_or_default(),
                 )? {
                     if !req.contains_key("version") {
-                        io.write_error3(&format!(
+                        io.write_error3(format!(
                             "You can also try re-running shirabe require with an explicit version constraint, e.g. \"shirabe require {}:*\" to figure out if any version is installable, or \"shirabe require {}:^2.1\" if you know which you need.",
                             req.get("name").cloned().unwrap_or_default(),
                             req.get("name").cloned().unwrap_or_default(),
@@ -527,7 +527,7 @@ impl RequireCommand {
                 );
             }
             self.get_io().write_error3(
-                &format!(
+                format!(
                     "Using version <info>{}</info> for <info>{}</info>",
                     requirements.get(package_name).cloned().unwrap_or_default(),
                     package_name.clone(),
@@ -849,7 +849,7 @@ impl Command for RequireCommand {
         let signals = SignalSubscription::new();
         let abort_on_signal = |signals: &SignalSubscription| {
             self.get_io().write_error3(
-                &format!("Received {}, aborting", signals.last_signal().as_str()),
+                format!("Received {}, aborting", signals.last_signal().as_str()),
                 true,
                 io_interface::DEBUG,
             );
