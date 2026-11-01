@@ -41,7 +41,7 @@ fn test_search() {
     run_search_case(
         vec![(
             ParameterName::of("tokens"),
-            InputValue::Array(vec!["fancy".to_string()]),
+            InputValue::Array(vec!["fancy".into()]),
         )],
         "bar/baz                <warning>! Abandoned !</warning> fancy baz\nvendor-2/fancy-package",
     );
@@ -50,7 +50,7 @@ fn test_search() {
     run_search_case(
         vec![(
             ParameterName::of("tokens"),
-            InputValue::Array(vec!["fancy".to_string(), "vendor".to_string()]),
+            InputValue::Array(vec!["fancy".into(), "vendor".into()]),
         )],
         "vendor-1/package-1     generic description\nbar/baz                <warning>! Abandoned !</warning> fancy baz\nvendor-2/fancy-package",
     );
@@ -60,7 +60,7 @@ fn test_search() {
         vec![
             (
                 ParameterName::of("tokens"),
-                InputValue::Array(vec!["fancy".to_string()]),
+                InputValue::Array(vec!["fancy".into()]),
             ),
             (ParameterName::of("--only-name"), InputValue::from(true)),
         ],
@@ -72,7 +72,7 @@ fn test_search() {
         vec![
             (
                 ParameterName::of("tokens"),
-                InputValue::Array(vec!["bar".to_string()]),
+                InputValue::Array(vec!["bar".into()]),
             ),
             (ParameterName::of("--only-vendor"), InputValue::from(true)),
         ],
@@ -84,7 +84,7 @@ fn test_search() {
         vec![
             (
                 ParameterName::of("tokens"),
-                InputValue::Array(vec!["vendor".to_string()]),
+                InputValue::Array(vec!["vendor".into()]),
             ),
             (ParameterName::of("--type"), InputValue::from("foo")),
         ],
@@ -96,7 +96,7 @@ fn test_search() {
         vec![
             (
                 ParameterName::of("tokens"),
-                InputValue::Array(vec!["vendor-2/fancy".to_string()]),
+                InputValue::Array(vec!["vendor-2/fancy".into()]),
             ),
             (ParameterName::of("--format"), InputValue::from("json")),
         ],
@@ -107,7 +107,7 @@ fn test_search() {
     run_search_case(
         vec![(
             ParameterName::of("tokens"),
-            InputValue::Array(vec!["invalid-package-name".to_string()]),
+            InputValue::Array(vec!["invalid-package-name".into()]),
         )],
         "",
     );
@@ -134,7 +134,7 @@ fn test_invalid_format() {
                 ),
                 (
                     ParameterName::of("tokens"),
-                    InputValue::Array(vec!["test".to_string()]),
+                    InputValue::Array(vec!["test".into()]),
                 ),
             ],
             RunOptions::default(),
@@ -166,7 +166,7 @@ fn test_invalid_flags() {
                 (ParameterName::of("--only-name"), InputValue::from(true)),
                 (
                     ParameterName::of("tokens"),
-                    InputValue::Array(vec!["test".to_string()]),
+                    InputValue::Array(vec!["test".into()]),
                 ),
             ],
             RunOptions::default(),

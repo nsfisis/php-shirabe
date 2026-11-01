@@ -374,7 +374,7 @@ vendor3/suggested is suggested by:
         true,
         &[(
             "packages",
-            InputValue::Array(vec!["vendor2/package2".to_string()]),
+            InputValue::Array(vec!["vendor2/package2".into()]),
         )],
         for_pkg,
     );
@@ -382,7 +382,7 @@ vendor3/suggested is suggested by:
         false,
         &[(
             "packages",
-            InputValue::Array(vec!["vendor2/package2".to_string()]),
+            InputValue::Array(vec!["vendor2/package2".into()]),
         )],
         for_pkg,
     );

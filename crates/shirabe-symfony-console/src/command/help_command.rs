@@ -138,7 +138,9 @@ impl Command for HelpCommand {
         if self.command.borrow().is_none() {
             let application = self.get_application().unwrap();
             let command_name = input.borrow().get_argument("command_name")?.to_php_string();
-            let found = application.borrow_mut().find(&command_name)?;
+            let found = application
+                .borrow_mut()
+                .find(&shirabe_php_shim::legacy_lossy(&command_name))?;
             *self.command.borrow_mut() = Some(found);
         }
 

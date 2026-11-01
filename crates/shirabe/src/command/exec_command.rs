@@ -152,9 +152,10 @@ impl Command for ExecCommand {
             )?;
 
             if let Some(idx) = binary.as_int() {
-                input
-                    .borrow_mut()
-                    .set_argument("binary", InputValue::String(binaries[idx as usize].clone()));
+                input.borrow_mut().set_argument(
+                    "binary",
+                    InputValue::String(bstr::BString::from(binaries[idx as usize].clone())),
+                );
             }
 
             Ok(())
@@ -202,12 +203,14 @@ impl Command for ExecCommand {
             return Ok(0);
         }
 
-        let binary = input
-            .borrow()
-            .get_argument("binary")?
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
+        let binary = legacy_lossy(
+            input
+                .borrow()
+                .get_argument("binary")?
+                .as_string()
+                .unwrap_or_default(),
+        )
+        .into_owned();
 
         let dispatcher = crate::composer::composer_full(&composer)
             .get_event_dispatcher()
@@ -246,13 +249,15 @@ impl Command for ExecCommand {
             .borrow()
             .get_argument("args")?
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
 
         dispatcher.borrow_mut().dispatch_script(
             "__exec_command",
             true,
-            args,
+            args.iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<String>>(),
             indexmap::IndexMap::new(),
         )
     }

@@ -7,7 +7,7 @@ pub trait InputInterface: std::fmt::Debug + AsAny {
     /// Models PHP's `clone` operatior.
     fn dup(&self) -> std::rc::Rc<std::cell::RefCell<dyn InputInterface>>;
 
-    fn get_first_argument(&self) -> Option<String>;
+    fn get_first_argument(&self) -> Option<bstr::BString>;
 
     fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool;
 
@@ -42,9 +42,8 @@ pub trait InputInterface: std::fmt::Debug + AsAny {
 
     fn set_interactive(&mut self, interactive: bool);
 
-    /// PHP's `(string) $input` (the `__toString` magic method every Symfony input implements);
-    /// implementors forward to their `Display` impl.
-    fn __to_string(&self) -> String;
+    /// PHP's `(string) $input` (the `__toString` magic method every Symfony input implements).
+    fn __to_string(&self) -> bstr::BString;
 
     /// Models PHP's `$input instanceof StreamableInputInterface` check. Streamable inputs override
     /// this to return `Some(self)`; everything else falls back to `None`.

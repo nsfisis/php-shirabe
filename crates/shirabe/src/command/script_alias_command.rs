@@ -4,6 +4,7 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
 use crate::util::Platform;
+use shirabe_php_shim::legacy_lossy;
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, impl_php_class, is_string, php_regex,
     preg_replace2,
@@ -141,15 +142,21 @@ impl Command for ScriptAliasCommand {
             PhpMixed::string(script_alias_input),
         );
 
-        let args_value: Vec<String> = args
+        let args_value: Vec<bstr::BString> = args
             .get("args")
             .and_then(|v| v.as_array())
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
 
-        dispatcher
-            .borrow_mut()
-            .dispatch_script(&self.script, dev_mode, args_value, flags)
+        dispatcher.borrow_mut().dispatch_script(
+            &self.script,
+            dev_mode,
+            args_value
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<String>>(),
+            flags,
+        )
     }
 
     fn initialize(

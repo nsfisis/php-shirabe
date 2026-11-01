@@ -428,7 +428,7 @@ impl ConfigCommand {
             let completion_value = input.get_completion_value();
 
             if !completion_value.is_empty() {
-                keys.retain(|key| key.starts_with(&completion_value));
+                keys.retain(|key| key.as_bytes().starts_with(&completion_value));
             }
 
             keys.sort();
@@ -662,15 +662,15 @@ impl Command for ConfigCommand {
 
         let setting_key_arg = input.borrow().get_argument("setting-key")?;
         let setting_key = match setting_key_arg.as_string() {
-            Some(s) => s.to_string(),
+            Some(s) => legacy_lossy(s).into_owned(),
             None => return Ok(0),
         };
 
         // If the user enters in a config variable, parse it and save to file
         let setting_values_raw = input.borrow().get_argument("setting-value")?;
-        let setting_values: Vec<String> = setting_values_raw
+        let setting_values: Vec<bstr::BString> = setting_values_raw
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
         if !setting_values.is_empty() && input.borrow().get_option("unset")?.as_bool() == Some(true)
         {
@@ -867,7 +867,10 @@ impl Command for ConfigCommand {
             return Ok(0);
         }
 
-        let values: Vec<String> = setting_values; // what the user is trying to add/change
+        let values: Vec<String> = setting_values
+            .iter()
+            .map(|s| legacy_lossy(s).into_owned())
+            .collect::<Vec<String>>(); // what the user is trying to add/change
 
         let boolean_validator = |val: &PhpMixed| -> bool {
             matches!(

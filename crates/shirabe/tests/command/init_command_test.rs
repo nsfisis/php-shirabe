@@ -56,7 +56,7 @@ fn opt(name: &str, value: &str) -> (ParameterName, InputValue) {
 fn opt_list(name: &str, values: &[&str]) -> (ParameterName, InputValue) {
     (
         ParameterName::of(name),
-        InputValue::Array(values.iter().map(|v| v.to_string()).collect()),
+        InputValue::Array(values.iter().map(|v| (*v).into()).collect()),
     )
 }
 

@@ -171,7 +171,7 @@ impl Command for CheckPlatformReqsCommand {
                 Some("f"),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
-                Some(InputValue::String("text".to_string())),
+                Some(InputValue::from("text")),
                 SuggestedValues::List(vec!["json".to_string(), "text".to_string()]),
             )
             .unwrap()
@@ -390,12 +390,14 @@ impl Command for CheckPlatformReqsCommand {
             }
         }
 
-        let format = input
-            .borrow()
-            .get_option("format")?
-            .as_string()
-            .unwrap_or("text")
-            .to_string();
+        let format = legacy_lossy(
+            input
+                .borrow()
+                .get_option("format")?
+                .as_string()
+                .unwrap_or(bstr::BStr::new("text")),
+        )
+        .into_owned();
         self.print_table(_output, &results, &format)?;
 
         Ok(exit_code)

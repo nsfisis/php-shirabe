@@ -87,9 +87,9 @@ impl Command for ReinstallCommand {
         let mut package_names_to_reinstall: Vec<String> = vec![];
 
         let type_option = input.borrow().get_option("type")?;
-        let type_count = type_option.as_array().map_or(0, <[String]>::len);
+        let type_count = type_option.as_array().map_or(0, <[bstr::BString]>::len);
         let packages_arg = input.borrow().get_argument("packages")?;
-        let packages_count = packages_arg.as_array().map_or(0, <[String]>::len);
+        let packages_count = packages_arg.as_array().map_or(0, <[bstr::BString]>::len);
 
         if type_count > 0 {
             if packages_count > 0 {
@@ -99,12 +99,12 @@ impl Command for ReinstallCommand {
                 )
                 .into());
             }
-            let filter_types: Vec<String> = type_option
+            let filter_types: Vec<bstr::BString> = type_option
                 .as_array()
-                .map(<[String]>::to_vec)
+                .map(<[bstr::BString]>::to_vec)
                 .unwrap_or_default();
             for package in local_repo.get_canonical_packages()? {
-                if filter_types.contains(&legacy_lossy(&package.get_type()).into_owned()) {
+                if filter_types.iter().any(|t| *t == package.get_type()) {
                     package_names_to_reinstall.push(legacy_lossy(&package.get_name()).into_owned());
                     packages_to_reinstall.push(package);
                 }
@@ -116,9 +116,9 @@ impl Command for ReinstallCommand {
                 )
                 .into());
             }
-            let patterns: Vec<String> = packages_arg
+            let patterns: Vec<bstr::BString> = packages_arg
                 .as_array()
-                .map(<[String]>::to_vec)
+                .map(<[bstr::BString]>::to_vec)
                 .unwrap_or_default();
             for pattern in &patterns {
                 let pattern_regexp = base_package::package_name_to_regexp(pattern);
@@ -132,7 +132,7 @@ impl Command for ReinstallCommand {
                     }
                 }
                 if !matched {
-                    io.write_error(format!("<warning>Pattern \"{}\" does not match any currently installed packages.</warning>", pattern));
+                    io.write_error(format!("<warning>Pattern \"{}\" does not match any currently installed packages.</warning>", pattern.display_lossy()));
                 }
             }
         }
@@ -273,7 +273,7 @@ impl Command for ReinstallCommand {
                 .borrow()
                 .get_option("apcu-autoloader-prefix")?
                 .as_string()
-                .map(|s| s.to_string());
+                .map(|s| legacy_lossy(s).into_owned());
             let apcu = apcu_prefix.is_some()
                 || input
                     .borrow()

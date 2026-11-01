@@ -357,7 +357,7 @@ impl Command for ArchiveCommand {
             .borrow()
             .get_option("format")?
             .as_string()
-            .map(|s| s.to_string())
+            .map(|s| legacy_lossy(s).into_owned())
             .unwrap_or_else(|| {
                 legacy_lossy(
                     config
@@ -373,7 +373,7 @@ impl Command for ArchiveCommand {
             .borrow()
             .get_option("dir")?
             .as_string()
-            .map(|s| s.to_string())
+            .map(|s| legacy_lossy(s).into_owned())
             .unwrap_or_else(|| {
                 legacy_lossy(
                     config
@@ -394,19 +394,19 @@ impl Command for ArchiveCommand {
                     .borrow()
                     .get_argument("package")?
                     .as_string()
-                    .map(|s| s.to_string()),
+                    .map(|s| legacy_lossy(s).into_owned()),
                 input
                     .borrow()
                     .get_argument("version")?
                     .as_string()
-                    .map(|s| s.to_string()),
+                    .map(|s| legacy_lossy(s).into_owned()),
                 &format,
                 &dir,
                 input
                     .borrow()
                     .get_option("file")?
                     .as_string()
-                    .map(|s| s.to_string()),
+                    .map(|s| legacy_lossy(s).into_owned()),
                 input
                     .borrow()
                     .get_option("ignore-filters")?

@@ -47,16 +47,16 @@ impl GlobalCommand {
     // Mirrors PHP's `method_exists($input, '__toString')` guard followed by
     // `$input->__toString()`. `InputInterface` does not declare `__toString`, so the
     // concrete stringable input types are matched explicitly.
-    fn input_to_string(input: &dyn InputInterface) -> anyhow::Result<String> {
+    fn input_to_string(input: &dyn InputInterface) -> anyhow::Result<bstr::BString> {
         let input_any = input.as_any();
         if let Some(argv_input) = input_any.downcast_ref::<ArgvInput>() {
-            Ok(argv_input.to_string())
+            Ok(argv_input.__to_string())
         } else if let Some(array_input) = input_any.downcast_ref::<ArrayInput>() {
-            Ok(array_input.to_string())
+            Ok(array_input.__to_string())
         } else if let Some(string_input) = input_any.downcast_ref::<StringInput>() {
-            Ok(string_input.to_string())
+            Ok(string_input.__to_string())
         } else if let Some(completion_input) = input_any.downcast_ref::<CompletionInput>() {
-            Ok(completion_input.to_string())
+            Ok(completion_input.__to_string())
         } else {
             Err(
                 LogicException::new("Expected an Input instance that is stringable".to_string())
@@ -190,21 +190,21 @@ impl Command for GlobalCommand {
                 .as_any_mut()
                 .downcast_mut::<Application>()
                 .expect("shirabe always installs its own Application");
-            app.has(&command_name)
+            app.has(&legacy_lossy(&command_name))
         };
         if has {
             let prepared = self.prepare_subcommand_input(
                 std::rc::Rc::new(std::cell::RefCell::new(input.clone())),
                 true,
             )?;
-            let mut input = CompletionInput::from_string(&prepared.to_string(), 2)?;
+            let mut input = CompletionInput::from_string(prepared.__to_string(), 2)?;
             let command = {
                 let mut app_ref = application.borrow_mut();
                 let app = app_ref
                     .as_any_mut()
                     .downcast_mut::<Application>()
                     .expect("shirabe always installs its own Application");
-                app.find(&command_name)?
+                app.find(&legacy_lossy(&command_name))?
             };
             command.borrow().merge_application_definition(true);
 

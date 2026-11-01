@@ -1,6 +1,6 @@
 //! ref: composer/bin/composer
 
-use shirabe_php_shim::{PHP_ENV, PHP_SERVER, getenv};
+use shirabe_php_shim::{PHP_ENV, PHP_SERVER, getenv, path_to_bytes};
 use std::io::IsTerminal as _;
 
 /// Initialize a tracing subscriber from the environment variable `$SHIRABE_TRACING`.
@@ -58,7 +58,11 @@ fn main() {
 
     init_tracing();
 
-    let result = runtime.block_on(shirabe::run(std::env::args().collect()));
+    let result = runtime.block_on(shirabe::run(
+        std::env::args_os()
+            .map(|arg| bstr::BString::from(path_to_bytes(&arg)))
+            .collect(),
+    ));
     let exit_code = match result {
         Ok(exit_code) => exit_code,
         Err(e) => {

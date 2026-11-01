@@ -269,7 +269,7 @@ impl RequireCommand {
             .borrow()
             .get_option("apcu-autoloader-prefix")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()
@@ -441,8 +441,11 @@ impl RequireCommand {
                         .borrow()
                         .get_argument("packages")?
                         .as_array()
-                        .map(<[String]>::to_vec)
-                        .unwrap_or_default(),
+                        .map(<[bstr::BString]>::to_vec)
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|s| legacy_lossy(s).into_owned())
+                        .collect::<Vec<String>>(),
                 )? {
                     if !req.contains_key("version") {
                         io.write_error3(format!(
@@ -757,7 +760,7 @@ impl Command for RequireCommand {
             InputOption::new("no-update", None, Some(InputOption::VALUE_NONE), "Disables the automatic update of the dependencies (implies --no-install).", None).unwrap().into(),
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Skip the install step after updating the composer.lock file.", None).unwrap().into(),
             InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
             InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
             InputOption::new("update-no-dev", None, Some(InputOption::VALUE_NONE), "Run the dependency update with the --no-dev option.", None).unwrap().into(),
             InputOption::new("update-with-dependencies", Some("w"), Some(InputOption::VALUE_NONE), "Allows inherited dependencies to be updated, except those that are root requirements (can also be set via the COMPOSER_WITH_DEPENDENCIES=1 env var).", None).unwrap().into(),
@@ -925,11 +928,11 @@ impl Command for RequireCommand {
             legacy_lossy(&composer.get_package().get_minimum_stability()).into_owned()
         };
 
-        let packages: Vec<String> = input
+        let packages: Vec<bstr::BString> = input
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
         // if there is no update, we need to use the best possible version constraint directly as we cannot rely on the solver to guess the best constraint
         let no_update = input
@@ -945,7 +948,10 @@ impl Command for RequireCommand {
         let requirements_result = self.determine_requirements(
             input.clone(),
             output.clone(),
-            packages,
+            packages
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<String>>(),
             Some(&platform_repo),
             &preferred_stability,
             no_update,

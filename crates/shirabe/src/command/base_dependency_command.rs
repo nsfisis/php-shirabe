@@ -124,19 +124,23 @@ pub trait BaseDependencyCommand: BaseCommand {
 
         let mut installed_repo = InstalledRepository::new(repos);
 
-        let needle = input
-            .borrow()
-            .get_argument(Self::ARGUMENT_PACKAGE)?
-            .as_string()
-            .unwrap_or_default()
-            .to_string();
-        let text_constraint: String = if input.borrow().has_argument(Self::ARGUMENT_CONSTRAINT) {
+        let needle = legacy_lossy(
             input
                 .borrow()
-                .get_argument(Self::ARGUMENT_CONSTRAINT)?
+                .get_argument(Self::ARGUMENT_PACKAGE)?
                 .as_string()
-                .unwrap_or("*")
-                .to_string()
+                .unwrap_or_default(),
+        )
+        .into_owned();
+        let text_constraint: String = if input.borrow().has_argument(Self::ARGUMENT_CONSTRAINT) {
+            legacy_lossy(
+                input
+                    .borrow()
+                    .get_argument(Self::ARGUMENT_CONSTRAINT)?
+                    .as_string()
+                    .unwrap_or(bstr::BStr::new("*")),
+            )
+            .into_owned()
         } else {
             "*".to_string()
         };

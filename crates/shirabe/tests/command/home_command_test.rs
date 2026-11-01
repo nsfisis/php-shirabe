@@ -65,7 +65,7 @@ fn test_home_command_with_show_flag_invalid_or_missing_repository_url() {
         }),
         vec![(
             ParameterName::of("packages"),
-            InputValue::Array(vec!["vendor/package".to_string()]),
+            InputValue::Array(vec!["vendor/package".into()]),
         )],
         "<warning>Invalid or missing repository URL for vendor/package</warning>",
         &[],
@@ -93,7 +93,7 @@ fn test_home_command_with_show_flag_package_not_found() {
         serde_json::json!({ "repositories": [] }),
         vec![(
             ParameterName::of("packages"),
-            InputValue::Array(vec!["vendor/anotherpackage".to_string()]),
+            InputValue::Array(vec!["vendor/anotherpackage".into()]),
         )],
         "<warning>Package vendor/anotherpackage not found</warning>\n\
          <warning>Invalid or missing repository URL for vendor/anotherpackage</warning>",
@@ -109,7 +109,7 @@ fn test_home_command_with_show_flag_a_valid_package_url() {
         serde_json::json!({ "repositories": [] }),
         vec![(
             ParameterName::of("packages"),
-            InputValue::Array(vec!["vendor/package".to_string()]),
+            InputValue::Array(vec!["vendor/package".into()]),
         )],
         "https://example.org",
         &[("vendor/package", "https://example.org")],
@@ -124,7 +124,7 @@ fn test_home_command_with_show_flag_a_valid_dev_package_url() {
         serde_json::json!({ "repositories": [] }),
         vec![(
             ParameterName::of("packages"),
-            InputValue::Array(vec!["vendor/devpackage".to_string()]),
+            InputValue::Array(vec!["vendor/devpackage".into()]),
         )],
         "https://example.org/dev",
         &[("vendor/devpackage", "https://example.org/dev")],

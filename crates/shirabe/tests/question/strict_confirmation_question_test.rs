@@ -118,7 +118,7 @@ fn create_input(entry: &str) -> (ArrayInput, QuestionHelper) {
     let mut input = ArrayInput::new(
         vec![(
             ParameterName::Index(0),
-            InputValue::String("--no-interaction".to_string()),
+            InputValue::String(bstr::BString::from("--no-interaction".to_string())),
         )],
         None,
     )

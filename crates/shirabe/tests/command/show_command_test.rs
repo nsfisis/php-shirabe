@@ -978,10 +978,7 @@ fn test_ignored_option_combinations() {
         .run(
             input(vec![
                 ("command", InputValue::from("show")),
-                (
-                    "--ignore",
-                    InputValue::Array(vec!["vendor/package".to_string()]),
-                ),
+                ("--ignore", InputValue::Array(vec!["vendor/package".into()])),
             ]),
             RunOptions::default(),
         )

@@ -281,7 +281,7 @@ impl Command for UpdateCommand {
             InputOption::new("lock", None, Some(InputOption::VALUE_NONE), "Overwrites the lock file hash to suppress warning about the lock file being out of date without updating package versions. Package metadata like mirrors and URLs are updated if they changed.", None).unwrap().into(),
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Skip the install step after updating the composer.lock file.", None).unwrap().into(),
             InputOption::new("no-audit", None, Some(InputOption::VALUE_NONE), "Skip the audit step after updating the composer.lock file (can also be set via the COMPOSER_NO_AUDIT=1 env var).", None).unwrap().into(),
-            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
             InputOption::new("no-security-blocking", None, Some(InputOption::VALUE_NONE), "Allows installing packages with security advisories or that are abandoned (can also be set via the COMPOSER_NO_SECURITY_BLOCKING=1 env var).", None).unwrap().into(),
             InputOption::new("no-autoloader", None, Some(InputOption::VALUE_NONE), "Skips autoloader generation", None).unwrap().into(),
             InputOption::new("no-suggest", None, Some(InputOption::VALUE_NONE), "DEPRECATED: This flag does not exist anymore.", None).unwrap().into(),
@@ -360,15 +360,21 @@ impl Command for UpdateCommand {
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(<[String]>::to_vec)
-            .unwrap_or_default();
+            .map(<[bstr::BString]>::to_vec)
+            .unwrap_or_default()
+            .iter()
+            .map(|s| legacy_lossy(s).into_owned())
+            .collect();
         let mut reqs: IndexMap<String, String> = self.format_requirements(
             input
                 .borrow()
                 .get_option("with")?
                 .as_array()
-                .map(<[String]>::to_vec)
-                .unwrap_or_default(),
+                .map(<[bstr::BString]>::to_vec)
+                .unwrap_or_default()
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<String>>(),
         )?;
 
         // extract --with shorthands from the allowlist
@@ -598,7 +604,7 @@ impl Command for UpdateCommand {
             .borrow()
             .get_option("apcu-autoloader-prefix")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()
@@ -752,8 +758,11 @@ impl Command for UpdateCommand {
                         .borrow()
                         .get_argument("packages")?
                         .as_array()
-                        .map(<[String]>::to_vec)
-                        .unwrap_or_default(),
+                        .map(<[bstr::BString]>::to_vec)
+                        .unwrap_or_default()
+                        .iter()
+                        .map(|s| legacy_lossy(s).into_owned())
+                        .collect::<Vec<String>>(),
                     "--bump-after-update=dev".to_string(),
                 )?;
             }

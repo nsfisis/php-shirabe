@@ -559,11 +559,11 @@ impl Command for InitCommand {
             options.shift_remove(B("author"));
         }
 
-        let repositories: Vec<String> = input
+        let repositories: Vec<bstr::BString> = input
             .borrow()
             .get_option("repository")?
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
         if (repositories.len() as i64) > 0 {
             let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
@@ -571,8 +571,12 @@ impl Command for InitCommand {
                 None,
             )?));
             for repo in &repositories {
-                let repo_config =
-                    RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
+                let repo_config = RepositoryFactory::config_from_string(
+                    io.clone(),
+                    &config,
+                    &legacy_lossy(repo),
+                    true,
+                )?;
                 let entry = options
                     .entry("repositories".into())
                     .or_insert_with(|| PhpMixed::List(vec![]));
@@ -652,12 +656,14 @@ impl Command for InitCommand {
             )
             .into_owned();
             autoload_path = Some(ap.clone());
-            let name = input
-                .borrow()
-                .get_option("name")?
-                .as_string()
-                .unwrap_or_default()
-                .to_string();
+            let name = legacy_lossy(
+                input
+                    .borrow()
+                    .get_option("name")?
+                    .as_string()
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             let namespace = self.namespace_from_package_name(&name).unwrap_or_default();
             let mut psr4 = IndexMap::new();
             psr4.insert(format!("{}\\", namespace).into(), PhpMixed::string(ap));
@@ -759,12 +765,14 @@ impl Command for InitCommand {
 
         // --autoload - Show post-install configuration info
         if autoload_path.is_some() {
-            let name = input
-                .borrow()
-                .get_option("name")?
-                .as_string()
-                .unwrap_or_default()
-                .to_string();
+            let name = legacy_lossy(
+                input
+                    .borrow()
+                    .get_option("name")?
+                    .as_string()
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             let namespace = self.namespace_from_package_name(&name).unwrap_or_default();
 
             io.write_error3(
@@ -825,11 +833,11 @@ impl Command for InitCommand {
                 .get_formatter();
 
             // initialize repos if configured
-            let repositories: Vec<String> = input
+            let repositories: Vec<bstr::BString> = input
                 .borrow()
                 .get_option("repository")?
                 .as_array()
-                .map(<[String]>::to_vec)
+                .map(<[bstr::BString]>::to_vec)
                 .unwrap_or_default();
             if (repositories.len() as i64) > 0 {
                 let config = std::rc::Rc::new(std::cell::RefCell::new(Factory::create_config(
@@ -847,8 +855,12 @@ impl Command for InitCommand {
                     )];
                 let mut create_default_packagist_repo = true;
                 for repo in &repositories {
-                    let repo_config =
-                        RepositoryFactory::config_from_string(io.clone(), &config, repo, true)?;
+                    let repo_config = RepositoryFactory::config_from_string(
+                        io.clone(),
+                        &config,
+                        &legacy_lossy(repo),
+                        true,
+                    )?;
                     let is_packagist_false = repo_config
                         .get(B("packagist"))
                         .map(|v| v.as_bool() == Some(false))
@@ -918,7 +930,7 @@ impl Command for InitCommand {
                 .borrow()
                 .get_option("name")?
                 .as_string()
-                .map(|s| s.to_string());
+                .map(|s| legacy_lossy(s).into_owned());
             let mut name = match name_option {
                 Some(name) => name,
                 None => self.get_default_package_name()?,
@@ -959,13 +971,13 @@ impl Command for InitCommand {
             .unwrap_or_default()).into_owned();
             input
                 .borrow_mut()
-                .set_option("name", InputValue::String(name));
+                .set_option("name", InputValue::String(bstr::BString::from(name)));
 
             let description = input
                 .borrow()
                 .get_option("description")?
                 .as_string()
-                .map(|s| s.to_string());
+                .map(|s| legacy_lossy(s).into_owned());
             let description_default = description.clone();
             let description = io.ask(
                 format!(
@@ -984,7 +996,7 @@ impl Command for InitCommand {
                 .borrow()
                 .get_option("author")?
                 .as_string()
-                .map(|s| s.to_string());
+                .map(|s| legacy_lossy(s).into_owned());
             let author = match author_option {
                 Some(author) => author,
                 None => self.get_default_author()?.unwrap_or_default(),
@@ -1034,7 +1046,7 @@ impl Command for InitCommand {
                 .borrow()
                 .get_option("stability")?
                 .as_string()
-                .map(|s| s.to_string());
+                .map(|s| legacy_lossy(s).into_owned());
             let minimum_stability_default = minimum_stability.clone();
             let minimum_stability_for_validate = minimum_stability.clone();
             let minimum_stability_value = io.ask_and_validate(
@@ -1082,7 +1094,7 @@ impl Command for InitCommand {
             );
 
             let type_val = input.borrow().get_option("type")?;
-            let type_str = type_val.as_string().unwrap_or_default().to_string();
+            let type_str = legacy_lossy(type_val.as_string().unwrap_or_default()).into_owned();
             let mut type_value = io.ask(
             format!(
                 "Package Type (e.g. library, project, metapackage, composer-plugin) [<comment>{}</comment>]: ",
@@ -1103,7 +1115,7 @@ impl Command for InitCommand {
                 .borrow()
                 .get_option("license")?
                 .as_string()
-                .map(|s| s.to_string());
+                .map(|s| legacy_lossy(s).into_owned());
             if license.is_none() {
                 // TODO(bytes): consumers read PhpMixed::String as UTF-8 text.
                 let default_license = PHP_SERVER
@@ -1152,7 +1164,7 @@ impl Command for InitCommand {
             // prepare to resolve dependencies
             let repos = self.get_repos();
             let preferred_stability =
-                if let Some(s) = minimum_stability_default.filter(|s| !s.is_empty()) {
+                if let Some(s) = minimum_stability_default.filter(|s: &String| !s.is_empty()) {
                     s
                 } else {
                     "stable".to_string()
@@ -1174,18 +1186,21 @@ impl Command for InitCommand {
                 };
 
             let question = "Would you like to define your dependencies (require) interactively [<comment>yes</comment>]? ".to_string();
-            let require: Vec<String> = input
+            let require: Vec<bstr::BString> = input
                 .borrow()
                 .get_option("require")?
                 .as_array()
-                .map(<[String]>::to_vec)
+                .map(<[bstr::BString]>::to_vec)
                 .unwrap_or_default();
             let requirements =
                 if (require.len() as i64) > 0 || io.ask_confirmation(question, true)? {
                     self.determine_requirements(
                         input.clone(),
                         output.clone(),
-                        require,
+                        require
+                            .iter()
+                            .map(|s| legacy_lossy(s).into_owned())
+                            .collect::<Vec<String>>(),
                         platform_repo.as_ref(),
                         &preferred_stability,
                         false,
@@ -1196,21 +1211,24 @@ impl Command for InitCommand {
                 };
             input
                 .borrow_mut()
-                .set_option("require", InputValue::Array(requirements));
+                .set_option("require", InputValue::from(requirements));
 
             let question = "Would you like to define your dev dependencies (require-dev) interactively [<comment>yes</comment>]? ".to_string();
-            let require_dev: Vec<String> = input
+            let require_dev: Vec<bstr::BString> = input
                 .borrow()
                 .get_option("require-dev")?
                 .as_array()
-                .map(<[String]>::to_vec)
+                .map(<[bstr::BString]>::to_vec)
                 .unwrap_or_default();
             let dev_requirements =
                 if (require_dev.len() as i64) > 0 || io.ask_confirmation(question, true)? {
                     self.determine_requirements(
                         input.clone(),
                         output.clone(),
-                        require_dev,
+                        require_dev
+                            .iter()
+                            .map(|s| legacy_lossy(s).into_owned())
+                            .collect::<Vec<String>>(),
                         platform_repo.as_ref(),
                         &preferred_stability,
                         false,
@@ -1221,22 +1239,24 @@ impl Command for InitCommand {
                 };
             input
                 .borrow_mut()
-                .set_option("require-dev", InputValue::Array(dev_requirements));
+                .set_option("require-dev", InputValue::from(dev_requirements));
 
             // --autoload - input and validation
             let autoload = input
                 .borrow()
                 .get_option("autoload")?
                 .as_string()
-                .map(|s| s.to_string())
-                .filter(|s| !s.is_empty())
+                .map(|s| legacy_lossy(s).into_owned())
+                .filter(|s: &String| !s.is_empty())
                 .unwrap_or_else(|| "src/".to_string());
-            let name_str = input
-                .borrow()
-                .get_option("name")?
-                .as_string()
-                .unwrap_or_default()
-                .to_string();
+            let name_str = legacy_lossy(
+                input
+                    .borrow()
+                    .get_option("name")?
+                    .as_string()
+                    .unwrap_or_default(),
+            )
+            .into_owned();
             let namespace = self
                 .namespace_from_package_name(&name_str)
                 .unwrap_or_default();

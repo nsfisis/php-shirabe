@@ -24,7 +24,10 @@ impl CommandCompletionTester {
         // array_unshift($input, $this->command->getName())
         input.insert(0, self.command.borrow().get_name().unwrap_or_default());
 
-        let mut completion_input = CompletionInput::from_tokens(input, current_index)?;
+        let mut completion_input = CompletionInput::from_tokens(
+            input.into_iter().map(bstr::BString::from).collect(),
+            current_index,
+        )?;
         {
             let command_ref = self.command.borrow();
             let definition = command_ref.get_definition();

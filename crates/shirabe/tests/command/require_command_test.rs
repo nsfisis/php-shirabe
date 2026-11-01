@@ -37,10 +37,7 @@ fn test_require_throws_if_none_matches() {
                 ("command", InputValue::from("require")),
                 ("--dry-run", InputValue::from(true)),
                 ("--no-audit", InputValue::from(true)),
-                (
-                    "packages",
-                    InputValue::Array(vec!["required/pkg".to_string()]),
-                ),
+                ("packages", InputValue::Array(vec!["required/pkg".into()])),
             ]),
             RunOptions::default(),
         )
@@ -84,10 +81,7 @@ fn test_require_warns_if_resolved_to_feature_branch() {
                 ("command", InputValue::from("require")),
                 ("--dry-run", InputValue::from(true)),
                 ("--no-audit", InputValue::from(true)),
-                (
-                    "packages",
-                    InputValue::Array(vec!["required/pkg".to_string()]),
-                ),
+                ("packages", InputValue::Array(vec!["required/pkg".into()])),
             ]),
             RunOptions {
                 interactive: Some(true),
@@ -134,7 +128,7 @@ fn provide_require() -> Vec<(
                     { "name": "required/pkg", "version": "1.0.0" },
                 ] } },
             }),
-            vec![("packages", InputValue::Array(vec!["required/pkg".to_string()]))],
+            vec![("packages", InputValue::Array(vec!["required/pkg".into()]))],
             "<warning>Cannot use required/pkg's latest version 1.2.0 as it requires ext-foobar ^1 which is missing from your platform.
 ./composer.json has been updated
 Running shirabe update required/pkg
@@ -157,7 +151,7 @@ Using version ^1.0 for required/pkg",
                 ] } },
             }),
             vec![
-                ("packages", InputValue::Array(vec!["required/pkg".to_string()])),
+                ("packages", InputValue::Array(vec!["required/pkg".into()])),
                 ("--no-install", InputValue::from(true)),
                 ("-v", InputValue::from(true)),
             ],
@@ -184,7 +178,7 @@ Using version ^1.0 for required/pkg",
                 ] } },
             }),
             vec![
-                ("packages", InputValue::Array(vec!["required/pkg".to_string()])),
+                ("packages", InputValue::Array(vec!["required/pkg".into()])),
                 ("--no-install", InputValue::from(true)),
             ],
             "<warning>Cannot use required/pkg's latest version 1.1.0 as it requires php ^20 which is not satisfied by your platform.
@@ -205,7 +199,7 @@ Using version ^1.0 for required/pkg",
                 ] } },
             }),
             vec![
-                ("packages", InputValue::Array(vec!["required/pkg".to_string()])),
+                ("packages", InputValue::Array(vec!["required/pkg".into()])),
                 ("--no-update", InputValue::from(true)),
             ],
             "<warning>Cannot use required/pkg's latest version 1.1.0 as it requires php ^20 which is not satisfied by your platform.
@@ -224,7 +218,7 @@ Using version ^1.0 for required/pkg
                 "require": { "existing/dep": "^1" },
             }),
             vec![
-                ("packages", InputValue::Array(vec!["required/pkg".to_string()])),
+                ("packages", InputValue::Array(vec!["required/pkg".into()])),
                 ("--no-install", InputValue::from(true)),
             ],
             "./composer.json has been updated
@@ -245,7 +239,7 @@ Using version ^1.1 for required/pkg",
                 ] } },
             }),
             vec![
-                ("packages", InputValue::Array(vec!["required/pkg".to_string()])),
+                ("packages", InputValue::Array(vec!["required/pkg".into()])),
                 ("--no-install", InputValue::from(true)),
                 ("--fixed", InputValue::from(true)),
             ],
@@ -361,10 +355,7 @@ fn test_inconsistent_require_keys() {
             ("--no-audit", InputValue::from(true)),
             ("--dev", InputValue::from(is_dev)),
             ("--no-install", InputValue::from(true)),
-            (
-                "packages",
-                InputValue::Array(vec!["required/pkg".to_string()]),
-            ),
+            ("packages", InputValue::Array(vec!["required/pkg".into()])),
         ];
         if is_interactive {
             app_tester.set_inputs(vec!["yes".to_string()]);

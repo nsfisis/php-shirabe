@@ -152,11 +152,11 @@ impl RepositoryCommand {
     fn suggest_repo_names(&self) -> crate::console::input::SuggestedValues {
         crate::console::input::SuggestedValues::Closure(Box::new(|this, input, _suggestions| {
             let action = input.get_argument("action")?.to_php_string();
-            if ["enable", "disable"].contains(&action.as_str()) {
+            if action == "enable" || action == "disable" {
                 return Ok(vec!["packagist.org".to_string()]);
             }
 
-            if !["remove", "set-url", "get-url"].contains(&action.as_str()) {
+            if action != "remove" && action != "set-url" && action != "get-url" {
                 return Ok(vec![]);
             }
 
@@ -260,7 +260,7 @@ impl Command for RepositoryCommand {
                 "action",
                 Some(InputArgument::OPTIONAL),
                 "Action to perform: list, add, remove, set-url, get-url, enable, disable",
-                Some(InputValue::String("list".to_string())),
+                Some(InputValue::from("list")),
                 crate::console::input::SuggestedValues::List(vec![
                     "list".to_string(),
                     "add".to_string(),
@@ -336,17 +336,17 @@ impl Command for RepositoryCommand {
             .borrow()
             .get_argument("name")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         let arg1 = input
             .borrow()
             .get_argument("arg1")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         let arg2 = input
             .borrow()
             .get_argument("arg2")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
 
         let config_file = self.config_file.borrow().as_ref().unwrap().clone();
         let config_data = config_file.borrow_mut().read()?;
@@ -393,12 +393,12 @@ impl Command for RepositoryCommand {
                     .borrow()
                     .get_option("before")?
                     .as_string()
-                    .map(|s| s.to_string());
+                    .map(|s| legacy_lossy(s).into_owned());
                 let after = input
                     .borrow()
                     .get_option("after")?
                     .as_string()
-                    .map(|s| s.to_string());
+                    .map(|s| legacy_lossy(s).into_owned());
                 if before.is_some() && after.is_some() {
                     return Err(RuntimeException::new(
                         "You can not combine --before and --after".to_string(),

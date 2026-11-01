@@ -391,11 +391,11 @@ impl Command for BumpCommand {
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         _output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
-        let packages_filter: Vec<String> = input
+        let packages_filter: Vec<bstr::BString> = input
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
 
         let dev_only = input
@@ -419,7 +419,10 @@ impl Command for BumpCommand {
             dev_only,
             no_dev_only,
             dry_run,
-            packages_filter,
+            packages_filter
+                .iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<String>>(),
             "--dev-only".to_string(),
         )
     }

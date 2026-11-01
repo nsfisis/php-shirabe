@@ -473,25 +473,26 @@ impl BaseCommand for BaseCommandData {
                 .into());
             }
             let prefer_install = input.borrow().get_option("prefer-install")?;
-            match prefer_install.as_string().unwrap_or_default() {
-                "dist" => {
+            let prefer_install_value: &[u8] = prefer_install.as_string().unwrap_or_default();
+            match prefer_install_value {
+                b"dist" => {
                     input
                         .borrow_mut()
                         .set_option("prefer-dist", InputValue::Bool(true))?;
                 }
-                "source" => {
+                b"source" => {
                     input
                         .borrow_mut()
                         .set_option("prefer-source", InputValue::Bool(true))?;
                 }
-                "auto" => {
+                b"auto" => {
                     prefer_dist = false;
                     prefer_source = false;
                 }
                 other => {
                     return Err(UnexpectedValueException::new(format!(
                         "--prefer-install accepts one of \"dist\", \"source\" or \"auto\", got {}",
-                        other
+                        bstr::BStr::new(other).display_lossy()
                     ))
                     .into());
                 }
@@ -676,7 +677,7 @@ impl BaseCommand for BaseCommandData {
             .into());
         }
 
-        Ok(val.as_string().unwrap_or_default().to_string())
+        Ok(legacy_lossy(val.as_string().unwrap_or_default()).into_owned())
     }
 
     fn create_audit_config(
@@ -932,12 +933,7 @@ pub fn base_command_initialize(
         {
             input.borrow_mut().set_option(
                 "ignore-platform-req",
-                InputValue::Array(
-                    explode(",", &ignore_str)
-                        .iter()
-                        .map(|s| legacy_lossy(s).into_owned())
-                        .collect::<Vec<_>>(),
-                ),
+                InputValue::Array(explode(",", &ignore_str)),
             );
 
             io.write_error(format!(

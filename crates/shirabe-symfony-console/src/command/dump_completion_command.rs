@@ -230,7 +230,7 @@ impl Command for DumpCompletionCommand {
         }
 
         let shell = match input.borrow().get_argument("shell")?.as_string() {
-            Some(s) => s.to_string(),
+            Some(s) => legacy_lossy(s).into_owned(),
             None => Self::guess_shell(),
         };
         // __DIR__.'/../Resources/completion.'.$shell — resolved against the embedded

@@ -275,7 +275,9 @@ impl Platform {
 
     /// Whether the current command is for bash completion
     pub fn is_input_completion_process() -> bool {
-        std::env::args().nth(1).as_deref() == Some("_complete")
+        std::env::args_os()
+            .nth(1)
+            .is_some_and(|arg| arg == "_complete")
     }
 
     pub fn workaround_filesystem_issues() {

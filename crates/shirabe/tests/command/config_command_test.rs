@@ -21,7 +21,7 @@ fn key(setting_key: &str) -> (ParameterName, InputValue) {
 fn value(values: &[&str]) -> (ParameterName, InputValue) {
     (
         ParameterName::of("setting-value"),
-        InputValue::Array(values.iter().map(|v| v.to_string()).collect()),
+        InputValue::Array(values.iter().map(|v| (*v).into()).collect()),
     )
 }
 

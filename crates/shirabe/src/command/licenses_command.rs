@@ -56,7 +56,7 @@ impl Command for LicensesCommand {
                 Some("f"),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text, json or summary",
-                Some(InputValue::String("text".to_string())),
+                Some(InputValue::from("text")),
                 SuggestedValues::List(vec![
                     "text".to_string(),
                     "json".to_string(),
@@ -160,12 +160,14 @@ impl Command for LicensesCommand {
         let packages = PackageSorter::sort_packages_alphabetically(packages);
         let io = self.get_io();
 
-        let format = input
-            .borrow()
-            .get_option("format")?
-            .as_string()
-            .unwrap_or("text")
-            .to_string();
+        let format = legacy_lossy(
+            input
+                .borrow()
+                .get_option("format")?
+                .as_string()
+                .unwrap_or(bstr::BStr::new("text")),
+        )
+        .into_owned();
         match format.as_str() {
             "text" => {
                 let root_licenses = root.get_license();

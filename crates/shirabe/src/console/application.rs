@@ -176,7 +176,7 @@ impl Application {
             .borrow()
             .get_parameter_option(&["--working-dir", "-d"], InputValue::Null, true)
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         if let Some(ref wd) = working_dir
             && !is_dir(wd)
         {
@@ -464,7 +464,10 @@ impl Application {
             }
         }
 
-        Ok(input.borrow().get_first_argument())
+        Ok(input
+            .borrow()
+            .get_first_argument()
+            .map(|name| legacy_lossy(&name).into_owned()))
     }
 
     pub fn get_long_version(&self) -> String {
@@ -1492,7 +1495,9 @@ impl Application {
         if self.single_command {
             Some(self.default_command.clone())
         } else {
-            input.get_first_argument()
+            input
+                .get_first_argument()
+                .map(|name| legacy_lossy(&name).into_owned())
         }
     }
 

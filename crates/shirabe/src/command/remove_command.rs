@@ -93,7 +93,7 @@ impl Command for RemoveCommand {
         None,
         Some(InputOption::VALUE_REQUIRED),
         "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
-        Some(InputValue::String(Auditor::FORMAT_SUMMARY.to_string())),
+        Some(InputValue::from(Auditor::FORMAT_SUMMARY)),
         SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
         InputOption::new("no-security-blocking",
         None,
@@ -184,7 +184,7 @@ impl Command for RemoveCommand {
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(<[String]>::is_empty)
+            .map(<[bstr::BString]>::is_empty)
             .unwrap_or(true)
             && !input
                 .borrow()
@@ -613,7 +613,7 @@ impl Command for RemoveCommand {
             .borrow()
             .get_option("apcu-autoloader-prefix")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()

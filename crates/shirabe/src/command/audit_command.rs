@@ -112,7 +112,7 @@ impl Command for AuditCommand {
                 Some("f"),
                 Some(InputOption::VALUE_REQUIRED),
                 "Output format. Must be \"table\", \"plain\", \"json\", or \"summary\".",
-                Some(InputValue::String(Auditor::FORMAT_TABLE.to_string())),
+                Some(InputValue::from(Auditor::FORMAT_TABLE)),
                 SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect()),
             )
             .unwrap()
@@ -211,7 +211,7 @@ impl Command for AuditCommand {
             .borrow()
             .get_option("abandoned")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         if abandoned.is_some()
             && !in_array_strict(
                 abandoned.clone().unwrap(),
@@ -242,7 +242,7 @@ impl Command for AuditCommand {
             indexmap::IndexMap::new();
         let cli_severities = input.borrow().get_option("ignore-severity")?;
         for severity in cli_severities.as_array().unwrap_or_default() {
-            ignore_severities.insert(BString::from(severity.as_str()), None);
+            ignore_severities.insert(severity.clone(), None);
         }
         for (k, v) in audit_config.ignore_severity_for_audit.clone() {
             ignore_severities.insert(k, v);

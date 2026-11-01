@@ -259,7 +259,7 @@ impl Command for RunScriptCommand {
                 )
                 .into());
             }
-            Some(s) => s.to_string(),
+            Some(s) => legacy_lossy(s).into_owned(),
         };
 
         if !self.script_events.contains(&script.as_str()) {
@@ -304,15 +304,15 @@ impl Command for RunScriptCommand {
             .into());
         }
 
-        let args: Vec<String> = input
+        let args: Vec<bstr::BString> = input
             .borrow()
             .get_argument("args")?
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
 
         if let Some(timeout_val) = input.borrow().get_option("timeout")?.as_string() {
-            let timeout_str = timeout_val.to_string();
+            let timeout_str: String = legacy_lossy(timeout_val).into_owned();
             if !timeout_str.chars().all(|c| c.is_ascii_digit()) {
                 return Err(RuntimeException::new(
                     "Timeout value must be numeric and positive if defined, or 0 for forever"
@@ -326,9 +326,14 @@ impl Command for RunScriptCommand {
 
         Platform::put_env("COMPOSER_DEV_MODE", if dev_mode { "1" } else { "0" });
 
-        dispatcher
-            .borrow_mut()
-            .dispatch_script(&script, dev_mode, args, IndexMap::new())
+        dispatcher.borrow_mut().dispatch_script(
+            &script,
+            dev_mode,
+            args.iter()
+                .map(|s| legacy_lossy(s).into_owned())
+                .collect::<Vec<String>>(),
+            IndexMap::new(),
+        )
     }
 
     fn initialize(

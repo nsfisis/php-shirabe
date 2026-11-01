@@ -2,10 +2,11 @@
 
 use crate::exception::{InvalidArgumentException, RuntimeException};
 use crate::input::{ArgumentName, InputDefinition, InputValue};
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, array_filter, array_keys, array_merge_map, escapeshellarg, legacy_lossy,
-    php_regex, preg_is_match,
+    PhpResource, array_filter, array_keys, array_merge_map, escapeshellarg, php_regex,
+    preg_is_match,
 };
 
 /// Input is the base class for all concrete Input classes.
@@ -198,11 +199,11 @@ impl Input {
     }
 
     /// Escapes a token through escapeshellarg if it contains unsafe chars.
-    pub fn escape_token(&self, token: &str) -> String {
+    pub fn escape_token(&self, token: &BStr) -> BString {
         if preg_is_match(php_regex!("{^[\\w-]+$}"), token) {
-            token.to_string()
+            BString::from(token)
         } else {
-            legacy_lossy(&escapeshellarg(token)).into_owned()
+            escapeshellarg(token)
         }
     }
 

@@ -1436,10 +1436,10 @@ impl Factory {
         static mut WARNED: bool = false;
         let mut disable_tls = false;
         // allow running the config command if disable-tls is in the arg list, even if openssl is missing, to allow disabling it via the config command
-        let argv: Vec<String> = std::env::args().collect();
+        let argv: Vec<std::ffi::OsString> = std::env::args_os().collect();
         if !argv.is_empty()
-            && argv.contains(&"disable-tls".to_string())
-            && (argv.contains(&"conf".to_string()) || argv.contains(&"config".to_string()))
+            && argv.iter().any(|arg| arg == "disable-tls")
+            && argv.iter().any(|arg| arg == "conf" || arg == "config")
         {
             unsafe { WARNED = true };
             disable_tls = !extension_loaded("openssl");

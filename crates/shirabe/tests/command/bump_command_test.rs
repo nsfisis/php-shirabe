@@ -107,7 +107,7 @@ fn test_bump() {
         }),
         &[(
             "packages",
-            InputValue::Array(vec!["first/pkg:3.0.1".to_string(), "dev/*".to_string()]),
+            InputValue::Array(vec!["first/pkg:3.0.1".into(), "dev/*".into()]),
         )],
         serde_json::json!({
             "require": { "first/pkg": "^2.3.4", "second/pkg": "3.*" },

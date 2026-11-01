@@ -50,7 +50,7 @@ impl Command for OutdatedCommand {
         InputOption::new("minor-only", Some("m"), Some(InputOption::VALUE_NONE), "Show only packages that have minor SemVer-compatible updates.", None).unwrap().into(),
         InputOption::new("patch-only", Some("p"), Some(InputOption::VALUE_NONE), "Show only packages that have patch SemVer-compatible updates.", None).unwrap().into(),
         InputOption::new("sort-by-age", Some("A"), Some(InputOption::VALUE_NONE), "Displays the installed version's age, and sorts packages oldest first.", None).unwrap().into(),
-        InputOption::new6("format", Some("f"), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(InputValue::String("text".to_string())), SuggestedValues::List(vec!["json".to_string(), "text".to_string()])).unwrap().into(),
+        InputOption::new6("format", Some("f"), Some(InputOption::VALUE_REQUIRED), "Format of the output: text or json", Some(InputValue::from("text")), SuggestedValues::List(vec!["json".to_string(), "text".to_string()])).unwrap().into(),
         InputOption::new6("ignore", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore specified package(s). Can contain wildcards (*). Use it if you don't want to be informed about new versions of some packages.", None, self.suggest_installed_package(false, false)).unwrap().into(),
         InputOption::new("no-dev", None, Some(InputOption::VALUE_NONE), "Disables search in require-dev packages.", None).unwrap().into(),
         InputOption::new("ignore-platform-req", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Ignore a specific platform requirement (php & ext- packages). Use with the --outdated option", None).unwrap().into(),
@@ -75,10 +75,7 @@ impl Command for OutdatedCommand {
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> anyhow::Result<i64> {
         let mut args: IndexMap<String, InputValue> = IndexMap::new();
-        args.insert(
-            "command".to_string(),
-            InputValue::String("show".to_string()),
-        );
+        args.insert("command".to_string(), InputValue::from("show"));
         args.insert("--latest".to_string(), InputValue::Bool(true));
 
         if input

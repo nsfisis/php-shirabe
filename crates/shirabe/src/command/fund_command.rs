@@ -91,7 +91,7 @@ impl Command for FundCommand {
             Some("f"),
             Some(InputOption::VALUE_REQUIRED),
             "Format of the output: text or json",
-            Some(InputValue::String("text".to_string())),
+            Some(InputValue::from("text")),
             SuggestedValues::List(vec!["text".to_string(), "json".to_string()]),
         )
         .unwrap()
@@ -166,12 +166,14 @@ impl Command for FundCommand {
 
         let io = self.get_io();
 
-        let format = input
-            .borrow()
-            .get_option("format")?
-            .as_string()
-            .unwrap_or("text")
-            .to_string();
+        let format = legacy_lossy(
+            input
+                .borrow()
+                .get_option("format")?
+                .as_string()
+                .unwrap_or(bstr::BStr::new("text")),
+        )
+        .into_owned();
         if !matches!(format.as_str(), "text" | "json") {
             io.write_error(format!(
                 "Unsupported format \"{}\". See help for supported formats.",

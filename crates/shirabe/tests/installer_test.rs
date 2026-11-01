@@ -1115,12 +1115,15 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
         update_ref.set_code(Box::new(move |input, _output| {
             let packages: Vec<String> =
                 match input.get_argument("packages").unwrap_or(InputValue::Null) {
-                    InputValue::Array(items) => items,
+                    InputValue::Array(items) => items
+                        .iter()
+                        .map(|s| legacy_lossy(s).into_owned())
+                        .collect::<Vec<String>>(),
                     _ => vec![],
                 };
             let filtered: Vec<String> = packages
                 .iter()
-                .filter(|p| !["lock", "nothing", "mirrors"].contains(&p.as_str()))
+                .filter(|p: &&String| !["lock", "nothing", "mirrors"].contains(&p.as_str()))
                 .cloned()
                 .collect();
             let update_mirrors = opt_bool(input, "lock") || filtered.len() != packages.len();
@@ -1180,7 +1183,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&str>) {
     let app_output = StreamOutput::new(app_output_stream.clone(), None, None, None)
         .unwrap()
         .expect("php://memory is a valid stream");
-    let mut string_input = StringInput::new(&format!("{} -vvv", case.run)).unwrap();
+    let mut string_input = StringInput::new(format!("{} -vvv", case.run)).unwrap();
     string_input.set_interactive(false);
     let input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>> =
         std::rc::Rc::new(std::cell::RefCell::new(string_input));

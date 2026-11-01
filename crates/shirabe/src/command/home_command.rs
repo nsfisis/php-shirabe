@@ -178,11 +178,11 @@ impl Command for HomeCommand {
         let io = self.get_io().clone();
         let mut return_code: i64 = 0;
 
-        let packages: Vec<String> = input
+        let packages: Vec<bstr::BString> = input
             .borrow()
             .get_argument("packages")?
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
 
         let packages = if packages.is_empty() {
@@ -192,9 +192,6 @@ impl Command for HomeCommand {
             vec![composer_ref.get_package().get_name()]
         } else {
             packages
-                .into_iter()
-                .map(bstr::BString::from)
-                .collect::<Vec<_>>()
         };
 
         let show_homepage = input

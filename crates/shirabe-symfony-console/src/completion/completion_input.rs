@@ -1,8 +1,9 @@
 //! ref: composer/vendor/symfony/console/Completion/CompletionInput.php
 
 use crate::input::{ArgvInput, InputDefinition, InputOption, InputValue};
+use bstr::{BStr, BString};
 use shirabe_php_shim::{
-    explode_with_limit, legacy_lossy, ltrim2, php_regex, preg_match_all, rtrim, substr, trim2,
+    explode_with_limit, ltrim2, php_regex, preg_match_all, rtrim, substr, trim2, utf8_text,
 };
 
 /// An input specialized for shell completion.
@@ -12,11 +13,11 @@ use shirabe_php_shim::{
 #[derive(Debug, Clone)]
 pub struct CompletionInput {
     inner: ArgvInput,
-    tokens: Vec<String>,
+    tokens: Vec<BString>,
     current_index: i64,
     completion_type: String,
     completion_name: Option<String>,
-    completion_value: String,
+    completion_value: BString,
 }
 
 impl CompletionInput {
@@ -28,21 +29,20 @@ impl CompletionInput {
     /// Converts a terminal string into tokens.
     ///
     /// This is required for shell completions without COMP_WORDS support.
-    pub fn from_string(input_str: &str, current_index: i64) -> anyhow::Result<Self> {
+    pub fn from_string(input_str: impl AsRef<[u8]>, current_index: i64) -> anyhow::Result<Self> {
         let tokens = preg_match_all(
             php_regex!("/(?<=^|\\s)(['\"]?)(.+?)(?<!\\\\)\\1(?=$|\\s)/"),
-            input_str,
+            input_str.as_ref(),
         );
 
         Self::from_tokens(
             tokens
                 .map(|token| {
-                    legacy_lossy(
+                    BString::from(
                         token
                             .get(0)
                             .expect("group 0 participates whenever the pattern matches"),
                     )
-                    .into_owned()
                 })
                 .collect(),
             current_index,
@@ -53,14 +53,14 @@ impl CompletionInput {
     ///
     /// `tokens` is the set of split tokens (e.g. COMP_WORDS or argv),
     /// `current_index` the index of the cursor (e.g. COMP_CWORD).
-    pub fn from_tokens(tokens: Vec<String>, current_index: i64) -> anyhow::Result<Self> {
+    pub fn from_tokens(tokens: Vec<BString>, current_index: i64) -> anyhow::Result<Self> {
         let mut input = Self {
             inner: ArgvInput::new(Some(tokens.clone()), None)?,
             tokens: vec![],
             current_index: 0,
             completion_type: String::new(),
             completion_name: None,
-            completion_value: String::new(),
+            completion_value: BString::default(),
         };
         input.tokens = tokens;
         input.current_index = current_index;
@@ -75,13 +75,13 @@ impl CompletionInput {
             })?;
 
         let relevant_token = self.get_relevant_token();
-        if "-" == &relevant_token[0..1] {
+        if relevant_token[0..1] == *b"-" {
             // the current token is an input option: complete either option name or option value
             let parts = explode_with_limit("=", &relevant_token, 2);
             let option_token = parts.first().cloned().unwrap_or_default();
             let option_value = parts.get(1).cloned().unwrap_or_default();
 
-            let option = self.get_option_from_token(&legacy_lossy(&option_token));
+            let option = self.get_option_from_token(option_token.as_ref());
             if option.is_none() && !self.is_cursor_free() {
                 self.completion_type = Self::TYPE_OPTION_NAME.to_string();
                 self.completion_value = relevant_token;
@@ -95,11 +95,11 @@ impl CompletionInput {
                 self.completion_type = Self::TYPE_OPTION_VALUE.to_string();
                 self.completion_name = Some(option.get_name().to_string());
                 self.completion_value = if !option_value.is_empty() {
-                    legacy_lossy(&option_value).into_owned()
+                    option_value
                 } else if !option_token.starts_with("--".as_bytes()) {
-                    legacy_lossy(&substr(&option_token, 2, None)).into_owned()
+                    substr(&option_token, 2, None)
                 } else {
-                    String::new()
+                    BString::default()
                 };
 
                 return Ok(());
@@ -107,9 +107,9 @@ impl CompletionInput {
         }
 
         let previous_token = self.tokens[(self.current_index - 1) as usize].clone();
-        if "-" == &previous_token[0..1] && !trim2(&previous_token, "-").is_empty() {
+        if previous_token[0..1] == *b"-" && !trim2(&previous_token, "-").is_empty() {
             // check if previous option accepted a value
-            let previous_option = self.get_option_from_token(&previous_token);
+            let previous_option = self.get_option_from_token(previous_token.as_ref());
             if let Some(previous_option) = &previous_option
                 && previous_option.accept_value()
             {
@@ -167,12 +167,12 @@ impl CompletionInput {
                     .is_array()
             {
                 self.completion_name = Some(argument_name);
-                self.completion_value = String::new();
+                self.completion_value = BString::default();
             } else {
                 // we've reached the end
                 self.completion_type = Self::TYPE_NONE.to_string();
                 self.completion_name = None;
-                self.completion_value = String::new();
+                self.completion_value = BString::default();
             }
         }
 
@@ -197,7 +197,7 @@ impl CompletionInput {
     }
 
     /// The value already typed by the user (or empty string).
-    pub fn get_completion_value(&self) -> String {
+    pub fn get_completion_value(&self) -> BString {
         self.completion_value.clone()
     }
 
@@ -211,12 +211,12 @@ impl CompletionInput {
             && Some(argument_name.to_string()) == self.get_completion_name()
     }
 
-    pub fn get_first_argument(&self) -> Option<String> {
+    pub fn get_first_argument(&self) -> Option<BString> {
         self.inner.get_first_argument()
     }
 
     /// PHP `CompletionInput::parseToken` (called back from `ArgvInput::base_bind`).
-    fn parse_token(inner: &mut ArgvInput, token: &str, parse_options: bool) -> bool {
+    fn parse_token(inner: &mut ArgvInput, token: &BStr, parse_options: bool) -> bool {
         match inner.parse_token(token, parse_options) {
             Ok(value) => return value,
             Err(_e) => {
@@ -227,48 +227,31 @@ impl CompletionInput {
         parse_options
     }
 
-    fn get_option_from_token(&self, option_token: &str) -> Option<std::rc::Rc<InputOption>> {
+    fn get_option_from_token(&self, option_token: &BStr) -> Option<std::rc::Rc<InputOption>> {
         let option_name = ltrim2(option_token, "-");
         if option_name.is_empty() {
             return None;
         }
 
-        if "-"
-            == option_token
-                .chars()
-                .nth(1)
-                .map(|c| c.to_string())
-                .unwrap_or_else(|| " ".to_string())
-        {
+        // TODO(bytes): InputDefinition keeps option names as Strings, so a name that is not UTF-8
+        // cannot be defined.
+        if option_token.get(1).copied().unwrap_or(b' ') == b'-' {
             // long option name
-            return if self
-                .inner
-                .inner
-                .definition
-                .has_option(&legacy_lossy(&option_name))
-            {
-                self.inner
-                    .inner
-                    .definition
-                    .get_option(&legacy_lossy(&option_name))
-                    .ok()
+            let option_name = utf8_text(&option_name)?;
+            return if self.inner.inner.definition.has_option(option_name) {
+                self.inner.inner.definition.get_option(option_name).ok()
             } else {
                 None
             };
         }
 
         // short option name
-        let first = &option_name[0..1];
-        if self
-            .inner
-            .inner
-            .definition
-            .has_shortcut(&legacy_lossy(first))
-        {
+        let first = utf8_text(&option_name[0..1])?;
+        if self.inner.inner.definition.has_shortcut(first) {
             self.inner
                 .inner
                 .definition
-                .get_option_for_shortcut(&legacy_lossy(first))
+                .get_option_for_shortcut(first)
                 .ok()
         } else {
             None
@@ -276,7 +259,7 @@ impl CompletionInput {
     }
 
     /// The token of the cursor, or the last token if the cursor is at the end of the input.
-    fn get_relevant_token(&self) -> String {
+    fn get_relevant_token(&self) -> BString {
         let index = if self.is_cursor_free() {
             self.current_index - 1
         } else {
@@ -295,6 +278,28 @@ impl CompletionInput {
 
         self.current_index >= nr_of_tokens
     }
+
+    pub fn __to_string(&self) -> BString {
+        let mut str = BString::default();
+        let mut last_i: i64 = 0;
+        for (i, token) in self.tokens.iter().enumerate() {
+            let i = i as i64;
+            last_i = i;
+            str.extend_from_slice(token);
+
+            if self.current_index == i {
+                str.push(b'|');
+            }
+
+            str.push(b' ');
+        }
+
+        if self.current_index > last_i {
+            str.push(b'|');
+        }
+
+        rtrim(&str)
+    }
 }
 
 /// PHP: `CompletionInput extends ArgvInput` — the inherited `InputInterface` surface,
@@ -305,12 +310,12 @@ impl crate::input::InputInterface for CompletionInput {
         std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
     }
 
-    fn get_first_argument(&self) -> Option<String> {
+    fn get_first_argument(&self) -> Option<BString> {
         self.inner.get_first_argument()
     }
 
-    fn __to_string(&self) -> String {
-        self.to_string()
+    fn __to_string(&self) -> BString {
+        CompletionInput::__to_string(self)
     }
 
     fn has_parameter_option(&self, values: &[&str], only_params: bool) -> bool {
@@ -385,29 +390,5 @@ impl crate::input::InputInterface for CompletionInput {
 
     fn as_streamable_mut(&mut self) -> Option<&mut dyn crate::input::StreamableInputInterface> {
         crate::input::InputInterface::as_streamable_mut(&mut self.inner)
-    }
-}
-
-impl std::fmt::Display for CompletionInput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut str = String::new();
-        let mut last_i: i64 = 0;
-        for (i, token) in self.tokens.iter().enumerate() {
-            let i = i as i64;
-            last_i = i;
-            str += token;
-
-            if self.current_index == i {
-                str += "|";
-            }
-
-            str += " ";
-        }
-
-        if self.current_index > last_i {
-            str += "|";
-        }
-
-        f.write_str(&legacy_lossy(&rtrim(&str)))
     }
 }

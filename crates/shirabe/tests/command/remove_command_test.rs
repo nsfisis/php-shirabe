@@ -97,7 +97,7 @@ fn test_warning_when_removing_non_existent_package() {
                 ("command", InputValue::from("remove")),
                 (
                     "packages",
-                    InputValue::Array(vec!["vendor1/package1".to_string()]),
+                    InputValue::Array(vec!["vendor1/package1".into()]),
                 ),
             ]),
             RunOptions::default(),
@@ -132,7 +132,7 @@ fn test_warning_when_removing_package_from_wrong_type() {
         .run(
             input(vec![
                 ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("packages", InputValue::Array(vec!["root/req".into()])),
                 ("--dev", InputValue::from(true)),
                 ("--no-update", InputValue::from(true)),
                 ("--no-interaction", InputValue::from(true)),
@@ -171,7 +171,7 @@ fn test_warning_when_removing_package_with_deprecated_dependencies_flag() {
         .run(
             input(vec![
                 ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("packages", InputValue::Array(vec!["root/req".into()])),
                 ("--update-with-dependencies", InputValue::from(true)),
                 ("--no-update", InputValue::from(true)),
                 ("--no-interaction", InputValue::from(true)),
@@ -361,7 +361,7 @@ fn test_remove_package_by_name() {
         .run(
             input(vec![
                 ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("packages", InputValue::Array(vec!["root/req".into()])),
                 ("--no-audit", InputValue::from(true)),
                 ("--no-interaction", InputValue::from(true)),
             ]),
@@ -442,7 +442,7 @@ fn test_remove_package_by_name_with_dry_run() {
         .run(
             input(vec![
                 ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("packages", InputValue::Array(vec!["root/req".into()])),
                 ("--dry-run", InputValue::from(true)),
                 ("--no-audit", InputValue::from(true)),
                 ("--no-interaction", InputValue::from(true)),
@@ -528,7 +528,7 @@ fn test_remove_allowed_plugin_package_with_no_other_allowed_plugins() {
         .run(
             input(vec![
                 ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("packages", InputValue::Array(vec!["root/req".into()])),
                 ("--no-audit", InputValue::from(true)),
                 ("--no-interaction", InputValue::from(true)),
             ]),
@@ -580,7 +580,7 @@ fn test_remove_allowed_plugin_package_with_other_allowed_plugins() {
         .run(
             input(vec![
                 ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("packages", InputValue::Array(vec!["root/req".into()])),
                 ("--no-audit", InputValue::from(true)),
                 ("--no-interaction", InputValue::from(true)),
             ]),
@@ -635,7 +635,7 @@ fn test_remove_packages_by_vendor() {
         .run(
             input(vec![
                 ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/*".to_string()])),
+                ("packages", InputValue::Array(vec!["root/*".into()])),
                 ("--no-install", InputValue::from(true)),
                 ("--no-audit", InputValue::from(true)),
                 ("--no-interaction", InputValue::from(true)),
@@ -715,7 +715,7 @@ fn test_remove_packages_by_vendor_with_dry_run() {
         .run(
             input(vec![
                 ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/*".to_string()])),
+                ("packages", InputValue::Array(vec!["root/*".into()])),
                 ("--dry-run", InputValue::from(true)),
                 ("--no-install", InputValue::from(true)),
                 ("--no-audit", InputValue::from(true)),
@@ -773,7 +773,7 @@ fn test_warning_when_removing_packages_by_vendor_from_wrong_type() {
         .run(
             input(vec![
                 ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/*".to_string()])),
+                ("packages", InputValue::Array(vec!["root/*".into()])),
                 ("--dev", InputValue::from(true)),
                 ("--no-interaction", InputValue::from(true)),
                 ("--no-update", InputValue::from(true)),
@@ -819,7 +819,7 @@ fn test_package_still_present_error_when_no_install_flag_used() {
         .run(
             input(vec![
                 ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("packages", InputValue::Array(vec!["root/req".into()])),
                 ("--no-install", InputValue::from(true)),
                 ("--no-audit", InputValue::from(true)),
                 ("--no-interaction", InputValue::from(true)),
@@ -909,7 +909,7 @@ fn run_update_inherited_dependencies_flag_case(
         .run(
             input(vec![
                 ("command", InputValue::from("remove")),
-                ("packages", InputValue::Array(vec!["root/req".to_string()])),
+                ("packages", InputValue::Array(vec!["root/req".into()])),
                 (install_flag_name, InputValue::from(true)),
                 ("--no-audit", InputValue::from(true)),
                 ("--no-interaction", InputValue::from(true)),

@@ -119,7 +119,7 @@ Installs: dep/pkg:1.0.2, root/req:1.0.0
             "update with temporary constraint + --no-install",
             root_dep_and_transitive_dep(),
             vec![
-                ("--with", InputValue::Array(vec!["dep/pkg:1.0.0".to_string()])),
+                ("--with", InputValue::Array(vec!["dep/pkg:1.0.0".into()])),
                 ("--no-install", InputValue::from(true)),
             ],
             "Loading composer repositories with package information
@@ -132,7 +132,7 @@ Lock file operations: 2 installs, 0 updates, 0 removals
         (
             "update with temporary constraint failing resolution",
             root_dep_and_transitive_dep(),
-            vec![("--with", InputValue::Array(vec!["dep/pkg:^2".to_string()]))],
+            vec![("--with", InputValue::Array(vec!["dep/pkg:^2".into()]))],
             "Loading composer repositories with package information
 Updating dependencies
 Your requirements could not be resolved to an installable set of packages.
@@ -145,7 +145,7 @@ Your requirements could not be resolved to an installable set of packages.
         (
             "update with temporary constraint failing resolution on root package",
             root_dep_and_transitive_dep(),
-            vec![("--with", InputValue::Array(vec!["root/req:^2".to_string()]))],
+            vec![("--with", InputValue::Array(vec!["root/req:^2".into()]))],
             "The temporary constraint \"^2\" for \"root/req\" must be a subset of the constraint in your composer.json (1.*)
 Run `shirabe require root/req` or `shirabe require root/req:^2` instead to replace the constraint",
             false,
@@ -205,7 +205,7 @@ No requirements to update in ./composer.json.",
             "update & dump with failing update",
             root_dep_and_transitive_dep(),
             vec![
-                ("--with", InputValue::Array(vec!["dep/pkg:^2".to_string()])),
+                ("--with", InputValue::Array(vec!["dep/pkg:^2".into()])),
                 ("--bump-after-update", InputValue::from(true)),
             ],
             "Loading composer repositories with package information
@@ -220,7 +220,7 @@ Your requirements could not be resolved to an installable set of packages.
         (
             "update with replaced name filter fails to resolve",
             root_dep_and_transitive_dep(),
-            vec![("--with", InputValue::Array(vec!["replaced/pkg:^2".to_string()]))],
+            vec![("--with", InputValue::Array(vec!["replaced/pkg:^2".into()]))],
             "Loading composer repositories with package information
 Updating dependencies
 Your requirements could not be resolved to an installable set of packages.
@@ -291,10 +291,7 @@ fn test_update_with_patch_only() {
                 ("--no-audit", InputValue::from(true)),
                 ("--no-install", InputValue::from(true)),
                 ("--patch-only", InputValue::from(true)),
-                (
-                    "--with",
-                    InputValue::Array(vec!["root/req:^1.1".to_string()]),
-                ),
+                ("--with", InputValue::Array(vec!["root/req:^1.1".into()])),
             ]),
             RunOptions::default(),
         )
@@ -322,13 +319,10 @@ Your requirements could not be resolved to an installable set of packages.
                 ("--no-audit", InputValue::from(true)),
                 ("--no-install", InputValue::from(true)),
                 ("--patch-only", InputValue::from(true)),
-                (
-                    "--with",
-                    InputValue::Array(vec!["root/req:^1.0.1".to_string()]),
-                ),
+                ("--with", InputValue::Array(vec!["root/req:^1.0.1".into()])),
                 (
                     "packages",
-                    InputValue::Array(vec!["root/req".to_string(), "root/req2".to_string()]),
+                    InputValue::Array(vec!["root/req".into(), "root/req2".into()]),
                 ),
             ]),
             RunOptions::default(),

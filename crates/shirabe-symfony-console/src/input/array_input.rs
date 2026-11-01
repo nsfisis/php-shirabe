@@ -4,8 +4,9 @@ use crate::exception::{InvalidArgumentException, InvalidOptionException};
 use crate::input::{
     ArgumentName, Input, InputDefinition, InputInterface, InputValue, StreamableInputInterface,
 };
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
-use shirabe_php_shim::{PhpResource, implode, legacy_lossy, substr};
+use shirabe_php_shim::{PhpResource, bconcat, implode};
 
 /// ArrayInput represents an input provided as an array.
 ///
@@ -76,14 +77,14 @@ impl ArrayInput {
             // if (!\is_int($k)) { $v = $k; }
             let v = match k {
                 ParameterName::Index(_) => v.as_string(),
-                ParameterName::Name(k) => Some(k.as_str()),
+                ParameterName::Name(k) => Some(BStr::new(k)),
             };
 
-            if only_params && v == Some("--") {
+            if only_params && v.is_some_and(|v| v == "--") {
                 return false;
             }
 
-            if v.is_some_and(|v| values.contains(&v)) {
+            if v.is_some_and(|v| values.iter().any(|value| v == *value)) {
                 return true;
             }
         }
@@ -101,8 +102,8 @@ impl ArrayInput {
             // $onlyParams && ('--' === $k || (\is_int($k) && '--' === $v))
             if only_params {
                 let k_is_double_dash = matches!(k, ParameterName::Name(k) if k == "--");
-                let int_v_double_dash =
-                    matches!(k, ParameterName::Index(_)) && v.as_string() == Some("--");
+                let int_v_double_dash = matches!(k, ParameterName::Index(_))
+                    && v.as_string().is_some_and(|v| v == "--");
                 if k_is_double_dash || int_v_double_dash {
                     return default;
                 }
@@ -110,7 +111,9 @@ impl ArrayInput {
 
             match k {
                 ParameterName::Index(_) => {
-                    if v.as_string().is_some_and(|v| values.contains(&v)) {
+                    if v.as_string()
+                        .is_some_and(|v| values.iter().any(|value| v == *value))
+                    {
                         return InputValue::Bool(true);
                     }
                 }
@@ -133,10 +136,10 @@ impl ArrayInput {
             if key_string == "--" {
                 return Ok(());
             }
-            if key_string.starts_with("--") {
-                self.add_long_option(&legacy_lossy(&substr(&key_string, 2, None)), value)?;
-            } else if key_string.starts_with("-") {
-                self.add_short_option(&legacy_lossy(&substr(&key_string, 1, None)), value)?;
+            if let Some(name) = key_string.strip_prefix("--") {
+                self.add_long_option(name, value)?;
+            } else if let Some(shortcut) = key_string.strip_prefix("-") {
+                self.add_short_option(shortcut, value)?;
             } else {
                 self.add_argument(&key.to_argument_name(), value)?;
             }
@@ -218,12 +221,10 @@ impl ArrayInput {
 
         Ok(())
     }
-}
 
-/// Returns a stringified representation of the args passed to the command.
-impl std::fmt::Display for ArrayInput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut params: Vec<String> = vec![];
+    /// Returns a stringified representation of the args passed to the command.
+    pub fn __to_string(&self) -> BString {
+        let mut params: Vec<BString> = vec![];
         for (param, val) in &self.parameters {
             // $param && \is_string($param) && '-' === $param[0]
             if let ParameterName::Name(param) = param
@@ -237,38 +238,38 @@ impl std::fmt::Display for ArrayInput {
                 };
                 if let InputValue::Array(list) = val {
                     for v in list {
-                        params.push(format!(
-                            "{}{}",
+                        params.push(bconcat!(
                             param,
                             if !v.is_empty() {
-                                format!("{}{}", glue, self.inner.escape_token(v))
+                                bconcat!(glue, self.inner.escape_token(v.as_ref()))
                             } else {
-                                String::new()
+                                BString::default()
                             }
                         ));
                     }
                 } else {
                     let val = val.to_php_string();
-                    params.push(format!(
-                        "{}{}",
+                    params.push(bconcat!(
                         param,
                         if !val.is_empty() {
-                            format!("{}{}", glue, self.inner.escape_token(&val))
+                            bconcat!(glue, self.inner.escape_token(val.as_ref()))
                         } else {
-                            String::new()
+                            BString::default()
                         }
                     ));
                 }
             } else if let InputValue::Array(list) = val {
-                let escaped: Vec<String> =
-                    list.iter().map(|v| self.inner.escape_token(v)).collect();
-                params.push(legacy_lossy(&implode(" ", &escaped)).into_owned());
+                let escaped: Vec<BString> = list
+                    .iter()
+                    .map(|v| self.inner.escape_token(v.as_ref()))
+                    .collect();
+                params.push(implode(" ", &escaped));
             } else {
-                params.push(self.inner.escape_token(&val.to_php_string()));
+                params.push(self.inner.escape_token(val.to_php_string().as_ref()));
             }
         }
 
-        f.write_str(&params.join(" "))
+        implode(" ", &params)
     }
 }
 
@@ -277,7 +278,7 @@ impl InputInterface for ArrayInput {
         std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
     }
 
-    fn get_first_argument(&self) -> Option<String> {
+    fn get_first_argument(&self) -> Option<BString> {
         ArrayInput::get_first_argument(self).map(|v| v.to_php_string())
     }
 
@@ -342,8 +343,8 @@ impl InputInterface for ArrayInput {
         self.inner.set_interactive(interactive)
     }
 
-    fn __to_string(&self) -> String {
-        self.to_string()
+    fn __to_string(&self) -> BString {
+        ArrayInput::__to_string(self)
     }
 
     fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {

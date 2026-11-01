@@ -1,4 +1,4 @@
-use shirabe_php_shim::{legacy_lossy, path_to_bytes, realpath};
+use shirabe_php_shim::{legacy_lossy, path_from_bytes, path_to_bytes, realpath};
 pub mod advisory;
 pub mod autoload;
 pub mod cache;
@@ -35,7 +35,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 // See also `__shirabe_installed_versions_reload` in crates/shirabe-php-rpc/php/worker.php.
 
 /// ref: composer/bin/composer
-pub async fn run(argv: Vec<String>) -> anyhow::Result<i32> {
+pub async fn run(argv: Vec<bstr::BString>) -> anyhow::Result<i32> {
     use crate::console::ApplicationHandle;
     use crate::util::Platform;
     use shirabe_symfony_console::input::ArgvInput;
@@ -44,9 +44,11 @@ pub async fn run(argv: Vec<String>) -> anyhow::Result<i32> {
     // somewhere else that communicates with the real PHP runtime.
     Platform::put_env(
         "COMPOSER_BINARY",
-        &realpath(argv.first().map(String::as_str).unwrap_or_default())
-            .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
-            .unwrap_or_default(),
+        &realpath(path_from_bytes(
+            argv.first().cloned().unwrap_or_default().as_slice(),
+        ))
+        .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
+        .unwrap_or_default(),
     );
 
     let application = ApplicationHandle::new("Shirabe".to_string(), String::new())?;

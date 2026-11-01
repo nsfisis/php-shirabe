@@ -8,6 +8,8 @@ use crate::installer::Installer;
 use crate::io::IOInterfaceWrite;
 use crate::plugin::{CommandEvent, PluginEvents};
 use shirabe_php_shim::impl_php_class;
+use shirabe_php_shim::implode;
+use shirabe_php_shim::legacy_lossy;
 use shirabe_symfony_console::command::Command;
 use shirabe_symfony_console::input::{InputInterface, InputValue};
 use shirabe_symfony_console::output::OutputInterface;
@@ -57,7 +59,7 @@ impl Command for InstallCommand {
             InputOption::new("no-progress", None, Some(InputOption::VALUE_NONE), "Do not output download progress.", None).unwrap().into(),
             InputOption::new("no-install", None, Some(InputOption::VALUE_NONE), "Do not use, only defined here to catch misuse of the install command.", None).unwrap().into(),
             InputOption::new("audit", None, Some(InputOption::VALUE_NONE), "Run an audit after installation is complete.", None).unwrap().into(),
-            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::String(Auditor::FORMAT_SUMMARY.to_string())), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
+            InputOption::new6("audit-format", None, Some(InputOption::VALUE_REQUIRED), "Audit output format. Must be \"table\", \"plain\", \"json\", or \"summary\".", Some(InputValue::from(Auditor::FORMAT_SUMMARY)), SuggestedValues::List(Auditor::FORMATS.iter().map(|s| s.to_string()).collect())).unwrap().into(),
             InputOption::new("verbose", Some("v|vv|vvv"), Some(InputOption::VALUE_NONE), "Shows more details including new commits pulled in when updating packages.", None).unwrap().into(),
             InputOption::new("optimize-autoloader", Some("o"), Some(InputOption::VALUE_NONE), "Optimize autoloader during autoloader dump", None).unwrap().into(),
             InputOption::new("classmap-authoritative", Some("a"), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize-autoloader`.", None).unwrap().into(),
@@ -98,12 +100,15 @@ impl Command for InstallCommand {
         }
 
         let args = input.borrow().get_argument("packages")?;
-        let args_vec: Vec<String> = args.as_array().map(<[String]>::to_vec).unwrap_or_default();
+        let args_vec: Vec<bstr::BString> = args
+            .as_array()
+            .map(<[bstr::BString]>::to_vec)
+            .unwrap_or_default();
         if !args_vec.is_empty() {
             io.write_error(format!(
                 "<error>Invalid argument {}. Use \"shirabe require {}\" instead to add packages to your composer.json.</error>",
-                args_vec.join(" "),
-                args_vec.join(" ")
+                implode(" ", &args_vec).display_lossy(),
+                implode(" ", &args_vec).display_lossy()
             ));
             return Ok(1);
         }
@@ -162,7 +167,7 @@ impl Command for InstallCommand {
             .borrow()
             .get_option("apcu-autoloader-prefix")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
         let apcu = apcu_prefix.is_some()
             || input
                 .borrow()

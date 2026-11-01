@@ -45,10 +45,7 @@ Generating autoload files"#,
         (
             "it writes an error when packages passed",
             serde_json::json!({ "repositories": [] }),
-            vec![(
-                "packages",
-                InputValue::Array(vec!["vendor/package".to_string()]),
-            )],
+            vec![("packages", InputValue::Array(vec!["vendor/package".into()]))],
             r#"Invalid argument vendor/package. Use "shirabe require vendor/package" instead to add packages to your composer.json."#,
         ),
         (

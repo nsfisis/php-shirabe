@@ -247,7 +247,7 @@ fn test_global_require() {
                 ),
                 (
                     ParameterName::of("packages"),
-                    InputValue::Array(vec!["vendor/required-pkg:2.0.0".to_string()]),
+                    InputValue::Array(vec!["vendor/required-pkg:2.0.0".into()]),
                 ),
             ],
             RunOptions::default(),

@@ -4,11 +4,10 @@ use crate::exception::InvalidArgumentException;
 use crate::input::{
     ArgvInput, InputDefinition, InputInterface, InputValue, StreamableInputInterface,
 };
-use bstr::BString;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    PhpResource, bconcat, legacy_lossy, php_regex, preg_match, str_replace_arr, stripcslashes,
-    strlen, substr,
+    PhpResource, bconcat, php_regex, preg_match, str_replace_arr, stripcslashes, strlen, substr,
 };
 
 /// StringInput represents an input provided as a string.
@@ -29,22 +28,22 @@ impl StringInput {
     pub const REGEX_QUOTED_STRING: &'static str =
         r#"(?:"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)')"#;
 
-    pub fn new(input: &str) -> anyhow::Result<Self> {
+    pub fn new(input: impl AsRef<[u8]>) -> anyhow::Result<Self> {
         // parent::__construct([])
         let inner = ArgvInput::new(Some(vec![]), None)?;
 
         let mut string_input = StringInput { inner };
 
-        let tokens = string_input.tokenize(input)?;
+        let tokens = string_input.tokenize(BStr::new(input.as_ref()))?;
         string_input.inner.set_tokens(tokens);
 
         Ok(string_input)
     }
 
     /// Tokenizes a string.
-    fn tokenize(&self, input: &str) -> anyhow::Result<Vec<String>> {
-        let bytes = input.as_bytes();
-        let mut tokens: Vec<String> = vec![];
+    fn tokenize(&self, input: &BStr) -> anyhow::Result<Vec<BString>> {
+        let bytes: &[u8] = input;
+        let mut tokens: Vec<BString> = vec![];
         let length = strlen(input);
         let mut cursor: i64 = 0;
         let mut token: Option<BString> = None;
@@ -69,7 +68,7 @@ impl StringInput {
 
             if let Some(m) = preg_match(php_regex!(r"/^\s+/"), rest) {
                 if token.is_some() {
-                    tokens.push(legacy_lossy(&token.take().unwrap()).into_owned());
+                    tokens.push(token.take().unwrap());
                 }
                 cursor += strlen(m.get(0).unwrap_or_default());
             } else if let Some(m) = preg_match(
@@ -109,16 +108,10 @@ impl StringInput {
         }
 
         if let Some(token) = token {
-            tokens.push(legacy_lossy(&token).into_owned());
+            tokens.push(token);
         }
 
         Ok(tokens)
-    }
-}
-
-impl std::fmt::Display for StringInput {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.inner.fmt(f)
     }
 }
 
@@ -127,7 +120,7 @@ impl InputInterface for StringInput {
         std::rc::Rc::new(std::cell::RefCell::new(self.clone()))
     }
 
-    fn get_first_argument(&self) -> Option<String> {
+    fn get_first_argument(&self) -> Option<BString> {
         self.inner.get_first_argument()
     }
 
@@ -192,8 +185,8 @@ impl InputInterface for StringInput {
         self.inner.set_interactive(interactive)
     }
 
-    fn __to_string(&self) -> String {
-        self.to_string()
+    fn __to_string(&self) -> BString {
+        self.inner.__to_string()
     }
 
     fn as_streamable(&self) -> Option<&dyn StreamableInputInterface> {

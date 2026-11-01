@@ -1500,7 +1500,7 @@ impl Command for ShowCommand {
                 Some("f"),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
-                Some(InputValue::String("text".to_string())),
+                Some(InputValue::from("text")),
                 SuggestedValues::List(vec!["json".to_string(), "text".to_string()]),
             )
             .unwrap()
@@ -1555,7 +1555,7 @@ impl Command for ShowCommand {
             .borrow()
             .get_option("ignore")?
             .as_array()
-            .map_or(0, <[String]>::len)
+            .map_or(0, <[bstr::BString]>::len)
             > 0
         {
             self.get_io().write_error("<warning>You are using the option \"ignore\" for action other than \"outdated\", it will be ignored.</warning>");
@@ -1616,12 +1616,14 @@ impl Command for ShowCommand {
             return Ok(1);
         }
 
-        let format = input
-            .borrow()
-            .get_option("format")?
-            .as_string()
-            .unwrap_or("text")
-            .to_string();
+        let format = legacy_lossy(
+            input
+                .borrow()
+                .get_option("format")?
+                .as_string()
+                .unwrap_or(bstr::BStr::new("text")),
+        )
+        .into_owned();
         if !in_array_loose(
             format.clone(),
             &[
@@ -1934,7 +1936,7 @@ impl Command for ShowCommand {
             .borrow()
             .get_argument("package")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
 
         // show single package or single version
         if let Some(ref pkg) = single_package {
@@ -1979,7 +1981,7 @@ impl Command for ShowCommand {
                 if let Some(working_dir) = options.get("working-dir").filter(|v| !v.is_null()) {
                     hint.push_str(&format!(
                         " in {}/composer.json",
-                        working_dir.as_string().unwrap_or_default()
+                        working_dir.as_string().unwrap_or_default().display_lossy()
                     ));
                 }
                 if PlatformRepository::is_platform_package(pf)

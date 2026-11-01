@@ -230,7 +230,7 @@ impl Command for ValidateCommand {
             .borrow()
             .get_argument("file")?
             .as_string()
-            .map(|s| s.to_string())
+            .map(|s| legacy_lossy(s).into_owned())
             .map(Ok)
             .unwrap_or_else(Factory::get_composer_file)?;
         let io = self.get_io().clone();

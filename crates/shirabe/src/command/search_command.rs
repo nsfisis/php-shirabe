@@ -81,7 +81,7 @@ impl Command for SearchCommand {
                 Some("f"),
                 Some(InputOption::VALUE_REQUIRED),
                 "Format of the output: text or json",
-                Some(InputValue::String("text".to_string())),
+                Some(InputValue::from("text")),
                 SuggestedValues::List(vec!["json".to_string(), "text".to_string()]),
             )
             .unwrap()
@@ -115,7 +115,7 @@ impl Command for SearchCommand {
             .borrow()
             .get_option("format")?
             .as_string()
-            .map(|s| s.to_string())
+            .map(|s| legacy_lossy(s).into_owned())
             .unwrap_or_else(|| "text".to_string());
         if !in_array_loose(
             format.clone(),
@@ -197,12 +197,12 @@ impl Command for SearchCommand {
             .borrow()
             .get_option("type")?
             .as_string()
-            .map(|s| s.to_string());
+            .map(|s| legacy_lossy(s).into_owned());
 
         let tokens_arg = input.borrow().get_argument("tokens")?;
-        let token_strings: Vec<String> = tokens_arg
+        let token_strings: Vec<bstr::BString> = tokens_arg
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
         let mut query = legacy_lossy(&implode(" ", &token_strings)).into_owned();
         if mode != repository_interface::SEARCH_FULLTEXT {

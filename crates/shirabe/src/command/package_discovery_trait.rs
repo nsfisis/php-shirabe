@@ -97,7 +97,7 @@ pub trait PackageDiscoveryTrait: BaseCommand {
                     .get_option("stability")
                     .expect("get_minimum_stability returns String, not anyhow::Result; stability option is guaranteed present by the has_option guard above")
                     .as_string()
-                    .map(|s| s.to_string())
+                    .map(|s| legacy_lossy(s).into_owned())
                     .unwrap_or_else(|| "stable".to_string()),
             )
             .unwrap_or_default()).into_owned();

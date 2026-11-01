@@ -21,7 +21,7 @@ fn cases() -> Vec<(&'static str, Vec<(&'static str, InputValue)>, &'static str)>
             "reinstall a package by name",
             vec![(
                 "packages",
-                InputValue::Array(vec!["root/req".to_string(), "root/anotherreq*".to_string()]),
+                InputValue::Array(vec!["root/req".into(), "root/anotherreq*".into()]),
             )],
             "- Removing root/req (1.0.0)
   - Removing root/anotherreq2 (1.0.0)
@@ -32,7 +32,7 @@ fn cases() -> Vec<(&'static str, Vec<(&'static str, InputValue)>, &'static str)>
         ),
         (
             "reinstall packages by type",
-            vec![("--type", InputValue::Array(vec!["metapackage".to_string()]))],
+            vec![("--type", InputValue::Array(vec!["metapackage".into()]))],
             "- Removing root/req (1.0.0)
   - Removing root/lala (1.0.0)
   - Removing root/anotherreq2 (1.0.0)
@@ -46,7 +46,7 @@ fn cases() -> Vec<(&'static str, Vec<(&'static str, InputValue)>, &'static str)>
             "reinstall a package that is not installed",
             vec![(
                 "packages",
-                InputValue::Array(vec!["root/unknownreq".to_string()]),
+                InputValue::Array(vec!["root/unknownreq".into()]),
             )],
             r#"<warning>Pattern "root/unknownreq" does not match any currently installed packages.</warning>
 <warning>Found no packages to reinstall, aborting.</warning>"#,

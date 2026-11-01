@@ -83,18 +83,14 @@ impl CompleteCommand {
             ));
         }
 
-        let tokens: Vec<String> = input
+        let tokens: Vec<bstr::BString> = input
             .get_option("input")?
             .as_array()
-            .map(<[String]>::to_vec)
+            .map(<[bstr::BString]>::to_vec)
             .unwrap_or_default();
         let mut completion_input = CompletionInput::from_tokens(
             tokens,
-            current_index
-                .as_string()
-                .unwrap_or_default()
-                .parse::<i64>()
-                .unwrap_or(0),
+            shirabe_php_shim::intval(&current_index.to_php_mixed()),
         )?;
 
         // try { $completionInput->bind(...); } catch (ExceptionInterface $e) {}
@@ -115,7 +111,10 @@ impl CompleteCommand {
 
         let application = self.get_application().unwrap();
         // CommandNotFoundException is caught and swallowed by returning None.
-        application.borrow_mut().find(&input_name).ok()
+        application
+            .borrow_mut()
+            .find(&shirabe_php_shim::legacy_lossy(&input_name))
+            .ok()
     }
 
     fn log(&self, messages: &str) {
@@ -275,7 +274,7 @@ impl Command for CompleteCommand {
             if !completion_output.to_bool() {
                 anyhow::bail!(RuntimeException::new(format!(
                     "Shell completion is not supported for your shell: \"{}\" (supported: \"{}\").",
-                    shell.as_string().unwrap_or_default(),
+                    shell.as_string().unwrap_or_default().display_lossy(),
                     self.completion_outputs
                         .keys()
                         .map(|shell| shell.to_str_lossy())
@@ -291,7 +290,7 @@ impl Command for CompleteCommand {
                 String::new(),
                 format!("<comment>{}</>", date_utc("Y-m-d H:i:s", None)),
                 "<info>Input:</> <comment>(\"|\" indicates the cursor position)</>".to_string(),
-                format!("  {}", completion_input.to_string()),
+                format!("  {}", completion_input.__to_string().display_lossy()),
                 "<info>Command:</>".to_string(),
                 format!(
                     "  {}",
@@ -321,13 +320,13 @@ impl Command for CompleteCommand {
                 }
                 Some(command)
                     if completion_input.must_suggest_argument_values_for("command")
-                        && command.borrow().get_name().as_deref()
-                            != Some(&completion_input.get_completion_value())
+                        && command.borrow().get_name().map(bstr::BString::from)
+                            != Some(completion_input.get_completion_value())
                         && !command
                             .borrow()
                             .get_aliases()
                             .iter()
-                            .any(|a| a == &completion_input.get_completion_value()) =>
+                            .any(|a| completion_input.get_completion_value() == *a) =>
                 {
                     self.log("  No command found, completing using the Application class.");
 
@@ -369,7 +368,10 @@ impl Command for CompleteCommand {
                         ]);
                         let compval = completion_input.get_completion_value();
                         if !compval.is_empty() {
-                            self.log(&format!("  Current value: <comment>{}</>", compval));
+                            self.log(&format!(
+                                "  Current value: <comment>{}</>",
+                                compval.display_lossy()
+                            ));
                         }
 
                         command

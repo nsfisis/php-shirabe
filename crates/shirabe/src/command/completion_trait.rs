@@ -206,7 +206,7 @@ pub trait CompletionTrait: BaseCommand {
 
             let mut results: Vec<SearchResult> = vec![];
             let mut show_vendors = false;
-            if !input.get_completion_value().contains('/') {
+            if !input.get_completion_value().contains(&b'/') {
                 results = repos.search(
                     bconcat!("^", preg_quote(input.get_completion_value(), None)),
                     SEARCH_VENDOR,
@@ -251,7 +251,7 @@ pub trait CompletionTrait: BaseCommand {
                 let mut pinned: Vec<String> = vec![];
 
                 // ensure if the input is an exact match that it is always in the result set
-                let completion_input = format!("{}/", input.get_completion_value());
+                let completion_input = format!("{}/", legacy_lossy(&input.get_completion_value()));
                 // PHP: array_search(..., true) + array_splice($results, $exactIndex, 1)
                 if let Some(exact_index) = results.iter().position(|r| *r == completion_input) {
                     pinned.push(completion_input);
@@ -302,8 +302,10 @@ pub trait CompletionTrait: BaseCommand {
                 .unwrap_or_default();
             let mut repos = PlatformRepository::new(vec![], overrides, None, None)?;
 
-            let pattern =
-                base_package::package_name_to_regexp(format!("{}*", input.get_completion_value()));
+            let pattern = base_package::package_name_to_regexp(format!(
+                "{}*",
+                legacy_lossy(&input.get_completion_value())
+            ));
 
             // array_filter(array_map(getName, ...), isMatch)
             let mut names: Vec<String> = vec![];

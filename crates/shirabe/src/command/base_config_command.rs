@@ -129,7 +129,7 @@ pub trait BaseConfigCommand: BaseCommand {
                 .borrow()
                 .get_option("file")?
                 .as_string()
-                .map(|s| s.to_string())
+                .map(|s| legacy_lossy(s).into_owned())
                 .unwrap_or_else(|| Factory::get_composer_file().unwrap_or_default()))
         }
     }
