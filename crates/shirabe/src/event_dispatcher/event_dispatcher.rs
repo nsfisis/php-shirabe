@@ -28,10 +28,10 @@ use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PhpMixed, RuntimeException, array_pop, array_push,
     array_search_in_vec, array_splice, bconcat, explode, explode_with_limit, file_exists,
     get_class, hash, implode, ini_get, is_array, is_callable, is_dir, is_object, is_string, krsort,
-    legacy_lossy, path_from_bytes, path_to_bytes, php_regex, preg_is_match, preg_match, preg_quote,
-    preg_replace, preg_replace_callback, realpath, spl_autoload_functions, spl_autoload_register,
-    spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos, strtoupper, substr,
-    trim2,
+    legacy_lossy, os_str_from_bytes, path_from_bytes, path_to_bytes, php_regex, preg_is_match,
+    preg_match, preg_quote, preg_replace, preg_replace_callback, realpath, spl_autoload_functions,
+    spl_autoload_register, spl_autoload_unregister, spl_object_hash, str_replace, strlen, strpos,
+    strtoupper, substr, trim2,
 };
 use shirabe_symfony_console::output::output_interface;
 use shirabe_symfony_process::{ExecutableFinder, PhpExecutableFinder};
@@ -92,7 +92,7 @@ pub struct EventDispatcher {
     listeners: IndexMap<String, IndexMap<i64, Vec<Callable>>>,
     run_scripts: bool,
     event_stack: Vec<String>,
-    skip_scripts: Vec<String>,
+    skip_scripts: Vec<BString>,
     previous_hash: Option<BString>,
     previous_listeners: IndexMap<BString, bool>,
     /// For testing only. Mirrors PHPUnit's `getMockBuilder(EventDispatcher)->onlyMethods(['getListeners'])`:
@@ -138,9 +138,9 @@ impl EventDispatcher {
         });
         let event_stack: Vec<String> = Vec::new();
         let skip_scripts_env = Platform::get_env("COMPOSER_SKIP_SCRIPTS").unwrap_or_default();
-        let skip_scripts: Vec<String> = skip_scripts_env
-            .split(',')
-            .map(|v| legacy_lossy(&trim2(v, " \t\n\r\0\u{0B}")).into_owned())
+        let skip_scripts: Vec<BString> = explode(",", &skip_scripts_env)
+            .iter()
+            .map(|v| trim2(v, " \t\n\r\0\u{0B}"))
             .filter(|val| !val.is_empty())
             .collect();
         Self {
@@ -1460,16 +1460,14 @@ try {
                 .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                 .unwrap_or(bin_dir);
             let path_value = Platform::get_env(path_env).unwrap_or_default();
-            if !std::env::split_paths(&path_value).any(|dir| dir == std::path::Path::new(&bin_dir))
-            {
+            let path_value = os_str_from_bytes(&path_value);
+            if !std::env::split_paths(path_value).any(|dir| dir == std::path::Path::new(&bin_dir)) {
                 let path_value = std::env::join_paths(
                     std::iter::once(std::path::PathBuf::from(&bin_dir))
-                        .chain(std::env::split_paths(&path_value)),
+                        .chain(std::env::split_paths(path_value)),
                 )
-                .expect("bin-dir holds no path separator")
-                .into_string()
-                .unwrap();
-                Platform::put_env(path_env, &path_value);
+                .expect("bin-dir holds no path separator");
+                Platform::put_env(path_env, path_to_bytes(&path_value));
             }
         }
     }

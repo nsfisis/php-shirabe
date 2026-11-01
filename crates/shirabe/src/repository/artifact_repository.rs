@@ -55,7 +55,7 @@ impl ArtifactRepository {
         Ok(Self {
             inner: ArrayRepository::new(Vec::new())?,
             loader: Box::new(ArrayLoader::new(None, true)),
-            lookup: bstr::BString::from(lookup),
+            lookup,
             repo_config,
             io,
         })

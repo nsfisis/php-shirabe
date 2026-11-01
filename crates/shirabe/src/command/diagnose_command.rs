@@ -1084,12 +1084,14 @@ impl DiagnoseCommand {
         }
 
         let composer_ipresolve = Platform::get_env("COMPOSER_IPRESOLVE").unwrap_or_default();
-        if ["4".to_string(), "6".to_string()].contains(&composer_ipresolve) {
+        if composer_ipresolve == "4" || composer_ipresolve == "6" {
             warnings.insert("ipresolve".to_string(), None);
             out_fn(
                 &format!(
                     "The COMPOSER_IPRESOLVE env var is set to {} which may result in network failures below.",
-                    Platform::get_env("COMPOSER_IPRESOLVE").unwrap_or_default()
+                    Platform::get_env("COMPOSER_IPRESOLVE")
+                        .unwrap_or_default()
+                        .display_lossy()
                 ),
                 "comment",
                 &mut output,

@@ -561,22 +561,22 @@ impl Command for ConfigCommand {
         // Open file in editor
         if input.borrow().get_option("editor")?.as_bool() == Some(true) {
             let mut editor = Platform::get_env("EDITOR");
-            if editor.is_none() || editor.as_deref() == Some("") {
+            if editor.as_ref().is_none_or(|editor| editor.is_empty()) {
                 if Platform::is_windows() {
-                    editor = Some("notepad".to_string());
+                    editor = Some("notepad".into());
                 } else {
                     for candidate in &["editor", "vim", "vi", "nano", "pico", "ed"] {
                         if !exec(format!("which {}", candidate), None, None)
                             .unwrap_or_default()
                             .is_empty()
                         {
-                            editor = Some(candidate.to_string());
+                            editor = Some((*candidate).into());
                             break;
                         }
                     }
                 }
             } else {
-                editor = Some(legacy_lossy(&escapeshellcmd(editor.unwrap())).into_owned());
+                editor = Some(escapeshellcmd(editor.unwrap()));
             }
 
             let file = if input.borrow().get_option("auth")?.as_bool() == Some(true) {
@@ -597,9 +597,9 @@ impl Command for ConfigCommand {
                     .to_string()
             };
             system(
-                format!(
-                    "{} {}{}",
+                bconcat!(
                     editor.unwrap_or_default(),
+                    " ",
                     file,
                     if Platform::is_windows() {
                         ""

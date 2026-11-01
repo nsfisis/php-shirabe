@@ -677,14 +677,8 @@ impl ProcessExecutor {
             None => PhpMixed::Null,
         };
         if is_numeric(&max_jobs_env_mixed) {
-            self.max_jobs.set(
-                max_jobs_env
-                    .as_deref()
-                    .unwrap_or("0")
-                    .parse()
-                    .unwrap_or(0)
-                    .clamp(1, 50),
-            );
+            self.max_jobs
+                .set(shirabe_php_shim::intval(&max_jobs_env_mixed).clamp(1, 50));
         } else {
             self.max_jobs.set(10);
         }

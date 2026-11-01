@@ -710,7 +710,7 @@ impl VersionGuesser {
     pub fn get_root_version_from_env(&self) -> anyhow::Result<BString> {
         let version = Platform::get_env("COMPOSER_ROOT_VERSION");
         let version = match version {
-            Some(v) if !v.is_empty() => BString::from(v),
+            Some(v) if !v.is_empty() => v,
             _ => {
                 return Err(RuntimeException::new(
                     "COMPOSER_ROOT_VERSION not set or empty".to_string(),

@@ -39,10 +39,10 @@
 1 crates/shirabe/src/command/package_discovery_trait.rs
 3 crates/shirabe/src/command/remove_command.rs
 1 crates/shirabe/src/command/show_command.rs
-6 crates/shirabe/src/config.rs
+5 crates/shirabe/src/config.rs
 4 crates/shirabe/src/console/application.rs
 1 crates/shirabe/src/downloader/svn_downloader.rs
-6 crates/shirabe/src/event_dispatcher/event_dispatcher.rs
+5 crates/shirabe/src/event_dispatcher/event_dispatcher.rs
 2 crates/shirabe/src/factory.rs
 1 crates/shirabe/src/io/buffer_io.rs
 2 crates/shirabe/src/io/console_io.rs
@@ -64,12 +64,10 @@
 1 crates/shirabe/src/repository/vcs/forgejo_driver.rs
 2 crates/shirabe/src/repository/vcs/github_driver.rs
 1 crates/shirabe/src/repository/vcs/gitlab_driver.rs
-1 crates/shirabe/src/repository/vcs_repository.rs
 3 crates/shirabe/src/util/config_validator.rs
 1 crates/shirabe/src/util/forgejo_repository_data.rs
 1 crates/shirabe/src/util/http/proxy_manager.rs
 5 crates/shirabe/src/util/no_proxy_pattern.rs
-2 crates/shirabe/src/util/platform.rs
 1 crates/shirabe/src/util/stream_context_factory.rs
 1 crates/shirabe/src/util/tar.rs
 1 crates/shirabe/src/util/zip.rs

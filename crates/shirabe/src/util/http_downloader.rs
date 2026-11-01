@@ -132,12 +132,7 @@ impl HttpDownloader {
             None => PhpMixed::Bool(false),
         };
         if is_numeric(&max_jobs_env_mixed) {
-            max_jobs = max_jobs_env
-                .as_deref()
-                .unwrap_or("0")
-                .parse()
-                .unwrap_or(0)
-                .clamp(1, 50);
+            max_jobs = shirabe_php_shim::intval(&max_jobs_env_mixed).clamp(1, 50);
         }
 
         Self {

@@ -775,7 +775,9 @@ impl Git {
             .as_ref()
             .map(|v| !v.is_empty() && v != "0")
             .unwrap_or(false)
-            && composer_disable_network.as_deref() != Some("prime")
+            && composer_disable_network
+                .as_ref()
+                .is_none_or(|v| v != "prime")
         {
             self.io.write_error3(
                 format!(
@@ -1193,12 +1195,12 @@ impl Git {
         if let Some(v) = git_version {
             if version_compare(&v, "2.3.0", CmpOp::Ge) {
                 // added in git 2.3.0, prevents prompting the user for username/password
-                if Platform::get_env("GIT_TERMINAL_PROMPT").as_deref() != Some("0") {
+                if Platform::get_env("GIT_TERMINAL_PROMPT").is_none_or(|v| v != "0") {
                     Platform::put_env("GIT_TERMINAL_PROMPT", "0");
                 }
             } else {
                 // added in git 1.7.1, prevents prompting the user for username/password
-                if Platform::get_env("GIT_ASKPASS").as_deref() != Some("echo") {
+                if Platform::get_env("GIT_ASKPASS").is_none_or(|v| v != "echo") {
                     Platform::put_env("GIT_ASKPASS", "echo");
                 }
             }
@@ -1213,7 +1215,7 @@ impl Git {
         }
 
         // Run processes with predictable LANGUAGE
-        if Platform::get_env("LANGUAGE").as_deref() != Some("C") {
+        if Platform::get_env("LANGUAGE").is_none_or(|v| v != "C") {
             Platform::put_env("LANGUAGE", "C");
         }
 

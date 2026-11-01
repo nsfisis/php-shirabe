@@ -19,7 +19,7 @@ use tempfile::TempDir;
 struct SetUp {
     home: TempDir,
     config: Config,
-    network_env: Option<String>,
+    network_env: Option<bstr::BString>,
 }
 
 fn set_up() -> SetUp {
@@ -42,7 +42,7 @@ fn set_up() -> SetUp {
     }
 }
 
-fn tear_down(home: &std::path::Path, network_env: &Option<String>) {
+fn tear_down(home: &std::path::Path, network_env: &Option<bstr::BString>) {
     let mut fs = Filesystem::new(None);
     fs.remove_directory(home).unwrap();
     match network_env {
@@ -53,11 +53,11 @@ fn tear_down(home: &std::path::Path, network_env: &Option<String>) {
 
 struct TearDown {
     home: std::path::PathBuf,
-    network_env: Option<String>,
+    network_env: Option<bstr::BString>,
 }
 
 impl TearDown {
-    fn new(home: std::path::PathBuf, network_env: Option<String>) -> Self {
+    fn new(home: std::path::PathBuf, network_env: Option<bstr::BString>) -> Self {
         TearDown { home, network_env }
     }
 }

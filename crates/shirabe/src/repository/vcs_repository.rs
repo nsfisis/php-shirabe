@@ -110,11 +110,10 @@ impl VcsRepository {
         });
 
         let url = Platform::expand_path(
-            &repo_config
+            repo_config
                 .get(B("url"))
                 .and_then(|v| v.as_string())
-                .unwrap_or_default()
-                .to_str_lossy(),
+                .unwrap_or_default(),
         );
         repo_config.insert("url".into(), PhpMixed::string(url.clone()));
         let r#type = BString::from(
@@ -133,7 +132,7 @@ impl VcsRepository {
 
         Ok(Self {
             inner,
-            url: bstr::BString::from(url),
+            url,
             package_name: std::cell::RefCell::new(None),
             is_verbose,
             is_very_verbose,

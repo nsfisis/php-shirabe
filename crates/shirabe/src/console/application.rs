@@ -1901,7 +1901,7 @@ impl ApplicationHandle {
             .has_parameter_option(&["--no-scripts"], false);
 
         let stdin = STDIN;
-        if Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").as_deref() != Some("1")
+        if Platform::get_env("COMPOSER_TESTS_ARE_RUNNING").is_none_or(|v| v != "1")
             && (Platform::get_env("COMPOSER_NO_INTERACTION").is_some()
                 || !Platform::is_tty(Some(stdin)))
         {
@@ -2004,8 +2004,8 @@ impl ApplicationHandle {
             let mut dir = dirname(path_to_bytes(&Platform::get_cwd(true).unwrap_or_default()));
             let home_value = Platform::get_env("HOME")
                 .or_else(|| Platform::get_env("USERPROFILE"))
-                .unwrap_or_else(|| "/".to_string());
-            let home = realpath(&home_value)
+                .unwrap_or_else(|| "/".into());
+            let home = realpath(path_from_bytes(&home_value))
                 .map(|p| legacy_lossy(path_to_bytes(&p)).into_owned())
                 .unwrap_or_default();
 
@@ -2051,7 +2051,7 @@ impl ApplicationHandle {
 
             if is_non_allowed_root {
                 let uid: i64 = Platform::get_env("SUDO_UID")
-                    .map(|v| v.parse().unwrap_or(0))
+                    .map(|v| shirabe_php_shim::intval(&PhpMixed::string(v)))
                     .unwrap_or(0);
                 if uid != 0 {
                     // Silently clobber any sudo credentials on the invoking user to avoid privilege escalations later on

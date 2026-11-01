@@ -926,7 +926,7 @@ pub fn base_command_initialize(
 
             io.write_error(format!(
                 "<warning>COMPOSER_IGNORE_PLATFORM_REQ is set to ignore {}. You may experience unexpected errors.</warning>",
-                ignore_str
+                ignore_str.display_lossy()
             ));
         }
     }

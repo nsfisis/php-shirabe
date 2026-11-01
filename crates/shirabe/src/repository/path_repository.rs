@@ -81,7 +81,7 @@ impl PathRepository {
             .collect::<IndexMap<BString, PhpMixed>>();
         if !options.contains_key(B("relative")) {
             let filesystem = Filesystem::new(None);
-            let is_relative = !filesystem.is_absolute_path(&url);
+            let is_relative = !filesystem.is_absolute_path(path_from_bytes(&url));
             options.insert("relative".into(), PhpMixed::Bool(is_relative));
         }
 
@@ -89,7 +89,7 @@ impl PathRepository {
             inner: ArrayRepository::new(vec![])?,
             loader: ArrayLoader::new(None, true),
             version_guesser: std::cell::RefCell::new(version_guesser),
-            url: bstr::BString::from(url),
+            url,
             repo_config,
             process,
             options,

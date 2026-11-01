@@ -20,6 +20,7 @@ fn test_expand_path() {
             Platform::get_env("HOME")
                 .or_else(|| Platform::get_env("USERPROFILE"))
                 .unwrap_or_default()
+                .display_lossy()
         ),
         Platform::expand_path("~/test")
     );

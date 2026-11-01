@@ -159,14 +159,14 @@ impl NativeHttpDownloader {
             .get(B("ipResolve"))
             .map(|v| v.is_null())
             .unwrap_or(true)
-            && Platform::get_env("COMPOSER_IPRESOLVE").as_deref() == Some("4")
+            && Platform::get_env("COMPOSER_IPRESOLVE").is_some_and(|v| v == "4")
         {
             attributes.insert("ipResolve".into(), PhpMixed::Int(4));
         } else if attributes
             .get(B("ipResolve"))
             .map(|v| v.is_null())
             .unwrap_or(true)
-            && Platform::get_env("COMPOSER_IPRESOLVE").as_deref() == Some("6")
+            && Platform::get_env("COMPOSER_IPRESOLVE").is_some_and(|v| v == "6")
         {
             attributes.insert("ipResolve".into(), PhpMixed::Int(6));
         }

@@ -92,7 +92,7 @@ pub fn get_version_constraint(operator: &str, version: &str) -> AnyConstraint {
 pub struct TearDown {
     temp_dir: TempDir,
     prev_cwd: PathBuf,
-    prev_composer_home: Option<String>,
+    prev_composer_home: Option<bstr::BString>,
 }
 
 impl TearDown {
@@ -208,11 +208,11 @@ impl Drop for GitVersionGuard {
 /// ```
 pub struct RestoreEnv {
     name: &'static str,
-    original: Option<String>,
+    original: Option<bstr::BString>,
 }
 
 impl RestoreEnv {
-    pub fn new(name: &'static str, original: Option<String>) -> Self {
+    pub fn new(name: &'static str, original: Option<bstr::BString>) -> Self {
         Self { name, original }
     }
 }

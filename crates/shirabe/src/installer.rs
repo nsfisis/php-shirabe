@@ -410,7 +410,7 @@ impl Installer {
         let fund_env = Platform::get_env("COMPOSER_FUND");
         let mut show_funding = true;
         if let Some(ref s) = fund_env {
-            let mixed = PhpMixed::string(s.to_string());
+            let mixed = PhpMixed::string(s.clone());
             if is_numeric(&mixed) {
                 show_funding = intval(&mixed) != 0;
             }
@@ -1682,7 +1682,7 @@ impl Installer {
         // Not the best architectural decision here, would need to be able
         // to configure from the outside of Installer but this is only
         // a debugging tool and should never be required in any other use case
-        if Platform::get_env("COMPOSER_POOL_OPTIMIZER").as_deref() == Some("0") {
+        if Platform::get_env("COMPOSER_POOL_OPTIMIZER").is_some_and(|v| v == "0") {
             self.io.write3(
                 "Pool Optimizer was disabled for debugging purposes.",
                 true,

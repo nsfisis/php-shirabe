@@ -27,8 +27,9 @@ use crate::repository::{
 };
 use crate::util::r#loop::Loop;
 use crate::util::{Filesystem, HttpDownloader, Platform, ProcessExecutor};
-use bstr::{B, BString, ByteSlice};
+use bstr::{B, BStr, BString, ByteSlice};
 use indexmap::IndexMap;
+use shirabe_php_shim::bconcat;
 use shirabe_php_shim::{
     Catch as _, InvalidArgumentException, PATHINFO_EXTENSION, PHP_EOL, PHP_OS, PHP_SERVER,
     PhpMixed, RuntimeException, UnexpectedValueException, array_replace_recursive, class_exists,
@@ -71,7 +72,7 @@ pub struct Factory {
 }
 
 impl Factory {
-    fn get_home_dir() -> anyhow::Result<String> {
+    fn get_home_dir() -> anyhow::Result<BString> {
         let home = Platform::get_env("COMPOSER_HOME");
         if let Some(h) = home
             && !h.is_empty()
@@ -89,30 +90,30 @@ impl Factory {
             }
 
             let appdata = Platform::get_env("APPDATA").unwrap_or_default();
-            return Ok(format!(
-                "{}/Shirabe",
-                legacy_lossy(&rtrim2(strtr(&appdata, "\\", "/"), "/"))
+            return Ok(bconcat!(
+                rtrim2(strtr(&appdata, "\\", "/"), "/"),
+                "/Shirabe"
             ));
         }
 
         let user_dir = Self::get_user_dir()?;
-        let mut dirs: Vec<String> = Vec::new();
+        let mut dirs: Vec<BString> = Vec::new();
 
         if Self::use_xdg() {
             // XDG Base Directory Specifications
             let mut xdg_config = Platform::get_env("XDG_CONFIG_HOME").unwrap_or_default();
             if xdg_config.is_empty() {
-                xdg_config = format!("{}/.config", user_dir);
+                xdg_config = bconcat!(user_dir, "/.config");
             }
 
-            dirs.push(format!("{}/shirabe", xdg_config));
+            dirs.push(bconcat!(xdg_config, "/shirabe"));
         }
 
-        dirs.push(format!("{}/.shirabe", user_dir));
+        dirs.push(bconcat!(user_dir, "/.shirabe"));
 
         // select first dir which exists of: $XDG_CONFIG_HOME/shirabe or ~/.shirabe
         for dir in &dirs {
-            if is_dir(dir) {
+            if is_dir(path_from_bytes(dir)) {
                 return Ok(dir.clone());
             }
         }
@@ -121,7 +122,7 @@ impl Factory {
         Ok(dirs[0].clone())
     }
 
-    fn get_cache_dir(home: &str) -> anyhow::Result<String> {
+    fn get_cache_dir(home: &BStr) -> anyhow::Result<BString> {
         let cache_dir = Platform::get_env("COMPOSER_CACHE_DIR").unwrap_or_default();
         if !cache_dir.is_empty() {
             return Ok(cache_dir);
@@ -129,75 +130,75 @@ impl Factory {
 
         let home_env = Platform::get_env("COMPOSER_HOME").unwrap_or_default();
         if !home_env.is_empty() {
-            return Ok(format!("{}/cache", home_env));
+            return Ok(bconcat!(home_env, "/cache"));
         }
 
         if Platform::is_windows() {
             let mut cache_dir = Platform::get_env("LOCALAPPDATA").unwrap_or_default();
             if !cache_dir.is_empty() {
-                cache_dir = format!("{}/Shirabe", cache_dir);
+                cache_dir = bconcat!(cache_dir, "/Shirabe");
             } else {
-                cache_dir = format!("{}/cache", home);
+                cache_dir = bconcat!(home, "/cache");
             }
 
-            return Ok(legacy_lossy(&rtrim2(strtr(&cache_dir, "\\", "/"), "/")).into_owned());
+            return Ok(rtrim2(strtr(&cache_dir, "\\", "/"), "/"));
         }
 
         let user_dir = Self::get_user_dir()?;
         if PHP_OS == "Darwin" {
             // Migrate existing cache dir in old location if present
-            if is_dir(format!("{}/cache", home))
-                && !is_dir(format!("{}/Library/Caches/shirabe", user_dir))
+            if is_dir_at(bconcat!(home, "/cache"))
+                && !is_dir_at(bconcat!(user_dir, "/Library/Caches/shirabe"))
             {
-                let from = format!("{}/cache", home);
-                let to = format!("{}/Library/Caches/shirabe", user_dir);
-                let _ = rename(&from, &to);
+                let from = bconcat!(home, "/cache");
+                let to = bconcat!(user_dir, "/Library/Caches/shirabe");
+                let _ = rename(path_from_bytes(&from), path_from_bytes(&to));
             }
 
-            return Ok(format!("{}/Library/Caches/shirabe", user_dir));
+            return Ok(bconcat!(user_dir, "/Library/Caches/shirabe"));
         }
 
-        if home == format!("{}/.shirabe", user_dir).as_str() && is_dir(format!("{}/cache", home)) {
-            return Ok(format!("{}/cache", home));
+        if home == bconcat!(user_dir, "/.shirabe") && is_dir_at(bconcat!(home, "/cache")) {
+            return Ok(bconcat!(home, "/cache"));
         }
 
         if Self::use_xdg() {
             let xdg_cache = Platform::get_env("XDG_CACHE_HOME").unwrap_or_default();
             let xdg_cache = if xdg_cache.is_empty() {
-                format!("{}/.cache", user_dir)
+                bconcat!(user_dir, "/.cache")
             } else {
                 xdg_cache
             };
 
-            return Ok(format!("{}/shirabe", xdg_cache));
+            return Ok(bconcat!(xdg_cache, "/shirabe"));
         }
 
-        Ok(format!("{}/cache", home))
+        Ok(bconcat!(home, "/cache"))
     }
 
-    fn get_data_dir(home: &str) -> anyhow::Result<String> {
+    fn get_data_dir(home: &BStr) -> anyhow::Result<BString> {
         let home_env = Platform::get_env("COMPOSER_HOME").unwrap_or_default();
         if !home_env.is_empty() {
             return Ok(home_env);
         }
 
         if Platform::is_windows() {
-            return Ok(legacy_lossy(&strtr(home, "\\", "/")).into_owned());
+            return Ok(strtr(home, "\\", "/"));
         }
 
         let user_dir = Self::get_user_dir()?;
-        if home != format!("{}/.shirabe", user_dir) && Self::use_xdg() {
+        if home != bconcat!(user_dir, "/.shirabe") && Self::use_xdg() {
             let xdg_data = Platform::get_env("XDG_DATA_HOME").unwrap_or_default();
             let xdg_data = if xdg_data.is_empty() {
-                format!("{}/.local/share", user_dir)
+                bconcat!(user_dir, "/.local/share")
             } else {
                 xdg_data
             };
 
-            return Ok(format!("{}/shirabe", xdg_data));
+            return Ok(bconcat!(xdg_data, "/shirabe"));
         }
 
-        Ok(home.to_string())
+        Ok(BString::from(home))
     }
 
     pub fn create_config(
@@ -218,11 +219,11 @@ impl Factory {
         inner.insert("home".into(), PhpMixed::string(home.clone()));
         inner.insert(
             "cache-dir".into(),
-            PhpMixed::string(Self::get_cache_dir(&home)?),
+            PhpMixed::string(Self::get_cache_dir(bstr::BStr::new(&home))?),
         );
         inner.insert(
             "data-dir".into(),
-            PhpMixed::string(Self::get_data_dir(&home)?),
+            PhpMixed::string(Self::get_data_dir(bstr::BStr::new(&home))?),
         );
         defaults.insert(
             "config".into(),
@@ -1580,14 +1581,14 @@ impl Factory {
         is_dir("/etc/xdg")
     }
 
-    fn get_user_dir() -> anyhow::Result<String> {
+    fn get_user_dir() -> anyhow::Result<BString> {
         let home = Platform::get_env("HOME").unwrap_or_default();
         if home.is_empty() {
             return Err(RuntimeException::new("The HOME or COMPOSER_HOME environment variable must be set for composer to run correctly"
                         .to_string()).into());
         }
 
-        Ok(legacy_lossy(&rtrim2(strtr(&home, "\\", "/"), "/")).into_owned())
+        Ok(rtrim2(strtr(&home, "\\", "/"), "/"))
     }
 
     fn validate_json_schema(
@@ -1638,4 +1639,8 @@ impl Factory {
 enum ValidateJsonInput<'a> {
     File(&'a JsonFile),
     Data(PhpMixed),
+}
+
+fn is_dir_at(path: BString) -> bool {
+    is_dir(path_from_bytes(&path))
 }

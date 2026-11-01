@@ -23,7 +23,7 @@ fn test_cmd_fail() {
         )
         .unwrap();
 
-    if Platform::get_env("COMPOSER_LOWEST_DEPS_TEST").as_deref() == Some("1") {
+    if Platform::get_env("COMPOSER_LOWEST_DEPS_TEST").is_some_and(|v| v == "1") {
         assert!(app_tester.get_status_code() >= 1);
     } else {
         assert_eq!(1, app_tester.get_status_code());
@@ -70,7 +70,7 @@ fn test_cmd_success() {
         )
         .unwrap();
 
-    if Platform::get_env("COMPOSER_LOWEST_DEPS_TEST").as_deref() != Some("1") {
+    if Platform::get_env("COMPOSER_LOWEST_DEPS_TEST").is_none_or(|v| v != "1") {
         // assertCommandIsSuccessful
         assert_eq!(
             0,

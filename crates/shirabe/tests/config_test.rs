@@ -299,11 +299,11 @@ fn test_var_replacement() {
         .filter(|s| !s.is_empty())
         .or_else(|| Platform::get_env("USERPROFILE"))
         .unwrap_or_default();
-    let home = home_raw.trim_end_matches(['\\', '/']).to_string();
+    let home = shirabe_php_shim::rtrim2(&home_raw, "\\/");
     assert_eq!(PhpMixed::string("b".to_string()), config.get("c"));
     assert_eq!(PhpMixed::string(home.clone()), config.get("bin-dir"));
     assert_eq!(
-        PhpMixed::string(format!("{}/foo", home)),
+        PhpMixed::string(shirabe_php_shim::bconcat!(home, "/foo")),
         config.get("cache-dir")
     );
 }
@@ -324,13 +324,13 @@ fn test_realpath_replacement() {
         .filter(|s| !s.is_empty())
         .or_else(|| Platform::get_env("USERPROFILE"))
         .unwrap_or_default();
-    let home = home_raw.trim_end_matches(['\\', '/']).to_string();
+    let home = shirabe_php_shim::rtrim2(&home_raw, "\\/");
     assert_eq!(
         PhpMixed::string("/foo/bar/vendor".to_string()),
         config.get("vendor-dir")
     );
     assert_eq!(
-        PhpMixed::string(format!("{}/foo", home)),
+        PhpMixed::string(shirabe_php_shim::bconcat!(home, "/foo")),
         config.get("bin-dir")
     );
     assert_eq!(

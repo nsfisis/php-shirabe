@@ -116,7 +116,7 @@ impl IOMock {
     pub fn assert_complete(&self) {
         let output = self.inner.get_output();
 
-        if Platform::get_env("DEBUG_OUTPUT").as_deref() == Some("1") {
+        if Platform::get_env("DEBUG_OUTPUT").is_some_and(|v| v == "1") {
             println!("{PHP_EOL}Collected output: {output}{PHP_EOL}");
         }
 

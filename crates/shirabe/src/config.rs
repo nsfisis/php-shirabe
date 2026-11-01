@@ -674,8 +674,7 @@ impl Config {
 
             "home" => {
                 let v = self.config.get(B(key)).cloned().unwrap_or(PhpMixed::Null);
-                let expanded =
-                    Platform::expand_path(&v.as_string().unwrap_or_default().to_str_lossy());
+                let expanded = Platform::expand_path(v.as_string().unwrap_or_default());
                 let processed = self.process(PhpMixed::string(expanded), flags)?;
                 Ok(PhpMixed::string(rtrim2(
                     processed.as_string().unwrap_or_default(),
