@@ -1007,7 +1007,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         std::rc::Rc::new(std::cell::RefCell::new(None));
 
     let install = std::rc::Rc::new(std::cell::RefCell::new(CommandData::new(Some(
-        "install".to_string(),
+        "install".into(),
     ))));
     {
         let install_ref = install.borrow();
@@ -1080,7 +1080,7 @@ fn do_test_integration(case: &IntegrationCase, expect_output: Option<&BString>) 
         .unwrap();
 
     let update = std::rc::Rc::new(std::cell::RefCell::new(CommandData::new(Some(
-        "update".to_string(),
+        "update".into(),
     ))));
     {
         let update_ref = update.borrow();

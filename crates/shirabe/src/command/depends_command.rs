@@ -49,9 +49,9 @@ impl BaseDependencyCommand for DependsCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for DependsCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("depends")?;
-        self.set_aliases(vec!["why".to_string()])?;
-        self.set_description("Shows which packages cause the given package to be installed");
+        self.set_name("depends".into())?;
+        self.set_aliases(vec!["why".into()])?;
+        self.set_description("Shows which packages cause the given package to be installed".into());
         self.set_definition(&[
             InputArgument::new5(
                 crate::command::ARGUMENT_PACKAGE,
@@ -93,7 +93,8 @@ impl Command for DependsCommand {
         self.set_help(
             "Displays detailed information about where a package is referenced.\n\n\
             <info>shirabe depends composer/composer</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#depends-why",
+            Read more at https://getcomposer.org/doc/03-cli.md#depends-why"
+                .into(),
         );
         Ok(())
     }

@@ -78,8 +78,8 @@ impl ExecCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ExecCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("exec")?;
-        self.set_description("Executes a vendored binary/script");
+        self.set_name("exec".into())?;
+        self.set_description("Executes a vendored binary/script".into());
         self.set_definition(&[
             InputOption::new("list", Some("l".into()), Some(InputOption::VALUE_NONE), "", None).unwrap().into(),
             // PHP passes an inline closure here (it takes no arguments; PHP tolerates the
@@ -102,7 +102,8 @@ impl Command for ExecCommand {
         ]);
         self.set_help(
             "Executes a vendored binary/script.\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#exec",
+            Read more at https://getcomposer.org/doc/03-cli.md#exec"
+                .into(),
         );
         Ok(())
     }

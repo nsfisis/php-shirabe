@@ -39,8 +39,8 @@ impl OutdatedCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for OutdatedCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("outdated")?;
-        self.set_description("Shows a list of installed packages that have updates available, including their latest version");
+        self.set_name("outdated".into())?;
+        self.set_description("Shows a list of installed packages that have updates available, including their latest version".into());
         self.set_definition(&[
             InputArgument::new5("package", Some(InputArgument::OPTIONAL), "Package to inspect. Or a name including a wildcard (*) to filter lists of packages instead.", None, self.suggest_installed_package(false, false)).unwrap().into(),
         InputOption::new("outdated", Some("o".into()), Some(InputOption::VALUE_NONE), "Show only packages that are outdated (this is the default, but present here for compat with `show`", None).unwrap().into(),
@@ -66,7 +66,7 @@ impl Command for OutdatedCommand {
               compatibility breaks according to semver, so upgrade when you can but it\n  \
               may involve work.\n\
             - <highlight>red</highlight> (!): Dependency has a new version that is semver-compatible and you should upgrade it.\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#outdated"
+            Read more at https://getcomposer.org/doc/03-cli.md#outdated".into()
         );
         Ok(())
     }

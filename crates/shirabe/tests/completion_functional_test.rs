@@ -17,6 +17,7 @@ mod isolated_cwd;
 #[cfg(not(target_os = "linux"))]
 use serial_test::serial;
 use shirabe::console::application::{Application, ApplicationHandle};
+use shirabe_php_shim::implode;
 use shirabe_symfony_console::tester::CommandCompletionTester;
 
 /// PHP runs from the Composer dev checkout; chdir into the vendored checkout to reproduce
@@ -47,7 +48,7 @@ fn assert_complete(input: &str, expected_suggestions: Option<&[&str]>) {
             .as_any_mut()
             .downcast_mut::<Application>()
             .expect("ApplicationHandle wraps the shirabe Application");
-        app.get(command_name).unwrap()
+        app.get(bstr::BStr::new(command_name)).unwrap()
     };
 
     let tester = CommandCompletionTester::new(command);
@@ -57,7 +58,7 @@ fn assert_complete(input: &str, expected_suggestions: Option<&[&str]>) {
         assert!(
             suggestions.is_empty(),
             "Expected no suggestions. Got \"{}\".",
-            suggestions.join("\", \"")
+            implode("\", \"", &suggestions).display_lossy()
         );
         return;
     };
@@ -71,7 +72,7 @@ fn assert_complete(input: &str, expected_suggestions: Option<&[&str]>) {
         diff.is_empty(),
         "Suggestions must contain \"{}\". Got \"{}\".",
         diff.join("\", \""),
-        suggestions.join("\", \"")
+        implode("\", \"", &suggestions).display_lossy()
     );
 }
 

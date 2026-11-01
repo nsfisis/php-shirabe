@@ -722,7 +722,7 @@ where
     array.sort_by(|k1, _, k2, _| callback(k1.as_ref(), k2.as_ref()).cmp(&0));
 }
 
-pub fn sort_natural_flag_case(values: &mut [String]) {
+pub fn sort_natural_flag_case<T: AsRef<[u8]>>(values: &mut [T]) {
     values.sort_by(|a, b| crate::strnatcasecmp(a, b).cmp(&0));
 }
 

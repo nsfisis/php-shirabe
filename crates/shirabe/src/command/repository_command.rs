@@ -196,9 +196,9 @@ impl RepositoryCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for RepositoryCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("repository")?;
-        self.set_aliases(vec!["repo".to_string()])?;
-        self.set_description("Manages repositories");
+        self.set_name("repository".into())?;
+        self.set_aliases(vec!["repo".into()])?;
+        self.set_description("Manages repositories".into());
         self.set_definition(&[
             InputOption::new(
                 "global",
@@ -306,7 +306,8 @@ impl Command for RepositoryCommand {
             shirabe repo disable packagist.org\n  \
             shirabe repo enable packagist.org\n\n\
             Use --global/-g to alter the global config.json instead.\n\
-            Use --file to alter a specific file.",
+            Use --file to alter a specific file."
+                .into(),
         );
         Ok(())
     }

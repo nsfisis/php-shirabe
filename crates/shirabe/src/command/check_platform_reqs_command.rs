@@ -150,8 +150,8 @@ impl CheckPlatformReqsCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for CheckPlatformReqsCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("check-platform-reqs")?;
-        self.set_description("Check that platform requirements are satisfied");
+        self.set_name("check-platform-reqs".into())?;
+        self.set_description("Check that platform requirements are satisfied".into());
         self.set_definition(&[
             InputOption::new(
                 "no-dev",
@@ -185,7 +185,7 @@ impl Command for CheckPlatformReqsCommand {
         self.set_help(
             "Checks that your PHP and extensions versions match the platform requirements of the installed packages.\n\n\
             Unlike update/install, this command will ignore config.platform settings and check the real platform packages so you can be certain you have the required platform dependencies.\n\n\
-            <info>shirabe check-platform-reqs</info>\n\n"
+            <info>shirabe check-platform-reqs</info>\n\n".into()
         );
         Ok(())
     }

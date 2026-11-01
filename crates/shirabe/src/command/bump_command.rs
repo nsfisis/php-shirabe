@@ -346,8 +346,8 @@ impl BumpCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for BumpCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("bump")?;
-        self.set_description("Increases the lower limit of your composer.json requirements to the currently installed versions");
+        self.set_name("bump".into())?;
+        self.set_description("Increases the lower limit of your composer.json requirements to the currently installed versions".into());
         self.set_definition(&[
             InputArgument::new5(
                 "packages",
@@ -395,7 +395,7 @@ impl Command for BumpCommand {
                 Running this blindly on libraries is **NOT** recommended as it will narrow down\n\
                 your allowed dependencies, which may cause dependency hell for your users.\n\
                 Running it with <info>--dev-only</info> on libraries may be fine however as dev requirements\n\
-                are local to the library and do not affect consumers of the package.\n"
+                are local to the library and do not affect consumers of the package.\n".into()
             );
         Ok(())
     }

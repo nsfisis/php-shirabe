@@ -9,7 +9,7 @@ pub struct InputArgument {
     name: BString,
     mode: i64,
     default: InputValue,
-    description: String,
+    description: BString,
 }
 
 impl InputArgument {
@@ -20,7 +20,7 @@ impl InputArgument {
     pub fn new(
         name: impl Into<BString>,
         mode: Option<i64>,
-        description: String,
+        description: impl AsRef<[u8]>,
         default: InputValue,
     ) -> anyhow::Result<Self> {
         let mode = match mode {
@@ -38,7 +38,7 @@ impl InputArgument {
         let mut argument = InputArgument {
             name: name.into(),
             mode,
-            description,
+            description: BString::from(description.as_ref()),
             default: InputValue::Null,
         };
 
@@ -90,7 +90,7 @@ impl InputArgument {
         &self.default
     }
 
-    pub fn get_description(&self) -> &str {
-        &self.description
+    pub fn get_description(&self) -> &BStr {
+        self.description.as_bstr()
     }
 }

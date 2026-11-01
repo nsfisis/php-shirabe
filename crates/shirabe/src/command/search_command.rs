@@ -47,8 +47,8 @@ impl SearchCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SearchCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("search")?;
-        self.set_description("Searches for packages");
+        self.set_name("search".into())?;
+        self.set_description("Searches for packages".into());
         self.set_definition(&[
             InputOption::new(
                 "only-name",
@@ -99,7 +99,8 @@ impl Command for SearchCommand {
         self.set_help(
             "The search command searches for packages by its name\n\
             <info>shirabe search symfony composer</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#search",
+            Read more at https://getcomposer.org/doc/03-cli.md#search"
+                .into(),
         );
         Ok(())
     }

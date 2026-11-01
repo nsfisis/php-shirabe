@@ -11,7 +11,7 @@ pub struct InputOption {
     shortcut: Option<BString>,
     mode: i64,
     default: InputValue,
-    description: String,
+    description: BString,
 }
 
 impl InputOption {
@@ -25,7 +25,7 @@ impl InputOption {
         name: impl AsRef<[u8]>,
         shortcut: Option<&BStr>,
         mode: Option<i64>,
-        description: String,
+        description: impl AsRef<[u8]>,
         default: InputValue,
     ) -> anyhow::Result<Self> {
         let name = name.as_ref();
@@ -60,7 +60,7 @@ impl InputOption {
             name,
             shortcut,
             mode,
-            description,
+            description: BString::from(description.as_ref()),
             default: InputValue::Null,
         };
 
@@ -156,8 +156,8 @@ impl InputOption {
         &self.default
     }
 
-    pub fn get_description(&self) -> &str {
-        &self.description
+    pub fn get_description(&self) -> &BStr {
+        self.description.as_bstr()
     }
 
     pub fn equals(&self, option: &InputOption) -> bool {

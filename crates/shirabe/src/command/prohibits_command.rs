@@ -49,9 +49,11 @@ impl BaseDependencyCommand for ProhibitsCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ProhibitsCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("prohibits")?;
-        self.set_aliases(vec!["why-not".to_string()])?;
-        self.set_description("Shows which packages prevent the given package from being installed");
+        self.set_name("prohibits".into())?;
+        self.set_aliases(vec!["why-not".into()])?;
+        self.set_description(
+            "Shows which packages prevent the given package from being installed".into(),
+        );
         self.set_definition(&[
             InputArgument::new5(
                 <Self as BaseDependencyCommand>::ARGUMENT_PACKAGE,
@@ -101,7 +103,8 @@ impl Command for ProhibitsCommand {
         self.set_help(
             "Displays detailed information about why a package cannot be installed.\n\n\
             <info>shirabe prohibits composer/composer</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#prohibits-why-not",
+            Read more at https://getcomposer.org/doc/03-cli.md#prohibits-why-not"
+                .into(),
         );
         Ok(())
     }

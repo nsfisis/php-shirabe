@@ -66,8 +66,8 @@ impl XmlDescriptor {
             command.merge_application_definition(false);
 
             let mut usages = vec![command.get_synopsis(false)];
-            usages.extend(command.get_aliases().into_iter().map(BString::from));
-            usages.extend(command.get_usages().into_iter().map(BString::from));
+            usages.extend(command.get_aliases());
+            usages.extend(command.get_usages());
             for usage in usages {
                 usages_xml.append_child(dom.create_element_with_value("usage", &usage));
             }
@@ -94,7 +94,7 @@ impl XmlDescriptor {
     pub fn get_application_document(
         &self,
         application: std::rc::Rc<std::cell::RefCell<dyn Application>>,
-        namespace: Option<String>,
+        namespace: Option<BString>,
         short: bool,
     ) -> DOMDocument {
         let dom = DOMDocument::new("1.0", "UTF-8");
@@ -195,7 +195,7 @@ impl XmlDescriptor {
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let namespace = match options.get(B("namespace")) {
-            Some(PhpMixed::String(s)) => Some(s.display_lossy().to_string()),
+            Some(PhpMixed::String(s)) => Some(s.clone()),
             _ => None,
         };
         let short = matches!(options.get(B("short")), Some(PhpMixed::Bool(true)));

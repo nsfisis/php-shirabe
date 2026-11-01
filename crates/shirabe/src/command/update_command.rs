@@ -255,9 +255,9 @@ impl UpdateCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for UpdateCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("update")?;
-        self.set_aliases(vec!["u".to_string(), "upgrade".to_string()])?;
-        self.set_description("Updates your dependencies to the latest version according to composer.json, and updates the composer.lock file");
+        self.set_name("update".into())?;
+        self.set_aliases(vec!["u".into(), "upgrade".into()])?;
+        self.set_description("Updates your dependencies to the latest version according to composer.json, and updates the composer.lock file".into());
         self.set_definition(&[
             InputArgument::new5("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Packages that should be updated, if not provided all packages are.", None, self.suggest_installed_package(false, false)).unwrap().into(),
             InputOption::new("with", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Temporary version constraint to add, e.g. foo/bar:1.0.0 or foo/bar=1.0.0", None).unwrap().into(),
@@ -308,7 +308,7 @@ impl Command for UpdateCommand {
             To run a partial update with more restrictive constraints you can use the shorthand:\n\n\
             <info>shirabe update vendor/package:1.0.*</info>\n\n\
             To select packages names interactively with auto-completion use <info>-i</info>.\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#update-u-upgrade\n",
+            Read more at https://getcomposer.org/doc/03-cli.md#update-u-upgrade\n".into(),
         );
         Ok(())
     }

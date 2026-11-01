@@ -296,8 +296,8 @@ impl StatusCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for StatusCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("status")?;
-        self.set_description("Shows a list of locally modified packages");
+        self.set_name("status".into())?;
+        self.set_description("Shows a list of locally modified packages".into());
         self.set_definition(&[InputOption::new(
             "verbose",
             Some("v|vv|vvv".into()),
@@ -308,7 +308,7 @@ impl Command for StatusCommand {
         .unwrap()
         .into()]);
         self.set_help(
-            "The status command displays a list of dependencies that have\nbeen modified locally.\n\nRead more at https://getcomposer.org/doc/03-cli.md#status"
+            "The status command displays a list of dependencies that have\nbeen modified locally.\n\nRead more at https://getcomposer.org/doc/03-cli.md#status".into()
         );
         Ok(())
     }

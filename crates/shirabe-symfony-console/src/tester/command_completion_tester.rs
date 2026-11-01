@@ -2,6 +2,8 @@
 
 use crate::command::Command;
 use crate::completion::{CompletionInput, CompletionSuggestions};
+use bstr::BString;
+use shirabe_php_shim::bconcat;
 
 /// Eases the testing of command completion.
 #[derive(Debug)]
@@ -15,19 +17,16 @@ impl CommandCompletionTester {
     }
 
     /// Create completion suggestions from input tokens.
-    pub fn complete(&self, input: &[&str]) -> anyhow::Result<Vec<String>> {
-        let mut input: Vec<String> = input.iter().map(|s| s.to_string()).collect();
+    pub fn complete(&self, input: &[&str]) -> anyhow::Result<Vec<BString>> {
+        let mut input: Vec<BString> = input.iter().map(|s| BString::from(*s)).collect();
         let current_index = input.len() as i64;
-        if input.last().map(String::as_str) == Some("") {
+        if input.last().is_some_and(|last| last.is_empty()) {
             input.pop();
         }
         // array_unshift($input, $this->command->getName())
         input.insert(0, self.command.borrow().get_name().unwrap_or_default());
 
-        let mut completion_input = CompletionInput::from_tokens(
-            input.into_iter().map(bstr::BString::from).collect(),
-            current_index,
-        )?;
+        let mut completion_input = CompletionInput::from_tokens(input, current_index)?;
         {
             let command_ref = self.command.borrow();
             let definition = command_ref.get_definition();
@@ -39,17 +38,17 @@ impl CommandCompletionTester {
             .borrow()
             .complete(&completion_input, &mut suggestions)?;
 
-        let mut result: Vec<String> = suggestions
+        let mut result: Vec<BString> = suggestions
             .get_option_suggestions()
             .iter()
-            .map(|option| format!("--{}", option.get_name().display_lossy()))
+            .map(|option| bconcat!("--", option.get_name()))
             .collect();
         // array_map('strval', ... $suggestions->getValueSuggestions())
         result.extend(
             suggestions
                 .get_value_suggestions()
                 .iter()
-                .map(|suggestion| suggestion.get_value().display_lossy().to_string()),
+                .map(|suggestion| suggestion.get_value()),
         );
         Ok(result)
     }

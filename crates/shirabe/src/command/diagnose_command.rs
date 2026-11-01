@@ -1154,12 +1154,12 @@ impl DiagnoseCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for DiagnoseCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("diagnose")?;
-        self.set_description("Diagnoses the system to identify common errors");
+        self.set_name("diagnose".into())?;
+        self.set_description("Diagnoses the system to identify common errors".into());
         self.set_help(
             "The <info>diagnose</info> command checks common errors to help debugging problems.\n\n\
              The process exit code will be 1 in case of warnings and 2 for errors.\n\n\
-             Read more at https://getcomposer.org/doc/03-cli.md#diagnose",
+             Read more at https://getcomposer.org/doc/03-cli.md#diagnose".into(),
         );
         Ok(())
     }

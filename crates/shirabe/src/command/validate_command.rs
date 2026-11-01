@@ -134,8 +134,8 @@ impl ValidateCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ValidateCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("validate")?;
-        self.set_description("Validates a composer.json and composer.lock");
+        self.set_name("validate".into())?;
+        self.set_description("Validates a composer.json and composer.lock".into());
         self.set_definition(&[
             InputOption::new(
                 "no-check-all",
@@ -215,7 +215,8 @@ impl Command for ValidateCommand {
             1 validation warning(s), only when --strict is given\n\
             2 validation error(s)\n\
             3 file unreadable or missing\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#validate",
+            Read more at https://getcomposer.org/doc/03-cli.md#validate"
+                .into(),
         );
         Ok(())
     }

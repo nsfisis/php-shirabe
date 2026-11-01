@@ -53,7 +53,7 @@ pub struct BaseCommandData {
 }
 
 impl BaseCommandData {
-    pub fn new(name: Option<String>) -> Self {
+    pub fn new(name: Option<bstr::BString>) -> Self {
         BaseCommandData {
             inner: CommandData::new(name),
             composer: std::cell::RefCell::new(None),

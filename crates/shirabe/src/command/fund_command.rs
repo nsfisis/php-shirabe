@@ -84,8 +84,10 @@ impl FundCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for FundCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("fund")?;
-        self.set_description("Discover how to help fund the maintenance of your dependencies");
+        self.set_name("fund".into())?;
+        self.set_description(
+            "Discover how to help fund the maintenance of your dependencies".into(),
+        );
         self.set_definition(&[InputOption::new6(
             "format",
             Some("f".into()),

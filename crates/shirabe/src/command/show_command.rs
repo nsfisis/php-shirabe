@@ -1363,9 +1363,9 @@ impl ShowCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ShowCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("show")?;
-        self.set_aliases(vec!["info".to_string()])?;
-        self.set_description("Shows information about packages");
+        self.set_name("show".into())?;
+        self.set_aliases(vec!["info".into()])?;
+        self.set_description("Shows information about packages".into());
         let opt_none = |name: &str, shortcut: Option<&str>, description: &str| {
             InputOption::new(
                 name,
@@ -1483,7 +1483,8 @@ impl Command for ShowCommand {
         self.set_help(
             "The show command displays detailed information about a package, or\n\
              lists all packages available.\n\n\
-             Read more at https://getcomposer.org/doc/03-cli.md#show-info",
+             Read more at https://getcomposer.org/doc/03-cli.md#show-info"
+                .into(),
         );
         Ok(())
     }

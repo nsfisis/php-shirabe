@@ -44,8 +44,8 @@ impl ReinstallCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ReinstallCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("reinstall")?;
-        self.set_description("Uninstalls and reinstalls the given package names");
+        self.set_name("reinstall".into())?;
+        self.set_description("Uninstalls and reinstalls the given package names".into());
         self.set_definition(&[
             InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
             InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
@@ -67,7 +67,8 @@ impl Command for ReinstallCommand {
             of a package if you messed with its files, or if you wish to change\n\
             the installation type using --prefer-install.\n\n\
             <info>shirabe reinstall acme/foo \"acme/bar-*\"</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#reinstall",
+            Read more at https://getcomposer.org/doc/03-cli.md#reinstall"
+                .into(),
         );
         Ok(())
     }

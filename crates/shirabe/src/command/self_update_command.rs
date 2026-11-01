@@ -37,9 +37,9 @@ impl SelfUpdateCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SelfUpdateCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("self-update")?;
-        self.set_aliases(vec!["selfupdate".to_string()])?;
-        self.set_description("Updates composer.phar to the latest version");
+        self.set_name("self-update".into())?;
+        self.set_aliases(vec!["selfupdate".into()])?;
+        self.set_description("Updates composer.phar to the latest version".into());
         self.set_definition(&[
             InputOption::new("rollback", Some("r".into()), Some(InputOption::VALUE_NONE), "Revert to an older installation of composer", None).unwrap().into(),
             InputOption::new("clean-backups", None, Some(InputOption::VALUE_NONE), "Delete old backups during an update. This makes the current version of composer the only backup available after the update", None).unwrap().into(),
@@ -60,7 +60,8 @@ impl Command for SelfUpdateCommand {
             \n\
             <info>shirabe self-update</info>\n\
             \n\
-            Read more at https://getcomposer.org/doc/03-cli.md#self-update-selfupdate",
+            Read more at https://getcomposer.org/doc/03-cli.md#self-update-selfupdate"
+                .into(),
         );
         Ok(())
     }

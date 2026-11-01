@@ -4,7 +4,7 @@ use crate::command::base_command::base_command_initialize;
 use crate::command::{BaseCommand, BaseCommandData};
 use crate::console::input::{InputArgument, InputOption};
 use crate::util::Platform;
-use bstr::{BStr, BString};
+use bstr::{BStr, BString, ByteSlice};
 use shirabe_php_shim::{
     InvalidArgumentException, LogicException, PhpMixed, bconcat, impl_php_class, is_string,
     php_regex, preg_replace2,
@@ -16,9 +16,9 @@ use shirabe_symfony_console::{command::Command, input::InputInterface, output::O
 pub struct ScriptAliasCommand {
     base_command_data: BaseCommandData,
 
-    script: String,
-    description: String,
-    aliases: Vec<String>,
+    script: BString,
+    description: BString,
+    aliases: Vec<BString>,
 }
 
 impl_php_class!(ScriptAliasCommand, r"Composer\Command\ScriptAliasCommand");
@@ -43,17 +43,9 @@ impl ScriptAliasCommand {
             }
         }
 
-        // These come from composer.json, whose JSON text is valid UTF-8.
-        let script = script.display_lossy().to_string();
-        let description = description.display_lossy().to_string();
-        let aliases = aliases
-            .iter()
-            .map(|alias| alias.display_lossy().to_string())
-            .collect();
-
         let command = Self {
             base_command_data: BaseCommandData::new(None),
-            script,
+            script: script.into(),
             description,
             aliases,
         };
@@ -68,10 +60,8 @@ impl ScriptAliasCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ScriptAliasCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        let name = self.script.clone();
-        self.set_name(&name)?;
-        let description = self.description.clone();
-        self.set_description(&description);
+        self.set_name(self.script.as_bstr())?;
+        self.set_description(self.description.as_bstr());
         self.set_aliases(self.aliases.clone())?;
         self.set_definition(&[
             InputOption::new(
@@ -104,7 +94,8 @@ impl Command for ScriptAliasCommand {
         self.set_help(
             "The <info>run-script</info> command runs scripts defined in composer.json:\n\n\
             <info>shirabe run-script post-update-cmd</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#run-script-run",
+            Read more at https://getcomposer.org/doc/03-cli.md#run-script-run"
+                .into(),
         );
         Ok(())
     }
@@ -158,7 +149,13 @@ impl Command for ScriptAliasCommand {
 
         dispatcher
             .borrow_mut()
-            .dispatch_script(&self.script, dev_mode, args_value, flags)
+            // TODO(bytes): event names are text, so a non-UTF-8 script name is dispatched lossily.
+            .dispatch_script(
+                &self.script.display_lossy().to_string(),
+                dev_mode,
+                args_value,
+                flags,
+            )
     }
 
     fn initialize(

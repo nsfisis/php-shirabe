@@ -4,7 +4,7 @@ use crate::command::Command;
 use crate::completion::{CompletionInput, CompletionSuggestions};
 use crate::helper::HelperSet;
 use crate::input::InputDefinition;
-use bstr::BStr;
+use bstr::{BStr, BString};
 use indexmap::IndexMap;
 use shirabe_php_shim::AsAny;
 
@@ -12,22 +12,22 @@ use shirabe_php_shim::AsAny;
 /// trait rather than a struct.
 /// Refer to shirabe::console::Application for the reason.
 pub trait Application: std::fmt::Debug + AsAny {
-    fn get_name(&self) -> String;
+    fn get_name(&self) -> BString;
 
-    fn get_version(&self) -> String;
+    fn get_version(&self) -> BString;
 
-    fn get_help(&self) -> String;
+    fn get_help(&self) -> BString;
 
     fn is_single_command(&self) -> bool;
 
-    fn extract_namespace(&self, name: &str, limit: Option<i64>) -> String;
+    fn extract_namespace(&self, name: &BStr, limit: Option<i64>) -> BString;
 
-    fn find_namespace(&mut self, namespace: &str) -> anyhow::Result<String>;
+    fn find_namespace(&mut self, namespace: &BStr) -> anyhow::Result<BString>;
 
     fn all(
         &mut self,
-        namespace: Option<&str>,
-    ) -> anyhow::Result<IndexMap<String, std::rc::Rc<std::cell::RefCell<dyn Command>>>>;
+        namespace: Option<&BStr>,
+    ) -> anyhow::Result<IndexMap<BString, std::rc::Rc<std::cell::RefCell<dyn Command>>>>;
 
     fn find(&mut self, name: &BStr)
     -> anyhow::Result<std::rc::Rc<std::cell::RefCell<dyn Command>>>;

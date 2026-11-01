@@ -831,8 +831,8 @@ impl CreateProjectCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for CreateProjectCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("create-project")?;
-        self.set_description("Creates new project from a package into given directory");
+        self.set_name("create-project".into())?;
+        self.set_description("Creates new project from a package into given directory".into());
         self.set_definition(&[
                 InputArgument::new5("package", Some(InputArgument::OPTIONAL), "Package name to be installed", None, self.suggest_available_package(99)).unwrap().into(),
                 InputArgument::new("directory", Some(InputArgument::OPTIONAL), "Directory where the files should be created", None).unwrap().into(),
@@ -875,7 +875,7 @@ impl Command for CreateProjectCommand {
                 controlled code by appending the <info>'--prefer-source'</info> flag.\n\n\
                 To install a package from another repository than the default one you\n\
                 can pass the <info>'--repository=https://myrepository.org'</info> flag.\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#create-project"
+                Read more at https://getcomposer.org/doc/03-cli.md#create-project".into()
             );
         Ok(())
     }

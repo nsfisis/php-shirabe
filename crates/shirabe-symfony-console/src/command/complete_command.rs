@@ -66,7 +66,8 @@ impl CompleteCommand {
         // PHP: static $defaultName = '|_complete' / $defaultDescription, applied by the parent
         // constructor before configure().
         this.inner.apply_default_name(Self::DEFAULT_NAME)?;
-        this.inner.set_description(Self::DEFAULT_DESCRIPTION);
+        this.inner
+            .set_description(bstr::BStr::new(Self::DEFAULT_DESCRIPTION));
         this.configure()?;
 
         Ok(this)
@@ -185,7 +186,7 @@ impl Command for CompleteCommand {
                 "shell",
                 Some("s".into()),
                 Some(InputOption::VALUE_REQUIRED),
-                &format!("The shell type (\"{}\")", shells),
+                format!("The shell type (\"{}\")", shells),
                 InputValue::Null,
             )?
             .add_option(
@@ -302,7 +303,7 @@ impl Command for CompleteCommand {
                 }
                 Some(command)
                     if completion_input.must_suggest_argument_values_for("command")
-                        && command.borrow().get_name().map(bstr::BString::from)
+                        && command.borrow().get_name()
                             != Some(completion_input.get_completion_value())
                         && !command
                             .borrow()
@@ -320,7 +321,7 @@ impl Command for CompleteCommand {
                             .into_iter()
                             .flatten()
                             .filter(|v| !v.is_empty())
-                            .map(|value| StringOrSuggestion::String(value.into()))
+                            .map(StringOrSuggestion::String)
                             .collect(),
                     );
                 }

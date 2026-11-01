@@ -43,8 +43,8 @@ impl SuggestsCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for SuggestsCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("suggests")?;
-        self.set_description("Shows package suggestions");
+        self.set_name("suggests".into())?;
+        self.set_description("Shows package suggestions".into());
         self.set_definition(&[
             InputOption::new(
                 "by-package",
@@ -102,7 +102,7 @@ impl Command for SuggestsCommand {
             .into(),
         ]);
         self.set_help(
-            "\nThe <info>%command.name%</info> command shows a sorted list of suggested packages.\n\nRead more at https://getcomposer.org/doc/03-cli.md#suggests",
+            "\nThe <info>%command.name%</info> command shows a sorted list of suggested packages.\n\nRead more at https://getcomposer.org/doc/03-cli.md#suggests".into(),
         );
         Ok(())
     }

@@ -44,9 +44,9 @@ impl InstallCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for InstallCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("install")?;
-        self.set_aliases(vec!["i".to_string()])?;
-        self.set_description("Installs the project dependencies from the composer.lock file if present, or falls back on the composer.json");
+        self.set_name("install".into())?;
+        self.set_aliases(vec!["i".into()])?;
+        self.set_description("Installs the project dependencies from the composer.lock file if present, or falls back on the composer.json".into());
         self.set_definition(&[
             InputOption::new("prefer-source", None, Some(InputOption::VALUE_NONE), "Forces installation from package sources when possible, including VCS information.", None).unwrap().into(),
             InputOption::new("prefer-dist", None, Some(InputOption::VALUE_NONE), "Forces installation from package dist (default behavior).", None).unwrap().into(),
@@ -77,7 +77,8 @@ impl Command for InstallCommand {
             libraries and dependencies outlined in that file. If the file does not\n\
             exist it will look for composer.json and do the same.\n\n\
             <info>shirabe install</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#install-i",
+            Read more at https://getcomposer.org/doc/03-cli.md#install-i"
+                .into(),
         );
         Ok(())
     }

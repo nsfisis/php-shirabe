@@ -18,7 +18,7 @@ impl InputArgument {
     pub fn new(
         name: impl AsRef<[u8]>,
         mode: Option<i64>,
-        description: &str,
+        description: impl AsRef<[u8]>,
         default: Option<InputValue>,
     ) -> anyhow::Result<Self> {
         Self::new5(
@@ -34,14 +34,14 @@ impl InputArgument {
     pub fn new5(
         name: impl AsRef<[u8]>,
         mode: Option<i64>,
-        description: &str,
+        description: impl AsRef<[u8]>,
         default: Option<InputValue>,
         suggested_values: SuggestedValues,
     ) -> anyhow::Result<Self> {
         let inner = BaseInputArgument::new(
             name.as_ref(),
             mode,
-            description.to_string(),
+            description,
             default.unwrap_or(InputValue::Null),
         )?;
         Ok(Self {

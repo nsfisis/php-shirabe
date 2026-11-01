@@ -351,10 +351,10 @@ impl RustMethodDispatcher for PluginRpcDispatcher<'_> {
                 return Ok(find_file_in_registered_loaders(&class).to_plugin_value());
             }
             if method_name == "__shirabe_run_rust_command" {
-                let name = arg::<String>(method_name, &args, 0)?;
+                let name = arg::<BString>(method_name, &args, 0)?;
                 let input_line = arg::<BString>(method_name, &args, 1)?;
                 return match crate::console::application::run_worker_reverse_command(
-                    &name,
+                    name.as_ref(),
                     input_line.as_ref(),
                 ) {
                     Ok(code) => Ok(code.to_plugin_value()),
@@ -4288,9 +4288,9 @@ impl Drop for PhpCommandProviderProxy {
 /// commands (their execution crosses back into this process).
 #[derive(Debug)]
 pub(crate) struct RustCommandMetadata {
-    pub(crate) name: String,
-    pub(crate) description: String,
-    pub(crate) aliases: Vec<String>,
+    pub(crate) name: BString,
+    pub(crate) description: BString,
+    pub(crate) aliases: Vec<BString>,
     pub(crate) hidden: bool,
 }
 
@@ -4513,14 +4513,14 @@ impl PhpCommandProxy {
         match name {
             PluginValue::Null => {}
             PluginValue::String(bytes) => {
-                Command::set_name(&data, &Self::text(&handle, "getName", bytes)?)?;
+                Command::set_name(&data, bytes.as_bstr())?;
             }
             other => return Err(Self::unsupported_shape(&handle, "getName", &other)),
         }
         let description = Self::call_metadata_getter(&handle, "getDescription")?;
         match description {
             PluginValue::String(bytes) => {
-                Command::set_description(&data, &bytes.display_lossy().to_string());
+                Command::set_description(&data, bytes.as_bstr());
             }
             other => return Err(Self::unsupported_shape(&handle, "getDescription", &other)),
         }
@@ -4534,7 +4534,7 @@ impl PhpCommandProxy {
         for alias in alias_items {
             match alias {
                 PluginValue::String(bytes) => {
-                    alias_names.push(Self::text(&handle, "getAliases", bytes)?);
+                    alias_names.push(bytes);
                 }
                 other => return Err(Self::unsupported_shape(&handle, "getAliases", &other)),
             }
@@ -4596,7 +4596,7 @@ impl PhpCommandProxy {
             let (name, description) =
                 match (field(&mut row, "name"), field(&mut row, "description")) {
                     (PluginValue::String(name), PluginValue::String(description)) => {
-                        (name, description.display_lossy().to_string())
+                        (name, description)
                     }
                     (other, _) => {
                         return Err(Self::unsupported_shape(handle, "getDefinition", &other));
@@ -4628,7 +4628,7 @@ impl PhpCommandProxy {
             let (name, description) =
                 match (field(&mut row, "name"), field(&mut row, "description")) {
                     (PluginValue::String(name), PluginValue::String(description)) => {
-                        (name, description.display_lossy().to_string())
+                        (name, description)
                     }
                     (other, _) => {
                         return Err(Self::unsupported_shape(handle, "getDefinition", &other));
@@ -4677,31 +4677,19 @@ impl PhpCommandProxy {
 
         match field(&mut map, "help") {
             PluginValue::String(help) => {
-                Command::set_help(data, &help.display_lossy().to_string());
+                Command::set_help(data, help.as_bstr());
             }
             other => return Err(Self::unsupported_shape(handle, "getHelp", &other)),
         }
         for usage in as_rows(field(&mut map, "usages")) {
             match usage {
                 PluginValue::String(usage) => {
-                    Command::add_usage(data, &usage.display_lossy().to_string());
+                    Command::add_usage(data, usage.as_bstr());
                 }
                 other => return Err(Self::unsupported_shape(handle, "getUsages", &other)),
             }
         }
         Ok(())
-    }
-
-    /// A value the command holds as text: its name or an alias.
-    fn text(handle: &PhpObjHandle, method: &str, bytes: BString) -> anyhow::Result<String> {
-        match utf8_text(&bytes) {
-            Some(text) => Ok(text.to_owned()),
-            None => Err(Self::unsupported_shape(
-                handle,
-                method,
-                &PluginValue::String(bytes),
-            )),
-        }
     }
 
     fn call_metadata_getter(handle: &PhpObjHandle, method: &str) -> anyhow::Result<PluginValue> {

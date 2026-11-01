@@ -64,7 +64,7 @@ impl JsonDescriptor {
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let described_namespace = match options.get(B("namespace")) {
-            Some(PhpMixed::String(s)) => Some(s.display_lossy().to_string()),
+            Some(PhpMixed::String(s)) => Some(s.clone()),
             _ => None,
         };
         let mut description =

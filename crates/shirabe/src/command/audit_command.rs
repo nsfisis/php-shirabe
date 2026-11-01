@@ -95,8 +95,10 @@ impl AuditCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for AuditCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("audit")?;
-        self.set_description("Checks for security vulnerability advisories for installed packages");
+        self.set_name("audit".into())?;
+        self.set_description(
+            "Checks for security vulnerability advisories for installed packages".into(),
+        );
         self.set_definition(&[
             InputOption::new(
                 "no-dev",
@@ -165,7 +167,7 @@ impl Command for AuditCommand {
             "The <info>audit</info> command checks for security vulnerability advisories for installed packages.\n\n\
             If you do not want to include dev dependencies in the audit you can omit them with --no-dev\n\n\
             If you want to ignore repositories that are unreachable or return a non-200 status code, use --ignore-unreachable\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#audit"
+            Read more at https://getcomposer.org/doc/03-cli.md#audit".into()
         );
         Ok(())
     }

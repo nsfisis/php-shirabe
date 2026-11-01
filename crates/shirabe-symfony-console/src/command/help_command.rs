@@ -68,7 +68,7 @@ impl HelpCommand {
                     .get_commands()
                     .keys()
                     .cloned()
-                    .map(|value| StringOrSuggestion::String(value.into()))
+                    .map(StringOrSuggestion::String)
                     .collect(),
             );
 
@@ -93,30 +93,31 @@ impl Command for HelpCommand {
     fn configure(&self) -> anyhow::Result<()> {
         self.inner.ignore_validation_errors();
 
-        self.inner.set_name("help")?;
+        self.inner.set_name("help".into())?;
         self.inner.set_definition(SetDefinitionArg::Array(vec![
             DefinitionItem::InputArgument(InputArgument::new(
                 "command_name".to_string(),
                 Some(InputArgument::OPTIONAL),
-                "The command name".to_string(),
+                "The command name",
                 InputValue::from("help".to_string()),
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "format",
                 None,
                 Some(InputOption::VALUE_REQUIRED),
-                "The output format (txt, xml, json, or md)".to_string(),
+                "The output format (txt, xml, json, or md)",
                 InputValue::from("txt".to_string()),
             )?),
             DefinitionItem::InputOption(InputOption::new(
                 "raw",
                 None,
                 Some(InputOption::VALUE_NONE),
-                "To output raw command help".to_string(),
+                "To output raw command help",
                 InputValue::Null,
             )?),
         ]));
-        self.inner.set_description("Display help for a command");
+        self.inner
+            .set_description("Display help for a command".into());
         self.inner.set_help(
                 "The <info>%command.name%</info> command displays help for a given command:\n\
                  \n\
@@ -126,7 +127,7 @@ impl Command for HelpCommand {
                  \n\
                  \x20\x20<info>%command.full_name% --format=xml list</info>\n\
                  \n\
-                 To display the list of available commands, please use the <info>list</info> command.",
+                 To display the list of available commands, please use the <info>list</info> command.".into(),
             );
 
         Ok(())

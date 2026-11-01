@@ -1,24 +1,25 @@
 //! ref: composer/vendor/symfony/console/Exception/CommandNotFoundException.php
 
 use super::exception_interface::ExceptionInterface;
+use bstr::BString;
 use shirabe_php_shim::InvalidArgumentException;
 
 #[derive(Debug)]
 pub struct CommandNotFoundException {
     inner: InvalidArgumentException,
-    alternatives: Vec<String>,
+    alternatives: Vec<BString>,
 }
 
 impl CommandNotFoundException {
     #[track_caller]
-    pub fn new(message: String, alternatives: Vec<String>, code: i64) -> Self {
+    pub fn new(message: String, alternatives: Vec<BString>, code: i64) -> Self {
         Self {
             inner: InvalidArgumentException::with_code(message, code),
             alternatives,
         }
     }
 
-    pub fn get_alternatives(&self) -> &Vec<String> {
+    pub fn get_alternatives(&self) -> &Vec<BString> {
         &self.alternatives
     }
 }

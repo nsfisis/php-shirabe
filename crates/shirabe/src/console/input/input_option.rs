@@ -21,7 +21,7 @@ impl InputOption {
         name: impl AsRef<[u8]>,
         shortcut: Option<&bstr::BStr>,
         mode: Option<i64>,
-        description: &str,
+        description: impl AsRef<[u8]>,
         default: Option<InputValue>,
     ) -> anyhow::Result<Self> {
         Self::new6(
@@ -39,12 +39,12 @@ impl InputOption {
         name: impl AsRef<[u8]>,
         shortcut: Option<&bstr::BStr>,
         mode: Option<i64>,
-        description: &str,
+        description: impl AsRef<[u8]>,
         default: Option<InputValue>,
         suggested_values: SuggestedValues,
     ) -> anyhow::Result<Self> {
         let default = default.unwrap_or(InputValue::Null);
-        let inner = BaseInputOption::new(name, shortcut, mode, description.to_string(), default)?;
+        let inner = BaseInputOption::new(name, shortcut, mode, description, default)?;
         // PHP throws LogicException here; suggested values on a valueless option cannot happen
         // at runtime unless a configure() is wrong, so this is a programming error.
         assert!(

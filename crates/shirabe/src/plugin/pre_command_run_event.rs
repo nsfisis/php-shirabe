@@ -10,14 +10,14 @@ use shirabe_symfony_console::input::InputInterface;
 pub struct PreCommandRunEvent {
     inner: Event,
     input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-    command: String,
+    command: BString,
 }
 
 impl PreCommandRunEvent {
     pub fn new(
         name: String,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
-        command: String,
+        command: BString,
     ) -> Self {
         let inner = Event::new(name, vec![], indexmap::IndexMap::new());
         Self {
@@ -35,8 +35,8 @@ impl PreCommandRunEvent {
         self.inner.get_name()
     }
 
-    pub fn get_command(&self) -> &str {
-        &self.command
+    pub fn get_command(&self) -> &bstr::BStr {
+        self.command.as_ref()
     }
 }
 

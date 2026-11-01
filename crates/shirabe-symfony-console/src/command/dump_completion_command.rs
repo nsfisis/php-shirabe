@@ -62,7 +62,9 @@ impl DumpCompletionCommand {
             .inner
             .apply_default_name(Self::DEFAULT_NAME)
             .expect("DumpCompletionCommand default name is valid");
-        command.inner.set_description(Self::DEFAULT_DESCRIPTION);
+        command
+            .inner
+            .set_description(bstr::BStr::new(Self::DEFAULT_DESCRIPTION));
         command
             .configure()
             .expect("DumpCompletionCommand::configure uses static, valid metadata");
@@ -149,7 +151,7 @@ impl Command for DumpCompletionCommand {
         };
         let full_command = full_command.display();
 
-        self.inner.set_help(&format!(
+        self.inner.set_help(bstr::BStr::new(&format!(
             "The <info>%command.name%</> command dumps the shell completion script required\n\
              to use shell autocompletion (currently only bash completion is supported).\n\
              \n\
@@ -176,7 +178,7 @@ impl Command for DumpCompletionCommand {
              Add this to the end of your shell configuration file (e.g. <info>\"~/.bashrc\"</>):\n\
              \n\
              \x20\x20\x20\x20<info>eval \"$({full_command} completion bash)\"</>",
-        ));
+        )));
         self.inner.add_argument(
             "shell",
             Some(InputArgument::OPTIONAL),
@@ -257,7 +259,7 @@ impl Command for DumpCompletionCommand {
         output.borrow_mut().write(
             &[str_replace_arrays(
                 &["{{ COMMAND_NAME }}", "{{ VERSION }}"],
-                &[command_name, BString::from(version)],
+                &[command_name, version],
                 completion_file,
             )],
             false,

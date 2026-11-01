@@ -45,7 +45,7 @@ pub trait BaseDependencyCommand: BaseCommand {
         let composer = self.require_composer(None, None)?;
         let mut command_event = CommandEvent::new(
             PluginEvents::COMMAND,
-            &self.get_name().unwrap_or_default(),
+            self.get_name().unwrap_or_default(),
             input.clone(),
             output.clone(),
         );

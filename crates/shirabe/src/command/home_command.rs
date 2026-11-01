@@ -135,9 +135,11 @@ impl HomeCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for HomeCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("browse")?;
-        self.set_aliases(vec!["home".to_string()])?;
-        self.set_description("Opens the package's repository URL or homepage in your browser");
+        self.set_name("browse".into())?;
+        self.set_aliases(vec!["home".into()])?;
+        self.set_description(
+            "Opens the package's repository URL or homepage in your browser".into(),
+        );
         self.set_definition(&[
             InputArgument::new5(
                 "packages",
@@ -172,7 +174,8 @@ impl Command for HomeCommand {
             homepage in your default browser.\n\n\
             To open the homepage by default, use -H or --homepage.\n\
             To show instead of open the repository or homepage URL, use -s or --show.\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#browse-home",
+            Read more at https://getcomposer.org/doc/03-cli.md#browse-home"
+                .into(),
         );
         Ok(())
     }

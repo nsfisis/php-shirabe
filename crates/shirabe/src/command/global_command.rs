@@ -120,8 +120,10 @@ impl GlobalCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for GlobalCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("global")?;
-        self.set_description("Allows running commands in the global composer dir ($COMPOSER_HOME)");
+        self.set_name("global".into())?;
+        self.set_description(
+            "Allows running commands in the global composer dir ($COMPOSER_HOME)".into(),
+        );
         self.set_definition(&[
             InputArgument::new("command-name", Some(InputArgument::REQUIRED), "", None)
                 .unwrap()
@@ -146,7 +148,8 @@ impl Command for GlobalCommand {
             XDG_CONFIG_HOME or default to /home/<user>/.config/composer\n\n\
             Note: This path may vary depending on customizations to bin-dir in\n\
             composer.json or the environmental variable COMPOSER_BIN_DIR.\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#global",
+            Read more at https://getcomposer.org/doc/03-cli.md#global"
+                .into(),
         );
         Ok(())
     }
@@ -176,7 +179,7 @@ impl Command for GlobalCommand {
                     // array_filter drops the nulls.
                     .filter(|command| !command.borrow().is_hidden())
                     .filter_map(|command| command.borrow().get_name())
-                    .map(|name| StringOrSuggestion::String(name.into()))
+                    .map(StringOrSuggestion::String)
                     .collect()
             };
             suggestions.suggest_values(values);

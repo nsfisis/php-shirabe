@@ -38,9 +38,9 @@ impl DumpAutoloadCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for DumpAutoloadCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("dump-autoload")?;
-        self.set_aliases(vec!["dumpautoload".to_string()])?;
-        self.set_description("Dumps the autoloader");
+        self.set_name("dump-autoload".into())?;
+        self.set_aliases(vec!["dumpautoload".into()])?;
+        self.set_description("Dumps the autoloader".into());
         self.set_definition(&[
             InputOption::new("optimize", Some("o".into()), Some(InputOption::VALUE_NONE), "Optimizes PSR0 and PSR4 packages to be loaded with classmaps too, good for production.", None).unwrap().into(),
         InputOption::new("classmap-authoritative", Some("a".into()), Some(InputOption::VALUE_NONE), "Autoload classes from the classmap only. Implicitly enables `--optimize`.", None).unwrap().into(),
@@ -56,7 +56,8 @@ impl Command for DumpAutoloadCommand {
         ]);
         self.set_help(
             "<info>shirabe dump-autoload</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#dump-autoload-dumpautoload",
+            Read more at https://getcomposer.org/doc/03-cli.md#dump-autoload-dumpautoload"
+                .into(),
         );
         Ok(())
     }

@@ -53,9 +53,9 @@ impl RemoveCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for RemoveCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("remove")?;
-        self.set_aliases(vec!["rm".to_string(), "uninstall".to_string()])?;
-        self.set_description("Removes a package from the require or require-dev");
+        self.set_name("remove".into())?;
+        self.set_aliases(vec!["rm".into(), "uninstall".into()])?;
+        self.set_description("Removes a package from the require or require-dev".into());
         self.set_definition(&[
                 InputArgument::new5("packages",
             Some(InputArgument::IS_ARRAY),
@@ -173,7 +173,8 @@ impl Command for RemoveCommand {
             "The <info>remove</info> command removes a package from the current\n\
                 list of installed packages\n\n\
                 <info>shirabe remove</info>\n\n\
-                Read more at https://getcomposer.org/doc/03-cli.md#remove-rm",
+                Read more at https://getcomposer.org/doc/03-cli.md#remove-rm"
+                .into(),
         );
         Ok(())
     }

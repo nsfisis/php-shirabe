@@ -1,0 +1,17 @@
+{
+    "name": "shirabe/e2e-bytes-command",
+    "description": "E2E fixture project: a composer.json script naming a Command class whose metadata is not valid UTF-8, run against upstream Composer and Shirabe.",
+    "autoload": {
+        "psr-4": {
+            "ShirabeTest\\BytesCommand\\": "src/"
+        }
+    },
+    "scripts": {
+        "bytes": "ShirabeTest\\BytesCommand\\BytesCommand"
+    },
+    "repositories": [
+        {
+            "packagist.org": false
+        }
+    ]
+}

@@ -48,8 +48,8 @@ impl LicensesCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for LicensesCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("licenses")?;
-        self.set_description("Shows information about licenses of dependencies");
+        self.set_name("licenses".into())?;
+        self.set_description("Shows information about licenses of dependencies".into());
         self.set_definition(&[
             InputOption::new6(
                 "format",
@@ -89,7 +89,8 @@ impl Command for LicensesCommand {
             the installed dependencies.\n\n\
             Use --locked to show licenses from composer.lock instead of what's currently\n\
             installed in the vendor directory.\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#licenses",
+            Read more at https://getcomposer.org/doc/03-cli.md#licenses"
+                .into(),
         );
         Ok(())
     }

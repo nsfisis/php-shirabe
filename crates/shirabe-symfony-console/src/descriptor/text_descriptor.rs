@@ -9,11 +9,11 @@ use crate::formatter::OutputFormatter;
 use crate::helper::Helper;
 use crate::input::{InputArgument, InputDefinition, InputOption};
 use crate::output::OutputInterface;
-use bstr::{B, BString};
+use bstr::{B, BString, ByteSlice};
 use indexmap::IndexMap;
 use shirabe_php_shim::{
-    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, bconcat, count, json_encode_ex,
-    php_truthy, preg_replace, str_replace, strip_tags, strlen,
+    JSON_UNESCAPED_SLASHES, JSON_UNESCAPED_UNICODE, PhpMixed, STR_PAD_RIGHT, bconcat, count,
+    implode, json_encode_ex, php_truthy, preg_replace, str_pad, str_replace, strip_tags, strlen,
 };
 
 /// Text descriptor.
@@ -27,7 +27,7 @@ pub struct TextDescriptor {
 #[derive(Debug)]
 enum CommandOrString {
     Command(std::rc::Rc<std::cell::RefCell<dyn Command>>),
-    String(String),
+    String(BString),
 }
 
 impl TextDescriptor {
@@ -41,12 +41,13 @@ impl TextDescriptor {
             && (!matches!(default_value, PhpMixed::List(_) | PhpMixed::Array(_))
                 || count(&default_value) != 0)
         {
-            format!(
-                "<comment> [default: {}]</comment>",
-                self.format_default_value(&default_value)?.display_lossy()
+            bconcat!(
+                "<comment> [default: ",
+                self.format_default_value(&default_value)?,
+                "]</comment>"
             )
         } else {
-            String::new()
+            BString::default()
         };
 
         let total_width = match options.get(B("total_width")) {
@@ -56,17 +57,17 @@ impl TextDescriptor {
         let spacing_width = total_width - strlen(argument.get_name());
 
         self.write_text(
-            format!(
-                "  <info>{}</info>  {}{}{}",
-                argument.get_name().display_lossy(),
+            bconcat!(
+                "  <info>",
+                argument.get_name(),
+                "</info>  ",
                 " ".repeat(spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
-                (preg_replace(
+                preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
                     format!("\n{}", " ".repeat((total_width + 4) as usize)),
                     argument.get_description(),
-                ))
-                .display_lossy(),
+                ),
                 default,
             ),
             &options,
@@ -85,12 +86,13 @@ impl TextDescriptor {
             && (!matches!(default_value, PhpMixed::List(_) | PhpMixed::Array(_))
                 || count(&default_value) != 0)
         {
-            format!(
-                "<comment> [default: {}]</comment>",
-                self.format_default_value(&default_value)?.display_lossy()
+            bconcat!(
+                "<comment> [default: ",
+                self.format_default_value(&default_value)?,
+                "]</comment>"
             )
         } else {
-            String::new()
+            BString::default()
         };
 
         let mut value = BString::default();
@@ -121,22 +123,22 @@ impl TextDescriptor {
         let spacing_width = total_width - Helper::width(&synopsis);
 
         self.write_text(
-            format!(
-                "  <info>{}</info>  {}{}{}{}",
-                synopsis.display_lossy(),
+            bconcat!(
+                "  <info>",
+                synopsis,
+                "</info>  ",
                 " ".repeat(spacing_width as usize),
                 // + 4 = 2 spaces before <info>, 2 spaces after </info>
-                (preg_replace(
+                preg_replace(
                     "/\\s*[\\r\\n]\\s*/",
                     format!("\n{}", " ".repeat((total_width + 4) as usize)),
                     option.get_description(),
-                ))
-                .display_lossy(),
+                ),
                 default,
                 if option.is_array() {
-                    "<comment> (multiple values allowed)</comment>".to_string()
+                    "<comment> (multiple values allowed)</comment>"
                 } else {
-                    String::new()
+                    ""
                 },
             ),
             &options,
@@ -210,20 +212,17 @@ impl TextDescriptor {
         if !description.is_empty() {
             self.write_text("<comment>Description:</comment>", &options);
             self.write_text("\n", &IndexMap::new());
-            self.write_text(format!("  {}", description), &IndexMap::new());
+            self.write_text(bconcat!("  ", description), &IndexMap::new());
             self.write_text("\n\n", &IndexMap::new());
         }
 
         self.write_text("<comment>Usage:</comment>", &options);
         let mut usages = vec![command.get_synopsis(true)];
-        usages.extend(command.get_aliases().into_iter().map(BString::from));
-        usages.extend(command.get_usages().into_iter().map(BString::from));
+        usages.extend(command.get_aliases());
+        usages.extend(command.get_usages());
         for usage in usages {
             self.write_text("\n", &IndexMap::new());
-            self.write_text(
-                format!("  {}", OutputFormatter::escape(&usage)?.display_lossy()),
-                &options,
-            );
+            self.write_text(bconcat!("  ", OutputFormatter::escape(&usage)?), &options);
         }
         self.write_text("\n", &IndexMap::new());
 
@@ -251,7 +250,7 @@ impl TextDescriptor {
         options: IndexMap<BString, PhpMixed>,
     ) -> anyhow::Result<()> {
         let described_namespace = match options.get(B("namespace")) {
-            Some(PhpMixed::String(s)) => Some(s.display_lossy().to_string()),
+            Some(PhpMixed::String(s)) => Some(s.clone()),
             _ => None,
         };
         let mut description =
@@ -270,11 +269,15 @@ impl TextDescriptor {
             for command in &command_list {
                 let command = command.borrow();
                 self.write_text(
-                    format!(
-                        "{:<w$} {}",
-                        command.get_name().unwrap_or_default(),
+                    bconcat!(
+                        str_pad(
+                            command.get_name().unwrap_or_default(),
+                            width as usize,
+                            " ",
+                            STR_PAD_RIGHT,
+                        ),
+                        " ",
                         command.get_description(),
-                        w = width as usize,
                     ),
                     &options,
                 );
@@ -283,7 +286,7 @@ impl TextDescriptor {
         } else {
             let help = application.borrow().get_help();
             if !help.is_empty() {
-                self.write_text(format!("{}\n\n", help), &options);
+                self.write_text(bconcat!(help, "\n\n"), &options);
             }
 
             self.write_text("<comment>Usage:</comment>\n", &options);
@@ -308,13 +311,12 @@ impl TextDescriptor {
                 // make sure all alias commands are included when describing a specific namespace
                 let described_namespace_info = namespaces.values().next().unwrap();
                 if let Some(PhpMixed::List(names)) = described_namespace_info.get(B("commands")) {
-                    // Command names are declared in code.
-                    let names: Vec<String> = names
+                    let names: Vec<BString> = names
                         .iter()
-                        .filter_map(|n| n.as_string().map(|s| s.display_lossy().to_string()))
+                        .filter_map(|n| n.as_string().map(BString::from))
                         .collect();
                     for name in names {
-                        let command = description.get_command(&name)?;
+                        let command = description.get_command(name.as_bstr())?;
                         commands.insert(name, command);
                     }
                 }
@@ -322,7 +324,7 @@ impl TextDescriptor {
 
             // calculate max. width based on available commands per namespace
             let width = self.get_column_width(&{
-                let command_keys: Vec<String> = commands.keys().cloned().collect();
+                let command_keys: Vec<BString> = commands.keys().cloned().collect();
                 let mut merged: Vec<CommandOrString> = vec![];
                 for namespace in namespaces.values() {
                     if let Some(PhpMixed::List(ns_commands)) = namespace.get(B("commands")) {
@@ -330,9 +332,7 @@ impl TextDescriptor {
                             if let PhpMixed::String(name) = c
                                 && command_keys.iter().any(|key| name == key)
                             {
-                                merged.push(CommandOrString::String(
-                                    name.display_lossy().to_string(),
-                                ));
+                                merged.push(CommandOrString::String(name.clone()));
                             }
                         }
                     }
@@ -342,9 +342,10 @@ impl TextDescriptor {
 
             if let Some(ref described_namespace) = described_namespace {
                 self.write_text(
-                    format!(
-                        "<comment>Available commands for the \"{}\" namespace:</comment>",
-                        described_namespace.clone(),
+                    bconcat!(
+                        "<comment>Available commands for the \"",
+                        described_namespace,
+                        "\" namespace:</comment>",
                     ),
                     &options,
                 );
@@ -353,14 +354,12 @@ impl TextDescriptor {
             }
 
             for namespace in namespaces.values() {
-                let ns_commands: Vec<String> = match namespace.get(B("commands")) {
+                let ns_commands: Vec<BString> = match namespace.get(B("commands")) {
                     Some(PhpMixed::List(names)) => names
                         .iter()
                         .filter_map(|n| match n {
-                            PhpMixed::String(name)
-                                if commands.contains_key(&*name.display_lossy().to_string()) =>
-                            {
-                                Some(name.display_lossy().to_string())
+                            PhpMixed::String(name) if commands.contains_key(name) => {
+                                Some(name.clone())
                             }
                             _ => None,
                         })
@@ -373,15 +372,15 @@ impl TextDescriptor {
                 }
 
                 let namespace_id = match namespace.get(B("id")) {
-                    Some(PhpMixed::String(s)) => s.display_lossy().to_string(),
-                    _ => String::new(),
+                    Some(PhpMixed::String(s)) => s.clone(),
+                    _ => BString::default(),
                 };
 
                 if described_namespace.is_none()
                     && ApplicationDescription::GLOBAL_NAMESPACE != namespace_id
                 {
                     self.write_text("\n", &IndexMap::new());
-                    self.write_text(format!(" <comment>{}</comment>", namespace_id), &options);
+                    self.write_text(bconcat!(" <comment>", namespace_id, "</comment>"), &options);
                 }
 
                 for name in ns_commands {
@@ -389,15 +388,16 @@ impl TextDescriptor {
                     let spacing_width = width - Helper::width(&name);
                     let command = commands.get(&name).unwrap().clone();
                     let command = command.borrow();
-                    let command_aliases = if command.get_name().as_deref() == Some(name.as_str()) {
+                    let command_aliases = if command.get_name().as_ref() == Some(&name) {
                         self.get_command_aliases_text(&*command)
                     } else {
-                        String::new()
+                        BString::default()
                     };
                     self.write_text(
-                        format!(
-                            "  <info>{}</info>{}{}{}",
-                            name.clone(),
+                        bconcat!(
+                            "  <info>",
+                            name,
+                            "</info>",
                             " ".repeat(spacing_width as usize),
                             command_aliases,
                             command.get_description(),
@@ -427,12 +427,12 @@ impl TextDescriptor {
     }
 
     /// Formats command aliases to show them in the command description.
-    fn get_command_aliases_text(&self, command: &dyn Command) -> String {
-        let mut text = String::new();
+    fn get_command_aliases_text(&self, command: &dyn Command) -> BString {
+        let mut text = BString::default();
         let aliases = command.get_aliases();
 
         if !aliases.is_empty() {
-            text = format!("[{}] ", aliases.join("|"));
+            text = bconcat!("[", implode("|", &aliases), "] ");
         }
 
         text
@@ -483,9 +483,7 @@ impl TextDescriptor {
             match command {
                 CommandOrString::Command(command) => {
                     let command = command.borrow();
-                    widths.push(Helper::width(
-                        command.get_name().as_deref().unwrap_or_default(),
-                    ));
+                    widths.push(Helper::width(command.get_name().unwrap_or_default()));
                     for alias in command.get_aliases() {
                         widths.push(Helper::width(&alias));
                     }

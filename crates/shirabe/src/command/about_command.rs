@@ -37,9 +37,9 @@ impl AboutCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for AboutCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("about")?;
-        self.set_description("Shows a short information about Composer");
-        self.set_help("<info>shirabe about</info>");
+        self.set_name("about".into())?;
+        self.set_description("Shows a short information about Composer".into());
+        self.set_help("<info>shirabe about</info>".into());
         Ok(())
     }
 

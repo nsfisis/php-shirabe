@@ -440,8 +440,8 @@ fn server_value(name: &str) -> Option<BString> {
 #[async_trait::async_trait(?Send)]
 impl Command for InitCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("init")?;
-        self.set_description("Creates a basic composer.json file in current directory");
+        self.set_name("init".into())?;
+        self.set_description("Creates a basic composer.json file in current directory".into());
         self.set_definition(&[
                 InputOption::new("name", None, Some(InputOption::VALUE_REQUIRED), "Name of the package", None).unwrap().into(),
         InputOption::new("description", None, Some(InputOption::VALUE_REQUIRED), "Description of package", None).unwrap().into(),
@@ -450,7 +450,7 @@ impl Command for InitCommand {
         InputOption::new("homepage", None, Some(InputOption::VALUE_REQUIRED), "Homepage of package", None).unwrap().into(),
         InputOption::new6("require", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
         InputOption::new6("require-dev", None, Some(InputOption::VALUE_IS_ARRAY | InputOption::VALUE_REQUIRED), "Package to require for development with a version constraint, e.g. foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
-        InputOption::new("stability", Some("s".into()), Some(InputOption::VALUE_REQUIRED), &format!("Minimum stability (empty or one of: {})", implode(", ", &base_package::STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>()).display_lossy()), None).unwrap().into(),
+        InputOption::new("stability", Some("s".into()), Some(InputOption::VALUE_REQUIRED), format!("Minimum stability (empty or one of: {})", implode(", ", &base_package::STABILITIES.keys().map(|k| k.to_string()).collect::<Vec<_>>()).display_lossy()), None).unwrap().into(),
         InputOption::new("license", Some("l".into()), Some(InputOption::VALUE_REQUIRED), "License of package", None).unwrap().into(),
         InputOption::new("repository", None, Some(InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY), "Add custom repositories, either by URL or using JSON arrays", None).unwrap().into(),
         InputOption::new("autoload", Some("a".into()), Some(InputOption::VALUE_REQUIRED), "Add PSR-4 autoload mapping. Maps your package's namespace to the provided directory. (Expects a relative path, e.g. src/)", None).unwrap().into(),
@@ -461,7 +461,8 @@ impl Command for InitCommand {
                 \n\
                 <info>shirabe init</info>\n\
                 \n\
-                Read more at https://getcomposer.org/doc/03-cli.md#init",
+                Read more at https://getcomposer.org/doc/03-cli.md#init"
+                .into(),
         );
         Ok(())
     }

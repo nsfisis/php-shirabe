@@ -306,8 +306,8 @@ impl ArchiveCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ArchiveCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("archive")?;
-        self.set_description("Creates an archive of this composer package");
+        self.set_name("archive".into())?;
+        self.set_description("Creates an archive of this composer package".into());
         self.set_definition(&[
             InputArgument::new5("package", Some(InputArgument::OPTIONAL), "The package to archive instead of the current project", None, self.suggest_available_package(99)).unwrap().into(),
             InputArgument::new("version", Some(InputArgument::OPTIONAL), "A version constraint to find the package to archive", None).unwrap().into(),
@@ -321,7 +321,7 @@ impl Command for ArchiveCommand {
             containing the files and directories of the Composer project or the specified\n\
             package in the specified version and writes it to the specified directory.\n\n\
             <info>shirabe archive [--format=zip] [--dir=/foo] [--file=filename] [package [version]]</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#archive"
+            Read more at https://getcomposer.org/doc/03-cli.md#archive".into()
         );
         Ok(())
     }

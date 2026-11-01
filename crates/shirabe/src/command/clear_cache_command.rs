@@ -41,9 +41,9 @@ impl ClearCacheCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ClearCacheCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("clear-cache")?;
-        self.set_aliases(vec!["clearcache".to_string(), "cc".to_string()])?;
-        self.set_description("Clears composer's internal package cache");
+        self.set_name("clear-cache".into())?;
+        self.set_aliases(vec!["clearcache".into(), "cc".into()])?;
+        self.set_description("Clears composer's internal package cache".into());
         self.set_definition(&[InputOption::new(
             "gc",
             None,
@@ -56,7 +56,8 @@ impl Command for ClearCacheCommand {
         self.set_help(
             "The <info>clear-cache</info> deletes all cached packages from composer's\n\
             cache directory.\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#clear-cache-clearcache-cc",
+            Read more at https://getcomposer.org/doc/03-cli.md#clear-cache-clearcache-cc"
+                .into(),
         );
         Ok(())
     }

@@ -82,7 +82,7 @@ impl RunScriptCommand {
         Ok(0)
     }
 
-    fn get_scripts(&self) -> anyhow::Result<Vec<(BString, String)>> {
+    fn get_scripts(&self) -> anyhow::Result<Vec<(BString, BString)>> {
         let composer = self.require_composer(None, None)?;
         let scripts = crate::composer::composer_full(&composer)
             .get_package()
@@ -92,9 +92,9 @@ impl RunScriptCommand {
             return Ok(vec![]);
         }
 
-        let mut result: Vec<(BString, String)> = vec![];
+        let mut result: Vec<(BString, BString)> = vec![];
         for (name, _script) in scripts {
-            let mut description = String::new();
+            let mut description = BString::default();
             if let Some(application) = self.get_application() {
                 match application.borrow_mut().find(name.as_ref()) {
                     Ok(cmd) => description = cmd.borrow().get_description(),
@@ -114,9 +114,9 @@ impl RunScriptCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for RunScriptCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("run-script")?;
-        self.set_aliases(vec!["run".to_string()])?;
-        self.set_description("Runs the scripts defined in composer.json");
+        self.set_name("run-script".into())?;
+        self.set_aliases(vec!["run".into()])?;
+        self.set_description("Runs the scripts defined in composer.json".into());
         self.set_definition(&[
             // PHP passes an inline closure here (it takes no arguments; PHP tolerates the
             // extra ones the caller passes).
@@ -190,7 +190,8 @@ impl Command for RunScriptCommand {
         self.set_help(
             "The <info>run-script</info> command runs scripts defined in composer.json:\n\n\
             <info>shirabe run-script post-update-cmd</info>\n\n\
-            Read more at https://getcomposer.org/doc/03-cli.md#run-script-run",
+            Read more at https://getcomposer.org/doc/03-cli.md#run-script-run"
+                .into(),
         );
         Ok(())
     }

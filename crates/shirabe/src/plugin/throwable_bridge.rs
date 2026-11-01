@@ -10,6 +10,7 @@ use crate::json::JsonValidationException;
 use crate::package::loader::InvalidPackageException;
 use crate::plugin::PluginBlockedException;
 use crate::repository::{InvalidRepositoryException, RepositorySecurityException};
+use bstr::BString;
 use indexmap::IndexMap;
 use shirabe_php_rpc::{PhpThrow, PluginValue};
 use shirabe_php_shim::{
@@ -108,6 +109,19 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
         PhpMixed::Array(items) => items.values().map(string_item).collect(),
         _ => Vec::new(),
     };
+    let byte_strings = |name: &str| -> Vec<BString> {
+        match property(name) {
+            PhpMixed::List(items) => items
+                .iter()
+                .map(|item| item.as_string().unwrap_or_default().into())
+                .collect(),
+            PhpMixed::Array(items) => items
+                .values()
+                .map(|item| item.as_string().unwrap_or_default().into())
+                .collect(),
+            _ => Vec::new(),
+        }
+    };
     Some(match class {
         "Exception" => Exception::new(message).into(),
         "Error" => Error::new(message).into(),
@@ -183,7 +197,7 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
         r"Symfony\Component\Console\Exception\CommandNotFoundException" => {
             shirabe_symfony_console::exception::CommandNotFoundException::new(
                 message,
-                strings("alternatives"),
+                byte_strings("alternatives"),
                 code,
             )
             .into()
@@ -191,7 +205,7 @@ fn revive(class: &str, throw: &PhpThrow) -> Option<AnyThrowable> {
         r"Symfony\Component\Console\Exception\NamespaceNotFoundException" => {
             shirabe_symfony_console::exception::NamespaceNotFoundException::new(
                 message,
-                strings("alternatives"),
+                byte_strings("alternatives"),
                 code,
             )
             .into()
@@ -255,6 +269,9 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
     let strings = |items: &[String]| {
         PluginValue::List(items.iter().cloned().map(PluginValue::string).collect())
     };
+    let byte_strings = |items: &[BString]| {
+        PluginValue::List(items.iter().cloned().map(PluginValue::string).collect())
+    };
     let mut properties = IndexMap::new();
     if let Some(exception) = error.catch::<TransportException>() {
         properties.insert(
@@ -305,7 +322,10 @@ fn throwable_properties(error: &anyhow::Error) -> IndexMap<bstr::BString, Plugin
     if let Some(exception) =
         error.catch::<shirabe_symfony_console::exception::CommandNotFoundException>()
     {
-        properties.insert("alternatives".into(), strings(exception.get_alternatives()));
+        properties.insert(
+            "alternatives".into(),
+            byte_strings(exception.get_alternatives()),
+        );
     }
     properties
 }

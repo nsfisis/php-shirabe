@@ -721,9 +721,11 @@ impl PackageDiscoveryTrait for RequireCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for RequireCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("require")?;
-        self.set_aliases(vec!["r".to_string()])?;
-        self.set_description("Adds required packages to your composer.json and installs them");
+        self.set_name("require".into())?;
+        self.set_aliases(vec!["r".into()])?;
+        self.set_description(
+            "Adds required packages to your composer.json and installs them".into(),
+        );
         self.set_definition(&[
             InputArgument::new5("packages", Some(InputArgument::IS_ARRAY | InputArgument::OPTIONAL), "Optional package name can also include a version constraint, e.g. foo/bar or foo/bar:1.0.0 or foo/bar=1.0.0 or \"foo/bar 1.0.0\"", None, self.suggest_available_package_incl_platform()).unwrap().into(),
             InputOption::new("dev", None, Some(InputOption::VALUE_NONE), "Add requirement to require-dev.", None).unwrap().into(),
@@ -765,7 +767,7 @@ impl Command for RequireCommand {
             \n\
             If you do not want to install the new dependencies immediately you can call it with --no-update\n\
             \n\
-            Read more at https://getcomposer.org/doc/03-cli.md#require-r"
+            Read more at https://getcomposer.org/doc/03-cli.md#require-r".into()
         );
         Ok(())
     }

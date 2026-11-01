@@ -8,6 +8,8 @@ mod php_worker;
 mod alias_package_test;
 mod e2e_async_test;
 mod e2e_autoload_generator_test;
+#[cfg(unix)]
+mod e2e_bytes_command_test;
 mod e2e_command_event_test;
 mod e2e_command_provider_test;
 mod e2e_exception_test;

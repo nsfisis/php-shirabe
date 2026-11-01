@@ -450,8 +450,8 @@ impl Default for ConfigCommand {
 #[async_trait::async_trait(?Send)]
 impl Command for ConfigCommand {
     fn configure(&self) -> anyhow::Result<()> {
-        self.set_name("config")?;
-        self.set_description("Sets config options");
+        self.set_name("config".into())?;
+        self.set_description("Sets config options".into());
         self.set_definition(&[
                 InputOption::new("global", Some("g".into()), Some(InputOption::VALUE_NONE), "Apply command to the global config file", None).unwrap().into(),
         InputOption::new("editor", Some("e".into()), Some(InputOption::VALUE_NONE), "Open editor", None).unwrap().into(),
@@ -500,7 +500,7 @@ impl Command for ConfigCommand {
                  You can always pass more than one option. As an example, if you want to edit the\n\
                  global config.json file.\n\n\
                  \t<comment>%command.full_name% --editor --global</comment>\n\n\
-                 Read more at https://getcomposer.org/doc/03-cli.md#config",
+                 Read more at https://getcomposer.org/doc/03-cli.md#config".into(),
             );
         Ok(())
     }

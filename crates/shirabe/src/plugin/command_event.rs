@@ -10,7 +10,7 @@ use shirabe_symfony_console::output::OutputInterface;
 #[derive(Debug)]
 pub struct CommandEvent {
     inner: Event,
-    command_name: String,
+    command_name: BString,
     input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
     output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
 }
@@ -18,7 +18,7 @@ pub struct CommandEvent {
 impl CommandEvent {
     pub fn new(
         name: &str,
-        command_name: &str,
+        command_name: impl AsRef<[u8]>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
     ) -> Self {
@@ -27,7 +27,7 @@ impl CommandEvent {
 
     pub fn new6(
         name: &str,
-        command_name: &str,
+        command_name: impl AsRef<[u8]>,
         input: std::rc::Rc<std::cell::RefCell<dyn InputInterface>>,
         output: std::rc::Rc<std::cell::RefCell<dyn OutputInterface>>,
         args: Vec<BString>,
@@ -36,7 +36,7 @@ impl CommandEvent {
         let inner = Event::new(name.to_string(), args, flags);
         Self {
             inner,
-            command_name: command_name.to_string(),
+            command_name: BString::from(command_name.as_ref()),
             input,
             output,
         }
@@ -54,8 +54,8 @@ impl CommandEvent {
         self.inner.get_name()
     }
 
-    pub fn get_command_name(&self) -> &str {
-        &self.command_name
+    pub fn get_command_name(&self) -> &bstr::BStr {
+        self.command_name.as_ref()
     }
 }
 
